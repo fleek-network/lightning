@@ -13,12 +13,13 @@ use lightning_interfaces::signer::SignerInterface;
 use lightning_interfaces::types::{NodePorts, UpdateMethod};
 use lightning_interfaces::{
     partial,
+    ForwarderInterface,
     KeystoreInterface,
     NotifierInterface,
     SyncQueryRunnerInterface,
 };
 use lightning_notifier::Notifier;
-use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
+use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus, MockForwarder};
 use lightning_test_utils::keys::EphemeralKeystore;
 use tokio::sync::mpsc;
 
@@ -80,9 +81,20 @@ async fn test_send_two_txs_in_a_row() {
 
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
 
-    let mut signer =
-        Signer::<TestBinding>::init(Default::default(), keystore.clone(), query_runner.clone())
-            .unwrap();
+    let forwarder = MockForwarder::<TestBinding>::init(
+        Default::default(),
+        consensus_public_key,
+        query_runner.clone(),
+    )
+    .unwrap();
+    let mut signer = Signer::<TestBinding>::init(
+        Default::default(),
+        keystore.clone(),
+        query_runner.clone(),
+        forwarder.mempool_socket(),
+    )
+    .unwrap();
+
     let signer_socket = signer.get_socket();
 
     let notifier = Notifier::<TestBinding>::init(&app);
@@ -106,8 +118,6 @@ async fn test_send_two_txs_in_a_row() {
         &notifier,
     )
     .unwrap();
-
-    signer.provide_mempool(consensus.mempool());
 
     let (new_block_tx, new_block_rx) = mpsc::channel(10);
 
@@ -185,9 +195,19 @@ async fn test_retry_send() {
 
     let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
 
-    let mut signer =
-        Signer::<TestBinding>::init(Default::default(), keystore.clone(), app.sync_query())
-            .unwrap();
+    let forwarder = MockForwarder::<TestBinding>::init(
+        Default::default(),
+        consensus_public_key,
+        query_runner.clone(),
+    )
+    .unwrap();
+    let mut signer = Signer::<TestBinding>::init(
+        Default::default(),
+        keystore.clone(),
+        query_runner.clone(),
+        forwarder.mempool_socket(),
+    )
+    .unwrap();
 
     let signer_socket = signer.get_socket();
 
@@ -212,8 +232,6 @@ async fn test_retry_send() {
         &notifier,
     )
     .unwrap();
-
-    signer.provide_mempool(consensus.mempool());
 
     let (new_block_tx, new_block_rx) = mpsc::channel(10);
 
@@ -248,25 +266,22 @@ async fn test_retry_send() {
 #[tokio::test]
 async fn test_shutdown() {
     let app = Application::<TestBinding>::init(AppConfig::test(), Default::default()).unwrap();
-    let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
+    let (_, query_runner) = (app.transaction_executor(), app.sync_query());
     let keystore = EphemeralKeystore::default();
-    let mut signer =
-        Signer::<TestBinding>::init(Default::default(), keystore.clone(), query_runner.clone())
-            .unwrap();
-    let notifier = Notifier::<TestBinding>::init(&app);
-
-    let consensus = MockConsensus::<TestBinding>::init(
-        ConsensusConfig::default(),
-        keystore,
-        &signer,
-        update_socket,
+    let forwarder = MockForwarder::<TestBinding>::init(
+        Default::default(),
+        [0u8; 96].into(),
         query_runner.clone(),
-        infusion::Blank::default(),
-        None,
-        &notifier,
     )
     .unwrap();
-    signer.provide_mempool(consensus.mempool());
+    let mut signer = Signer::<TestBinding>::init(
+        Default::default(),
+        keystore.clone(),
+        query_runner.clone(),
+        forwarder.mempool_socket(),
+    )
+    .unwrap();
+    let notifier = Notifier::<TestBinding>::init(&app);
 
     let (new_block_tx, new_block_rx) = mpsc::channel(10);
 
@@ -286,25 +301,22 @@ async fn test_shutdown() {
 #[tokio::test]
 async fn test_shutdown_and_start_again() {
     let app = Application::<TestBinding>::init(AppConfig::test(), Default::default()).unwrap();
-    let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
+    let (_, query_runner) = (app.transaction_executor(), app.sync_query());
     let keystore = EphemeralKeystore::default();
-    let mut signer =
-        Signer::<TestBinding>::init(Default::default(), keystore.clone(), query_runner.clone())
-            .unwrap();
-    let notifier = Notifier::<TestBinding>::init(&app);
-
-    let consensus = MockConsensus::<TestBinding>::init(
-        ConsensusConfig::default(),
-        keystore,
-        &signer,
-        update_socket,
+    let forwarder = MockForwarder::<TestBinding>::init(
+        Default::default(),
+        [0u8; 96].into(),
         query_runner.clone(),
-        infusion::Blank::default(),
-        None,
-        &notifier,
     )
     .unwrap();
-    signer.provide_mempool(consensus.mempool());
+    let mut signer = Signer::<TestBinding>::init(
+        Default::default(),
+        keystore.clone(),
+        query_runner.clone(),
+        forwarder.mempool_socket(),
+    )
+    .unwrap();
+    let notifier = Notifier::<TestBinding>::init(&app);
 
     let (new_block_tx, new_block_rx) = mpsc::channel(10);
 
@@ -340,25 +352,22 @@ async fn test_shutdown_and_start_again() {
 #[tokio::test]
 async fn test_sign_raw_digest() {
     let app = Application::<TestBinding>::init(AppConfig::test(), Default::default()).unwrap();
-    let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
+    let (_, query_runner) = (app.transaction_executor(), app.sync_query());
     let keystore = EphemeralKeystore::default();
-    let mut signer =
-        Signer::<TestBinding>::init(Default::default(), keystore.clone(), query_runner.clone())
-            .unwrap();
-    let notifier = Notifier::<TestBinding>::init(&app);
-
-    let consensus = MockConsensus::<TestBinding>::init(
-        ConsensusConfig::default(),
-        keystore.clone(),
-        &signer,
-        update_socket,
+    let forwarder = MockForwarder::<TestBinding>::init(
+        Default::default(),
+        [0u8; 96].into(),
         query_runner.clone(),
-        infusion::Blank::default(),
-        None,
-        &notifier,
     )
     .unwrap();
-    signer.provide_mempool(consensus.mempool());
+    let mut signer = Signer::<TestBinding>::init(
+        Default::default(),
+        keystore.clone(),
+        query_runner.clone(),
+        forwarder.mempool_socket(),
+    )
+    .unwrap();
+    let notifier = Notifier::<TestBinding>::init(&app);
 
     let (new_block_tx, new_block_rx) = mpsc::channel(10);
 
