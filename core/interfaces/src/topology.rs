@@ -20,7 +20,7 @@ use crate::{
 /// algorithm generates.
 #[infusion::service]
 pub trait TopologyInterface<C: Collection>:
-    WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync + Clone
+    WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync
 {
     fn _init(
         config: ::ConfigProviderInterface,

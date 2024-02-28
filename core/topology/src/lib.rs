@@ -28,7 +28,6 @@ use lightning_utils::application::QueryRunnerExt;
 use tokio::sync::{mpsc, watch, Notify};
 use tracing::{error, info};
 
-#[derive(Clone)]
 pub struct Topology<C: Collection> {
     inner: Arc<TopologyInner<C>>,
     is_running: Arc<AtomicBool>,

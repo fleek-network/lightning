@@ -242,7 +242,7 @@ fn event_receiver(
     peer: &Peer<TestBinding>,
 ) -> (EventReceiver<TestBinding>, EventReceiverTestState) {
     let query_runner = app.sync_query();
-    let topology = peer.topology.clone();
+    let topology_rx = peer.topology.get_receiver();
     let notifier = peer._notifier.clone();
     let pk = peer.node_public_key;
 
@@ -250,7 +250,6 @@ fn event_receiver(
     let (endpoint_task_tx, endpoint_task_rx) = mpsc::channel(8);
 
     let shutdown = CancellationToken::new();
-    let topology_rx = topology.get_receiver();
     (
         EventReceiver::<TestBinding>::new(
             query_runner,
