@@ -1,28 +1,76 @@
 use std::collections::HashSet;
-use std::sync::{Arc, Mutex};
+use std::marker::PhantomData;
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
-use affair::{Socket, Task};
+use affair::{AsyncWorker, Executor, TokioSpawn};
+use fleek_crypto::ConsensusPublicKey;
 use lightning_interfaces::application::ExecutionEngineSocket;
+// TODO(qti3e): Should we deprecate this?
 use lightning_interfaces::config::ConfigConsumer;
-use lightning_interfaces::consensus::{ConsensusInterface, MempoolSocket};
+use lightning_interfaces::consensus::ConsensusInterface;
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::types::{Block, Event, TransactionRequest};
 use lightning_interfaces::{
     ApplicationInterface,
     BroadcastInterface,
     Emitter,
+    ForwarderInterface,
     IndexSocket,
+    MempoolSocket,
     NotifierInterface,
     SyncQueryRunnerInterface,
     WithStartAndShutdown,
 };
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc;
+use tokio::sync::{broadcast, mpsc};
 use tokio::time::{interval, sleep};
 
-// TODO(qti3e): Should we deprecate this?
+static CHANNEL: OnceLock<broadcast::Sender<TransactionRequest>> = OnceLock::new();
+
+/// A mock forwarder that sends transactions. MUST ALWAYS be used alongside [`MockConsensus`].
+pub struct MockForwarder<C>(MempoolSocket, PhantomData<C>);
+impl<C: Collection> ForwarderInterface<C> for MockForwarder<C> {
+    fn init(
+        _config: Self::Config,
+        _consensus_key: ConsensusPublicKey,
+        _query_runner: c!(C::ApplicationInterface::SyncExecutor),
+    ) -> anyhow::Result<Self> {
+        let tx = CHANNEL.get_or_init(|| broadcast::channel(128).0);
+        let socket = TokioSpawn::spawn_async(MempoolSocketWorker { sender: tx.clone() });
+
+        Ok(Self(socket, PhantomData))
+    }
+
+    fn mempool_socket(&self) -> MempoolSocket {
+        self.0.clone()
+    }
+}
+
+impl<C> ConfigConsumer for MockForwarder<C> {
+    const KEY: &'static str = "consensus";
+    /// Just take the same config as mock consensus
+    type Config = Config;
+}
+
+struct MempoolSocketWorker {
+    sender: broadcast::Sender<TransactionRequest>,
+}
+
+impl AsyncWorker for MempoolSocketWorker {
+    type Request = TransactionRequest;
+    type Response = ();
+
+    async fn handle(&mut self, req: Self::Request) -> Self::Response {
+        let sender = self.sender.clone();
+        sender
+            .send(req)
+            .expect("MockConsensus: Could not send to the consensus socket.");
+    }
+}
+
+/// Mock consensus. MUST ALWAYS be used with [`MockForwarder`]
 #[allow(clippy::type_complexity)]
 pub struct MockConsensus<C: Collection> {
     inner: Arc<
@@ -31,10 +79,9 @@ pub struct MockConsensus<C: Collection> {
             c![C::NotifierInterface::Emitter],
         >,
     >,
-    socket: Socket<TransactionRequest, ()>,
     is_running: Arc<Mutex<bool>>,
     shutdown_tx: Arc<Mutex<Option<mpsc::Sender<()>>>>,
-    rx: Arc<Mutex<Option<mpsc::Receiver<Task<TransactionRequest, ()>>>>>,
+    rx: Arc<Mutex<Option<broadcast::Receiver<TransactionRequest>>>>,
 }
 
 struct MockConsensusInner<Q: SyncQueryRunnerInterface + 'static, NE: Emitter> {
@@ -58,7 +105,10 @@ impl<C: Collection> ConsensusInterface<C> for MockConsensus<C> {
         _indexer_socket: Option<IndexSocket>,
         notifier: &c!(C::NotifierInterface),
     ) -> anyhow::Result<Self> {
-        let (socket, rx) = Socket::raw_bounded(2048);
+        let rx = CHANNEL
+            .get_or_init(|| broadcast::channel(128).0)
+            .subscribe();
+
         let inner = MockConsensusInner {
             _query_runner: query_runner,
             executor,
@@ -67,18 +117,11 @@ impl<C: Collection> ConsensusInterface<C> for MockConsensus<C> {
         };
         Ok(Self {
             inner: Arc::new(inner),
-            socket,
+
             is_running: Arc::new(Mutex::new(false)),
             shutdown_tx: Arc::new(Mutex::new(None)),
             rx: Arc::new(Mutex::new(Some(rx))),
         })
-    }
-
-    /// Returns a socket that can be used to submit transactions to the consensus,
-    /// this can be used by any other systems that are interested in posting some
-    /// transaction to the consensus.
-    fn mempool(&self) -> MempoolSocket {
-        self.socket.clone()
     }
 
     fn set_event_tx(&mut self, _tx: mpsc::Sender<Vec<Event>>) {}
@@ -128,17 +171,15 @@ impl<C: Collection> ConfigConsumer for MockConsensus<C> {
 impl<Q: SyncQueryRunnerInterface, NE: Emitter> MockConsensusInner<Q, NE> {
     async fn handle(
         self: Arc<Self>,
-        mut rx: mpsc::Receiver<Task<TransactionRequest, ()>>,
+        mut rx: broadcast::Receiver<TransactionRequest>,
         mut shutdown_rx: mpsc::Receiver<()>,
     ) {
         let mut tx_count = 0;
         let mut interval = interval(self.config.new_block_interval);
         loop {
             tokio::select! {
-                task = rx.recv() => {
-                    let Some(task) = task else {
-                        continue;
-                    };
+                // fine to unwrap since the channel is static and will always be alive
+                Ok(task) = rx.recv() => {
                     // Randomly wait before ordering the transaction to make it more realistic.
                     let range = self.config.min_ordering_time..self.config.max_ordering_time;
                     let ordering_duration = rand::thread_rng().gen_range(range);
@@ -147,8 +188,7 @@ impl<Q: SyncQueryRunnerInterface, NE: Emitter> MockConsensusInner<Q, NE> {
                     if rand::thread_rng().gen_bool(self.config.probability_txn_lost) {
                         continue;
                     }
-                    let update_request = task.request.clone();
-                    task.respond(());
+                    let update_request = task;
                     tx_count += 1;
 
                     if self.config.transactions_to_lose.contains(&tx_count) {
