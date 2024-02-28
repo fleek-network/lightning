@@ -3,6 +3,7 @@ use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::time::Duration;
 
+use affair::Socket;
 use blake3_tree::ProofBuf;
 use fleek_crypto::{AccountOwnerSecretKey, NodePublicKey, SecretKey};
 use lightning_application::app::Application;
@@ -140,9 +141,13 @@ async fn get_peers(
     for (i, keystore) in keystores.into_iter().enumerate() {
         let node_public_key = keystore.get_ed25519_pk();
         let query_runner = app.sync_query();
-        let signer =
-            Signer::<TestBinding>::init(Default::default(), keystore.clone(), query_runner.clone())
-                .unwrap();
+        let signer = Signer::<TestBinding>::init(
+            Default::default(),
+            keystore.clone(),
+            query_runner.clone(),
+            Socket::raw_bounded(128).0,
+        )
+        .unwrap();
         let notifier = Notifier::<TestBinding>::init(&app);
         let topology = Topology::<TestBinding>::init(
             TopologyConfig::default(),
