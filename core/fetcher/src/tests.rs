@@ -28,6 +28,7 @@ use lightning_interfaces::{
     BroadcastInterface,
     ConsensusInterface,
     FetcherInterface,
+    ForwarderInterface,
     IndexerInterface,
     KeystoreInterface,
     NotifierInterface,
@@ -49,7 +50,7 @@ use lightning_rep_collector::config::Config as RepCollConfig;
 use lightning_resolver::config::Config as ResolverConfig;
 use lightning_resolver::resolver::Resolver;
 use lightning_signer::Signer;
-use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus};
+use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus, MockForwarder};
 use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_test_utils::server::spawn_server;
 use lightning_topology::{Config as TopologyConfig, Topology};
@@ -159,9 +160,21 @@ async fn get_fetchers(
     for (i, keystore) in keystores.into_iter().enumerate() {
         let node_public_key = keystore.get_ed25519_pk();
         let query_runner = app.sync_query();
-        let mut signer =
-            Signer::<TestBinding>::init(Default::default(), keystore.clone(), query_runner.clone())
-                .unwrap();
+
+        let forwarder = MockForwarder::<TestBinding>::init(
+            Default::default(),
+            keystore.get_bls_pk(),
+            query_runner.clone(),
+        )
+        .unwrap();
+        let mut signer = Signer::<TestBinding>::init(
+            Default::default(),
+            keystore.clone(),
+            query_runner.clone(),
+            forwarder.mempool_socket(),
+        )
+        .unwrap();
+
         let notifier = Notifier::<TestBinding>::init(&app);
         let topology = Topology::<TestBinding>::init(
             TopologyConfig::default(),
@@ -227,8 +240,6 @@ async fn get_fetchers(
             &notifier,
         )
         .unwrap();
-
-        signer.provide_mempool(consensus.mempool());
 
         let (new_block_tx, new_block_rx) = mpsc::channel(10);
 
