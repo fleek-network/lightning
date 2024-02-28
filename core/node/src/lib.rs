@@ -15,6 +15,8 @@ use lightning_interfaces::infu_collection::{
     CollectionBase,
     ConsensusInterfaceContainer,
     ConsensusInterfaceModifier,
+    ForwarderInterfaceContainer,
+    ForwarderInterfaceModifier,
 };
 use lightning_keystore::Keystore;
 use lightning_notifier::Notifier;
@@ -28,7 +30,7 @@ use lightning_service_executor::shim::ServiceExecutor;
 use lightning_signer::Signer;
 use lightning_syncronizer::syncronizer::Syncronizer;
 use lightning_topology::Topology;
-use mock::consensus::MockConsensus;
+use mock::consensus::{MockConsensus, MockForwarder};
 
 use crate::config::TomlConfigProvider;
 
@@ -67,8 +69,14 @@ impl CollectionBase for FinalTypes {
 // into the FinalTypes (or other collections.).
 
 pub struct UseMockConsensusMarker;
+impl ForwarderInterfaceContainer for UseMockConsensusMarker {
+    type ForwarderInterface<C: Collection> = MockForwarder<C>;
+}
 impl ConsensusInterfaceContainer for UseMockConsensusMarker {
     type ConsensusInterface<C: Collection> = MockConsensus<C>;
 }
 
-pub type WithMockConsensus<O = FinalTypes> = ConsensusInterfaceModifier<UseMockConsensusMarker, O>;
+pub type WithMockConsensus<O = FinalTypes> = ConsensusInterfaceModifier<
+    UseMockConsensusMarker,
+    ForwarderInterfaceModifier<UseMockConsensusMarker, O>,
+>;
