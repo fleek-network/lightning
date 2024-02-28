@@ -48,7 +48,7 @@ pub struct Signer<C: Collection> {
     inner: Arc<SignerInner>,
     socket: Socket<UpdateMethod, u64>,
     is_running: Arc<AtomicBool>,
-    mempool_socket: Option<MempoolSocket>,
+    mempool_socket: MempoolSocket,
     query_runner: c![C::ApplicationInterface::SyncExecutor],
     new_block_rx: Arc<Mutex<Option<mpsc::Receiver<Notification>>>>,
     shutdown_notify: Arc<Notify>,
@@ -66,7 +66,7 @@ impl<C: Collection> WithStartAndShutdown for Signer<C> {
         if !self.is_running.load(Ordering::Relaxed) {
             let inner = self.inner.clone();
             //let rx = self.rx.lock().unwrap().take().unwrap();
-            let mempool_socket = self.mempool_socket.clone().unwrap();
+            let mempool_socket = self.mempool_socket.clone();
             let query_runner = self.query_runner.clone();
             let shutdown_notify = self.shutdown_notify.clone();
 
@@ -93,6 +93,7 @@ impl<C: Collection> SignerInterface<C> for Signer<C> {
         _config: Self::Config,
         keystore: C::KeystoreInterface,
         query_runner: c![C::ApplicationInterface::SyncExecutor],
+        mempool_socket: MempoolSocket,
     ) -> anyhow::Result<Self> {
         let (socket, rx) = Socket::raw_bounded(2048);
         let new_block_rx = Arc::new(Mutex::new(None));
@@ -101,18 +102,11 @@ impl<C: Collection> SignerInterface<C> for Signer<C> {
             inner: Arc::new(inner),
             socket,
             is_running: Arc::new(AtomicBool::new(false)),
-            mempool_socket: None,
+            mempool_socket,
             query_runner,
             new_block_rx,
             shutdown_notify: Arc::new(Notify::new()),
         })
-    }
-
-    /// Provide the signer service with the mempool socket after initialization, this function
-    /// should only be called once.
-    fn provide_mempool(&mut self, mempool: MempoolSocket) {
-        // TODO(matthias): I think the receiver can be &self here.
-        self.mempool_socket = Some(mempool);
     }
 
     // Provide the signer service with a new block notifications channel's receiver to get notified
