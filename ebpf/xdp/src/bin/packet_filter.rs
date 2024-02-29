@@ -8,6 +8,7 @@ use aya_bpf::macros::{map, xdp};
 use aya_bpf::maps::HashMap;
 use aya_bpf::programs::XdpContext;
 use aya_log_ebpf::info;
+use common::IpPortKey;
 use memoffset::offset_of;
 use network_types::eth::{EthHdr, EtherType};
 use network_types::ip::{IpProto, Ipv4Hdr};
@@ -17,7 +18,7 @@ use network_types::udp::UdpHdr;
 type XdpAction = xdp_action::Type;
 
 #[map]
-static BLOCK_LIST: HashMap<u32, u32> = HashMap::<u32, u32>::with_max_entries(1024, 0);
+static BLOCK_LIST: HashMap<IpPortKey, u32> = HashMap::<IpPortKey, u32>::with_max_entries(1024, 0);
 
 #[xdp]
 pub fn xdp_packet_filter(ctx: XdpContext) -> u32 {
@@ -74,8 +75,8 @@ fn ptr_at<T>(ctx: &XdpContext, offset: usize) -> Result<*const T, ()> {
     Ok((start + offset) as *const T)
 }
 
-fn not_allowed(address: u32, _port: u16) -> bool {
-    unsafe { BLOCK_LIST.get(&address).is_some() }
+fn not_allowed(ip: u32, port: u16) -> bool {
+    unsafe { BLOCK_LIST.get(&IpPortKey { ip, port: port as u32 }).is_some() }
 }
 
 #[panic_handler]
