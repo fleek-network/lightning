@@ -9,6 +9,7 @@ anyhow = "1.0"
 aya = { git = "https://github.com/aya-rs/aya", features = ["async_tokio"] }
 aya-log = { git = "https://github.com/aya-rs/aya" }
 clap = { version = "4.4", features = ["derive"] }
+common = { path = "../common", features = ["userspace"] }
 env_logger = "0.11"
 libc = "0.2"
 log = "0.4"

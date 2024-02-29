@@ -37,12 +37,17 @@ unsafe fn filter(ctx: XdpContext) -> Result<u32, ()> {
 }
 
 fn process_ipv4(ctx: &XdpContext) -> Result<XdpAction, ()> {
-    let proto = unsafe { *ptr_at::<IpProto>(&ctx, EthHdr::LEN + offset_of!(Ipv4Hdr, proto))? };
     let ip =
         u32::from_be_bytes(unsafe { *ptr_at(&ctx, EthHdr::LEN + offset_of!(Ipv4Hdr, src_addr))? });
 
     info!(ctx, "received a packet from {:i}", ip);
 
+    // First check if it's blocked from all ports.
+    if not_allowed(ip) {
+        return Ok(xdp_action::XDP_DROP);
+    }
+
+    let proto = unsafe { *ptr_at::<IpProto>(&ctx, EthHdr::LEN + offset_of!(Ipv4Hdr, proto))? };
     let port = match proto {
         IpProto::Tcp => u16::from_be_bytes(unsafe {
             *ptr_at(&ctx, EthHdr::LEN + Ipv4Hdr::LEN + offset_of!(TcpHdr, dest))?
@@ -55,7 +60,8 @@ fn process_ipv4(ctx: &XdpContext) -> Result<XdpAction, ()> {
         },
     };
 
-    if not_allowed(ip, port) {
+    // Check if it's block for a particular port.
+    if not_allowed_for_port(ip, port) {
         Ok(xdp_action::XDP_DROP)
     } else {
         Ok(xdp_action::XDP_PASS)
@@ -75,8 +81,19 @@ fn ptr_at<T>(ctx: &XdpContext, offset: usize) -> Result<*const T, ()> {
     Ok((start + offset) as *const T)
 }
 
-fn not_allowed(ip: u32, port: u16) -> bool {
-    unsafe { BLOCK_LIST.get(&IpPortKey { ip, port: port as u32 }).is_some() }
+fn not_allowed_for_port(ip: u32, port: u16) -> bool {
+    unsafe {
+        BLOCK_LIST
+            .get(&IpPortKey {
+                ip,
+                port: port as u32,
+            })
+            .is_some()
+    }
+}
+
+fn not_allowed(ip: u32) -> bool {
+    unsafe { BLOCK_LIST.get(&IpPortKey { ip, port: 0 }).is_some() }
 }
 
 #[panic_handler]

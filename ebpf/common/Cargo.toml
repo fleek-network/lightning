@@ -3,4 +3,9 @@ name = "common"
 version = "0.0.0"
 edition = "2021"
 
+[features]
+default = []
+userspace = ["aya"]
+
 [dependencies]
+aya = { git = "https://github.com/aya-rs/aya", features = ["default"], optional=true }
