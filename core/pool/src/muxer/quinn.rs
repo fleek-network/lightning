@@ -56,6 +56,7 @@ impl MuxerInterface for QuinnMuxer {
             tracing::error!("failed to set max idle timeout: {e:?}");
             io::ErrorKind::Other
         })?));
+        transport_config.keep_alive_interval(Some(self.max_idle_timeout / 2));
         client_config.transport_config(Arc::new(transport_config));
         let connecting = self
             .endpoint
