@@ -69,6 +69,10 @@ where
     muxer: Option<M>,
     /// Information about attempted connection dials.
     dial_info: Arc<scc::HashMap<NodeIndex, DialInfo>>,
+    /// Indicates that the endpoint is currently shutting down.
+    /// This flag is used to avoid re-trying connections that ended because
+    /// of a shutdown.
+    shutting_down: bool,
     /// Config for the multiplexed transport.
     config: M::Config,
     shutdown: CancellationToken,
@@ -99,6 +103,7 @@ where
             query_runner,
             muxer: None,
             dial_info,
+            shutting_down: false,
             config,
             shutdown,
         }
@@ -110,6 +115,11 @@ where
         muxer: M,
         delay: Option<Duration>,
     ) -> anyhow::Result<()> {
+        if self.shutting_down {
+            // If we are currently shutting down, we don't want to enqueue another dial task.
+            return Ok(());
+        }
+
         increment_counter!(
             "pool_enqueue_request",
             Some("Counter for connection requests made")
@@ -125,11 +135,11 @@ where
                 if let Some(delay) = delay {
                     tokio::select! {
                         biased;
-                        _ = cancel.cancelled() => return AsyncTaskResult::ConnectionFailed {
+                    _ = cancel.cancelled() => return AsyncTaskResult::ConnectionFailed {
                             remote: Some(index),
                             error: anyhow::anyhow!("dial was cancelled")
-                        },
-                        _ = tokio::time::sleep(delay) => (),
+                    },
+                    _ = tokio::time::sleep(delay) => (),
                     }
                 }
 
@@ -137,11 +147,12 @@ where
                 let connection = tokio::select! {
                     biased;
                     _ = cancel.cancelled() => return AsyncTaskResult::ConnectionFailed {
-                        remote: Some(index),
-                        error: anyhow::anyhow!("dial was cancelled")
+                            remote: Some(index),
+                            error: anyhow::anyhow!("dial was cancelled")
                     },
                     connection = connect() => connection,
                 };
+
                 match connection {
                     Ok(conn) => AsyncTaskResult::ConnectionSuccess {
                         incoming: false,
@@ -353,10 +364,15 @@ where
         Ok(())
     }
 
-    fn handle_add(&mut self, _node: NodeIndex, info: ConnectionInfo) -> anyhow::Result<()> {
+    fn handle_add(
+        &mut self,
+        _node: NodeIndex,
+        info: ConnectionInfo,
+        delay: Option<Duration>,
+    ) -> anyhow::Result<()> {
         if !self.pool.contains_key(&info.node_info.index) && info.connect {
             if let Err(e) =
-                self.enqueue_dial_task(info.node_info, self.muxer.clone().unwrap(), None)
+                self.enqueue_dial_task(info.node_info, self.muxer.clone().unwrap(), delay)
             {
                 tracing::error!("failed to enqueue the dial task: {e:?}");
             }
@@ -619,8 +635,8 @@ where
             EndpointTask::Update { keep, drop } => {
                 let _ = self.handle_update(keep, drop);
             },
-            EndpointTask::Add { node, info } => {
-                let _ = self.handle_add(node, info);
+            EndpointTask::Add { node, info, delay } => {
+                let _ = self.handle_add(node, info, delay);
             },
             EndpointTask::Stats { respond } => {
                 self.handle_stats_request(respond);
@@ -694,6 +710,8 @@ where
 
     /// Shutdowns workers and clears state.
     pub async fn shutdown(&mut self) {
+        self.shutting_down = true;
+
         for (_, handle) in self.pool.iter() {
             let _ = handle
                 .service_request_tx
@@ -714,6 +732,12 @@ where
 
         // Clean out the queue.
         while !matches!(self.task_queue.try_recv(), Err(TryRecvError::Empty)) {}
+
+        // Cancel pending connection dials before shutting down
+        let nodes: Vec<NodeIndex> = self.pending_dial.keys().copied().collect();
+        for node in &nodes {
+            self.cancel_dial(node);
+        }
 
         // Todo: maybe pass a cancel token to connection loop to make this shutdown faster.
         // Let's wait for connections to drop.
@@ -776,6 +800,8 @@ where
     }
 
     pub async fn run(&mut self) -> anyhow::Result<()> {
+        self.shutting_down = false;
+
         let mut muxer = M::init(self.config.clone())?;
         self.muxer = Some(muxer.clone());
         let shutdown = self.shutdown.clone();
@@ -843,6 +869,7 @@ pub enum EndpointTask {
     Add {
         node: NodeIndex,
         info: ConnectionInfo,
+        delay: Option<Duration>,
     },
     Stats {
         respond: oneshot::Sender<EndpointInfo>,

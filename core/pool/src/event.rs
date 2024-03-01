@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::future::Future;
 use std::io;
 use std::sync::Arc;
+use std::time::Duration;
 
 use bytes::{BufMut, Bytes, BytesMut};
 use fleek_crypto::NodePublicKey;
@@ -28,6 +29,16 @@ use crate::endpoint::EndpointTask;
 use crate::logical_pool::LogicalPool;
 use crate::provider::{Request, Response};
 use crate::state::{ConnectionInfo, DialInfo, EventReceiverInfo};
+
+/// If a connection ended and the duration was shorter than `CONN_DURATION_THRESHOLD`,
+/// we assume that something is wrong, and wait before re-trying the connection.
+const CONN_DURATION_THRESHOLD: Duration = Duration::from_secs(30);
+
+/// The minimum amount of time that we wait before re-trying a failed connection.
+const CONN_MIN_RETRY_DELAY: Duration = Duration::from_secs(10);
+
+/// The maximum amount of time that we wait before re-trying a failed connection.
+const CONN_MAX_RETRY_DELAY: Duration = Duration::from_secs(1800); // 30 minutes
 
 /// Events.
 pub enum Event {
@@ -82,7 +93,6 @@ pub struct EventReceiver<C: Collection> {
     /// Ongoing asynchronous tasks.
     ongoing_async_tasks: FuturesUnordered<JoinHandle<anyhow::Result<()>>>,
     /// Information about attempted connection dials.
-    #[allow(unused)]
     dial_info: Arc<scc::HashMap<NodeIndex, DialInfo>>,
     /// Our public key.
     shutdown: CancellationToken,
@@ -295,9 +305,25 @@ where
         if let Some(info) = self.handler.pool.get(&peer) {
             if info.from_topology {
                 // A connection to a peer in our topology was ended or failed.
+                // We want to retry the connection.
+
+                // Calculate the delay before re-trying the connection based on past failed
+                // attempts and previous connection duration.
+                let mut delay = Some(CONN_MIN_RETRY_DELAY);
+                if let Some(dial_info) = self.dial_info.get(&peer) {
+                    let dial_info = dial_info.get();
+                    if dial_info.last_try.elapsed() < CONN_DURATION_THRESHOLD {
+                        delay = Some(
+                            (dial_info.num_tries * CONN_MIN_RETRY_DELAY).min(CONN_MAX_RETRY_DELAY),
+                        )
+                    }
+                }
+
+                println!("RETRY CONN");
                 self.enqueue_endpoint_task(EndpointTask::Add {
                     node: peer,
                     info: info.clone(),
+                    delay,
                 });
             }
         }
