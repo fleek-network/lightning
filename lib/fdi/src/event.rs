@@ -14,8 +14,7 @@ pub struct Eventstore {
 
 impl Eventstore {
     /// Return a set of all of the dependencies required to trigger an event.
-    #[allow(unused)]
-    fn get_dependencies(&self, event: &'static str) -> IndexSet<TypeId> {
+    pub fn get_dependencies(&self, event: &'static str) -> IndexSet<TypeId> {
         let mut result = IndexSet::new();
 
         if let Some(handlers) = self.handlers.get(event) {
@@ -27,6 +26,8 @@ impl Eventstore {
         result
     }
 
+    /// Register a new handler for the given event. The handler will only be called once when the
+    /// event is triggered.
     pub fn on<F, T, P>(&mut self, event: &'static str, handler: F)
     where
         F: Method<T, P>,
@@ -38,7 +39,8 @@ impl Eventstore {
             .push(DynMethod::new(handler));
     }
 
-    pub fn trigger(&mut self, event: &'static str, registry: &Registry) -> usize {
+    /// Trigger the event. This is used internally.
+    pub(crate) fn trigger(&mut self, event: &'static str, registry: &Registry) -> usize {
         let mut result = 0;
         if let Some(handlers) = self.handlers.remove(event) {
             for handler in handlers {
