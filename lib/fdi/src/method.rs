@@ -139,18 +139,6 @@ impl<T, P, F: Method<T, P>> Named<T, P, F> {
     }
 }
 
-/// A method that returns the given value when called.
-pub struct Value<T>(pub T);
-
-impl<T> Method<T, ()> for Value<T> {
-    fn dependencies(&self) -> Vec<TypeId> {
-        vec![]
-    }
-    fn call(self, _registry: &Registry) -> T {
-        self.0
-    }
-}
-
 impl<T, P, F: Method<T, P>> Method<T, P> for Named<T, P, F> {
     #[inline(always)]
     fn name(&self) -> &'static str {
@@ -168,23 +156,39 @@ impl<T, P, F: Method<T, P>> Method<T, P> for Named<T, P, F> {
     }
 }
 
+/// A method that returns the given value when called.
+pub struct Value<T>(pub T);
+
+impl<T> Method<T, ()> for Value<T> {
+    fn dependencies(&self) -> Vec<TypeId> {
+        vec![]
+    }
+    fn call(self, _registry: &Registry) -> T {
+        self.0
+    }
+}
+
 pub struct ToInfallible<F>(pub F);
 impl<F, T, P> Method<Result<T>, P> for ToInfallible<F>
 where
     F: Method<T, P>,
 {
+    #[inline(always)]
     fn name(&self) -> &'static str {
         self.0.name()
     }
 
+    #[inline(always)]
     fn return_type_name(&self) -> &'static str {
         self.0.return_type_name()
     }
 
+    #[inline(always)]
     fn dependencies(&self) -> Vec<TypeId> {
         self.0.dependencies()
     }
 
+    #[inline(always)]
     fn call(self, registry: &Registry) -> Result<T> {
         Ok(self.0.call(registry))
     }
@@ -205,18 +209,22 @@ where
     F: Method<Result<T>, P>,
     T: 'static,
 {
+    #[inline(always)]
     fn name(&self) -> &'static str {
         self.0.name()
     }
 
+    #[inline(always)]
     fn return_type_name(&self) -> &'static str {
         self.0.return_type_name()
     }
 
+    #[inline(always)]
     fn dependencies(&self) -> Vec<TypeId> {
         self.0.dependencies()
     }
 
+    #[inline(always)]
     fn call(self, registry: &Registry) -> Result<Box<dyn Any>> {
         match self.0.call(registry) {
             Ok(value) => Ok(Box::new(value)),
