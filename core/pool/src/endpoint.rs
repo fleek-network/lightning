@@ -332,6 +332,9 @@ where
             if let Some(conn_handle) = self.redundant_pool.remove(&index) {
                 self.connection_buffer.push(conn_handle);
             }
+
+            // Cancel ongoing dial task, if one exists.
+            self.cancel_dial(&index);
         });
 
         // Schedule a timeout to drop connections in buffer.
