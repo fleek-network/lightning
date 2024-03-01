@@ -1,10 +1,11 @@
-use std::any::{type_name, Any, TypeId};
+use std::any::{type_name, Any};
 use std::marker::PhantomData;
 use std::ptr;
 
 use anyhow::Result;
 
 use crate::registry::Registry;
+use crate::ty::Ty;
 
 /// An internal trait that is implemented for any function-like object that can be called once.
 pub trait Method<T, P> {
@@ -16,17 +17,17 @@ pub trait Method<T, P> {
         type_name::<T>()
     }
     /// The parameters this method will ask for from the registry when invoked.
-    fn dependencies(&self) -> Vec<TypeId>;
+    fn dependencies(&self) -> Vec<Ty>;
     /// Consume and invoke the method.
     fn call(self, registry: &Registry) -> T;
 }
 
 /// A fixed-size struct that can be created from any [`Method`].
 pub struct DynMethod {
-    tid: TypeId,
+    tid: Ty,
     name: &'static str,
     return_type_name: &'static str,
-    dependencies: Vec<TypeId>,
+    dependencies: Vec<Ty>,
     ptr: *mut (),
     call_fn: fn(*mut (), registry: &Registry) -> Box<dyn Any>,
     drop_fn: fn(*mut ()),
@@ -38,7 +39,7 @@ impl DynMethod {
         F: Method<T, P>,
         T: 'static,
     {
-        let tid = TypeId::of::<T>();
+        let tid = Ty::of::<T>();
         let name = method.name();
         let return_type_name = method.return_type_name();
         let dependencies = method.dependencies();
@@ -74,8 +75,8 @@ impl DynMethod {
         }
     }
 
-    /// Returns the [`TypeId`] of the object that this method will return.
-    pub fn type_id(&self) -> TypeId {
+    /// Returns the [`Ty`] of the object that this method will return.
+    pub fn type_id(&self) -> Ty {
         self.tid
     }
 
@@ -90,7 +91,7 @@ impl DynMethod {
     }
 
     /// Returns the captured result from [`Method::dependencies`].
-    pub fn dependencies(&self) -> &Vec<TypeId> {
+    pub fn dependencies(&self) -> &Vec<Ty> {
         &self.dependencies
     }
 
@@ -103,7 +104,7 @@ impl DynMethod {
         // This should never happen, and only serves as a sanity check.
         assert_eq!(
             value.as_ref().type_id(),
-            self.type_id(),
+            self.type_id().id(),
             "Unexpected return value from method call."
         );
         value
@@ -146,7 +147,7 @@ impl<T, P, F: Method<T, P>> Method<T, P> for Named<T, P, F> {
     }
 
     #[inline(always)]
-    fn dependencies(&self) -> Vec<TypeId> {
+    fn dependencies(&self) -> Vec<Ty> {
         self.injectable.dependencies()
     }
 
@@ -160,7 +161,7 @@ impl<T, P, F: Method<T, P>> Method<T, P> for Named<T, P, F> {
 pub struct Value<T>(pub T);
 
 impl<T> Method<T, ()> for Value<T> {
-    fn dependencies(&self) -> Vec<TypeId> {
+    fn dependencies(&self) -> Vec<Ty> {
         vec![]
     }
     fn call(self, _registry: &Registry) -> T {
@@ -184,7 +185,7 @@ where
     }
 
     #[inline(always)]
-    fn dependencies(&self) -> Vec<TypeId> {
+    fn dependencies(&self) -> Vec<Ty> {
         self.0.dependencies()
     }
 
@@ -220,7 +221,7 @@ where
     }
 
     #[inline(always)]
-    fn dependencies(&self) -> Vec<TypeId> {
+    fn dependencies(&self) -> Vec<Ty> {
         self.0.dependencies()
     }
 
@@ -253,10 +254,10 @@ macro_rules! impl_for_fn {
             $($name: 'static,)*
             $($name_mut: 'static,)*
         {
-            fn dependencies(&self) -> Vec<TypeId> {
+            fn dependencies(&self) -> Vec<Ty> {
                 vec![
-                    $(TypeId::of::<$name>(),)*
-                    $(TypeId::of::<$name_mut>(),)*
+                    $(Ty::of::<$name>(),)*
+                    $(Ty::of::<$name_mut>(),)*
                 ]
             }
 
@@ -325,8 +326,8 @@ mod tests {
             fn name(&self) -> &'static str {
                 "Hello World"
             }
-            fn dependencies(&self) -> Vec<TypeId> {
-                vec![TypeId::of::<Thing>()]
+            fn dependencies(&self) -> Vec<Ty> {
+                vec![Ty::of::<Thing>()]
             }
             fn call(self, _registry: &Registry) -> Thing {
                 Thing
@@ -342,9 +343,9 @@ mod tests {
             dropped: false,
             _v: vec![0, 1, 2],
         });
-        assert_eq!(maker.type_id(), TypeId::of::<Thing>());
+        assert_eq!(maker.type_id(), Ty::of::<Thing>());
         assert_eq!(maker.name(), "Hello World");
-        assert_eq!(maker.dependencies(), &vec![TypeId::of::<Thing>()]);
+        assert_eq!(maker.dependencies(), &vec![Ty::of::<Thing>()]);
         let thing = maker.call(&Registry::default());
         thing.downcast::<Thing>().unwrap();
     }
@@ -354,11 +355,29 @@ mod tests {
         #[derive(Debug, PartialEq, Eq)]
         struct Thing(Vec<u8>);
         let maker = DynMethod::new(Named::new("Foo", Value(Thing(vec![0, 1]))));
-        assert_eq!(maker.type_id(), TypeId::of::<Thing>());
+        assert_eq!(maker.type_id(), Ty::of::<Thing>());
         assert_eq!(maker.name(), "Foo");
         assert_eq!(maker.dependencies(), &vec![]);
         let thing = maker.call(&Registry::default());
         let thing = *thing.downcast::<Thing>().unwrap();
         assert_eq!(&thing, &Thing(vec![0, 1]));
+    }
+
+    #[test]
+    fn gen() {
+        let mut names = (0..10).map(|n| format!("A{n}")).collect::<Vec<_>>();
+        for i in 0..=3 {
+            let x = names[0..i].join(" ");
+            for j in i..=10 {
+                let y = names[i..j].join(" ");
+                for k in j..=10 {
+                    let z = names[j..k].join(" ");
+                    if k - j > 5 {
+                        continue;
+                    }
+                    println!("x!([{x}], [{y}], [{z}]);")
+                }
+            }
+        }
     }
 }

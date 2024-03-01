@@ -1,10 +1,10 @@
-use std::any::TypeId;
 use std::collections::HashMap;
 
 use indexmap::IndexSet;
 
 use crate::method::{DynMethod, Method};
 use crate::registry::Registry;
+use crate::ty::Ty;
 
 /// The [`Eventstore`] can be used to store a list of event handlers under each event name.
 #[derive(Default)]
@@ -14,7 +14,7 @@ pub struct Eventstore {
 
 impl Eventstore {
     /// Return a set of all of the dependencies required to trigger an event.
-    pub fn get_dependencies(&self, event: &'static str) -> IndexSet<TypeId> {
+    pub fn get_dependencies(&self, event: &'static str) -> IndexSet<Ty> {
         let mut result = IndexSet::new();
 
         if let Some(handlers) = self.handlers.get(event) {
