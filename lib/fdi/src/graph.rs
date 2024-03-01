@@ -1,4 +1,3 @@
-use std::any::Any;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::rc::Rc;
 
@@ -160,11 +159,11 @@ impl DependencyGraph {
 
     /// Internal method to insert a constructor method to this graph.
     fn insert(&mut self, tid: Ty, method: DynMethod) {
-        debug_assert_eq!(method.type_id(), Ty::of::<Result<Object>>());
+        debug_assert_eq!(method.ty(), Ty::of::<Result<Object>>());
         if let Some(old) = self.constructors.get(&tid) {
             panic!(
                 "A constructor for type '{}' is already present.\n\told='{}'\n\tnew='{}'",
-                method.return_type_name(),
+                method.ty().name(),
                 old.name(),
                 method.name()
             );
@@ -354,8 +353,8 @@ impl DependencyGraph {
             .unwrap_or_else(|| panic!("Constructor for type not provided. tid={ty:?}"));
 
         let name = constructor.name();
-        let rt_name = constructor.return_type_name();
-        let value = constructor.call(&registry);
+        let rt_name = constructor.ty().name();
+        let value = constructor.call(registry);
 
         let value = value
             .downcast::<Result<Object>>()

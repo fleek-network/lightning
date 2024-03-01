@@ -1,5 +1,4 @@
 use std::any::{type_name, Any, TypeId};
-use std::borrow::BorrowMut;
 use std::collections::HashMap;
 
 use crate::event::Eventstore;
