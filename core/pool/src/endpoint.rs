@@ -104,7 +104,12 @@ where
         }
     }
 
-    fn enqueue_dial_task(&mut self, info: NodeInfo, muxer: M) -> anyhow::Result<()> {
+    fn enqueue_dial_task(
+        &mut self,
+        info: NodeInfo,
+        muxer: M,
+        delay: Option<Duration>,
+    ) -> anyhow::Result<()> {
         increment_counter!(
             "pool_enqueue_request",
             Some("Counter for connection requests made")
@@ -114,9 +119,20 @@ where
         if let Entry::Vacant(entry) = self.pending_dial.entry(info.index) {
             let cancel = CancellationToken::new();
             entry.insert(cancel.clone());
+            let index = info.index;
 
             let handle = tokio::spawn(async move {
-                let index = info.index;
+                if let Some(delay) = delay {
+                    tokio::select! {
+                        biased;
+                        _ = cancel.cancelled() => return AsyncTaskResult::ConnectionFailed {
+                            remote: Some(index),
+                            error: anyhow::anyhow!("dial was cancelled")
+                        },
+                        _ = tokio::time::sleep(delay) => (),
+                    }
+                }
+
                 let connect = || async { muxer.connect(info, "lightning-node").await?.await };
                 let connection = tokio::select! {
                     biased;
@@ -192,6 +208,7 @@ where
                     self.muxer
                         .clone()
                         .expect("Endpoint is always initialized on start"),
+                    None,
                 )?;
 
                 let request = connection::Request::SendReqResp {
@@ -250,6 +267,7 @@ where
                 self.muxer
                     .clone()
                     .expect("Endpoint is always initialized on start"),
+                None,
             ) {
                 tracing::error!("failed to enqueue task: {e:?}");
             }
@@ -325,11 +343,24 @@ where
                 continue;
             }
 
-            if let Err(e) = self.enqueue_dial_task(info.node_info, self.muxer.clone().unwrap()) {
+            if let Err(e) =
+                self.enqueue_dial_task(info.node_info, self.muxer.clone().unwrap(), None)
+            {
                 tracing::error!("failed to enqueue the dial task: {e:?}");
             }
         }
 
+        Ok(())
+    }
+
+    fn handle_add(&mut self, _node: NodeIndex, info: ConnectionInfo) -> anyhow::Result<()> {
+        if !self.pool.contains_key(&info.node_info.index) && info.connect {
+            if let Err(e) =
+                self.enqueue_dial_task(info.node_info, self.muxer.clone().unwrap(), None)
+            {
+                tracing::error!("failed to enqueue the dial task: {e:?}");
+            }
+        }
         Ok(())
     }
 
@@ -588,6 +619,9 @@ where
             EndpointTask::Update { keep, drop } => {
                 let _ = self.handle_update(keep, drop);
             },
+            EndpointTask::Add { node, info } => {
+                let _ = self.handle_add(node, info);
+            },
             EndpointTask::Stats { respond } => {
                 self.handle_stats_request(respond);
             },
@@ -638,6 +672,7 @@ where
                     let peer = remote.unwrap();
                     tracing::warn!("failed to dial peer {:?}: {error:?}", peer);
                     self.remove_pending_dial(&peer);
+                    self.enqueue_event(Event::ConnectionEnded { remote: peer });
                 }
             },
             AsyncTaskResult::ConnectionFinished {
@@ -804,6 +839,10 @@ pub enum EndpointTask {
         // Nodes that are in our cluster.
         keep: HashMap<NodeIndex, ConnectionInfo>,
         drop: Vec<NodeIndex>,
+    },
+    Add {
+        node: NodeIndex,
+        info: ConnectionInfo,
     },
     Stats {
         respond: oneshot::Sender<EndpointInfo>,

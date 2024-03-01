@@ -82,6 +82,7 @@ pub struct EventReceiver<C: Collection> {
     /// Ongoing asynchronous tasks.
     ongoing_async_tasks: FuturesUnordered<JoinHandle<anyhow::Result<()>>>,
     /// Information about attempted connection dials.
+    #[allow(unused)]
     dial_info: Arc<scc::HashMap<NodeIndex, DialInfo>>,
     /// Our public key.
     shutdown: CancellationToken,
@@ -291,6 +292,15 @@ where
 
     #[inline]
     fn handle_closed_connection(&mut self, peer: NodeIndex) {
+        if let Some(info) = self.handler.pool.get(&peer) {
+            if info.from_topology {
+                // A connection to a peer in our topology was ended or failed.
+                self.enqueue_endpoint_task(EndpointTask::Add {
+                    node: peer,
+                    info: info.clone(),
+                });
+            }
+        }
         self.handler.clean(peer);
     }
 
