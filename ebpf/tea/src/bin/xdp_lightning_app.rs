@@ -10,7 +10,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     #[cfg(debug_assertions)]
     let mut handle = Bpf::load(include_bytes_aligned!(
-        "../../../xdp/target/bpfel-unknown-none/debug/packet_filter"
+        "../../../ebpf/target/bpfel-unknown-none/debug/packet_filter"
     ))?;
     #[cfg(not(debug_assertions))]
     let mut bpf = Bpf::load(include_bytes_aligned!(
