@@ -314,12 +314,12 @@ where
                     let dial_info = dial_info.get();
                     if dial_info.last_try.elapsed() < CONN_DURATION_THRESHOLD {
                         delay = Some(
-                            (dial_info.num_tries * CONN_MIN_RETRY_DELAY).min(CONN_MAX_RETRY_DELAY),
+                            (CONN_MIN_RETRY_DELAY * 2_u32.pow(dial_info.num_tries))
+                                .min(CONN_MAX_RETRY_DELAY),
                         )
                     }
                 }
 
-                println!("RETRY CONN");
                 self.enqueue_endpoint_task(EndpointTask::Add {
                     node: peer,
                     info: info.clone(),
