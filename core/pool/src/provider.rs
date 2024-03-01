@@ -224,6 +224,7 @@ impl<C: Collection> PoolInterface<C> for PoolProvider<C, QuinnMuxer> {
             max_idle_timeout: config.max_idle_timeout,
         };
 
+        let dial_info = Arc::new(scc::HashMap::default());
         let shutdown = CancellationToken::new();
         let (endpoint_task_tx, endpoint_task_rx) = mpsc::channel(1024);
         let (event_tx, event_rx) = mpsc::channel(1024);
@@ -234,12 +235,14 @@ impl<C: Collection> PoolInterface<C> for PoolProvider<C, QuinnMuxer> {
             event_rx,
             endpoint_task_tx.clone(),
             public_key,
+            dial_info.clone(),
             shutdown.clone(),
         );
         let endpoint = Endpoint::<C, QuinnMuxer>::new(
             sync_query,
             endpoint_task_rx,
             event_tx.clone(),
+            dial_info,
             muxer_config,
             shutdown.clone(),
         );

@@ -27,7 +27,7 @@ use x509_parser::nom::AsBytes;
 use crate::endpoint::EndpointTask;
 use crate::logical_pool::LogicalPool;
 use crate::provider::{Request, Response};
-use crate::state::{ConnectionInfo, EventReceiverInfo};
+use crate::state::{ConnectionInfo, DialInfo, EventReceiverInfo};
 
 /// Events.
 pub enum Event {
@@ -81,6 +81,8 @@ pub struct EventReceiver<C: Collection> {
     send_request_service_handles: HashMap<ServiceScope, Sender<(RequestHeader, Request)>>,
     /// Ongoing asynchronous tasks.
     ongoing_async_tasks: FuturesUnordered<JoinHandle<anyhow::Result<()>>>,
+    /// Information about attempted connection dials.
+    dial_info: Arc<scc::HashMap<NodeIndex, DialInfo>>,
     /// Our public key.
     shutdown: CancellationToken,
 }
@@ -97,6 +99,7 @@ where
         event_queue: Receiver<Event>,
         pool_queue: Sender<EndpointTask>,
         public_key: NodePublicKey,
+        dial_info: Arc<scc::HashMap<NodeIndex, DialInfo>>,
         shutdown: CancellationToken,
     ) -> Self {
         let (notifier_tx, notifier_rx) = mpsc::channel(16);
@@ -113,6 +116,7 @@ where
             broadcast_service_handles: HashMap::new(),
             send_request_service_handles: HashMap::new(),
             ongoing_async_tasks: FuturesUnordered::new(),
+            dial_info,
             shutdown,
         }
     }

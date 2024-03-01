@@ -2,7 +2,8 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::future::Future;
 use std::io;
-use std::time::Duration;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use bytes::Bytes;
 use fleek_crypto::NodePublicKey;
@@ -27,7 +28,7 @@ use crate::event::{Event, Message};
 use crate::logical_pool::ConnectionInfo;
 use crate::muxer::{ConnectionInterface, MuxerInterface};
 use crate::provider::Response;
-use crate::state::{EndpointInfo, NodeInfo, TransportConnectionInfo};
+use crate::state::{DialInfo, EndpointInfo, NodeInfo, TransportConnectionInfo};
 
 const CONN_GRACE_PERIOD: Duration = Duration::from_secs(30);
 
@@ -66,6 +67,8 @@ where
     query_runner: c![C::ApplicationInterface::SyncExecutor],
     /// Multiplexed transport.
     muxer: Option<M>,
+    /// Information about attempted connection dials.
+    dial_info: Arc<scc::HashMap<NodeIndex, DialInfo>>,
     /// Config for the multiplexed transport.
     config: M::Config,
     shutdown: CancellationToken,
@@ -80,6 +83,7 @@ where
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         task_queue: Receiver<EndpointTask>,
         event_queue: Sender<Event>,
+        dial_info: Arc<scc::HashMap<NodeIndex, DialInfo>>,
         config: M::Config,
         shutdown: CancellationToken,
     ) -> Self {
@@ -94,6 +98,7 @@ where
             event_queue,
             query_runner,
             muxer: None,
+            dial_info,
             config,
             shutdown,
         }
@@ -105,6 +110,7 @@ where
             Some("Counter for connection requests made")
         );
 
+        let node_index = info.index;
         if let Entry::Vacant(entry) = self.pending_dial.entry(info.index) {
             let cancel = CancellationToken::new();
             entry.insert(cancel.clone());
@@ -132,12 +138,32 @@ where
                 }
             });
 
+            self.update_dial_info(node_index);
+
             self.ongoing_async_tasks.push(handle);
         } else {
             increment_counter!("pool_pool_hit", Some("Counter for pool hits"));
         }
 
         Ok(())
+    }
+
+    #[inline]
+    fn update_dial_info(&self, node: NodeIndex) {
+        if self.dial_info.contains(&node) {
+            self.dial_info.update(&node, |_, info| DialInfo {
+                num_tries: info.num_tries + 1,
+                last_try: Instant::now(),
+            });
+        } else {
+            let _ = self.dial_info.insert(
+                node,
+                DialInfo {
+                    num_tries: 1,
+                    last_try: Instant::now(),
+                },
+            );
+        }
     }
 
     #[inline]

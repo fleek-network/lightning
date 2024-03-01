@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::types::NodeIndex;
@@ -60,4 +60,10 @@ pub struct NodeInfo {
     pub index: NodeIndex,
     pub pk: NodePublicKey,
     pub socket_address: SocketAddr,
+}
+
+#[derive(Debug)]
+pub struct DialInfo {
+    pub num_tries: u32,
+    pub last_try: Instant,
 }

@@ -21,6 +21,7 @@ tracing.workspace = true
 serde.workspace = true
 tokio.workspace = true
 tokio-stream.workspace = true
+scc.workspace = true
 tokio-util = { workspace = true, features = ["codec"] }
 affair = "0.1.2"
 der = { version = "0.7", features = ["alloc", "derive"] }

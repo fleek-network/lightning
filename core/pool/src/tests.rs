@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::io;
 use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
 
 use bytes::Bytes;
@@ -246,6 +247,7 @@ fn event_receiver(
     let notifier = peer._notifier.clone();
     let pk = peer.node_public_key;
 
+    let dial_info = Arc::new(scc::HashMap::default());
     let (event_tx, event_rx) = mpsc::channel(8);
     let (endpoint_task_tx, endpoint_task_rx) = mpsc::channel(8);
 
@@ -258,6 +260,7 @@ fn event_receiver(
             event_rx,
             endpoint_task_tx,
             pk,
+            dial_info,
             shutdown.clone(),
         ),
         EventReceiverTestState {
