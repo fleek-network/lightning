@@ -69,10 +69,6 @@ where
     muxer: Option<M>,
     /// Information about attempted connection dials.
     dial_info: Arc<scc::HashMap<NodeIndex, DialInfo>>,
-    /// Indicates that the endpoint is currently shutting down.
-    /// This flag is used to avoid re-trying connections that ended because
-    /// of a shutdown.
-    shutting_down: bool,
     /// Config for the multiplexed transport.
     config: M::Config,
     shutdown: CancellationToken,
@@ -103,7 +99,6 @@ where
             query_runner,
             muxer: None,
             dial_info,
-            shutting_down: false,
             config,
             shutdown,
         }
@@ -115,11 +110,6 @@ where
         muxer: M,
         delay: Option<Duration>,
     ) -> anyhow::Result<()> {
-        if self.shutting_down {
-            // If we are currently shutting down, we don't want to enqueue another dial task.
-            return Ok(());
-        }
-
         increment_counter!(
             "pool_enqueue_request",
             Some("Counter for connection requests made")
@@ -165,7 +155,7 @@ where
                 }
             });
 
-            self.update_dial_info(node_index);
+            self.update_dial_info(node_index, delay);
 
             self.ongoing_async_tasks.push(handle);
         } else {
@@ -176,18 +166,23 @@ where
     }
 
     #[inline]
-    fn update_dial_info(&self, node: NodeIndex) {
+    fn update_dial_info(&self, node: NodeIndex, delay: Option<Duration>) {
+        // If the connection dial is delayed, we have to update `last_try` accordingly.
+        // There is a chance that the dial is canceled, in which case we would incorrectly update
+        // the dial info, but this only happens on shutdown, or when the node is removed from the
+        // topology.
+        let delay = delay.unwrap_or(Duration::from_secs(0));
         if self.dial_info.contains(&node) {
             self.dial_info.update(&node, |_, info| DialInfo {
                 num_tries: info.num_tries + 1,
-                last_try: Instant::now(),
+                last_try: Instant::now() + delay,
             });
         } else {
             let _ = self.dial_info.insert(
                 node,
                 DialInfo {
                     num_tries: 1,
-                    last_try: Instant::now(),
+                    last_try: Instant::now() + delay,
                 },
             );
         }
@@ -713,8 +708,6 @@ where
 
     /// Shutdowns workers and clears state.
     pub async fn shutdown(&mut self) {
-        self.shutting_down = true;
-
         for (_, handle) in self.pool.iter() {
             let _ = handle
                 .service_request_tx
@@ -803,8 +796,6 @@ where
     }
 
     pub async fn run(&mut self) -> anyhow::Result<()> {
-        self.shutting_down = false;
-
         let mut muxer = M::init(self.config.clone())?;
         self.muxer = Some(muxer.clone());
         let shutdown = self.shutdown.clone();
