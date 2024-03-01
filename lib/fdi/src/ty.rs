@@ -1,33 +1,38 @@
 use std::any::{type_name, TypeId};
 use std::fmt::Debug;
 
-use crate::registry::Taker;
+use crate::object::Container;
 
 /// A wrapper around [`TypeId`] that preserves the name.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub struct Ty {
     name: &'static str,
-    type_id: TypeId,
-    taker_id: TypeId,
+    ty: TypeId,
+    container_ty: TypeId,
 }
 
 impl Ty {
     pub fn of<T: 'static>() -> Self {
         Self {
             name: type_name::<T>(),
-            type_id: TypeId::of::<T>(),
-            taker_id: TypeId::of::<Taker<T>>(),
+            ty: TypeId::of::<T>(),
+            container_ty: TypeId::of::<Container<T>>(),
         }
+    }
+
+    /// Returns the name of the original type.
+    pub fn name(&self) -> &'static str {
+        self.name
     }
 
     /// Returns the original type id.
     pub fn id(&self) -> TypeId {
-        self.type_id
+        self.ty
     }
 
-    /// Returns the type id of `Taker<T>` where `T` was the original type id.
-    pub fn taker_id(&self) -> TypeId {
-        self.taker_id
+    /// Returns the type id of `Container<T>` where `T` was the original type id.
+    pub fn container_id(&self) -> TypeId {
+        self.container_ty
     }
 }
 

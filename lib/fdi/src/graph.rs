@@ -5,10 +5,10 @@ use std::rc::Rc;
 use anyhow::{Context, Result};
 use indexmap::{IndexMap, IndexSet};
 
-use crate::method::{DynMethod, Method, ToInfallible, ToResultBoxAny, Value};
-use crate::registry::MutRegistry;
+use crate::method::{DynMethod, Method, ToInfallible, ToResultObject, Value};
+use crate::object::Object;
 use crate::ty::Ty;
-use crate::Eventstore;
+use crate::{Eventstore, Registry};
 
 #[derive(Default)]
 pub struct DependencyGraph {
@@ -63,7 +63,7 @@ impl DependencyGraph {
     /// }
     ///
     /// let graph = DependencyGraph::new().with_default::<Value>();
-    /// let mut registry = MutRegistry::default();
+    /// let mut registry = Registry::default();
     /// graph.init_all(&mut registry).unwrap();
     /// assert_eq!(&*registry.get::<Value>().0, "Fleek");
     /// ```
@@ -86,7 +86,7 @@ impl DependencyGraph {
     /// use fdi::*;
     ///
     /// let graph = DependencyGraph::new().with_value(String::from("Hello!"));
-    /// let mut registry = MutRegistry::default();
+    /// let mut registry = Registry::default();
     /// graph.init_all(&mut registry).unwrap();
     /// assert_eq!(&*registry.get::<String>(), "Hello!");
     /// ```
@@ -110,7 +110,7 @@ impl DependencyGraph {
     /// ```
     /// use fdi::*;
     /// let graph = DependencyGraph::new().with_infallible(|| String::from("Fleek"));
-    /// let mut registry = MutRegistry::default();
+    /// let mut registry = Registry::default();
     /// graph.init_all(&mut registry).unwrap();
     /// assert_eq!(&*registry.get::<String>(), "Fleek");
     /// ```
@@ -136,11 +136,11 @@ impl DependencyGraph {
     /// use anyhow::{bail, Result};
     /// use fdi::*;
     /// let graph = DependencyGraph::new().with(|| -> Result<String> { bail!("error") });
-    /// let mut registry = MutRegistry::default();
+    /// let mut registry = Registry::default();
     /// assert!(graph.init_all(&mut registry).is_err());
     ///
     /// let graph = DependencyGraph::new().with(|| Ok(String::from("Fleek")));
-    /// let mut registry = MutRegistry::default();
+    /// let mut registry = Registry::default();
     /// graph.init_all(&mut registry).unwrap();
     /// assert_eq!(&*registry.get::<String>(), "Fleek");
     /// ```
@@ -150,7 +150,7 @@ impl DependencyGraph {
         T: 'static,
     {
         self.touched = true;
-        let f = ToResultBoxAny::<F, T, P>::new(f);
+        let f = ToResultObject::<F, T, P>::new(f);
         let deps = f.dependencies();
         let tid = Ty::of::<T>();
         self.insert(tid, DynMethod::new(f));
@@ -160,7 +160,7 @@ impl DependencyGraph {
 
     /// Internal method to insert a constructor method to this graph.
     fn insert(&mut self, tid: Ty, method: DynMethod) {
-        debug_assert_eq!(method.type_id(), Ty::of::<Result<Box<dyn Any>>>());
+        debug_assert_eq!(method.type_id(), Ty::of::<Result<Object>>());
         if let Some(old) = self.constructors.get(&tid) {
             panic!(
                 "A constructor for type '{}' is already present.\n\told='{}'\n\tnew='{}'",
@@ -248,7 +248,7 @@ impl DependencyGraph {
     ///
     /// This method will automatically trigger the `_post` event on the registry. To learn more
     /// check the documentations around [Eventstore](crate::Eventstore).
-    pub fn init_all(mut self, registry: &mut MutRegistry) -> Result<()> {
+    pub fn init_all(mut self, registry: &mut Registry) -> Result<()> {
         self.ensure_topo_order();
 
         for ty in self.ordered.clone().iter() {
@@ -266,7 +266,7 @@ impl DependencyGraph {
     /// # Events
     ///
     /// After the initialization every newly registered `_post` event handler is called.
-    pub fn init_one<T: 'static>(&mut self, registry: &mut MutRegistry) -> Result<()> {
+    pub fn init_one<T: 'static>(&mut self, registry: &mut Registry) -> Result<()> {
         self.init_many(registry, vec![Ty::of::<T>()])
     }
 
@@ -279,7 +279,7 @@ impl DependencyGraph {
     /// triggering the event.
     ///
     /// In other word all of the constructors are called before triggering `_post`.
-    pub fn init_many(&mut self, registry: &mut MutRegistry, types: Vec<Ty>) -> Result<()> {
+    pub fn init_many(&mut self, registry: &mut Registry, types: Vec<Ty>) -> Result<()> {
         self.ensure_topo_order();
 
         let mut queue = types;
@@ -312,7 +312,6 @@ impl DependencyGraph {
             }
 
             // Here we ensure that we also have all of the dependencies
-            let registry = registry.as_reader();
             let events = registry.get::<Eventstore>();
             let deps = events.get_dependencies("_post");
             queue.extend(deps);
@@ -332,9 +331,8 @@ impl DependencyGraph {
     ///
     /// This is particularly useful when you wish to initialize a subset of a system and avoid using
     /// `init_all`.
-    pub fn trigger(&mut self, registry: &mut MutRegistry, event: &'static str) -> Result<()> {
+    pub fn trigger(&mut self, registry: &mut Registry, event: &'static str) -> Result<()> {
         let deps = {
-            let registry = registry.as_reader();
             let events = registry.get::<Eventstore>();
             events.get_dependencies(event)
         };
@@ -345,7 +343,7 @@ impl DependencyGraph {
         Ok(())
     }
 
-    fn construct_internal(&mut self, ty: Ty, registry: &mut MutRegistry) -> Result<()> {
+    fn construct_internal(&mut self, ty: Ty, registry: &mut Registry) -> Result<()> {
         if registry.contains_type_id(&ty) {
             return Ok(());
         }
@@ -357,20 +355,16 @@ impl DependencyGraph {
 
         let name = constructor.name();
         let rt_name = constructor.return_type_name();
-
-        let value = {
-            let reader = registry.as_reader();
-            constructor.call(&reader)
-        };
+        let value = constructor.call(&registry);
 
         let value = value
-            .downcast::<Result<Box<dyn Any>>>()
+            .downcast::<Result<Object>>()
             .unwrap()
             .with_context(|| {
                 format!("Error while calling the constructor:\n\t'{name} -> {rt_name}'")
             })?;
 
-        registry.insert_raw(ty, value);
+        registry.insert_raw(value);
         Ok(())
     }
 }
@@ -408,7 +402,7 @@ fn xxx() {
         .with(make_thing2)
         .with_infallible(Thing2::get_sub);
 
-    let mut registry = MutRegistry::default();
+    let mut registry = Registry::default();
     graph.init_all(&mut registry).unwrap();
 
     let thing1 = &*registry.get::<Thing1>();

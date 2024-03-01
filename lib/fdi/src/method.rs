@@ -4,6 +4,7 @@ use std::ptr;
 
 use anyhow::Result;
 
+use crate::object::Object;
 use crate::registry::Registry;
 use crate::ty::Ty;
 
@@ -229,6 +230,45 @@ where
     fn call(self, registry: &Registry) -> Result<Box<dyn Any>> {
         match self.0.call(registry) {
             Ok(value) => Ok(Box::new(value)),
+            Err(e) => Err(e),
+        }
+    }
+}
+
+pub struct ToResultObject<F: Method<Result<T>, P>, T: 'static, P>(F, PhantomData<(T, P)>);
+impl<F, T, P> ToResultObject<F, T, P>
+where
+    F: Method<Result<T>, P>,
+    T: 'static,
+{
+    pub fn new(value: F) -> Self {
+        Self(value, PhantomData)
+    }
+}
+impl<F, T, P> Method<Result<Object>, P> for ToResultObject<F, T, P>
+where
+    F: Method<Result<T>, P>,
+    T: 'static,
+{
+    #[inline(always)]
+    fn name(&self) -> &'static str {
+        self.0.name()
+    }
+
+    #[inline(always)]
+    fn return_type_name(&self) -> &'static str {
+        self.0.return_type_name()
+    }
+
+    #[inline(always)]
+    fn dependencies(&self) -> Vec<Ty> {
+        self.0.dependencies()
+    }
+
+    #[inline(always)]
+    fn call(self, registry: &Registry) -> Result<Object> {
+        match self.0.call(registry) {
+            Ok(value) => Ok(Object::new(value)),
             Err(e) => Err(e),
         }
     }
