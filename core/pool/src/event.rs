@@ -313,10 +313,15 @@ where
                 if let Some(dial_info) = self.dial_info.get(&peer) {
                     let dial_info = dial_info.get();
                     if dial_info.last_try.elapsed() < CONN_DURATION_THRESHOLD {
+                        let max_n = ((CONN_MAX_RETRY_DELAY.as_secs_f64())
+                            / (CONN_MIN_RETRY_DELAY.as_secs_f64()))
+                        .log2()
+                        .ceil();
                         delay = Some(
-                            (CONN_MIN_RETRY_DELAY * 2_u32.pow(dial_info.num_tries))
-                                .min(CONN_MAX_RETRY_DELAY),
-                        )
+                            (CONN_MIN_RETRY_DELAY
+                                * 2_u32.pow(dial_info.num_tries.max(max_n as u32)))
+                            .min(CONN_MAX_RETRY_DELAY),
+                        );
                     }
                 }
 
