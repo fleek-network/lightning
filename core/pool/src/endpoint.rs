@@ -341,6 +341,9 @@ where
 
             // Cancel ongoing dial task, if one exists.
             self.cancel_dial(&index);
+
+            // Remove dial info.
+            self.dial_info.remove(&index);
         });
 
         // Schedule a timeout to drop connections in buffer.
