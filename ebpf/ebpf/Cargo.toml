@@ -1,5 +1,5 @@
 [package]
-name = "xdp"
+name = "ebpf"
 version = "0.0.0"
 edition = "2021"
 authors = ["M. Meier <miguel@fleek.xyz>"]
