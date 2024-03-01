@@ -14,9 +14,6 @@ pub trait Method<T, P> {
     fn name(&self) -> &'static str {
         type_name::<Self>()
     }
-    fn return_type_name(&self) -> &'static str {
-        type_name::<T>()
-    }
     /// The parameters this method will ask for from the registry when invoked.
     fn dependencies(&self) -> Vec<Ty>;
     /// Consume and invoke the method.
@@ -27,7 +24,6 @@ pub trait Method<T, P> {
 pub struct DynMethod {
     tid: Ty,
     name: &'static str,
-    return_type_name: &'static str,
     dependencies: Vec<Ty>,
     ptr: *mut (),
     call_fn: fn(*mut (), registry: &Registry) -> Box<dyn Any>,
@@ -42,7 +38,7 @@ impl DynMethod {
     {
         let tid = Ty::of::<T>();
         let name = method.name();
-        let return_type_name = method.return_type_name();
+
         let dependencies = method.dependencies();
 
         let value = Box::new(method);
@@ -68,7 +64,6 @@ impl DynMethod {
         Self {
             tid,
             name,
-            return_type_name,
             dependencies,
             ptr,
             call_fn: call_fn::<F, T, P>,
@@ -77,18 +72,13 @@ impl DynMethod {
     }
 
     /// Returns the [`Ty`] of the object that this method will return.
-    pub fn type_id(&self) -> Ty {
+    pub fn ty(&self) -> Ty {
         self.tid
     }
 
     /// Returns the captured result from [`Method::name`].
     pub fn name(&self) -> &'static str {
         self.name
-    }
-
-    /// Returns the captured result from [`Method::return_type_name`].
-    pub fn return_type_name(&self) -> &'static str {
-        self.return_type_name
     }
 
     /// Returns the captured result from [`Method::dependencies`].
@@ -105,7 +95,7 @@ impl DynMethod {
         // This should never happen, and only serves as a sanity check.
         assert_eq!(
             value.as_ref().type_id(),
-            self.type_id().id(),
+            self.ty().id(),
             "Unexpected return value from method call."
         );
         value
@@ -125,18 +115,31 @@ impl Drop for DynMethod {
 /// given name.
 pub struct Named<T, P, F: Method<T, P>> {
     name: &'static str,
-    injectable: F,
+    method: F,
     _unused: PhantomData<(T, P)>,
 }
 
 impl<T, P, F: Method<T, P>> Named<T, P, F> {
-    /// Wrap the given injectable with the given name.
+    /// Wrap the given method with the given name.
     #[inline(always)]
-    pub fn new(name: &'static str, injectable: F) -> Self {
+    pub fn new(name: &'static str, method: F) -> Self {
         Self {
             name,
-            injectable,
+            method,
             _unused: PhantomData,
+        }
+    }
+
+    // Wrap the given method with a name parsed from the return type,
+    // with all generics removed.
+    #[inline(always)]
+    pub fn from_return_type(method: F) -> Self {
+        let existing = std::any::type_name::<T>();
+        if let Some(idx) = existing.find('<') {
+            let name = &existing[0..idx];
+            Self::new(name, method)
+        } else {
+            Self::new(existing, method)
         }
     }
 }
@@ -149,12 +152,12 @@ impl<T, P, F: Method<T, P>> Method<T, P> for Named<T, P, F> {
 
     #[inline(always)]
     fn dependencies(&self) -> Vec<Ty> {
-        self.injectable.dependencies()
+        self.method.dependencies()
     }
 
     #[inline(always)]
     fn call(self, registry: &Registry) -> T {
-        self.injectable.call(registry)
+        self.method.call(registry)
     }
 }
 
@@ -178,11 +181,6 @@ where
     #[inline(always)]
     fn name(&self) -> &'static str {
         self.0.name()
-    }
-
-    #[inline(always)]
-    fn return_type_name(&self) -> &'static str {
-        self.0.return_type_name()
     }
 
     #[inline(always)]
@@ -217,11 +215,6 @@ where
     }
 
     #[inline(always)]
-    fn return_type_name(&self) -> &'static str {
-        self.0.return_type_name()
-    }
-
-    #[inline(always)]
     fn dependencies(&self) -> Vec<Ty> {
         self.0.dependencies()
     }
@@ -253,11 +246,6 @@ where
     #[inline(always)]
     fn name(&self) -> &'static str {
         self.0.name()
-    }
-
-    #[inline(always)]
-    fn return_type_name(&self) -> &'static str {
-        self.0.return_type_name()
     }
 
     #[inline(always)]
@@ -383,7 +371,7 @@ mod tests {
             dropped: false,
             _v: vec![0, 1, 2],
         });
-        assert_eq!(maker.type_id(), Ty::of::<Thing>());
+        assert_eq!(maker.ty(), Ty::of::<Thing>());
         assert_eq!(maker.name(), "Hello World");
         assert_eq!(maker.dependencies(), &vec![Ty::of::<Thing>()]);
         let thing = maker.call(&Registry::default());
@@ -395,7 +383,7 @@ mod tests {
         #[derive(Debug, PartialEq, Eq)]
         struct Thing(Vec<u8>);
         let maker = DynMethod::new(Named::new("Foo", Value(Thing(vec![0, 1]))));
-        assert_eq!(maker.type_id(), Ty::of::<Thing>());
+        assert_eq!(maker.ty(), Ty::of::<Thing>());
         assert_eq!(maker.name(), "Foo");
         assert_eq!(maker.dependencies(), &vec![]);
         let thing = maker.call(&Registry::default());
