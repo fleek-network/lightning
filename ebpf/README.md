@@ -1,5 +1,13 @@
 # Fleek eBPF
 
+## Packages
+
+- `tea` - (Tool for eBPF Applications) is a cli for building and running 
+eBPF kernel-space and user-space programs. 
+Its main purpose is to inform us of user-space application requirements for 
+the lightning integration.
+- `ebpf` - eBPF programs.
+
 ## Linux
 
 1. Install Rust toolchains.
@@ -14,8 +22,6 @@ rustup toolchain install nightly --component rust-src
 ```
 cargo install bpf-linker
 ```
-
-3. Install `bpftool`.
 
 ## MacOS
 
