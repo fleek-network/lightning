@@ -1,4 +1,4 @@
-use std::any::{Any, TypeId};
+use std::any::Any;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::rc::Rc;
 
@@ -7,14 +7,15 @@ use indexmap::{IndexMap, IndexSet};
 
 use crate::method::{DynMethod, Method, ToInfallible, ToResultBoxAny, Value};
 use crate::registry::MutRegistry;
+use crate::ty::Ty;
 use crate::Eventstore;
 
 #[derive(Default)]
 pub struct DependencyGraph {
     touched: bool,
-    constructors: HashMap<TypeId, DynMethod>,
-    graph: IndexMap<TypeId, IndexSet<TypeId>>,
-    ordered: Rc<Vec<TypeId>>,
+    constructors: HashMap<Ty, DynMethod>,
+    graph: IndexMap<Ty, IndexSet<Ty>>,
+    ordered: Rc<Vec<Ty>>,
 }
 
 /// The dependency graph should be used to create a project model. This can be done by providing
@@ -151,15 +152,15 @@ impl DependencyGraph {
         self.touched = true;
         let f = ToResultBoxAny::<F, T, P>::new(f);
         let deps = f.dependencies();
-        let tid = TypeId::of::<T>();
+        let tid = Ty::of::<T>();
         self.insert(tid, DynMethod::new(f));
         self.graph.insert(tid, deps.into_iter().collect());
         self
     }
 
     /// Internal method to insert a constructor method to this graph.
-    fn insert(&mut self, tid: TypeId, method: DynMethod) {
-        debug_assert_eq!(method.type_id(), TypeId::of::<Result<Box<dyn Any>>>());
+    fn insert(&mut self, tid: Ty, method: DynMethod) {
+        debug_assert_eq!(method.type_id(), Ty::of::<Result<Box<dyn Any>>>());
         if let Some(old) = self.constructors.get(&tid) {
             panic!(
                 "A constructor for type '{}' is already present.\n\told='{}'\n\tnew='{}'",
@@ -181,10 +182,10 @@ impl DependencyGraph {
 
         // Nodes with degree == 0.
         let len = self.graph.len();
-        let mut queue = VecDeque::<TypeId>::with_capacity(len);
+        let mut queue = VecDeque::<Ty>::with_capacity(len);
 
         // Map each node to its in-degree.
-        let mut in_degree = IndexMap::<TypeId, usize>::with_capacity(len);
+        let mut in_degree = IndexMap::<Ty, usize>::with_capacity(len);
 
         for (v, connections) in &self.graph {
             in_degree.entry(*v).or_default();
@@ -266,7 +267,7 @@ impl DependencyGraph {
     ///
     /// After the initialization every newly registered `_post` event handler is called.
     pub fn init_one<T: 'static>(&mut self, registry: &mut MutRegistry) -> Result<()> {
-        self.init_many(registry, vec![TypeId::of::<T>()])
+        self.init_many(registry, vec![Ty::of::<T>()])
     }
 
     /// Like [`init_one`](Self::init_one) but performs many initializations at one step.
@@ -278,7 +279,7 @@ impl DependencyGraph {
     /// triggering the event.
     ///
     /// In other word all of the constructors are called before triggering `_post`.
-    pub fn init_many(&mut self, registry: &mut MutRegistry, types: Vec<TypeId>) -> Result<()> {
+    pub fn init_many(&mut self, registry: &mut MutRegistry, types: Vec<Ty>) -> Result<()> {
         self.ensure_topo_order();
 
         let mut queue = types;
@@ -344,7 +345,7 @@ impl DependencyGraph {
         Ok(())
     }
 
-    fn construct_internal(&mut self, ty: TypeId, registry: &mut MutRegistry) -> Result<()> {
+    fn construct_internal(&mut self, ty: Ty, registry: &mut MutRegistry) -> Result<()> {
         if registry.contains_type_id(&ty) {
             return Ok(());
         }
@@ -369,7 +370,7 @@ impl DependencyGraph {
                 format!("Error while calling the constructor:\n\t'{name} -> {rt_name}'")
             })?;
 
-        registry.insert_raw(value);
+        registry.insert_raw(ty, value);
         Ok(())
     }
 }
@@ -394,6 +395,10 @@ fn xxx() {
         events.on("_post", |this: &mut Thing2| {
             dbg!(this);
         });
+
+        // events.on("start", |this: &Take<Thing2>| {
+        //     let this = this.take();
+        // });
 
         Ok(Thing2(15))
     }
