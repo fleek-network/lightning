@@ -172,6 +172,7 @@ where
         // the dial info, but this only happens on shutdown, or when the node is removed from the
         // topology.
         let delay = delay.unwrap_or(Duration::from_secs(0));
+
         if self.dial_info.contains(&node) {
             self.dial_info.update(&node, |_, info| DialInfo {
                 num_tries: info.num_tries + 1,
@@ -185,6 +186,16 @@ where
                     last_try: Instant::now() + delay,
                 },
             );
+        }
+    }
+
+    #[inline]
+    fn reset_dial_info(&self, node: NodeIndex) {
+        if self.dial_info.contains(&node) {
+            self.dial_info.update(&node, |_, info| DialInfo {
+                num_tries: 0,
+                last_try: info.last_try,
+            });
         }
     }
 
@@ -493,6 +504,9 @@ where
                     vacant.insert(handle);
                 },
             }
+
+            // Once we make a successful connection, we reset the dial attempts.
+            self.reset_dial_info(peer_index);
 
             self.enqueue_event(Event::NewConnection {
                 remote: peer_index,
