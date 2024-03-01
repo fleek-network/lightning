@@ -6,6 +6,7 @@ use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
 use crate::event::Eventstore;
+use crate::ty::Ty;
 
 /// The registry contains all of the constructed values.
 ///
@@ -14,18 +15,20 @@ use crate::event::Eventstore;
 /// The registry is meant to be used during an overall initlization of a system and allowing it to
 /// be [`Sync`] or [`Send`] would allow non optimal use cases. So it doesn't implement those.
 pub struct Registry<T = ()>(Rc<UnsafeCell<InnerMap>>, PhantomData<T>);
+type InnerMap = HashMap<Ty, RefCell<Option<Box<dyn Any>>>>;
+
+/// For when the registry is mutable.
+#[derive(Default)]
+pub struct MutMarker;
 
 pub type MutRegistry = Registry<MutMarker>;
-
-type InnerMap = HashMap<TypeId, RefCell<Box<dyn Any>>>;
 
 pub struct Ref<'a, T: ?Sized + 'a>(cell::Ref<'a, T>);
 pub struct RefMut<'a, T: ?Sized + 'a>(cell::RefMut<'a, T>);
 pub struct RegistryGuard<'a>(Registry, PhantomData<&'a Registry>);
 
-/// For when the registry is mutable.
-#[derive(Default)]
-pub struct MutMarker;
+pub struct Taker<T: 'static>(RefCell<Option<T>>);
+impl<T: 'static> Taker<T> {}
 
 impl Registry<MutMarker> {
     fn get_map_mut(&mut self) -> &mut InnerMap {
@@ -34,14 +37,14 @@ impl Registry<MutMarker> {
 
     /// Insert the given value to the registry.
     pub fn insert<T: 'static>(&mut self, value: T) {
-        let tid = TypeId::of::<T>();
-        let value: Box<dyn Any> = Box::new(value);
-        self.get_map_mut().insert(tid, RefCell::new(value));
+        self.insert_raw(Ty::of::<T>(), Box::new(value));
     }
 
-    pub fn insert_raw(&mut self, value: Box<dyn Any>) {
-        let tid = value.as_ref().type_id();
-        self.get_map_mut().insert(tid, RefCell::new(value));
+    pub fn insert_raw(&mut self, tid: Ty, value: Box<dyn Any>) {
+        if tid == Ty::of::<Registry>() || tid == Ty::of::<MutRegistry>() {
+            panic!("Adding registry to registry is not safe and disabled.");
+        }
+        self.get_map_mut().insert(tid, RefCell::new(Some(value)));
     }
 
     pub fn as_reader(&mut self) -> RegistryGuard<'_> {
@@ -72,8 +75,8 @@ impl<U> Registry<U> {
     }
 
     #[inline(always)]
-    fn map_get<T: 'static>(&self) -> &RefCell<Box<dyn Any>> {
-        let tid = TypeId::of::<T>();
+    fn map_get<T: 'static>(&self) -> &RefCell<Option<Box<dyn Any>>> {
+        let tid = Ty::of::<T>();
         self.get_map().get(&tid).unwrap_or_else(|| {
             panic!(
                 "No value for type '{}' found in the registry.",
@@ -84,11 +87,11 @@ impl<U> Registry<U> {
 
     /// Returns true if the registry has a value with the given type.
     pub fn contains<T: 'static>(&self) -> bool {
-        let tid = TypeId::of::<T>();
+        let tid = Ty::of::<T>();
         self.get_map().contains_key(&tid)
     }
 
-    pub fn contains_type_id(&self, tid: &TypeId) -> bool {
+    pub fn contains_type_id(&self, tid: &Ty) -> bool {
         self.get_map().contains_key(tid)
     }
 
@@ -100,7 +103,17 @@ impl<U> Registry<U> {
                     type_name::<T>()
                 )
             }),
-            |x| x.downcast_ref::<T>().unwrap(),
+            |x| {
+                x.as_ref()
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "Value of type '{}' has been taken out from the registry.",
+                            type_name::<T>()
+                        )
+                    })
+                    .downcast_ref::<T>()
+                    .unwrap()
+            },
         ))
     }
 
@@ -112,8 +125,37 @@ impl<U> Registry<U> {
                     type_name::<T>()
                 )
             }),
-            |x| x.downcast_mut::<T>().unwrap(),
+            |x| {
+                x.as_mut()
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "Value of type '{}' has been taken out from the registry.",
+                            type_name::<T>()
+                        )
+                    })
+                    .downcast_mut::<T>()
+                    .unwrap()
+            },
         ))
+    }
+
+    /// Take the value of the given type out of the registry.
+    pub fn take<T: 'static>(&self) -> T {
+        let mut x = self.map_get::<T>().try_borrow_mut().unwrap_or_else(|e| {
+            panic!(
+                "Could not get a mutable ref to the value of type '{}' from registry: {e}",
+                type_name::<T>()
+            )
+        });
+        *x.take()
+            .unwrap_or_else(|| {
+                panic!(
+                    "Value of type '{}' has been taken out from the registry.",
+                    type_name::<T>()
+                )
+            })
+            .downcast::<T>()
+            .unwrap()
     }
 
     /// Trigger the event with the given name from the event store.
