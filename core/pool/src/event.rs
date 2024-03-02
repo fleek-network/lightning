@@ -307,12 +307,14 @@ where
                 // A connection to a peer in our topology was ended or failed.
                 // We want to retry the connection.
 
+                let mut healthy_conn = true;
                 // Calculate the delay before re-trying the connection based on past failed
                 // attempts and previous connection duration.
                 let mut delay = Some(CONN_MIN_RETRY_DELAY);
                 if let Some(dial_info) = self.dial_info.get(&peer) {
                     let dial_info = dial_info.get();
                     if dial_info.last_try.elapsed() < CONN_DURATION_THRESHOLD {
+                        // connection was not healthy
                         let max_n = ((CONN_MAX_RETRY_DELAY.as_secs_f64())
                             / (CONN_MIN_RETRY_DELAY.as_secs_f64()))
                         .log2()
@@ -322,7 +324,13 @@ where
                                 * 2_u32.pow(dial_info.num_tries.max(max_n as u32)))
                             .min(CONN_MAX_RETRY_DELAY),
                         );
+                        healthy_conn = false;
                     }
+                }
+
+                if healthy_conn {
+                    // connection was healthy, we can reset the counter
+                    self.reset_dial_info(peer);
                 }
 
                 self.enqueue_endpoint_task(EndpointTask::Add {
@@ -333,6 +341,17 @@ where
             }
         }
         self.handler.clean(peer);
+    }
+
+    #[inline]
+    fn reset_dial_info(&self, node: NodeIndex) {
+        // Warning: this method should not be called while holding a reference into the hashmap.
+        if self.dial_info.contains(&node) {
+            self.dial_info.update(&node, |_, info| DialInfo {
+                num_tries: 0,
+                last_try: info.last_try,
+            });
+        }
     }
 
     #[inline]

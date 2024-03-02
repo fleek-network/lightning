@@ -190,16 +190,6 @@ where
     }
 
     #[inline]
-    fn reset_dial_info(&self, node: NodeIndex) {
-        if self.dial_info.contains(&node) {
-            self.dial_info.update(&node, |_, info| DialInfo {
-                num_tries: 0,
-                last_try: info.last_try,
-            });
-        }
-    }
-
-    #[inline]
     pub fn remove_pending_dial(&mut self, peer: &NodeIndex) {
         self.pending_dial.remove(peer);
     }
@@ -507,9 +497,6 @@ where
                     vacant.insert(handle);
                 },
             }
-
-            // Once we make a successful connection, we reset the dial attempts.
-            self.reset_dial_info(peer_index);
 
             self.enqueue_event(Event::NewConnection {
                 remote: peer_index,
