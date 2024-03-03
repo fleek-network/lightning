@@ -1,7 +1,4 @@
-use std::any::TypeId;
-
-use crate::ty::Ty;
-use crate::{DynMethod, Registry};
+use crate::{Container, DependencyGraph, Registry};
 
 mod demo_dep {
     use crate::{DependencyGraph, Eventstore, Named};
@@ -83,9 +80,17 @@ fn test_partial_2() {
 }
 
 #[test]
-fn x() {
-    println!("{}", std::mem::size_of::<DynMethod>());
-    println!("{}", std::mem::size_of::<Ty>());
-    println!("{}", std::mem::size_of::<TypeId>());
-    println!("{}", std::mem::size_of::<&'static str>());
+fn depending_on_container() {
+    struct A;
+    struct B;
+    fn new_b(_a: &Container<A>) -> B {
+        B
+    }
+
+    let mut graph = DependencyGraph::new()
+        .with_infallible(|| A)
+        .with_infallible(new_b);
+
+    let mut registry = Registry::default();
+    graph.init_one::<B>(&mut registry).expect("Failed to init.");
 }

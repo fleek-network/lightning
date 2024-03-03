@@ -1,3 +1,4 @@
+use std::any::TypeId;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Write;
 use std::rc::Rc;
@@ -14,6 +15,7 @@ use crate::{Eventstore, Registry};
 pub struct DependencyGraph {
     touched: bool,
     constructors: HashMap<Ty, DynMethod>,
+    container_id_to_ty_id: HashMap<TypeId, Ty>,
     graph: IndexMap<Ty, IndexSet<Ty>>,
     ordered: Rc<Vec<Ty>>,
 }
@@ -192,12 +194,42 @@ impl DependencyGraph {
             );
         }
         self.constructors.insert(tid, method);
+        self.container_id_to_ty_id.insert(tid.container_id(), tid);
+    }
+
+    /// Normalizes the dependency graph by converting every container id dep to actual
+    /// type.
+    fn normalize_graph(&mut self) {
+        let mut to_remove = Vec::with_capacity(16);
+        let mut to_add = Vec::with_capacity(16);
+
+        for (_, set) in &mut self.graph {
+            // for each type in the set try to see if its a container id.
+            // if so we have to remove it from the set, and instead add the
+            // actual type.
+            for ty in set.iter() {
+                if let Some(actual_ty) = self.container_id_to_ty_id.get(&ty.id()) {
+                    to_remove.push(*ty);
+                    to_add.push(*actual_ty);
+                }
+            }
+
+            for ty in to_remove.drain(..) {
+                set.remove(&ty);
+            }
+
+            for ty in to_add.drain(..) {
+                set.insert(ty);
+            }
+        }
     }
 
     fn ensure_topo_order(&mut self) {
         if !self.touched {
             return;
         }
+
+        self.normalize_graph();
 
         self.touched = false;
         let mut result = Vec::new();
