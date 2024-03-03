@@ -1,12 +1,49 @@
 use std::ops::Deref;
 
 use derive_more::IsVariant;
+use lightning_schema::AutoImplSerde;
+use serde::{Deserialize, Serialize};
 
 use crate::ReqRes;
 
 /// Client public key bytes. We use this type alias instead of the actual fleek-crypto type
-/// to allow us to use rkyv.
-pub type ClientPublicKeyBytes = [u8; 96];
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ClientPublicKeyBytes([u8; 96]);
+
+impl Serialize for ClientPublicKeyBytes {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_bytes(&self.0)
+    }
+}
+
+impl<'de> Deserialize<'de> for ClientPublicKeyBytes {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let buffer = <&[u8]>::deserialize(deserializer)?;
+
+        if buffer.len() != 96 {
+            return Err(serde::de::Error::custom(format!(
+                "Expected 96 bytes, got {}",
+                buffer.len()
+            )));
+        }
+
+        let mut new_buffer = [0; 96];
+        new_buffer.copy_from_slice(buffer);
+        Ok(Self(new_buffer))
+    }
+}
+
+impl From<[u8; 96]> for ClientPublicKeyBytes {
+    fn from(value: [u8; 96]) -> Self {
+        Self(value)
+    }
+}
+
+impl From<ClientPublicKeyBytes> for [u8; 96] {
+    fn from(value: ClientPublicKeyBytes) -> Self {
+        value.0
+    }
+}
 
 pub type RequestCtxU64 = u64;
 
@@ -14,6 +51,25 @@ pub type RequestCtxU64 = u64;
 pub struct StaticVec<const CAP: usize> {
     size: usize,
     buffer: [u8; CAP],
+}
+
+impl<const CAP: usize> Serialize for StaticVec<CAP> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_bytes(&self.buffer[0..self.size])
+    }
+}
+
+impl<'de, const CAP: usize> Deserialize<'de> for StaticVec<CAP> {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let buffer = <&[u8]>::deserialize(deserializer)?;
+        let size = buffer.len();
+        let mut new_buffer = [0; CAP];
+        new_buffer[0..size].copy_from_slice(buffer);
+        Ok(Self {
+            size,
+            buffer: new_buffer,
+        })
+    }
 }
 
 impl<const CAP: usize> Deref for StaticVec<CAP> {
@@ -41,8 +97,7 @@ impl<const CAP: usize> From<&StaticVec<CAP>> for Vec<u8> {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IpcRequest {
     /// A pointer to the request context.
     pub request_ctx: Option<RequestCtxU64>,
@@ -51,14 +106,18 @@ pub struct IpcRequest {
 }
 
 /// A message sent from the core process to the service.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum IpcMessage {
     Response {
         request_ctx: RequestCtxU64,
         response: Response,
     },
 }
+
+impl AutoImplSerde for IpcRequest {}
+impl AutoImplSerde for IpcMessage {}
+impl AutoImplSerde for Request {}
+impl AutoImplSerde for Response {}
 
 ReqRes! {
     /// Query a client's bandwidth balance.

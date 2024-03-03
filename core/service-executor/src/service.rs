@@ -5,16 +5,18 @@ use std::time::{Duration, Instant};
 
 use dashmap::DashMap;
 use fleek_crypto::ClientPublicKey;
-use fn_sdk::ipc_types::{self, IpcMessage};
+use fn_sdk::ipc_types::{self, IpcMessage, IpcRequest};
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::{ApplicationInterface, FetcherSocket, SyncQueryRunnerInterface};
+use lightning_schema::LightningMessage;
 use tokio::io::{self, Interest};
 use tokio::net::{UnixListener, UnixStream};
 use tokio::process::Command;
 use tokio::sync::Notify;
 use tokio::task::JoinSet;
 use tokio::{pin, select};
+use tracing::instrument;
 use triomphe::Arc;
 
 /// The shared object with every service.
@@ -32,7 +34,7 @@ impl<C: Collection> Context<C> {
             ipc_types::Request::QueryClientBandwidth { pk } => {
                 let balance = self
                     .query_runner
-                    .client_key_to_account_key(&ClientPublicKey(pk))
+                    .client_key_to_account_key(&ClientPublicKey(pk.into()))
                     .and_then(|address| {
                         self.query_runner
                             .get_account_info(&address, |a| a.bandwidth_balance)
@@ -43,7 +45,7 @@ impl<C: Collection> Context<C> {
             ipc_types::Request::QueryClientFLK { pk } => {
                 let balance = self
                     .query_runner
-                    .client_key_to_account_key(&ClientPublicKey(pk))
+                    .client_key_to_account_key(&ClientPublicKey(pk.into()))
                     .and_then(|address| {
                         self.query_runner
                             .get_account_info(&address, |a| a.flk_balance)
@@ -205,111 +207,147 @@ async fn run_ctrl_loop<C: Collection>(
     drop(listener);
 }
 
+#[instrument(skip(stream, ctx))]
 async fn handle_stream<C: Collection>(
     stream: UnixStream,
     ctx: Arc<Context<C>>,
 ) -> Result<(), Box<dyn Error>> {
-    const IPC_MESSAGE_SIZE: usize = std::mem::size_of::<ipc_types::IpcMessage>();
-    const IPC_REQUEST_SIZE: usize = std::mem::size_of::<ipc_types::IpcRequest>();
+    // incoming IpcRequests
+    let mut read_buffer = Vec::<u8>::new();
+    let mut read_buffer_pos = 0;
+    let mut read_len = 0;
+
+    // outgoing IpcMessages
+    let mut write_buffer = Vec::<u8>::new();
+    let mut write_buffer_pos = 0;
+
+    let mut task_set = JoinSet::<IpcMessage>::new();
 
     pin! {
         let kill_fut = ctx.kill.notified();
     }
 
-    let mut read_buffer = [0u8; IPC_REQUEST_SIZE];
-    let mut read_pos = 0;
-    let mut write_buffer = [0u8; IPC_MESSAGE_SIZE];
-    let mut write_pos = IPC_MESSAGE_SIZE;
-    let mut task_set = JoinSet::<IpcMessage>::new();
-    let mut is_writable = false;
-    let mut is_readable = false;
-
     'outer: loop {
-        tracing::trace!("awaiting an event");
-
-        // First check to see if we have something to write to the socket. If so we would be
-        // interested in writing to the UnixStream. Otherwise we would only be interested in
-        // reading. But would listen for new completed tasks at the same time.
-
-        if write_pos == IPC_MESSAGE_SIZE {
+        // Theres no messages to write
+        let ready = if write_buffer.is_empty() {
             tokio::select! {
                 biased;
                 _ = &mut kill_fut => {
-                    tracing::trace!("exiting loop");
                     break 'outer;
                 },
                 Some(msg) = task_set.join_next() => {
-                    write_buffer = unsafe { std::mem::transmute(msg) };
-                    write_pos = 0;
-
-                    if !is_writable {
-                        // Jump back to the beginning of the outer loop. This time message will be
-                        // there and we would also be interested in `WRITABLE` status. This will
-                        // give us opportunity to turn the `is_writable` flag on.
-                        continue 'outer;
+                    match msg {
+                        Ok(msg) => {
+                            IpcMessage::encode_length_delimited(&msg, &mut write_buffer)?;
+                            continue 'outer;
+                        },
+                        Err(e) => {
+                            tracing::error!("Error while processing task: {e:?}");
+                            return Err(e.into());
+                        },
                     }
                 },
                 ready_result = stream.ready(Interest::READABLE) => {
-                    let ready = ready_result?;
-                    is_readable |= ready.is_readable();
+                    ready_result?
                 },
             }
         } else {
             tokio::select! {
                 biased;
                 _ = &mut kill_fut => {
-                    tracing::trace!("exiting loop");
                     break 'outer;
                 },
                 ready_result = stream.ready(Interest::READABLE | Interest::WRITABLE) => {
-                    let ready = ready_result?;
-                    is_writable |= ready.is_writable();
-                    is_readable |= ready.is_readable();
-                },
+                    ready_result?
+                }
+            }
+        };
+
+        // dont try to write more than 1 response because the (async) tasks take a while we want to
+        // get them started asap
+        if ready.is_writable() && !write_buffer.is_empty() {
+            while write_buffer_pos < write_buffer.len() {
+                match stream.try_write(&write_buffer[write_buffer_pos..]) {
+                    Ok(n) => {
+                        write_buffer_pos += n;
+                    },
+                    Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                        break;
+                    },
+                    Err(e) => {
+                        return Err(e.into());
+                    },
+                }
+            }
+
+            if write_buffer_pos == write_buffer.len() {
+                // we've written everything
+                write_buffer.clear();
+                write_buffer_pos = 0;
             }
         }
 
-        tracing::trace!("is_writable={is_writable},is_readable={is_readable}");
+        // these might take awhile so we want to get them kicked off asap, if theres multiple
+        // messages in the stream then this will handle them all before moving on
+        if ready.is_readable() {
+            'read: loop {
+                // try to read the length delimiter first
+                while read_buffer_pos < 4 && read_len == 0 {
+                    match stream.try_read(&mut read_buffer[read_buffer_pos..]) {
+                        Ok(0) => {
+                            break 'outer;
+                        },
+                        Ok(n) => {
+                            read_buffer_pos += n;
+                        },
+                        Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                            break 'read;
+                        },
+                        Err(e) => {
+                            return Err(e.into());
+                        },
+                    }
+                }
 
-        // While the stream is writable and we have a message to write try to write the message.
-        // Only turning the is_writable flag off once we get a WouldBlock error.
-        while is_writable && write_pos < IPC_MESSAGE_SIZE {
-            match stream.try_write(&write_buffer[write_pos..]) {
-                Ok(n) => {
-                    write_pos += n;
-                },
-                Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
-                    tracing::trace!("is_writable=false");
-                    is_writable = false;
-                },
-                Err(e) => {
-                    return Err(e.into());
-                },
-            }
-        }
+                // if we have no message len already then we have the new length delimiter
+                if read_len == 0 {
+                    read_len = u32::from_le_bytes(
+                        read_buffer[0..4]
+                            .try_into()
+                            .expect("can create length from stream bytes"),
+                    );
 
-        while is_readable {
-            match stream.try_read(&mut read_buffer[read_pos..]) {
-                Ok(0) => {
-                    tracing::trace!("Got 0 bytes. Returning.");
-                    break 'outer;
-                },
-                Ok(n) => {
-                    read_pos += n;
-                },
-                Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
-                    tracing::trace!("is_readable=false");
-                    is_readable = false;
-                },
-                Err(e) => {
-                    return Err(e.into());
-                },
-            }
+                    // cleanup to read the actual request
+                    read_buffer_pos = 0;
+                    read_buffer.clear();
+                }
 
-            if read_pos == IPC_REQUEST_SIZE {
-                read_pos = 0;
-                let request: ipc_types::IpcRequest =
-                    unsafe { std::mem::transmute_copy(&read_buffer) };
+                // try to read the request
+                // downcast here should be safe on >= 32 bit machines
+                while read_buffer_pos < read_len as usize {
+                    match stream.try_read(&mut read_buffer[read_buffer_pos..]) {
+                        Ok(0) => {
+                            // connection reset
+                            tracing::warn!("Connection reset control loop");
+                            break 'outer;
+                        },
+                        Ok(n) => {
+                            read_buffer_pos += n;
+                        },
+                        Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                            break 'read;
+                        },
+                        Err(e) => {
+                            return Err(e.into());
+                        },
+                    }
+                }
+
+                let request = IpcRequest::decode(&read_buffer)?;
+                // cleanup now that we have the request
+                read_buffer_pos = 0;
+                read_len = 0;
+                read_buffer.clear();
 
                 if let Some(request_ctx) = request.request_ctx {
                     let ctx = ctx.clone();
