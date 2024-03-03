@@ -2,7 +2,7 @@ use std::any::{type_name, Any, TypeId};
 use std::collections::HashMap;
 
 use crate::event::Eventstore;
-use crate::object::{Container, Object, Ref, RefMut};
+use crate::object::{Object, Ref, RefMut};
 use crate::ty::Ty;
 
 /// The registry contains all of the constructed values.
@@ -33,6 +33,16 @@ impl Registry {
         self.values.contains_key(&tid.id()) || self.values.contains_key(&tid.container_id())
     }
 
+    /// Returns a immutable reference to the value with given type from the registry
+    ///
+    /// In case of trying to get the container directly out of the registry this function is still
+    /// supposed to work. In other words if type `T` has already been inserted in the registry, the
+    /// request for `&Container<T>` will return the container to `T`.
+    ///
+    /// # Panics
+    ///
+    /// If the value with the given type is not inserted in the registry or if the value has been
+    /// taken out of the container.
     pub fn get<T: 'static + Any>(&self) -> Ref<'_, T> {
         let ty = Ty::of::<T>();
         if let Some(obj) = self.values.get(&ty.id()) {
@@ -48,6 +58,12 @@ impl Registry {
         }
     }
 
+    /// Return a mutable reference to the value of type `T` from the registry.
+    ///
+    /// # Panics
+    ///
+    /// If the value with the given type is not inserted in the registry or if the value has been
+    /// taken out of the container. It also panics if `T: Container<U>`.
     pub fn get_mut<T: 'static + Any>(&self) -> RefMut<'_, T> {
         let ty = Ty::of::<T>();
         if self.values.get(&ty.id()).is_some() {
@@ -77,18 +93,4 @@ impl Default for Registry {
         tmp.insert_raw(Object::new(Eventstore::default()));
         tmp
     }
-}
-
-#[test]
-fn zzz() {
-    let mut registry = Registry::default();
-    registry.insert(String::from("Hello"));
-
-    let value = registry.get::<String>();
-    println!("{:?}", *value);
-    drop(value);
-
-    let taker = &*registry.get::<Container<String>>();
-    let value = taker.borrow();
-    println!("{:?}", *value);
 }

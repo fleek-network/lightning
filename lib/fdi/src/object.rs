@@ -54,6 +54,7 @@ pub(crate) enum RefInner<'a, T: ?Sized + 'a> {
     Cell(cell::Ref<'a, T>),
 }
 pub(crate) enum RefMutInner<'a, T: ?Sized + 'a> {
+    #[allow(unused)]
     Ref(&'a mut T),
     Cell(cell::RefMut<'a, T>),
 }
@@ -111,5 +112,67 @@ impl<'a, T: ?Sized + 'a> DerefMut for RefMut<'a, T> {
             RefMutInner::Ref(a) => a,
             RefMutInner::Cell(a) => &mut *a,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn object_downcast_should_work() {
+        let obj = Object::new(String::from("Hello"));
+        let ty = Ty::of::<String>();
+        assert_eq!(obj.ty(), &ty);
+        let container = obj.downcast::<String>();
+        let s = &*container.borrow();
+        assert_eq!(s, &String::from("Hello"));
+        let container = obj.downcast_into::<Container<String>>();
+        let s = &*container.borrow();
+        assert_eq!(s, &String::from("Hello"));
+    }
+
+    #[test]
+    fn container() {
+        let container = Container::new(String::from("Hello"));
+        let a0 = &*container.borrow();
+        let a1 = &*container.borrow();
+        assert_eq!(a0, a1);
+    }
+
+    #[test]
+    #[should_panic]
+    fn container_borrow_and_borrow_mut() {
+        let container = Container::new(String::from("Hello"));
+        let a0 = container.borrow();
+        let a1 = container.borrow_mut();
+        drop((a0, a1));
+    }
+
+    #[test]
+    #[should_panic]
+    fn container_take_and_borrow() {
+        let container = Container::new(String::from("Hello"));
+        let a0 = container.take();
+        let a1 = container.borrow();
+        drop((a0, a1));
+    }
+
+    #[test]
+    #[should_panic]
+    fn container_take_and_borrow_mut() {
+        let container = Container::new(String::from("Hello"));
+        let a0 = container.take();
+        let a1 = container.borrow_mut();
+        drop((a0, a1));
+    }
+
+    #[test]
+    #[should_panic]
+    fn container_take_and_take() {
+        let container = Container::new(String::from("Hello"));
+        let a0 = container.take();
+        let a1 = container.take();
+        drop((a0, a1));
     }
 }

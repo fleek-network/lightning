@@ -14,6 +14,11 @@ pub trait Method<T, P> {
     fn name(&self) -> &'static str {
         type_name::<Self>()
     }
+    /// The display name of the method. This is used for printing purposes. It defaults
+    /// to the name of the output type.
+    fn display_name(&self) -> &'static str {
+        type_name::<T>()
+    }
     /// The parameters this method will ask for from the registry when invoked.
     fn dependencies(&self) -> Vec<Ty>;
     /// Consume and invoke the method.
@@ -24,6 +29,7 @@ pub trait Method<T, P> {
 pub struct DynMethod {
     tid: Ty,
     name: &'static str,
+    display_name: &'static str,
     dependencies: Vec<Ty>,
     ptr: *mut (),
     call_fn: fn(*mut (), registry: &Registry) -> Box<dyn Any>,
@@ -38,6 +44,7 @@ impl DynMethod {
     {
         let tid = Ty::of::<T>();
         let name = method.name();
+        let display_name = method.display_name();
 
         let dependencies = method.dependencies();
 
@@ -64,6 +71,7 @@ impl DynMethod {
         Self {
             tid,
             name,
+            display_name,
             dependencies,
             ptr,
             call_fn: call_fn::<F, T, P>,
@@ -79,6 +87,11 @@ impl DynMethod {
     /// Returns the captured result from [`Method::name`].
     pub fn name(&self) -> &'static str {
         self.name
+    }
+
+    /// Returns the captured result from [`Method::display_name`].
+    pub fn display_name(&self) -> &'static str {
+        self.display_name
     }
 
     /// Returns the captured result from [`Method::dependencies`].
@@ -111,8 +124,7 @@ impl Drop for DynMethod {
     }
 }
 
-/// A higher order function over a injetable that can change the name of the injetable to the
-/// given name.
+/// A higher order function over a method that can change the name of the method to the given name.
 pub struct Named<T, P, F: Method<T, P>> {
     name: &'static str,
     method: F,
@@ -130,8 +142,7 @@ impl<T, P, F: Method<T, P>> Named<T, P, F> {
         }
     }
 
-    // Wrap the given method with a name parsed from the return type,
-    // with all generics removed.
+    // Wrap the given method with a name parsed from the return type, with all generics removed.
     #[inline(always)]
     pub fn from_return_type(method: F) -> Self {
         let existing = std::any::type_name::<T>();
@@ -147,6 +158,11 @@ impl<T, P, F: Method<T, P>> Named<T, P, F> {
 impl<T, P, F: Method<T, P>> Method<T, P> for Named<T, P, F> {
     #[inline(always)]
     fn name(&self) -> &'static str {
+        self.method.name()
+    }
+
+    #[inline(always)]
+    fn display_name(&self) -> &'static str {
         self.name
     }
 
@@ -165,6 +181,7 @@ impl<T, P, F: Method<T, P>> Method<T, P> for Named<T, P, F> {
 pub struct Value<T>(pub T);
 
 impl<T> Method<T, ()> for Value<T> {
+    #[inline(always)]
     fn dependencies(&self) -> Vec<Ty> {
         vec![]
     }
@@ -181,6 +198,11 @@ where
     #[inline(always)]
     fn name(&self) -> &'static str {
         self.0.name()
+    }
+
+    #[inline(always)]
+    fn display_name(&self) -> &'static str {
+        self.0.display_name()
     }
 
     #[inline(always)]
@@ -212,6 +234,11 @@ where
     #[inline(always)]
     fn name(&self) -> &'static str {
         self.0.name()
+    }
+
+    #[inline(always)]
+    fn display_name(&self) -> &'static str {
+        self.0.display_name()
     }
 
     #[inline(always)]
@@ -249,6 +276,11 @@ where
     }
 
     #[inline(always)]
+    fn display_name(&self) -> &'static str {
+        self.0.display_name()
+    }
+
+    #[inline(always)]
     fn dependencies(&self) -> Vec<Ty> {
         self.0.dependencies()
     }
@@ -269,15 +301,16 @@ macro_rules! impl_for_fn {
     ) => {
         impl<F, T $(, $name)* $(, $name_mut)*> Method<T, (
             (
-                $($name,)*
+                $($name_mut,)*
             ),
             (
-                $($name_mut,)*
+                $($name,)*
             )
         )> for F
         where
             F: FnOnce(
-                $(&$name,)*  $(&mut $name_mut,)*
+                $(&mut $name_mut,)*
+                $(&$name,)*
             ) -> T,
             $($name: 'static,)*
             $($name_mut: 'static,)*
@@ -292,8 +325,8 @@ macro_rules! impl_for_fn {
             #[allow(unused)]
             fn call(self, registry: &Registry) -> T {
                 (self)(
-                    $(&registry.get::<$name>(),)*
                     $(&mut registry.get_mut::<$name_mut>(),)*
+                    $(&registry.get::<$name>(),)*
                 )
             }
         }
@@ -384,28 +417,10 @@ mod tests {
         struct Thing(Vec<u8>);
         let maker = DynMethod::new(Named::new("Foo", Value(Thing(vec![0, 1]))));
         assert_eq!(maker.ty(), Ty::of::<Thing>());
-        assert_eq!(maker.name(), "Foo");
+        assert_eq!(maker.display_name(), "Foo");
         assert_eq!(maker.dependencies(), &vec![]);
         let thing = maker.call(&Registry::default());
         let thing = *thing.downcast::<Thing>().unwrap();
         assert_eq!(&thing, &Thing(vec![0, 1]));
-    }
-
-    #[test]
-    fn gen() {
-        let mut names = (0..10).map(|n| format!("A{n}")).collect::<Vec<_>>();
-        for i in 0..=3 {
-            let x = names[0..i].join(" ");
-            for j in i..=10 {
-                let y = names[i..j].join(" ");
-                for k in j..=10 {
-                    let z = names[j..k].join(" ");
-                    if k - j > 5 {
-                        continue;
-                    }
-                    println!("x!([{x}], [{y}], [{z}]);")
-                }
-            }
-        }
     }
 }
