@@ -405,7 +405,7 @@ impl DependencyGraph {
         let constructor = self
             .constructors
             .remove(&ty)
-            .unwrap_or_else(|| panic!("Constructor for type not provided. tid={ty:?}"));
+            .unwrap_or_else(|| panic!("Constructor for type '{}' not provided.", ty.name()));
 
         let name = constructor.name();
         let rt_name = constructor.ty().name();
