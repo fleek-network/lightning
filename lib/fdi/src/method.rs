@@ -7,6 +7,7 @@ use anyhow::Result;
 use crate::object::Object;
 use crate::registry::Registry;
 use crate::ty::Ty;
+use crate::Eventstore;
 
 /// An internal trait that is implemented for any function-like object that can be called once.
 pub trait Method<T, P> {
@@ -18,6 +19,10 @@ pub trait Method<T, P> {
     /// to the name of the output type.
     fn display_name(&self) -> &'static str {
         type_name::<T>()
+    }
+    /// Return the events that should be registered after this method is invoked.
+    fn events(&self) -> Option<Eventstore> {
+        None
     }
     /// The parameters this method will ask for from the registry when invoked.
     fn dependencies(&self) -> Vec<Ty>;
@@ -34,6 +39,7 @@ pub struct DynMethod {
     ptr: *mut (),
     call_fn: fn(*mut (), registry: &Registry) -> Box<dyn Any>,
     drop_fn: fn(*mut ()),
+    events_fn: fn(*mut ()) -> Option<Eventstore>,
 }
 
 impl DynMethod {
@@ -68,6 +74,18 @@ impl DynMethod {
             drop(value);
         }
 
+        fn events_fn<F, T, P>(ptr: *mut ()) -> Option<Eventstore>
+        where
+            F: Method<T, P>,
+            T: 'static,
+        {
+            let ptr = ptr as *mut F;
+            let value = unsafe { Box::from_raw(ptr) };
+            let result = value.events();
+            std::mem::forget(value);
+            result
+        }
+
         Self {
             tid,
             name,
@@ -76,6 +94,7 @@ impl DynMethod {
             ptr,
             call_fn: call_fn::<F, T, P>,
             drop_fn: drop_fn::<F>,
+            events_fn: events_fn::<F, T, P>,
         }
     }
 
@@ -92,6 +111,11 @@ impl DynMethod {
     /// Returns the captured result from [`Method::display_name`].
     pub fn display_name(&self) -> &'static str {
         self.display_name
+    }
+
+    /// Returns the result from [`Method::events`].
+    pub fn events(&self) -> Option<Eventstore> {
+        (self.events_fn)(self.ptr)
     }
 
     /// Returns the captured result from [`Method::dependencies`].
@@ -172,6 +196,11 @@ impl<T, P, F: Method<T, P>> Method<T, P> for Named<T, P, F> {
     }
 
     #[inline(always)]
+    fn events(&self) -> Option<Eventstore> {
+        self.method.events()
+    }
+
+    #[inline(always)]
     fn call(self, registry: &Registry) -> T {
         self.method.call(registry)
     }
@@ -203,6 +232,11 @@ where
     #[inline(always)]
     fn display_name(&self) -> &'static str {
         self.0.display_name()
+    }
+
+    #[inline(always)]
+    fn events(&self) -> Option<Eventstore> {
+        self.0.events()
     }
 
     #[inline(always)]
@@ -239,6 +273,11 @@ where
     #[inline(always)]
     fn display_name(&self) -> &'static str {
         self.0.display_name()
+    }
+
+    #[inline(always)]
+    fn events(&self) -> Option<Eventstore> {
+        self.0.events()
     }
 
     #[inline(always)]
@@ -281,6 +320,11 @@ where
     }
 
     #[inline(always)]
+    fn events(&self) -> Option<Eventstore> {
+        self.0.events()
+    }
+
+    #[inline(always)]
     fn dependencies(&self) -> Vec<Ty> {
         self.0.dependencies()
     }
@@ -296,8 +340,8 @@ where
 
 macro_rules! impl_for_fn {
     (
-        [$($name:ident)*],
-        [ $($name_mut:ident)* ]
+        [ $($name_mut:ident)* ],
+        [$($name:ident)*]
     ) => {
         impl<F, T $(, $name)* $(, $name_mut)*> Method<T, (
             (

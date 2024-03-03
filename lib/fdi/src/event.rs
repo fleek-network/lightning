@@ -1,4 +1,6 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::marker::PhantomData;
 
 use indexmap::IndexSet;
 
@@ -13,6 +15,13 @@ pub struct Eventstore {
 }
 
 impl Eventstore {
+    /// Extend the current event store with another event store.
+    pub fn extend(&mut self, other: Eventstore) {
+        for (ev, handlers) in other.handlers {
+            self.handlers.entry(ev).or_default().extend(handlers);
+        }
+    }
+
     /// Return a set of all of the dependencies required to trigger an event.
     pub fn get_dependencies(&self, event: &'static str) -> IndexSet<Ty> {
         let mut result = IndexSet::new();
@@ -49,5 +58,76 @@ impl Eventstore {
             }
         }
         result
+    }
+}
+
+pub struct WithEvents<F, T, P>
+where
+    F: Method<T, P>,
+{
+    method: F,
+    events: RefCell<Eventstore>,
+    _unused: PhantomData<(T, P)>,
+}
+
+impl<F, T, P> WithEvents<F, T, P>
+where
+    F: Method<T, P>,
+{
+    pub fn new(method: F) -> Self {
+        Self {
+            method,
+            events: RefCell::new(Eventstore::default()),
+            _unused: PhantomData,
+        }
+    }
+
+    /// Register a new handler for the given event. The handler will only be called once when the
+    /// event is triggered.
+    pub fn on<Fx, Tx, Px>(self, event: &'static str, handler: Fx) -> Self
+    where
+        Fx: Method<Tx, Px>,
+        Tx: 'static,
+    {
+        self.events.borrow_mut().on(event, handler);
+        self
+    }
+}
+
+impl<F, T, P> Method<T, P> for WithEvents<F, T, P>
+where
+    F: Method<T, P>,
+{
+    #[inline(always)]
+    fn name(&self) -> &'static str {
+        self.method.name()
+    }
+
+    #[inline(always)]
+    fn display_name(&self) -> &'static str {
+        self.method.display_name()
+    }
+
+    #[inline(always)]
+    fn events(&self) -> Option<Eventstore> {
+        let mut borrow = self.events.borrow_mut();
+        let events_mut_ref = &mut *borrow;
+        let events = std::mem::take(events_mut_ref);
+        if let Some(mut prev) = self.method.events() {
+            prev.extend(events);
+            Some(prev)
+        } else {
+            Some(events)
+        }
+    }
+
+    #[inline(always)]
+    fn dependencies(&self) -> Vec<Ty> {
+        self.method.dependencies()
+    }
+
+    #[inline(always)]
+    fn call(self, registry: &Registry) -> T {
+        self.method.call(registry)
     }
 }
