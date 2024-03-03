@@ -409,6 +409,7 @@ impl DependencyGraph {
 
         let name = constructor.name();
         let rt_name = constructor.ty().name();
+        let maybe_events = constructor.events();
         let value = constructor.call(registry);
 
         let value = value
@@ -419,6 +420,12 @@ impl DependencyGraph {
             })?;
 
         registry.insert_raw(value);
+
+        if let Some(events) = maybe_events {
+            let mut event_store = registry.get_mut::<Eventstore>();
+            event_store.extend(events);
+        }
+
         Ok(())
     }
 }

@@ -1,4 +1,9 @@
-use crate::{Container, DependencyGraph, Registry};
+use std::borrow::Borrow;
+use std::collections::HashMap;
+use std::hash::Hash;
+
+use crate::event::WithEvents;
+use crate::{Container, DependencyGraph, DynMethod, Eventstore, Method, Registry, Value};
 
 mod demo_dep {
     use crate::{DependencyGraph, Eventstore, Named};
@@ -52,6 +57,26 @@ mod demo_dep {
     }
 }
 
+#[derive(Default)]
+struct Counter {
+    counter: HashMap<String, usize>,
+}
+
+impl Counter {
+    pub fn add(&mut self, key: impl Into<String>) {
+        let key = key.into();
+        *self.counter.entry(key).or_default() += 1;
+    }
+
+    pub fn get<Q: ?Sized>(&self, k: &Q) -> usize
+    where
+        String: Borrow<Q>,
+        Q: Hash + Eq,
+    {
+        *self.counter.get(k).unwrap_or(&0)
+    }
+}
+
 #[test]
 fn test_partial_01() {
     let mut graph = demo_dep::graph();
@@ -93,4 +118,148 @@ fn depending_on_container() {
 
     let mut registry = Registry::default();
     graph.init_one::<B>(&mut registry).expect("Failed to init.");
+}
+
+#[test]
+fn with_value() {
+    let registry = Registry::default();
+    let value = Value(String::from("Hello!"));
+    let value = value.call(&registry);
+    assert_eq!(value, "Hello!");
+
+    let registry = Registry::default();
+    let value = Value(String::from("Hello!"));
+    let value = DynMethod::new(value);
+    let value = value.call(&registry).downcast::<String>().unwrap();
+    assert_eq!(*value, "Hello!");
+
+    let mut registry = Registry::default();
+    let graph = DependencyGraph::new().with_value(String::from("Hello!"));
+    graph.init_all(&mut registry).unwrap();
+    assert_eq!(&*registry.get::<String>(), "Hello!");
+}
+
+#[test]
+fn post_should_be_fired() {
+    struct A;
+    struct B;
+
+    fn new_a(store: &mut Eventstore) -> A {
+        store.on("_post", |counter: &mut Counter| {
+            counter.add("A::_post");
+        });
+
+        A
+    }
+
+    fn new_b() -> B {
+        B
+    }
+
+    let mut graph = DependencyGraph::new()
+        .with_infallible(new_a)
+        .with_infallible(new_b);
+
+    let mut registry = Registry::default();
+    registry.insert(Counter::default());
+
+    graph.init_one::<B>(&mut registry).expect("Failed to init.");
+    assert_eq!(registry.get::<Counter>().get("A::_post"), 0);
+
+    graph.init_one::<A>(&mut registry).expect("Failed to init.");
+    assert_eq!(registry.get::<Counter>().get("A::_post"), 1);
+}
+
+#[test]
+fn post_should_resolve_unmet_dep() {
+    struct A;
+    struct B;
+
+    fn new_a(store: &mut Eventstore) -> A {
+        store.on("_post", |counter: &mut Counter| {
+            counter.add("A::_post");
+        });
+        A
+    }
+
+    fn new_b(store: &mut Eventstore) -> B {
+        store.on("_post", |counter: &mut Counter, _a: &A| {
+            counter.add("B::_post");
+        });
+        B
+    }
+
+    let mut graph = DependencyGraph::new()
+        .with_infallible(new_a)
+        .with_infallible(new_b);
+
+    let mut registry = Registry::default();
+    registry.insert(Counter::default());
+
+    graph.init_one::<B>(&mut registry).expect("Failed to init.");
+    assert_eq!(registry.get::<Counter>().get("B::_post"), 1);
+    assert_eq!(registry.get::<Counter>().get("A::_post"), 1);
+}
+
+#[test]
+fn basic_with_events_should_work() {
+    #[derive(Default)]
+    struct A;
+
+    let mut graph = DependencyGraph::new().with_infallible(
+        WithEvents::new(A::default)
+            .on("_post", |counter: &mut Counter| {
+                counter.add("A::_post");
+            })
+            .on("_start", |counter: &mut Counter| {
+                counter.add("A::_start");
+            }),
+    );
+
+    let mut registry = Registry::default();
+    registry.insert(Counter::default());
+    graph.init_one::<A>(&mut registry).expect("Failed to init.");
+    assert_eq!(registry.get::<Counter>().get("A::_post"), 1);
+    assert_eq!(registry.get::<Counter>().get("A::_start"), 0);
+    registry.trigger("_start");
+    assert_eq!(registry.get::<Counter>().get("A::_start"), 1);
+}
+
+#[test]
+fn nested_with_events_should_work() {
+    #[derive(Default)]
+    struct A;
+
+    let mut graph = DependencyGraph::new().with_infallible(
+        WithEvents::new(
+            WithEvents::new(A::default)
+                .on("_post", |counter: &mut Counter| {
+                    counter.add("A::_post");
+                })
+                .on("_start", |counter: &mut Counter| {
+                    counter.add("A::_start");
+                })
+                .on("_inner", |counter: &mut Counter| {
+                    counter.add("A::_inner");
+                }),
+        )
+        .on("_post", |counter: &mut Counter| {
+            counter.add("A::_post");
+        })
+        .on("_outer", |counter: &mut Counter| {
+            counter.add("A::_outer");
+        }),
+    );
+
+    let mut registry = Registry::default();
+    registry.insert(Counter::default());
+    graph.init_one::<A>(&mut registry).expect("Failed to init.");
+    assert_eq!(registry.get::<Counter>().get("A::_post"), 2);
+    assert_eq!(registry.get::<Counter>().get("A::_start"), 0);
+    registry.trigger("_start");
+    assert_eq!(registry.get::<Counter>().get("A::_start"), 1);
+    registry.trigger("_inner");
+    assert_eq!(registry.get::<Counter>().get("A::_inner"), 1);
+    registry.trigger("_outer");
+    assert_eq!(registry.get::<Counter>().get("A::_outer"), 1);
 }
