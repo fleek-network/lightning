@@ -42,6 +42,10 @@ impl Eventstore {
         F: Method<T, P>,
         T: 'static,
     {
+        if handler.events().is_some() {
+            panic!("Event handler can not be a WithEvents.");
+        }
+
         self.handlers
             .entry(event)
             .or_default()
@@ -61,6 +65,9 @@ impl Eventstore {
     }
 }
 
+/// This wrapper allows to define a series of events on top of a method, and these events will only
+/// be registerd (activated) when the method itself is called. In other words these events will not
+/// even exist as long as the constructor method is used by the dependency graph.
 pub struct WithEvents<F, T, P>
 where
     F: Method<T, P>,
@@ -82,8 +89,7 @@ where
         }
     }
 
-    /// Register a new handler for the given event. The handler will only be called once when the
-    /// event is triggered.
+    /// Register a new handler for the given event.
     pub fn on<Fx, Tx, Px>(self, event: &'static str, handler: Fx) -> Self
     where
         Fx: Method<Tx, Px>,
