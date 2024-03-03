@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::fmt::Write;
 use std::rc::Rc;
 
 use anyhow::{Context, Result};
@@ -23,6 +24,28 @@ impl DependencyGraph {
     /// Create a new and empty [`DependencyGraph`].
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn viz(&self) -> String {
+        let mut result = String::with_capacity(4096);
+        let mut names = HashMap::new();
+
+        for (ty, method) in &self.constructors {
+            let name = method.display_name();
+            names.insert(*ty, name);
+            writeln!(result, "{name}").unwrap();
+        }
+
+        for (ty, dependencies) in &self.graph {
+            let ty_name = names.get(ty).copied().unwrap_or(ty.name());
+
+            for dep in dependencies {
+                let dep_name = names.get(dep).copied().unwrap_or(dep.name());
+                writeln!(result, "{} -> {}", ty_name, dep_name).unwrap();
+            }
+        }
+
+        result
     }
 
     /// Expand the current dependency graph from another dependency graph.
@@ -366,47 +389,4 @@ impl DependencyGraph {
         registry.insert_raw(value);
         Ok(())
     }
-}
-
-#[test]
-fn xxx() {
-    use crate::event::Eventstore;
-
-    #[derive(Debug)]
-    struct Thing1(u32);
-    #[derive(Debug)]
-    struct Thing2(u32);
-    struct SubComponentOfThing2;
-
-    impl Thing2 {
-        pub fn get_sub(&self) -> SubComponentOfThing2 {
-            SubComponentOfThing2
-        }
-    }
-
-    fn make_thing2(events: &mut Eventstore) -> Result<Thing2> {
-        events.on("_post", |this: &mut Thing2| {
-            dbg!(this);
-        });
-
-        // events.on("start", |this: &Take<Thing2>| {
-        //     let this = this.take();
-        // });
-
-        Ok(Thing2(15))
-    }
-
-    let graph = DependencyGraph::default()
-        .with_infallible(|| Thing1(12))
-        .with(make_thing2)
-        .with_infallible(Thing2::get_sub);
-
-    let mut registry = Registry::default();
-    graph.init_all(&mut registry).unwrap();
-
-    let thing1 = &*registry.get::<Thing1>();
-    println!("{thing1:?}");
-
-    let thing2 = &*registry.get::<Thing2>();
-    println!("{thing2:?}");
 }
