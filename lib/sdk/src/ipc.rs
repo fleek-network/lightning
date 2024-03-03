@@ -11,6 +11,7 @@
 use std::error::Error;
 use std::path::PathBuf;
 
+use lightning_schema::LightningMessage;
 use tokio::io::{self, Interest};
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::mpsc;
@@ -71,62 +72,39 @@ pub(crate) async fn spawn_service_loop_inner(
     ipc_stream: UnixStream,
     mut rx: mpsc::Receiver<IpcRequest>,
 ) -> Result<(), Box<dyn Error>> {
-    const IPC_REQUEST_SIZE: usize = std::mem::size_of::<IpcRequest>();
-    const IPC_MESSAGE_SIZE: usize = std::mem::size_of::<IpcMessage>();
+    // Vecs are mostly fine here because allocation should really only ever occur a few times
+    // throught execution runtime since there arent any dynamic types
+    // however we might want to consider using a fixed size
 
     // IpcRequest
-    let mut write_buffer = [0; IPC_REQUEST_SIZE];
-    let mut write_buffer_pos = IPC_REQUEST_SIZE;
+    let mut write_buffer = Vec::<u8>::new();
+    let mut write_buffer_pos = 0_usize;
     // IpcMessage
-    let mut read_buffer = [0; IPC_MESSAGE_SIZE];
-    let mut read_buffer_pos = 0;
+    let mut read_buffer = Vec::<u8>::new();
+    let mut read_buffer_pos = 0_usize;
+    let mut read_len = 0_u32;
 
     'outer: loop {
-        // Check to see if we have something to write. If the current `write_buffer`
-        // is already flushed out (write_buffer_pos == IPC_REQUEST_SIZE), try to get
-        // something from the mpsc channel and encode it.
-
-        if write_buffer_pos == IPC_REQUEST_SIZE {
-            if let Ok(req) = rx.try_recv() {
-                write_buffer_pos = 0;
-                write_buffer =
-                    unsafe { std::mem::transmute::<IpcRequest, [u8; IPC_REQUEST_SIZE]>(req) };
-            }
-        }
-
-        let ready = if write_buffer_pos == IPC_REQUEST_SIZE {
-            // We're not interested to write anything atm. So we have to wait until the UDS
-            // is ready for read. And we can also at the same time wait until there is message
-            // in the mpsc channel.
+        let ready = if write_buffer.is_empty() {
             tokio::select! {
                 ready_result = ipc_stream.ready(Interest::READABLE) => {
-                    ready_result
+                    ready_result?
                 },
                 Some(req) = rx.recv() => {
-                    write_buffer_pos = 0;
-                    write_buffer =
-                        unsafe { std::mem::transmute::<IpcRequest, [u8; IPC_REQUEST_SIZE]>(req) };
-                    // Okay now we have something to write. Let's jump back to the beginning of
-                    // the outer loop. This time `write_buffer_pos == 0` and that would trigger
-                    // us waiting for `ready(WRITABLE)` and the rest will follow as normal.
+                    IpcRequest::encode_length_delimited(&req, &mut write_buffer)?;
                     continue 'outer;
                 }
             }
         } else {
             ipc_stream
                 .ready(Interest::WRITABLE | Interest::READABLE)
-                .await
-        }?;
+                .await?
+        };
 
-        if ready.is_writable() {
-            // This inner loop will iterate as long as we have messages to write. Once we don't have
-            // any message to write. We break from it which will allow us to continue with the code
-            // and execute the `read` task, as opposed to just jumping to 'outer' which would prefer
-            // pending writes again.
+        // if we can write and there are messages to write, we should write as many as possible
+        if ready.is_writable() && !write_buffer.is_empty() {
             'write: loop {
-                // The socket is writable. First try to flush whatever that is left in the write
-                // buffer.
-                while write_buffer_pos < IPC_REQUEST_SIZE {
+                while write_buffer_pos < write_buffer.len() {
                     match ipc_stream.try_write(&write_buffer[write_buffer_pos..]) {
                         Ok(n) => {
                             write_buffer_pos += n;
@@ -140,10 +118,13 @@ pub(crate) async fn spawn_service_loop_inner(
                     }
                 }
 
+                // always clear because we know it has non zero values
+                write_buffer.clear();
+                write_buffer_pos = 0;
+
+                // See if can write any more messages in this loop
                 if let Ok(req) = rx.try_recv() {
-                    write_buffer_pos = 0;
-                    write_buffer =
-                        unsafe { std::mem::transmute::<IpcRequest, [u8; IPC_REQUEST_SIZE]>(req) };
+                    IpcRequest::encode_length_delimited(&req, &mut write_buffer)?;
                 } else {
                     break 'write;
                 }
@@ -152,8 +133,46 @@ pub(crate) async fn spawn_service_loop_inner(
 
         if ready.is_readable() {
             'read: loop {
-                while read_buffer_pos < IPC_MESSAGE_SIZE {
-                    match ipc_stream.try_read(&mut read_buffer[read_buffer_pos..]) {
+                // try to read the length from the buffer,
+                // if were not already trying to read a message
+                while read_buffer_pos < 4 && read_len == 0 {
+                    match ipc_stream.try_read(&mut read_buffer) {
+                        // socket reset
+                        Ok(0) => {
+                            break 'outer;
+                        },
+                        Ok(n) => {
+                            read_buffer_pos += n;
+                            // continue
+                        },
+                        Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                            // there is nothiing in the stream to read
+                            break 'read;
+                        },
+                        Err(e) => {
+                            return Err(e.into());
+                        },
+                    }
+                }
+
+                // if the len is 0 then we dont have any messages yet, therefore we jsut finished
+                // reading the len or else we would have broken out
+                if read_len == 0 {
+                    read_len = u32::from_le_bytes(
+                        read_buffer[0..4]
+                            .try_into()
+                            .expect("can create length from stream bytes"),
+                    );
+
+                    // clear the buffer of the len bytes
+                    read_buffer_pos = 0;
+                    read_buffer.clear();
+                }
+
+                // this downcasting should be safe because its from a u32
+                // and no one should be running this on a < 32 bit machine
+                while read_buffer_pos < read_len as usize {
+                    match ipc_stream.try_read(&mut read_buffer) {
                         Ok(0) => {
                             break 'outer;
                         },
@@ -169,11 +188,13 @@ pub(crate) async fn spawn_service_loop_inner(
                     }
                 }
 
-                debug_assert_eq!(read_buffer_pos, IPC_MESSAGE_SIZE);
+                let message = IpcMessage::decode(&read_buffer)?;
+
+                // cleanup now that weve read the message
                 read_buffer_pos = 0;
-                let message = unsafe {
-                    std::mem::transmute_copy::<[u8; IPC_MESSAGE_SIZE], IpcMessage>(&read_buffer)
-                };
+                read_len = 0;
+                read_buffer.clear();
+
                 handle_message(message);
             }
         }
@@ -252,7 +273,7 @@ mod tests {
         let started = std::time::Instant::now();
         for i in 0..100 {
             let send_task = tokio::spawn(async move {
-                send_and_await_response(Request::QueryClientBandwidth { pk: [i; 96] }).await
+                send_and_await_response(Request::QueryClientBandwidth { pk: [i; 96].into() }).await
             });
 
             let mut buffer = [0; std::mem::size_of::<IpcRequest>()];
@@ -277,7 +298,10 @@ mod tests {
             assert_eq!(pos, std::mem::size_of::<IpcRequest>());
 
             let req = unsafe { std::mem::transmute::<_, IpcRequest>(buffer) };
-            assert_eq!(req.request, Request::QueryClientBandwidth { pk: [i; 96] });
+            assert_eq!(
+                req.request,
+                Request::QueryClientBandwidth { pk: [i; 96].into() }
+            );
 
             let result = IpcMessage::Response {
                 request_ctx: req.request_ctx.unwrap(),

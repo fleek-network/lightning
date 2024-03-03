@@ -6,7 +6,8 @@ edition.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-lightning-interfaces = { path = "../interfaces/" }
+lightning-interfaces = { path = "../interfaces" }
+lightning-schema = { path = "../schema" }
 fn-sdk = { path = "../../lib/sdk" }
 infusion.workspace = true
 fleek-crypto.workspace = true

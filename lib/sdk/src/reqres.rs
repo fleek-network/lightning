@@ -19,8 +19,10 @@ macro_rules! ReqRes {
         ),*
         $(,)?
     } => (
-    #[derive(Clone, Copy, Debug, IsVariant, PartialEq, Eq)]
-    #[repr(C)]
+    #[rustfmt::skip]
+    #[derive(
+        Clone, Copy, Debug, IsVariant, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize
+    )]
     #[non_exhaustive]
     pub enum Request {
     $(
@@ -33,8 +35,10 @@ macro_rules! ReqRes {
     }),*
     }
 
-    #[derive(Clone, Copy, Debug, IsVariant, PartialEq, Eq)]
-    #[repr(C)]
+    #[rustfmt::skip]
+    #[derive(
+        Clone, Copy, Debug, IsVariant, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize
+    )]
     #[non_exhaustive]
     pub enum Response {
     $(
