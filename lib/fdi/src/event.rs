@@ -35,6 +35,14 @@ impl Eventstore {
         result
     }
 
+    pub(crate) fn insert(&mut self, event: &'static str, handler: DynMethod) {
+        if handler.events().is_some() {
+            panic!("Event handler can not be a WithEvents.");
+        }
+
+        self.handlers.entry(event).or_default().push(handler);
+    }
+
     /// Register a new handler for the given event. The handler will only be called once when the
     /// event is triggered.
     pub fn on<F, T, P>(&mut self, event: &'static str, handler: F)
@@ -42,14 +50,7 @@ impl Eventstore {
         F: Method<T, P>,
         T: 'static,
     {
-        if handler.events().is_some() {
-            panic!("Event handler can not be a WithEvents.");
-        }
-
-        self.handlers
-            .entry(event)
-            .or_default()
-            .push(DynMethod::new(handler));
+        self.insert(event, DynMethod::new(handler))
     }
 
     /// Trigger the event. This is used internally.
