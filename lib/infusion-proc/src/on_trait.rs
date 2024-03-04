@@ -73,9 +73,9 @@ pub fn process_trait(mode: utils::Mode, mut trait_: syn::ItemTrait) -> TokenStre
                         Err(err) => report.extend(err.to_compile_error()),
                     },
                     "_post" => match impl_post(&base_name, item) {
-                        Ok(item) => {
+                        Ok(items) => {
                             has_post = true;
-                            trait_body.push(item);
+                            trait_body.extend(items.into_iter());
                         },
                         Err(err) => report.extend(err.to_compile_error()),
                     },
@@ -301,7 +301,7 @@ fn impl_init(base: &syn::Ident, item: syn::TraitItemFn) -> Result<Vec<syn::Trait
     ])
 }
 
-fn impl_post(base: &syn::Ident, item: syn::TraitItemFn) -> Result<syn::TraitItem> {
+fn impl_post(base: &syn::Ident, item: syn::TraitItemFn) -> Result<Vec<syn::TraitItem>> {
     let Some(block) = &item.default else {
         return Err(Error::new(
             item.span(),
@@ -312,18 +312,31 @@ fn impl_post(base: &syn::Ident, item: syn::TraitItemFn) -> Result<syn::TraitItem
     let (deps, names) = sig::verify_fn_signature(sig::InfuFnKind::Post, &item.sig)?;
     let tags = deps.iter().map(|d| utils::tag(base, d));
 
-    Ok(parse_quote! {
-        #[doc(hidden)]
-        fn infu_post_initialize(&mut self, __container: &infusion::Container) {
-            #(
-                let #names: &<#base as Collection>::#deps = __container.get(#tags);
-             )*
+    Ok(vec![
+        parse_quote! {
+            #[doc(hidden)]
+            fn infu_post_initialize(&mut self, __container: &infusion::Container) {
+                #(
+                    let #names: &<#base as Collection>::#deps = __container.get(#tags);
+                 )*
 
-            {
+                {
+                    #block
+                };
+            }
+        },
+        parse_quote! {
+            #[doc(hidden)]
+            fn infu_post_hack(
+                &mut self,
+                #(
+                    #names: &<#base as Collection>::#deps,
+                 )*
+            ) where Self: Sized {
                 #block
-            };
-        }
-    })
+            }
+        },
+    ])
 }
 
 fn extract_default_attribute(mut item: syn::TraitItemFn) -> (syn::TraitItemFn, Option<syn::Expr>) {

@@ -125,9 +125,7 @@ async fn fetch<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>>(
     tracing::info!("Starting the node.");
     node.start().await;
 
-    let blockstore = node
-        .container
-        .get::<C::BlockStoreServerInterface>(infusion::tag!(C::BlockStoreServerInterface));
+    let blockstore = node.container.get::<C::BlockStoreServerInterface>();
 
     let socket = blockstore.get_socket();
 

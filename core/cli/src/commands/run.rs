@@ -3,7 +3,6 @@ use std::pin::Pin;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use infusion::tag;
 use lightning_interfaces::infu_collection::{Collection, Node};
 use lightning_interfaces::{
     ApplicationInterface,
@@ -47,7 +46,7 @@ where
 
     let mut rx_update_ready = node
         .container
-        .get::<<C as Collection>::SyncronizerInterface>(tag!(C::SyncronizerInterface))
+        .get::<<C as Collection>::SyncronizerInterface>()
         .checkpoint_socket();
 
     let shutdown_future = shutdown_controller.wait_for_shutdown();
@@ -60,7 +59,7 @@ where
                 // get the checkpoint from the blockstore
                 let checkpoint = node
                 .container
-                .get::<<C as Collection>::BlockStoreInterface>(tag!(C::BlockStoreInterface))
+                .get::<<C as Collection>::BlockStoreInterface>()
                 .read_all_to_vec(&checkpoint_hash).await.expect("Failed to read checkpoint from blockstore");
 
                 // shutdown the node
@@ -92,7 +91,7 @@ where
                 // reseed our rx_update_ready
                 rx_update_ready = node
                 .container
-                .get::<<C as Collection>::SyncronizerInterface>(tag!(C::SyncronizerInterface))
+                .get::<<C as Collection>::SyncronizerInterface>()
                 .checkpoint_socket();
             }
         }

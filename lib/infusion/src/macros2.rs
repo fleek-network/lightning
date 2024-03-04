@@ -242,7 +242,7 @@ macro_rules! tag {
 #[macro_export]
 macro_rules! ok {
     ($e:expr) => {
-        ::std::result::Result::<_, $crate::error::Infallible>::Ok($e)
+        ::anyhow::Result::<_>::Ok($e)
     };
 }
 

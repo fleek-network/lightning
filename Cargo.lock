@@ -4990,6 +4990,7 @@ dependencies = [
 name = "infusion"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "indexmap 2.1.0",
  "infusion-proc",
  "log",
@@ -6005,8 +6006,10 @@ dependencies = [
  "blake3-tree",
  "bytes",
  "ethers",
+ "fdi",
  "fleek-crypto",
  "fn-sdk",
+ "futures",
  "hp-fixed",
  "infusion",
  "ink-quill",
@@ -6095,6 +6098,7 @@ dependencies = [
 name = "lightning-notifier"
 version = "0.0.0"
 dependencies = [
+ "anyhow",
  "infusion",
  "lightning-application",
  "lightning-interfaces",

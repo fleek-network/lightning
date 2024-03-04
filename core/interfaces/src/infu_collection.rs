@@ -1,8 +1,10 @@
 use std::marker::PhantomData;
 
+use fdi::{consume, DependencyGraph, MethodExt, Registry};
+use futures::executor::block_on;
 pub use infusion::c;
 use infusion::collection;
-use tracing::info;
+use tokio::runtime::Handle;
 
 use super::*;
 
@@ -36,19 +38,111 @@ collection!([
 
 /// The Fleek Network node.
 pub struct Node<C: Collection> {
-    pub container: infusion::Container,
+    // pub container: infusion::Container,
+    pub container: Registry,
     collection: PhantomData<C>,
 }
 
 impl<C: Collection> Node<C> {
-    pub fn init(
-        config: c![C::ConfigProviderInterface],
-    ) -> Result<Self, infusion::InitializationError> {
-        let graph = C::build_graph();
+    pub fn init(config: C::ConfigProviderInterface) -> Result<Self, infusion::InitializationError> {
+        let graph = DependencyGraph::new()
+            .with_infallible(Handle::current) // tokio runtime handle
+            .with_infallible(|| config)
+            .with(C::KeystoreInterface::infu_initialize_hack)
+            .with(C::BlockStoreInterface::infu_initialize_hack)
+            .with(C::BlockStoreServerInterface::infu_initialize_hack.on(
+                "start",
+                consume(|c: C::BlockStoreServerInterface| block_on(c.start())),
+            ))
+            .with(
+                <C::ApplicationInterface as ApplicationInterface<C>>::infu_initialize_hack
+                    .on("start", |c: &C::ApplicationInterface| block_on(c.start())),
+            )
+            .with(
+                C::SyncronizerInterface::infu_initialize_hack
+                    .on("start", |c: &C::SyncronizerInterface| block_on(c.start())),
+            )
+            .with(
+                C::BroadcastInterface::infu_initialize_hack
+                    .on("start", |c: &C::BroadcastInterface| block_on(c.start())),
+            )
+            .with(
+                C::TopologyInterface::infu_initialize_hack
+                    .on("start", |c: &C::TopologyInterface| block_on(c.start())),
+            )
+            .with(
+                C::ArchiveInterface::infu_initialize_hack
+                    .on("start", |c: &C::ArchiveInterface| block_on(c.start())),
+            )
+            .with(
+                C::ConsensusInterface::infu_initialize_hack
+                    .on("start", |c: &C::ConsensusInterface| block_on(c.start())),
+            )
+            .with(
+                C::HandshakeInterface::infu_initialize_hack
+                    .on("start", |c: &C::HandshakeInterface| block_on(c.start())),
+            )
+            .with(C::NotifierInterface::infu_initialize_hack)
+            .with(
+                C::OriginProviderInterface::infu_initialize_hack
+                    .on("start", |c: &C::OriginProviderInterface| {
+                        block_on(c.start())
+                    }),
+            )
+            // .with(
+            //     C::DeliveryAcknowledgmentAggregatorInterface::infu_initialize_hack.on(
+            //         "start",
+            //         |c: &C::DeliveryAcknowledgmentAggregatorInterface| {
+            //             h.block_on(c.start())
+            //         },
+            //     ),
+            // )
+            .with(
+                C::ReputationAggregatorInterface::infu_initialize_hack
+                    .on("start", |c: &C::ReputationAggregatorInterface| {
+                        block_on(c.start())
+                    }),
+            )
+            .with(
+                <C::ResolverInterface as ResolverInterface<C>>::infu_initialize_hack
+                    .on("start", |c: &C::ResolverInterface| block_on(c.start())),
+            )
+            .with(
+                C::RpcInterface::infu_initialize_hack
+                    .on("start", |c: &C::RpcInterface| block_on(c.start())),
+            )
+            .with(
+                C::ServiceExecutorInterface::infu_initialize_hack
+                    .on("start", |c: &C::ServiceExecutorInterface| {
+                        block_on(c.start())
+                    }),
+            )
+            .with(
+                C::SignerInterface::infu_initialize_hack
+                    .on("_post", C::SignerInterface::infu_post_hack)
+                    .on("start", |c: &C::SignerInterface| block_on(c.start())),
+            )
+            .with(
+                C::FetcherInterface::infu_initialize_hack
+                    .on("start", |c: &C::FetcherInterface| block_on(c.start())),
+            )
+            .with(
+                C::PoolInterface::infu_initialize_hack
+                    .on("start", |c: &C::PoolInterface| block_on(c.start())),
+            )
+            .with(
+                C::PingerInterface::infu_initialize_hack
+                    .on("start", |c: &C::PingerInterface| block_on(c.start())),
+            )
+            .with(<C::IndexerInterface as IndexerInterface<C>>::infu_initialize_hack);
 
-        let container = infusion::Container::default()
-            .with(infusion::tag!(C::ConfigProviderInterface), config)
-            .initialize(graph)?;
+        let vis = graph.viz();
+        println!("{vis}");
+
+        let mut container = Registry::default();
+        graph
+            .init_all(&mut container)
+            .expect("failed to init dependency graph");
 
         Ok(Self {
             container,
@@ -57,21 +151,23 @@ impl<C: Collection> Node<C> {
     }
 
     pub async fn start(&self) {
-        start_or_shutdown_node::<C>(&self.container, true).await;
+        self.container.trigger("start");
     }
 
+    /// Temporary shutdown for old start and shutdown handlers
     pub async fn shutdown(&self) {
-        start_or_shutdown_node::<C>(&self.container, false).await;
+        self.container.trigger("shutdown");
     }
 
     /// Will load the appstate from a checkpoint. Stops the proccesses that depend on the appstate,
     /// replaces the db with the checkpoint and restarts the processess
     pub async fn load_checkpoint(&self, _checkpoint: ()) {
         // shutdown node
-        start_or_shutdown_node::<C>(&self.container, false).await;
+        // start_or_shutdown_node::<C>(&self.container, false).await;
         // load db
 
-        start_or_shutdown_node::<C>(&self.container, true).await;
+        // start_or_shutdown_node::<C>(&self.container, true).await;
+        todo!("this should be refactored elsewhere, node should get dropped")
     }
 
     /// Fill the configuration provider with the default configuration without performing any
@@ -98,37 +194,4 @@ impl<C: Collection> Node<C> {
         provider.get::<C::PoolInterface>();
         provider.get::<C::PingerInterface>();
     }
-}
-
-forward!(async fn start_or_shutdown_node(this, start: bool) on [
-    BlockStoreServerInterface,
-    SignerInterface,
-    TopologyInterface,
-    PoolInterface,
-    ApplicationInterface,
-    SyncronizerInterface,
-    ReputationAggregatorInterface,
-    PingerInterface,
-    BroadcastInterface,
-    HandshakeInterface,
-    ArchiveInterface,
-    ConsensusInterface,
-    ResolverInterface,
-    DeliveryAcknowledgmentAggregatorInterface,
-    OriginProviderInterface,
-    FetcherInterface,
-    ServiceExecutorInterface,
-    RpcInterface,
-] {
-    if start {
-        info!("starting {}", get_name(&this));
-        this.start().await;
-    } else {
-        info!("shutting down {}", get_name(&this));
-        this.shutdown().await;
-    }
-});
-
-fn get_name<T>(_: &T) -> &str {
-    std::any::type_name::<T>()
 }
