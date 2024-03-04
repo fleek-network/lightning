@@ -3,10 +3,11 @@ use std::collections::HashMap;
 use std::hash::Hash;
 
 use crate::event::WithEvents;
-use crate::{Container, DependencyGraph, DynMethod, Eventstore, Method, Registry, Value};
+use crate::{Container, DependencyGraph, DynMethod, Eventstore, Method, Registry};
 
 mod demo_dep {
-    use crate::{DependencyGraph, Eventstore, Named};
+    use crate::ext::MethodExt;
+    use crate::{DependencyGraph, Eventstore};
 
     pub struct Application;
     pub struct QueryRunner;
@@ -46,11 +47,8 @@ mod demo_dep {
 
     pub fn graph() -> DependencyGraph {
         DependencyGraph::new()
-            .with_infallible(Named::new("App", Application::new))
-            .with_infallible(Named::new(
-                "App::QueryRunner",
-                Application::get_query_runner,
-            ))
+            .with_infallible(Application::new.with_display_name("App"))
+            .with_infallible(Application::get_query_runner.with_display_name("App::QueryRunner"))
             .with_infallible(Archive::new)
             .with_infallible(Blockstore::new)
             .with_infallible(Indexer::new)
@@ -123,12 +121,12 @@ fn depending_on_container() {
 #[test]
 fn with_value() {
     let registry = Registry::default();
-    let value = Value(String::from("Hello!"));
+    let value = || String::from("Hello!");
     let value = value.call(&registry);
     assert_eq!(value, "Hello!");
 
     let registry = Registry::default();
-    let value = Value(String::from("Hello!"));
+    let value = || String::from("Hello!");
     let value = DynMethod::new(value);
     let value = value.call(&registry).downcast::<String>().unwrap();
     assert_eq!(*value, "Hello!");
