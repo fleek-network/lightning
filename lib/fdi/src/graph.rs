@@ -6,10 +6,11 @@ use std::rc::Rc;
 use anyhow::{Context, Result};
 use indexmap::{IndexMap, IndexSet};
 
-use crate::method::{DynMethod, Method, ToInfallible, ToResultObject, Value};
+use crate::helpers::to_result_object;
+use crate::method::{DynMethod, Method};
 use crate::object::Object;
 use crate::ty::Ty;
-use crate::{Eventstore, Registry};
+use crate::{helpers, Eventstore, Registry};
 
 #[derive(Default)]
 pub struct DependencyGraph {
@@ -118,7 +119,7 @@ impl DependencyGraph {
     where
         T: 'static,
     {
-        self.with(Value(Ok(value)))
+        self.with(|| (Ok(value)))
     }
 
     /// Provide the graph with an infalliable constructor for a certain type. It is expected for a
@@ -143,7 +144,7 @@ impl DependencyGraph {
         F: Method<T, P>,
         T: 'static,
     {
-        self.with(ToInfallible(f))
+        self.with(helpers::to_infalliable(f))
     }
 
     /// Provide the graph with a failable constructor for a certain type. The output type of the
@@ -174,7 +175,7 @@ impl DependencyGraph {
         T: 'static,
     {
         self.touched = true;
-        let f = ToResultObject::<F, T, P>::new(f);
+        let f = to_result_object(f);
         let deps = f.dependencies();
         let tid = Ty::of::<T>();
         self.insert(tid, DynMethod::new(f));
