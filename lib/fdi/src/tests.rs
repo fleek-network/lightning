@@ -2,7 +2,8 @@ use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::hash::Hash;
 
-use crate::{Container, DependencyGraph, DynMethod, Eventstore, Method, MethodExt, Registry};
+use crate::method::DynMethod;
+use crate::{Container, DependencyGraph, Eventstore, Method, MethodExt, Registry};
 
 mod demo_dep {
     use crate::ext::MethodExt;
