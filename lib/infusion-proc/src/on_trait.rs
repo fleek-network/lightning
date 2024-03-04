@@ -283,6 +283,21 @@ fn impl_init(base: &syn::Ident, item: syn::TraitItemFn) -> Result<Vec<syn::Trait
                 __tmp.map_err(|e| e.into())
             }
         },
+        parse_quote! {
+            #[doc(hidden)]
+            fn infu_initialize_hack(
+                #(
+                    #names: &<#base as Collection>::#deps,
+                 )*
+            ) -> ::std::result::Result<Self, ::std::boxed::Box<dyn std::error::Error>>
+            where Self: Sized {
+                let __tmp: ::std::result::Result<Self, _> = {
+                    #block
+                };
+
+                __tmp.map_err(|e| e.into())
+            }
+        },
     ])
 }
 
