@@ -1,4 +1,5 @@
 use std::any::{type_name, Any};
+use std::fmt::Debug;
 use std::ptr;
 
 use crate::registry::Registry;
@@ -141,6 +142,12 @@ impl Drop for DynMethod {
         if !self.ptr.is_null() {
             (self.drop_fn)(self.ptr)
         }
+    }
+}
+
+impl Debug for DynMethod {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("DynMethod").field(&self.name()).finish()
     }
 }
 
