@@ -47,7 +47,7 @@ pub async fn handle(mut connection: Connection) -> anyhow::Result<()> {
         return Ok(());
     };
 
-    let message = rmp_serde::from_slice::<StartSession>(initial_message.as_ref())
+    let message = serde_json::from_slice::<StartSession>(initial_message.as_ref())
         .context("Could not deserialize initial message")?;
 
     // Load model.
