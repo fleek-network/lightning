@@ -289,9 +289,9 @@ fn impl_init(base: &syn::Ident, item: syn::TraitItemFn) -> Result<Vec<syn::Trait
                 #(
                     #names: &<#base as Collection>::#deps,
                  )*
-            ) -> ::std::result::Result<Self, ::std::boxed::Box<dyn std::error::Error>>
+            ) -> ::anyhow::Result<Self>
             where Self: Sized {
-                let __tmp: ::std::result::Result<Self, _> = {
+                let __tmp: ::anyhow::Result<Self> = {
                     #block
                 };
 
