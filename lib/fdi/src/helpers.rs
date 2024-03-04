@@ -2,8 +2,9 @@ use std::any::type_name;
 use std::cell::RefCell;
 use std::marker::PhantomData;
 
+use crate::method::DynMethod;
 use crate::object::Object;
-use crate::{DynMethod, Method, Registry};
+use crate::{Method, Registry};
 
 struct Transform<F, T, P, M, U> {
     display_name: &'static str,

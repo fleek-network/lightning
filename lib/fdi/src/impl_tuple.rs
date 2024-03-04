@@ -1,3 +1,4 @@
+use crate::consume::Consume;
 use crate::ty::Ty;
 use crate::{Method, Registry};
 
@@ -32,6 +33,7 @@ macro_rules! impl_method {
                 ]
             }
 
+            #[inline(always)]
             #[allow(unused)]
             fn call(self, registry: &Registry) -> T {
                 (self)(
@@ -40,6 +42,55 @@ macro_rules! impl_method {
                 )
             }
         }
+
+        impl<F, T, O
+            $(, $mut)*
+            $(, $get)*
+        > Method<T, (O,
+            (
+                (
+                    $($mut,)*
+                ),
+                (
+                    $($get,)*
+                )
+            )
+        )> for Consume<F, T, (
+            (
+                $($mut,)*
+            ),
+            (
+                $($get,)*
+            )
+        ), O>
+        where
+            F: FnOnce(
+                O,
+                $(&mut $mut,)*
+                $(& $get,)*
+            ) -> T,
+            O: 'static,
+            $($mut: 'static,)*
+            $($get: 'static,)*
+        {
+            fn dependencies(&self) -> Vec<crate::ty::Ty> {
+                vec![
+                    Ty::of::<O>(),
+                    $(Ty::of::<$mut>(),)*
+                    $(Ty::of::<$get>(),)*
+                ]
+            }
+
+            #[inline(always)]
+            fn call(self, registry: &crate::Registry) -> T {
+                (self.f)(
+                    registry.take(),
+                    $(&mut registry.get_mut::<$mut>(),)*
+                    $(&registry.get::<$get>(),)*
+                )
+            }
+        }
+
     };
 }
 
