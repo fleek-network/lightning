@@ -8,6 +8,7 @@ pub mod ty;
 
 pub use event::Eventstore;
 pub use graph::DependencyGraph;
+pub mod helpers;
 pub use method::*;
 pub use object::Container;
 pub use registry::Registry;
