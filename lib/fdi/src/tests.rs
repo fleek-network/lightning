@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::hash::Hash;
 
 use crate::method::DynMethod;
-use crate::{Container, DependencyGraph, Eventstore, Method, MethodExt, Registry};
+use crate::{consume, Container, DependencyGraph, Eventstore, Method, MethodExt, Registry};
 
 mod demo_dep {
     use crate::ext::MethodExt;
@@ -271,4 +271,24 @@ fn init_one_failure_should_panic() {
     let mut graph = DependencyGraph::new();
     let mut registry = Registry::default();
     graph.init_one::<A>(&mut registry).unwrap();
+}
+
+#[test]
+fn consume_usage() {
+    #[derive(Default)]
+    struct A;
+
+    impl A {
+        fn start(self, counter: &mut Counter) {
+            counter.add("start");
+        }
+    }
+
+    let mut graph =
+        DependencyGraph::new().with(A::default.to_infallible().on("start", consume(A::start)));
+    let mut registry = Registry::default();
+    registry.insert(Counter::default());
+    graph.init_one::<A>(&mut registry).unwrap();
+    registry.trigger("start");
+    assert_eq!(registry.get::<Counter>().get("start"), 1);
 }
