@@ -2,8 +2,7 @@ use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::hash::Hash;
 
-use crate::event::WithEvents;
-use crate::{Container, DependencyGraph, DynMethod, Eventstore, Method, Registry};
+use crate::{Container, DependencyGraph, DynMethod, Eventstore, Method, MethodExt, Registry};
 
 mod demo_dep {
     use crate::ext::MethodExt;
@@ -204,8 +203,9 @@ fn basic_with_events_should_work() {
     #[derive(Default)]
     struct A;
 
-    let mut graph = DependencyGraph::new().with_infallible(
-        WithEvents::new(A::default)
+    let mut graph = DependencyGraph::new().with(
+        A::default
+            .to_infallible()
             .on("_post", |counter: &mut Counter| {
                 counter.add("A::_post");
             })
@@ -229,24 +229,23 @@ fn nested_with_events_should_work() {
     struct A;
 
     let mut graph = DependencyGraph::new().with_infallible(
-        WithEvents::new(
-            WithEvents::new(A::default)
-                .on("_post", |counter: &mut Counter| {
-                    counter.add("A::_post");
-                })
-                .on("_start", |counter: &mut Counter| {
-                    counter.add("A::_start");
-                })
-                .on("_inner", |counter: &mut Counter| {
-                    counter.add("A::_inner");
-                }),
-        )
-        .on("_post", |counter: &mut Counter| {
-            counter.add("A::_post");
-        })
-        .on("_outer", |counter: &mut Counter| {
-            counter.add("A::_outer");
-        }),
+        A::default
+            .to_infallible()
+            .on("_post", |counter: &mut Counter| {
+                counter.add("A::_post");
+            })
+            .on("_start", |counter: &mut Counter| {
+                counter.add("A::_start");
+            })
+            .on("_inner", |counter: &mut Counter| {
+                counter.add("A::_inner");
+            })
+            .on("_post", |counter: &mut Counter| {
+                counter.add("A::_post");
+            })
+            .on("_outer", |counter: &mut Counter| {
+                counter.add("A::_outer");
+            }),
     );
 
     let mut registry = Registry::default();
