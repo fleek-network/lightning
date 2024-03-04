@@ -20,6 +20,12 @@ struct On<F, T, P> {
     _p: PhantomData<(T, P)>,
 }
 
+struct Wrap<F, T, P, W, U, A, R> {
+    method: F,
+    wrapper: W,
+    _p: PhantomData<(F, T, P, W, U, A, R)>,
+}
+
 impl<F, T, P, M, U> Method<U, P> for Transform<F, T, P, M, U>
 where
     F: Method<T, P>,
@@ -92,6 +98,26 @@ where
     }
 }
 
+impl<F, T, P, W, U, A, R> Method<R, (P, A)> for Wrap<F, T, P, W, U, A, R>
+where
+    F: Method<T, P>,
+    T: 'static,
+    W: Method<U, A>,
+    U: 'static + FnOnce(T) -> R,
+{
+    fn dependencies(&self) -> Vec<crate::ty::Ty> {
+        let mut dep = self.method.dependencies();
+        dep.extend(self.wrapper.dependencies());
+        dep
+    }
+
+    fn call(self, registry: &Registry) -> R {
+        let result = self.method.call(registry);
+        let higher = self.wrapper.call(registry);
+        (higher)(result)
+    }
+}
+
 pub fn to_infalliable<F, T, P>(f: F) -> impl Method<anyhow::Result<T>, P>
 where
     F: Method<T, P>,
@@ -145,6 +171,20 @@ where
         display_name: name,
         original: f,
         transform: |v| v,
+        _p: PhantomData,
+    }
+}
+
+pub fn wrap<F, T, P, W, U, A, R>(f: F, w: W) -> impl Method<R, (P, A)>
+where
+    F: Method<T, P>,
+    T: 'static,
+    W: Method<U, A>,
+    U: 'static + FnOnce(T) -> R,
+{
+    Wrap {
+        method: f,
+        wrapper: w,
         _p: PhantomData,
     }
 }
