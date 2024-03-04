@@ -260,3 +260,14 @@ fn nested_with_events_should_work() {
     registry.trigger("_outer");
     assert_eq!(registry.get::<Counter>().get("A::_outer"), 1);
 }
+
+#[test]
+#[should_panic]
+fn init_one_failure_should_panic() {
+    #[derive(Default)]
+    struct A;
+
+    let mut graph = DependencyGraph::new();
+    let mut registry = Registry::default();
+    graph.init_one::<A>(&mut registry).unwrap();
+}
