@@ -22,6 +22,15 @@ where
     {
         helpers::on(self, event, handler)
     }
+
+    #[inline(always)]
+    fn wrap_with<W, U, A, R>(self, f: W) -> impl Method<R, (P, A)>
+    where
+        W: Method<U, A>,
+        U: 'static + FnOnce(T) -> R,
+    {
+        helpers::wrap(self, f)
+    }
 }
 
 impl<F, T, P> MethodExt<T, P> for F
