@@ -361,9 +361,14 @@ impl DependencyGraph {
             }
 
             for ty in self.ordered.clone().iter() {
-                if should_init.contains(ty) {
+                if should_init.remove(ty) {
                     self.construct_internal(*ty, registry)?;
                 }
+            }
+
+            if !should_init.is_empty() {
+                let ty = should_init.into_iter().next().unwrap();
+                panic!("Could not construct a value for '{ty:?}'");
             }
 
             // Here we ensure that we also have all of the dependencies
