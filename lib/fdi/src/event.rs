@@ -9,7 +9,7 @@ use crate::ty::Ty;
 /// The [`Eventstore`] can be used to store a list of event handlers under each event name.
 #[derive(Default)]
 pub struct Eventstore {
-    handlers: HashMap<&'static str, Vec<DynMethod>>,
+    pub handlers: HashMap<&'static str, Vec<DynMethod>>,
 }
 
 impl Eventstore {

@@ -228,7 +228,7 @@ fn nested_with_events_should_work() {
     #[derive(Default)]
     struct A;
 
-    let mut graph = DependencyGraph::new().with_infallible(
+    let mut graph = DependencyGraph::new().with(
         A::default
             .to_infallible()
             .on("_post", |counter: &mut Counter| {
