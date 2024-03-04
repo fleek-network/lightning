@@ -79,6 +79,27 @@ impl Registry {
         }
     }
 
+    /// Consume the value of type `T` from the registry.
+    ///
+    /// # Panics
+    ///
+    /// If the value with the given type is not inserted in the registry or if the value has been
+    /// taken out of the container. It also panics if `T: Container<U>`.
+    pub fn take<T: 'static>(&self) -> T {
+        let ty = Ty::of::<T>();
+        if self.values.get(&ty.id()).is_some() {
+            // -> T: Container<U>
+            panic!("Consuming 'Container<_>' is not supported.")
+        } else if let Some(obj) = self.values.get(&ty.container_id()) {
+            obj.downcast::<T>().take()
+        } else {
+            panic!(
+                "Could not find a value of type '{}' in this registry.",
+                type_name::<T>()
+            )
+        }
+    }
+
     /// Trigger the event with the given name from the event store.
     pub fn trigger(&self, event: &'static str) -> usize {
         self.get_mut::<Eventstore>().trigger(event, self)
