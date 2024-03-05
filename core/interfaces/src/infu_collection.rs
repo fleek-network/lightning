@@ -85,6 +85,7 @@ impl<C: Collection> Node<C> {
                     .with_display_name("Archive")
                     .on("start", |c: &C::ArchiveInterface| block_on(c.start())),
             )
+            .with(C::ForwarderInterface::infu_initialize_hack.with_display_name("Forwarder"))
             .with(
                 C::ConsensusInterface::infu_initialize_hack
                     .with_display_name("Consensus")
