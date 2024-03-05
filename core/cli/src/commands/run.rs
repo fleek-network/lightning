@@ -1,5 +1,3 @@
-use std::future::Future;
-use std::pin::Pin;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
@@ -16,13 +14,7 @@ use resolved_pathbuf::ResolvedPathBuf;
 use tokio::pin;
 use tracing::warn;
 
-pub type CustomStartShutdown<C> = Box<dyn for<'a> Fn(&'a Node<C>, bool) -> Fut<'a>>;
-pub type Fut<'a> = Pin<Box<dyn Future<Output = ()> + 'a>>;
-
-pub async fn exec<C>(
-    config_path: ResolvedPathBuf,
-    custom_start_shutdown: Option<CustomStartShutdown<C>>,
-) -> Result<()>
+pub async fn exec<C>(config_path: ResolvedPathBuf) -> Result<()>
 where
     C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>,
 {
@@ -38,11 +30,7 @@ where
 
     panic_report::add_context("config", config.into_inner());
 
-    if let Some(cb) = &custom_start_shutdown {
-        ((cb)(&node, true)).await;
-    } else {
-        node.start().await;
-    }
+    node.start().await;
 
     let mut rx_update_ready = node
         .container
@@ -63,12 +51,7 @@ where
                 .read_all_to_vec(&checkpoint_hash).await.expect("Failed to read checkpoint from blockstore");
 
                 // shutdown the node
-                if let Some(cb) = &custom_start_shutdown {
-                    ((cb)(&node, false)).await;
-                } else {
-                    node.shutdown().await;
-                }
-
+                node.shutdown().await;
                 std::mem::drop(node);
 
                 // Sleep for a bit but provide some feedback, some of our proccesses take a few milliseconds to drop from memory
@@ -78,15 +61,10 @@ where
                 C::ApplicationInterface::load_from_checkpoint(
                     &app_config, checkpoint, checkpoint_hash).await?;
 
+                //restart the node
                 node = Node::<C>::init(config.clone())
                     .map_err(|e| anyhow::anyhow!("Could not start the node: {e:?}"))?;
-
-                //restart the node
-                if let Some(cb) = &custom_start_shutdown {
-                    ((cb)(&node, true)).await;
-                } else {
-                    node.start().await;
-                }
+                node.start().await;
 
                 // reseed our rx_update_ready
                 rx_update_ready = node
@@ -97,11 +75,7 @@ where
         }
     }
 
-    if let Some(cb) = custom_start_shutdown {
-        ((cb)(&node, false)).await;
-    } else {
-        node.shutdown().await;
-    }
+    node.shutdown().await;
 
     Ok(())
 }
