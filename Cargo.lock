@@ -9926,6 +9926,7 @@ dependencies = [
 name = "safetensors-ndarray"
 version = "0.0.0"
 dependencies = [
+ "anyhow",
  "ndarray",
  "safetensors",
 ]

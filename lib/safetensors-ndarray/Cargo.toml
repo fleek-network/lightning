@@ -8,5 +8,6 @@ repository = "https://github.com/fleek-network/lightning"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow.workspace = true
 ndarray = "0.15"
 safetensors = "0.4"
