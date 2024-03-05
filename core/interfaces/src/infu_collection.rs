@@ -58,49 +58,74 @@ impl<C: Collection> Node<C> {
                     .with_display_name("Blockstore_Server")
                     .on("start", |c: &C::BlockStoreServerInterface| {
                         block_on(c.start())
+                    })
+                    .on("shutdown", |c: &C::BlockStoreServerInterface| {
+                        block_on(c.shutdown())
                     }),
             )
             .with(
                 <C::ApplicationInterface as ApplicationInterface<C>>::infu_initialize_hack
                     .with_display_name("Application")
-                    .on("start", |c: &C::ApplicationInterface| block_on(c.start())),
+                    .on("start", |c: &C::ApplicationInterface| block_on(c.start()))
+                    .on("shutdown", |c: &C::ApplicationInterface| {
+                        block_on(c.shutdown())
+                    }),
             )
             .with(
                 C::SyncronizerInterface::infu_initialize_hack
                     .with_display_name("Syncronizer")
-                    .on("start", |c: &C::SyncronizerInterface| block_on(c.start())),
+                    .on("start", |c: &C::SyncronizerInterface| block_on(c.start()))
+                    .on("shutdown", |c: &C::SyncronizerInterface| {
+                        block_on(c.shutdown())
+                    }),
             )
             .with(
                 C::BroadcastInterface::infu_initialize_hack
                     .with_display_name("Broadcast")
-                    .on("start", |c: &C::BroadcastInterface| block_on(c.start())),
+                    .on("start", |c: &C::BroadcastInterface| block_on(c.start()))
+                    .on("shutdown", |c: &C::BroadcastInterface| {
+                        block_on(c.shutdown())
+                    }),
             )
             .with(
                 C::TopologyInterface::infu_initialize_hack
                     .with_display_name("Topology")
-                    .on("start", |c: &C::TopologyInterface| block_on(c.start())),
+                    .on("start", |c: &C::TopologyInterface| block_on(c.start()))
+                    .on("shutdown", |c: &C::TopologyInterface| {
+                        block_on(c.shutdown())
+                    }),
             )
             .with(
                 C::ArchiveInterface::infu_initialize_hack
                     .with_display_name("Archive")
-                    .on("start", |c: &C::ArchiveInterface| block_on(c.start())),
+                    .on("start", |c: &C::ArchiveInterface| block_on(c.start()))
+                    .on("shutdown", |c: &C::ArchiveInterface| block_on(c.shutdown())),
             )
             .with(C::ForwarderInterface::infu_initialize_hack.with_display_name("Forwarder"))
             .with(
                 C::ConsensusInterface::infu_initialize_hack
                     .with_display_name("Consensus")
-                    .on("start", |c: &C::ConsensusInterface| block_on(c.start())),
+                    .on("start", |c: &C::ConsensusInterface| block_on(c.start()))
+                    .on("shutdown", |c: &C::ConsensusInterface| {
+                        block_on(c.shutdown())
+                    }),
             )
             .with(
                 C::HandshakeInterface::infu_initialize_hack
                     .with_display_name("Handshake")
-                    .on("start", |c: &C::HandshakeInterface| block_on(c.start())),
+                    .on("start", |c: &C::HandshakeInterface| block_on(c.start()))
+                    .on("shutdown", |c: &C::HandshakeInterface| {
+                        block_on(c.shutdown())
+                    }),
             )
             .with(
                 C::OriginProviderInterface::infu_initialize_hack
                     .with_display_name("Origin_Provider")
                     .on("start", |c: &C::OriginProviderInterface| {
                         block_on(c.start())
+                    })
+                    .on("shutdown", |c: &C::OriginProviderInterface| {
+                        block_on(c.shutdown())
                     }),
             )
             // .with(
@@ -116,45 +141,59 @@ impl<C: Collection> Node<C> {
                     .with_display_name("Reputation_Aggregator")
                     .on("start", |c: &C::ReputationAggregatorInterface| {
                         block_on(c.start())
+                    })
+                    .on("shutdown", |c: &C::ReputationAggregatorInterface| {
+                        block_on(c.shutdown())
                     }),
             )
             .with(
                 <C::ResolverInterface as ResolverInterface<C>>::infu_initialize_hack
                     .with_display_name("Resolver")
-                    .on("start", |c: &C::ResolverInterface| block_on(c.start())),
+                    .on("start", |c: &C::ResolverInterface| block_on(c.start()))
+                    .on("shutdown", |c: &C::ResolverInterface| {
+                        block_on(c.shutdown())
+                    }),
             )
             .with(
                 C::RpcInterface::infu_initialize_hack
                     .with_display_name("Rpc")
-                    .on("start", |c: &C::RpcInterface| block_on(c.start())),
+                    .on("start", |c: &C::RpcInterface| block_on(c.start()))
+                    .on("shutdown", |c: &C::RpcInterface| block_on(c.shutdown())),
             )
             .with(
                 C::ServiceExecutorInterface::infu_initialize_hack
                     .with_display_name("Service_Executor")
                     .on("start", |c: &C::ServiceExecutorInterface| {
                         block_on(c.start())
+                    })
+                    .on("shutdown", |c: &C::ServiceExecutorInterface| {
+                        block_on(c.shutdown())
                     }),
             )
             .with(
                 C::SignerInterface::infu_initialize_hack
                     .with_display_name("Signer")
                     .on("_post", C::SignerInterface::infu_post_hack)
-                    .on("start", |c: &C::SignerInterface| block_on(c.start())),
+                    .on("start", |c: &C::SignerInterface| block_on(c.start()))
+                    .on("shutdown", |c: &C::SignerInterface| block_on(c.shutdown())),
             )
             .with(
                 C::FetcherInterface::infu_initialize_hack
                     .with_display_name("Fetcher")
-                    .on("start", |c: &C::FetcherInterface| block_on(c.start())),
+                    .on("start", |c: &C::FetcherInterface| block_on(c.start()))
+                    .on("shutdown", |c: &C::FetcherInterface| block_on(c.shutdown())),
             )
             .with(
                 C::PoolInterface::infu_initialize_hack
                     .with_display_name("Pool")
-                    .on("start", |c: &C::PoolInterface| block_on(c.start())),
+                    .on("start", |c: &C::PoolInterface| block_on(c.start()))
+                    .on("shutdown", |c: &C::PoolInterface| block_on(c.shutdown())),
             )
             .with(
                 C::PingerInterface::infu_initialize_hack
                     .with_display_name("Pinger")
-                    .on("start", |c: &C::PingerInterface| block_on(c.start())),
+                    .on("start", |c: &C::PingerInterface| block_on(c.start()))
+                    .on("shutdown", |c: &C::PingerInterface| block_on(c.shutdown())),
             );
 
         let vis = graph.viz("Lightning Dependency Graph");
