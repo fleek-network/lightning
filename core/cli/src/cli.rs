@@ -9,7 +9,6 @@ use tracing_subscriber::prelude::*;
 use tracing_subscriber::EnvFilter;
 
 use crate::args::{Args, Command};
-use crate::commands::run::CustomStartShutdown;
 use crate::commands::{dev, keys, opt, print_config, run};
 use crate::utils::fs::ensure_parent_exist;
 
@@ -34,31 +33,18 @@ impl Cli {
         match self.args.with_mock_consensus {
             true => {
                 info!("Using MockConsensus");
-                self.run::<WithMockConsensus>(config_path, None).await
+                self.run::<WithMockConsensus>(config_path).await
             },
-            false => self.run::<FinalTypes>(config_path, None).await,
+            false => self.run::<FinalTypes>(config_path).await,
         }
     }
 
-    pub async fn exec_with_custom_start_shutdown<C>(self, cb: CustomStartShutdown<C>) -> Result<()>
-    where
-        C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>,
-    {
-        self.setup_logging(false);
-        let config_path = self.resolve_config_path()?;
-        self.run::<C>(config_path, Some(cb)).await
-    }
-
-    async fn run<C>(
-        self,
-        config_path: ResolvedPathBuf,
-        custom_start_shutdown: Option<CustomStartShutdown<C>>,
-    ) -> Result<()>
+    async fn run<C>(self, config_path: ResolvedPathBuf) -> Result<()>
     where
         C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>,
     {
         match self.args.cmd {
-            Command::Run => run::exec::<C>(config_path, custom_start_shutdown).await,
+            Command::Run => run::exec::<C>(config_path).await,
             Command::Keys(cmd) => keys::exec::<C>(cmd, config_path).await,
             Command::Opt(cmd) => opt::exec::<C>(cmd, config_path).await,
             Command::PrintConfig { default } => print_config::exec::<C>(default, config_path).await,
