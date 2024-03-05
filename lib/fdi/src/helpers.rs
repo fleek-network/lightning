@@ -1,4 +1,3 @@
-use std::any::type_name;
 use std::cell::RefCell;
 use std::marker::PhantomData;
 
@@ -72,7 +71,7 @@ where
 
     #[inline(always)]
     fn display_name(&self) -> &'static str {
-        self.original.name()
+        self.original.display_name()
     }
 
     #[inline(always)]
@@ -124,7 +123,7 @@ where
     T: 'static,
 {
     Transform {
-        display_name: type_name::<anyhow::Result<T>>(),
+        display_name: f.display_name(),
         original: f,
         transform: |v| Ok(v),
         _p: PhantomData,
