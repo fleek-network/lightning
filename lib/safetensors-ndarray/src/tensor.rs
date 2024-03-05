@@ -1,13 +1,13 @@
-use ndarray::{Array, Dimension};
-use safetensors::{Dtype, View};
 use std::borrow::Cow;
 
+use ndarray::{Array, Dimension};
+use safetensors::{Dtype, View};
 
-pub struct Tensor<A, D>(Array<A, D>);
+pub struct Tensor<A, D>(pub Array<A, D>);
 
 impl<A, D> Tensor<A, D>
 where
-    D: Dimension
+    D: Dimension,
 {
     fn buffer(&self) -> &[u8] {
         let slice = self.0.as_slice().expect("Non contiguous tensors");
@@ -51,4 +51,3 @@ impl_view!(i32, Dtype::I32);
 impl_view!(i64, Dtype::I64);
 impl_view!(f32, Dtype::F32);
 impl_view!(f64, Dtype::F64);
-
