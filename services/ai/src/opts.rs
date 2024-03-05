@@ -28,11 +28,9 @@ impl From<&str> for Origin {
     }
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone, Copy)]
 #[repr(u8)]
 pub enum Encoding {
-    /// Data is encoded using Borsh.
-    #[serde(rename = "borsh")]
     BorshInt8 = 0x00,
     BorshInt16 = 0x01,
     BorshInt32 = 0x02,
@@ -43,21 +41,13 @@ pub enum Encoding {
     BorshUint64 = 0x07,
     BorshFloat32 = 0x08,
     BorshFloat64 = 0x09,
-    /// Data is a npy file.
-    #[serde(rename = "npy")]
-    Npy = 0x0A,
+    SafeTensors = 0x0A,
 }
 
-impl TryFrom<i8> for Encoding {
+impl TryFrom<u8> for Encoding {
     type Error = std::io::Error;
 
-    fn try_from(value: i8) -> Result<Self, Self::Error> {
-        if value < 0 {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "invalid encoding {value}",
-            ));
-        }
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
         let encoding = match value {
             0x00 => Encoding::BorshInt8,
             0x01 => Encoding::BorshInt16,
@@ -69,7 +59,7 @@ impl TryFrom<i8> for Encoding {
             0x07 => Encoding::BorshUint64,
             0x08 => Encoding::BorshFloat32,
             0x09 => Encoding::BorshFloat64,
-            0x0A => Encoding::Npy,
+            0x0A => Encoding::SafeTensors,
             _ => {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidInput,

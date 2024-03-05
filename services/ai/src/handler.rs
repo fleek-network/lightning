@@ -33,7 +33,8 @@ pub async fn handle(mut connection: Connection) -> anyhow::Result<()> {
         let session = Session::new(model)?;
 
         // Run inference.
-        let output = session.run(body.into())?;
+        let input = serde_json::from_slice(body.as_ref())?;
+        let output = session.run(input)?;
         let serialized_output = rmp_serde::to_vec_named(&output)?;
 
         connection.write_payload(&serialized_output).await?;
@@ -55,7 +56,7 @@ pub async fn handle(mut connection: Connection) -> anyhow::Result<()> {
 
     // Process incoming inference requests.
     while let Some(payload) = connection.read_payload().await {
-        let output = session.run(payload.freeze())?;
+        let output = session.run(payload.freeze().try_into()?)?;
         let serialized_output = rmp_serde::to_vec_named(&output)?;
         connection.write_payload(&serialized_output).await?;
     }

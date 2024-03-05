@@ -11,12 +11,13 @@ derive_more = "0.99"
 fn-sdk = { path = "../../lib/sdk" }
 hex = "0.4"
 ndarray = "0.15"
-ndarray-npy = "0.8"
-npyz = "0.8"
 ort = { version = "2.0.0-rc.0", features = ["custom-ops"] }
 rmpv = "1.0"
 rmp-serde = "1.1"
+safetensors = "0.4"
+safetensors-ndarray = { path = "../../lib/safetensors-ndarray" }
 serde.workspace = true
+serde_json.workspace = true
 tracing.workspace = true
 tracing-subscriber = { version = "0.3", features = [ "env-filter" ] }
 tokio.workspace = true

@@ -1,11 +1,9 @@
-mod array;
 mod handler;
 mod opts;
 mod runtime;
+mod utils;
 
-use std::collections::HashMap;
-
-use bytes::Bytes;
+use bytes::{Buf, Bytes};
 use serde::{Deserialize, Serialize};
 
 use crate::opts::{Device, Origin};
@@ -22,23 +20,33 @@ pub struct StartSession {
 }
 
 /// Input for inference.
-#[derive(Deserialize, Serialize, Debug)]
-pub enum Input {
-    /// The input is an array.
-    #[serde(rename = "array")]
-    Array { data: EncodedArrayExt },
-    /// The input is a hash map.
-    ///
-    /// Keys will be passed directly to the session
-    /// along with their corresponding value.
-    #[serde(rename = "map")]
-    Map {
-        data: HashMap<String, EncodedArrayExt>,
-    },
+#[derive(Deserialize, Serialize)]
+pub struct Input {
+    pub encoding: u8,
+    pub data: Bytes,
+}
+
+// Binary deserialization for non-HTTP API.
+impl TryFrom<Bytes> for Input {
+    type Error = std::io::Error;
+
+    fn try_from(mut value: Bytes) -> Result<Self, Self::Error> {
+        if value.is_empty() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "invalid empty input",
+            ));
+        }
+        let encoding = value.get_u8();
+        Ok(Input {
+            encoding,
+            data: value,
+        })
+    }
 }
 
 /// Output from an inference run.
-pub type Output = HashMap<String, EncodedArrayExt>;
+pub type Output = Bytes;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(rename = "_ExtStruct")]

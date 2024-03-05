@@ -1,9 +1,8 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 
-use anyhow::bail;
 use ndarray::{ArrayD, IxDyn};
-use safetensors::{Dtype, SafeTensors, View};
+use safetensors::{Dtype, View};
 
 use crate::tensor::Tensor;
 
