@@ -29,26 +29,34 @@ impl DependencyGraph {
         Self::default()
     }
 
-    pub fn viz(&self) -> String {
-        let mut result = String::with_capacity(4096);
-        let mut names = HashMap::new();
+    pub fn viz(&self, title: &'static str) -> String {
+        let mut res = String::with_capacity(4096);
 
-        for (ty, method) in &self.constructors {
-            let name = method.display_name();
-            names.insert(*ty, name);
-            writeln!(result, "{name}").unwrap();
-        }
+        writeln!(res, "---").unwrap();
+        writeln!(res, "title: {title}").unwrap();
+        writeln!(res, "---").unwrap();
+        writeln!(res, "stateDiagram-v2").unwrap();
+        writeln!(res, "  direction LR").unwrap();
 
         for (ty, dependencies) in &self.graph {
-            let ty_name = names.get(ty).copied().unwrap_or(ty.name());
+            let ty_name = self
+                .constructors
+                .get(ty)
+                .map(|m| m.display_name())
+                .unwrap_or("fuck1");
 
             for dep in dependencies {
-                let dep_name = names.get(dep).copied().unwrap_or(dep.name());
-                writeln!(result, "{} -> {}", ty_name, dep_name).unwrap();
+                let dep_name = self
+                    .constructors
+                    .get(dep)
+                    .map(|m| m.display_name())
+                    .unwrap_or("shit");
+
+                writeln!(res, "{} --> {}", dep_name, ty_name).unwrap();
             }
         }
 
-        result
+        res
     }
 
     /// Expand the current dependency graph from another dependency graph.
