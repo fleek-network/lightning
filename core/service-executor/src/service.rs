@@ -213,7 +213,7 @@ async fn handle_stream<C: Collection>(
     ctx: Arc<Context<C>>,
 ) -> Result<(), Box<dyn Error>> {
     // incoming IpcRequests
-    let mut read_buffer = Vec::<u8>::new();
+    let mut read_buffer = vec![0; 4];
     let mut read_buffer_pos = 0;
     let mut read_len = 0;
 
@@ -295,6 +295,7 @@ async fn handle_stream<C: Collection>(
                 while read_buffer_pos < 4 && read_len == 0 {
                     match stream.try_read(&mut read_buffer[read_buffer_pos..]) {
                         Ok(0) => {
+                            tracing::warn!("Connection reset control loop");
                             break 'outer;
                         },
                         Ok(n) => {
@@ -312,14 +313,13 @@ async fn handle_stream<C: Collection>(
                 // if we have no message len already then we have the new length delimiter
                 if read_len == 0 {
                     read_len = u32::from_le_bytes(
-                        read_buffer[0..4]
+                        read_buffer[..4]
                             .try_into()
-                            .expect("can create length from stream bytes"),
+                            .expect("Can create len 4 array from read buffer slice"),
                     );
 
-                    // cleanup to read the actual request
                     read_buffer_pos = 0;
-                    read_buffer.clear();
+                    read_buffer.resize(read_len as usize, 0);
                 }
 
                 // try to read the request
@@ -344,10 +344,12 @@ async fn handle_stream<C: Collection>(
                 }
 
                 let request = IpcRequest::decode(&read_buffer)?;
-                // cleanup now that we have the request
-                read_buffer_pos = 0;
+
+                // we need to resize to 4 bytes or else the first part of the read loop may bring in
+                // too many bytes
+                read_buffer.resize(4, 0);
                 read_len = 0;
-                read_buffer.clear();
+                read_buffer_pos = 0;
 
                 if let Some(request_ctx) = request.request_ctx {
                     let ctx = ctx.clone();
