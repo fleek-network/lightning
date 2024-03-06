@@ -45,11 +45,11 @@ impl Registry {
     ///
     /// If the value with the given type is not inserted in the registry or if the value has been
     /// taken out of the container.
-    pub fn get<T: 'static + Any>(&self) -> Ref<'_, T> {
+    pub fn get<T: 'static + Any>(&self) -> Ref<T> {
         let ty = Ty::of::<T>();
         if let Some(obj) = self.values.get(&ty.id()) {
             // -> T: Container<U>
-            Ref(crate::object::RefInner::Ref(obj.downcast()))
+            Ref(crate::object::RefInner::Ref(obj.clone()))
         } else if let Some(obj) = self.values.get(&ty.container_id()) {
             obj.downcast::<Container<T>>().borrow()
         } else {
@@ -66,7 +66,7 @@ impl Registry {
     ///
     /// If the value with the given type is not inserted in the registry or if the value has been
     /// taken out of the container. It also panics if `T: Container<U>`.
-    pub fn get_mut<T: 'static + Any>(&self) -> RefMut<'_, T> {
+    pub fn get_mut<T: 'static + Any>(&self) -> RefMut<T> {
         let ty = Ty::of::<T>();
         if self.values.get(&ty.id()).is_some() {
             // -> T: Container<U>
