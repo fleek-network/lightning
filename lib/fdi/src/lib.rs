@@ -1,3 +1,4 @@
+mod async_exp;
 mod consume;
 pub mod event;
 mod executor;
