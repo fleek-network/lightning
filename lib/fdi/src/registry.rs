@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use crate::event::Eventstore;
 use crate::object::{Object, Ref, RefMut};
 use crate::ty::Ty;
+use crate::Executor;
 
 /// The registry contains all of the constructed values.
 pub struct Registry {
@@ -112,6 +113,7 @@ impl Default for Registry {
             values: HashMap::default(),
         };
         tmp.insert_raw(Object::new(Eventstore::default()));
+        tmp.insert_raw(Object::new(Executor::default()));
         tmp
     }
 }

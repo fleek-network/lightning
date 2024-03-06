@@ -2,6 +2,9 @@ use std::any::{type_name, Any};
 use std::fmt::Debug;
 use std::ptr;
 
+use futures::future::LocalBoxFuture;
+use futures::Future;
+
 use crate::registry::Registry;
 use crate::ty::Ty;
 use crate::Eventstore;
@@ -25,6 +28,14 @@ pub trait Method<T, P> {
     fn dependencies(&self) -> Vec<Ty>;
     /// Consume and invoke the method.
     fn call(self, registry: &Registry) -> T;
+
+    fn async_call<U>(self, _registry: &Registry) -> LocalBoxFuture<'static, U>
+    where
+        T: Future<Output = U>,
+        Self: Sized,
+    {
+        todo!()
+    }
 }
 
 /// A fixed-size struct that can be created from any [`Method`].

@@ -3,7 +3,16 @@ use std::collections::HashMap;
 use std::hash::Hash;
 
 use crate::method::DynMethod;
-use crate::{consume, Container, DependencyGraph, Eventstore, Method, MethodExt, Registry};
+use crate::{
+    consume,
+    Container,
+    DependencyGraph,
+    Eventstore,
+    Executor,
+    Method,
+    MethodExt,
+    Registry,
+};
 
 mod demo_dep {
     use crate::ext::MethodExt;
@@ -291,4 +300,22 @@ fn consume_usage() {
     graph.init_one::<A>(&mut registry).unwrap();
     registry.trigger("start");
     assert_eq!(registry.get::<Counter>().get("start"), 1);
+}
+
+#[test]
+fn async_usage() {
+    #[derive(Default)]
+    struct A;
+
+    impl A {
+        pub async fn work(&self) {}
+    }
+
+    // #[rustfmt::skip]
+    // let mut graph = DependencyGraph::new()
+    //     .with(
+    //         A::default
+    //             .to_infallible()
+    //             .on("start", |e: &mut Executor, a: &A| { e.spawn(a.work()); })
+    //     );
 }
