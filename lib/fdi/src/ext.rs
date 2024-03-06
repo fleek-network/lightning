@@ -1,3 +1,5 @@
+use futures::Future;
+
 use crate::{helpers, Method};
 
 pub trait MethodExt<T, P>: Sized + Method<T, P>
@@ -30,6 +32,24 @@ where
         U: 'static + FnOnce(T) -> R,
     {
         helpers::wrap(self, f)
+    }
+
+    #[inline(always)]
+    fn spawn<U>(self) -> impl Method<(), P>
+    where
+        Self: 'static + Method<T, P> + Sized,
+        T: 'static + Future<Output = U>,
+    {
+        helpers::spawn(self)
+    }
+
+    #[inline(always)]
+    fn block_on<U>(self) -> impl Method<U, P>
+    where
+        Self: 'static + Method<T, P> + Sized,
+        T: 'static + Future<Output = U>,
+    {
+        helpers::block_on(self)
     }
 }
 

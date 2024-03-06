@@ -1,9 +1,11 @@
 use std::cell::RefCell;
 use std::marker::PhantomData;
 
+use futures::Future;
+
 use crate::method::DynMethod;
 use crate::object::Object;
-use crate::{Method, Registry};
+use crate::{Executor, Method, Registry};
 
 struct Transform<F, T, P, M, U> {
     display_name: &'static str,
@@ -23,6 +25,24 @@ struct Wrap<F, T, P, W, U, A, R> {
     method: F,
     wrapper: W,
     _p: PhantomData<(F, T, P, W, U, A, R)>,
+}
+
+struct Spawn<F, T, P, U>
+where
+    F: 'static + Method<T, P> + Sized,
+    T: 'static + Future<Output = U>,
+{
+    method: F,
+    _p: PhantomData<(F, T, P, U)>,
+}
+
+struct BlockOn<F, T, P, U>
+where
+    F: 'static + Method<T, P> + Sized,
+    T: 'static + Future<Output = U>,
+{
+    method: F,
+    _p: PhantomData<(F, T, P, U)>,
 }
 
 impl<F, T, P, M, U> Method<U, P> for Transform<F, T, P, M, U>
@@ -117,6 +137,59 @@ where
     }
 }
 
+impl<F, T, P, U> Method<(), P> for Spawn<F, T, P, U>
+where
+    F: 'static + Method<T, P> + Sized,
+    T: 'static + Future<Output = U>,
+{
+    fn name(&self) -> &'static str {
+        self.method.name()
+    }
+
+    fn events(&self) -> Option<crate::Eventstore> {
+        self.method.events()
+    }
+
+    fn dependencies(&self) -> Vec<crate::ty::Ty> {
+        self.method.dependencies()
+    }
+
+    fn call(self, registry: &Registry) {
+        let mut executor = registry.get_mut::<Executor>();
+        let registry = registry.snapshot();
+        executor.spawn(Box::pin(async move {
+            self.method.call(&registry).await;
+        }));
+    }
+}
+
+impl<F, T, P, U> Method<U, P> for BlockOn<F, T, P, U>
+where
+    F: 'static + Method<T, P> + Sized,
+    T: 'static + Future<Output = U>,
+{
+    fn name(&self) -> &'static str {
+        self.method.name()
+    }
+
+    fn display_name(&self) -> &'static str {
+        self.method.display_name()
+    }
+
+    fn events(&self) -> Option<crate::Eventstore> {
+        self.method.events()
+    }
+
+    fn dependencies(&self) -> Vec<crate::ty::Ty> {
+        self.method.dependencies()
+    }
+
+    fn call(self, registry: &Registry) -> U {
+        let future = self.method.call(registry);
+        futures::executor::block_on(future)
+    }
+}
+
 pub fn to_infalliable<F, T, P>(f: F) -> impl Method<anyhow::Result<T>, P>
 where
     F: Method<T, P>,
@@ -184,6 +257,28 @@ where
     Wrap {
         method: f,
         wrapper: w,
+        _p: PhantomData,
+    }
+}
+
+pub fn spawn<F, T, P, U>(f: F) -> impl Method<(), P>
+where
+    F: 'static + Method<T, P> + Sized,
+    T: 'static + Future<Output = U>,
+{
+    Spawn {
+        method: f,
+        _p: PhantomData,
+    }
+}
+
+pub fn block_on<F, T, P, U>(f: F) -> impl Method<U, P>
+where
+    F: 'static + Method<T, P> + Sized,
+    T: 'static + Future<Output = U>,
+{
+    BlockOn {
+        method: f,
         _p: PhantomData,
     }
 }

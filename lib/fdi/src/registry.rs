@@ -14,6 +14,13 @@ pub struct Registry {
 }
 
 impl Registry {
+    /// Take a snapshot of the current registry.
+    pub fn snapshot(&self) -> Registry {
+        Self {
+            values: self.values.clone(),
+        }
+    }
+
     /// Insert the given value to the registry.
     pub fn insert<T: 'static>(&mut self, value: T) {
         self.insert_raw(Object::new(value))
