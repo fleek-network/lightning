@@ -311,11 +311,18 @@ fn async_usage() {
         pub async fn work(&self) {}
     }
 
+    // async fn work(a: &A) {}
+    // crate::helpers::block_on(|a: &A| async {
+    //     a.work();
+    // });
+
+    // let m = crate::helpers::spawn(|a: &A| Box::pin(async move { todo!() }));
+
     // #[rustfmt::skip]
     // let mut graph = DependencyGraph::new()
     //     .with(
     //         A::default
     //             .to_infallible()
-    //             .on("start", |e: &mut Executor, a: &A| { e.spawn(a.work()); })
+    //             .on("start", A::work.spawn())
     //     );
 }
