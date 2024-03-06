@@ -20,7 +20,7 @@ impl Registry {
     }
 
     /// Insert the given object to the registry.
-    pub fn insert_raw(&mut self, object: Object) {
+    pub(crate) fn insert_raw(&mut self, object: Object) {
         let ty = object.ty();
         self.values.insert(ty.container_id(), Rc::new(object));
     }

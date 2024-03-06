@@ -32,7 +32,7 @@ pub trait Method<T, P> {
     fn async_call<U>(self, _registry: &Registry) -> LocalBoxFuture<'static, U>
     where
         T: Future<Output = U>,
-        Self: Sized,
+        Self: 'static + Sized,
     {
         todo!()
     }

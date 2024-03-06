@@ -50,18 +50,17 @@ macro_rules! impl_method {
             fn async_call<U>(self, registry: &Registry) -> LocalBoxFuture<'static, U>
             where
                 T: Future<Output = U>,
-                Self: Sized,
+                Self: 'static + Sized,
             {
-                // $(let $mut = registry.get_mut::<$mut>();)*
-                // $(let $get = registry.get_mut::<$get>();)*
+                $(let mut $mut = registry.get_mut::<$mut>();)*
+                $(let $get = registry.get::<$get>();)*
 
-                // Box::pin(async move {
-                //     (self)(
-                //         $(&mut $mut,)*
-                //         $(&$get,)*
-                //     ).await
-                // })
-                todo!()
+                Box::pin(async move {
+                    (self)(
+                        $(&mut $mut,)*
+                        $(&$get,)*
+                    ).await
+                })
             }
         }
 
