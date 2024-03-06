@@ -1,8 +1,8 @@
 use std::any::{type_name, Any, TypeId};
-use std::cell;
-use std::cell::RefCell;
 use std::ops::{Deref, DerefMut};
+use std::rc::Rc;
 
+use crate::rc_cell::{self, RcCell};
 use crate::ty::Ty;
 
 /// A registry entry. The box in this type is always a `Taker<T>` for some `T: 'static`.
@@ -35,36 +35,34 @@ impl Object {
     }
 }
 
-pub struct Container<T: 'static>(RefCell<Option<T>>);
-pub struct Ref<'a, T: ?Sized + 'a>(pub(crate) RefInner<'a, T>);
-pub struct RefMut<'a, T: ?Sized + 'a>(pub(crate) RefMutInner<'a, T>);
-pub(crate) enum RefInner<'a, T: ?Sized + 'a> {
-    Ref(&'a T),
-    Cell(cell::Ref<'a, T>),
-}
-pub(crate) enum RefMutInner<'a, T: ?Sized + 'a> {
-    #[allow(unused)]
-    Ref(&'a mut T),
-    Cell(cell::RefMut<'a, T>),
+pub struct Container<T: 'static>(RcCell<Option<T>>);
+pub struct Ref<T: 'static>(pub(crate) RefInner<T>);
+pub struct RefMut<T: 'static>(pub(crate) rc_cell::RefMut<Option<T>>);
+pub(crate) enum RefInner<T: 'static> {
+    Ref(Rc<Object>),
+    Cell(rc_cell::Ref<Option<T>>),
 }
 
 impl<T: 'static> Container<T> {
     fn new(value: T) -> Self {
-        Self(RefCell::new(Some(value)))
+        Self(RcCell::new(Some(value)))
     }
 
-    pub fn borrow(&self) -> Ref<'_, T> {
-        Ref(RefInner::Cell(
-            cell::Ref::filter_map(self.0.borrow(), Option::as_ref)
-                .unwrap_or_else(|_| panic!("The value is already taken.")),
-        ))
+    pub fn borrow(&self) -> Ref<T> {
+        let cell_ref = self.0.borrow();
+        if cell_ref.is_none() {
+            panic!("The value is already taken.");
+        }
+
+        Ref(RefInner::Cell(cell_ref))
     }
 
-    pub fn borrow_mut(&self) -> RefMut<'_, T> {
-        RefMut(RefMutInner::Cell(
-            cell::RefMut::filter_map(self.0.borrow_mut(), Option::as_mut)
-                .unwrap_or_else(|_| panic!("The value is already taken.")),
-        ))
+    pub fn borrow_mut(&self) -> RefMut<T> {
+        let cell_ref = self.0.borrow_mut();
+        if cell_ref.is_none() {
+            panic!("The value is already taken.");
+        }
+        RefMut(cell_ref)
     }
 
     pub fn take(&self) -> T {
@@ -75,32 +73,26 @@ impl<T: 'static> Container<T> {
     }
 }
 
-impl<'a, T: ?Sized + 'a> Deref for Ref<'a, T> {
+impl<T: 'static> Deref for Ref<T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
         match &self.0 {
-            RefInner::Ref(a) => a,
-            RefInner::Cell(a) => a,
+            RefInner::Ref(a) => a.downcast(),
+            RefInner::Cell(a) => a.as_ref().unwrap(),
         }
     }
 }
 
-impl<'a, T: ?Sized + 'a> Deref for RefMut<'a, T> {
+impl<T: 'static> Deref for RefMut<T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
-        match &self.0 {
-            RefMutInner::Ref(a) => a,
-            RefMutInner::Cell(a) => a,
-        }
+        self.0.as_ref().unwrap()
     }
 }
 
-impl<'a, T: ?Sized + 'a> DerefMut for RefMut<'a, T> {
+impl<T: 'static> DerefMut for RefMut<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        match &mut self.0 {
-            RefMutInner::Ref(a) => a,
-            RefMutInner::Cell(a) => &mut *a,
-        }
+        self.0.as_mut().unwrap()
     }
 }
 
