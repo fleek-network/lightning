@@ -80,9 +80,9 @@ pub(crate) async fn spawn_service_loop_inner(
     let mut write_buffer = Vec::<u8>::new();
     let mut write_buffer_pos = 0_usize;
     // IpcMessage
-    let mut read_buffer = Vec::<u8>::new();
-    let mut read_buffer_pos = 0_usize;
-    let mut read_len = 0_u32;
+    let mut read_buffer = vec![0; 4];
+    let mut read_buffer_pos = 4;
+    let mut read_len = 0;
 
     'outer: loop {
         let ready = if write_buffer.is_empty() {
@@ -136,9 +136,10 @@ pub(crate) async fn spawn_service_loop_inner(
                 // try to read the length from the buffer,
                 // if were not already trying to read a message
                 while read_buffer_pos < 4 && read_len == 0 {
-                    match ipc_stream.try_read(&mut read_buffer) {
+                    match ipc_stream.try_read(&mut read_buffer[read_buffer_pos..]) {
                         // socket reset
                         Ok(0) => {
+                            tracing::warn!("service control loop connection reset");
                             break 'outer;
                         },
                         Ok(n) => {
@@ -159,21 +160,23 @@ pub(crate) async fn spawn_service_loop_inner(
                 // reading the len or else we would have broken out
                 if read_len == 0 {
                     read_len = u32::from_le_bytes(
-                        read_buffer[0..4]
+                        read_buffer[..4]
                             .try_into()
-                            .expect("can create length from stream bytes"),
+                            .expect("can create len 4 buffer from read buffer"),
                     );
 
-                    // clear the buffer of the len bytes
+                    // were now using this as the postion in the message buffer
                     read_buffer_pos = 0;
-                    read_buffer.clear();
+                    // resize will not deallocate
+                    read_buffer.resize(read_len as usize, 0);
                 }
 
                 // this downcasting should be safe because its from a u32
                 // and no one should be running this on a < 32 bit machine
                 while read_buffer_pos < read_len as usize {
-                    match ipc_stream.try_read(&mut read_buffer) {
+                    match ipc_stream.try_read(&mut read_buffer[read_buffer_pos..]) {
                         Ok(0) => {
+                            tracing::warn!("service control loop connection reset");
                             break 'outer;
                         },
                         Ok(n) => {
@@ -193,7 +196,7 @@ pub(crate) async fn spawn_service_loop_inner(
                 // cleanup now that weve read the message
                 read_buffer_pos = 0;
                 read_len = 0;
-                read_buffer.clear();
+                read_buffer.resize(4, 0);
 
                 handle_message(message);
             }
@@ -276,13 +279,36 @@ mod tests {
                 send_and_await_response(Request::QueryClientBandwidth { pk: [i; 96].into() }).await
             });
 
-            let mut buffer = [0; std::mem::size_of::<IpcRequest>()];
+            let mut len_buffer = [0_u8; 4];
+            let mut buffer = Vec::new();
             let mut pos = 0;
-            while pos < buffer.len() {
+            while pos < 4 {
                 s2.readable().await.unwrap();
-                match s2.try_read(&mut buffer) {
+                match s2.try_read(&mut len_buffer[pos..]) {
                     Ok(0) => {
-                        break;
+                        panic!("connection reset");
+                    },
+                    Ok(n) => {
+                        println!("read {n} bytes");
+                        pos += n;
+                    },
+                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                        continue;
+                    },
+                    Err(e) => {
+                        panic!("failed {e:?}");
+                    },
+                }
+            }
+
+            let len = u32::from_le_bytes(len_buffer) as usize;
+            pos = 0;
+
+            while pos < len {
+                s2.readable().await.unwrap();
+                match s2.try_read_buf(&mut buffer) {
+                    Ok(0) => {
+                        panic!("connection reset");
                     },
                     Ok(n) => {
                         pos += n;
@@ -295,9 +321,8 @@ mod tests {
                     },
                 }
             }
-            assert_eq!(pos, std::mem::size_of::<IpcRequest>());
+            let req = IpcRequest::decode(&buffer).unwrap();
 
-            let req = unsafe { std::mem::transmute::<_, IpcRequest>(buffer) };
             assert_eq!(
                 req.request,
                 Request::QueryClientBandwidth { pk: [i; 96].into() }
@@ -309,9 +334,9 @@ mod tests {
                     balance: i as u128 + 100,
                 },
             };
-            let res_buffer = unsafe {
-                std::mem::transmute::<_, [u8; std::mem::size_of::<IpcMessage>()]>(result)
-            };
+            let mut res_buffer = Vec::new();
+            result.encode_length_delimited(&mut res_buffer).unwrap();
+
             let mut to_write = res_buffer.as_slice();
             while !to_write.is_empty() {
                 s2.writable().await.unwrap();
