@@ -1,15 +1,16 @@
 use std::any::{type_name, Any, TypeId};
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use crate::event::Eventstore;
 use crate::object::{Object, Ref, RefMut};
 use crate::ty::Ty;
-use crate::Executor;
+use crate::{Container, Executor};
 
 /// The registry contains all of the constructed values.
 pub struct Registry {
     /// Map container id to object.
-    values: HashMap<TypeId, Object>,
+    values: HashMap<TypeId, Rc<Object>>,
 }
 
 impl Registry {
@@ -21,7 +22,7 @@ impl Registry {
     /// Insert the given object to the registry.
     pub fn insert_raw(&mut self, object: Object) {
         let ty = object.ty();
-        self.values.insert(ty.container_id(), object);
+        self.values.insert(ty.container_id(), Rc::new(object));
     }
 
     /// Returns true if the registry has a value with the given type.
@@ -48,9 +49,9 @@ impl Registry {
         let ty = Ty::of::<T>();
         if let Some(obj) = self.values.get(&ty.id()) {
             // -> T: Container<U>
-            Ref(crate::object::RefInner::Ref(obj.downcast_into()))
+            Ref(crate::object::RefInner::Ref(obj.downcast()))
         } else if let Some(obj) = self.values.get(&ty.container_id()) {
-            obj.downcast::<T>().borrow()
+            obj.downcast::<Container<T>>().borrow()
         } else {
             panic!(
                 "Could not find a value of type '{}' in this registry.",
@@ -71,7 +72,7 @@ impl Registry {
             // -> T: Container<U>
             panic!("Taking mutable reference to 'Container<_>' is not supported.")
         } else if let Some(obj) = self.values.get(&ty.container_id()) {
-            obj.downcast::<T>().borrow_mut()
+            obj.downcast::<Container<T>>().borrow_mut()
         } else {
             panic!(
                 "Could not find a value of type '{}' in this registry.",
@@ -92,7 +93,7 @@ impl Registry {
             // -> T: Container<U>
             panic!("Consuming 'Container<_>' is not supported.")
         } else if let Some(obj) = self.values.get(&ty.container_id()) {
-            obj.downcast::<T>().take()
+            obj.downcast::<Container<T>>().take()
         } else {
             panic!(
                 "Could not find a value of type '{}' in this registry.",

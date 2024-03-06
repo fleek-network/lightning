@@ -19,21 +19,10 @@ impl Object {
         &self.0
     }
 
-    /// Downcast this object to the requested type.
-    pub fn downcast<T: 'static>(&self) -> &Container<T> {
-        if self.0.id() != TypeId::of::<T>() {
-            panic!(
-                "Could not return object of type '{}' as '{}'.",
-                self.0.name(),
-                type_name::<T>()
-            );
-        }
-
-        self.1.downcast_ref().unwrap()
-    }
-
-    /// Downcast this object to the requested type.
-    pub fn downcast_into<T: 'static>(&self) -> &T {
+    /// Downcast this object to the requested type. Note that upon creation of an object with
+    /// type `T` it is wrapped in a `Container<T>` so you can only downcast to `Container<T>` and
+    /// not `T` directly.
+    pub fn downcast<T: 'static>(&self) -> &T {
         if self.0.container_id() != TypeId::of::<T>() {
             panic!(
                 "Could not return object of type '{}' as '{}'.",
@@ -124,12 +113,21 @@ mod tests {
         let obj = Object::new(String::from("Hello"));
         let ty = Ty::of::<String>();
         assert_eq!(obj.ty(), &ty);
-        let container = obj.downcast::<String>();
+        let container = obj.downcast::<Container<String>>();
         let s = &*container.borrow();
         assert_eq!(s, &String::from("Hello"));
-        let container = obj.downcast_into::<Container<String>>();
+        let container = obj.downcast::<Container<String>>();
         let s = &*container.borrow();
         assert_eq!(s, &String::from("Hello"));
+    }
+
+    #[test]
+    #[should_panic]
+    fn downcast_to_org_should_panic() {
+        let obj = Object::new(String::from("Hello"));
+        let ty = Ty::of::<String>();
+        assert_eq!(obj.ty(), &ty);
+        obj.downcast::<String>();
     }
 
     #[test]
