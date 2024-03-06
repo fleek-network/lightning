@@ -1,6 +1,3 @@
-use futures::future::LocalBoxFuture;
-use futures::Future;
-
 use crate::consume::Consume;
 use crate::ty::Ty;
 use crate::{Method, Registry};
@@ -43,24 +40,6 @@ macro_rules! impl_method {
                     $(&mut registry.get_mut::<$mut>(),)*
                     $(&registry.get::<$get>(),)*
                 )
-            }
-
-            #[allow(unused)]
-            #[allow(non_snake_case)]
-            fn async_call<U>(self, registry: &Registry) -> LocalBoxFuture<'static, U>
-            where
-                T: Future<Output = U>,
-                Self: 'static + Sized,
-            {
-                $(let mut $mut = registry.get_mut::<$mut>();)*
-                $(let $get = registry.get::<$get>();)*
-
-                Box::pin(async move {
-                    (self)(
-                        $(&mut $mut,)*
-                        $(&$get,)*
-                    ).await
-                })
             }
         }
 
