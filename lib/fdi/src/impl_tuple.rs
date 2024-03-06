@@ -36,9 +36,12 @@ macro_rules! impl_method {
             #[inline(always)]
             #[allow(unused)]
             fn call(self, registry: &Registry) -> T {
+                $(let mut $mut = registry.get_mut::<$mut>();)*
+                $(let $get = &registry.get::<$get>();)*
+
                 (self)(
-                    $(&mut registry.get_mut::<$mut>(),)*
-                    $(&registry.get::<$get>(),)*
+                    $(&mut *$mut,)*
+                    $(&$get,)*
                 )
             }
         }
