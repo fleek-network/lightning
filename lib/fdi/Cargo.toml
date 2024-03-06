@@ -6,3 +6,4 @@ edition.workspace = true
 [dependencies]
 anyhow = "1.0"
 indexmap = "2.0.0"
+futures = "0.3"
