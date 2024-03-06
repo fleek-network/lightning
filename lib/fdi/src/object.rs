@@ -6,7 +6,7 @@ use crate::rc_cell::{self, RcCell};
 use crate::ty::Ty;
 
 /// A registry entry. The box in this type is always a `Taker<T>` for some `T: 'static`.
-pub struct Object(Ty, Box<dyn Any>);
+pub(crate) struct Object(Ty, Box<dyn Any>);
 
 impl Object {
     /// Create a new object with the given value.
