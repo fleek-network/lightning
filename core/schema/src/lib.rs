@@ -29,7 +29,7 @@ pub trait LightningMessage: Sized + Send + Sync + 'static {
     fn encode<W: Write>(&self, writer: &mut W) -> std::io::Result<usize>;
 
     /// Encode the message with length delimited. Return the result from the `writer.write`
-    /// The length is written as a u32 in little endian.
+    /// The length is written as a u64 in little endian.
     /// This is useful for framing the message in a stream.
     fn encode_length_delimited<W: Write>(&self, writer: &mut W) -> std::io::Result<usize>;
 }

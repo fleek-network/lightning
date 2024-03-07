@@ -44,6 +44,7 @@ num-derive = "0.3.3"
 dirs = "5.0.1"
 lazy_static = "1.4.0"
 schemars = "0.8.1"
+rkyv = { version = "0.7.44", features = ["validation", "alloc", "std", "hashbrown", "bytecheck", "alloc"]}
 
 # Our libraries
 lightning-types = { path = "core/types" }
