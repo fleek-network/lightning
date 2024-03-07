@@ -11,6 +11,8 @@ use crate::{
     Executor,
     Method,
     MethodExt,
+    Ref,
+    RefMut,
     Registry,
 };
 
@@ -303,26 +305,61 @@ fn consume_usage() {
 }
 
 #[test]
-fn async_usage() {
+fn spawn_async_fn_depending_on_ref() {
     #[derive(Default)]
     struct A;
 
-    impl A {
-        pub async fn work(&self) {}
+    async fn method(mut c: RefMut<Counter>, _a: Ref<A>) {
+        (*c).add("method");
     }
 
-    // async fn work(a: &A) {}
-    // crate::helpers::block_on(|a: &A| async {
-    //     a.work();
-    // });
+    async fn method_2(mut c: RefMut<Counter>, _a: Ref<A>) {
+        (*c).add("block_on");
+    }
 
-    // let m = crate::helpers::spawn(|a: &A| Box::pin(async move { todo!() }));
+    let graph = DependencyGraph::new().with(
+        A::default
+            .to_infallible()
+            .on("start", method.spawn())
+            .on("start", method_2.block_on()),
+    );
+    let mut registry = Registry::default();
+    graph.init_all(&mut registry).unwrap();
+    registry.insert(Counter::default());
 
-    // #[rustfmt::skip]
-    // let mut graph = DependencyGraph::new()
-    //     .with(
-    //         A::default
-    //             .to_infallible()
-    //             .on("start", A::work.spawn())
-    //     );
+    assert_eq!(registry.get::<Counter>().get("method"), 0);
+    assert_eq!(registry.get::<Counter>().get("block_on"), 0);
+
+    {
+        let mut e = registry.get_mut::<Executor>();
+        futures::executor::block_on(e.run_until_finish());
+    }
+
+    registry.trigger("start");
+    assert_eq!(registry.get::<Counter>().get("method"), 0);
+    assert_eq!(registry.get::<Counter>().get("block_on"), 1);
+
+    {
+        let mut e = registry.get_mut::<Executor>();
+        futures::executor::block_on(e.run_until_finish());
+    }
+
+    assert_eq!(registry.get::<Counter>().get("method"), 1);
+    assert_eq!(registry.get::<Counter>().get("block_on"), 1);
+}
+
+#[test]
+fn depend_on_ref_should_resolve() {
+    #[derive(Default)]
+    struct A(u32);
+
+    fn method(a: Ref<A>) -> A {
+        A((*a).0)
+    }
+
+    let graph = DependencyGraph::new().with((|| A(17)).to_infallible());
+    let mut registry = Registry::default();
+    graph.init_all(&mut registry).unwrap();
+    let a = method.call(&registry);
+    assert_eq!(a.0, 17);
 }

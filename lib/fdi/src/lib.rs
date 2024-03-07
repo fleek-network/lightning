@@ -1,4 +1,3 @@
-mod async_exp;
 mod consume;
 pub mod event;
 mod executor;
@@ -18,7 +17,7 @@ pub use executor::Executor;
 pub use ext::MethodExt;
 pub use graph::DependencyGraph;
 pub use method::Method;
-pub use object::Container;
+pub use object::{Container, Ref, RefMut};
 pub use registry::Registry;
 
 #[cfg(test)]
