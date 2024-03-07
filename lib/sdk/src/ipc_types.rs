@@ -5,6 +5,8 @@ use lightning_schema::LightningMessage;
 use rkyv::ser::Serializer;
 use rkyv::{Archive, Deserialize, Serialize};
 
+use crate::ReqRes;
+
 /// Client public key bytes. We use this type alias instead of the actual fleek-crypto type
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Archive, Serialize, Deserialize)]
 #[archive(check_bytes)]
@@ -135,108 +137,43 @@ impl LightningMessage for IpcRequest {
     }
 }
 
-// Recursive expansion of ReqRes! macro
-// =====================================
-
-#[derive(
-    Clone,
-    Copy,
-    Debug,
-    IsVariant,
-    PartialEq,
-    Eq,
-    ::rkyv::Archive,
-    ::rkyv::Serialize,
-    ::rkyv::Deserialize,
-)]
-#[archive(check_bytes)]
-#[non_exhaustive]
-pub enum Request {
-    #[doc = r" Query a client's bandwidth balance."]
+ReqRes! {
+    // we need an extra `meta` attribute to specify the derive macros otherwise it could be a multiple parse
+    // todo!(n) find out how to remove this,
+    // for some reasons adding these directly into the macro invocation doesn't work
+    meta: #[derive(IsVariant, Archive, Serialize, Deserialize, PartialEq, Eq, Debug, Clone, Copy)],
+    meta: #[archive(check_bytes)]
+    endmeta,
+    /// Query a client's bandwidth balance.
     QueryClientBandwidth {
-        #[doc = r" The public key of the user that we want their balance."]
+        /// The public key of the user that we want their balance.
         pk: ClientPublicKeyBytes,
+        =>
+        /// The balance of the user.
+        balance: u128,
     },
-    #[doc = r" Query a client's FLK balance."]
+    /// Query a client's FLK balance.
     QueryClientFLK {
-        #[doc = r" The public key of the user."]
+        /// The public key of the user.
         pk: ClientPublicKeyBytes,
+        =>
+        /// The balance of the user.
+        balance: u128,
     },
     FetchFromOrigin {
         origin: u8,
-        #[doc = r" The encoded URI."]
+        /// The encoded URI.
         uri: StaticVec<256>,
-    },
-    #[doc = r" Fetch a content via a blake3 digest."]
-    FetchBlake3 {
-        #[doc = r" Hash of the content we are interested to fetch."]
-        hash: [u8; 32],
-    },
-}
-
-#[derive(
-    Clone,
-    Copy,
-    Debug,
-    IsVariant,
-    PartialEq,
-    Eq,
-    ::rkyv::Archive,
-    ::rkyv::Serialize,
-    ::rkyv::Deserialize,
-)]
-#[archive(check_bytes)]
-#[non_exhaustive]
-pub enum Response {
-    QueryClientBandwidth {
-        #[doc = r" The balance of the user."]
-        balance: u128,
-    },
-    QueryClientFLK {
-        #[doc = r" The balance of the user."]
-        balance: u128,
-    },
-    FetchFromOrigin {
-        #[doc = r" Returns the hash of the content on successful fetch."]
+        =>
+        /// Returns the hash of the content on successful fetch.
         hash: Option<[u8; 32]>,
     },
+    /// Fetch a content via a blake3 digest.
     FetchBlake3 {
-        #[doc = r" Returns true if the fetch succeeded."]
-        succeeded: bool,
+        /// Hash of the content we are interested to fetch.
+        hash: [u8; 32],
+        =>
+        /// Returns true if the fetch succeeded.
+        succeeded: bool
     },
 }
-
-// ReqRes! {
-//     /// Query a client's bandwidth balance.
-//     QueryClientBandwidth {
-//         /// The public key of the user that we want their balance.
-//         pk: ClientPublicKeyBytes,
-//         =>
-//         /// The balance of the user.
-//         balance: u128,
-//     },
-//     /// Query a client's FLK balance.
-//     QueryClientFLK {
-//         /// The public key of the user.
-//         pk: ClientPublicKeyBytes,
-//         =>
-//         /// The balance of the user.
-//         balance: u128,
-//     },
-//     FetchFromOrigin {
-//         origin: u8,
-//         /// The encoded URI.
-//         uri: StaticVec<256>,
-//         =>
-//         /// Returns the hash of the content on successful fetch.
-//         hash: Option<[u8; 32]>,
-//     },
-//     /// Fetch a content via a blake3 digest.
-//     FetchBlake3 {
-//         /// Hash of the content we are interested to fetch.
-//         hash: [u8; 32],
-//         =>
-//         /// Returns true if the fetch succeeded.
-//         succeeded: bool
-//     },
-// }
