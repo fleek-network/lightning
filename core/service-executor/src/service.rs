@@ -213,7 +213,7 @@ async fn handle_stream<C: Collection>(
     ctx: Arc<Context<C>>,
 ) -> Result<(), Box<dyn Error>> {
     // incoming IpcRequests
-    let mut read_buffer = vec![0; 4];
+    let mut read_buffer = vec![0; 8];
     let mut read_buffer_pos = 0;
     let mut read_len = 0;
 
@@ -292,7 +292,7 @@ async fn handle_stream<C: Collection>(
         if ready.is_readable() {
             'read: loop {
                 // try to read the length delimiter first
-                while read_buffer_pos < 4 && read_len == 0 {
+                while read_buffer_pos < 8 && read_len == 0 {
                     match stream.try_read(&mut read_buffer[read_buffer_pos..]) {
                         Ok(0) => {
                             tracing::warn!("Connection reset control loop");
@@ -312,19 +312,19 @@ async fn handle_stream<C: Collection>(
 
                 // if we have no message len already then we have the new length delimiter
                 if read_len == 0 {
-                    read_len = u32::from_le_bytes(
-                        read_buffer[..4]
+                    read_len = usize::from_le_bytes(
+                        read_buffer[..8]
                             .try_into()
                             .expect("Can create len 4 array from read buffer slice"),
                     );
 
                     read_buffer_pos = 0;
-                    read_buffer.resize(read_len as usize, 0);
+                    read_buffer.resize(read_len, 0);
                 }
 
                 // try to read the request
                 // downcast here should be safe on >= 32 bit machines
-                while read_buffer_pos < read_len as usize {
+                while read_buffer_pos < read_len {
                     match stream.try_read(&mut read_buffer[read_buffer_pos..]) {
                         Ok(0) => {
                             // connection reset
@@ -347,7 +347,7 @@ async fn handle_stream<C: Collection>(
 
                 // we need to resize to 4 bytes or else the first part of the read loop may bring in
                 // too many bytes
-                read_buffer.resize(4, 0);
+                read_buffer.resize(8, 0);
                 read_len = 0;
                 read_buffer_pos = 0;
 

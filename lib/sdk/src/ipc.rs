@@ -73,15 +73,15 @@ pub(crate) async fn spawn_service_loop_inner(
     mut rx: mpsc::Receiver<IpcRequest>,
 ) -> Result<(), Box<dyn Error>> {
     // Vecs are mostly fine here because allocation should really only ever occur a few times
-    // throught execution runtime since there arent any dynamic types
-    // however we might want to consider using a fixed size
+    // throught execution runtime since there arent any dynamic types and all of operations never
+    // deallocate however we might want to consider using a fixed size
 
     // IpcRequest
     let mut write_buffer = Vec::<u8>::new();
     let mut write_buffer_pos = 0_usize;
     // IpcMessage
-    let mut read_buffer = vec![0; 4];
-    let mut read_buffer_pos = 4;
+    let mut read_buffer = vec![0; 8];
+    let mut read_buffer_pos = 0;
     let mut read_len = 0;
 
     'outer: loop {
@@ -119,6 +119,7 @@ pub(crate) async fn spawn_service_loop_inner(
                 }
 
                 // always clear because we know it has non zero values
+                // doenst deallocate
                 write_buffer.clear();
                 write_buffer_pos = 0;
 
@@ -135,7 +136,7 @@ pub(crate) async fn spawn_service_loop_inner(
             'read: loop {
                 // try to read the length from the buffer,
                 // if were not already trying to read a message
-                while read_buffer_pos < 4 && read_len == 0 {
+                while read_buffer_pos < 8 && read_len == 0 {
                     match ipc_stream.try_read(&mut read_buffer[read_buffer_pos..]) {
                         // socket reset
                         Ok(0) => {
@@ -159,21 +160,22 @@ pub(crate) async fn spawn_service_loop_inner(
                 // if the len is 0 then we dont have any messages yet, therefore we jsut finished
                 // reading the len or else we would have broken out
                 if read_len == 0 {
-                    read_len = u32::from_le_bytes(
-                        read_buffer[..4]
+                    // assume were running on a 64bit machine
+                    read_len = usize::from_le_bytes(
+                        read_buffer[..8]
                             .try_into()
-                            .expect("can create len 4 buffer from read buffer"),
+                            .expect("can create len 8 buffer from read buffer"),
                     );
 
                     // were now using this as the postion in the message buffer
                     read_buffer_pos = 0;
                     // resize will not deallocate
-                    read_buffer.resize(read_len as usize, 0);
+                    read_buffer.resize(read_len, 0);
                 }
 
                 // this downcasting should be safe because its from a u32
                 // and no one should be running this on a < 32 bit machine
-                while read_buffer_pos < read_len as usize {
+                while read_buffer_pos < read_len {
                     match ipc_stream.try_read(&mut read_buffer[read_buffer_pos..]) {
                         Ok(0) => {
                             tracing::warn!("service control loop connection reset");
@@ -196,7 +198,7 @@ pub(crate) async fn spawn_service_loop_inner(
                 // cleanup now that weve read the message
                 read_buffer_pos = 0;
                 read_len = 0;
-                read_buffer.resize(4, 0);
+                read_buffer.resize(8, 0);
 
                 handle_message(message);
             }
@@ -279,10 +281,10 @@ mod tests {
                 send_and_await_response(Request::QueryClientBandwidth { pk: [i; 96].into() }).await
             });
 
-            let mut len_buffer = [0_u8; 4];
+            let mut len_buffer = [0_u8; 8];
             let mut buffer = Vec::new();
             let mut pos = 0;
-            while pos < 4 {
+            while pos < 8 {
                 s2.readable().await.unwrap();
                 match s2.try_read(&mut len_buffer[pos..]) {
                     Ok(0) => {
@@ -301,7 +303,7 @@ mod tests {
                 }
             }
 
-            let len = u32::from_le_bytes(len_buffer) as usize;
+            let len = usize::from_le_bytes(len_buffer);
             pos = 0;
 
             while pos < len {

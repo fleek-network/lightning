@@ -21,8 +21,10 @@ macro_rules! ReqRes {
     } => (
     #[rustfmt::skip]
     #[derive(
-        Clone, Copy, Debug, IsVariant, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize
+        Clone, Copy, Debug, IsVariant, PartialEq, Eq, ::rkyv::Archive, ::rkyv::Serialize,
+        ::rkyv::Deserialize
     )]
+    #[archive(check_bytes)]
     #[non_exhaustive]
     pub enum Request {
     $(
@@ -37,8 +39,10 @@ macro_rules! ReqRes {
 
     #[rustfmt::skip]
     #[derive(
-        Clone, Copy, Debug, IsVariant, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize
+        Clone, Copy, Debug, IsVariant, PartialEq, Eq, ::rkyv::Archive, ::rkyv::Serialize,
+        ::rkyv::Deserialize
     )]
+    #[archive(check_bytes)]
     #[non_exhaustive]
     pub enum Response {
     $(
