@@ -3708,6 +3708,7 @@ name = "fleek-service-ai"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "base64 0.21.5",
  "borsh",
  "bytes",
  "derive_more",
@@ -3715,8 +3716,6 @@ dependencies = [
  "hex",
  "ndarray",
  "ort",
- "rmp-serde",
- "rmpv",
  "safetensors",
  "safetensors-ndarray",
  "serde",
@@ -9591,16 +9590,6 @@ dependencies = [
  "byteorder",
  "rmp",
  "serde",
-]
-
-[[package]]
-name = "rmpv"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e0e0214a4a2b444ecce41a4025792fc31f77c7bb89c46d253953ea8c65701ec"
-dependencies = [
- "num-traits",
- "rmp",
 ]
 
 [[package]]

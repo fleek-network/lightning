@@ -1,10 +1,14 @@
+use std::collections::HashMap;
+
 use anyhow::{anyhow, bail, Context};
+use base64::Engine;
 use bytes::Bytes;
 use fn_sdk::connection::Connection;
 use fn_sdk::header::TransportDetail;
 use url::Url;
 
-use crate::runtime::Session;
+use crate::opts::{BorshVector, Encoding, Format};
+use crate::runtime::{RunOutput, Session};
 use crate::{Origin, StartSession};
 
 pub async fn handle(mut connection: Connection) -> anyhow::Result<()> {
@@ -30,14 +34,14 @@ pub async fn handle(mut connection: Connection) -> anyhow::Result<()> {
 
         // Load model.
         let model = load_model(uri, origin).await?;
-        let session = Session::new(model)?;
+        // Todo: get encoding from HTTP headers.
+        let session = Session::new(model, Encoding::Borsh)?;
 
         // Run inference.
         let input = serde_json::from_slice(body.as_ref())?;
-        let output = session.run(input)?;
-        let serialized_output = rmp_serde::to_vec_named(&output)?;
-
-        connection.write_payload(&serialized_output).await?;
+        // Todo: get format from HTTP headers.
+        let output = serialize_output(session.run(input)?, &Format::Json)?;
+        connection.write_payload(&output).await?;
 
         return Ok(());
     }
@@ -47,18 +51,20 @@ pub async fn handle(mut connection: Connection) -> anyhow::Result<()> {
         return Ok(());
     };
 
-    let message = serde_json::from_slice::<StartSession>(initial_message.as_ref())
+    let session_params = serde_json::from_slice::<StartSession>(initial_message.as_ref())
         .context("Could not deserialize initial message")?;
 
     // Load model.
-    let model = load_model(message.model, message.origin).await?;
-    let session = Session::new(model)?;
+    let model = load_model(session_params.model, session_params.origin).await?;
+    let session = Session::new(model, session_params.model_io_encoding)?;
 
     // Process incoming inference requests.
     while let Some(payload) = connection.read_payload().await {
-        let output = session.run(payload.freeze().try_into()?)?;
-        let serialized_output = rmp_serde::to_vec_named(&output)?;
-        connection.write_payload(&serialized_output).await?;
+        let output = serialize_output(
+            session.run(payload.freeze().try_into()?)?,
+            &session_params.content_format,
+        )?;
+        connection.write_payload(&output).await?;
     }
 
     Ok(())
@@ -94,6 +100,7 @@ async fn load_model(model: String, origin: Origin) -> anyhow::Result<Bytes> {
             bail!("HTTP origin is not supported");
         },
         Origin::Unknown => {
+            // This should be unreachable because we're skipping it during deserialization.
             bail!("unknown origin");
         },
     };
@@ -105,4 +112,41 @@ async fn load_model(model: String, origin: Origin) -> anyhow::Result<Bytes> {
         .await?;
 
     Ok(model.into())
+}
+
+fn serialize_output(output: RunOutput, format: &Format) -> anyhow::Result<Bytes> {
+    let output = match output {
+        RunOutput::SafeTensors(bytes) => {
+            if format.is_json() {
+                serde_json::to_string(&serde_json::json!({
+                    "safetensors": base64::prelude::BASE64_STANDARD.encode(bytes),
+                }))?
+                .into_bytes()
+                .into()
+            } else {
+                bytes
+            }
+        },
+        RunOutput::Borsh(named_vectors) => {
+            // Todo: which binary encoding could we support?
+            let named_vectors = named_vectors
+                .into_iter()
+                .map(|(name, vector)| {
+                    (
+                        name,
+                        BorshVector {
+                            dtype: vector.dtype,
+                            data: base64::prelude::BASE64_STANDARD
+                                .encode(vector.data)
+                                .into_bytes()
+                                .into(),
+                        },
+                    )
+                })
+                .collect::<HashMap<_, _>>();
+            serde_json::to_string(&named_vectors)?.into_bytes().into()
+        },
+    };
+
+    Ok(output)
 }

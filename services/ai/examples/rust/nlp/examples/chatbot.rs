@@ -10,7 +10,6 @@ use std::net::SocketAddr;
 use cdk_rust::schema::ResponseFrame;
 use cdk_rust::transport::tcp::TcpTransport;
 use cdk_rust::Builder;
-use common::service_api::{Device, Origin, StartSession};
 use ndarray::{s, Array1, Axis};
 use safetensors::{Dtype, SafeTensors};
 use safetensors_ndarray::collection::Collection;
@@ -21,7 +20,7 @@ const EOS: usize = 50256;
 #[tokio::main]
 async fn main() {
     let tokenizer =
-        Tokenizer::from_file("tokenizer.json")
+        Tokenizer::from_file("/Users/acadia/models/dialogpt-medium-texttask/tokenizer.json")
             .unwrap();
 
     let target: SocketAddr = "127.0.0.1:4221".parse().unwrap();
@@ -33,11 +32,13 @@ async fn main() {
     let (mut sender, mut receiver) = connector.connect().await.unwrap().split();
 
     // Start the session.
-    let start_session = serde_json::to_string(&StartSession {
-        model: "387cbc21bd420764043db21330ccfbaaceafa9aa6c858a0cc16d8fc611c0dbb8".to_string(),
-        origin: Origin::Blake3,
-        device: Device::Cpu,
-    })
+    let start_session = serde_json::to_string(&serde_json::json!( {
+        "model": "387cbc21bd420764043db21330ccfbaaceafa9aa6c858a0cc16d8fc611c0dbb8".to_string(),
+        "origin": "blake3",
+        "device": "cpu",
+        "content_format": "bin",
+        "model_io_encoding": "safetensors"
+    }))
     .unwrap();
     sender
         .send(start_session.into_bytes().into())
@@ -82,7 +83,7 @@ async fn main() {
                 .copied()
                 .map(|mask| mask as i64)
                 .collect::<Vec<_>>();
-            let attention_mask = Array1::from(attention_mask);
+            let attention_mask = Array1::from(attention_mask).insert_axis(Axis(0));
             safetensors.insert_array_i64("attention_mask".to_string(), attention_mask.into_dyn());
 
             // Gather position ids.
@@ -92,7 +93,7 @@ async fn main() {
                 .copied()
                 .map(|id| id.unwrap() as i64)
                 .collect::<Vec<_>>();
-            let position_ids = Array1::from(position_ids);
+            let position_ids = Array1::from(position_ids).insert_axis(Axis(0));
             safetensors.insert_array_i64("position_ids".to_string(), position_ids.into_dyn());
 
             // Gather input ids.
@@ -106,10 +107,8 @@ async fn main() {
             safetensors.insert_array_i64("input_ids".to_string(), input_ids.into_dyn());
 
             // Send service a request.
-            sender
-                .send(safetensors.serialize(&None).unwrap().into())
-                .await
-                .unwrap();
+            let serialized_input = safetensors.serialize(&None).unwrap();
+            sender.send(serialized_input.into()).await.unwrap();
 
             // Read response frame.
             let resp = receiver.recv().await.unwrap().unwrap();
