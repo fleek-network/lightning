@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::str::FromStr;
 
 use bytes::Bytes;
 use derive_more::IsVariant;
@@ -11,6 +12,24 @@ pub enum Format {
     Binary,
     #[serde(rename = "json")]
     Json,
+}
+
+impl FromStr for Format {
+    type Err = std::io::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let format = match s {
+            "bin" => Self::Binary,
+            "json" => Self::Json,
+            _ => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "unknown format",
+                ));
+            },
+        };
+        Ok(format)
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize, IsVariant)]
@@ -55,6 +74,24 @@ pub enum Encoding {
     /// Data is a safetensors-encoded ndarray.
     #[serde(rename = "safetensors")]
     SafeTensors = 1,
+}
+
+impl FromStr for Encoding {
+    type Err = std::io::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let format = match s {
+            "borsh" => Self::Borsh,
+            "safetensors" => Self::SafeTensors,
+            _ => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "unknown encoding",
+                ));
+            },
+        };
+        Ok(format)
+    }
 }
 
 pub type BorshInput = HashMap<String, BorshVector>;

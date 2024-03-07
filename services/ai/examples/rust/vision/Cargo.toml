@@ -8,10 +8,10 @@ publish = false
 image = "0.24"
 rmp-serde = "1.1"
 ndarray = "0.15"
-ndarray-npy = "0.8"
-npyz = "0.8"
 raqote = { version = "0.8", default-features = false }
 reqwest = "0.11"
+safetensors = "0.4"
+safetensors-ndarray = { path = "../../../../../lib/safetensors-ndarray" }
 tokio.workspace = true
 common = { path = "../common" }
 

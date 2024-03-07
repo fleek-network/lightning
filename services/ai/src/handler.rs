@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 use anyhow::{anyhow, bail, Context};
@@ -17,6 +18,8 @@ pub async fn handle(mut connection: Connection) -> anyhow::Result<()> {
             unreachable!()
         };
 
+        let (content_format, model_io_encoding) = parse_query_params(uri)?;
+
         let Some((origin, uri)) = parse_http_url(uri) else {
             let _ = connection.write_payload(b"invalid request url").await;
             bail!("Invalid url");
@@ -34,13 +37,10 @@ pub async fn handle(mut connection: Connection) -> anyhow::Result<()> {
 
         // Load model.
         let model = load_model(uri, origin).await?;
-        // Todo: get encoding from HTTP headers.
-        let session = Session::new(model, Encoding::Borsh)?;
+        let session = Session::new(model, model_io_encoding)?;
 
         // Run inference.
-        let input = serde_json::from_slice(body.as_ref())?;
-        // Todo: get format from HTTP headers.
-        let output = serialize_output(session.run(input)?, &Format::Json)?;
+        let output = serialize_output(session.run(body.freeze())?, &content_format)?;
         connection.write_payload(&output).await?;
 
         return Ok(());
@@ -75,6 +75,26 @@ fn parse_http_url(url: &Url) -> Option<(Origin, String)> {
     let seg1 = segments.next()?;
     let seg2 = segments.next()?;
     Some((seg1.into(), seg2.into()))
+}
+
+fn parse_query_params(url: &Url) -> anyhow::Result<(Format, Encoding)> {
+    let mut content_format = None;
+    let mut encoding = None;
+    for (name, value) in url.query_pairs() {
+        if name == "format" {
+            content_format = Some(value);
+        } else if name == "encoding" {
+            encoding = Some(value);
+        }
+
+        if content_format.is_some() && encoding.is_some() {
+            break;
+        }
+    }
+    Ok((
+        content_format.unwrap_or(Cow::Borrowed("json")).parse()?,
+        encoding.unwrap_or(Cow::Borrowed("borsh")).parse()?,
+    ))
 }
 
 async fn load_model(model: String, origin: Origin) -> anyhow::Result<Bytes> {

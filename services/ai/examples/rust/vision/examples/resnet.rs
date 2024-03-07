@@ -1,13 +1,10 @@
-use std::collections::HashMap;
-use std::io::Cursor;
 use std::path::Path;
 
 use common::imagenet::CLASSES;
-use common::service_api::{EncodedArrayExt, Input};
-use common::to_array_d;
 use image::GenericImageView;
 use ndarray::{Array, Axis};
-use ndarray_npy::WriteNpyExt;
+use safetensors::SafeTensors;
+use safetensors_ndarray::Tensor;
 
 #[tokio::main]
 async fn main() {
@@ -34,18 +31,12 @@ async fn main() {
         input[[0, 2, y, x]] = (b as f32) / 255.;
     }
 
-    // Encode input into npy.
-    let mut buffer = Vec::new();
-    input.write_npy(Cursor::new(&mut buffer)).unwrap();
-
-    let payload_buffer = rmp_serde::to_vec_named(&Input::Array {
-        data: EncodedArrayExt((10, buffer.into())),
-    })
-    .unwrap();
+    // Encode input into safetensors.
+    let safetensors = safetensors::serialize(vec![("input", Tensor(input))], &None).unwrap();
 
     // Send service a request.
-    let resp = reqwest::Client::new().post("http://127.0.0.1:4220/services/2/blake3/f2700c0d695006d953ca920b7eb73602b5aef7dbe7b6506d296528f13ebf0d95")
-        .body(payload_buffer)
+    let resp = reqwest::Client::new().post("http://127.0.0.1:4220/services/2/blake3/f2700c0d695006d953ca920b7eb73602b5aef7dbe7b6506d296528f13ebf0d95?format=bin&encoding=safetensors")
+        .body(safetensors)
         .send().await.unwrap();
 
     if !resp.status().is_success() {
@@ -55,20 +46,9 @@ async fn main() {
 
     // Process response and extract encoded array.
     let data = resp.bytes().await.unwrap();
-    let mut outputs =
-        rmp_serde::from_slice::<HashMap<String, EncodedArrayExt>>(data.as_ref()).unwrap();
-    let EncodedArrayExt((encoding, encoded_array)) = outputs.remove("output").unwrap();
-    // Assert that the array was encoded as a npy file.
-    assert_eq!(encoding, 10);
-
-    // Decode output.
-    let npy_file = npyz::NpyFile::new(Cursor::new(encoded_array)).unwrap();
-
-    // Conver to ndarray::Array.
-    let shape = npy_file.shape().to_vec();
-    let order = npy_file.order();
-    let data = npy_file.into_vec::<f32>().unwrap();
-    let output = to_array_d(data, shape, order);
+    let outputs = SafeTensors::deserialize(data.as_ref()).unwrap();
+    let view = outputs.tensor("output").unwrap();
+    let output = safetensors_ndarray::utils::deserialize_f32(view.shape(), view.data()).unwrap();
 
     // Shape is (1, 1000) so drop first axis.
     let output = output.remove_axis(Axis(0));

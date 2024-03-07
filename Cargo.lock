@@ -1760,12 +1760,6 @@ dependencies = [
 [[package]]
 name = "common"
 version = "0.0.0"
-dependencies = [
- "bytes",
- "ndarray",
- "npyz",
- "serde",
-]
 
 [[package]]
 name = "compact_str"
@@ -3449,11 +3443,11 @@ dependencies = [
  "common",
  "image",
  "ndarray",
- "ndarray-npy",
- "npyz",
  "raqote",
  "reqwest",
  "rmp-serde",
+ "safetensors",
+ "safetensors-ndarray",
  "tokio",
 ]
 
@@ -3462,7 +3456,6 @@ name = "example-machine-comprehension"
 version = "0.0.0"
 dependencies = [
  "cdk-rust",
- "common",
  "ndarray",
  "rand 0.8.5",
  "reqwest",
@@ -7486,20 +7479,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ndarray-npy"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f85776816e34becd8bd9540818d7dc77bf28307f3b3dcc51cc82403c6931680c"
-dependencies = [
- "byteorder",
- "ndarray",
- "num-complex",
- "num-traits",
- "py_literal",
- "zip 0.5.13",
-]
-
-[[package]]
 name = "ndarray-rand"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7543,17 +7522,6 @@ name = "normalize-line-endings"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "61807f77802ff30975e01f4f071c8ba10c022052f98b3294119f3e615d13e5be"
-
-[[package]]
-name = "npyz"
-version = "0.8.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13f27ea175875c472b3df61ece89a6d6ef4e0627f43704e400c782f174681ebd"
-dependencies = [
- "byteorder",
- "num-bigint",
- "py_literal",
-]
 
 [[package]]
 name = "nu-ansi-term"
@@ -8284,40 +8252,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pest_derive"
-version = "2.7.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22e1288dbd7786462961e69bfd4df7848c1e37e8b74303dbdab82c3a9cdd2809"
-dependencies = [
- "pest",
- "pest_generator",
-]
-
-[[package]]
-name = "pest_generator"
-version = "2.7.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1381c29a877c6d34b8c176e734f35d7f7f5b3adaefe940cb4d1bb7af94678e2e"
-dependencies = [
- "pest",
- "pest_meta",
- "proc-macro2 1.0.74",
- "quote 1.0.35",
- "syn 2.0.46",
-]
-
-[[package]]
-name = "pest_meta"
-version = "2.7.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d0934d6907f148c22a3acbda520c7eed243ad7487a30f51f6ce52b58b7077a8a"
-dependencies = [
- "once_cell",
- "pest",
- "sha2 0.10.8",
-]
-
-[[package]]
 name = "petgraph"
 version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8939,19 +8873,6 @@ dependencies = [
  "bitflags 1.3.2",
  "memchr",
  "unicase",
-]
-
-[[package]]
-name = "py_literal"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "102df7a3d46db9d3891f178dcc826dc270a6746277a9ae6436f8d29fd490a8e1"
-dependencies = [
- "num-bigint",
- "num-complex",
- "num-traits",
- "pest",
- "pest_derive",
 ]
 
 [[package]]
@@ -11077,7 +10998,7 @@ dependencies = [
  "sha2 0.10.8",
  "thiserror",
  "url",
- "zip 0.6.6",
+ "zip",
 ]
 
 [[package]]
@@ -13147,18 +13068,6 @@ dependencies = [
  "proc-macro2 1.0.74",
  "quote 1.0.35",
  "syn 2.0.46",
-]
-
-[[package]]
-name = "zip"
-version = "0.5.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "93ab48844d61251bb3835145c521d88aa4031d7139e8485990f60ca911fa0815"
-dependencies = [
- "byteorder",
- "crc32fast",
- "flate2",
- "thiserror",
 ]
 
 [[package]]
