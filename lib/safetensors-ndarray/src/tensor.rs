@@ -11,10 +11,10 @@ where
 {
     fn buffer(&self) -> &[u8] {
         let slice = self.0.as_slice().expect("Non contiguous tensors");
-        let num_bytes = std::mem::size_of::<A>();
         let new_slice: &[u8] = unsafe {
-            std::slice::from_raw_parts(slice.as_ptr() as *const u8, slice.len() * num_bytes)
+            std::slice::from_raw_parts(slice.as_ptr() as *const u8, std::mem::size_of_val(slice))
         };
+
         new_slice
     }
 }

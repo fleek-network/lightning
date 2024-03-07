@@ -9,14 +9,20 @@ use crate::opts::{Device, Encoding, Format, Origin};
 
 /// Header for stream-based protocols.
 ///
-/// This header must be sent before sending an [`Input`].
+/// All of these parameters apply to the entire duration of the session.
+/// This header must be sent before sending any input.
 /// Note: do not send this header when using HTTP.
 #[derive(Deserialize, Serialize)]
 pub struct StartSession {
+    /// CID of Onnx model.
     pub model: String,
+    /// Origin to fetch model from.
     pub origin: Origin,
+    /// Device to use for inference.
     pub device: Device,
+    /// Format to use for requests and responses.
     pub content_format: Format,
+    /// Encoding to use for the input and output arrays.
     pub model_io_encoding: Encoding,
 }
 

@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::str::FromStr;
 
-use bytes::Bytes;
 use derive_more::IsVariant;
 use serde::{Deserialize, Serialize};
 
@@ -94,12 +93,13 @@ impl FromStr for Encoding {
     }
 }
 
-pub type BorshInput = HashMap<String, BorshVector>;
+pub type BorshNamedVectors = HashMap<String, BorshVector>;
 
 #[derive(Deserialize, Serialize)]
 pub struct BorshVector {
     pub dtype: BorshVectorType,
-    pub data: Bytes,
+    #[serde(with = "borsh_base64")]
+    pub data: Vec<u8>,
 }
 
 #[derive(Deserialize, Serialize, Clone, Copy)]
@@ -121,7 +121,7 @@ pub enum BorshVectorType {
     Uint32 = 0x06,
     #[serde(rename = "u64")]
     Uint64 = 0x07,
-    #[serde(rename = "32")]
+    #[serde(rename = "f32")]
     Float32 = 0x08,
     #[serde(rename = "f64")]
     Float64 = 0x09,
@@ -151,5 +151,24 @@ impl TryFrom<u8> for BorshVectorType {
         };
 
         Ok(encoding)
+    }
+}
+
+mod borsh_base64 {
+    use base64::Engine;
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S: Serializer>(v: &[u8], serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.collect_str(&base64::display::Base64Display::new(
+            v,
+            &base64::prelude::BASE64_STANDARD,
+        ))
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<u8>, D::Error> {
+        let base64 = String::deserialize(d)?;
+        base64::prelude::BASE64_STANDARD
+            .decode(base64.as_bytes())
+            .map_err(serde::de::Error::custom)
     }
 }

@@ -1,5 +1,4 @@
 use std::borrow::Cow;
-use std::collections::HashMap;
 
 use anyhow::{anyhow, bail, Context};
 use base64::Engine;
@@ -8,7 +7,7 @@ use fn_sdk::connection::Connection;
 use fn_sdk::header::TransportDetail;
 use url::Url;
 
-use crate::opts::{BorshVector, Encoding, Format};
+use crate::opts::{Encoding, Format};
 use crate::runtime::{RunOutput, Session};
 use crate::{Origin, StartSession};
 
@@ -61,7 +60,7 @@ pub async fn handle(mut connection: Connection) -> anyhow::Result<()> {
     // Process incoming inference requests.
     while let Some(payload) = connection.read_payload().await {
         let output = serialize_output(
-            session.run(payload.freeze().try_into()?)?,
+            session.run(payload.freeze())?,
             &session_params.content_format,
         )?;
         connection.write_payload(&output).await?;
@@ -149,21 +148,6 @@ fn serialize_output(output: RunOutput, format: &Format) -> anyhow::Result<Bytes>
         },
         RunOutput::Borsh(named_vectors) => {
             // Todo: which binary encoding could we support?
-            let named_vectors = named_vectors
-                .into_iter()
-                .map(|(name, vector)| {
-                    (
-                        name,
-                        BorshVector {
-                            dtype: vector.dtype,
-                            data: base64::prelude::BASE64_STANDARD
-                                .encode(vector.data)
-                                .into_bytes()
-                                .into(),
-                        },
-                    )
-                })
-                .collect::<HashMap<_, _>>();
             serde_json::to_string(&named_vectors)?.into_bytes().into()
         },
     };

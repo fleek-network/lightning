@@ -19,9 +19,7 @@ const EOS: usize = 50256;
 
 #[tokio::main]
 async fn main() {
-    let tokenizer =
-        Tokenizer::from_file("/Users/acadia/models/dialogpt-medium-texttask/tokenizer.json")
-            .unwrap();
+    let tokenizer = Tokenizer::from_file("tokenizer.json").unwrap();
 
     let target: SocketAddr = "127.0.0.1:4221".parse().unwrap();
     let transport = TcpTransport::new(target);

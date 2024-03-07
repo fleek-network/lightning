@@ -138,3 +138,9 @@ impl Collection {
             .map_err(Into::into)
     }
 }
+
+impl Default for Collection {
+    fn default() -> Self {
+        Self::new()
+    }
+}

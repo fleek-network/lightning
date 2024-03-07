@@ -9,7 +9,7 @@ use ort::{SessionInputs, SessionOutputs, TensorElementType, Value, ValueType};
 use safetensors::tensor::{Dtype, SafeTensors};
 use safetensors_ndarray::collection::Collection;
 
-use crate::opts::{BorshInput, BorshVector, BorshVectorType};
+use crate::opts::{BorshNamedVectors, BorshVector, BorshVectorType};
 
 pub fn safetensors_serialize_outputs(session_outputs: SessionOutputs) -> anyhow::Result<Bytes> {
     let mut safetensors_out = Collection::new();
@@ -73,7 +73,7 @@ pub fn safetensors_serialize_outputs(session_outputs: SessionOutputs) -> anyhow:
 
 pub fn borsh_serialize_outputs(
     session_outputs: SessionOutputs,
-) -> anyhow::Result<HashMap<String, BorshVector>> {
+) -> anyhow::Result<BorshNamedVectors> {
     let mut borsh_out = HashMap::new();
     for (name, value) in session_outputs.deref().iter() {
         let name = name.to_string();
@@ -91,7 +91,7 @@ pub fn borsh_serialize_outputs(
                             name,
                             BorshVector {
                                 dtype: BorshVectorType::Int8,
-                                data: borsh::to_vec::<Vec<i8>>(&array)?.into(),
+                                data: borsh::to_vec::<Vec<i8>>(&array)?,
                             },
                         );
                     }
@@ -106,7 +106,7 @@ pub fn borsh_serialize_outputs(
                             name,
                             BorshVector {
                                 dtype: BorshVectorType::Int8,
-                                data: borsh::to_vec::<Vec<i16>>(&array)?.into(),
+                                data: borsh::to_vec::<Vec<i16>>(&array)?,
                             },
                         );
                     }
@@ -121,7 +121,7 @@ pub fn borsh_serialize_outputs(
                             name,
                             BorshVector {
                                 dtype: BorshVectorType::Int8,
-                                data: borsh::to_vec::<Vec<i32>>(&array)?.into(),
+                                data: borsh::to_vec::<Vec<i32>>(&array)?,
                             },
                         );
                     }
@@ -136,7 +136,7 @@ pub fn borsh_serialize_outputs(
                             name,
                             BorshVector {
                                 dtype: BorshVectorType::Int8,
-                                data: borsh::to_vec::<Vec<i64>>(&array)?.into(),
+                                data: borsh::to_vec::<Vec<i64>>(&array)?,
                             },
                         );
                     }
@@ -151,7 +151,7 @@ pub fn borsh_serialize_outputs(
                             name,
                             BorshVector {
                                 dtype: BorshVectorType::Int8,
-                                data: borsh::to_vec::<Vec<u8>>(&array)?.into(),
+                                data: borsh::to_vec::<Vec<u8>>(&array)?,
                             },
                         );
                     }
@@ -166,7 +166,7 @@ pub fn borsh_serialize_outputs(
                             name,
                             BorshVector {
                                 dtype: BorshVectorType::Int8,
-                                data: borsh::to_vec::<Vec<u16>>(&array)?.into(),
+                                data: borsh::to_vec::<Vec<u16>>(&array)?,
                             },
                         );
                     }
@@ -181,7 +181,7 @@ pub fn borsh_serialize_outputs(
                             name,
                             BorshVector {
                                 dtype: BorshVectorType::Int8,
-                                data: borsh::to_vec::<Vec<u32>>(&array)?.into(),
+                                data: borsh::to_vec::<Vec<u32>>(&array)?,
                             },
                         );
                     }
@@ -196,7 +196,7 @@ pub fn borsh_serialize_outputs(
                             name,
                             BorshVector {
                                 dtype: BorshVectorType::Uint64,
-                                data: borsh::to_vec::<Vec<u64>>(&array)?.into(),
+                                data: borsh::to_vec::<Vec<u64>>(&array)?,
                             },
                         );
                     }
@@ -211,7 +211,7 @@ pub fn borsh_serialize_outputs(
                             name,
                             BorshVector {
                                 dtype: BorshVectorType::Int8,
-                                data: borsh::to_vec::<Vec<f32>>(&array)?.into(),
+                                data: borsh::to_vec::<Vec<f32>>(&array)?,
                             },
                         );
                     }
@@ -226,7 +226,7 @@ pub fn borsh_serialize_outputs(
                             name,
                             BorshVector {
                                 dtype: BorshVectorType::Int8,
-                                data: borsh::to_vec::<Vec<f64>>(&array)?.into(),
+                                data: borsh::to_vec::<Vec<f64>>(&array)?,
                             },
                         );
                     }
@@ -279,7 +279,7 @@ pub fn deserialize_safetensors(data: Bytes) -> anyhow::Result<SessionInputs<'sta
 }
 
 pub fn deserialize_borsh(data: Bytes) -> anyhow::Result<SessionInputs<'static>> {
-    let named_inputs = serde_json::from_slice::<BorshInput>(data.as_ref())?;
+    let named_inputs = serde_json::from_slice::<BorshNamedVectors>(data.as_ref()).unwrap();
     let mut session_inputs = HashMap::new();
     for (name, vector) in named_inputs {
         let value: Value = match vector.dtype {
@@ -288,31 +288,40 @@ pub fn deserialize_borsh(data: Bytes) -> anyhow::Result<SessionInputs<'static>> 
                     .try_into()?
             },
             BorshVectorType::Int16 => {
-                Array1::<i16>::from(borsh::from_slice::<Vec<i16>>(data.as_ref())?).try_into()?
+                Array1::<i16>::from(borsh::from_slice::<Vec<i16>>(vector.data.as_ref())?)
+                    .try_into()?
             },
             BorshVectorType::Int32 => {
-                Array1::<i32>::from(borsh::from_slice::<Vec<i32>>(data.as_ref())?).try_into()?
+                Array1::<i32>::from(borsh::from_slice::<Vec<i32>>(vector.data.as_ref())?)
+                    .try_into()?
             },
             BorshVectorType::Int64 => {
-                Array1::<i64>::from(borsh::from_slice::<Vec<i64>>(data.as_ref())?).try_into()?
+                Array1::<i64>::from(borsh::from_slice::<Vec<i64>>(vector.data.as_ref())?)
+                    .try_into()?
             },
             BorshVectorType::Uint8 => {
-                Array1::<u8>::from(borsh::from_slice::<Vec<u8>>(data.as_ref())?).try_into()?
+                Array1::<u8>::from(borsh::from_slice::<Vec<u8>>(vector.data.as_ref()).unwrap())
+                    .try_into()?
             },
             BorshVectorType::Uint16 => {
-                Array1::<u16>::from(borsh::from_slice::<Vec<u16>>(data.as_ref())?).try_into()?
+                Array1::<u16>::from(borsh::from_slice::<Vec<u16>>(vector.data.as_ref())?)
+                    .try_into()?
             },
             BorshVectorType::Uint32 => {
-                Array1::<u32>::from(borsh::from_slice::<Vec<u32>>(data.as_ref())?).try_into()?
+                Array1::<u32>::from(borsh::from_slice::<Vec<u32>>(vector.data.as_ref())?)
+                    .try_into()?
             },
             BorshVectorType::Uint64 => {
-                Array1::<u64>::from(borsh::from_slice::<Vec<u64>>(data.as_ref())?).try_into()?
+                Array1::<u64>::from(borsh::from_slice::<Vec<u64>>(vector.data.as_ref())?)
+                    .try_into()?
             },
             BorshVectorType::Float32 => {
-                Array1::<f32>::from(borsh::from_slice::<Vec<f32>>(data.as_ref())?).try_into()?
+                Array1::<f32>::from(borsh::from_slice::<Vec<f32>>(vector.data.as_ref())?)
+                    .try_into()?
             },
             BorshVectorType::Float64 => {
-                Array1::<f64>::from(borsh::from_slice::<Vec<f64>>(data.as_ref())?).try_into()?
+                Array1::<f64>::from(borsh::from_slice::<Vec<f64>>(vector.data.as_ref())?)
+                    .try_into()?
             },
         };
 

@@ -5,7 +5,7 @@ pub fn deserialize_u8(shape: &[usize], data: &[u8]) -> anyhow::Result<ArrayD<u8>
 }
 
 pub fn deserialize_i8(shape: &[usize], data: &[u8]) -> anyhow::Result<ArrayD<i8>> {
-    let view_data = data.into_iter().map(|byte| *byte as i8).collect::<Vec<_>>();
+    let view_data = data.iter().map(|byte| *byte as i8).collect::<Vec<_>>();
     ArrayD::<i8>::from_shape_vec(shape, view_data).map_err(Into::into)
 }
 
