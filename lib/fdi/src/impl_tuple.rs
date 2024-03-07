@@ -1,12 +1,59 @@
 use crate::consume::Consume;
 use crate::ty::Ty;
-use crate::{Method, Registry};
+use crate::{Method, Ref, RefMut, Registry};
+
+macro_rules! impl_owned_method {
+    ([], []) => { };
+    (
+        [$($mut:ident)*],
+        [$($get:ident)*]
+    ) => {
+        impl<F, T
+            $(, $mut)*
+            $(, $get)*
+        > Method<T, (
+            (),
+            (
+                $($mut,)*
+            ),
+            (
+                $($get,)*
+            )
+        )> for F
+        where
+            F: FnOnce(
+                $(RefMut<$mut>,)*
+                $(Ref<$get>,)*
+            ) -> T,
+            $($mut: 'static,)*
+            $($get: 'static,)*
+        {
+            fn dependencies(&self) -> Vec<Ty> {
+                vec![
+                    $(Ty::of::<$mut>(),)*
+                    $(Ty::of::<$get>(),)*
+                ]
+            }
+
+            #[inline(always)]
+            #[allow(unused)]
+            fn call(self, registry: &Registry) -> T {
+                (self)(
+                    $(registry.get_mut::<$mut>(),)*
+                    $(registry.get::<$get>(),)*
+                )
+            }
+        }
+    };
+}
 
 macro_rules! impl_method {
     (
         [$($mut:ident)*],
         [$($get:ident)*]
     ) => {
+        impl_owned_method!([$($mut)*], [$($get)*]);
+
         impl<F, T
             $(, $mut)*
             $(, $get)*
@@ -36,12 +83,9 @@ macro_rules! impl_method {
             #[inline(always)]
             #[allow(unused)]
             fn call(self, registry: &Registry) -> T {
-                $(let mut $mut = registry.get_mut::<$mut>();)*
-                $(let $get = &registry.get::<$get>();)*
-
                 (self)(
-                    $(&mut *$mut,)*
-                    $(&$get,)*
+                    $(&mut *registry.get_mut::<$mut>(),)*
+                    $(&*registry.get::<$get>(),)*
                 )
             }
         }
