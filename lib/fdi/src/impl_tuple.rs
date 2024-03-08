@@ -1,23 +1,25 @@
 use crate::consume::Consume;
 use crate::extractor::Extractor;
 use crate::ty::Ty;
-use crate::{Method, Provider, Ref, RefMut};
+use crate::{Method, Provider, ProviderGuard, Ref, RefMut};
 
 macro_rules! impl_method {
     (
         [$($arg:ident)*]
     ) => {
         #[allow(unused)]
-        impl<F, T
+        impl<'a, 'p, F, T
             $(, $arg)*
-        > Method<T, (
+        > Method<'p, T, (
             $($arg,)*
         )> for F
         where
-            F: FnOnce(
+            F: 'static + FnOnce(
                 $($arg,)*
             ) -> T,
-            $($arg: for<'a> Extractor<'a>,)*
+            T: 'static,
+            $($arg: Extractor<'a>,)*
+            'p: 'a
         {
             fn dependencies(&self) -> Vec<Ty> {
                 let mut out = Vec::new();
@@ -26,8 +28,7 @@ macro_rules! impl_method {
             }
 
             #[inline(always)]
-            fn call(self, registry: &Provider) -> T {
-                let guard = registry.guard();
+            fn call(self, guard: &'p ProviderGuard) -> T {
                 (self)(
                     $($arg::extract(&guard),)*
                 )

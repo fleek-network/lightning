@@ -19,8 +19,8 @@ pub struct Provider {
 type MapEntry = (Arc<RawRwLock>, Arc<Object>);
 pub(crate) type Object = UnsafeCell<Box<dyn Any>>;
 
-pub struct ProviderGuard<'a> {
-    provider: &'a Provider,
+pub struct ProviderGuard {
+    provider: Provider,
     inner: Mutex<ProviderGuardInner>,
 }
 
@@ -64,8 +64,8 @@ impl Provider {
 
     /// Returns a [ProviderGuard] from this [Provider]. The guard could be used to resolve
     /// references that live as long as the guard.
-    pub fn guard<'a>(&'a self) -> ProviderGuard<'a> {
-        ProviderGuard::new(self)
+    pub fn guard(&self) -> ProviderGuard {
+        ProviderGuard::new(self.clone())
     }
 
     /// Returns true if the provider contains a value for the given type.
@@ -129,14 +129,14 @@ impl Provider {
         *any_box.downcast::<T>().unwrap()
     }
 
-    pub fn trigger(&self, event: &'static str) -> usize {
-        let mut store = self.get_mut::<Eventstore>();
-        store.trigger(event, &self)
-    }
+    // pub fn trigger(&self, event: &'static str) -> usize {
+    //     let mut store = self.get_mut::<Eventstore>();
+    //     store.trigger(event, &self)
+    // }
 }
 
-impl<'a> ProviderGuard<'a> {
-    fn new(provider: &'a Provider) -> Self {
+impl ProviderGuard {
+    fn new(provider: Provider) -> Self {
         Self {
             provider,
             inner: Mutex::new(ProviderGuardInner {
@@ -233,7 +233,7 @@ impl<T: 'static> Drop for RefMut<T> {
     }
 }
 
-impl<'a> Drop for ProviderGuard<'a> {
+impl Drop for ProviderGuard {
     fn drop(&mut self) {
         let inner = self.inner.lock();
 
