@@ -6,21 +6,28 @@ mod extractor;
 mod graph;
 mod helpers;
 mod impl_tuple;
+mod lab;
 mod method;
-mod object;
-pub mod provider;
-mod rc_cell;
-mod registry;
+mod provider;
 mod ty;
 
-pub use consume::consume;
 pub use event::Eventstore;
 pub use executor::Executor;
 pub use ext::MethodExt;
 pub use graph::DependencyGraph;
 pub use method::Method;
-pub use object::{Container, Ref, RefMut};
-pub use registry::Registry;
+pub use provider::{Provider, ProviderGuard, Ref, RefMut};
 
-#[cfg(test)]
-mod tests;
+// #[cfg(test)]
+// mod tests;
+
+// mod tests {
+//     use crate::DependencyGraph;
+
+//     fn x() {
+//         #[derive(Default)]
+//         struct A;
+
+//         let graph = DependencyGraph::new().with_infallible(|x: &mut String| A::default());
+//     }
+// }

@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use indexmap::IndexSet;
 
 use crate::method::{DynMethod, Method};
-use crate::registry::Registry;
 use crate::ty::Ty;
+use crate::Provider;
 
 /// The [`Eventstore`] can be used to store a list of event handlers under each event name.
 #[derive(Default)]
@@ -52,7 +52,7 @@ impl Eventstore {
     }
 
     /// Trigger the event. This is used internally.
-    pub(crate) fn trigger(&mut self, event: &'static str, registry: &Registry) -> usize {
+    pub(crate) fn trigger(&mut self, event: &'static str, registry: &Provider) -> usize {
         let mut result = 0;
         if let Some(handlers) = self.handlers.remove(event) {
             for handler in handlers {

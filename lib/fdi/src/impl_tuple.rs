@@ -1,188 +1,46 @@
 use crate::consume::Consume;
+use crate::extractor::Extractor;
 use crate::ty::Ty;
-use crate::{Method, Ref, RefMut, Registry};
-
-macro_rules! impl_owned_method {
-    ([], []) => { };
-    (
-        [$($mut:ident)*],
-        [$($get:ident)*]
-    ) => {
-        impl<F, T
-            $(, $mut)*
-            $(, $get)*
-        > Method<T, (
-            (),
-            (
-                $($mut,)*
-            ),
-            (
-                $($get,)*
-            )
-        )> for F
-        where
-            F: FnOnce(
-                $(RefMut<$mut>,)*
-                $(Ref<$get>,)*
-            ) -> T,
-            $($mut: 'static,)*
-            $($get: 'static,)*
-        {
-            fn dependencies(&self) -> Vec<Ty> {
-                vec![
-                    $(Ty::of::<$mut>(),)*
-                    $(Ty::of::<$get>(),)*
-                ]
-            }
-
-            #[inline(always)]
-            #[allow(unused)]
-            fn call(self, registry: &Registry) -> T {
-                (self)(
-                    $(registry.get_mut::<$mut>(),)*
-                    $(registry.get::<$get>(),)*
-                )
-            }
-        }
-    };
-}
+use crate::{Method, Provider, Ref, RefMut};
 
 macro_rules! impl_method {
     (
-        [$($mut:ident)*],
-        [$($get:ident)*]
+        [$($arg:ident)*]
     ) => {
-        impl_owned_method!([$($mut)*], [$($get)*]);
-
+        #[allow(unused)]
         impl<F, T
-            $(, $mut)*
-            $(, $get)*
+            $(, $arg)*
         > Method<T, (
-            (
-                $($mut,)*
-            ),
-            (
-                $($get,)*
-            )
+            $($arg,)*
         )> for F
         where
             F: FnOnce(
-                $(&mut $mut,)*
-                $(& $get,)*
+                $($arg,)*
             ) -> T,
-            $($mut: 'static,)*
-            $($get: 'static,)*
+            $($arg: for<'a> Extractor<'a>,)*
         {
             fn dependencies(&self) -> Vec<Ty> {
-                vec![
-                    $(Ty::of::<$mut>(),)*
-                    $(Ty::of::<$get>(),)*
-                ]
+                let mut out = Vec::new();
+                $($arg::dependencies(&mut out);)*
+                out
             }
 
             #[inline(always)]
-            #[allow(unused)]
-            fn call(self, registry: &Registry) -> T {
+            fn call(self, registry: &Provider) -> T {
+                let guard = registry.guard();
                 (self)(
-                    $(&mut *registry.get_mut::<$mut>(),)*
-                    $(&*registry.get::<$get>(),)*
+                    $($arg::extract(&guard),)*
                 )
             }
         }
-
-        impl<F, T, O
-            $(, $mut)*
-            $(, $get)*
-        > Method<T, (O,
-            (
-                (
-                    $($mut,)*
-                ),
-                (
-                    $($get,)*
-                )
-            )
-        )> for Consume<F, T, (
-            (
-                $($mut,)*
-            ),
-            (
-                $($get,)*
-            )
-        ), O>
-        where
-            F: FnOnce(
-                O,
-                $(&mut $mut,)*
-                $(& $get,)*
-            ) -> T,
-            O: 'static,
-            $($mut: 'static,)*
-            $($get: 'static,)*
-        {
-            fn dependencies(&self) -> Vec<crate::ty::Ty> {
-                vec![
-                    Ty::of::<O>(),
-                    $(Ty::of::<$mut>(),)*
-                    $(Ty::of::<$get>(),)*
-                ]
-            }
-
-            #[inline(always)]
-            fn call(self, registry: &crate::Registry) -> T {
-                (self.f)(
-                    registry.take(),
-                    $(&mut registry.get_mut::<$mut>(),)*
-                    $(&registry.get::<$get>(),)*
-                )
-            }
-        }
-
     };
 }
 
-impl_method!([], []);
-impl_method!([], [C0]);
-impl_method!([B0], []);
-impl_method!([], [C0 C1]);
-impl_method!([B0], [C0]);
-impl_method!([B0 B1], []);
-impl_method!([], [C0 C1 C2]);
-impl_method!([B0], [C0 C1]);
-impl_method!([B0 B1], [C0]);
-impl_method!([B0 B1 B2], []);
-impl_method!([], [C0 C1 C2 C3]);
-impl_method!([B0], [C0 C1 C2]);
-impl_method!([B0 B1], [C0 C1]);
-impl_method!([B0 B1 B2], [C0]);
-impl_method!([B0 B1 B2 B3], []);
-impl_method!([], [C0 C1 C2 C3 C4]);
-impl_method!([B0], [C0 C1 C2 C3]);
-impl_method!([B0 B1], [C0 C1 C2]);
-impl_method!([B0 B1 B2], [C0 C1]);
-impl_method!([B0 B1 B2 B3], [C0]);
-impl_method!([B0 B1 B2 B3 B4], []);
-impl_method!([], [C0 C1 C2 C3 C4 C5]);
-impl_method!([B0], [C0 C1 C2 C3 C4]);
-impl_method!([B0 B1], [C0 C1 C2 C3]);
-impl_method!([B0 B1 B2], [C0 C1 C2]);
-impl_method!([B0 B1 B2 B3], [C0 C1]);
-impl_method!([B0 B1 B2 B3 B4], [C0]);
-impl_method!([B0 B1 B2 B3 B4 B5], []);
-impl_method!([], [C0 C1 C2 C3 C4 C5 C6]);
-impl_method!([B0], [C0 C1 C2 C3 C4 C5]);
-impl_method!([B0 B1], [C0 C1 C2 C3 C4]);
-impl_method!([B0 B1 B2], [C0 C1 C2 C3]);
-impl_method!([B0 B1 B2 B3], [C0 C1 C2]);
-impl_method!([B0 B1 B2 B3 B4], [C0 C1]);
-impl_method!([B0 B1 B2 B3 B4 B5], [C0]);
-impl_method!([B0 B1 B2 B3 B4 B5 B6], []);
-impl_method!([], [C0 C1 C2 C3 C4 C5 C6 C7]);
-impl_method!([B0], [C0 C1 C2 C3 C4 C5 C6]);
-impl_method!([B0 B1], [C0 C1 C2 C3 C4 C5]);
-impl_method!([B0 B1 B2], [C0 C1 C2 C3 C4]);
-impl_method!([B0 B1 B2 B3], [C0 C1 C2 C3]);
-impl_method!([B0 B1 B2 B3 B4], [C0 C1 C2]);
-impl_method!([B0 B1 B2 B3 B4 B5], [C0 C1]);
-impl_method!([B0 B1 B2 B3 B4 B5 B6], [C0]);
-impl_method!([B0 B1 B2 B3 B4 B5 B6 B7], []);
+impl_method!([]);
+impl_method!([A0]);
+impl_method!([A0 A1]);
+impl_method!([A0 A1 A2]);
+impl_method!([A0 A1 A2 A3]);
+impl_method!([A0 A1 A2 A3 A4]);
+impl_method!([A0 A1 A2 A3 A4 A5]);
+impl_method!([A0 A1 A2 A3 A4 A5 A6]);
