@@ -7,3 +7,6 @@ edition.workspace = true
 anyhow = "1.0"
 indexmap = "2.0.0"
 futures = "0.3"
+
+triomphe = "0.1.11"
+parking_lot = "0.12.1"
