@@ -9,17 +9,18 @@ use parking_lot::{Mutex, RawRwLock, RwLock};
 use triomphe::Arc;
 
 use crate::ty::Ty;
+use crate::{Eventstore, Executor};
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct Provider {
     values: Arc<RwLock<HashMap<Ty, MapEntry>>>,
 }
 
 type MapEntry = (Arc<RawRwLock>, Arc<Object>);
-pub(crate) type Object = UnsafeCell<Box<dyn Any + Send>>;
+pub(crate) type Object = UnsafeCell<Box<dyn Any>>;
 
-pub struct ProviderGuard {
-    provider: Provider,
+pub struct ProviderGuard<'a> {
+    provider: &'a Provider,
     inner: Mutex<ProviderGuardInner>,
 }
 
@@ -45,7 +46,7 @@ impl Provider {
     /// # Panics
     ///
     /// If a value with the same type already exists in the provider.
-    pub fn insert<T: 'static + Send>(&self, value: T) {
+    pub fn insert<T: 'static>(&self, value: T) {
         let obj = UnsafeCell::new(Box::new(value));
         self.insert_raw(Ty::of::<T>(), obj);
     }
@@ -63,8 +64,8 @@ impl Provider {
 
     /// Returns a [ProviderGuard] from this [Provider]. The guard could be used to resolve
     /// references that live as long as the guard.
-    pub fn guard(&self) -> ProviderGuard {
-        ProviderGuard::new(self.clone())
+    pub fn guard<'a>(&'a self) -> ProviderGuard<'a> {
+        ProviderGuard::new(self)
     }
 
     /// Returns true if the provider contains a value for the given type.
@@ -127,10 +128,15 @@ impl Provider {
         let any_box = unsafe_cell.into_inner();
         *any_box.downcast::<T>().unwrap()
     }
+
+    pub fn trigger(&self, event: &'static str) -> usize {
+        let mut store = self.get_mut::<Eventstore>();
+        store.trigger(event, &self)
+    }
 }
 
-impl ProviderGuard {
-    fn new(provider: Provider) -> Self {
+impl<'a> ProviderGuard<'a> {
+    fn new(provider: &'a Provider) -> Self {
         Self {
             provider,
             inner: Mutex::new(ProviderGuardInner {
@@ -227,7 +233,7 @@ impl<T: 'static> Drop for RefMut<T> {
     }
 }
 
-impl Drop for ProviderGuard {
+impl<'a> Drop for ProviderGuard<'a> {
     fn drop(&mut self) {
         let inner = self.inner.lock();
 
@@ -241,16 +247,16 @@ impl Drop for ProviderGuard {
     }
 }
 
-// impl Default for Provider {
-//     fn default() -> Self {
-//         let mut provider = Provider {
-//             values: Default::default(),
-//         };
-//         provider.insert(Eventstore::default());
-//         provider.insert(Executor::default());
-//         provider
-//     }
-// }
+impl Default for Provider {
+    fn default() -> Self {
+        let provider = Provider {
+            values: Default::default(),
+        };
+        provider.insert(Eventstore::default());
+        provider.insert(Executor::default());
+        provider
+    }
+}
 
 fn get_value(map: &HashMap<Ty, MapEntry>, ty: &Ty, shared: bool) -> MapEntry {
     let entry = map
@@ -278,6 +284,10 @@ fn get_value(map: &HashMap<Ty, MapEntry>, ty: &Ty, shared: bool) -> MapEntry {
     }
 
     entry
+}
+
+pub(crate) fn to_obj<T: 'static>(value: T) -> Object {
+    UnsafeCell::new(Box::new(value))
 }
 
 #[cfg(test)]

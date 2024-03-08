@@ -4,8 +4,8 @@ use std::marker::PhantomData;
 use futures::Future;
 
 use crate::method::DynMethod;
-use crate::object::Object;
-use crate::{Executor, Method, Registry};
+use crate::provider::{to_obj, Object};
+use crate::{Executor, Method, Provider};
 
 struct Transform<F, T, P, M, U> {
     display_name: &'static str,
@@ -73,7 +73,7 @@ where
     }
 
     #[inline(always)]
-    fn call(self, registry: &Registry) -> U {
+    fn call(self, registry: &Provider) -> U {
         let value = self.original.call(registry);
         (self.transform)(value)
     }
@@ -112,7 +112,7 @@ where
     }
 
     #[inline(always)]
-    fn call(self, registry: &Registry) -> T {
+    fn call(self, registry: &Provider) -> T {
         self.original.call(registry)
     }
 }
@@ -130,7 +130,7 @@ where
         dep
     }
 
-    fn call(self, registry: &Registry) -> R {
+    fn call(self, registry: &Provider) -> R {
         let result = self.method.call(registry);
         let higher = self.wrapper.call(registry);
         (higher)(result)
@@ -154,9 +154,9 @@ where
         self.method.dependencies()
     }
 
-    fn call(self, registry: &Registry) {
+    fn call(self, registry: &Provider) {
         let mut executor = registry.get_mut::<Executor>();
-        let registry = registry.snapshot();
+        let registry = registry.clone();
         executor.spawn(Box::pin(async move {
             self.method.call(&registry).await;
         }));
@@ -184,7 +184,7 @@ where
         self.method.dependencies()
     }
 
-    fn call(self, registry: &Registry) -> U {
+    fn call(self, registry: &Provider) -> U {
         let future = self.method.call(registry);
         futures::executor::block_on(future)
     }
@@ -212,7 +212,7 @@ where
         display_name: f.display_name(),
         original: f,
         transform: |v| match v {
-            Ok(v) => Ok(Object::new(v)),
+            Ok(v) => Ok(to_obj(v)),
             Err(e) => Err(e),
         },
         _p: PhantomData,
