@@ -77,6 +77,11 @@ pub enum IpcMessage {
     },
 }
 
+/// Deduping this as is seems to be impossible because it would require IpcMessage (`T`)
+/// To implemenet both Serialize<AllocSeralizer<_>> and Serialize<WriteSerializer<_>>
+///
+///
+/// todo!(n)
 impl LightningMessage for IpcMessage {
     fn decode(buffer: &[u8]) -> anyhow::Result<Self> {
         let archived = rkyv::check_archived_root::<Self>(buffer)
@@ -85,55 +90,57 @@ impl LightningMessage for IpcMessage {
         Ok(archived.deserialize(&mut rkyv::Infallible)?)
     }
 
-    fn encode<W: std::io::prelude::Write>(&self, writer: &mut W) -> std::io::Result<usize> {
+    fn encode<W: std::io::prelude::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         let mut ser = rkyv::ser::serializers::WriteSerializer::new(writer);
 
-        ser.serialize_value(self)
+        // writes all internally
+        let _ = ser.serialize_value(self);
+
+        Ok(())
     }
 
     fn encode_length_delimited<W: std::io::prelude::Write>(
         &self,
         writer: &mut W,
-    ) -> std::io::Result<usize> {
+    ) -> std::io::Result<()> {
         let encoded = rkyv::to_bytes::<_, 256>(self)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
         let len = encoded.len().to_le_bytes();
 
         writer.write_all(&len)?;
-        writer.write_all(&encoded)?;
-
-        Ok(encoded.len() + 8)
+        writer.write_all(&encoded)
     }
 }
 
 impl LightningMessage for IpcRequest {
     fn decode(buffer: &[u8]) -> anyhow::Result<Self> {
         let archived = rkyv::check_archived_root::<Self>(buffer)
-            .map_err(|e| anyhow::anyhow!(format!("failed to check root {}", e)))?;
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
         Ok(archived.deserialize(&mut rkyv::Infallible)?)
     }
 
-    fn encode<W: std::io::prelude::Write>(&self, writer: &mut W) -> std::io::Result<usize> {
+    fn encode<W: std::io::prelude::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         let mut ser = rkyv::ser::serializers::WriteSerializer::new(writer);
 
-        ser.serialize_value(self)
+        // writes all internally
+        let _ = ser.serialize_value(self);
+
+        Ok(())
     }
 
     fn encode_length_delimited<W: std::io::prelude::Write>(
         &self,
         writer: &mut W,
-    ) -> std::io::Result<usize> {
+    ) -> std::io::Result<()> {
         let encoded = rkyv::to_bytes::<_, 256>(self)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
         let len = encoded.len().to_le_bytes();
 
         writer.write_all(&len)?;
-        writer.write_all(&encoded)?;
-
-        Ok(encoded.len() + 8)
+        writer.write_all(&encoded)
     }
 }
 

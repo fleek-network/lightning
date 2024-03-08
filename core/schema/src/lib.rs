@@ -26,12 +26,12 @@ pub trait LightningMessage: Sized + Send + Sync + 'static {
     fn decode(buffer: &[u8]) -> anyhow::Result<Self>;
 
     /// Encode the message. Return the result from the `writer.write`
-    fn encode<W: Write>(&self, writer: &mut W) -> std::io::Result<usize>;
+    fn encode<W: Write>(&self, writer: &mut W) -> std::io::Result<()>;
 
     /// Encode the message with length delimited. Return the result from the `writer.write`
     /// The length is written as a u64 in little endian.
     /// This is useful for framing the message in a stream.
-    fn encode_length_delimited<W: Write>(&self, writer: &mut W) -> std::io::Result<usize>;
+    fn encode_length_delimited<W: Write>(&self, writer: &mut W) -> std::io::Result<()>;
 }
 
 /// A marker type which enables auto implementation for serde serialize and deserialize. This
@@ -53,19 +53,19 @@ impl<T: AutoImplSerde + 'static> LightningMessage for T {
     }
 
     #[inline]
-    fn encode<W: Write>(&self, writer: &mut W) -> std::io::Result<usize> {
+    fn encode<W: Write>(&self, writer: &mut W) -> std::io::Result<()> {
         let mut ser = flexbuffers::FlexbufferSerializer::new();
         self.serialize(&mut ser).expect("Failed to serialize");
-        writer.write(ser.view())
+        writer.write_all(ser.view())
     }
 
-    fn encode_length_delimited<W: Write>(&self, writer: &mut W) -> std::io::Result<usize> {
+    fn encode_length_delimited<W: Write>(&self, writer: &mut W) -> std::io::Result<()> {
         let mut ser = flexbuffers::FlexbufferSerializer::new();
         self.serialize(&mut ser).expect("Failed to serialize");
 
         let len = ser.view().len() as u32;
-        let _ = writer.write(&len.to_le_bytes())?;
-        writer.write(ser.view())
+        writer.write_all(&len.to_le_bytes())?;
+        writer.write_all(ser.view())
     }
 }
 
