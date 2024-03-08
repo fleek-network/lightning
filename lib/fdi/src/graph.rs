@@ -1,4 +1,3 @@
-use std::any::TypeId;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Write;
 use std::rc::Rc;
@@ -8,15 +7,14 @@ use indexmap::{IndexMap, IndexSet};
 
 use crate::helpers::to_result_object;
 use crate::method::{DynMethod, Method};
-use crate::object::Object;
+use crate::provider::Object;
 use crate::ty::Ty;
-use crate::{helpers, Eventstore, Registry};
+use crate::{helpers, Eventstore, Provider};
 
 #[derive(Default)]
 pub struct DependencyGraph {
     touched: bool,
     constructors: HashMap<Ty, DynMethod>,
-    container_id_to_ty_id: HashMap<TypeId, Ty>,
     graph: IndexMap<Ty, IndexSet<Ty>>,
     ordered: Rc<Vec<Ty>>,
 }
@@ -96,7 +94,7 @@ impl DependencyGraph {
     /// }
     ///
     /// let graph = DependencyGraph::new().with_default::<Value>();
-    /// let mut registry = Registry::default();
+    /// let mut registry = Provider::default();
     /// graph.init_all(&mut registry).unwrap();
     /// assert_eq!(&*registry.get::<Value>().0, "Fleek");
     /// ```
@@ -119,7 +117,7 @@ impl DependencyGraph {
     /// use fdi::*;
     ///
     /// let graph = DependencyGraph::new().with_value(String::from("Hello!"));
-    /// let mut registry = Registry::default();
+    /// let mut registry = Provider::default();
     /// graph.init_all(&mut registry).unwrap();
     /// assert_eq!(&*registry.get::<String>(), "Hello!");
     /// ```
@@ -143,7 +141,7 @@ impl DependencyGraph {
     /// ```
     /// use fdi::*;
     /// let graph = DependencyGraph::new().with_infallible(|| String::from("Fleek"));
-    /// let mut registry = Registry::default();
+    /// let mut registry = Provider::default();
     /// graph.init_all(&mut registry).unwrap();
     /// assert_eq!(&*registry.get::<String>(), "Fleek");
     /// ```
@@ -169,11 +167,11 @@ impl DependencyGraph {
     /// use anyhow::{bail, Result};
     /// use fdi::*;
     /// let graph = DependencyGraph::new().with(|| -> Result<String> { bail!("error") });
-    /// let mut registry = Registry::default();
+    /// let mut registry = Provider::default();
     /// assert!(graph.init_all(&mut registry).is_err());
     ///
     /// let graph = DependencyGraph::new().with(|| Ok(String::from("Fleek")));
-    /// let mut registry = Registry::default();
+    /// let mut registry = Provider::default();
     /// graph.init_all(&mut registry).unwrap();
     /// assert_eq!(&*registry.get::<String>(), "Fleek");
     /// ```
@@ -203,42 +201,12 @@ impl DependencyGraph {
             );
         }
         self.constructors.insert(tid, method);
-        self.container_id_to_ty_id.insert(tid.container_id(), tid);
-    }
-
-    /// Normalizes the dependency graph by converting every container id dep to actual
-    /// type.
-    fn normalize_graph(&mut self) {
-        let mut to_remove = Vec::with_capacity(16);
-        let mut to_add = Vec::with_capacity(16);
-
-        for (_, set) in &mut self.graph {
-            // for each type in the set try to see if its a container id.
-            // if so we have to remove it from the set, and instead add the
-            // actual type.
-            for ty in set.iter() {
-                if let Some(actual_ty) = self.container_id_to_ty_id.get(&ty.id()) {
-                    to_remove.push(*ty);
-                    to_add.push(*actual_ty);
-                }
-            }
-
-            for ty in to_remove.drain(..) {
-                set.remove(&ty);
-            }
-
-            for ty in to_add.drain(..) {
-                set.insert(ty);
-            }
-        }
     }
 
     fn ensure_topo_order(&mut self) {
         if !self.touched {
             return;
         }
-
-        self.normalize_graph();
 
         self.touched = false;
         let mut result = Vec::new();
@@ -311,7 +279,7 @@ impl DependencyGraph {
     ///
     /// This method will automatically trigger the `_post` event on the registry. To learn more
     /// check the documentations around [Eventstore](crate::Eventstore).
-    pub fn init_all(mut self, registry: &mut Registry) -> Result<()> {
+    pub fn init_all(mut self, registry: &mut Provider) -> Result<()> {
         self.ensure_topo_order();
 
         for ty in self.ordered.clone().iter() {
@@ -329,7 +297,7 @@ impl DependencyGraph {
     /// # Events
     ///
     /// After the initialization every newly registered `_post` event handler is called.
-    pub fn init_one<T: 'static>(&mut self, registry: &mut Registry) -> Result<()> {
+    pub fn init_one<T: 'static>(&mut self, registry: &mut Provider) -> Result<()> {
         self.init_many(registry, vec![Ty::of::<T>()])
     }
 
@@ -342,7 +310,7 @@ impl DependencyGraph {
     /// triggering the event.
     ///
     /// In other word all of the constructors are called before triggering `_post`.
-    pub fn init_many(&mut self, registry: &mut Registry, types: Vec<Ty>) -> Result<()> {
+    pub fn init_many(&mut self, registry: &mut Provider, types: Vec<Ty>) -> Result<()> {
         self.ensure_topo_order();
 
         let mut queue = types;
@@ -353,7 +321,7 @@ impl DependencyGraph {
             while let Some(ty) = queue.pop() {
                 // If we have already visited this node or it's already present in the registry
                 // there is no point in collecting its dependencies.
-                if should_init.contains(&ty) || registry.contains_type_id(&ty) {
+                if should_init.contains(&ty) || registry.contains_ty(&ty) {
                     continue;
                 }
 
@@ -393,13 +361,13 @@ impl DependencyGraph {
     /// Trigger the event with the provided name using this dependency graph along with the provided
     /// registry.
     ///
-    /// Unlike [`Registry::trigger`](crate::Registry::trigger) this method actually cares about the
+    /// Unlike [`Provider::trigger`](crate::Provider::trigger) this method actually cares about the
     /// dependencies required by the registred event handlers and tries to initialize them before
     /// triggering the event.
     ///
     /// This is particularly useful when you wish to initialize a subset of a system and avoid using
     /// `init_all`.
-    pub fn trigger(&mut self, registry: &mut Registry, event: &'static str) -> Result<()> {
+    pub fn trigger(&mut self, registry: &mut Provider, event: &'static str) -> Result<()> {
         let deps = {
             let events = registry.get::<Eventstore>();
             events.get_dependencies(event)
@@ -411,8 +379,8 @@ impl DependencyGraph {
         Ok(())
     }
 
-    fn construct_internal(&mut self, ty: Ty, registry: &mut Registry) -> Result<()> {
-        if registry.contains_type_id(&ty) {
+    fn construct_internal(&mut self, ty: Ty, registry: &mut Provider) -> Result<()> {
+        if registry.contains_ty(&ty) {
             return Ok(());
         }
 
@@ -433,7 +401,7 @@ impl DependencyGraph {
                 format!("Error while calling the constructor:\n\t'{name} -> {rt_name}'")
             })?;
 
-        registry.insert_raw(value);
+        registry.insert_raw(ty, value);
 
         if let Some(events) = maybe_events {
             let mut event_store = registry.get_mut::<Eventstore>();

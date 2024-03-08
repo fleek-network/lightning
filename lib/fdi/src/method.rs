@@ -2,7 +2,7 @@ use std::any::{type_name, Any};
 use std::fmt::Debug;
 use std::ptr;
 
-use crate::registry::Registry;
+use crate::provider::Provider;
 use crate::ty::Ty;
 use crate::Eventstore;
 
@@ -24,7 +24,7 @@ pub trait Method<T, P> {
     /// The parameters this method will ask for from the registry when invoked.
     fn dependencies(&self) -> Vec<Ty>;
     /// Consume and invoke the method.
-    fn call(self, registry: &Registry) -> T;
+    fn call(self, registry: &Provider) -> T;
 }
 
 /// A fixed-size struct that can be created from any [`Method`].
@@ -34,7 +34,7 @@ pub struct DynMethod {
     display_name: &'static str,
     dependencies: Vec<Ty>,
     ptr: *mut (),
-    call_fn: fn(*mut (), registry: &Registry) -> Box<dyn Any>,
+    call_fn: fn(*mut (), registry: &Provider) -> Box<dyn Any>,
     drop_fn: fn(*mut ()),
     events_fn: fn(*mut ()) -> Option<Eventstore>,
 }
@@ -54,7 +54,7 @@ impl DynMethod {
         let value = Box::new(method);
         let ptr = Box::into_raw(value) as *mut ();
 
-        fn call_fn<F, T, P>(ptr: *mut (), registry: &Registry) -> Box<dyn Any>
+        fn call_fn<F, T, P>(ptr: *mut (), registry: &Provider) -> Box<dyn Any>
         where
             F: Method<T, P>,
             T: 'static,
@@ -121,7 +121,7 @@ impl DynMethod {
     }
 
     /// Invoke this method and returns the result in a `Box<dyn Any>`.
-    pub fn call(mut self, registry: &Registry) -> Box<dyn Any> {
+    pub fn call(mut self, registry: &Provider) -> Box<dyn Any> {
         // self.construct_fn consumes the pointer so we have to set it to null after use
         // so we wouldn't double-free it on drop.
         let value = (self.call_fn)(self.ptr, registry);

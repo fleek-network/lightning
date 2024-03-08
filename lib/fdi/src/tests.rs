@@ -5,15 +5,14 @@ use std::hash::Hash;
 use crate::method::DynMethod;
 use crate::{
     consume,
-    Container,
     DependencyGraph,
     Eventstore,
     Executor,
     Method,
     MethodExt,
+    Provider,
     Ref,
     RefMut,
-    Registry,
 };
 
 mod demo_dep {
@@ -89,7 +88,7 @@ impl Counter {
 #[test]
 fn test_partial_01() {
     let mut graph = demo_dep::graph();
-    let mut registry = Registry::default();
+    let mut registry = Provider::default();
     graph
         .init_one::<demo_dep::Indexer>(&mut registry)
         .expect("Failed to init.");
@@ -102,7 +101,7 @@ fn test_partial_01() {
 #[test]
 fn test_partial_2() {
     let mut graph = demo_dep::graph();
-    let mut registry = Registry::default();
+    let mut registry = Provider::default();
     graph
         .init_one::<demo_dep::Blockstore>(&mut registry)
         .expect("Failed to init.");
@@ -114,35 +113,19 @@ fn test_partial_2() {
 }
 
 #[test]
-fn depending_on_container() {
-    struct A;
-    struct B;
-    fn new_b(_a: &Container<A>) -> B {
-        B
-    }
-
-    let mut graph = DependencyGraph::new()
-        .with_infallible(|| A)
-        .with_infallible(new_b);
-
-    let mut registry = Registry::default();
-    graph.init_one::<B>(&mut registry).expect("Failed to init.");
-}
-
-#[test]
 fn with_value() {
-    let registry = Registry::default();
+    let registry = Provider::default();
     let value = || String::from("Hello!");
     let value = value.call(&registry);
     assert_eq!(value, "Hello!");
 
-    let registry = Registry::default();
+    let registry = Provider::default();
     let value = || String::from("Hello!");
     let value = DynMethod::new(value);
     let value = value.call(&registry).downcast::<String>().unwrap();
     assert_eq!(*value, "Hello!");
 
-    let mut registry = Registry::default();
+    let mut registry = Provider::default();
     let graph = DependencyGraph::new().with_value(String::from("Hello!"));
     graph.init_all(&mut registry).unwrap();
     assert_eq!(&*registry.get::<String>(), "Hello!");
@@ -169,7 +152,7 @@ fn post_should_be_fired() {
         .with_infallible(new_a)
         .with_infallible(new_b);
 
-    let mut registry = Registry::default();
+    let mut registry = Provider::default();
     registry.insert(Counter::default());
 
     graph.init_one::<B>(&mut registry).expect("Failed to init.");
@@ -202,7 +185,7 @@ fn post_should_resolve_unmet_dep() {
         .with_infallible(new_a)
         .with_infallible(new_b);
 
-    let mut registry = Registry::default();
+    let mut registry = Provider::default();
     registry.insert(Counter::default());
 
     graph.init_one::<B>(&mut registry).expect("Failed to init.");
@@ -226,7 +209,7 @@ fn basic_with_events_should_work() {
             }),
     );
 
-    let mut registry = Registry::default();
+    let mut registry = Provider::default();
     registry.insert(Counter::default());
     graph.init_one::<A>(&mut registry).expect("Failed to init.");
     assert_eq!(registry.get::<Counter>().get("A::_post"), 1);
@@ -260,7 +243,7 @@ fn nested_with_events_should_work() {
             }),
     );
 
-    let mut registry = Registry::default();
+    let mut registry = Provider::default();
     registry.insert(Counter::default());
     graph.init_one::<A>(&mut registry).expect("Failed to init.");
     assert_eq!(registry.get::<Counter>().get("A::_post"), 2);
@@ -280,7 +263,7 @@ fn init_one_failure_should_panic() {
     struct A;
 
     let mut graph = DependencyGraph::new();
-    let mut registry = Registry::default();
+    let mut registry = Provider::default();
     graph.init_one::<A>(&mut registry).unwrap();
 }
 
@@ -297,7 +280,7 @@ fn consume_usage() {
 
     let mut graph =
         DependencyGraph::new().with(A::default.to_infallible().on("start", consume(A::start)));
-    let mut registry = Registry::default();
+    let mut registry = Provider::default();
     registry.insert(Counter::default());
     graph.init_one::<A>(&mut registry).unwrap();
     registry.trigger("start");
@@ -323,7 +306,7 @@ fn spawn_async_fn_depending_on_ref() {
             .on("start", method.spawn())
             .on("start", method_2.block_on()),
     );
-    let mut registry = Registry::default();
+    let mut registry = Provider::default();
     graph.init_all(&mut registry).unwrap();
     registry.insert(Counter::default());
 
@@ -358,7 +341,7 @@ fn depend_on_ref_should_resolve() {
     }
 
     let graph = DependencyGraph::new().with((|| A(17)).to_infallible());
-    let mut registry = Registry::default();
+    let mut registry = Provider::default();
     graph.init_all(&mut registry).unwrap();
     let a = method.call(&registry);
     assert_eq!(a.0, 17);

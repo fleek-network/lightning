@@ -2,14 +2,11 @@ use std::any::{type_name, TypeId};
 use std::fmt::Debug;
 use std::hash::Hash;
 
-use crate::object::Container;
-
 /// A wrapper around [`TypeId`] that preserves the name.
 #[derive(Clone, Copy)]
 pub struct Ty {
     name: &'static str,
     ty: TypeId,
-    container_ty: TypeId,
 }
 
 impl Ty {
@@ -17,7 +14,6 @@ impl Ty {
         Self {
             name: type_name::<T>(),
             ty: TypeId::of::<T>(),
-            container_ty: TypeId::of::<Container<T>>(),
         }
     }
 
@@ -29,11 +25,6 @@ impl Ty {
     /// Returns the original type id.
     pub fn id(&self) -> TypeId {
         self.ty
-    }
-
-    /// Returns the type id of `Container<T>` where `T` was the original type id.
-    pub fn container_id(&self) -> TypeId {
-        self.container_ty
     }
 }
 
