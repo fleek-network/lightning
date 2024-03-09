@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use std::ptr;
 
 use crate::ty::Ty;
-use crate::{Eventstore, Method, ProviderGuard};
+use crate::{Eventstore, Method, Provider};
 
 /// A fixed-size struct that can be created from any [`Method`].
 pub struct DynMethod {
@@ -12,18 +12,18 @@ pub struct DynMethod {
     display_name: &'static str,
     dependencies: Vec<Ty>,
     ptr: *mut (),
-    call_fn: fn(*mut (), registry: ProviderGuard) -> Box<dyn Any>,
+    call_fn: fn(*mut (), provider: &Provider) -> Box<dyn Any>,
     drop_fn: fn(*mut ()),
     events_fn: fn(*mut ()) -> Option<Eventstore>,
 }
 
 impl DynMethod {
-    pub fn new<'a, F, T, P>(method: F) -> Self
+    pub fn new<F, P>(method: F) -> Self
     where
-        F: Method<'a, P, Output = T>,
-        T: 'static,
+        F: Method<P>,
+        F::Output: 'static,
     {
-        let tid = Ty::of::<T>();
+        let tid = Ty::of::<F::Output>();
         let name = method.name();
         let display_name = method.display_name();
 
@@ -32,21 +32,13 @@ impl DynMethod {
         let value = Box::new(method);
         let ptr = Box::into_raw(value) as *mut ();
 
-        fn call_fn<'a, F, T, P>(ptr: *mut (), guard: ProviderGuard) -> Box<dyn Any>
+        fn call_fn<F, P>(ptr: *mut (), provider: &Provider) -> Box<dyn Any>
         where
-            F: Method<'a, P, Output = T>,
-            T: 'static,
+            F: Method<P>,
         {
             let ptr = ptr as *mut F;
             let value = unsafe { Box::from_raw(ptr) };
-            let guard = Box::into_raw(Box::new(guard));
-            let result = {
-                let guard = unsafe { &*guard };
-                value.call(guard)
-            };
-            unsafe {
-                drop(Box::from_raw(guard));
-            };
+            let result = value.call(provider);
             Box::new(result)
         }
 
@@ -56,10 +48,9 @@ impl DynMethod {
             drop(value);
         }
 
-        fn events_fn<'a, F, T, P>(ptr: *mut ()) -> Option<Eventstore>
+        fn events_fn<F, P>(ptr: *mut ()) -> Option<Eventstore>
         where
-            F: Method<'a, P, Output = T>,
-            T: 'static,
+            F: Method<P>,
         {
             let ptr = ptr as *mut F;
             let value = unsafe { Box::from_raw(ptr) };
@@ -74,9 +65,9 @@ impl DynMethod {
             display_name,
             dependencies,
             ptr,
-            call_fn: call_fn::<F, T, P>,
+            call_fn: call_fn::<F, P>,
             drop_fn: drop_fn::<F>,
-            events_fn: events_fn::<F, T, P>,
+            events_fn: events_fn::<F, P>,
         }
     }
 
@@ -106,10 +97,10 @@ impl DynMethod {
     }
 
     /// Invoke this method and returns the result in a `Box<dyn Any>`.
-    pub fn call(mut self, registry: ProviderGuard) -> Box<dyn Any> {
+    pub fn call(mut self, provider: &Provider) -> Box<dyn Any> {
         // self.construct_fn consumes the pointer so we have to set it to null after use
         // so we wouldn't double-free it on drop.
-        let value = (self.call_fn)(self.ptr, registry);
+        let value = (self.call_fn)(self.ptr, provider);
         self.ptr = ptr::null_mut();
         // This should never happen, and only serves as a sanity check.
         assert_eq!(
@@ -147,19 +138,16 @@ mod tests {
         provider.insert(String::from("Hello"));
 
         let method = DynMethod::new(|a: &String| a.clone());
-        let guard = provider.guard();
-        let out = *method.call(guard).downcast::<String>().unwrap();
+        let out = *method.call(&provider).downcast::<String>().unwrap();
         assert_eq!(out, String::from("Hello"));
 
         let method = DynMethod::new(|a: &mut String| {
             *a = String::from("World");
         });
-        let guard = provider.guard();
-        method.call(guard);
+        method.call(&provider);
 
         let method = DynMethod::new(|a: &String| a.clone());
-        let guard = provider.guard();
-        let out = *method.call(guard).downcast::<String>().unwrap();
+        let out = *method.call(&provider).downcast::<String>().unwrap();
         assert_eq!(out, String::from("World"));
 
         provider.get_mut::<String>();
@@ -172,8 +160,7 @@ mod tests {
         provider.insert(String::from("Hello"));
 
         let method = DynMethod::new(|a: Ref<String>| a);
-        let guard = provider.guard();
-        let out = *method.call(guard).downcast::<Ref<String>>().unwrap();
+        let out = *method.call(&provider).downcast::<Ref<String>>().unwrap();
         provider.get_mut::<String>();
         drop(out);
     }
@@ -184,34 +171,8 @@ mod tests {
         provider.insert(String::from("Hello"));
 
         let method = DynMethod::new(|a: Ref<String>| a);
-        let guard = provider.guard();
-        let out = *method.call(guard).downcast::<Ref<String>>().unwrap();
+        let out = *method.call(&provider).downcast::<Ref<String>>().unwrap();
         drop(out);
         provider.get_mut::<String>();
-    }
-
-    #[test]
-    fn xxx() {
-        let provider = Provider::default();
-        provider.insert(String::from("Hello"));
-
-        fn get_static_str(s: &'static String) -> &'static String {
-            println!("= {s}");
-            s
-        }
-
-        let method = DynMethod::new(|a: &'static String| get_static_str(a));
-        let guard = provider.guard();
-        let out = *method.call(guard).downcast::<&'static String>().unwrap();
-
-        let method = DynMethod::new(|a: &mut String| {
-            *a = String::from("World");
-        });
-        let guard = provider.guard();
-        method.call(guard);
-
-        println!("out = {out}");
-        drop(provider.take::<String>());
-        println!("out = {out}");
     }
 }
