@@ -1,10 +1,9 @@
-mod consume;
 mod event;
 mod executor;
 // mod ext;
 mod extractor;
 // mod graph;
-// mod dyn_method;
+mod dyn_method;
 // mod helpers;
 mod impl_tuple;
 mod method;
