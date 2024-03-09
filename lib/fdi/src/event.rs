@@ -5,12 +5,12 @@ use indexmap::IndexSet;
 use crate::dyn_method::DynMethod;
 use crate::method::Method;
 use crate::ty::Ty;
-use crate::Provider;
+use crate::{MethodExt, Provider};
 
 /// The [`Eventstore`] can be used to store a list of event handlers under each event name.
 #[derive(Default)]
 pub struct Eventstore {
-    pub handlers: HashMap<&'static str, Vec<DynMethod>>,
+    pub handlers: HashMap<&'static str, Vec<DynMethod<()>>>,
 }
 
 impl Eventstore {
@@ -34,7 +34,7 @@ impl Eventstore {
         result
     }
 
-    pub(crate) fn insert(&mut self, event: &'static str, handler: DynMethod) {
+    pub(crate) fn insert(&mut self, event: &'static str, handler: DynMethod<()>) {
         if handler.events().is_some() {
             panic!("event handler can not be a withevents.");
         }
@@ -48,7 +48,7 @@ impl Eventstore {
     where
         F: Method<P>,
     {
-        self.insert(event, DynMethod::new(handler))
+        self.insert(event, DynMethod::new(handler.map(|_| ())))
     }
 
     /// Trigger the event. This is used internally.

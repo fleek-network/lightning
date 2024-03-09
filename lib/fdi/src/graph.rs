@@ -15,7 +15,7 @@ use crate::{helpers, Eventstore, Provider};
 #[derive(Default)]
 pub struct DependencyGraph {
     touched: bool,
-    constructors: HashMap<Ty, DynMethod>,
+    constructors: HashMap<Ty, DynMethod<Result<Object>>>,
     graph: IndexMap<Ty, IndexSet<Ty>>,
     ordered: Rc<Vec<Ty>>,
 }
@@ -190,7 +190,7 @@ impl DependencyGraph {
     }
 
     /// Internal method to insert a constructor method to this graph.
-    fn insert(&mut self, tid: Ty, method: DynMethod) {
+    fn insert(&mut self, tid: Ty, method: DynMethod<Result<Object>>) {
         debug_assert_eq!(method.ty(), Ty::of::<Result<Object>>());
         if let Some(old) = self.constructors.get(&tid) {
             panic!(
@@ -394,12 +394,9 @@ impl DependencyGraph {
         let maybe_events = constructor.events();
         let value = constructor.call(registry);
 
-        let value = value
-            .downcast::<Result<Object>>()
-            .unwrap()
-            .with_context(|| {
-                format!("Error while calling the constructor:\n\t'{name} -> {rt_name}'")
-            })?;
+        let value = value.with_context(|| {
+            format!("Error while calling the constructor:\n\t'{name} -> {rt_name}'")
+        })?;
 
         registry.insert_raw(ty, value);
 
