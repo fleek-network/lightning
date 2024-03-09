@@ -41,6 +41,13 @@ pub struct RefMut<T: 'static> {
     _t: PhantomData<T>,
 }
 
+// SAFETY: The data in `Ref` and `RefMut` is wrapped in an Arc. And the access permission
+// to the `UnsafeCell` in Object is only done through a valid RwLock guard permissions.
+unsafe impl<T: 'static> Send for Ref<T> where T: Send {}
+unsafe impl<T: 'static> Send for RefMut<T> where T: Send {}
+unsafe impl<T: 'static> Sync for Ref<T> where T: Send + Sync {}
+unsafe impl<T: 'static> Sync for RefMut<T> where T: Send + Sync {}
+
 impl Provider {
     /// Insert the given value to the provider.
     ///
