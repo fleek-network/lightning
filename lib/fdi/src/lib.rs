@@ -4,7 +4,7 @@ mod executor;
 mod extractor;
 // mod graph;
 mod dyn_method;
-// mod helpers;
+mod helpers;
 mod impl_tuple;
 mod method;
 mod provider;
