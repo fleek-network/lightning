@@ -9,10 +9,12 @@ mod impl_tuple;
 mod method;
 mod provider;
 mod ty;
+// mod x_helpers;
 // mod x;
 
 pub use event::Eventstore;
 pub use executor::Executor;
+pub use extractor::{Cloned, Consume, Extractor};
 // pub use ext::MethodExt;
 // pub use graph::DependencyGraph;
 pub use method::Method;

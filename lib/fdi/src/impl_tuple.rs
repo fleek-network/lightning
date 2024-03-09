@@ -37,7 +37,7 @@ macro_rules! impl_method {
         {
             type Output = T;
 
-            fn dependencies(&self) -> Vec<Ty> {
+            fn dependencies() -> Vec<Ty> {
                 let mut out = Vec::new();
                 $(out.push(Ty::of::<$mut>());)*
                 $(out.push(Ty::of::<$get>());)*
