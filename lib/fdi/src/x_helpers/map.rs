@@ -15,6 +15,11 @@ where
     type Output = U;
 
     #[inline(always)]
+    fn display_name(&self) -> Option<String> {
+        self.method.display_name()
+    }
+
+    #[inline(always)]
     fn dependencies() -> Vec<Ty> {
         F::dependencies()
     }

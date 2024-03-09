@@ -2,7 +2,7 @@ use crate::ty::Ty;
 use crate::{Method, Provider};
 
 struct WithDisplayName<F> {
-    display_name: &'static str,
+    display_name: String,
     method: F,
 }
 
@@ -13,8 +13,8 @@ where
     type Output = F::Output;
 
     #[inline(always)]
-    fn display_name(&self) -> &'static str {
-        self.display_name
+    fn display_name(&self) -> Option<String> {
+        Some(self.display_name.clone())
     }
 
     #[inline(always)]
@@ -31,13 +31,13 @@ where
 #[inline(always)]
 pub fn with_display_name<F, P>(
     f: F,
-    display_name: &'static str,
+    display_name: impl Into<String>,
 ) -> impl Method<P, Output = F::Output>
 where
     F: Method<P>,
 {
     WithDisplayName {
-        display_name,
+        display_name: display_name.into(),
         method: f,
     }
 }

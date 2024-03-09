@@ -16,6 +16,7 @@ pub struct DependencyGraph {
     touched: bool,
     constructors: HashMap<Ty, DynMethod<Result<Object>>>,
     graph: IndexMap<Ty, IndexSet<Ty>>,
+    display_names: HashMap<Ty, String>,
     ordered: Rc<Vec<Ty>>,
 }
 
@@ -38,17 +39,17 @@ impl DependencyGraph {
 
         for (ty, dependencies) in &self.graph {
             let ty_name = self
-                .constructors
+                .display_names
                 .get(ty)
-                .map(|m| m.display_name())
-                .unwrap_or("fuck1");
+                .map(String::as_str)
+                .unwrap_or_else(|| ty.name());
 
             for dep in dependencies {
                 let dep_name = self
-                    .constructors
+                    .display_names
                     .get(dep)
-                    .map(|m| m.display_name())
-                    .unwrap_or("shit");
+                    .map(String::as_str)
+                    .unwrap_or_else(|| ty.name());
 
                 writeln!(res, "{} --> {}", dep_name, ty_name).unwrap();
             }
@@ -180,14 +181,18 @@ impl DependencyGraph {
         T: 'static,
     {
         self.touched = true;
-        let display_name = f.display_name();
-        let method = DynMethod::new(f.map(|v| v.map(to_obj)).with_display_name(display_name));
-
         let ty = Ty::of::<T>();
-        let deps = F::dependencies();
 
-        self.insert(ty, method);
-        self.graph.insert(ty, deps.into_iter().collect());
+        // If an explicit display name is provided then we should store and remember it. Otherwise
+        // we can just default to the ty.name() when we need it.
+        if let Some(display_name) = f.display_name() {
+            self.display_names.insert(ty, display_name);
+        }
+
+        self.insert(ty, DynMethod::new(f.map(|v| v.map(to_obj))));
+        self.graph
+            .insert(ty, F::dependencies().into_iter().collect());
+
         self
     }
 

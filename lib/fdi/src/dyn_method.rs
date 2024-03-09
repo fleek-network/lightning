@@ -1,3 +1,4 @@
+use std::any::type_name;
 use std::fmt::Debug;
 use std::ptr;
 
@@ -7,7 +8,7 @@ use crate::{Eventstore, Method, Provider};
 /// A fixed-size struct that can be created from any [`Method`].
 pub struct DynMethod<T: 'static> {
     name: &'static str,
-    display_name: &'static str,
+    display_name: Option<String>,
     dependencies: Vec<Ty>,
     ptr: *mut (),
     call_fn: fn(*mut (), provider: &Provider) -> T,
@@ -20,7 +21,7 @@ impl<T: 'static> DynMethod<T> {
     where
         F: Method<P, Output = T>,
     {
-        let name = method.name();
+        let name = type_name::<F>();
         let display_name = method.display_name();
 
         let dependencies = F::dependencies();
@@ -69,14 +70,14 @@ impl<T: 'static> DynMethod<T> {
         Ty::of::<T>()
     }
 
-    /// Returns the captured result from [`Method::name`].
+    /// Returns the name of the original method.
     pub fn name(&self) -> &'static str {
         self.name
     }
 
     /// Returns the captured result from [`Method::display_name`].
-    pub fn display_name(&self) -> &'static str {
-        self.display_name
+    pub fn display_name(&self) -> Option<String> {
+        self.display_name.clone()
     }
 
     /// Returns the result from [`Method::events`].
