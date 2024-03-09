@@ -9,14 +9,17 @@
 //!         ;; another closure which will be called using the registry.
 //! ```
 
+use std::marker::PhantomData;
+
 use crate::Method;
 
-struct WrapWith<F, W> {
+struct WrapWith<F, W, ArgsF, ArgsOutW> {
     method: F,
     wrapper: W,
+    _p: PhantomData<(ArgsF, ArgsOutW)>,
 }
 
-impl<F, ArgsF, W, OutW, ArgsOutW> Method<(ArgsF, ArgsOutW)> for WrapWith<F, W>
+impl<F, ArgsF, W, OutW, ArgsOutW> Method<()> for WrapWith<F, W, ArgsF, ArgsOutW>
 where
     F: Method<ArgsF>,
     W: FnOnce(F::Output) -> OutW,
@@ -43,11 +46,15 @@ where
 pub fn wrap_with<F, ArgsF, W, OutW, ArgsOutW>(
     method: F,
     wrapper: W,
-) -> impl Method<(ArgsF, ArgsOutW), Output = OutW::Output>
+) -> impl Method<(), Output = OutW::Output>
 where
     F: Method<ArgsF>,
     W: FnOnce(F::Output) -> OutW,
     OutW: Method<ArgsOutW>,
 {
-    WrapWith { method, wrapper }
+    WrapWith {
+        method,
+        wrapper,
+        _p: PhantomData,
+    }
 }

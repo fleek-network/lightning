@@ -31,10 +31,7 @@ pub trait MethodExt<P>: Sized + Method<P> {
     }
 
     #[inline(always)]
-    fn wrap_with<W, OutW, ArgsOutW>(
-        self,
-        wrapper: W,
-    ) -> impl Method<(P, ArgsOutW), Output = OutW::Output>
+    fn wrap_with<W, OutW, ArgsOutW>(self, wrapper: W) -> impl Method<(), Output = OutW::Output>
     where
         W: FnOnce(Self::Output) -> OutW,
         OutW: Method<ArgsOutW>,
@@ -52,7 +49,7 @@ pub trait MethodExt<P>: Sized + Method<P> {
     }
 
     #[inline(always)]
-    fn spawn(self) -> impl Method<(P, ((Executor,), (), ())), Output = ()>
+    fn spawn(self) -> impl Method<(), Output = ()>
     where
         Self: 'static + Method<P> + Sized,
         Self::Output: Future,
