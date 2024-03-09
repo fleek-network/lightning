@@ -24,7 +24,7 @@ pub trait Method<P> {
     }
 
     /// The parameters this method will ask for from the registry when invoked.
-    fn dependencies(&self) -> Vec<Ty>;
+    fn dependencies() -> Vec<Ty>;
 
     /// Consume and invoke the method.
     fn call(self, registry: &Provider) -> Self::Output;

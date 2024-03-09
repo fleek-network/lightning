@@ -6,7 +6,8 @@ use futures::Future;
 
 use crate::dyn_method::DynMethod;
 use crate::provider::{to_obj, Object};
-use crate::{Executor, Method, Provider};
+use crate::ty::Ty;
+use crate::{Eventstore, Executor, Method, Provider};
 
 struct Transform<F, T, P, M, U> {
     display_name: &'static str,
@@ -40,6 +41,11 @@ where
     _p: PhantomData<(F, T, P, U)>,
 }
 
+struct Flatten<F, A, B> {
+    method: F,
+    _p: PhantomData<(A, B)>,
+}
+
 impl<F, T, P, M, U> Method<P> for Transform<F, T, P, M, U>
 where
     F: Method<P, Output = T>,
@@ -65,8 +71,8 @@ where
     }
 
     #[inline(always)]
-    fn dependencies(&self) -> Vec<crate::ty::Ty> {
-        self.original.dependencies()
+    fn dependencies() -> Vec<Ty> {
+        F::dependencies()
     }
 
     #[inline(always)]
@@ -106,8 +112,8 @@ where
     }
 
     #[inline(always)]
-    fn dependencies(&self) -> Vec<crate::ty::Ty> {
-        self.original.dependencies()
+    fn dependencies() -> Vec<Ty> {
+        F::dependencies()
     }
 
     #[inline(always)]
@@ -131,8 +137,8 @@ where
         self.method.events()
     }
 
-    fn dependencies(&self) -> Vec<crate::ty::Ty> {
-        self.method.dependencies()
+    fn dependencies() -> Vec<Ty> {
+        F::dependencies()
     }
 
     fn call(self, registry: &Provider) {
@@ -162,13 +168,50 @@ where
         self.method.events()
     }
 
-    fn dependencies(&self) -> Vec<crate::ty::Ty> {
-        self.method.dependencies()
+    fn dependencies() -> Vec<Ty> {
+        F::dependencies()
     }
 
     fn call(self, registry: &Provider) -> U {
         let future = self.method.call(registry);
         futures::executor::block_on(future)
+    }
+}
+
+impl<F, A, B> Method<(A, B)> for Flatten<F, A, B>
+where
+    F: Method<A>,
+    F::Output: Method<B>,
+{
+    type Output = <F::Output as Method<B>>::Output;
+
+    fn name(&self) -> &'static str {
+        self.method.name()
+    }
+
+    fn display_name(&self) -> &'static str {
+        self.method.display_name()
+    }
+
+    fn events(&self) -> Option<crate::Eventstore> {
+        self.method.events()
+    }
+
+    fn dependencies() -> Vec<Ty> {
+        let mut out = F::dependencies();
+        out.extend(F::Output::dependencies());
+        out
+    }
+
+    fn call(self, registry: &Provider) -> Self::Output {
+        let inner_method = self.method.call(registry);
+
+        if let Some(events) = inner_method.events() {
+            let mut event_store = registry.get_mut::<Eventstore>();
+            event_store.extend(events);
+        }
+
+        inner_method.call(registry)
     }
 }
 
@@ -261,6 +304,17 @@ where
     U: 'static,
 {
     BlockOn {
+        method: f,
+        _p: PhantomData,
+    }
+}
+
+pub fn flatten<F, A, B>(f: F) -> impl Method<(A, B), Output = <F::Output as Method<B>>::Output>
+where
+    F: Method<A>,
+    F::Output: Method<B>,
+{
+    Flatten::<F, A, B> {
         method: f,
         _p: PhantomData,
     }

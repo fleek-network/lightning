@@ -27,8 +27,7 @@ impl DynMethod {
         let name = method.name();
         let display_name = method.display_name();
 
-        let dependencies = method.dependencies();
-
+        let dependencies = F::dependencies();
         let value = Box::new(method);
         let ptr = Box::into_raw(value) as *mut ();
 
