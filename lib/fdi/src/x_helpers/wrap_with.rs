@@ -28,6 +28,11 @@ where
     type Output = OutW::Output;
 
     #[inline(always)]
+    fn display_name(&self) -> Option<String> {
+        self.method.display_name()
+    }
+
+    #[inline(always)]
     fn dependencies() -> Vec<crate::ty::Ty> {
         let mut dependencies = F::dependencies();
         dependencies.extend(OutW::dependencies());

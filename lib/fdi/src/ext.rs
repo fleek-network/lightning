@@ -9,7 +9,7 @@ pub trait MethodExt<P>: Sized + Method<P> {
     }
 
     #[inline(always)]
-    fn with_display_name(self, name: &'static str) -> impl Method<P, Output = Self::Output> {
+    fn with_display_name(self, name: impl Into<String>) -> impl Method<P, Output = Self::Output> {
         x_helpers::display_name::with_display_name(self, name)
     }
 
