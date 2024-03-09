@@ -10,9 +10,7 @@ pub trait Method<P> {
     fn display_name(&self) -> Option<String>;
 
     /// Return the events that should be registered after this method is invoked.
-    fn events(&self) -> Option<Eventstore> {
-        None
-    }
+    fn events(&self) -> Option<Eventstore>;
 
     /// The parameters this method will ask for from the registry when invoked.
     fn dependencies() -> Vec<Ty>;

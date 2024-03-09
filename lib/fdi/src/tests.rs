@@ -2,18 +2,8 @@ use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::hash::Hash;
 
-use crate::method::DynMethod;
-use crate::{
-    consume,
-    DependencyGraph,
-    Eventstore,
-    Executor,
-    Method,
-    MethodExt,
-    Provider,
-    Ref,
-    RefMut,
-};
+use crate::dyn_method::DynMethod;
+use crate::{DependencyGraph, Eventstore, Method, MethodExt, Provider, Ref};
 
 mod demo_dep {
     use crate::ext::MethodExt;
@@ -122,8 +112,8 @@ fn with_value() {
     let registry = Provider::default();
     let value = || String::from("Hello!");
     let value = DynMethod::new(value);
-    let value = value.call(&registry).downcast::<String>().unwrap();
-    assert_eq!(*value, "Hello!");
+    let value = value.call(&registry);
+    assert_eq!(value, "Hello!");
 
     let mut registry = Provider::default();
     let graph = DependencyGraph::new().with_value(String::from("Hello!"));
@@ -211,6 +201,7 @@ fn basic_with_events_should_work() {
 
     let mut registry = Provider::default();
     registry.insert(Counter::default());
+
     graph.init_one::<A>(&mut registry).expect("Failed to init.");
     assert_eq!(registry.get::<Counter>().get("A::_post"), 1);
     assert_eq!(registry.get::<Counter>().get("A::_start"), 0);
@@ -268,76 +259,12 @@ fn init_one_failure_should_panic() {
 }
 
 #[test]
-fn consume_usage() {
-    #[derive(Default)]
-    struct A;
-
-    impl A {
-        fn start(self, counter: &mut Counter) {
-            counter.add("start");
-        }
-    }
-
-    let mut graph =
-        DependencyGraph::new().with(A::default.to_infallible().on("start", consume(A::start)));
-    let mut registry = Provider::default();
-    registry.insert(Counter::default());
-    graph.init_one::<A>(&mut registry).unwrap();
-    registry.trigger("start");
-    assert_eq!(registry.get::<Counter>().get("start"), 1);
-}
-
-#[test]
-fn spawn_async_fn_depending_on_ref() {
-    #[derive(Default)]
-    struct A;
-
-    async fn method(mut c: RefMut<Counter>, _a: Ref<A>) {
-        (*c).add("method");
-    }
-
-    async fn method_2(mut c: RefMut<Counter>, _a: Ref<A>) {
-        (*c).add("block_on");
-    }
-
-    let graph = DependencyGraph::new().with(
-        A::default
-            .to_infallible()
-            .on("start", method.spawn())
-            .on("start", method_2.block_on()),
-    );
-    let mut registry = Provider::default();
-    graph.init_all(&mut registry).unwrap();
-    registry.insert(Counter::default());
-
-    assert_eq!(registry.get::<Counter>().get("method"), 0);
-    assert_eq!(registry.get::<Counter>().get("block_on"), 0);
-
-    {
-        let mut e = registry.get_mut::<Executor>();
-        futures::executor::block_on(e.run_until_finish());
-    }
-
-    registry.trigger("start");
-    assert_eq!(registry.get::<Counter>().get("method"), 0);
-    assert_eq!(registry.get::<Counter>().get("block_on"), 1);
-
-    {
-        let mut e = registry.get_mut::<Executor>();
-        futures::executor::block_on(e.run_until_finish());
-    }
-
-    assert_eq!(registry.get::<Counter>().get("method"), 1);
-    assert_eq!(registry.get::<Counter>().get("block_on"), 1);
-}
-
-#[test]
 fn depend_on_ref_should_resolve() {
     #[derive(Default)]
     struct A(u32);
 
     fn method(a: Ref<A>) -> A {
-        A((*a).0)
+        A(a.0)
     }
 
     let graph = DependencyGraph::new().with((|| A(17)).to_infallible());

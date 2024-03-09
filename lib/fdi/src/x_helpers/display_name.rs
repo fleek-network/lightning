@@ -20,6 +20,11 @@ where
     }
 
     #[inline(always)]
+    fn events(&self) -> Option<crate::Eventstore> {
+        self.method.events()
+    }
+
+    #[inline(always)]
     fn dependencies() -> Vec<Ty> {
         F::dependencies()
     }

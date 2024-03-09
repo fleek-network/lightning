@@ -33,6 +33,11 @@ where
     }
 
     #[inline(always)]
+    fn events(&self) -> Option<crate::Eventstore> {
+        self.method.events()
+    }
+
+    #[inline(always)]
     fn dependencies() -> Vec<crate::ty::Ty> {
         let mut dependencies = F::dependencies();
         dependencies.extend(OutW::dependencies());

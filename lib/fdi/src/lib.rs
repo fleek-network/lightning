@@ -18,5 +18,5 @@ pub use graph::DependencyGraph;
 pub use method::Method;
 pub use provider::{Provider, ProviderGuard, Ref, RefMut};
 
-// #[cfg(test)]
-// mod tests;
+#[cfg(test)]
+mod tests;
