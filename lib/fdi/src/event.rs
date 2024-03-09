@@ -10,7 +10,7 @@ use crate::{MethodExt, Provider};
 /// The [`Eventstore`] can be used to store a list of event handlers under each event name.
 #[derive(Default)]
 pub struct Eventstore {
-    pub handlers: HashMap<&'static str, Vec<DynMethod<()>>>,
+    pub(crate) handlers: HashMap<&'static str, Vec<DynMethod<()>>>,
 }
 
 impl Eventstore {

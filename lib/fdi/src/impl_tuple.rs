@@ -1,6 +1,6 @@
 use crate::extractor::Extractor;
 use crate::ty::Ty;
-use crate::{Method, Provider};
+use crate::{Eventstore, Method, Provider};
 
 macro_rules! impl_method {
     (
@@ -39,6 +39,11 @@ macro_rules! impl_method {
 
             #[inline(always)]
             fn display_name(&self) -> Option<String> {
+                None
+            }
+
+            #[inline(always)]
+            fn events(&self) -> Option<Eventstore> {
                 None
             }
 
