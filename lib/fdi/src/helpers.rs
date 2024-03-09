@@ -7,7 +7,7 @@ use futures::Future;
 use crate::dyn_method::DynMethod;
 use crate::provider::{to_obj, Object};
 use crate::ty::Ty;
-use crate::{Eventstore, Executor, Method, Provider};
+use crate::{Eventstore, Executor, Method, MethodExt, Provider};
 
 struct Transform<F, T, P, M, U> {
     display_name: &'static str,
@@ -19,7 +19,7 @@ struct Transform<F, T, P, M, U> {
 struct On<F, T, P> {
     original: F,
     name: &'static str,
-    handler: RefCell<Option<DynMethod>>,
+    handler: RefCell<Option<DynMethod<()>>>,
     _p: PhantomData<(T, P)>,
 }
 
@@ -286,7 +286,7 @@ where
     On {
         original: f,
         name: event,
-        handler: RefCell::new(Some(DynMethod::new(handler))),
+        handler: RefCell::new(Some(DynMethod::new(handler.map(|_| ())))),
         _p: PhantomData,
     }
 }
