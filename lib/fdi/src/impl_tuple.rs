@@ -37,6 +37,12 @@ macro_rules! impl_method {
         {
             type Output = T;
 
+            #[inline(always)]
+            fn display_name(&self) -> Option<String> {
+                None
+            }
+
+            #[inline]
             fn dependencies() -> Vec<Ty> {
                 let mut out = Vec::new();
                 $(out.push(Ty::of::<$mut>());)*

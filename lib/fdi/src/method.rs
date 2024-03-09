@@ -1,5 +1,3 @@
-use std::any::type_name;
-
 use crate::ty::Ty;
 use crate::{Eventstore, Provider};
 
@@ -7,16 +5,9 @@ use crate::{Eventstore, Provider};
 pub trait Method<P> {
     type Output: 'static;
 
-    /// The name of the method. By default is the name of `Self`.
-    fn name(&self) -> &'static str {
-        type_name::<Self>()
-    }
-
     /// The display name of the method. This is used for printing purposes. It defaults
     /// to the name of the output type.
-    fn display_name(&self) -> &'static str {
-        type_name::<Self::Output>()
-    }
+    fn display_name(&self) -> Option<String>;
 
     /// Return the events that should be registered after this method is invoked.
     fn events(&self) -> Option<Eventstore> {

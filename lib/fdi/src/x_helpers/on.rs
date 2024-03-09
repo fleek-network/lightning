@@ -17,12 +17,7 @@ where
     type Output = F::Output;
 
     #[inline(always)]
-    fn name(&self) -> &'static str {
-        self.method.name()
-    }
-
-    #[inline(always)]
-    fn display_name(&self) -> &'static str {
+    fn display_name(&self) -> Option<String> {
         self.method.display_name()
     }
 
