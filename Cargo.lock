@@ -3651,6 +3651,8 @@ dependencies = [
  "anyhow",
  "futures",
  "indexmap 2.1.0",
+ "parking_lot",
+ "triomphe",
 ]
 
 [[package]]
