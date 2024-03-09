@@ -1,11 +1,16 @@
+mod deserialize;
+mod model;
+mod serialize;
+
 use std::collections::HashMap;
 use std::path::Path;
 
 use anyhow::bail;
 use bytes::Bytes;
+use ort::{TensorElementType, ValueType};
 
 use crate::opts::{BorshVector, Encoding};
-use crate::utils;
+use crate::runtime::model::Info;
 
 // Todo: let's improve this.
 // Ideally we want every node to run onnx with runtime extensions.
@@ -41,22 +46,100 @@ impl Session {
         // Process input and pass it to the model.
         let output = match self.encoding {
             Encoding::Borsh => {
-                let session_input = utils::deserialize_borsh(input)?;
+                let session_input = deserialize::deserialize_borsh(input)?;
                 let session_outputs = self.onnx.run(session_input)?;
-                RunOutput::Borsh(utils::borsh_serialize_outputs(session_outputs)?)
+                RunOutput::Borsh(serialize::borsh_serialize_outputs(session_outputs)?)
             },
             Encoding::SafeTensors => {
-                let session_input = utils::deserialize_safetensors(input)?;
+                let session_input = deserialize::deserialize_safetensors(input)?;
                 let session_outputs = self.onnx.run(session_input)?;
-                RunOutput::SafeTensors(utils::safetensors_serialize_outputs(session_outputs)?)
+                RunOutput::SafeTensors(serialize::safetensors_serialize_outputs(session_outputs)?)
             },
         };
 
         Ok(output)
+    }
+
+    #[allow(unused)]
+    pub fn _model_info(&self) -> anyhow::Result<Info> {
+        let mut name = None;
+        let mut description = None;
+        let mut producer = None;
+
+        let meta = self.onnx.metadata()?;
+        if let Ok(mode_name) = meta.name() {
+            name = Some(mode_name);
+        }
+        if let Ok(desc) = meta.description() {
+            description = Some(desc);
+        }
+        if let Ok(prod) = meta.producer() {
+            producer = Some(prod);
+        }
+
+        let mut inputs = Vec::new();
+        for (i, input) in self.onnx.inputs.iter().enumerate() {
+            let input = format!(
+                "{i} {}: {}",
+                input.name,
+                value_type_to_string(&input.input_type)
+            );
+            inputs.push(input);
+        }
+        let mut outputs = Vec::new();
+        for (i, output) in self.onnx.outputs.iter().enumerate() {
+            let output = format!(
+                "{i} {}: {}",
+                output.name,
+                value_type_to_string(&output.output_type)
+            );
+            outputs.push(output);
+        }
+
+        Ok(Info {
+            name,
+            description,
+            producer,
+            inputs,
+            outputs,
+        })
     }
 }
 
 pub enum RunOutput {
     SafeTensors(Bytes),
     Borsh(HashMap<String, BorshVector>),
+}
+
+fn element_type_to_str(t: TensorElementType) -> &'static str {
+    match t {
+        TensorElementType::Bfloat16 => "bf16",
+        TensorElementType::Bool => "bool",
+        TensorElementType::Float16 => "f16",
+        TensorElementType::Float32 => "f32",
+        TensorElementType::Float64 => "f64",
+        TensorElementType::Int16 => "i16",
+        TensorElementType::Int32 => "i32",
+        TensorElementType::Int64 => "i64",
+        TensorElementType::Int8 => "i8",
+        TensorElementType::String => "str",
+        TensorElementType::Uint16 => "u16",
+        TensorElementType::Uint32 => "u32",
+        TensorElementType::Uint64 => "u64",
+        TensorElementType::Uint8 => "u8",
+    }
+}
+
+fn value_type_to_string(value: &ValueType) -> String {
+    match value {
+        ValueType::Tensor { ty, dimensions } => {
+            format!("Tensor<{}>({:?})", element_type_to_str(*ty), dimensions)
+        },
+        ValueType::Map { key, value } => format!(
+            "Map<{}, {}>",
+            element_type_to_str(*key),
+            element_type_to_str(*value)
+        ),
+        ValueType::Sequence(_) => "Sequence<_>".to_string(),
+    }
 }

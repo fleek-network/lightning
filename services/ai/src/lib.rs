@@ -1,7 +1,6 @@
 mod handler;
 mod opts;
 mod runtime;
-mod utils;
 
 use serde::{Deserialize, Serialize};
 
