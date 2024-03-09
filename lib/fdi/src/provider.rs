@@ -299,26 +299,3 @@ fn get_value(map: &HashMap<Ty, MapEntry>, ty: &Ty, shared: bool) -> MapEntry {
 pub(crate) fn to_obj<T: 'static>(value: T) -> Object {
     UnsafeCell::new(Box::new(value))
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn usage() {
-        struct A(String);
-        struct B(String);
-        let provider = Provider::default();
-        provider.insert(A(String::from("Hello")));
-        provider.insert(B(String::from("Hello")));
-
-        fn f(a: &A, b: &B) {}
-
-        let guard = provider.guard();
-        let a = guard.get::<A>();
-        let b = guard.get::<B>();
-        // drop(guard);
-        // let c = guard.get_mut::<B>();
-        // let d = guard.get_mut::<A>();
-        f(a, b);
-    }
-}
