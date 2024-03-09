@@ -8,7 +8,6 @@ use crate::{Eventstore, Method, Provider};
 /// A fixed-size struct that can be created from any [`Method`].
 pub struct DynMethod<T: 'static> {
     name: &'static str,
-    display_name: Option<String>,
     dependencies: Vec<Ty>,
     ptr: *mut (),
     call_fn: fn(*mut (), provider: &Provider) -> T,
@@ -22,8 +21,6 @@ impl<T: 'static> DynMethod<T> {
         F: Method<P, Output = T>,
     {
         let name = type_name::<F>();
-        let display_name = method.display_name();
-
         let dependencies = F::dependencies();
         let value = Box::new(method);
         let ptr = Box::into_raw(value) as *mut ();
@@ -56,7 +53,6 @@ impl<T: 'static> DynMethod<T> {
 
         Self {
             name,
-            display_name,
             dependencies,
             ptr,
             call_fn: call_fn::<F, P>,
@@ -73,11 +69,6 @@ impl<T: 'static> DynMethod<T> {
     /// Returns the name of the original method.
     pub fn name(&self) -> &'static str {
         self.name
-    }
-
-    /// Returns the captured result from [`Method::display_name`].
-    pub fn display_name(&self) -> Option<String> {
-        self.display_name.clone()
     }
 
     /// Returns the result from [`Method::events`].
