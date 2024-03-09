@@ -1,3 +1,5 @@
+use std::any::type_name;
+
 use crate::ty::Ty;
 use crate::{Method, Provider};
 
@@ -42,15 +44,19 @@ where
     }
 }
 
-// TODO(qti3e): Display name to String
-// pub fn map_display_name<F, P, N>(f: F, map: N) -> impl Method<P, Output = F::Output>
-// where
-//     F: Method<P>,
-//     N: FnOnce(String) -> String,
-// {
-//     let naw_name = (map)(f.display_name());
-//     WithDisplayName {
-//         display_name,
-//         method: f,
-//     }
-// }
+#[inline(always)]
+pub fn map_display_name<F, P, N>(f: F, map: N) -> impl Method<P, Output = F::Output>
+where
+    F: Method<P>,
+    N: FnOnce(String) -> String,
+{
+    let display_name = (map)(
+        f.display_name()
+            .unwrap_or_else(|| String::from(type_name::<F::Output>())),
+    );
+
+    WithDisplayName {
+        display_name,
+        method: f,
+    }
+}
