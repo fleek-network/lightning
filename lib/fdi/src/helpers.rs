@@ -6,7 +6,7 @@ use futures::Future;
 
 use crate::dyn_method::DynMethod;
 use crate::provider::{to_obj, Object};
-use crate::{Executor, Method, ProviderGuard};
+use crate::{Executor, Method, Provider};
 
 struct Transform<F, T, P, M, U> {
     display_name: &'static str,
@@ -22,27 +22,27 @@ struct On<F, T, P> {
     _p: PhantomData<(T, P)>,
 }
 
-struct Spawn<'a, F, T, P, U>
+struct Spawn<F, T, P, U>
 where
-    F: 'static + Method<'a, P, Output = T> + Sized,
+    F: 'static + Method<P, Output = T> + Sized,
     T: 'static + Future<Output = U>,
 {
     method: F,
-    _p: PhantomData<(&'a F, T, P, U)>,
+    _p: PhantomData<(F, T, P, U)>,
 }
 
-struct BlockOn<'a, F, T, P, U>
+struct BlockOn<F, T, P, U>
 where
-    F: 'static + Method<'a, P, Output = T> + Sized,
+    F: 'static + Method<P, Output = T> + Sized,
     T: 'static + Future<Output = U>,
 {
     method: F,
-    _p: PhantomData<(&'a F, T, P, U)>,
+    _p: PhantomData<(F, T, P, U)>,
 }
 
-impl<'a, F, T, P, M, U> Method<'a, P> for Transform<F, T, P, M, U>
+impl<F, T, P, M, U> Method<P> for Transform<F, T, P, M, U>
 where
-    F: Method<'a, P, Output = T>,
+    F: Method<P, Output = T>,
     T: 'static,
     M: FnOnce(T) -> U,
     U: 'static,
@@ -70,15 +70,15 @@ where
     }
 
     #[inline(always)]
-    fn call(self, registry: &'a ProviderGuard) -> U {
+    fn call(self, registry: &Provider) -> U {
         let value = self.original.call(registry);
         (self.transform)(value)
     }
 }
 
-impl<'a, F, T, P> Method<'a, P> for On<F, T, P>
+impl<F, T, P> Method<P> for On<F, T, P>
 where
-    F: Method<'a, P, Output = T>,
+    F: Method<P, Output = T>,
     T: 'static,
 {
     type Output = T;
@@ -98,7 +98,6 @@ where
         let events = self.original.events();
         if let Some(handler) = self.handler.borrow_mut().take() {
             let mut events = events.unwrap_or_default();
-            // TODO(qti3e)
             events.insert(self.name, handler);
             Some(events)
         } else {
@@ -112,14 +111,14 @@ where
     }
 
     #[inline(always)]
-    fn call(self, registry: &'a ProviderGuard) -> T {
+    fn call(self, registry: &Provider) -> T {
         self.original.call(registry)
     }
 }
 
-impl<'a, F, T, P, U> Method<'a, P> for Spawn<'a, F, T, P, U>
+impl<F, T, P, U> Method<P> for Spawn<F, T, P, U>
 where
-    F: 'static + Method<'a, P, Output = T> + Sized,
+    F: 'static + Method<P, Output = T> + Sized,
     T: 'static + Future<Output = U>,
 {
     type Output = ();
@@ -136,17 +135,16 @@ where
         self.method.dependencies()
     }
 
-    fn call(self, registry: &'a ProviderGuard) {
+    fn call(self, registry: &Provider) {
         let future = self.method.call(registry);
-        let registry = registry.provider().clone();
         let mut executor = registry.get_mut::<Executor>();
         executor.spawn(Box::pin(future));
     }
 }
 
-impl<'a, F, T, P, U> Method<'a, P> for BlockOn<'a, F, T, P, U>
+impl<F, T, P, U> Method<P> for BlockOn<F, T, P, U>
 where
-    F: 'static + Method<'a, P, Output = T> + Sized,
+    F: 'static + Method<P, Output = T> + Sized,
     T: 'static + Future<Output = U>,
     U: 'static,
 {
@@ -168,15 +166,15 @@ where
         self.method.dependencies()
     }
 
-    fn call(self, registry: &'a ProviderGuard) -> U {
+    fn call(self, registry: &Provider) -> U {
         let future = self.method.call(registry);
         futures::executor::block_on(future)
     }
 }
 
-pub fn map<'a, F, P, U, M>(f: F, transform: M) -> impl Method<'a, P, Output = U>
+pub fn map<F, P, U, M>(f: F, transform: M) -> impl Method<P, Output = U>
 where
-    F: Method<'a, P>,
+    F: Method<P>,
     M: FnOnce(F::Output) -> U,
     U: 'static,
 {
@@ -188,9 +186,9 @@ where
     }
 }
 
-pub fn to_infalliable<'a, F, T, P>(f: F) -> impl Method<'a, P, Output = anyhow::Result<T>>
+pub fn to_infalliable<F, T, P>(f: F) -> impl Method<P, Output = anyhow::Result<T>>
 where
-    F: Method<'a, P, Output = T>,
+    F: Method<P, Output = T>,
     T: 'static,
 {
     Transform {
@@ -201,9 +199,9 @@ where
     }
 }
 
-pub fn to_result_object<'a, F, T, P>(f: F) -> impl Method<'a, P, Output = anyhow::Result<Object>>
+pub fn to_result_object<F, T, P>(f: F) -> impl Method<P, Output = anyhow::Result<Object>>
 where
-    F: Method<'a, P, Output = anyhow::Result<T>>,
+    F: Method<P, Output = anyhow::Result<T>>,
     T: 'static,
 {
     Transform {
@@ -217,15 +215,11 @@ where
     }
 }
 
-pub fn on<'a, F, T, P, H, Q, A>(
-    f: F,
-    event: &'static str,
-    handler: H,
-) -> impl Method<'a, P, Output = T>
+pub fn on<F, T, P, H, Q, A>(f: F, event: &'static str, handler: H) -> impl Method<P, Output = T>
 where
-    F: Method<'a, P, Output = T>,
+    F: Method<P, Output = T>,
     T: 'static,
-    H: Method<'a, A, Output = Q>,
+    H: Method<A, Output = Q>,
     Q: 'static,
 {
     On {
@@ -236,9 +230,9 @@ where
     }
 }
 
-pub fn display_name<'a, F, T, P>(name: &'static str, f: F) -> impl Method<'a, P, Output = T>
+pub fn display_name<F, T, P>(name: &'static str, f: F) -> impl Method<P, Output = T>
 where
-    F: Method<'a, P, Output = T>,
+    F: Method<P, Output = T>,
     T: 'static,
 {
     Transform {
@@ -249,9 +243,9 @@ where
     }
 }
 
-pub fn spawn<'a, F, T, P, U>(f: F) -> impl Method<'a, P, Output = ()>
+pub fn spawn<F, T, P, U>(f: F) -> impl Method<P, Output = ()>
 where
-    F: 'static + Method<'a, P, Output = T> + Sized,
+    F: 'static + Method<P, Output = T> + Sized,
     T: 'static + Future<Output = U>,
 {
     Spawn {
@@ -260,9 +254,9 @@ where
     }
 }
 
-pub fn block_on<'a, F, T, P, U>(f: F) -> impl Method<'a, P, Output = U>
+pub fn block_on<F, T, P, U>(f: F) -> impl Method<P, Output = U>
 where
-    F: 'static + Method<'a, P, Output = T> + Sized,
+    F: 'static + Method<P, Output = T> + Sized,
     T: 'static + Future<Output = U>,
     U: 'static,
 {
