@@ -1,47 +1,180 @@
-use crate::consume::Consume;
 use crate::extractor::Extractor;
 use crate::ty::Ty;
-use crate::{Method, Provider, ProviderGuard, Ref, RefMut};
+use crate::{Method, Provider};
 
 macro_rules! impl_method {
     (
-        [$($arg:ident)*]
+        [$($mut:ident)*],
+        [$($get:ident)*],
+        [$($ext:ident)*]
     ) => {
-        #[allow(unused)]
-        impl<'a, 'p, F, T
-            $(, $arg)*
-        > Method<'p, T, (
-            $($arg,)*
+        #[allow(clippy::all, unused, unused_mut)]
+        impl<F, T
+            $(, $mut)*
+            $(, $get)*
+            $(, $ext)*
+        > Method<(
+            (
+                $($mut,)*
+            ),
+            (
+                $($get,)*
+            ),
+            (
+                $($ext,)*
+            ),
         )> for F
         where
             F: 'static + FnOnce(
-                $($arg,)*
+                $(&mut $mut,)*
+                $(& $get,)*
+                $($ext,)*
             ) -> T,
             T: 'static,
-            $($arg: Extractor<'a>,)*
-            'p: 'a
+            $($mut: 'static,)*
+            $($get: 'static,)*
+            $($ext: 'static + for<'x> Extractor<'x>,)*
         {
+            type Output = T;
+
             fn dependencies(&self) -> Vec<Ty> {
                 let mut out = Vec::new();
-                $($arg::dependencies(&mut out);)*
+                $(out.push(Ty::of::<$mut>());)*
+                $(out.push(Ty::of::<$get>());)*
+                $($ext::dependencies(&mut out);)*
                 out
             }
 
             #[inline(always)]
-            fn call(self, guard: &'p ProviderGuard) -> T {
+            fn call(self, provider: &Provider) -> T {
+                let guard = provider.guard();
                 (self)(
-                    $($arg::extract(&guard),)*
+                    $(guard.extract::<&mut $mut>(),)*
+                    $(guard.extract::<&$get>(),)*
+                    $(guard.extract::<$ext>(),)*
                 )
             }
         }
     };
 }
 
-impl_method!([]);
-impl_method!([A0]);
-impl_method!([A0 A1]);
-impl_method!([A0 A1 A2]);
-impl_method!([A0 A1 A2 A3]);
-impl_method!([A0 A1 A2 A3 A4]);
-impl_method!([A0 A1 A2 A3 A4 A5]);
-impl_method!([A0 A1 A2 A3 A4 A5 A6]);
+impl_method!([], [], []);
+impl_method!([], [], [E0]);
+impl_method!([], [], [E0 E1]);
+impl_method!([], [], [E0 E1 E2]);
+impl_method!([], [], [E0 E1 E2 E3]);
+impl_method!([], [], [E0 E1 E2 E3 E4]);
+impl_method!([], [], [E0 E1 E2 E3 E4 E5]);
+impl_method!([], [], [E0 E1 E2 E3 E4 E5 E6]);
+impl_method!([], [R0], []);
+impl_method!([], [R0], [E0]);
+impl_method!([], [R0], [E0 E1]);
+impl_method!([], [R0], [E0 E1 E2]);
+impl_method!([], [R0], [E0 E1 E2 E3]);
+impl_method!([], [R0], [E0 E1 E2 E3 E4]);
+impl_method!([], [R0], [E0 E1 E2 E3 E4 E5]);
+impl_method!([], [R0 R1], []);
+impl_method!([], [R0 R1], [E0]);
+impl_method!([], [R0 R1], [E0 E1]);
+impl_method!([], [R0 R1], [E0 E1 E2]);
+impl_method!([], [R0 R1], [E0 E1 E2 E3]);
+impl_method!([], [R0 R1], [E0 E1 E2 E3 E4]);
+impl_method!([], [R0 R1 R2], []);
+impl_method!([], [R0 R1 R2], [E0]);
+impl_method!([], [R0 R1 R2], [E0 E1]);
+impl_method!([], [R0 R1 R2], [E0 E1 E2]);
+impl_method!([], [R0 R1 R2], [E0 E1 E2 E3]);
+impl_method!([], [R0 R1 R2 R3], []);
+impl_method!([], [R0 R1 R2 R3], [E0]);
+impl_method!([], [R0 R1 R2 R3], [E0 E1]);
+impl_method!([], [R0 R1 R2 R3], [E0 E1 E2]);
+impl_method!([], [R0 R1 R2 R3 R4], []);
+impl_method!([], [R0 R1 R2 R3 R4], [E0]);
+impl_method!([], [R0 R1 R2 R3 R4], [E0 E1]);
+impl_method!([], [R0 R1 R2 R3 R4 R5], []);
+impl_method!([], [R0 R1 R2 R3 R4 R5], [E0]);
+impl_method!([], [R0 R1 R2 R3 R4 R5 R6], []);
+impl_method!([M0], [], []);
+impl_method!([M0], [], [E0]);
+impl_method!([M0], [], [E0 E1]);
+impl_method!([M0], [], [E0 E1 E2]);
+impl_method!([M0], [], [E0 E1 E2 E3]);
+impl_method!([M0], [], [E0 E1 E2 E3 E4]);
+impl_method!([M0], [], [E0 E1 E2 E3 E4 E5]);
+impl_method!([M0], [R0], []);
+impl_method!([M0], [R0], [E0]);
+impl_method!([M0], [R0], [E0 E1]);
+impl_method!([M0], [R0], [E0 E1 E2]);
+impl_method!([M0], [R0], [E0 E1 E2 E3]);
+impl_method!([M0], [R0], [E0 E1 E2 E3 E4]);
+impl_method!([M0], [R0 R1], []);
+impl_method!([M0], [R0 R1], [E0]);
+impl_method!([M0], [R0 R1], [E0 E1]);
+impl_method!([M0], [R0 R1], [E0 E1 E2]);
+impl_method!([M0], [R0 R1], [E0 E1 E2 E3]);
+impl_method!([M0], [R0 R1 R2], []);
+impl_method!([M0], [R0 R1 R2], [E0]);
+impl_method!([M0], [R0 R1 R2], [E0 E1]);
+impl_method!([M0], [R0 R1 R2], [E0 E1 E2]);
+impl_method!([M0], [R0 R1 R2 R3], []);
+impl_method!([M0], [R0 R1 R2 R3], [E0]);
+impl_method!([M0], [R0 R1 R2 R3], [E0 E1]);
+impl_method!([M0], [R0 R1 R2 R3 R4], []);
+impl_method!([M0], [R0 R1 R2 R3 R4], [E0]);
+impl_method!([M0], [R0 R1 R2 R3 R4 R5], []);
+impl_method!([M0 M1], [], []);
+impl_method!([M0 M1], [], [E0]);
+impl_method!([M0 M1], [], [E0 E1]);
+impl_method!([M0 M1], [], [E0 E1 E2]);
+impl_method!([M0 M1], [], [E0 E1 E2 E3]);
+impl_method!([M0 M1], [], [E0 E1 E2 E3 E4]);
+impl_method!([M0 M1], [R0], []);
+impl_method!([M0 M1], [R0], [E0]);
+impl_method!([M0 M1], [R0], [E0 E1]);
+impl_method!([M0 M1], [R0], [E0 E1 E2]);
+impl_method!([M0 M1], [R0], [E0 E1 E2 E3]);
+impl_method!([M0 M1], [R0 R1], []);
+impl_method!([M0 M1], [R0 R1], [E0]);
+impl_method!([M0 M1], [R0 R1], [E0 E1]);
+impl_method!([M0 M1], [R0 R1], [E0 E1 E2]);
+impl_method!([M0 M1], [R0 R1 R2], []);
+impl_method!([M0 M1], [R0 R1 R2], [E0]);
+impl_method!([M0 M1], [R0 R1 R2], [E0 E1]);
+impl_method!([M0 M1], [R0 R1 R2 R3], []);
+impl_method!([M0 M1], [R0 R1 R2 R3], [E0]);
+impl_method!([M0 M1], [R0 R1 R2 R3 R4], []);
+impl_method!([M0 M1 M2], [], []);
+impl_method!([M0 M1 M2], [], [E0]);
+impl_method!([M0 M1 M2], [], [E0 E1]);
+impl_method!([M0 M1 M2], [], [E0 E1 E2]);
+impl_method!([M0 M1 M2], [], [E0 E1 E2 E3]);
+impl_method!([M0 M1 M2], [R0], []);
+impl_method!([M0 M1 M2], [R0], [E0]);
+impl_method!([M0 M1 M2], [R0], [E0 E1]);
+impl_method!([M0 M1 M2], [R0], [E0 E1 E2]);
+impl_method!([M0 M1 M2], [R0 R1], []);
+impl_method!([M0 M1 M2], [R0 R1], [E0]);
+impl_method!([M0 M1 M2], [R0 R1], [E0 E1]);
+impl_method!([M0 M1 M2], [R0 R1 R2], []);
+impl_method!([M0 M1 M2], [R0 R1 R2], [E0]);
+impl_method!([M0 M1 M2], [R0 R1 R2 R3], []);
+impl_method!([M0 M1 M2 M3], [], []);
+impl_method!([M0 M1 M2 M3], [], [E0]);
+impl_method!([M0 M1 M2 M3], [], [E0 E1]);
+impl_method!([M0 M1 M2 M3], [], [E0 E1 E2]);
+impl_method!([M0 M1 M2 M3], [R0], []);
+impl_method!([M0 M1 M2 M3], [R0], [E0]);
+impl_method!([M0 M1 M2 M3], [R0], [E0 E1]);
+impl_method!([M0 M1 M2 M3], [R0 R1], []);
+impl_method!([M0 M1 M2 M3], [R0 R1], [E0]);
+impl_method!([M0 M1 M2 M3], [R0 R1 R2], []);
+impl_method!([M0 M1 M2 M3 M4], [], []);
+impl_method!([M0 M1 M2 M3 M4], [], [E0]);
+impl_method!([M0 M1 M2 M3 M4], [], [E0 E1]);
+impl_method!([M0 M1 M2 M3 M4], [R0], []);
+impl_method!([M0 M1 M2 M3 M4], [R0], [E0]);
+impl_method!([M0 M1 M2 M3 M4], [R0 R1], []);
+impl_method!([M0 M1 M2 M3 M4 M5], [], []);
+impl_method!([M0 M1 M2 M3 M4 M5], [], [E0]);
+impl_method!([M0 M1 M2 M3 M4 M5], [R0], []);
+impl_method!([M0 M1 M2 M3 M4 M5 M6], [], []);

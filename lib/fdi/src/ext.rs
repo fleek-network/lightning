@@ -2,60 +2,51 @@ use futures::Future;
 
 use crate::{helpers, Method};
 
-pub trait MethodExt<T, P>: Sized + Method<T, P>
-where
-    T: 'static,
-{
+pub trait MethodExt<'a, P>: Sized + Method<'a, P> {
     #[inline(always)]
-    fn with_display_name(self, name: &'static str) -> impl Method<T, P> {
+    fn with_display_name(self, name: &'static str) -> impl Method<'a, P, Output = Self::Output> {
         helpers::display_name(name, self)
     }
 
     #[inline(always)]
-    fn to_infallible(self) -> impl Method<anyhow::Result<T>, P> {
+    fn to_infallible(self) -> impl Method<'a, P, Output = anyhow::Result<Self::Output>> {
         helpers::to_infalliable(self)
     }
 
     #[inline(always)]
-    fn on<H, X, Y>(self, event: &'static str, handler: H) -> impl Method<T, P>
+    fn map<M, U>(self, transform: M) -> impl Method<'a, P, Output = U>
     where
-        H: Method<X, Y>,
-        X: 'static,
+        M: FnOnce(Self::Output) -> U,
+        U: 'static,
+    {
+        helpers::map(self, transform)
+    }
+
+    #[inline(always)]
+    fn on<H, Y>(self, event: &'static str, handler: H) -> impl Method<'a, P, Output = Self::Output>
+    where
+        H: Method<'a, Y>,
     {
         helpers::on(self, event, handler)
     }
 
     #[inline(always)]
-    fn wrap_with<W, U, A, R>(self, f: W) -> impl Method<R, (P, A)>
+    fn spawn(self) -> impl Method<'a, P, Output = ()>
     where
-        W: Method<U, A>,
-        U: 'static + FnOnce(T) -> R,
-    {
-        helpers::wrap(self, f)
-    }
-
-    #[inline(always)]
-    fn spawn<U>(self) -> impl Method<(), P>
-    where
-        Self: 'static + Method<T, P> + Sized,
-        T: 'static + Future<Output = U>,
+        Self: 'static + Method<'a, P> + Sized,
+        Self::Output: Future,
     {
         helpers::spawn(self)
     }
 
     #[inline(always)]
-    fn block_on<U>(self) -> impl Method<U, P>
+    fn block_on(self) -> impl Method<'a, P, Output = <Self::Output as Future>::Output>
     where
-        Self: 'static + Method<T, P> + Sized,
-        T: 'static + Future<Output = U>,
+        Self: 'static + Method<'a, P> + Sized,
+        Self::Output: Future,
     {
         helpers::block_on(self)
     }
 }
 
-impl<F, T, P> MethodExt<T, P> for F
-where
-    F: Method<T, P>,
-    T: 'static,
-{
-}
+impl<'a, F, P> MethodExt<'a, P> for F where F: Method<'a, P> {}

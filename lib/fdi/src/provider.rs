@@ -8,6 +8,7 @@ use parking_lot::lock_api::RawRwLock as RawRwLockTrait;
 use parking_lot::{Mutex, RawRwLock, RwLock};
 use triomphe::Arc;
 
+use crate::extractor::Extractor;
 use crate::ty::Ty;
 use crate::{Eventstore, Executor};
 
@@ -129,10 +130,10 @@ impl Provider {
         *any_box.downcast::<T>().unwrap()
     }
 
-    // pub fn trigger(&self, event: &'static str) -> usize {
-    //     let mut store = self.get_mut::<Eventstore>();
-    //     store.trigger(event, &self)
-    // }
+    pub fn trigger(&self, event: &'static str) -> usize {
+        let mut store = self.get_mut::<Eventstore>();
+        store.trigger(event, self)
+    }
 }
 
 impl ProviderGuard {
@@ -189,6 +190,15 @@ impl ProviderGuard {
         mutex_guard.exclusive.push(rw);
 
         unsafe { &mut *ptr }.downcast_mut::<T>().unwrap()
+    }
+
+    /// Extract the given value from this guard.
+    pub fn extract<'s, 'e, E>(&'s self) -> E
+    where
+        E: Extractor<'e>,
+        's: 'e,
+    {
+        E::extract(self)
     }
 }
 
