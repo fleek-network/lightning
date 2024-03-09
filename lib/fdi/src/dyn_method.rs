@@ -20,7 +20,7 @@ pub struct DynMethod {
 impl DynMethod {
     pub fn new<'a, F, T, P>(method: F) -> Self
     where
-        F: Method<'a, T, P>,
+        F: Method<'a, P, Output = T>,
         T: 'static,
     {
         let tid = Ty::of::<T>();
@@ -34,7 +34,7 @@ impl DynMethod {
 
         fn call_fn<'a, F, T, P>(ptr: *mut (), guard: ProviderGuard) -> Box<dyn Any>
         where
-            F: Method<'a, T, P>,
+            F: Method<'a, P, Output = T>,
             T: 'static,
         {
             let ptr = ptr as *mut F;
@@ -58,7 +58,7 @@ impl DynMethod {
 
         fn events_fn<'a, F, T, P>(ptr: *mut ()) -> Option<Eventstore>
         where
-            F: Method<'a, T, P>,
+            F: Method<'a, P, Output = T>,
             T: 'static,
         {
             let ptr = ptr as *mut F;

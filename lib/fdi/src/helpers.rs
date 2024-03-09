@@ -1,11 +1,12 @@
+use std::any::type_name;
 use std::cell::RefCell;
 use std::marker::PhantomData;
 
 use futures::Future;
 
-use crate::method::DynMethod;
+use crate::dyn_method::DynMethod;
 use crate::provider::{to_obj, Object};
-use crate::{Executor, Method, Provider};
+use crate::{Executor, Method, ProviderGuard};
 
 struct Transform<F, T, P, M, U> {
     display_name: &'static str,
@@ -21,37 +22,33 @@ struct On<F, T, P> {
     _p: PhantomData<(T, P)>,
 }
 
-struct Wrap<F, T, P, W, U, A, R> {
-    method: F,
-    wrapper: W,
-    _p: PhantomData<(F, T, P, W, U, A, R)>,
-}
-
-struct Spawn<F, T, P, U>
+struct Spawn<'a, F, T, P, U>
 where
-    F: 'static + Method<T, P> + Sized,
+    F: 'static + Method<'a, P, Output = T> + Sized,
     T: 'static + Future<Output = U>,
 {
     method: F,
-    _p: PhantomData<(F, T, P, U)>,
+    _p: PhantomData<(&'a F, T, P, U)>,
 }
 
-struct BlockOn<F, T, P, U>
+struct BlockOn<'a, F, T, P, U>
 where
-    F: 'static + Method<T, P> + Sized,
+    F: 'static + Method<'a, P, Output = T> + Sized,
     T: 'static + Future<Output = U>,
 {
     method: F,
-    _p: PhantomData<(F, T, P, U)>,
+    _p: PhantomData<(&'a F, T, P, U)>,
 }
 
-impl<F, T, P, M, U> Method<U, P> for Transform<F, T, P, M, U>
+impl<'a, F, T, P, M, U> Method<'a, P> for Transform<F, T, P, M, U>
 where
-    F: Method<T, P>,
+    F: Method<'a, P, Output = T>,
     T: 'static,
     M: FnOnce(T) -> U,
     U: 'static,
 {
+    type Output = U;
+
     #[inline(always)]
     fn name(&self) -> &'static str {
         self.original.name()
@@ -73,17 +70,19 @@ where
     }
 
     #[inline(always)]
-    fn call(self, registry: &Provider) -> U {
+    fn call(self, registry: &'a ProviderGuard) -> U {
         let value = self.original.call(registry);
         (self.transform)(value)
     }
 }
 
-impl<F, T, P> Method<T, P> for On<F, T, P>
+impl<'a, F, T, P> Method<'a, P> for On<F, T, P>
 where
-    F: Method<T, P>,
+    F: Method<'a, P, Output = T>,
     T: 'static,
 {
+    type Output = T;
+
     #[inline(always)]
     fn name(&self) -> &'static str {
         self.original.name()
@@ -99,6 +98,7 @@ where
         let events = self.original.events();
         if let Some(handler) = self.handler.borrow_mut().take() {
             let mut events = events.unwrap_or_default();
+            // TODO(qti3e)
             events.insert(self.name, handler);
             Some(events)
         } else {
@@ -112,36 +112,18 @@ where
     }
 
     #[inline(always)]
-    fn call(self, registry: &Provider) -> T {
+    fn call(self, registry: &'a ProviderGuard) -> T {
         self.original.call(registry)
     }
 }
 
-impl<F, T, P, W, U, A, R> Method<R, (P, A)> for Wrap<F, T, P, W, U, A, R>
+impl<'a, F, T, P, U> Method<'a, P> for Spawn<'a, F, T, P, U>
 where
-    F: Method<T, P>,
-    T: 'static,
-    W: Method<U, A>,
-    U: 'static + FnOnce(T) -> R,
-{
-    fn dependencies(&self) -> Vec<crate::ty::Ty> {
-        let mut dep = self.method.dependencies();
-        dep.extend(self.wrapper.dependencies());
-        dep
-    }
-
-    fn call(self, registry: &Provider) -> R {
-        let result = self.method.call(registry);
-        let higher = self.wrapper.call(registry);
-        (higher)(result)
-    }
-}
-
-impl<F, T, P, U> Method<(), P> for Spawn<F, T, P, U>
-where
-    F: 'static + Method<T, P> + Sized,
+    F: 'static + Method<'a, P, Output = T> + Sized,
     T: 'static + Future<Output = U>,
 {
+    type Output = ();
+
     fn name(&self) -> &'static str {
         self.method.name()
     }
@@ -154,20 +136,22 @@ where
         self.method.dependencies()
     }
 
-    fn call(self, registry: &Provider) {
+    fn call(self, registry: &'a ProviderGuard) {
+        let future = self.method.call(registry);
+        let registry = registry.provider().clone();
         let mut executor = registry.get_mut::<Executor>();
-        let registry = registry.clone();
-        executor.spawn(Box::pin(async move {
-            self.method.call(&registry).await;
-        }));
+        executor.spawn(Box::pin(future));
     }
 }
 
-impl<F, T, P, U> Method<U, P> for BlockOn<F, T, P, U>
+impl<'a, F, T, P, U> Method<'a, P> for BlockOn<'a, F, T, P, U>
 where
-    F: 'static + Method<T, P> + Sized,
+    F: 'static + Method<'a, P, Output = T> + Sized,
     T: 'static + Future<Output = U>,
+    U: 'static,
 {
+    type Output = U;
+
     fn name(&self) -> &'static str {
         self.method.name()
     }
@@ -184,15 +168,29 @@ where
         self.method.dependencies()
     }
 
-    fn call(self, registry: &Provider) -> U {
+    fn call(self, registry: &'a ProviderGuard) -> U {
         let future = self.method.call(registry);
         futures::executor::block_on(future)
     }
 }
 
-pub fn to_infalliable<F, T, P>(f: F) -> impl Method<anyhow::Result<T>, P>
+pub fn map<'a, F, P, U, M>(f: F, transform: M) -> impl Method<'a, P, Output = U>
 where
-    F: Method<T, P>,
+    F: Method<'a, P>,
+    M: FnOnce(F::Output) -> U,
+    U: 'static,
+{
+    Transform {
+        display_name: type_name::<U>(),
+        original: f,
+        transform,
+        _p: PhantomData,
+    }
+}
+
+pub fn to_infalliable<'a, F, T, P>(f: F) -> impl Method<'a, P, Output = anyhow::Result<T>>
+where
+    F: Method<'a, P, Output = T>,
     T: 'static,
 {
     Transform {
@@ -203,9 +201,9 @@ where
     }
 }
 
-pub fn to_result_object<F, T, P>(f: F) -> impl Method<anyhow::Result<Object>, P>
+pub fn to_result_object<'a, F, T, P>(f: F) -> impl Method<'a, P, Output = anyhow::Result<Object>>
 where
-    F: Method<anyhow::Result<T>, P>,
+    F: Method<'a, P, Output = anyhow::Result<T>>,
     T: 'static,
 {
     Transform {
@@ -219,11 +217,15 @@ where
     }
 }
 
-pub fn on<F, T, P, H, Q, A>(f: F, event: &'static str, handler: H) -> impl Method<T, P>
+pub fn on<'a, F, T, P, H, Q, A>(
+    f: F,
+    event: &'static str,
+    handler: H,
+) -> impl Method<'a, P, Output = T>
 where
-    F: Method<T, P>,
+    F: Method<'a, P, Output = T>,
     T: 'static,
-    H: Method<Q, A>,
+    H: Method<'a, A, Output = Q>,
     Q: 'static,
 {
     On {
@@ -234,9 +236,9 @@ where
     }
 }
 
-pub fn display_name<F, T, P>(name: &'static str, f: F) -> impl Method<T, P>
+pub fn display_name<'a, F, T, P>(name: &'static str, f: F) -> impl Method<'a, P, Output = T>
 where
-    F: Method<T, P>,
+    F: Method<'a, P, Output = T>,
     T: 'static,
 {
     Transform {
@@ -247,23 +249,9 @@ where
     }
 }
 
-pub fn wrap<F, T, P, W, U, A, R>(f: F, w: W) -> impl Method<R, (P, A)>
+pub fn spawn<'a, F, T, P, U>(f: F) -> impl Method<'a, P, Output = ()>
 where
-    F: Method<T, P>,
-    T: 'static,
-    W: Method<U, A>,
-    U: 'static + FnOnce(T) -> R,
-{
-    Wrap {
-        method: f,
-        wrapper: w,
-        _p: PhantomData,
-    }
-}
-
-pub fn spawn<F, T, P, U>(f: F) -> impl Method<(), P>
-where
-    F: 'static + Method<T, P> + Sized,
+    F: 'static + Method<'a, P, Output = T> + Sized,
     T: 'static + Future<Output = U>,
 {
     Spawn {
@@ -272,10 +260,11 @@ where
     }
 }
 
-pub fn block_on<F, T, P, U>(f: F) -> impl Method<U, P>
+pub fn block_on<'a, F, T, P, U>(f: F) -> impl Method<'a, P, Output = U>
 where
-    F: 'static + Method<T, P> + Sized,
+    F: 'static + Method<'a, P, Output = T> + Sized,
     T: 'static + Future<Output = U>,
+    U: 'static,
 {
     BlockOn {
         method: f,
