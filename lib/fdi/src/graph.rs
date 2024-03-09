@@ -6,11 +6,10 @@ use anyhow::{Context, Result};
 use indexmap::{IndexMap, IndexSet};
 
 use crate::dyn_method::DynMethod;
-use crate::helpers::to_result_object;
 use crate::method::Method;
-use crate::provider::Object;
+use crate::provider::{to_obj, Object};
 use crate::ty::Ty;
-use crate::{helpers, Eventstore, Provider};
+use crate::{Eventstore, MethodExt, Provider};
 
 #[derive(Default)]
 pub struct DependencyGraph {
@@ -150,7 +149,7 @@ impl DependencyGraph {
     where
         F: Method<P>,
     {
-        self.with(helpers::to_infalliable(f))
+        self.with(f.to_infallible())
     }
 
     /// Provide the graph with a failable constructor for a certain type. The output type of the
@@ -181,11 +180,14 @@ impl DependencyGraph {
         T: 'static,
     {
         self.touched = true;
-        let f = to_result_object(f);
+        let display_name = f.display_name();
+        let method = DynMethod::new(f.map(|v| v.map(to_obj)).with_display_name(display_name));
+
+        let ty = Ty::of::<T>();
         let deps = F::dependencies();
-        let tid = Ty::of::<T>();
-        self.insert(tid, DynMethod::new(f));
-        self.graph.insert(tid, deps.into_iter().collect());
+
+        self.insert(ty, method);
+        self.graph.insert(ty, deps.into_iter().collect());
         self
     }
 

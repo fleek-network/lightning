@@ -1,4 +1,5 @@
-use crate::Method;
+use crate::ty::Ty;
+use crate::{Method, Provider};
 
 struct Map<F, M> {
     method: F,
@@ -13,15 +14,19 @@ where
 {
     type Output = U;
 
-    fn dependencies() -> Vec<crate::ty::Ty> {
-        todo!()
+    #[inline(always)]
+    fn dependencies() -> Vec<Ty> {
+        F::dependencies()
     }
 
-    fn call(self, registry: &crate::Provider) -> Self::Output {
-        todo!()
+    #[inline(always)]
+    fn call(self, registry: &Provider) -> Self::Output {
+        let output = self.method.call(registry);
+        (self.transform)(output)
     }
 }
 
+#[inline(always)]
 pub fn map<F, P, M, U>(f: F, transform: M) -> impl Method<P, Output = U>
 where
     F: Method<P>,

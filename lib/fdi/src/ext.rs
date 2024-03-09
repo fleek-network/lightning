@@ -1,16 +1,16 @@
 use futures::Future;
 
-use crate::{helpers, Method};
+use crate::{x_helpers, Executor, Method};
 
 pub trait MethodExt<P>: Sized + Method<P> {
     #[inline(always)]
-    fn with_display_name(self, name: &'static str) -> impl Method<P, Output = Self::Output> {
-        helpers::display_name(name, self)
+    fn to_infallible(self) -> impl Method<P, Output = anyhow::Result<Self::Output>> {
+        x_helpers::map::map(self, Ok)
     }
 
     #[inline(always)]
-    fn to_infallible(self) -> impl Method<P, Output = anyhow::Result<Self::Output>> {
-        helpers::to_infalliable(self)
+    fn with_display_name(self, name: &'static str) -> impl Method<P, Output = Self::Output> {
+        x_helpers::display_name::with_display_name(self, name)
     }
 
     #[inline(always)]
@@ -19,15 +19,7 @@ pub trait MethodExt<P>: Sized + Method<P> {
         M: FnOnce(Self::Output) -> U,
         U: 'static,
     {
-        helpers::map(self, transform)
-    }
-
-    #[inline(always)]
-    fn flatten<B>(self) -> impl Method<(P, B), Output = <Self::Output as Method<B>>::Output>
-    where
-        Self::Output: Method<B>,
-    {
-        helpers::flatten(self)
+        x_helpers::map::map(self, transform)
     }
 
     #[inline(always)]
@@ -35,16 +27,19 @@ pub trait MethodExt<P>: Sized + Method<P> {
     where
         H: Method<Y>,
     {
-        helpers::on(self, event, handler)
+        x_helpers::on::on(self, event, handler)
     }
 
     #[inline(always)]
-    fn spawn(self) -> impl Method<P, Output = ()>
+    fn wrap_with<W, OutW, ArgsOutW>(
+        self,
+        wrapper: W,
+    ) -> impl Method<(P, ArgsOutW), Output = OutW::Output>
     where
-        Self: 'static + Method<P> + Sized,
-        Self::Output: Future,
+        W: FnOnce(Self::Output) -> OutW,
+        OutW: Method<ArgsOutW>,
     {
-        helpers::spawn(self)
+        x_helpers::wrap_with::wrap_with(self, wrapper)
     }
 
     #[inline(always)]
@@ -53,7 +48,16 @@ pub trait MethodExt<P>: Sized + Method<P> {
         Self: 'static + Method<P> + Sized,
         Self::Output: Future,
     {
-        helpers::block_on(self)
+        x_helpers::map::map(self, futures::executor::block_on)
+    }
+
+    #[inline(always)]
+    fn spawn(self) -> impl Method<(P, ((Executor,), (), ())), Output = ()>
+    where
+        Self: 'static + Method<P> + Sized,
+        Self::Output: Future,
+    {
+        self.wrap_with(|fut| move |e: &mut Executor| e.spawn(fut))
     }
 }
 
