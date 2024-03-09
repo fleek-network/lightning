@@ -5,8 +5,9 @@ use std::rc::Rc;
 use anyhow::{Context, Result};
 use indexmap::{IndexMap, IndexSet};
 
+use crate::dyn_method::DynMethod;
 use crate::helpers::to_result_object;
-use crate::method::{DynMethod, Method};
+use crate::method::Method;
 use crate::provider::Object;
 use crate::ty::Ty;
 use crate::{helpers, Eventstore, Provider};
@@ -145,10 +146,9 @@ impl DependencyGraph {
     /// graph.init_all(&mut registry).unwrap();
     /// assert_eq!(&*registry.get::<String>(), "Fleek");
     /// ```
-    pub fn with_infallible<F, T, P>(self, f: F) -> Self
+    pub fn with_infallible<F, P>(self, f: F) -> Self
     where
-        F: Method<T, P>,
-        T: 'static,
+        F: Method<P>,
     {
         self.with(helpers::to_infalliable(f))
     }
@@ -177,12 +177,12 @@ impl DependencyGraph {
     /// ```
     pub fn with<F, T, P>(mut self, f: F) -> Self
     where
-        F: Method<Result<T>, P>,
+        F: Method<P, Output = Result<T>>,
         T: 'static,
     {
         self.touched = true;
         let f = to_result_object(f);
-        let deps = f.dependencies();
+        let deps = F::dependencies();
         let tid = Ty::of::<T>();
         self.insert(tid, DynMethod::new(f));
         self.graph.insert(tid, deps.into_iter().collect());

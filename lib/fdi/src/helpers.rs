@@ -129,18 +129,22 @@ where
 {
     type Output = ();
 
+    #[inline(always)]
     fn name(&self) -> &'static str {
         self.method.name()
     }
 
+    #[inline(always)]
     fn events(&self) -> Option<crate::Eventstore> {
         self.method.events()
     }
 
+    #[inline(always)]
     fn dependencies() -> Vec<Ty> {
         F::dependencies()
     }
 
+    #[inline(always)]
     fn call(self, registry: &Provider) {
         let future = self.method.call(registry);
         let mut executor = registry.get_mut::<Executor>();
@@ -156,22 +160,27 @@ where
 {
     type Output = U;
 
+    #[inline(always)]
     fn name(&self) -> &'static str {
         self.method.name()
     }
 
+    #[inline(always)]
     fn display_name(&self) -> &'static str {
         self.method.display_name()
     }
 
+    #[inline(always)]
     fn events(&self) -> Option<crate::Eventstore> {
         self.method.events()
     }
 
+    #[inline(always)]
     fn dependencies() -> Vec<Ty> {
         F::dependencies()
     }
 
+    #[inline(always)]
     fn call(self, registry: &Provider) -> U {
         let future = self.method.call(registry);
         futures::executor::block_on(future)
@@ -185,24 +194,29 @@ where
 {
     type Output = <F::Output as Method<B>>::Output;
 
+    #[inline(always)]
     fn name(&self) -> &'static str {
         self.method.name()
     }
 
+    #[inline(always)]
     fn display_name(&self) -> &'static str {
         self.method.display_name()
     }
 
+    #[inline(always)]
     fn events(&self) -> Option<crate::Eventstore> {
         self.method.events()
     }
 
+    #[inline(always)]
     fn dependencies() -> Vec<Ty> {
         let mut out = F::dependencies();
         out.extend(F::Output::dependencies());
         out
     }
 
+    #[inline(always)]
     fn call(self, registry: &Provider) -> Self::Output {
         let inner_method = self.method.call(registry);
 
@@ -215,6 +229,7 @@ where
     }
 }
 
+#[inline(always)]
 pub fn map<F, P, U, M>(f: F, transform: M) -> impl Method<P, Output = U>
 where
     F: Method<P>,
@@ -229,6 +244,7 @@ where
     }
 }
 
+#[inline(always)]
 pub fn to_infalliable<F, T, P>(f: F) -> impl Method<P, Output = anyhow::Result<T>>
 where
     F: Method<P, Output = T>,
@@ -242,6 +258,7 @@ where
     }
 }
 
+#[inline(always)]
 pub fn to_result_object<F, T, P>(f: F) -> impl Method<P, Output = anyhow::Result<Object>>
 where
     F: Method<P, Output = anyhow::Result<T>>,
@@ -258,6 +275,7 @@ where
     }
 }
 
+#[inline(always)]
 pub fn on<F, T, P, H, Q, A>(f: F, event: &'static str, handler: H) -> impl Method<P, Output = T>
 where
     F: Method<P, Output = T>,
@@ -273,6 +291,7 @@ where
     }
 }
 
+#[inline(always)]
 pub fn display_name<F, T, P>(name: &'static str, f: F) -> impl Method<P, Output = T>
 where
     F: Method<P, Output = T>,
@@ -286,6 +305,7 @@ where
     }
 }
 
+#[inline(always)]
 pub fn spawn<F, T, P, U>(f: F) -> impl Method<P, Output = ()>
 where
     F: 'static + Method<P, Output = T> + Sized,
@@ -297,6 +317,7 @@ where
     }
 }
 
+#[inline(always)]
 pub fn block_on<F, T, P, U>(f: F) -> impl Method<P, Output = U>
 where
     F: 'static + Method<P, Output = T> + Sized,
@@ -309,6 +330,7 @@ where
     }
 }
 
+#[inline(always)]
 pub fn flatten<F, A, B>(f: F) -> impl Method<(A, B), Output = <F::Output as Method<B>>::Output>
 where
     F: Method<A>,
