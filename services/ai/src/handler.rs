@@ -7,7 +7,7 @@ use fn_sdk::connection::Connection;
 use fn_sdk::header::TransportDetail;
 use url::Url;
 
-use crate::opts::{Encoding, Format};
+use crate::opts::{Encoding, Format, Service};
 use crate::runtime::{RunOutput, Session};
 use crate::{Origin, StartSession};
 
@@ -19,10 +19,12 @@ pub async fn handle(mut connection: Connection) -> anyhow::Result<()> {
 
         let (content_format, model_io_encoding) = parse_query_params(uri)?;
 
-        let Some((origin, uri)) = parse_http_url(uri) else {
+        let Some((service, origin, uri)) = parse_http_url(uri) else {
             let _ = connection.write_payload(b"invalid request url").await;
             bail!("Invalid url");
         };
+
+        let service: Service = service.parse()?;
 
         if origin != Origin::Blake3 {
             let _ = connection.write_payload(b"unsupported origin").await;
@@ -38,8 +40,13 @@ pub async fn handle(mut connection: Connection) -> anyhow::Result<()> {
         let model = load_model(uri, origin).await?;
         let session = Session::new(model, model_io_encoding)?;
 
-        // Run inference.
-        let output = serialize_output(session.run(body.freeze())?, &content_format)?;
+        let output = match service {
+            Service::Inference => serialize_output(session.run(body.freeze())?, &content_format)?,
+            Service::Info => serde_json::to_string(&session.model_info()?)?
+                .into_bytes()
+                .into(),
+        };
+
         connection.write_payload(&output).await?;
 
         return Ok(());
@@ -69,11 +76,12 @@ pub async fn handle(mut connection: Connection) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn parse_http_url(url: &Url) -> Option<(Origin, String)> {
+fn parse_http_url(url: &Url) -> Option<(String, Origin, String)> {
     let mut segments = url.path_segments()?;
     let seg1 = segments.next()?;
     let seg2 = segments.next()?;
-    Some((seg1.into(), seg2.into()))
+    let seg3 = segments.next()?;
+    Some((seg1.into(), seg2.into(), seg3.into()))
 }
 
 fn parse_query_params(url: &Url) -> anyhow::Result<(Format, Encoding)> {

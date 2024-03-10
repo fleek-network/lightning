@@ -4,6 +4,29 @@ use std::str::FromStr;
 use derive_more::IsVariant;
 use serde::{Deserialize, Serialize};
 
+pub enum Service {
+    Inference,
+    Info,
+}
+
+impl FromStr for Service {
+    type Err = std::io::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let service = match s {
+            "infer" => Self::Inference,
+            "info" => Self::Info,
+            _ => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "unknown service",
+                ));
+            },
+        };
+        Ok(service)
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize, IsVariant)]
 #[repr(u8)]
 pub enum Format {

@@ -60,8 +60,7 @@ impl Session {
         Ok(output)
     }
 
-    #[allow(unused)]
-    pub fn _model_info(&self) -> anyhow::Result<Info> {
+    pub fn model_info(&self) -> anyhow::Result<Info> {
         let mut name = None;
         let mut description = None;
         let mut producer = None;
