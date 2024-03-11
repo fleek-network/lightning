@@ -6,6 +6,7 @@
 //! different values. To do that you should use [DependencyGraph] to add a series of constructor
 //! functions.
 
+mod bind;
 mod dyn_method;
 mod event;
 mod executor;
@@ -19,6 +20,7 @@ mod ty;
 pub mod viz;
 mod x_helpers;
 
+pub use bind::Bind;
 pub use event::Eventstore;
 pub use executor::Executor;
 pub use ext::MethodExt;
