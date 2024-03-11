@@ -25,7 +25,7 @@ inputElement!.addEventListener("change", async () => {
     });
 
     const resp = await fetch(
-      "http://127.0.0.1:4220/services/2/blake3/c0a9b26955bf5175802624d94f07e6d87d844d3d29aadbe11902ec0830a30e37",
+      "http://127.0.0.1:4220/services/2/infer/blake3/c0a9b26955bf5175802624d94f07e6d87d844d3d29aadbe11902ec0830a30e37",
       {
         method: "POST",
         headers: {

@@ -35,7 +35,7 @@ async fn main() {
     let safetensors = safetensors::serialize(vec![("input", Tensor(input))], &None).unwrap();
 
     // Send service a request.
-    let resp = reqwest::Client::new().post("http://127.0.0.1:4220/services/2/blake3/f2700c0d695006d953ca920b7eb73602b5aef7dbe7b6506d296528f13ebf0d95?format=bin&encoding=safetensors")
+    let resp = reqwest::Client::new().post("http://127.0.0.1:4220/services/2/infer/blake3/f2700c0d695006d953ca920b7eb73602b5aef7dbe7b6506d296528f13ebf0d95?format=bin&encoding=safetensors")
         .body(safetensors)
         .send().await.unwrap();
 
