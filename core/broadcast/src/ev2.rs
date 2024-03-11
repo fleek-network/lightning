@@ -252,7 +252,7 @@ impl<B: BroadcastBackend> Context<B> {
             payload: msg.payload.clone().into(),
         };
 
-        let now = now();
+        let now = Self::now();
         // only insert metrics for pseudo-valid timestamps (not in the future)
         if msg.timestamp > now {
             increment_counter!(
@@ -297,7 +297,7 @@ impl<B: BroadcastBackend> Context<B> {
                         origin: *node_index,
                         signature: NodeSignature([0; 64]),
                         topic: cmd.topic,
-                        timestamp: now(),
+                        timestamp: Self::now(),
                         payload: cmd.payload,
                     };
                     let digest = tmp.to_digest();
@@ -403,6 +403,10 @@ impl<B: BroadcastBackend> Context<B> {
             }
         }
     }
+
+    fn now() -> u64 {
+        B::now()
+    }
 }
 
 /// Runs the main loop of the broadcast algorithm. This is our main central worker.
@@ -461,12 +465,4 @@ fn topic_to_index(topic: Topic) -> usize {
         Topic::Resolver => 1,
         Topic::Debug => 2,
     }
-}
-
-/// Get the current unix timestamp in milliseconds
-fn now() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_millis() as u64
 }
