@@ -55,11 +55,11 @@ impl<C: Collection> Container<C> {
                     let node = Node::<C>::init(config).unwrap();
                     node.start().await;
                     let ckpt_rx = node
-                        .container
+                        .provider
                         .get::<<C as Collection>::SyncronizerInterface>()
                         .checkpoint_socket();
                     let blockstore = node
-                        .container
+                        .provider
                         .get::<<C as Collection>::BlockStoreInterface>()
                         .clone();
 

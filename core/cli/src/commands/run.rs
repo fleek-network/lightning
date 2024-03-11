@@ -33,7 +33,7 @@ where
     node.start().await;
 
     let mut rx_update_ready = node
-        .container
+        .provider
         .get::<<C as Collection>::SyncronizerInterface>()
         .checkpoint_socket();
 
@@ -46,7 +46,7 @@ where
             Ok(checkpoint_hash) = &mut rx_update_ready => {
                 // get the checkpoint from the blockstore
                 let checkpoint = node
-                .container
+                .provider
                 .get::<<C as Collection>::BlockStoreInterface>()
                 .read_all_to_vec(&checkpoint_hash).await.expect("Failed to read checkpoint from blockstore");
 
@@ -68,7 +68,7 @@ where
 
                 // reseed our rx_update_ready
                 rx_update_ready = node
-                .container
+                .provider
                 .get::<<C as Collection>::SyncronizerInterface>()
                 .checkpoint_socket();
             }
