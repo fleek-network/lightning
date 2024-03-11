@@ -78,47 +78,47 @@ impl Counter {
 #[test]
 fn test_partial_01() {
     let mut graph = demo_dep::graph();
-    let mut registry = Provider::default();
+    let mut provider = Provider::default();
     graph
-        .init_one::<demo_dep::Indexer>(&mut registry)
+        .init_one::<demo_dep::Indexer>(&mut provider)
         .expect("Failed to init.");
-    assert!(!registry.contains::<demo_dep::Application>());
-    assert!(!registry.contains::<demo_dep::Archive>());
-    assert!(!registry.contains::<demo_dep::Blockstore>());
-    assert!(registry.contains::<demo_dep::Indexer>());
+    assert!(!provider.contains::<demo_dep::Application>());
+    assert!(!provider.contains::<demo_dep::Archive>());
+    assert!(!provider.contains::<demo_dep::Blockstore>());
+    assert!(provider.contains::<demo_dep::Indexer>());
 }
 
 #[test]
 fn test_partial_2() {
     let mut graph = demo_dep::graph();
-    let mut registry = Provider::default();
+    let mut provider = Provider::default();
     graph
-        .init_one::<demo_dep::Blockstore>(&mut registry)
+        .init_one::<demo_dep::Blockstore>(&mut provider)
         .expect("Failed to init.");
-    assert!(!registry.contains::<demo_dep::Application>());
-    assert!(!registry.contains::<demo_dep::Archive>());
-    assert!(registry.contains::<demo_dep::Blockstore>());
+    assert!(!provider.contains::<demo_dep::Application>());
+    assert!(!provider.contains::<demo_dep::Archive>());
+    assert!(provider.contains::<demo_dep::Blockstore>());
     // because of _post
-    assert!(registry.contains::<demo_dep::Indexer>());
+    assert!(provider.contains::<demo_dep::Indexer>());
 }
 
 #[test]
 fn with_value() {
-    let registry = Provider::default();
+    let provider = Provider::default();
     let value = || String::from("Hello!");
-    let value = value.call(&registry);
+    let value = value.call(&provider);
     assert_eq!(value, "Hello!");
 
-    let registry = Provider::default();
+    let provider = Provider::default();
     let value = || String::from("Hello!");
     let value = DynMethod::new(value);
-    let value = value.call(&registry);
+    let value = value.call(&provider);
     assert_eq!(value, "Hello!");
 
-    let mut registry = Provider::default();
+    let mut provider = Provider::default();
     let graph = DependencyGraph::new().with_value(String::from("Hello!"));
-    graph.init_all(&mut registry).unwrap();
-    assert_eq!(&*registry.get::<String>(), "Hello!");
+    graph.init_all(&mut provider).unwrap();
+    assert_eq!(&*provider.get::<String>(), "Hello!");
 }
 
 #[test]
@@ -142,14 +142,14 @@ fn post_should_be_fired() {
         .with_infallible(new_a)
         .with_infallible(new_b);
 
-    let mut registry = Provider::default();
-    registry.insert(Counter::default());
+    let mut provider = Provider::default();
+    provider.insert(Counter::default());
 
-    graph.init_one::<B>(&mut registry).expect("Failed to init.");
-    assert_eq!(registry.get::<Counter>().get("A::_post"), 0);
+    graph.init_one::<B>(&mut provider).expect("Failed to init.");
+    assert_eq!(provider.get::<Counter>().get("A::_post"), 0);
 
-    graph.init_one::<A>(&mut registry).expect("Failed to init.");
-    assert_eq!(registry.get::<Counter>().get("A::_post"), 1);
+    graph.init_one::<A>(&mut provider).expect("Failed to init.");
+    assert_eq!(provider.get::<Counter>().get("A::_post"), 1);
 }
 
 #[test]
@@ -175,12 +175,12 @@ fn post_should_resolve_unmet_dep() {
         .with_infallible(new_a)
         .with_infallible(new_b);
 
-    let mut registry = Provider::default();
-    registry.insert(Counter::default());
+    let mut provider = Provider::default();
+    provider.insert(Counter::default());
 
-    graph.init_one::<B>(&mut registry).expect("Failed to init.");
-    assert_eq!(registry.get::<Counter>().get("B::_post"), 1);
-    assert_eq!(registry.get::<Counter>().get("A::_post"), 1);
+    graph.init_one::<B>(&mut provider).expect("Failed to init.");
+    assert_eq!(provider.get::<Counter>().get("B::_post"), 1);
+    assert_eq!(provider.get::<Counter>().get("A::_post"), 1);
 }
 
 #[test]
@@ -199,14 +199,14 @@ fn basic_with_events_should_work() {
             }),
     );
 
-    let mut registry = Provider::default();
-    registry.insert(Counter::default());
+    let mut provider = Provider::default();
+    provider.insert(Counter::default());
 
-    graph.init_one::<A>(&mut registry).expect("Failed to init.");
-    assert_eq!(registry.get::<Counter>().get("A::_post"), 1);
-    assert_eq!(registry.get::<Counter>().get("A::_start"), 0);
-    registry.trigger("_start");
-    assert_eq!(registry.get::<Counter>().get("A::_start"), 1);
+    graph.init_one::<A>(&mut provider).expect("Failed to init.");
+    assert_eq!(provider.get::<Counter>().get("A::_post"), 1);
+    assert_eq!(provider.get::<Counter>().get("A::_start"), 0);
+    provider.trigger("_start");
+    assert_eq!(provider.get::<Counter>().get("A::_start"), 1);
 }
 
 #[test]
@@ -234,17 +234,17 @@ fn nested_with_events_should_work() {
             }),
     );
 
-    let mut registry = Provider::default();
-    registry.insert(Counter::default());
-    graph.init_one::<A>(&mut registry).expect("Failed to init.");
-    assert_eq!(registry.get::<Counter>().get("A::_post"), 2);
-    assert_eq!(registry.get::<Counter>().get("A::_start"), 0);
-    registry.trigger("_start");
-    assert_eq!(registry.get::<Counter>().get("A::_start"), 1);
-    registry.trigger("_inner");
-    assert_eq!(registry.get::<Counter>().get("A::_inner"), 1);
-    registry.trigger("_outer");
-    assert_eq!(registry.get::<Counter>().get("A::_outer"), 1);
+    let mut provider = Provider::default();
+    provider.insert(Counter::default());
+    graph.init_one::<A>(&mut provider).expect("Failed to init.");
+    assert_eq!(provider.get::<Counter>().get("A::_post"), 2);
+    assert_eq!(provider.get::<Counter>().get("A::_start"), 0);
+    provider.trigger("_start");
+    assert_eq!(provider.get::<Counter>().get("A::_start"), 1);
+    provider.trigger("_inner");
+    assert_eq!(provider.get::<Counter>().get("A::_inner"), 1);
+    provider.trigger("_outer");
+    assert_eq!(provider.get::<Counter>().get("A::_outer"), 1);
 }
 
 #[test]
@@ -254,8 +254,8 @@ fn init_one_failure_should_panic() {
     struct A;
 
     let mut graph = DependencyGraph::new();
-    let mut registry = Provider::default();
-    graph.init_one::<A>(&mut registry).unwrap();
+    let mut provider = Provider::default();
+    graph.init_one::<A>(&mut provider).unwrap();
 }
 
 #[test]
@@ -268,8 +268,8 @@ fn depend_on_ref_should_resolve() {
     }
 
     let graph = DependencyGraph::new().with((|| A(17)).to_infallible());
-    let mut registry = Provider::default();
-    graph.init_all(&mut registry).unwrap();
-    let a = method.call(&registry);
+    let mut provider = Provider::default();
+    graph.init_all(&mut provider).unwrap();
+    let a = method.call(&provider);
     assert_eq!(a.0, 17);
 }
