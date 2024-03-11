@@ -1,6 +1,9 @@
 use crate::extractor::Extractor;
 use crate::ty::Ty;
-use crate::{Eventstore, Method, Provider};
+use crate::{Bind, Eventstore, Method, Provider};
+
+// TODO(qti3e): we could be smarter here to reduce the number of generated lines of code.
+// idea: maybe convert everything to a bind recursivly.
 
 macro_rules! impl_method {
     (
@@ -60,6 +63,67 @@ macro_rules! impl_method {
             fn call(self, provider: &Provider) -> T {
                 let guard = provider.guard();
                 (self)(
+                    $(guard.extract::<&mut $mut>(),)*
+                    $(guard.extract::<&$get>(),)*
+                    $(guard.extract::<$ext>(),)*
+                )
+            }
+        }
+
+        #[allow(clippy::all, unused, unused_mut)]
+        impl<Arg, F, T
+            $(, $mut)*
+            $(, $get)*
+            $(, $ext)*
+        > Method<(
+            (
+                $($mut,)*
+            ),
+            (
+                $($get,)*
+            ),
+            (
+                $($ext,)*
+            ),
+        )> for Bind<Arg, F>
+        where
+            F: 'static + FnOnce(
+                Arg,
+                $(&mut $mut,)*
+                $(& $get,)*
+                $($ext,)*
+            ) -> T,
+            T: 'static,
+            $($mut: 'static,)*
+            $($get: 'static,)*
+            $($ext: 'static + for<'x> Extractor<'x>,)*
+        {
+            type Output = T;
+
+            #[inline(always)]
+            fn display_name(&self) -> Option<String> {
+                None
+            }
+
+            #[inline(always)]
+            fn events(&self) -> Option<Eventstore> {
+                None
+            }
+
+            #[inline]
+            fn dependencies() -> Vec<Ty> {
+                let mut out = Vec::new();
+                $(out.push(Ty::of::<$mut>());)*
+                $(out.push(Ty::of::<$get>());)*
+                $($ext::dependencies(&mut out);)*
+                out
+            }
+
+            #[inline(always)]
+            fn call(self, provider: &Provider) -> T {
+                let guard = provider.guard();
+                (self.fun)(
+                    self.arg,
                     $(guard.extract::<&mut $mut>(),)*
                     $(guard.extract::<&$get>(),)*
                     $(guard.extract::<$ext>(),)*
