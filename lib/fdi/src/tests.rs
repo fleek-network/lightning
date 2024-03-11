@@ -326,3 +326,23 @@ fn demo_consume() {
     graph.init_all(&mut provider).unwrap();
     provider.trigger("start");
 }
+
+#[test]
+fn demo_bounded() {
+    #[derive(Default)]
+    struct A(u32);
+
+    impl A {
+        pub fn capture(self, value: &String) {
+            println!("hello {value}");
+        }
+    }
+
+    let graph = DependencyGraph::new()
+        .with((|| A(17)).to_infallible().on("start", A::capture.bounded()))
+        .with_value(String::from("World"));
+
+    let mut provider = Provider::default();
+    graph.init_all(&mut provider).unwrap();
+    provider.trigger("start");
+}
