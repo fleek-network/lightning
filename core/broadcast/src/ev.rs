@@ -8,25 +8,14 @@
 
 use std::cell::OnceCell;
 use std::collections::HashSet;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use bytes::Bytes;
 use fleek_crypto::{NodePublicKey, NodeSecretKey, NodeSignature, PublicKey, SecretKey};
-use infusion::c;
 use ink_quill::ToDigest;
-use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::schema::broadcast::{Advr, Frame, Message, MessageInternedId, Want};
 use lightning_interfaces::schema::LightningMessage;
 use lightning_interfaces::types::{Digest, NodeIndex, Topic};
-use lightning_interfaces::{
-    ApplicationInterface,
-    EventHandlerInterface,
-    PoolInterface,
-    ReputationAggregatorInterface,
-    ReputationReporterInterface,
-    SyncQueryRunnerInterface,
-    Weight,
-};
+use lightning_interfaces::Weight;
 use lightning_metrics::{histogram, increment_counter};
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
@@ -39,12 +28,13 @@ use crate::pending::PendingStore;
 use crate::recv_buffer::RecvBuffer;
 use crate::ring::MessageRing;
 use crate::stats::{ConnectionStats, Stats};
+use crate::BroadcastBackend;
 
 /// An interned id. But not from our interned table.
 pub type RemoteInternedId = MessageInternedId;
 
 /// The execution context of the broadcast.
-pub struct Context<C: Collection> {
+pub struct Context<B: BroadcastBackend> {
     /// Our database where we store what we have seen.
     db: Database,
     /// Our digest interner.
@@ -62,23 +52,14 @@ pub struct Context<C: Collection> {
     command_rx: CommandReceiver,
     // Pending store.
     pending_store: PendingStore,
-    sqr: c![C::ApplicationInterface::SyncExecutor],
-    rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
-    event_handler: c![C::PoolInterface::EventHandler],
     sk: NodeSecretKey,
     pk: NodePublicKey,
     current_node_index: OnceCell<NodeIndex>,
+    backend: B,
 }
 
-impl<C: Collection> Context<C> {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        db: Database,
-        sqr: c![C::ApplicationInterface::SyncExecutor],
-        rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
-        event_handler: c![C::PoolInterface::EventHandler],
-        sk: NodeSecretKey,
-    ) -> Self {
+impl<B: BroadcastBackend> Context<B> {
+    pub fn new(db: Database, sk: NodeSecretKey, backend: B) -> Self {
         let (command_tx, command_rx) = mpsc::unbounded_channel();
         let pk = sk.to_pk();
         Self {
@@ -95,12 +76,10 @@ impl<C: Collection> Context<C> {
             command_tx,
             command_rx,
             pending_store: PendingStore::default(),
-            sqr,
-            rep_reporter,
-            event_handler,
             sk,
             pk,
             current_node_index: OnceCell::new(), // will be set upon spawn.
+            backend,
         }
     }
 
@@ -126,7 +105,7 @@ impl<C: Collection> Context<C> {
 
     #[inline]
     fn get_node_pk(&self, index: NodeIndex) -> Option<NodePublicKey> {
-        self.sqr.index_to_pubkey(&index)
+        self.backend.get_node_pk(index)
     }
 
     /// Handle a message sent from another node.
@@ -262,7 +241,7 @@ impl<C: Collection> Context<C> {
             payload: msg.payload.clone().into(),
         };
 
-        let now = now();
+        let now = Self::now();
         // only insert metrics for pseudo-valid timestamps (not in the future)
         if msg.timestamp > now {
             increment_counter!(
@@ -281,7 +260,7 @@ impl<C: Collection> Context<C> {
         // Mark message as received for RTT measurements.
         self.pending_store.received_message(sender, id);
         // Report a satisfactory interaction when we receive a message.
-        self.rep_reporter.report_sat(sender, Weight::Weak);
+        self.backend.report_sat(sender, Weight::Weak);
         self.incoming_messages[topic_index].insert(shared);
     }
 
@@ -297,8 +276,8 @@ impl<C: Collection> Context<C> {
             },
             Command::Send(cmd) => {
                 let node_index = self
-                    .sqr
-                    .pubkey_to_index(&self.pk)
+                    .backend
+                    .get_node_index(&self.pk)
                     .expect("Tried to send message before node index was available");
                 let node_index = self.current_node_index.get_or_init(|| node_index);
 
@@ -307,7 +286,7 @@ impl<C: Collection> Context<C> {
                         origin: *node_index,
                         signature: NodeSignature([0; 64]),
                         topic: cmd.topic,
-                        timestamp: now(),
+                        timestamp: Self::now(),
                         payload: cmd.payload,
                     };
                     let digest = tmp.to_digest();
@@ -377,11 +356,11 @@ impl<C: Collection> Context<C> {
 
         match filter {
             Some(nodes) => self
-                .event_handler
+                .backend
                 .send_to_all(message.into(), move |id| nodes.contains(&id)),
             None => {
                 let peers = self.peers.clone();
-                self.event_handler.send_to_all(message.into(), move |id| {
+                self.backend.send_to_all(message.into(), move |id| {
                     peers
                         .get(&id)
                         .map(|mapping| !mapping.contains_key(&interned_id))
@@ -399,7 +378,7 @@ impl<C: Collection> Context<C> {
             return;
         };
 
-        self.event_handler.send_to_one(destination, message.into());
+        self.backend.send_to_one(destination, message.into());
     }
 
     fn handle_pending_tick(&self, requests: Vec<(MessageInternedId, NodeIndex)>) {
@@ -413,13 +392,17 @@ impl<C: Collection> Context<C> {
             }
         }
     }
+
+    fn now() -> u64 {
+        B::now()
+    }
 }
 
 /// Runs the main loop of the broadcast algorithm. This is our main central worker.
-async fn main_loop<C: Collection>(
+async fn main_loop<B: BroadcastBackend>(
     mut shutdown: tokio::sync::oneshot::Receiver<()>,
-    mut ctx: Context<C>,
-) -> Context<C> {
+    mut ctx: Context<B>,
+) -> Context<B> {
     info!("Starting broadcast for {}", ctx.pk);
 
     // During initialization the application state might have not had loaded, and at
@@ -428,7 +411,7 @@ async fn main_loop<C: Collection>(
     //
     // We need the node index because when we're sending messages out (when the current
     // node is the origin of the message.), we have to put our own id as the origin.
-    if let Some(node_index) = ctx.sqr.pubkey_to_index(&ctx.pk) {
+    if let Some(node_index) = ctx.backend.get_node_index(&ctx.pk) {
         let _ = ctx.current_node_index.set(node_index);
     }
 
@@ -450,7 +433,7 @@ async fn main_loop<C: Collection>(
                 trace!("received command in event loop");
                 ctx.handle_command(command);
             },
-            Some((sender, payload)) = ctx.event_handler.receive() => {
+            Some((sender, payload)) = ctx.backend.receive() => {
                 ctx.handle_frame_payload(sender, payload);
             }
             requests = ctx.pending_store.tick() => {
@@ -471,12 +454,4 @@ fn topic_to_index(topic: Topic) -> usize {
         Topic::Resolver => 1,
         Topic::Debug => 2,
     }
-}
-
-/// Get the current unix timestamp in milliseconds
-fn now() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_millis() as u64
 }

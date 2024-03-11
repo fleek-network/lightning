@@ -6,7 +6,6 @@ mod command;
 mod config;
 mod db;
 mod ev;
-mod ev2;
 mod interner;
 mod pending;
 mod pubsub;

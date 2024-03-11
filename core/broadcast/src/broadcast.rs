@@ -17,6 +17,7 @@ use tokio::sync::{oneshot, Mutex};
 use tokio::task::JoinHandle;
 use tracing::debug;
 
+use crate::backend::LightningBackend;
 use crate::command::CommandSender;
 use crate::config::Config;
 use crate::db::Database;
@@ -33,10 +34,10 @@ pub struct Broadcast<C: Collection> {
 enum Status<C: Collection> {
     Running {
         shutdown: Option<oneshot::Sender<()>>,
-        handle: JoinHandle<Context<C>>,
+        handle: JoinHandle<Context<LightningBackend<C>>>,
     },
     NotRunning {
-        ctx: Context<C>,
+        ctx: Context<LightningBackend<C>>,
     },
 }
 
@@ -111,7 +112,9 @@ impl<C: Collection> BroadcastInterface<C> for Broadcast<C> {
         let sk = keystore.get_ed25519_sk();
         let event_handler = pool.open_event(ServiceScope::Broadcast);
 
-        let ctx = Context::<C>::new(Database::default(), sqr, rep_reporter, event_handler, sk);
+        let backend = LightningBackend::new(sqr, rep_reporter, event_handler);
+
+        let ctx = Context::new(Database::default(), sk, backend);
 
         Ok(Self {
             command_sender: ctx.get_command_sender(),

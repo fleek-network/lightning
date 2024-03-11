@@ -36,10 +36,24 @@ pub trait BroadcastBackend: Send + Sync + 'static {
     fn now() -> u64;
 }
 
-struct LightningBackend<C: Collection> {
+pub struct LightningBackend<C: Collection> {
     sqr: c![C::ApplicationInterface::SyncExecutor],
     rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
     event_handler: c![C::PoolInterface::EventHandler],
+}
+
+impl<C: Collection> LightningBackend<C> {
+    pub fn new(
+        sqr: c![C::ApplicationInterface::SyncExecutor],
+        rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
+        event_handler: c![C::PoolInterface::EventHandler],
+    ) -> Self {
+        Self {
+            sqr,
+            rep_reporter,
+            event_handler,
+        }
+    }
 }
 
 impl<C: Collection> BroadcastBackend for LightningBackend<C> {
