@@ -20,7 +20,7 @@ mod ty;
 pub mod viz;
 mod x_helpers;
 
-pub use bind::Bind;
+pub use bind::{consume, Bind, Captured};
 pub use event::Eventstore;
 pub use executor::Executor;
 pub use ext::MethodExt;
