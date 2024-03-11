@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 use std::marker::PhantomData;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use fxhash::{FxHashMap, FxHashSet};
 use lightning_interfaces::schema::broadcast::MessageInternedId;
@@ -15,7 +15,7 @@ use crate::stats::FusedTa;
 use crate::BroadcastBackend;
 
 const TICK_DURATION: Duration = Duration::from_millis(500);
-const DEFAULT_REQUEST_TIMEOUT: Duration = Duration::from_millis(1000);
+const DEFAULT_REQUEST_TIMEOUT: u64 = 1000; // millis for LightningBackend
 const BUFFER_SIZE: usize = 1000;
 
 /// Responsible for keeping track of the pending want requests we have
@@ -58,7 +58,7 @@ impl<B: BroadcastBackend> PendingStore<B> {
         if requests.len() >= BUFFER_SIZE {
             requests.pop_front();
         }
-        requests.push_back(PendingRequest::new(node));
+        requests.push_back(PendingRequest::new(node, B::now()));
     }
 
     pub async fn tick(&mut self) -> Vec<(MessageInternedId, NodeIndex)> {
@@ -77,7 +77,7 @@ impl<B: BroadcastBackend> PendingStore<B> {
             if !pending_requests.is_empty() {
                 return pending_requests;
             }
-            tokio::time::sleep(TICK_DURATION).await;
+            B::sleep(TICK_DURATION).await;
         }
     }
 
@@ -87,7 +87,7 @@ impl<B: BroadcastBackend> PendingStore<B> {
             .map(|requests| requests.iter().find(|req| req.node == node))
             .map(|req| {
                 req.map(|req| {
-                    let rtt = req.timestamp.elapsed().as_millis() as f64;
+                    let rtt = req.timestamp.elapsed(B::now()) as f64;
                     self.rtt_map
                         .entry(node)
                         .or_insert(FusedTa::from(ExponentialMovingAverage::default()))
@@ -158,9 +158,9 @@ impl<B: BroadcastBackend> PendingStore<B> {
                             .get(&req.node)
                             .and_then(|ema| ema.current())
                             .map(|ema| ema * 2.0)
-                            .unwrap_or(DEFAULT_REQUEST_TIMEOUT.as_millis() as f64)
+                            .unwrap_or(DEFAULT_REQUEST_TIMEOUT as f64)
                             as u128;
-                        req.timestamp.elapsed().as_millis() >= timeout
+                        req.timestamp.elapsed(B::now()) as u128 >= timeout
                     } else {
                         // We haven't send a request for this digest.
                         true
@@ -183,10 +183,52 @@ struct PendingRequest {
 }
 
 impl PendingRequest {
-    pub fn new(node: NodeIndex) -> Self {
+    pub fn new(node: NodeIndex, now: u64) -> Self {
         Self {
             node,
-            timestamp: Instant::now(),
+            timestamp: Instant(now),
         }
+    }
+}
+
+struct Instant(u64);
+
+impl Instant {
+    fn elapsed(&self, now: u64) -> u64 {
+        let then = self.0;
+        now.saturating_sub(then)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+    use crate::pending::Instant;
+
+    fn now() -> u64 {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64
+    }
+
+    #[tokio::test]
+    async fn test_instant_elapsed() {
+        let instant = Instant(now());
+        tokio::time::sleep(Duration::from_millis(1000)).await;
+
+        let elapsed = instant.elapsed(now());
+        assert!(elapsed > 800 && elapsed < 1200);
+    }
+
+    #[tokio::test]
+    async fn test_instant_elapsed_past() {
+        let then = now();
+        tokio::time::sleep(Duration::from_millis(500)).await;
+
+        let now = Instant(now());
+        let elapsed = now.elapsed(then);
+        assert_eq!(elapsed, 0);
     }
 }
