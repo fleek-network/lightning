@@ -12,30 +12,64 @@ use crate::extractor::Extractor;
 use crate::ty::Ty;
 use crate::{Eventstore, Executor};
 
+/// The [Provider] is used to store a set of dynamically typed values and provide them on demand
+/// to a requester.
+///
+/// Unless [take](Provider::take) is called the returned value is always just a reference to the
+/// actual value and it will stay in the provider. Once a value is taken out of the provider, it
+/// is as if it was never inserted in the provider.
+///
+/// The provider is clone and upon clone it will reference to the same provider. Basically think
+/// about it as an `Arc<Provider>`.
+///
+/// Another point worth mentioning is that a [Provider] is basically an RwLock for each inserted
+/// value.
+///
+/// The references returned from Provider are owned, which means even if the [Provider] itself
+/// goes out of scope, the values will still stay alive as long as there is a [Ref] or [RefMut]
+/// pointing to the value.
+///
+/// Based on the intended use case there are no 'safe' APIs over the [Provider], any call could
+/// result in a panic in case of an error. Which could be any of the following errors:
+///
+/// 1. Value not existing in the provider.
+/// 2. Inserting the same value twice.
+/// 3. Requesting a shared reference to the value in case an exclusive lock is alive on the type.
+/// 4. Requesting an exclusive lock on the value in case a shared reference is alive.
 #[derive(Clone)]
 pub struct Provider {
     values: Arc<RwLock<HashMap<Ty, MapEntry>>>,
 }
 
+/// For each type [Ty] we store a RawRwLock and
 type MapEntry = (Arc<RawRwLock>, Arc<Object>);
 pub(crate) type Object = UnsafeCell<Box<dyn Any>>;
 
+/// An scoped guard over a provider so that we can obtain `&T` or `&mut T` from a provider that
+/// live as long as this guard.
 pub struct ProviderGuard {
     provider: Provider,
     inner: Mutex<ProviderGuardInner>,
 }
 
 struct ProviderGuardInner {
+    /// For each requested value here we store an `Arc<Object>` of that value to keep the
+    /// Object alive as long as this struct is dropped.
     values: Vec<Arc<Object>>,
+    /// The RawRwLock of an object for shared data access, upon dropping this object we
+    /// unlock_shared these locks.
     shared: Vec<Arc<RawRwLock>>,
+    /// Like `shared` but for exclusive `&mut T` access to the objects.
     exclusive: Vec<Arc<RawRwLock>>,
 }
 
+/// An owned immutable reference to a value of type `T` obtained from a [Provider::get].
 pub struct Ref<T: 'static> {
     entry: MapEntry,
     _t: PhantomData<T>,
 }
 
+/// An owned mutable reference to a value of type `T` obtained from a [Provider::get_mut].
 pub struct RefMut<T: 'static> {
     entry: MapEntry,
     _t: PhantomData<T>,
@@ -91,7 +125,7 @@ impl Provider {
     ///
     /// # Panics
     ///
-    /// If the value does not exists in the registry or if there is an exclusive lock on the value.
+    /// If the value does not exists in the provider or if there is an exclusive lock on the value.
     pub fn get<T: 'static>(&self) -> Ref<T> {
         let guard = self.values.read();
         Ref {
@@ -104,7 +138,7 @@ impl Provider {
     ///
     /// # Panics
     ///
-    /// If the value does not exists in the registry or if there is any other references to the
+    /// If the value does not exists in the provider or if there is any other references to the
     /// value.
     pub fn get_mut<T: 'static>(&self) -> RefMut<T> {
         let guard = self.values.read();
@@ -118,7 +152,7 @@ impl Provider {
     ///
     /// # Panics
     ///
-    /// If the value does not exists in the registry or if there is any other references to the
+    /// If the value does not exists in the provider or if there is any other references to the
     /// value.
     pub fn take<T: 'static>(&self) -> T {
         let ty = Ty::of::<T>();
@@ -137,6 +171,7 @@ impl Provider {
         *any_box.downcast::<T>().unwrap()
     }
 
+    /// Trigger an event with the given name on the [Eventstore] in this provider.
     pub fn trigger(&self, event: &'static str) -> usize {
         let mut store = self.get_mut::<Eventstore>();
         store.trigger(event, self)

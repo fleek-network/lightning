@@ -7,7 +7,7 @@ use crate::method::Method;
 use crate::ty::Ty;
 use crate::{MethodExt, Provider};
 
-/// The [`Eventstore`] can be used to store a list of event handlers under each event name.
+/// The [Eventstore] can be used to store a list of event handlers under each event name.
 #[derive(Default)]
 pub struct Eventstore {
     pub(crate) handlers: HashMap<&'static str, Vec<DynMethod<()>>>,
@@ -52,12 +52,12 @@ impl Eventstore {
     }
 
     /// Trigger the event. This is used internally.
-    pub(crate) fn trigger(&mut self, event: &'static str, registry: &Provider) -> usize {
+    pub(crate) fn trigger(&mut self, event: &'static str, provider: &Provider) -> usize {
         let mut result = 0;
         if let Some(handlers) = self.handlers.remove(event) {
             for handler in handlers {
                 result += 1;
-                handler.call(registry);
+                handler.call(provider);
             }
         }
         result

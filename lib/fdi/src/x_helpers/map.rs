@@ -30,8 +30,8 @@ where
     }
 
     #[inline(always)]
-    fn call(self, registry: &Provider) -> Self::Output {
-        let output = self.method.call(registry);
+    fn call(self, provider: &Provider) -> Self::Output {
+        let output = self.method.call(provider);
         (self.transform)(output)
     }
 }

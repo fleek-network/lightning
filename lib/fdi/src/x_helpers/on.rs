@@ -38,8 +38,8 @@ where
     }
 
     #[inline(always)]
-    fn call(self, registry: &Provider) -> Self::Output {
-        self.method.call(registry)
+    fn call(self, provider: &Provider) -> Self::Output {
+        self.method.call(provider)
     }
 }
 

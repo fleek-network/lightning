@@ -6,7 +6,7 @@
 //!         .wrap_with(|fut| move |e: &mut Executor| e.spawn(fut))
 //!         ;; the orignal method `f` is called first and its output is passed
 //!         ;; to the provided closure. Then the provided closure can return back
-//!         ;; another closure which will be called using the registry.
+//!         ;; another closure which will be called using the provider.
 //! ```
 
 use std::marker::PhantomData;
@@ -45,10 +45,10 @@ where
     }
 
     #[inline(always)]
-    fn call(self, registry: &crate::Provider) -> Self::Output {
-        let out_f = self.method.call(registry);
+    fn call(self, provider: &crate::Provider) -> Self::Output {
+        let out_f = self.method.call(provider);
         let out_w = (self.wrapper)(out_f);
-        out_w.call(registry)
+        out_w.call(provider)
     }
 }
 
