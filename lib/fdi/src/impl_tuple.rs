@@ -1,6 +1,6 @@
 use crate::extractor::Extractor;
 use crate::ty::Ty;
-use crate::{Bind, Eventstore, Method, Provider};
+use crate::{Bind, Captured, Eventstore, Method, Provider};
 
 // TODO(qti3e): we could be smarter here to reduce the number of generated lines of code.
 // idea: maybe convert everything to a bind recursivly.
@@ -75,6 +75,45 @@ macro_rules! impl_method {
             $(, $mut)*
             $(, $get)*
             $(, $ext)*
+        > Bind<Arg, (
+            (
+                $($mut,)*
+            ),
+            (
+                $($get,)*
+            ),
+            (
+                $($ext,)*
+            ),
+        )> for F
+        where
+            F: 'static + FnOnce(
+                Arg,
+                $(&mut $mut,)*
+                $(& $get,)*
+                $($ext,)*
+            ) -> T,
+            Arg: 'static,
+            T: 'static,
+            $($mut: 'static,)*
+            $($get: 'static,)*
+            $($ext: 'static + for<'x> Extractor<'x>,)*
+        {
+            type Output = T;
+            #[inline(always)]
+            fn bind(self, arg: Arg) -> Captured<Arg, Self> {
+                Captured {
+                    arg,
+                    fun: self
+                }
+            }
+        }
+
+        #[allow(clippy::all, unused, unused_mut)]
+        impl<Arg, F, T
+            $(, $mut)*
+            $(, $get)*
+            $(, $ext)*
         > Method<(
             (
                 $($mut,)*
@@ -85,7 +124,7 @@ macro_rules! impl_method {
             (
                 $($ext,)*
             ),
-        )> for Bind<Arg, F>
+        )> for Captured<Arg, F>
         where
             F: 'static + FnOnce(
                 Arg,

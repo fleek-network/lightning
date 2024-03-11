@@ -3,7 +3,17 @@ use std::collections::HashMap;
 use std::hash::Hash;
 
 use crate::dyn_method::DynMethod;
-use crate::{DependencyGraph, Eventstore, Method, MethodExt, Provider, Ref};
+use crate::{
+    consume,
+    Bind,
+    Consume,
+    DependencyGraph,
+    Eventstore,
+    Method,
+    MethodExt,
+    Provider,
+    Ref,
+};
 
 mod demo_dep {
     use crate::ext::MethodExt;
@@ -272,4 +282,47 @@ fn depend_on_ref_should_resolve() {
     graph.init_all(&mut provider).unwrap();
     let a = method.call(&provider);
     assert_eq!(a.0, 17);
+}
+
+#[test]
+fn demo_captured() {
+    #[derive(Default)]
+    struct A(u32);
+
+    impl A {
+        pub fn capture(self, value: &String) {
+            println!("hello {value}");
+        }
+    }
+
+    let method_handler = (|a: Consume<A>| A::capture.bind(a.0)).wrap_with(|a| a);
+
+    let graph = DependencyGraph::new()
+        .with((|| A(17)).to_infallible().on("start", method_handler))
+        .with_value(String::from("World"));
+
+    let mut provider = Provider::default();
+    graph.init_all(&mut provider).unwrap();
+    provider.trigger("start");
+}
+
+#[test]
+fn demo_consume() {
+    #[derive(Default)]
+    struct A(u32);
+
+    impl A {
+        pub fn capture(self, value: &String) {
+            println!("hello {value}");
+        }
+    }
+
+    let method_handler = consume(A::capture);
+    let graph = DependencyGraph::new()
+        .with((|| A(17)).to_infallible().on("start", method_handler))
+        .with_value(String::from("World"));
+
+    let mut provider = Provider::default();
+    graph.init_all(&mut provider).unwrap();
+    provider.trigger("start");
 }
