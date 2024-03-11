@@ -1,5 +1,5 @@
 use std::future::Future;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use bytes::Bytes;
 use fleek_crypto::NodePublicKey;
@@ -34,6 +34,8 @@ pub trait BroadcastBackend: Send + Sync + 'static {
     fn report_sat(&self, peer: NodeIndex, weight: Weight);
 
     fn now() -> u64;
+
+    fn sleep(duration: Duration) -> impl Future<Output = ()> + Send;
 }
 
 pub struct LightningBackend<C: Collection> {
@@ -91,5 +93,9 @@ impl<C: Collection> BroadcastBackend for LightningBackend<C> {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_millis() as u64
+    }
+
+    async fn sleep(duration: Duration) {
+        tokio::time::sleep(duration).await;
     }
 }

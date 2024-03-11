@@ -51,7 +51,7 @@ pub struct Context<B: BroadcastBackend> {
     /// Receiving end of the commands.
     command_rx: CommandReceiver,
     // Pending store.
-    pending_store: PendingStore,
+    pending_store: PendingStore<B>,
     sk: NodeSecretKey,
     pk: NodePublicKey,
     current_node_index: OnceCell<NodeIndex>,
@@ -75,7 +75,7 @@ impl<B: BroadcastBackend> Context<B> {
             stats: Stats::default(),
             command_tx,
             command_rx,
-            pending_store: PendingStore::default(),
+            pending_store: PendingStore::new(),
             sk,
             pk,
             current_node_index: OnceCell::new(), // will be set upon spawn.

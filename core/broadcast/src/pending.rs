@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::marker::PhantomData;
 use std::time::{Duration, Instant};
 
 use fxhash::{FxHashMap, FxHashSet};
@@ -11,6 +12,7 @@ use ta::indicators::ExponentialMovingAverage;
 use ta::Next;
 
 use crate::stats::FusedTa;
+use crate::BroadcastBackend;
 
 const TICK_DURATION: Duration = Duration::from_millis(500);
 const DEFAULT_REQUEST_TIMEOUT: Duration = Duration::from_millis(1000);
@@ -21,8 +23,7 @@ const BUFFER_SIZE: usize = 1000;
 ///
 /// The desired functionality is that we need to store an outgoing
 /// want request here.
-#[derive(Default)]
-pub struct PendingStore {
+pub struct PendingStore<B: BroadcastBackend> {
     /// Map each pending digest to a set of nodes that we know have this digest.
     pending_map: FxHashMap<MessageInternedId, FxHashSet<NodeIndex>>,
 
@@ -31,9 +32,20 @@ pub struct PendingStore {
 
     /// RTTs for the peers we interacted with.
     rtt_map: FxHashMap<NodeIndex, FusedTa<f64, ExponentialMovingAverage>>,
+
+    _marker: PhantomData<B>,
 }
 
-impl PendingStore {
+impl<B: BroadcastBackend> PendingStore<B> {
+    pub fn new() -> Self {
+        Self {
+            pending_map: FxHashMap::default(),
+            request_map: FxHashMap::default(),
+            rtt_map: FxHashMap::default(),
+            _marker: PhantomData,
+        }
+    }
+
     pub fn insert_pending(&mut self, node: NodeIndex, interned_id: MessageInternedId) {
         self.pending_map
             .entry(interned_id)
