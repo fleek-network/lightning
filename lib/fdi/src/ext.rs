@@ -60,7 +60,7 @@ pub trait MethodExt<P>: Sized + Method<P> {
     fn spawn(self) -> impl Method<(), Output = ()>
     where
         Self: 'static + Method<P> + Sized,
-        Self::Output: Future + Send,
+        Self::Output: Future + Send + 'static,
     {
         self.wrap_with(|fut| move |e: &Executor| e.spawn(fut))
     }

@@ -8,7 +8,7 @@ pub struct Captured<Arg, F> {
 
 /// The bind trait could be used to bind the first argument of a function to a certain value.
 pub trait Bind<Arg, Args>: Sized {
-    type Output: 'static;
+    type Output;
 
     /// Bind the given first arg to the function. Returning a Method that would only depend on the
     /// rest of the arguments.
