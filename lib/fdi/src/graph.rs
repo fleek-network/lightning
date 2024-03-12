@@ -200,13 +200,16 @@ impl DependencyGraph {
     /// Internal method to insert a constructor method to this graph.
     fn insert(&mut self, tid: Ty, method: DynMethod<Result<Object>>) {
         debug_assert_eq!(method.ty(), Ty::of::<Result<Object>>());
-        if let Some(old) = self.constructors.get(&tid) {
-            panic!(
-                "A constructor for type '{}' is already present.\n\told='{}'\n\tnew='{}'",
-                method.ty().name(),
-                old.name(),
-                method.name()
-            );
+        if let Some(_old) = self.constructors.get(&tid) {
+            // TODO(qti3e): Right now this is a hack for our Blank use case. We should panic
+            // here eventually.
+            // panic!(
+            //     "A constructor for type '{}' is already present.\n\told='{}'\n\tnew='{}'",
+            //     method.ty().name(),
+            //     old.name(),
+            //     method.name()
+            // );
+            return;
         }
         self.constructors.insert(tid, method);
     }
