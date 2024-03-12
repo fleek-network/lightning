@@ -191,6 +191,8 @@ impl DependencyGraph {
             return;
         }
 
+        self.touched = true;
+
         // If an explicit display name is provided then we should store and remember it. Otherwise
         // we can just default to the ty.name() when we need it.
         if let Some(display_name) = method.display_name() {
