@@ -9,6 +9,7 @@ use crate::{Eventstore, Method, Provider};
 pub struct DynMethod<T: 'static> {
     name: &'static str,
     dependencies: Vec<Ty>,
+    display_name: Option<String>,
     ptr: *mut (),
     call_fn: fn(*mut (), provider: &Provider) -> T,
     drop_fn: fn(*mut ()),
@@ -21,6 +22,7 @@ impl<T: 'static> DynMethod<T> {
         F: Method<P, Output = T>,
     {
         let name = type_name::<F>();
+        let display_name = method.display_name();
         let dependencies = F::dependencies();
         let value = Box::new(method);
         let ptr = Box::into_raw(value) as *mut ();
@@ -54,6 +56,7 @@ impl<T: 'static> DynMethod<T> {
         Self {
             name,
             dependencies,
+            display_name,
             ptr,
             call_fn: call_fn::<F, P>,
             drop_fn: drop_fn::<F>,
@@ -69,6 +72,11 @@ impl<T: 'static> DynMethod<T> {
     /// Returns the name of the original method.
     pub fn name(&self) -> &'static str {
         self.name
+    }
+
+    /// Returns the result from [`Method::display_name`].
+    pub fn display_name(&self) -> Option<String> {
+        self.display_name.clone()
     }
 
     /// Returns the result from [`Method::events`].
