@@ -73,7 +73,7 @@ use crate::table::{Backend, TableRef};
 /// Minimum number of reported measurements that have to be available for a node.
 /// If less measurements have been reported, no reputation score will be computed in that epoch.
 #[cfg(all(not(test), not(debug_assertions)))]
-const MIN_NUM_MEASUREMENTS: usize = 10;
+const MIN_NUM_MEASUREMENTS: usize = 4;
 #[cfg(any(test, debug_assertions))]
 const MIN_NUM_MEASUREMENTS: usize = 2;
 

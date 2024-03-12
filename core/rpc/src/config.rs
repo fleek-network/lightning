@@ -46,7 +46,7 @@ impl Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            addr: "0.0.0.0:4230".parse().expect("RPC Socket Addr to parse"),
+            addr: "0.0.0.0:4240".parse().expect("RPC Socket Addr to parse"),
             rpc_selection: Default::default(),
         }
     }
