@@ -1,5 +1,5 @@
 chain_id = 59330
-epoch_start = 1710260674199
+epoch_start = 1710261708786
 epoch_time = 1800000
 committee_size = 6
 min_stake = 1000
@@ -36,7 +36,7 @@ stake.staked = "1000"
 stake.stake_locked_until = 0
 stake.locked = "0"
 stake.locked_until = 0
-stake.genesis_committee = true
+genesis_committee = true
 
 [[node_info]]
 owner = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
@@ -58,7 +58,7 @@ stake.staked = "1000"
 stake.stake_locked_until = 0
 stake.locked = "0"
 stake.locked_until = 0
-stake.genesis_committee = true
+genesis_committee = true
 
 [[node_info]]
 owner = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
@@ -80,7 +80,7 @@ stake.staked = "1000"
 stake.stake_locked_until = 0
 stake.locked = "0"
 stake.locked_until = 0
-stake.genesis_committee = true
+genesis_committee = true
 
 [[node_info]]
 owner = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
@@ -102,7 +102,7 @@ stake.staked = "1000"
 stake.stake_locked_until = 0
 stake.locked = "0"
 stake.locked_until = 0
-stake.genesis_committee = true
+genesis_committee = true
 
 [[node_info]]
 owner = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
@@ -124,7 +124,7 @@ stake.staked = "1000"
 stake.stake_locked_until = 0
 stake.locked = "0"
 stake.locked_until = 0
-stake.genesis_committee = true
+genesis_committee = true
 
 
 [[service]]
