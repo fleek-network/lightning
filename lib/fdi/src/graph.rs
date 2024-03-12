@@ -64,14 +64,9 @@ impl DependencyGraph {
     ///
     /// If any of the items in `other` is already present in this graph.
     pub fn expand(mut self, other: DependencyGraph) -> Self {
-        self.touched = true;
-
         for (tid, method) in other.constructors {
             self.insert(tid, method);
         }
-
-        self.graph.extend(other.graph);
-
         self
     }
 
@@ -182,35 +177,37 @@ impl DependencyGraph {
         T: 'static,
     {
         self.touched = true;
-        let ty = Ty::of::<T>();
-
-        // If an explicit display name is provided then we should store and remember it. Otherwise
-        // we can just default to the ty.name() when we need it.
-        if let Some(display_name) = f.display_name() {
-            self.display_names.insert(ty, display_name);
-        }
-
-        self.insert(ty, DynMethod::new(f.map(|v| v.map(to_obj))));
-        self.graph
-            .insert(ty, F::dependencies().into_iter().collect());
-
+        self.insert(Ty::of::<T>(), DynMethod::new(f.map(|v| v.map(to_obj))));
         self
     }
 
     /// Internal method to insert a constructor method to this graph.
     fn insert(&mut self, tid: Ty, method: DynMethod<Result<Object>>) {
         debug_assert_eq!(method.ty(), Ty::of::<Result<Object>>());
-        if let Some(_old) = self.constructors.get(&tid) {
-            // TODO(qti3e): Right now this is a hack for our Blank use case. We should panic
-            // here eventually.
-            // panic!(
-            //     "A constructor for type '{}' is already present.\n\told='{}'\n\tnew='{}'",
-            //     method.ty().name(),
-            //     old.name(),
-            //     method.name()
-            // );
+
+        // TODO(qti3e): Right now this is a hack for our Blank use case. We should panic
+        // here eventually.
+        if self.constructors.contains_key(&tid) {
             return;
         }
+
+        // If an explicit display name is provided then we should store and remember it. Otherwise
+        // we can just default to the ty.name() when we need it.
+        if let Some(display_name) = method.display_name() {
+            self.display_names.insert(tid, display_name);
+        }
+
+        if let Some(old) = self.constructors.get(&tid) {
+            panic!(
+                "A constructor for type '{}' is already present.\n\told='{}'\n\tnew='{}'",
+                method.ty().name(),
+                old.name(),
+                method.name()
+            );
+        }
+
+        self.graph
+            .insert(tid, method.dependencies().iter().copied().collect());
         self.constructors.insert(tid, method);
     }
 
