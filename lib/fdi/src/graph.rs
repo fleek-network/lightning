@@ -149,6 +149,7 @@ impl DependencyGraph {
     pub fn with_infallible<F, P>(self, f: F) -> Self
     where
         F: Method<P>,
+        F::Output: 'static,
     {
         self.with(f.to_infallible())
     }
