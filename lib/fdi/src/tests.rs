@@ -346,3 +346,25 @@ fn demo_bounded() {
     graph.init_all(&mut provider).unwrap();
     provider.trigger("start");
 }
+
+#[test]
+fn async_function_usage() {
+    #[derive(Default)]
+    struct A(u32);
+
+    impl A {
+        async fn hello(&self) -> u32 {
+            self.0
+        }
+    }
+
+    fn expect_method<F, P>(m: F)
+    where
+        F: Method<P>,
+    {
+    }
+
+    expect_method(A::hello);
+    // expect_method(A::hello.spawn());
+    // expect_method(A::hello.block_on());
+}

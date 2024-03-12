@@ -1,3 +1,5 @@
+use futures::Future;
+
 use crate::extractor::Extractor;
 use crate::ty::Ty;
 use crate::{Bind, Captured, Eventstore, Method, Provider};
@@ -5,12 +7,86 @@ use crate::{Bind, Captured, Eventstore, Method, Provider};
 // TODO(qti3e): we could be smarter here to reduce the number of generated lines of code.
 // idea: maybe convert everything to a bind recursivly.
 
+macro_rules! impl_async {
+    ([], [], []) => {};
+    (
+        [$($mut:ident)*],
+        [$($get:ident)*],
+        [$($ext:ident)*]
+    ) => {
+        #[allow(clippy::all, unused, unused_mut)]
+        impl<'a, F, T: 'a, Fut
+            $(, $mut: 'a)*
+            $(, $get: 'a)*
+            $(, $ext: 'a)*
+        > Method<(
+            Fut,
+            (
+                $($mut,)*
+            ),
+            (
+                $($get,)*
+            ),
+            (
+                $($ext,)*
+            ),
+        )> for F
+        where
+            F: FnOnce(
+                $(&'a mut $mut,)*
+                $(&'a $get,)*
+                $($ext,)*
+            ) -> Fut,
+            Fut: Future<Output = T> + 'a,
+            $($ext: 'static + for<'x> Extractor<'x>,)*
+        {
+            type Output = Fut;
+
+            #[inline(always)]
+            fn display_name(&self) -> Option<String> {
+                None
+            }
+
+            #[inline(always)]
+            fn events(&self) -> Option<Eventstore> {
+                None
+            }
+
+            #[inline]
+            fn dependencies() -> Vec<Ty> {
+                let mut out = Vec::new();
+                $(out.push(Ty::of::<$mut>());)*
+                $(out.push(Ty::of::<$get>());)*
+                $($ext::dependencies(&mut out);)*
+                out
+            }
+
+            #[inline(always)]
+            fn call(self, provider: &Provider) -> Self::Output {
+                let guard = provider.guard();
+                (self)(
+                    $(guard.extract::<&mut $mut>(),)*
+                    $(guard.extract::<&$get>(),)*
+                    $(guard.extract::<$ext>(),)*
+                )
+            }
+        }
+
+    };
+}
+
 macro_rules! impl_method {
     (
         [$($mut:ident)*],
         [$($get:ident)*],
         [$($ext:ident)*]
     ) => {
+        // impl_async!(
+        //     [$($mut)*],
+        //     [$($get)*],
+        //     [$($ext)*]
+        // );
+
         #[allow(clippy::all, unused, unused_mut)]
         impl<F, T
             $(, $mut)*
@@ -28,12 +104,11 @@ macro_rules! impl_method {
             ),
         )> for F
         where
-            F: 'static + FnOnce(
+            F: FnOnce(
                 $(&mut $mut,)*
                 $(& $get,)*
                 $($ext,)*
             ) -> T,
-            T: 'static,
             $($mut: 'static,)*
             $($get: 'static,)*
             $($ext: 'static + for<'x> Extractor<'x>,)*
@@ -94,7 +169,6 @@ macro_rules! impl_method {
                 $($ext,)*
             ) -> T,
             Arg: 'static,
-            T: 'static,
             $($mut: 'static,)*
             $($get: 'static,)*
             $($ext: 'static + for<'x> Extractor<'x>,)*
@@ -132,7 +206,6 @@ macro_rules! impl_method {
                 $(& $get,)*
                 $($ext,)*
             ) -> T,
-            T: 'static,
             $($mut: 'static,)*
             $($get: 'static,)*
             $($ext: 'static + for<'x> Extractor<'x>,)*
