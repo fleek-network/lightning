@@ -64,6 +64,7 @@ impl<C: Collection> Node<C> {
         let graph = DependencyGraph::new()
             .with_value(waiter)
             .with_value(Blank::<C>::default())
+            .with_module::<C::BlockstoreServerInterface>()
             .with(C::KeystoreInterface::infu_initialize_hack)
             .with(
                 C::BlockstoreInterface::infu_initialize_hack
@@ -72,10 +73,6 @@ impl<C: Collection> Node<C> {
             .with(C::NotifierInterface::infu_initialize_hack)
             .with(
                 <C::IndexerInterface as IndexerInterface<C>>::infu_initialize_hack
-            )
-            .with(
-                C::BlockstoreServerInterface::infu_initialize_hack
-                    .on("start", C::BlockstoreServerInterface::start.spawn()),
             )
             .with(
                 <C::ApplicationInterface as ApplicationInterface<C>>::infu_initialize_hack
@@ -134,14 +131,16 @@ impl<C: Collection> Node<C> {
                         block_on(c.shutdown())
                     }),
             )
-            // .with(
-            //     C::DeliveryAcknowledgmentAggregatorInterface::infu_initialize_hack.on(
-            //         "start",
-            //         |c: &C::DeliveryAcknowledgmentAggregatorInterface| {
-            //             h.block_on(c.start())
-            //         },
-            //     ),
-            // )
+            .with(
+                C::DeliveryAcknowledgmentAggregatorInterface::infu_initialize_hack.on(
+                    "start",
+                    |daa: &C::DeliveryAcknowledgmentAggregatorInterface| {
+                        block_on(daa.start())
+                    },
+                ).on("shutdown", |daa: Consume<C::DeliveryAcknowledgmentAggregatorInterface>| {
+                    block_on(daa.shutdown())
+                }),
+            )
             .with(
                 C::ReputationAggregatorInterface::infu_initialize_hack
                     .on("start", |c: &C::ReputationAggregatorInterface| {
