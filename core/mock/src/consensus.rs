@@ -9,7 +9,6 @@ use axum::extract::State;
 use axum::routing::post;
 use axum::{Json, Router};
 use fdi::{BuildGraph, DependencyGraph};
-
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::types::{Block, Event, TransactionRequest};
 use lightning_interfaces::{

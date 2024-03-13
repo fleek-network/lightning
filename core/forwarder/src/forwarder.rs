@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use affair::{Executor, TokioSpawn};
 use fdi::{BuildGraph, DependencyGraph};
-use lightning_interfaces::infu_collection::{Collection};
+use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::{
     ApplicationInterface,
     ConfigConsumer,
