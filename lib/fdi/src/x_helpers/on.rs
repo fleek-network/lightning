@@ -17,11 +17,6 @@ where
     type Output = F::Output;
 
     #[inline(always)]
-    fn display_name(&self) -> Option<String> {
-        self.method.display_name()
-    }
-
-    #[inline(always)]
     fn events(&self) -> Option<Eventstore> {
         if let Some(handler) = self.handler.borrow_mut().take() {
             let mut events = self.method.events().unwrap_or_default();

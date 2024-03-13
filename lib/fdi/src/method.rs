@@ -5,10 +5,6 @@ use crate::{Eventstore, Provider};
 pub trait Method<P> {
     type Output;
 
-    /// The display name of the method. This is used for printing purposes. It defaults
-    /// to the name of the output type.
-    fn display_name(&self) -> Option<String>;
-
     /// Return the events that should be registered after this method is invoked.
     fn events(&self) -> Option<Eventstore>;
 

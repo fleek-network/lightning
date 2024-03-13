@@ -28,11 +28,6 @@ where
     type Output = OutW::Output;
 
     #[inline(always)]
-    fn display_name(&self) -> Option<String> {
-        self.method.display_name()
-    }
-
-    #[inline(always)]
     fn events(&self) -> Option<crate::Eventstore> {
         self.method.events()
     }
