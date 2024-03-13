@@ -4,7 +4,7 @@ use indexmap::IndexSet;
 
 use crate::dyn_method::DynMethod;
 use crate::method::Method;
-use crate::ty::Ty;
+use crate::ty::Param;
 use crate::{MethodExt, Provider};
 
 /// The [Eventstore] can be used to store a list of event handlers under each event name.
@@ -22,7 +22,7 @@ impl Eventstore {
     }
 
     /// Return a set of all of the dependencies required to trigger an event.
-    pub fn get_dependencies(&self, event: &'static str) -> IndexSet<Ty> {
+    pub fn get_dependencies(&self, event: &'static str) -> IndexSet<Param> {
         let mut result = IndexSet::new();
 
         if let Some(handlers) = self.handlers.get(event) {

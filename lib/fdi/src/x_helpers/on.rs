@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 
 use crate::dyn_method::DynMethod;
-use crate::ty::Ty;
+use crate::ty::Param;
 use crate::{Eventstore, Method, Provider};
 
 struct On<F> {
@@ -28,7 +28,7 @@ where
     }
 
     #[inline(always)]
-    fn dependencies() -> Vec<Ty> {
+    fn dependencies() -> Vec<Param> {
         F::dependencies()
     }
 

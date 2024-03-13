@@ -9,6 +9,16 @@ pub struct Ty {
     ty: TypeId,
 }
 
+#[derive(Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash)]
+pub enum Ownership {
+    Ref,
+    RefMut,
+    Take,
+}
+
+/// The required ownership of a parameter along the type for it.
+pub type Param = (Ownership, Ty);
+
 impl Ty {
     pub fn of<T: 'static>() -> Self {
         Self {
