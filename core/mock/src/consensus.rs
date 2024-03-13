@@ -9,7 +9,7 @@ use axum::extract::State;
 use axum::routing::post;
 use axum::{Json, Router};
 use fdi::{BuildGraph, DependencyGraph};
-use fleek_crypto::ConsensusPublicKey;
+
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::types::{Block, Event, TransactionRequest};
 use lightning_interfaces::{
@@ -58,23 +58,6 @@ impl Default for Config {
 /// delay. MUST ALWAYS be used alongside [`MockConsensus`].
 pub struct MockForwarder<C>(MempoolSocket, PhantomData<C>);
 impl<C: Collection> ForwarderInterface<C> for MockForwarder<C> {
-    fn init(
-        config: Self::Config,
-        _consensus_key: ConsensusPublicKey,
-        _query_runner: c!(C::ApplicationInterface::SyncExecutor),
-    ) -> anyhow::Result<Self> {
-        let tx = CHANNEL.get_or_init(|| broadcast::channel(128).0);
-        let socket = TokioSpawn::spawn_async(MempoolSocketWorker {
-            sender: tx.clone(),
-            success_distr: Binomial::new(100, config.mempool_success_rate)
-                .expect("MockConsensus: Success rate must be 0.0<=p<=1.0"),
-            delay_distr: Cauchy::new(1000.0, 0.3).unwrap(), // 1000 is in ms.
-            rng: ChaCha20Rng::from_seed(thread_rng().gen()),
-        });
-
-        Ok(Self(socket, PhantomData))
-    }
-
     fn mempool_socket(&self) -> MempoolSocket {
         self.0.clone()
     }
@@ -88,19 +71,21 @@ impl<C> ConfigConsumer for MockForwarder<C> {
 
 impl<C: Collection> BuildGraph for MockForwarder<C> {
     fn build_graph() -> DependencyGraph {
-        use lightning_interfaces::{ConfigProviderInterface, KeystoreInterface};
+        use lightning_interfaces::ConfigProviderInterface;
 
-        DependencyGraph::new().with_infallible(
-            |provider: &C::ConfigProviderInterface,
-             app: &C::ApplicationInterface,
-             keystore: &C::KeystoreInterface| {
-                Self::init(
-                    provider.get::<Self>(),
-                    keystore.get_bls_pk(),
-                    app.sync_query(),
-                )
-            },
-        )
+        DependencyGraph::new().with_infallible(|provider: &C::ConfigProviderInterface| {
+            let config = provider.get::<Self>();
+            let tx = CHANNEL.get_or_init(|| broadcast::channel(128).0);
+            let socket = TokioSpawn::spawn_async(MempoolSocketWorker {
+                sender: tx.clone(),
+                success_distr: Binomial::new(100, config.mempool_success_rate)
+                    .expect("MockConsensus: Success rate must be 0.0<=p<=1.0"),
+                delay_distr: Cauchy::new(1000.0, 0.3).unwrap(), // 1000 is in ms.
+                rng: ChaCha20Rng::from_seed(thread_rng().gen()),
+            });
+
+            Self(socket, PhantomData)
+        })
     }
 }
 

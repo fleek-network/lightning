@@ -1,10 +1,8 @@
 use std::marker::PhantomData;
 
 use affair::{Executor, TokioSpawn};
-use anyhow::Result;
 use fdi::{BuildGraph, DependencyGraph};
-use fleek_crypto::ConsensusPublicKey;
-use lightning_interfaces::infu_collection::{c, Collection};
+use lightning_interfaces::infu_collection::{Collection};
 use lightning_interfaces::{
     ApplicationInterface,
     ConfigConsumer,
@@ -21,19 +19,6 @@ pub struct Forwarder<C> {
 }
 
 impl<C: Collection> ForwarderInterface<C> for Forwarder<C> {
-    fn init(
-        _config: Self::Config,
-        consensus_key: ConsensusPublicKey,
-        query_runner: c!(C::ApplicationInterface::SyncExecutor),
-    ) -> Result<Self> {
-        let socket = TokioSpawn::spawn_async(Worker::new(consensus_key, query_runner));
-
-        Ok(Self {
-            socket,
-            _p: PhantomData,
-        })
-    }
-
     fn mempool_socket(&self) -> MempoolSocket {
         self.socket.clone()
     }
@@ -52,7 +37,12 @@ impl<C: Collection> BuildGraph for Forwarder<C> {
             |keystore: &C::KeystoreInterface, app: &C::ApplicationInterface| {
                 let consensus_key = keystore.get_bls_pk();
                 let query_runner = app.sync_query();
-                Self::init(ForwarderConfig {}, consensus_key, query_runner)
+                let socket = TokioSpawn::spawn_async(Worker::new(consensus_key, query_runner));
+
+                Self {
+                    socket,
+                    _p: PhantomData,
+                }
             },
         )
     }

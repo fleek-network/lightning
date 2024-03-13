@@ -65,6 +65,7 @@ impl<C: Collection> Node<C> {
             .with_value(waiter)
             .with_value(Blank::<C>::default())
             .with_module::<C::BlockstoreServerInterface>()
+            .with_module::<C::ForwarderInterface>()
             .with(C::KeystoreInterface::infu_initialize_hack)
             .with(
                 C::BlockstoreInterface::infu_initialize_hack
@@ -107,7 +108,6 @@ impl<C: Collection> Node<C> {
                     .on("start", |c: &C::ArchiveInterface| block_on(c.start()))
                     .on("shutdown", |c: &C::ArchiveInterface| block_on(c.shutdown())),
             )
-            .with(C::ForwarderInterface::infu_initialize_hack)
             .with(
                 C::ConsensusInterface::infu_initialize_hack
                     .on("start", |c: &C::ConsensusInterface| block_on(c.start()))
@@ -231,26 +231,5 @@ impl<C: Collection> Node<C> {
 
     /// Fill the configuration provider with the default configuration without performing any
     /// initialization.
-    pub fn fill_configuration<T: Collection>(config_provider: &impl ConfigProviderInterface<T>) {
-        config_provider.get::<C::BlockstoreServerInterface>();
-        config_provider.get::<C::KeystoreInterface>();
-        config_provider.get::<C::SignerInterface>();
-        config_provider.get::<C::ApplicationInterface>();
-        config_provider.get::<C::BlockstoreInterface>();
-        config_provider.get::<C::BroadcastInterface>();
-        config_provider.get::<C::TopologyInterface>();
-        config_provider.get::<C::ArchiveInterface>();
-        config_provider.get::<C::ForwarderInterface>();
-        config_provider.get::<C::ConsensusInterface>();
-        config_provider.get::<C::HandshakeInterface>();
-        config_provider.get::<C::OriginProviderInterface>();
-        config_provider.get::<C::DeliveryAcknowledgmentAggregatorInterface>();
-        config_provider.get::<C::ReputationAggregatorInterface>();
-        config_provider.get::<C::ResolverInterface>();
-        config_provider.get::<C::RpcInterface>();
-        config_provider.get::<C::ServiceExecutorInterface>();
-        config_provider.get::<C::FetcherInterface>();
-        config_provider.get::<C::PoolInterface>();
-        config_provider.get::<C::PingerInterface>();
-    }
+    pub fn fill_configuration<T: Collection>(_config_provider: &impl ConfigProviderInterface<T>) {}
 }

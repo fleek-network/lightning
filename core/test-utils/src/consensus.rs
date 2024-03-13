@@ -5,7 +5,6 @@ use std::time::Duration;
 
 use affair::{AsyncWorker, Executor, TokioSpawn};
 use fdi::{BuildGraph, DependencyGraph};
-use fleek_crypto::ConsensusPublicKey;
 use lightning_interfaces::application::ExecutionEngineSocket;
 // TODO(qti3e): Should we deprecate this?
 use lightning_interfaces::config::ConfigConsumer;
@@ -33,17 +32,6 @@ static CHANNEL: OnceLock<broadcast::Sender<TransactionRequest>> = OnceLock::new(
 /// A mock forwarder that sends transactions. MUST ALWAYS be used alongside [`MockConsensus`].
 pub struct MockForwarder<C>(MempoolSocket, PhantomData<C>);
 impl<C: Collection> ForwarderInterface<C> for MockForwarder<C> {
-    fn init(
-        _config: Self::Config,
-        _consensus_key: ConsensusPublicKey,
-        _query_runner: c!(C::ApplicationInterface::SyncExecutor),
-    ) -> anyhow::Result<Self> {
-        let tx = CHANNEL.get_or_init(|| broadcast::channel(128).0);
-        let socket = TokioSpawn::spawn_async(MempoolSocketWorker { sender: tx.clone() });
-
-        Ok(Self(socket, PhantomData))
-    }
-
     fn mempool_socket(&self) -> MempoolSocket {
         self.0.clone()
     }
