@@ -5,7 +5,7 @@ use anyhow::Result;
 use fleek_blake3 as blake3;
 use lightning_e2e::swarm::Swarm;
 use lightning_e2e::utils::{logging, rpc};
-use lightning_interfaces::BlockStoreInterface;
+use lightning_interfaces::BlockstoreInterface;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde_json::json;
 use serial_test::serial;

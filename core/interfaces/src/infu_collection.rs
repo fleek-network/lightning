@@ -12,8 +12,8 @@ collection!([
     ConfigProviderInterface,
     KeystoreInterface,
     ApplicationInterface,
-    BlockStoreInterface,
-    BlockStoreServerInterface,
+    BlockstoreInterface,
+    BlockstoreServerInterface,
     SyncronizerInterface,
     BroadcastInterface,
     TopologyInterface,
@@ -66,9 +66,9 @@ impl<C: Collection> Node<C> {
             .with_value(Blank::<C>::default())
             .with(C::KeystoreInterface::infu_initialize_hack.with_display_name("Keystore"))
             .with(
-                C::BlockStoreInterface::infu_initialize_hack
+                C::BlockstoreInterface::infu_initialize_hack
                     .with_display_name("Blockstore")
-                    .on("_post", C::BlockStoreInterface::infu_post_hack),
+                    .on("_post", C::BlockstoreInterface::infu_post_hack),
             )
             .with(C::NotifierInterface::infu_initialize_hack.with_display_name("Notifier"))
             .with(
@@ -76,9 +76,9 @@ impl<C: Collection> Node<C> {
                     .with_display_name("Indexer"),
             )
             .with(
-                C::BlockStoreServerInterface::infu_initialize_hack
+                C::BlockstoreServerInterface::infu_initialize_hack
                     .with_display_name("Blockstore_Server")
-                    .on("start", C::BlockStoreServerInterface::start.spawn()),
+                    .on("start", C::BlockstoreServerInterface::start.spawn()),
             )
             .with(
                 <C::ApplicationInterface as ApplicationInterface<C>>::infu_initialize_hack
@@ -247,11 +247,11 @@ impl<C: Collection> Node<C> {
     /// Fill the configuration provider with the default configuration without performing any
     /// initialization.
     pub fn fill_configuration<T: Collection>(config_provider: &impl ConfigProviderInterface<T>) {
-        config_provider.get::<C::BlockStoreServerInterface>();
+        config_provider.get::<C::BlockstoreServerInterface>();
         config_provider.get::<C::KeystoreInterface>();
         config_provider.get::<C::SignerInterface>();
         config_provider.get::<C::ApplicationInterface>();
-        config_provider.get::<C::BlockStoreInterface>();
+        config_provider.get::<C::BlockstoreInterface>();
         config_provider.get::<C::BroadcastInterface>();
         config_provider.get::<C::TopologyInterface>();
         config_provider.get::<C::ArchiveInterface>();

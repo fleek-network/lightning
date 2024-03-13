@@ -39,7 +39,7 @@ impl<C: Collection> SyncronizerInterface<C> for MockSyncronizer<C> {
     fn init(
         _config: Self::Config,
         _query_runner: c!(C::ApplicationInterface::SyncExecutor),
-        _blockstore_server: &C::BlockStoreServerInterface,
+        _blockstore_server: &C::BlockstoreServerInterface,
         _keystore: C::KeystoreInterface,
         _rx_epoch_change: Receiver<Notification>,
     ) -> Result<Self> {

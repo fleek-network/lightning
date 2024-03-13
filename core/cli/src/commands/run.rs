@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use lightning_interfaces::infu_collection::{Collection, Node};
 use lightning_interfaces::{
     ApplicationInterface,
-    BlockStoreInterface,
+    BlockstoreInterface,
     ConfigProviderInterface,
     SyncronizerInterface,
 };
@@ -47,7 +47,7 @@ where
                 // get the checkpoint from the blockstore
                 let checkpoint = node
                 .provider
-                .get::<<C as Collection>::BlockStoreInterface>()
+                .get::<<C as Collection>::BlockstoreInterface>()
                 .read_all_to_vec(&checkpoint_hash).await.expect("Failed to read checkpoint from blockstore");
 
                 // shutdown the node

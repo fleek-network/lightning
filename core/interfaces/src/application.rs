@@ -46,7 +46,7 @@ use crate::types::{
     TotalServed,
     TransactionResponse,
 };
-use crate::{BlockStoreInterface, ConfigProviderInterface};
+use crate::{BlockstoreInterface, ConfigProviderInterface};
 
 /// The socket that is handled by the application layer and fed by consensus (or other
 /// synchronization systems in place) which executes and persists transactions that
@@ -63,7 +63,7 @@ pub type ExecutionEngineSocket = Socket<Block, BlockExecutionResponse>;
 pub trait ApplicationInterface<C: Collection>:
     WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync
 {
-    fn _init(config: ::ConfigProviderInterface, blockstore: ::BlockStoreInterface) {
+    fn _init(config: ::ConfigProviderInterface, blockstore: ::BlockstoreInterface) {
         let config = config.get::<Self>();
         Self::init(config, blockstore.clone())
     }
@@ -72,7 +72,7 @@ pub trait ApplicationInterface<C: Collection>:
     type SyncExecutor: SyncQueryRunnerInterface;
 
     /// Create a new instance of the application layer using the provided configuration.
-    fn init(config: Self::Config, blockstore: C::BlockStoreInterface) -> anyhow::Result<Self>;
+    fn init(config: Self::Config, blockstore: C::BlockstoreInterface) -> anyhow::Result<Self>;
 
     /// Returns a socket that should be used to submit transactions to be executed
     /// by the application layer.

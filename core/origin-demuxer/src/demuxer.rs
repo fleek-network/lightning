@@ -20,7 +20,7 @@ pub struct Demuxer<C: Collection> {
 impl<C: Collection> Demuxer<C> {
     pub fn new(
         config: Config,
-        blockstore: C::BlockStoreInterface,
+        blockstore: C::BlockstoreInterface,
         task_rx: Receiver<Task<ImmutablePointer, anyhow::Result<Blake3Hash>>>,
     ) -> anyhow::Result<Self> {
         Ok(Self {

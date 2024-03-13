@@ -8,7 +8,7 @@ use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::ServiceId;
 use lightning_interfaces::{
     ApplicationInterface,
-    BlockStoreInterface,
+    BlockstoreInterface,
     ConfigConsumer,
     ExecutorProviderInterface,
     FetcherSocket,
@@ -74,7 +74,7 @@ impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
 
     fn init(
         config: Self::Config,
-        blockstore: &C::BlockStoreInterface,
+        blockstore: &C::BlockstoreInterface,
         fetcher_socket: FetcherSocket,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
     ) -> anyhow::Result<Self> {

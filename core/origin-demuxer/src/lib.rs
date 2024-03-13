@@ -78,7 +78,7 @@ impl<C: Collection> WithStartAndShutdown for OriginDemuxer<C> {
 }
 
 impl<C: Collection> OriginProviderInterface<C> for OriginDemuxer<C> {
-    fn init(config: Config, blockstore: C::BlockStoreInterface) -> anyhow::Result<Self> {
+    fn init(config: Config, blockstore: C::BlockstoreInterface) -> anyhow::Result<Self> {
         let (socket, rx) = Socket::raw_bounded(2048);
         Ok(Self {
             status: Mutex::new(Some(Status::NotRunning {

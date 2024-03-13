@@ -305,7 +305,7 @@ mod tests {
 
     use anyhow::Result;
     use lightning_blockstore::blockstore::Blockstore;
-    use lightning_interfaces::{partial, BlockStoreInterface};
+    use lightning_interfaces::{partial, BlockstoreInterface};
     use lightning_service_executor::shim::{ServiceExecutor, ServiceExecutorConfig};
     use lightning_test_utils::keys::EphemeralKeystore;
 
@@ -315,7 +315,7 @@ mod tests {
         HandshakeInterface = Handshake<Self>;
         ServiceExecutorInterface = ServiceExecutor<Self>;
         KeystoreInterface = EphemeralKeystore<Self>;
-        BlockStoreInterface = Blockstore<Self>;
+        BlockstoreInterface = Blockstore<Self>;
     });
 
     #[tokio::test]

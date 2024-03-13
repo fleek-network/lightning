@@ -18,7 +18,7 @@ use lightning_interfaces::{
     ArchiveRequest,
     ArchiveResponse,
     ArchiveSocket,
-    BlockStoreInterface,
+    BlockstoreInterface,
     ConfigConsumer,
     IndexRequest,
     IndexSocket,
@@ -63,7 +63,7 @@ impl<C: Collection> ArchiveInterface<C> for Archive<C> {
     fn init(
         config: Self::Config,
         _query_runner: c!(C::ApplicationInterface::SyncExecutor),
-        blockstore: C::BlockStoreInterface,
+        blockstore: C::BlockstoreInterface,
     ) -> anyhow::Result<Self> {
         if config.is_archive {
             let shutdown_notify = Arc::new(Notify::new());
@@ -161,7 +161,7 @@ struct ArchiveInner<C: Collection> {
     db: Arc<DB>,
     shutdown_notify: Arc<Notify>,
     _marker: PhantomData<C>,
-    blockstore: c!(C::BlockStoreInterface),
+    blockstore: c!(C::BlockstoreInterface),
     /// Handles the rocks db storage for each epoch
     historical_state_dir: ResolvedPathBuf,
 }
@@ -174,7 +174,7 @@ impl<C: Collection> ArchiveInner<C> {
         db: Arc<DB>,
         shutdown_notify: Arc<Notify>,
         historical_state_dir: ResolvedPathBuf,
-        blockstore: c!(C::BlockStoreInterface),
+        blockstore: c!(C::BlockstoreInterface),
     ) -> Self {
         Self {
             archive_rx: Arc::new(Mutex::new(Some(archive_rx))),
