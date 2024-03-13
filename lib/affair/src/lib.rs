@@ -31,7 +31,9 @@ use std::fmt::Display;
 use std::sync::{Arc, Weak};
 
 use crossbeam::sync::ShardedLock;
-use futures::Future;
+use futures::future::BoxFuture;
+use futures::stream::FuturesUnordered;
+use futures::{Future, StreamExt};
 use tokio::sync::{mpsc, oneshot};
 
 pub type Observer<Res> = Box<dyn Fn(&Res) + Send + Sync>;
@@ -60,6 +62,18 @@ pub trait AsyncWorker: Send + 'static {
 
     /// Implement your custom handler for this async worker and enjoy using `await`.
     fn handle(&mut self, req: Self::Request) -> impl Future<Output = Self::Response> + Send;
+}
+
+/// An awaiting worker that processes requests and returns a response in an unordered way.
+pub trait AsyncWorkerUnordered: Send + Sync + 'static {
+    /// The payload of the request that can be sent to the worker.
+    type Request: Send + 'static;
+
+    /// The response for a request.
+    type Response: Send + 'static;
+
+    /// Implement your custom handler for this async worker and enjoy using `await`.
+    fn handle(&self, req: Self::Request) -> impl Future<Output = Self::Response> + Send;
 }
 
 /// A socket that can be used to communicate with a worker, you can use a socket to send
@@ -133,6 +147,15 @@ pub trait Executor {
     /// The worker is stopped when all of the references to [`Socket`] are dropped, if you want a
     /// socket that does not keep the worker alive consider using a [`WeakSocket`].
     fn spawn_async<H: AsyncWorker>(handler: H) -> Socket<H::Request, H::Response>;
+
+    /// Spawn a [`AsyncWorker`] and returns a [`Socket`] which can be used to send requests to the
+    /// spawned worker.
+    ///
+    /// The worker is stopped when all of the references to [`Socket`] are dropped, if you want a
+    /// socket that does not keep the worker alive consider using a [`WeakSocket`].
+    fn spawn_async_unordered<H: AsyncWorkerUnordered>(
+        handler: H,
+    ) -> Socket<H::Request, H::Response>;
 }
 
 pub struct Task<Req, Res> {
@@ -220,6 +243,12 @@ impl Executor for DedicatedThread {
             observers: Default::default(),
         }
     }
+
+    fn spawn_async_unordered<H: AsyncWorkerUnordered>(
+        _handler: H,
+    ) -> Socket<H::Request, H::Response> {
+        unimplemented!()
+    }
 }
 
 impl Executor for TokioSpawn {
@@ -235,6 +264,19 @@ impl Executor for TokioSpawn {
     fn spawn_async<H: AsyncWorker>(handler: H) -> Socket<H::Request, H::Response> {
         let (tx, rx) = mpsc::channel(64);
         tokio::spawn(run_non_blocking_async(rx, handler));
+        Socket {
+            sender: tx,
+            observers: Default::default(),
+        }
+    }
+
+    fn spawn_async_unordered<H: AsyncWorkerUnordered>(
+        handler: H,
+    ) -> Socket<H::Request, H::Response> {
+        let (tx, rx) = mpsc::channel(64);
+        tokio::spawn(async move {
+            run_unordered_async(rx, &handler).await;
+        });
         Socket {
             sender: tx,
             observers: Default::default(),
@@ -275,6 +317,43 @@ async fn run_non_blocking_async<Req, Res, H: AsyncWorker<Request = Req, Response
 ) {
     while let Some(event) = rx.recv().await {
         event.handle_async(|req| handler.handle(req)).await;
+    }
+}
+
+async fn run_unordered_async<'a, H: AsyncWorkerUnordered + 'a>(
+    mut rx: mpsc::Receiver<Task<H::Request, H::Response>>,
+    handler: &'a H,
+) {
+    'outer: loop {
+        let Some(event) = rx.recv().await else {
+            return;
+        };
+
+        let mut futures = FuturesUnordered::<BoxFuture<'a, ()>>::new();
+        let fut = event.handle_async(|req| handler.handle(req));
+        futures.push(Box::pin(fut));
+
+        'inner: loop {
+            tokio::select! {
+                maybe_event = rx.recv() => {
+                    let Some(event) = maybe_event else {
+                        break 'inner;
+                    };
+                    let fut = event.handle_async(|req| handler.handle(req));
+                    futures.push(Box::pin(fut));
+                },
+                _ = futures.next() => {
+                    if futures.is_empty() {
+                        continue 'outer;
+                    }
+                }
+            }
+        }
+
+        if !futures.is_empty() {
+            // drive all of the futures to completion.
+            futures.count().await;
+        }
     }
 }
 
