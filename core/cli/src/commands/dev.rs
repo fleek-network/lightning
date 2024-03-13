@@ -118,7 +118,7 @@ async fn fetch<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>>(
     let hash_string = fleek_blake3::Hash::from(hash).to_string();
 
     let config = TomlConfigProvider::<C>::load_or_write_config(config_path).await?;
-    let node = Node::<C>::init(config)
+    let mut node = Node::<C>::init(config)
         .map_err(|e| anyhow::anyhow!("Node Initialization failed: {e:?}"))
         .context("Could not start the node.")?;
 

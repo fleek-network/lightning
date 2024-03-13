@@ -52,7 +52,7 @@ impl<C: Collection> Container<C> {
                     .expect("Failed to build tokio runtime for node container.");
 
                 runtime.block_on(async move {
-                    let node = Node::<C>::init(config).unwrap();
+                    let mut node = Node::<C>::init(config).unwrap();
                     node.start().await;
                     let ckpt_rx = node
                         .provider

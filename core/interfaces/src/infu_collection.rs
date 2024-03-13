@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use fdi::{DependencyGraph, MethodExt, Provider};
 use futures::executor::block_on;
 pub use infusion::c;
-use infusion::collection;
+use infusion::{collection, Blank};
 
 use super::*;
 
@@ -38,15 +38,38 @@ collection!([
 /// The Fleek Network node.
 pub struct Node<C: Collection> {
     pub provider: Provider,
-    collection: PhantomData<C>,
+    pub shutdown: ShutdownController,
+    _p: PhantomData<C>,
 }
 
 impl<C: Collection> Node<C> {
+    #[inline(always)]
     pub fn init(config: C::ConfigProviderInterface) -> Result<Self, infusion::InitializationError> {
+        let provider = Provider::default();
+        provider.insert(config);
+        Self::init_with_provider(provider)
+    }
+
+    pub fn init_with_provider(
+        mut provider: Provider,
+    ) -> Result<Self, infusion::InitializationError> {
+        let mut exec = provider.get_mut::<fdi::Executor>();
+        exec.set_spawn_cb(|fut| {
+            tokio::spawn(fut);
+        });
+
+        let shutdown = ShutdownController::new();
+        let waiter = shutdown.waiter();
+
         let graph = DependencyGraph::new()
-            .with_infallible((|| config).with_display_name("Config_Provider"))
+            .with_value(waiter)
+            .with_value(Blank::<C>::default())
             .with(C::KeystoreInterface::infu_initialize_hack.with_display_name("Keystore"))
-            .with(C::BlockStoreInterface::infu_initialize_hack.with_display_name("Blockstore"))
+            .with(
+                C::BlockStoreInterface::infu_initialize_hack
+                    .with_display_name("Blockstore")
+                    .on("_post", C::BlockStoreInterface::infu_post_hack),
+            )
             .with(C::NotifierInterface::infu_initialize_hack.with_display_name("Notifier"))
             .with(
                 <C::IndexerInterface as IndexerInterface<C>>::infu_initialize_hack
@@ -55,12 +78,7 @@ impl<C: Collection> Node<C> {
             .with(
                 C::BlockStoreServerInterface::infu_initialize_hack
                     .with_display_name("Blockstore_Server")
-                    .on("start", |c: &C::BlockStoreServerInterface| {
-                        block_on(c.start())
-                    })
-                    .on("shutdown", |c: &C::BlockStoreServerInterface| {
-                        block_on(c.shutdown())
-                    }),
+                    .on("start", C::BlockStoreServerInterface::start.spawn()),
             )
             .with(
                 <C::ApplicationInterface as ApplicationInterface<C>>::infu_initialize_hack
@@ -186,7 +204,14 @@ impl<C: Collection> Node<C> {
                 C::PoolInterface::infu_initialize_hack
                     .with_display_name("Pool")
                     .on("start", |c: &C::PoolInterface| block_on(c.start()))
-                    .on("shutdown", |c: &C::PoolInterface| block_on(c.shutdown())),
+                    .on(
+                        "shutdown",
+                        (|c: Consume<C::PoolInterface>, waiter: Cloned<ShutdownWaiter>| async move {
+                            c.shutdown().await;
+                            // hack: use waiter as a simple guard to hold off shutdown until this is complete.
+                            drop(waiter);
+                        }).spawn(),
+                    ),
             )
             .with(
                 C::PingerInterface::infu_initialize_hack
@@ -198,14 +223,14 @@ impl<C: Collection> Node<C> {
         let vis = graph.viz("Lightning Dependency Graph");
         println!("{vis}");
 
-        let mut container = Provider::default();
         graph
-            .init_all(&mut container)
+            .init_all(&mut provider)
             .expect("failed to init dependency graph");
 
         Ok(Self {
-            provider: container,
-            collection: PhantomData,
+            provider,
+            shutdown,
+            _p: PhantomData,
         })
     }
 
@@ -213,9 +238,10 @@ impl<C: Collection> Node<C> {
         self.provider.trigger("start");
     }
 
-    /// Temporary shutdown for old start and shutdown handlers
-    pub async fn shutdown(&self) {
+    /// Shutdown the node
+    pub async fn shutdown(&mut self) {
         self.provider.trigger("shutdown");
+        self.shutdown.shutdown().await;
     }
 
     /// Fill the configuration provider with the default configuration without performing any
