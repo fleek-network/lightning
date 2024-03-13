@@ -38,7 +38,7 @@ collection!([
 /// The Fleek Network node.
 pub struct Node<C: Collection> {
     pub provider: Provider,
-    pub shutdown: ShutdownController,
+    pub shutdown: Option<ShutdownController>,
     _p: PhantomData<C>,
 }
 
@@ -229,7 +229,7 @@ impl<C: Collection> Node<C> {
 
         Ok(Self {
             provider,
-            shutdown,
+            shutdown: Some(shutdown),
             _p: PhantomData,
         })
     }
@@ -240,8 +240,13 @@ impl<C: Collection> Node<C> {
 
     /// Shutdown the node
     pub async fn shutdown(&mut self) {
+        let mut shutdown = self
+            .shutdown
+            .take()
+            .expect("cannot call shutdown more than once");
+        let handle = tokio::spawn(async move { shutdown.shutdown().await });
         self.provider.trigger("shutdown");
-        self.shutdown.shutdown().await;
+        handle.await.unwrap();
     }
 
     /// Fill the configuration provider with the default configuration without performing any
