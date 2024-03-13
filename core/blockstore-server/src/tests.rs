@@ -4,7 +4,6 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use blake3_tree::ProofBuf;
-use fdi::Ref;
 use fleek_crypto::{AccountOwnerSecretKey, NodePublicKey, SecretKey};
 use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
@@ -12,6 +11,7 @@ use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_blockstore::blockstore::{Blockstore, BLOCK_SIZE};
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_indexer::Indexer;
+use lightning_interfaces::fdi::Ref;
 use lightning_interfaces::infu_collection::{Collection, Node};
 use lightning_interfaces::types::{
     CompressionAlgoSet,
@@ -128,7 +128,7 @@ async fn get_peers(
     for (i, keystore) in keystores.into_iter().enumerate() {
         let node_public_key = keystore.get_ed25519_pk();
         let node = Node::<TestBinding>::init_with_provider(
-            fdi::Provider::default()
+            lightning_interfaces::fdi::Provider::default()
                 .with(
                     JsonConfigProvider::default()
                         .with::<Application<TestBinding>>(AppConfig {

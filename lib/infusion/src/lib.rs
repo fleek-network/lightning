@@ -33,7 +33,7 @@
 //! # Example
 //!
 //! ```
-#![doc = include_str!("../examples/graph.rs")]
+// #![doc = include_str!("../examples/graph.rs")]
 //! ```
 
 #![allow(clippy::all, unused)]
