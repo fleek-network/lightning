@@ -83,6 +83,17 @@ unsafe impl<T: 'static> Sync for Ref<T> where T: Send + Sync {}
 unsafe impl<T: 'static> Sync for RefMut<T> where T: Send + Sync {}
 
 impl Provider {
+    /// Helper to insert the given value to the provider inline during construction.
+    ///
+    /// # Panics
+    ///
+    /// If a value with the same type already exists in the provider.
+    #[inline(always)]
+    pub fn with<T: 'static>(self, value: T) -> Self {
+        self.insert(value);
+        self
+    }
+
     /// Insert the given value to the provider.
     ///
     /// # Panics
