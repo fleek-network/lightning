@@ -46,11 +46,6 @@ macro_rules! impl_method {
             type Output = T;
 
             #[inline(always)]
-            fn display_name(&self) -> Option<String> {
-                None
-            }
-
-            #[inline(always)]
             fn events(&self) -> Option<Eventstore> {
                 None
             }
@@ -141,11 +136,6 @@ macro_rules! impl_method {
             $($ext: 'static + for<'x> Extractor<'x>,)*
         {
             type Output = T;
-
-            #[inline(always)]
-            fn display_name(&self) -> Option<String> {
-                None
-            }
 
             #[inline(always)]
             fn events(&self) -> Option<Eventstore> {

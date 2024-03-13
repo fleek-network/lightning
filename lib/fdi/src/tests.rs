@@ -16,7 +16,6 @@ use crate::{
 };
 
 mod demo_dep {
-    use crate::ext::MethodExt;
     use crate::{DependencyGraph, Eventstore};
 
     pub struct Application;
@@ -57,8 +56,8 @@ mod demo_dep {
 
     pub fn graph() -> DependencyGraph {
         DependencyGraph::new()
-            .with_infallible(Application::new.with_display_name("App"))
-            .with_infallible(Application::get_query_runner.with_display_name("App::QueryRunner"))
+            .with_infallible(Application::new)
+            .with_infallible(Application::get_query_runner)
             .with_infallible(Archive::new)
             .with_infallible(Blockstore::new)
             .with_infallible(Indexer::new)

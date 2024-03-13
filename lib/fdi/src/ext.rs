@@ -9,19 +9,6 @@ pub trait MethodExt<P>: Sized + Method<P> {
     }
 
     #[inline(always)]
-    fn with_display_name(self, name: impl Into<String>) -> impl Method<P, Output = Self::Output> {
-        x_helpers::display_name::with_display_name(self, name)
-    }
-
-    #[inline(always)]
-    fn map_display_name<M>(self, map: M) -> impl Method<P, Output = Self::Output>
-    where
-        M: FnOnce(String) -> String,
-    {
-        x_helpers::display_name::map_display_name(self, map)
-    }
-
-    #[inline(always)]
     fn map<M, U>(self, transform: M) -> impl Method<P, Output = U>
     where
         M: FnOnce(Self::Output) -> U,
