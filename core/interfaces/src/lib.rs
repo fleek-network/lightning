@@ -59,3 +59,5 @@ pub use topology::*;
 // Re-export schema.
 #[rustfmt::skip]
 pub use lightning_schema as schema;
+
+pub use fdi;

@@ -169,39 +169,6 @@ macro_rules! collection {
         $(
             type $service: $service<Self> + 'static;
          )*
-
-            fn build_graph() -> $crate::DependencyGraph {
-                let mut vtables = Vec::<$crate::vtable::VTable>::new();
-
-            $(
-                vtables.push({
-                    fn init<C: Collection, T: $service<C> + 'static>(
-                        container: &$crate::Container
-                    ) -> ::std::result::Result<
-                        $crate::vtable::Object, ::std::boxed::Box<dyn std::error::Error>
-                    > {
-                        T::infu_initialize(container).map($crate::vtable::Object::new)
-                    }
-
-                    fn post<C: Collection, T: $service<C> + 'static>(
-                        obj: &mut $crate::vtable::Object,
-                        container: &$crate::Container
-                    ) {
-                        let obj = obj.downcast_mut::<T>();
-                        obj.infu_post_initialize(container);
-                    }
-
-                    $crate::vtable::VTable::new::<Self::$service>(
-                        stringify!($service),
-                        <Self::$service as $service<Self>>::infu_dependencies,
-                        init::<Self, Self::$service>,
-                        post::<Self, Self::$service>,
-                    )
-                });
-             )*
-
-                $crate::DependencyGraph::new(vtables)
-            }
         }
 
         #[derive(Clone)]
