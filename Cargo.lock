@@ -3610,6 +3610,7 @@ dependencies = [
  "anyhow",
  "futures",
  "indexmap 2.1.0",
+ "infusion",
  "parking_lot",
  "triomphe",
 ]
@@ -5566,7 +5567,6 @@ dependencies = [
  "anyhow",
  "blake3-tree",
  "bytes",
- "fdi",
  "fleek-crypto",
  "infusion",
  "lightning-application",

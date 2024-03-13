@@ -14,6 +14,7 @@ use anyhow::{anyhow, Result};
 use blake3_tree::ProofBuf;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use infusion::c;
+use lightning_interfaces::fdi::{BuildGraph, DependencyGraph, MethodExt};
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{
     Blake3Hash,
@@ -29,6 +30,7 @@ use lightning_interfaces::{
     BlockstoreServerSocket,
     Cloned,
     ConfigConsumer,
+    ConfigProviderInterface,
     IncrementalPutInterface,
     PoolInterface,
     RefMut,
@@ -62,22 +64,29 @@ pub struct BlockstoreServer<C: Collection> {
 }
 
 impl<C: Collection> BlockstoreServerInterface<C> for BlockstoreServer<C> {
+    fn get_socket(&self) -> BlockstoreServerSocket {
+        self.socket.clone()
+    }
+}
+
+impl<C: Collection> BlockstoreServer<C> {
     fn init(
-        config: Self::Config,
-        blockstore: C::BlockstoreInterface,
+        config: &C::ConfigProviderInterface,
+        blockstore: &C::BlockstoreInterface,
         pool: &C::PoolInterface,
-        rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
+        rep_aggregator: &C::ReputationAggregatorInterface,
     ) -> Result<Self> {
+        let config = config.get::<Self>();
         let (pool_requester, pool_responder) = pool.open_req_res(ServiceScope::BlockstoreServer);
         let (socket, request_rx) = Socket::raw_bounded(2048);
         let inner = Some(BlockstoreServerInner::<C>::new(
-            blockstore,
+            blockstore.clone(),
             request_rx,
             config.max_conc_req,
             config.max_conc_res,
             pool_requester,
             pool_responder,
-            rep_reporter,
+            rep_aggregator.get_reporter(),
         ));
 
         Ok(Self { inner, socket })
@@ -92,9 +101,11 @@ impl<C: Collection> BlockstoreServerInterface<C> for BlockstoreServer<C> {
         drop(this);
         waiter.run_until_shutdown(inner.start()).await;
     }
+}
 
-    fn get_socket(&self) -> BlockstoreServerSocket {
-        self.socket.clone()
+impl<C: Collection> BuildGraph for BlockstoreServer<C> {
+    fn build_graph() -> DependencyGraph {
+        DependencyGraph::default().with(Self::init.on("start", Self::start.spawn()))
     }
 }
 
