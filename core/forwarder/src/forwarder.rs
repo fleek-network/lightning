@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 
 use affair::{Executor, TokioSpawn};
 use anyhow::Result;
+use fdi::{BuildGraph, DependencyGraph};
 use fleek_crypto::ConsensusPublicKey;
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::{
@@ -41,4 +42,18 @@ impl<C: Collection> ForwarderInterface<C> for Forwarder<C> {
 impl<C> ConfigConsumer for Forwarder<C> {
     const KEY: &'static str = "forwarder";
     type Config = ForwarderConfig;
+}
+
+impl<C: Collection> BuildGraph for Forwarder<C> {
+    fn build_graph() -> DependencyGraph {
+        use lightning_interfaces::KeystoreInterface;
+
+        DependencyGraph::new().with_infallible(
+            |keystore: &C::KeystoreInterface, app: &C::ApplicationInterface| {
+                let consensus_key = keystore.get_bls_pk();
+                let query_runner = app.sync_query();
+                Self::init(ForwarderConfig {}, consensus_key, query_runner)
+            },
+        )
+    }
 }
