@@ -18,6 +18,13 @@ pub struct DependencyGraph {
     ordered: Rc<Vec<Ty>>,
 }
 
+/// Anything that can describe a (sub) dependency graph. The intended use case of this trait is to
+/// be used along [DependencyGraph::with_module].
+pub trait BuildGraph {
+    /// Create a dependency graph for this type.
+    fn build_graph() -> DependencyGraph;
+}
+
 /// The dependency graph should be used to create a project model. This can be done by providing
 /// a set of constructors for different values.
 impl DependencyGraph {
@@ -40,6 +47,15 @@ impl DependencyGraph {
             self.insert(tid, method);
         }
         self
+    }
+
+    /// Extend the current dependency graph with the provided sub module.
+    ///
+    /// # Panics
+    ///
+    /// If any of the items in `other` is already present in this graph.
+    pub fn with_module<G: BuildGraph>(self) -> Self {
+        self.expand(G::build_graph())
     }
 
     /// Shorthand function to use the [`default`](Default::default) as the constructor for a value.
