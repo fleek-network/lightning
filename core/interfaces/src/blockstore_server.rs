@@ -1,5 +1,7 @@
 use affair::Socket;
 use anyhow::Result;
+use fdi::{Cloned, RefMut};
+use futures::Future;
 use infusion::c;
 use lightning_types::{PeerRequestError, ServerRequest};
 use tokio::sync::broadcast;
@@ -11,16 +13,14 @@ use crate::{
     ConfigProviderInterface,
     PoolInterface,
     ReputationAggregatorInterface,
-    WithStartAndShutdown,
+    ShutdownWaiter,
 };
 
 pub type BlockStoreServerSocket =
     Socket<ServerRequest, broadcast::Receiver<Result<(), PeerRequestError>>>;
 
 #[infusion::service]
-pub trait BlockStoreServerInterface<C: Collection>:
-    Sized + Send + Sync + ConfigConsumer + WithStartAndShutdown
-{
+pub trait BlockStoreServerInterface<C: Collection>: Sized + Send + Sync + ConfigConsumer {
     fn _init(
         config: ::ConfigProviderInterface,
         blockstre: ::BlockStoreInterface,
@@ -41,6 +41,11 @@ pub trait BlockStoreServerInterface<C: Collection>:
         pool: &C::PoolInterface,
         rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
     ) -> anyhow::Result<Self>;
+
+    #[blank = async { }]
+    #[allow(clippy::manual_async_fn)]
+    fn start(this: RefMut<Self>, waiter: Cloned<ShutdownWaiter>)
+    -> impl Future<Output = ()> + Send;
 
     fn get_socket(&self) -> BlockStoreServerSocket;
 }
