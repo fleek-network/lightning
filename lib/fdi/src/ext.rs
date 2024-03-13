@@ -1,11 +1,11 @@
 use futures::Future;
 
-use crate::{x_helpers, Executor, Method};
+use crate::{helpers, Executor, Method};
 
 pub trait MethodExt<P>: Sized + Method<P> {
     #[inline(always)]
     fn to_infallible(self) -> impl Method<P, Output = anyhow::Result<Self::Output>> {
-        x_helpers::map::map(self, Ok)
+        helpers::map::map(self, Ok)
     }
 
     #[inline(always)]
@@ -14,7 +14,7 @@ pub trait MethodExt<P>: Sized + Method<P> {
         M: FnOnce(Self::Output) -> U,
         U: 'static,
     {
-        x_helpers::map::map(self, transform)
+        helpers::map::map(self, transform)
     }
 
     #[inline(always)]
@@ -22,7 +22,7 @@ pub trait MethodExt<P>: Sized + Method<P> {
     where
         H: Method<Y>,
     {
-        x_helpers::on::on(self, event, handler)
+        helpers::on::on(self, event, handler)
     }
 
     #[inline(always)]
@@ -31,7 +31,7 @@ pub trait MethodExt<P>: Sized + Method<P> {
         W: FnOnce(Self::Output) -> OutW,
         OutW: Method<ArgsOutW>,
     {
-        x_helpers::wrap_with::wrap_with(self, wrapper)
+        helpers::wrap_with::wrap_with(self, wrapper)
     }
 
     #[inline(always)]
@@ -40,7 +40,7 @@ pub trait MethodExt<P>: Sized + Method<P> {
         Self: 'static + Method<P> + Sized,
         Self::Output: Future,
     {
-        x_helpers::map::map(self, futures::executor::block_on)
+        helpers::map::map(self, futures::executor::block_on)
     }
 
     #[inline(always)]
