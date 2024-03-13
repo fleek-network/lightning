@@ -114,7 +114,7 @@ pub trait ResponseInterface: Send + Sync {
 }
 
 #[infusion::blank]
-pub trait ResponderInterface: Send {
+pub trait ResponderInterface: Send + Sync {
     type Request: RequestInterface;
     async fn get_next_request(&mut self) -> io::Result<(RequestHeader, Self::Request)>;
 }
