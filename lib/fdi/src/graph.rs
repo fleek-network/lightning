@@ -7,14 +7,14 @@ use indexmap::{IndexMap, IndexSet};
 use crate::dyn_method::DynMethod;
 use crate::method::Method;
 use crate::provider::{to_obj, Object};
-use crate::ty::Ty;
+use crate::ty::{Param, Ty};
 use crate::{Eventstore, MethodExt, Provider};
 
 #[derive(Default)]
 pub struct DependencyGraph {
     touched: bool,
     constructors: HashMap<Ty, DynMethod<Result<Object>>>,
-    pub(crate) graph: IndexMap<Ty, IndexSet<Ty>>,
+    pub(crate) graph: IndexMap<Ty, IndexSet<Param>>,
     ordered: Rc<Vec<Ty>>,
 }
 
@@ -214,7 +214,7 @@ impl DependencyGraph {
         for (v, connections) in &self.graph {
             in_degree.entry(*v).or_default();
 
-            for tag in connections {
+            for (_, tag) in connections {
                 *in_degree.entry(*tag).or_default() += 1;
             }
         }
@@ -239,7 +239,7 @@ impl DependencyGraph {
             in_degree.remove(&u);
 
             if let Some(values) = self.graph.get(&u) {
-                for v in values {
+                for (_, v) in values {
                     if let Some(ref_mut) = in_degree.get_mut(v) {
                         assert_ne!(*ref_mut, 0);
 
@@ -323,7 +323,7 @@ impl DependencyGraph {
                 should_init.insert(ty);
 
                 if let Some(deps) = self.graph.get(&ty) {
-                    queue.extend(deps.iter().copied());
+                    queue.extend(deps.iter().map(|(_, ty)| ty).copied());
                 }
             }
 
@@ -345,7 +345,7 @@ impl DependencyGraph {
             // Here we ensure that we also have all of the dependencies
             let events = provider.get::<Eventstore>();
             let deps = events.get_dependencies("_post");
-            queue.extend(deps);
+            queue.extend(deps.into_iter().map(|(_, ty)| ty));
         }
 
         provider.trigger("_post");
@@ -367,7 +367,7 @@ impl DependencyGraph {
             events.get_dependencies(event)
         };
 
-        self.init_many(provider, Vec::from_iter(deps))?;
+        self.init_many(provider, Vec::from_iter(deps.into_iter().map(|(_, ty)| ty)))?;
         provider.trigger(event);
 
         Ok(())

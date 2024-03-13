@@ -1,5 +1,5 @@
 use crate::extractor::Extractor;
-use crate::ty::Ty;
+use crate::ty::{Ownership, Param, Ty};
 use crate::{Bind, Captured, Eventstore, Method, Provider};
 
 // TODO(qti3e): we could be smarter here to reduce the number of generated lines of code.
@@ -51,10 +51,10 @@ macro_rules! impl_method {
             }
 
             #[inline]
-            fn dependencies() -> Vec<Ty> {
+            fn dependencies() -> Vec<Param> {
                 let mut out = Vec::new();
-                $(out.push(Ty::of::<$mut>());)*
-                $(out.push(Ty::of::<$get>());)*
+                $(out.push((Ownership::RefMut, Ty::of::<$mut>()));)*
+                $(out.push((Ownership::Ref, Ty::of::<$get>()));)*
                 $($ext::dependencies(&mut out);)*
                 out
             }
@@ -143,10 +143,10 @@ macro_rules! impl_method {
             }
 
             #[inline]
-            fn dependencies() -> Vec<Ty> {
+            fn dependencies() -> Vec<Param> {
                 let mut out = Vec::new();
-                $(out.push(Ty::of::<$mut>());)*
-                $(out.push(Ty::of::<$get>());)*
+                $(out.push((Ownership::RefMut, Ty::of::<$mut>()));)*
+                $(out.push((Ownership::Ref, Ty::of::<$get>()));)*
                 $($ext::dependencies(&mut out);)*
                 out
             }

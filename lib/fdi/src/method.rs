@@ -1,4 +1,4 @@
-use crate::ty::Ty;
+use crate::ty::Param;
 use crate::{Eventstore, Provider};
 
 /// An internal trait that is implemented for any function-like object that can be called once.
@@ -9,7 +9,7 @@ pub trait Method<P> {
     fn events(&self) -> Option<Eventstore>;
 
     /// The parameters this method will ask for from the provider when invoked.
-    fn dependencies() -> Vec<Ty>;
+    fn dependencies() -> Vec<Param>;
 
     /// Consume and invoke the method.
     fn call(self, provider: &Provider) -> Self::Output;

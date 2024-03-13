@@ -11,6 +11,7 @@
 
 use std::marker::PhantomData;
 
+use crate::ty::Param;
 use crate::Method;
 
 struct WrapWith<F, W, ArgsF, ArgsOutW> {
@@ -33,7 +34,7 @@ where
     }
 
     #[inline(always)]
-    fn dependencies() -> Vec<crate::ty::Ty> {
+    fn dependencies() -> Vec<Param> {
         let mut dependencies = F::dependencies();
         dependencies.extend(OutW::dependencies());
         dependencies

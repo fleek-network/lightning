@@ -2,13 +2,13 @@ use std::any::type_name;
 use std::fmt::Debug;
 use std::ptr;
 
-use crate::ty::Ty;
+use crate::ty::{Param, Ty};
 use crate::{Eventstore, Method, Provider};
 
 /// A fixed-size struct that can be created from any [`Method`].
 pub struct DynMethod<T: 'static> {
     name: &'static str,
-    dependencies: Vec<Ty>,
+    dependencies: Vec<Param>,
     ptr: *mut (),
     call_fn: fn(*mut (), provider: &Provider) -> T,
     drop_fn: fn(*mut ()),
@@ -77,7 +77,7 @@ impl<T: 'static> DynMethod<T> {
     }
 
     /// Returns the captured result from [`Method::dependencies`].
-    pub fn dependencies(&self) -> &Vec<Ty> {
+    pub fn dependencies(&self) -> &Vec<Param> {
         &self.dependencies
     }
 

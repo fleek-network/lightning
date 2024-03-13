@@ -1,4 +1,4 @@
-use crate::ty::Ty;
+use crate::ty::Param;
 use crate::{Method, Provider};
 
 struct Map<F, M> {
@@ -19,7 +19,7 @@ where
     }
 
     #[inline(always)]
-    fn dependencies() -> Vec<Ty> {
+    fn dependencies() -> Vec<Param> {
         F::dependencies()
     }
 
