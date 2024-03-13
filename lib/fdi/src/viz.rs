@@ -16,7 +16,7 @@ pub fn dependency_graph(graph: &DependencyGraph, title: &str) -> String {
     for (ty, dependencies) in &graph.graph {
         let ty_name = normalize_type_name(ty.name());
 
-        for dep in dependencies {
+        for (_, dep) in dependencies {
             let dep_name = normalize_type_name(dep.name());
             writeln!(res, "{dep_name} --> {ty_name}").unwrap();
         }
