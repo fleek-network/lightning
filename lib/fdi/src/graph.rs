@@ -213,6 +213,23 @@ impl DependencyGraph {
         self.constructors.insert(tid, method);
     }
 
+    #[inline]
+    fn capture_events_from_already_constructed(&mut self, provider: &mut Provider) {
+        let mut collect = Vec::new();
+        for ty in self.constructors.keys() {
+            if provider.contains_ty(ty) {
+                collect.push(*ty);
+            }
+        }
+        let mut events = provider.get_mut::<Eventstore>();
+        for ty in collect {
+            let method = self.constructors.remove(&ty).unwrap();
+            if let Some(e) = method.events() {
+                events.extend(e);
+            }
+        }
+    }
+
     fn ensure_topo_order(&mut self) {
         if !self.touched {
             return;
@@ -291,6 +308,7 @@ impl DependencyGraph {
     /// check the documentations around [Eventstore](crate::Eventstore).
     pub fn init_all(mut self, provider: &mut Provider) -> Result<()> {
         self.ensure_topo_order();
+        self.capture_events_from_already_constructed(provider);
 
         for ty in self.ordered.clone().iter() {
             self.construct_internal(*ty, provider)?;
@@ -322,6 +340,7 @@ impl DependencyGraph {
     /// In other word all of the constructors are called before triggering `_post`.
     pub fn init_many(&mut self, provider: &mut Provider, types: Vec<Ty>) -> Result<()> {
         self.ensure_topo_order();
+        self.capture_events_from_already_constructed(provider);
 
         let mut queue = types;
 
