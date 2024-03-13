@@ -12,7 +12,6 @@ use lightning_interfaces::{
     ApplicationInterface,
     BroadcastInterface,
     ConsensusInterface,
-    ForwarderInterface,
     KeystoreInterface,
     NotifierInterface,
     PoolInterface,
