@@ -1,5 +1,4 @@
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::fmt::Write;
 use std::rc::Rc;
 
 use anyhow::{Context, Result};
@@ -15,8 +14,7 @@ use crate::{Eventstore, MethodExt, Provider};
 pub struct DependencyGraph {
     touched: bool,
     constructors: HashMap<Ty, DynMethod<Result<Object>>>,
-    graph: IndexMap<Ty, IndexSet<Ty>>,
-    display_names: HashMap<Ty, String>,
+    pub(crate) graph: IndexMap<Ty, IndexSet<Ty>>,
     ordered: Rc<Vec<Ty>>,
 }
 
@@ -29,33 +27,7 @@ impl DependencyGraph {
     }
 
     pub fn viz(&self, title: &'static str) -> String {
-        let mut res = String::with_capacity(4096);
-
-        writeln!(res, "---").unwrap();
-        writeln!(res, "title: {title}").unwrap();
-        writeln!(res, "---").unwrap();
-        writeln!(res, "stateDiagram-v2").unwrap();
-        writeln!(res, "  direction LR").unwrap();
-
-        for (ty, dependencies) in &self.graph {
-            let ty_name = self
-                .display_names
-                .get(ty)
-                .map(String::as_str)
-                .unwrap_or_else(|| ty.name());
-
-            for dep in dependencies {
-                let dep_name = self
-                    .display_names
-                    .get(dep)
-                    .map(String::as_str)
-                    .unwrap_or_else(|| ty.name());
-
-                writeln!(res, "{} --> {}", dep_name, ty_name).unwrap();
-            }
-        }
-
-        res
+        crate::viz::dependency_graph(self, title)
     }
 
     /// Expand the current dependency graph from another dependency graph.
@@ -192,12 +164,6 @@ impl DependencyGraph {
         }
 
         self.touched = true;
-
-        // If an explicit display name is provided then we should store and remember it. Otherwise
-        // we can just default to the ty.name() when we need it.
-        if let Some(display_name) = method.display_name() {
-            self.display_names.insert(tid, display_name);
-        }
 
         if let Some(old) = self.constructors.get(&tid) {
             panic!(
