@@ -1,17 +1,13 @@
+use fdi::BuildGraph;
 use fleek_crypto::{ConsensusPublicKey, ConsensusSecretKey, NodePublicKey, NodeSecretKey};
 
 use crate::infu_collection::Collection;
-use crate::{ConfigConsumer, ConfigProviderInterface};
+use crate::ConfigConsumer;
 
 #[infusion::service]
-pub trait KeystoreInterface<C: Collection>: ConfigConsumer + Clone + Sized + Send + Sync {
-    fn _init(config: ::ConfigProviderInterface) {
-        Self::init(config.get::<Self>())
-    }
-
-    /// Initialize the keystore
-    fn init(config: Self::Config) -> anyhow::Result<Self>;
-
+pub trait KeystoreInterface<C: Collection>:
+    BuildGraph + ConfigConsumer + Clone + Sized + Send + Sync
+{
     /// Returns the Ed25519 public key
     fn get_ed25519_pk(&self) -> NodePublicKey;
     /// Returns the raw Ed25519 secret key. Should be used with caution!
