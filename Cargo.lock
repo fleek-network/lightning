@@ -6439,6 +6439,7 @@ dependencies = [
  "lightning-application",
  "lightning-interfaces",
  "lightning-notifier",
+ "lightning-test-utils",
  "lightning-utils",
  "mcmf",
  "ndarray",
