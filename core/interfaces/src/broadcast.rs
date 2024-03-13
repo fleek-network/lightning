@@ -55,6 +55,7 @@ pub trait BroadcastInterface<C: Collection>:
     ) -> Result<Self>;
 
     /// Get a send and receiver for messages in a pub-sub topic.
+    #[blank = Default::default()]
     fn get_pubsub<T: LightningMessage + Clone>(&self, topic: Topic) -> Self::PubSub<T>;
 }
 

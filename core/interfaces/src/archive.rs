@@ -69,9 +69,11 @@ pub trait ArchiveInterface<C: Collection>:
 
     /// Returns a socket that can be used to query about data that has been archived
     /// Will return none if the node is not currently configured to be an archive node
+    #[blank = None]
     fn archive_socket(&self) -> Option<ArchiveSocket<C>>;
 
     /// Returns a socket that can be given to consensus to submit blocks and transactions it has
     /// executed to be archived
+    #[blank = None]
     fn index_socket(&self) -> Option<IndexSocket>;
 }
