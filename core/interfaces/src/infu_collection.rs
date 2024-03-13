@@ -66,6 +66,8 @@ impl<C: Collection> Node<C> {
             .with_value(Blank::<C>::default())
             .with_module::<C::BlockstoreServerInterface>()
             .with_module::<C::ForwarderInterface>()
+            .with_module::<C::TopologyInterface>()
+            // TODO: Refactor the rest of start/shutdown/inits:
             .with(C::KeystoreInterface::infu_initialize_hack)
             .with(
                 C::BlockstoreInterface::infu_initialize_hack
@@ -82,6 +84,9 @@ impl<C: Collection> Node<C> {
                         block_on(c.shutdown())
                     }),
             )
+            .with_infallible(|app: &C::ApplicationInterface| {
+                application::ApplicationInterface::sync_query(app)
+            })
             .with(
                 C::SyncronizerInterface::infu_initialize_hack
                     .on("start", |c: &C::SyncronizerInterface| block_on(c.start()))
@@ -93,13 +98,6 @@ impl<C: Collection> Node<C> {
                 C::BroadcastInterface::infu_initialize_hack
                     .on("start", |c: &C::BroadcastInterface| block_on(c.start()))
                     .on("shutdown", |c: &C::BroadcastInterface| {
-                        block_on(c.shutdown())
-                    }),
-            )
-            .with(
-                C::TopologyInterface::infu_initialize_hack
-                    .on("start", |c: &C::TopologyInterface| block_on(c.start()))
-                    .on("shutdown", |c: &C::TopologyInterface| {
                         block_on(c.shutdown())
                     }),
             )

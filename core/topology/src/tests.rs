@@ -10,26 +10,29 @@ use fleek_crypto::{
 use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisLatency, GenesisNode};
-use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::fdi::Provider;
+use lightning_interfaces::infu_collection::{Collection, Node};
 use lightning_interfaces::types::{NodePorts, Participation};
 use lightning_interfaces::{
     partial,
     ApplicationInterface,
-    NotifierInterface,
     TopologyInterface,
     WithStartAndShutdown,
 };
 use lightning_notifier::Notifier;
+use lightning_test_utils::json_config::JsonConfigProvider;
+use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_utils::application::QueryRunnerExt;
 
-use crate::config::Config;
 use crate::core::build_latency_matrix;
 use crate::Topology;
 
 partial!(TestBinding {
+    ConfigProviderInterface = JsonConfigProvider;
     TopologyInterface = Topology<Self>;
     ApplicationInterface = Application<Self>;
     NotifierInterface = Notifier<Self>;
+    KeystoreInterface = EphemeralKeystore<Self>;
 });
 
 #[tokio::test]
@@ -201,37 +204,31 @@ async fn test_build_latency_matrix() {
 
 #[tokio::test]
 async fn test_receive_connections() {
-    let app = Application::<TestBinding>::init(
-        AppConfig {
+    let mut node = Node::<TestBinding>::init_with_provider(Provider::default().with(
+        JsonConfigProvider::default().with::<Application<TestBinding>>(AppConfig {
             genesis: None,
             mode: Mode::Test,
             testnet: false,
             storage: StorageConfig::InMemory,
             db_path: None,
             db_options: None,
-        },
-        Default::default(),
-    )
+        }),
+    ))
     .unwrap();
-    let query_runner = app.sync_query();
-    app.start().await;
 
-    let our_secret_key = NodeSecretKey::generate();
-    let our_public_key = our_secret_key.to_pk();
-    let notifier = Notifier::<TestBinding>::init(&app);
-    let topology =
-        Topology::<TestBinding>::init(Config::default(), our_public_key, notifier, query_runner)
-            .unwrap();
+    let mut topology_rx = node.provider.get::<Topology<TestBinding>>().get_receiver();
 
-    let mut topology_rx = topology.get_receiver();
     let connections = topology_rx.borrow_and_update().clone();
     // The topology sends an empty vec in its init function because the tokio watch channel has to
     // be initialized with a value.
     assert!(connections.is_empty());
 
-    topology.start().await;
+    node.start().await;
+
     // Once the topology starts, it will compute the actual connections and send them.
     topology_rx.changed().await.unwrap();
     let connections = topology_rx.borrow_and_update().clone();
     assert!(!connections.is_empty());
+
+    node.shutdown().await;
 }
