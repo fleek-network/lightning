@@ -9,20 +9,24 @@ pub mod pairing;
 mod tests;
 
 use std::collections::BTreeSet;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use anyhow::anyhow;
 pub use config::Config;
 use fleek_crypto::NodePublicKey;
+use lightning_interfaces::fdi::{BuildGraph, DependencyGraph, MethodExt};
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::{
     ApplicationInterface,
+    Cloned,
     ConfigConsumer,
+    ConfigProviderInterface,
+    KeystoreInterface,
     Notification,
     NotifierInterface,
+    RefMut,
+    ShutdownWaiter,
     TopologyInterface,
-    WithStartAndShutdown,
 };
 use lightning_utils::application::QueryRunnerExt;
 use tokio::sync::{mpsc, watch, Notify};
@@ -30,8 +34,6 @@ use tracing::{error, info};
 
 pub struct Topology<C: Collection> {
     inner: Arc<TopologyInner<C>>,
-    is_running: Arc<AtomicBool>,
-    shutdown_notify: Arc<Notify>,
 }
 
 struct TopologyInner<C: Collection> {
@@ -109,12 +111,19 @@ impl<C: Collection> TopologyInner<C> {
 }
 
 impl<C: Collection> TopologyInterface<C> for Topology<C> {
+    fn get_receiver(&self) -> watch::Receiver<Arc<Vec<Vec<NodePublicKey>>>> {
+        self.inner.topology_rx.clone()
+    }
+}
+
+impl<C: Collection> Topology<C> {
     fn init(
-        config: Self::Config,
-        our_public_key: NodePublicKey,
-        notifier: C::NotifierInterface,
-        query_runner: c!(C::ApplicationInterface::SyncExecutor),
+        config: &C::ConfigProviderInterface,
+        signer: &C::KeystoreInterface,
+        notifier: &C::NotifierInterface,
+        Cloned(query): Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
     ) -> anyhow::Result<Self> {
+        let config = config.get::<Self>();
         let (notifier_tx, notifier_rx) = mpsc::channel(16);
         notifier.notify_on_new_epoch(notifier_tx);
 
@@ -123,46 +132,29 @@ impl<C: Collection> TopologyInterface<C> for Topology<C> {
         let inner = TopologyInner {
             target_k: config.testing_target_k,
             min_nodes: config.testing_min_nodes,
-            query: query_runner,
+            query,
             notifier_rx: Arc::new(Mutex::new(Some(notifier_rx))),
             topology_tx,
             topology_rx,
-            our_public_key,
+            our_public_key: signer.get_ed25519_pk(),
             shutdown_notify: shutdown_notify.clone(),
         };
         Ok(Self {
             inner: Arc::new(inner),
-            is_running: Arc::new(AtomicBool::new(false)),
-            shutdown_notify,
         })
     }
 
-    fn get_receiver(&self) -> watch::Receiver<Arc<Vec<Vec<NodePublicKey>>>> {
-        self.inner.topology_rx.clone()
+    async fn start(this: RefMut<Self>, waiter: Cloned<ShutdownWaiter>) {
+        let inner = this.inner.clone();
+        drop(this);
+
+        waiter.run_until_shutdown(inner.start()).await;
     }
 }
 
-impl<C: Collection> WithStartAndShutdown for Topology<C> {
-    fn is_running(&self) -> bool {
-        self.is_running.load(Ordering::Relaxed)
-    }
-
-    async fn start(&self) {
-        if !self.is_running() {
-            let inner = self.inner.clone();
-            let is_running = self.is_running.clone();
-            tokio::spawn(async move {
-                inner.start().await;
-                is_running.store(false, Ordering::Relaxed);
-            });
-            self.is_running.store(true, Ordering::Relaxed);
-        } else {
-            error!("Cannot start topology because it is already running");
-        }
-    }
-
-    async fn shutdown(&self) {
-        self.shutdown_notify.notify_one();
+impl<C: Collection> BuildGraph for Topology<C> {
+    fn build_graph() -> DependencyGraph {
+        DependencyGraph::default().with(Self::init.on("start", Self::start.spawn()))
     }
 }
 
