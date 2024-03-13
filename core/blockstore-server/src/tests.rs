@@ -22,8 +22,8 @@ use lightning_interfaces::types::{
 use lightning_interfaces::{
     partial,
     ApplicationInterface,
-    BlockStoreInterface,
-    BlockStoreServerInterface,
+    BlockstoreInterface,
+    BlockstoreServerInterface,
     IncrementalPutInterface,
     KeystoreInterface,
     SyncQueryRunnerInterface,
@@ -36,14 +36,14 @@ use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_topology::Topology;
 
-use super::BlockStoreServer;
+use super::BlockstoreServer;
 use crate::blockstore_server::Frame;
 use crate::config::Config;
 
 partial!(TestBinding {
     ConfigProviderInterface = JsonConfigProvider;
-    BlockStoreInterface = Blockstore<Self>;
-    BlockStoreServerInterface = BlockStoreServer<Self>;
+    BlockstoreInterface = Blockstore<Self>;
+    BlockstoreServerInterface = BlockstoreServer<Self>;
     ApplicationInterface = Application<Self>;
     PoolInterface = PoolProvider<Self>;
     KeystoreInterface = EphemeralKeystore<Self>;
@@ -67,16 +67,16 @@ struct Peer<C: Collection> {
 }
 
 impl<C: Collection> Peer<C> {
-    fn blockstore(&self) -> Ref<C::BlockStoreInterface> {
-        self.inner.provider.get::<C::BlockStoreInterface>()
+    fn blockstore(&self) -> Ref<C::BlockstoreInterface> {
+        self.inner.provider.get::<C::BlockstoreInterface>()
     }
 
     fn app(&self) -> Ref<C::ApplicationInterface> {
         self.inner.provider.get::<C::ApplicationInterface>()
     }
 
-    fn blockstore_server(&self) -> Ref<C::BlockStoreServerInterface> {
-        self.inner.provider.get::<C::BlockStoreServerInterface>()
+    fn blockstore_server(&self) -> Ref<C::BlockstoreServerInterface> {
+        self.inner.provider.get::<C::BlockstoreServerInterface>()
     }
 }
 
@@ -149,7 +149,7 @@ async fn get_peers(
                         .with::<Blockstore<TestBinding>>(BlockstoreConfig {
                             root: path.join(format!("node{i}/blockstore")).try_into().unwrap(),
                         })
-                        .with::<BlockStoreServer<TestBinding>>(Config {
+                        .with::<BlockstoreServer<TestBinding>>(Config {
                             max_conc_req: 10,
                             max_conc_res: 10,
                         }),

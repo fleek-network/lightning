@@ -15,7 +15,7 @@ use mock::syncronizer::MockSyncronizer;
 
 partial!(ExampleBinding {
     ConfigProviderInterface = TomlConfigProvider<Self>;
-    BlockStoreInterface = Blockstore<Self>;
+    BlockstoreInterface = Blockstore<Self>;
     SignerInterface = Signer<Self>;
     SyncronizerInterface = MockSyncronizer<Self>;
     HandshakeInterface = Handshake<Self>;

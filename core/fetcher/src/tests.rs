@@ -8,7 +8,7 @@ use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
-use lightning_blockstore_server::{BlockStoreServer, Config as BlockServerConfig};
+use lightning_blockstore_server::{BlockstoreServer, Config as BlockServerConfig};
 use lightning_broadcast::{Broadcast, Config as BroadcastConfig};
 use lightning_indexer::Indexer;
 use lightning_interfaces::infu_collection::Collection;
@@ -23,8 +23,8 @@ use lightning_interfaces::types::{
 use lightning_interfaces::{
     partial,
     ApplicationInterface,
-    BlockStoreInterface,
-    BlockStoreServerInterface,
+    BlockstoreInterface,
+    BlockstoreServerInterface,
     BroadcastInterface,
     ConsensusInterface,
     FetcherInterface,
@@ -63,8 +63,8 @@ partial!(TestBinding {
     FetcherInterface = Fetcher<Self>;
     OriginProviderInterface = OriginDemuxer<Self>;
     BroadcastInterface = Broadcast<Self>;
-    BlockStoreInterface = Blockstore<Self>;
-    BlockStoreServerInterface = BlockStoreServer<Self>;
+    BlockstoreInterface = Blockstore<Self>;
+    BlockstoreServerInterface = BlockstoreServer<Self>;
     KeystoreInterface = EphemeralKeystore<Self>;
     SignerInterface = Signer<Self>;
     ResolverInterface = Resolver<Self>;
@@ -83,11 +83,11 @@ struct Peer<C: Collection> {
     _pool: C::PoolInterface,
     _topology: C::TopologyInterface,
     _broadcast: C::BroadcastInterface,
-    _blockstore_server: C::BlockStoreServerInterface,
+    _blockstore_server: C::BlockstoreServerInterface,
     _rep_aggregator: C::ReputationAggregatorInterface,
     _signer: C::SignerInterface,
     _ipfs_origin: C::OriginProviderInterface,
-    blockstore: C::BlockStoreInterface,
+    blockstore: C::BlockstoreInterface,
 }
 
 async fn get_fetchers(
@@ -282,7 +282,7 @@ async fn get_fetchers(
         )
         .unwrap();
 
-        let blockstore_server = BlockStoreServer::<TestBinding>::init(
+        let blockstore_server = BlockstoreServer::<TestBinding>::init(
             BlockServerConfig::default(),
             blockstore.clone(),
             &pool,

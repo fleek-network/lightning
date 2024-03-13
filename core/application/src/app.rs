@@ -49,7 +49,7 @@ impl<C: Collection> ApplicationInterface<C> for Application<C> {
     type SyncExecutor = QueryRunner;
 
     /// Create a new instance of the application layer using the provided configuration.
-    fn init(config: Self::Config, blockstore: C::BlockStoreInterface) -> Result<Self> {
+    fn init(config: Self::Config, blockstore: C::BlockstoreInterface) -> Result<Self> {
         if let StorageConfig::RocksDb = &config.storage {
             assert!(
                 config.db_path.is_some(),

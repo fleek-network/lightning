@@ -15,7 +15,7 @@ use lightning_interfaces::types::NodePorts;
 use lightning_interfaces::{
     partial,
     ApplicationInterface,
-    BlockStoreInterface,
+    BlockstoreInterface,
     ConsensusInterface,
     ForwarderInterface,
     IndexerInterface,
@@ -37,7 +37,7 @@ use crate::IPFSOrigin;
 partial!(TestBinding {
     ApplicationInterface = Application<Self>;
     ConsensusInterface = MockConsensus<Self>;
-    BlockStoreInterface = Blockstore<Self>;
+    BlockstoreInterface = Blockstore<Self>;
     IndexerInterface = Indexer<Self>;
     KeystoreInterface = EphemeralKeystore<Self>;
     SignerInterface = Signer<Self>;

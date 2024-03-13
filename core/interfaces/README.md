@@ -30,16 +30,16 @@ impl Aplpication for App {
 ```
 
 But in some other cases an interface takes as a generic input an implementer of some interface
-for example `FileSystem` takes a `BlockStore`, it is important for a file system to work with
-any underlying `BlockStore` so it **MUST NOT** dictate a concrete type when implementing.
+for example `FileSystem` takes a `Blockstore`, it is important for a file system to work with
+any underlying `Blockstore` so it **MUST NOT** dictate a concrete type when implementing.
 
 ```rs
-trait BlockStore {}
+trait Blockstore {}
 
 trait FileSystem {
     // -- DYNAMIC TYPES
 
-    type BlockStore: BlockStore;
+    type Blockstore: Blockstore;
 }
 
 
@@ -52,16 +52,16 @@ struct Fs { }
 impl FileSystem for Fs {
     // ❌ This is wrong and bad. File system should not dictate the
     // type for dynamic generic types.
-    type BlockStore = Store;
+    type Blockstore = Store;
 }
 
 // -- 🟢 Right
 
-struct Fs<B: BlockStore> { b: PhantomData<B> }
+struct Fs<B: Blockstore> { b: PhantomData<B> }
 
-impl<B: BlockStore> FileSystem for Fs {
+impl<B: Blockstore> FileSystem for Fs {
     // Notice how `B` here is not resolved and is generic.
-    type BlockStore = B;
+    type Blockstore = B;
 }
 }
 ```

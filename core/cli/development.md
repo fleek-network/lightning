@@ -7,11 +7,11 @@ title: Fleek Network Dependency Graph
 stateDiagram-v2
   direction LR
   ConfigProviderInterface --> ApplicationInterface
-  BlockStoreInterface --> ApplicationInterface
-  BlockStoreServerInterface --> ApplicationInterface
-  ConfigProviderInterface --> BlockStoreInterface
-  ConfigProviderInterface --> BlockStoreServerInterface
-  BlockStoreInterface --> BlockStoreServerInterface
+  BlockstoreInterface --> ApplicationInterface
+  BlockstoreServerInterface --> ApplicationInterface
+  ConfigProviderInterface --> BlockstoreInterface
+  ConfigProviderInterface --> BlockstoreServerInterface
+  BlockstoreInterface --> BlockstoreServerInterface
   ConfigProviderInterface --> BroadcastInterface
   ApplicationInterface --> BroadcastInterface
   TopologyInterface --> BroadcastInterface
@@ -30,7 +30,7 @@ stateDiagram-v2
   SignerInterface --> HandshakeInterface
   ApplicationInterface --> NotifierInterface
   ConfigProviderInterface --> OriginProviderInterface
-  BlockStoreInterface --> OriginProviderInterface
+  BlockstoreInterface --> OriginProviderInterface
   ConfigProviderInterface --> DeliveryAcknowledgmentAggregatorInterface
   SignerInterface --> DeliveryAcknowledgmentAggregatorInterface
   ConfigProviderInterface --> ReputationAggregatorInterface
@@ -45,11 +45,11 @@ stateDiagram-v2
   ApplicationInterface --> RpcInterface
   FetcherInterface --> RpcInterface
   ConfigProviderInterface --> ServiceExecutorInterface
-  BlockStoreInterface --> ServiceExecutorInterface
+  BlockstoreInterface --> ServiceExecutorInterface
   ConfigProviderInterface --> SignerInterface
   ApplicationInterface --> SignerInterface
   ConfigProviderInterface --> FetcherInterface
-  BlockStoreInterface --> FetcherInterface
+  BlockstoreInterface --> FetcherInterface
   ResolverInterface --> FetcherInterface
   OriginProviderInterface --> FetcherInterface
 ```

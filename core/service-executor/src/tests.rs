@@ -14,7 +14,7 @@ use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisAccount};
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
-use lightning_blockstore_server::{BlockStoreServer, Config as BlockServerConfig};
+use lightning_blockstore_server::{BlockstoreServer, Config as BlockServerConfig};
 use lightning_broadcast::{Broadcast, Config as BroadcastConfig};
 use lightning_fetcher::config::Config as FetcherConfig;
 use lightning_fetcher::fetcher::Fetcher;
@@ -23,8 +23,8 @@ use lightning_interfaces::types::Topic;
 use lightning_interfaces::{
     partial,
     ApplicationInterface,
-    BlockStoreInterface,
-    BlockStoreServerInterface,
+    BlockstoreInterface,
+    BlockstoreServerInterface,
     BroadcastInterface,
     FetcherInterface,
     KeystoreInterface,
@@ -60,8 +60,8 @@ partial!(TestBinding {
     FetcherInterface = Fetcher<Self>;
     OriginProviderInterface = OriginDemuxer<Self>;
     BroadcastInterface = Broadcast<Self>;
-    BlockStoreInterface = Blockstore<Self>;
-    BlockStoreServerInterface = BlockStoreServer<Self>;
+    BlockstoreInterface = Blockstore<Self>;
+    BlockstoreServerInterface = BlockstoreServer<Self>;
     KeystoreInterface = EphemeralKeystore<Self>;
     SignerInterface = Signer<Self>;
     ResolverInterface = Resolver<Self>;
@@ -77,11 +77,11 @@ struct Peer<C: Collection> {
     _fetcher: C::FetcherInterface,
     _pool: C::PoolInterface,
     _broadcast: C::BroadcastInterface,
-    _blockstore_server: C::BlockStoreServerInterface,
+    _blockstore_server: C::BlockstoreServerInterface,
     _rep_aggregator: C::ReputationAggregatorInterface,
     _signer: C::SignerInterface,
     _origin_provider: C::OriginProviderInterface,
-    _blockstore: C::BlockStoreInterface,
+    _blockstore: C::BlockstoreInterface,
 }
 
 async fn init_service_executor(
@@ -201,7 +201,7 @@ async fn init_service_executor(
     let origin_provider =
         OriginDemuxer::<TestBinding>::init(demuxer_config, blockstore.clone()).unwrap();
 
-    let blockstore_server = BlockStoreServer::<TestBinding>::init(
+    let blockstore_server = BlockstoreServer::<TestBinding>::init(
         BlockServerConfig::default(),
         blockstore.clone(),
         &pool,

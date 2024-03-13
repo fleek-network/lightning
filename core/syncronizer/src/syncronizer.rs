@@ -15,8 +15,8 @@ use lightning_interfaces::types::{
 };
 use lightning_interfaces::{
     ApplicationInterface,
-    BlockStoreServerInterface,
-    BlockStoreServerSocket,
+    BlockstoreServerInterface,
+    BlockstoreServerSocket,
     ConfigConsumer,
     KeystoreInterface,
     Notification,
@@ -47,7 +47,7 @@ pub struct Syncronizer<C: Collection> {
 pub struct SyncronizerInner<C: Collection> {
     our_public_key: NodePublicKey,
     query_runner: c![C::ApplicationInterface::SyncExecutor],
-    blockstore_server_socket: BlockStoreServerSocket,
+    blockstore_server_socket: BlockstoreServerSocket,
     rx_epoch_change: Receiver<Notification>,
     genesis_committee: Vec<(NodeIndex, NodeInfo)>,
     rpc_client: reqwest::Client,
@@ -102,7 +102,7 @@ impl<C: Collection> SyncronizerInterface<C> for Syncronizer<C> {
     fn init(
         config: Self::Config,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
-        blockstore_server: &C::BlockStoreServerInterface,
+        blockstore_server: &C::BlockstoreServerInterface,
         keystore: C::KeystoreInterface,
         rx_epoch_change: Receiver<Notification>,
     ) -> Result<Self> {
@@ -219,7 +219,7 @@ impl<C: Collection> SyncronizerInner<C> {
         our_public_key: NodePublicKey,
         genesis_committee: Vec<(NodeIndex, NodeInfo)>,
         query_runner: c![C::ApplicationInterface::SyncExecutor],
-        blockstore_server: &C::BlockStoreServerInterface,
+        blockstore_server: &C::BlockstoreServerInterface,
         rx_epoch_change: Receiver<Notification>,
         epoch_change_delta: Duration,
         rpc_client: reqwest::Client,

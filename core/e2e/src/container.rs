@@ -13,7 +13,7 @@ pub struct Container<C: Collection> {
     join_handle: Option<JoinHandle<()>>,
     shutdown_notify: Option<Arc<Notify>>,
     ckpt_rx: Option<oneshot::Receiver<Blake3Hash>>,
-    blockstore: Option<C::BlockStoreInterface>,
+    blockstore: Option<C::BlockstoreInterface>,
 }
 
 impl<C: Collection> Drop for Container<C> {
@@ -60,7 +60,7 @@ impl<C: Collection> Container<C> {
                         .checkpoint_socket();
                     let blockstore = node
                         .provider
-                        .get::<<C as Collection>::BlockStoreInterface>()
+                        .get::<<C as Collection>::BlockstoreInterface>()
                         .clone();
 
                     tx.send((ckpt_rx, blockstore)).expect("Failed to send");
@@ -96,7 +96,7 @@ impl<C: Collection> Container<C> {
         self.ckpt_rx.take()
     }
 
-    pub fn take_blockstore(&mut self) -> Option<C::BlockStoreInterface> {
+    pub fn take_blockstore(&mut self) -> Option<C::BlockstoreInterface> {
         self.blockstore.take()
     }
 }

@@ -4,7 +4,7 @@ use std::time::{Duration, SystemTime};
 use anyhow::Result;
 use fleek_blake3 as blake3;
 use lightning_e2e::swarm::Swarm;
-use lightning_e2e::utils::rpc;
+use lightning_e2e::utils::{logging, rpc};
 use lightning_interfaces::BlockStoreInterface;
 use lightning_test_utils::logging;
 use resolved_pathbuf::ResolvedPathBuf;

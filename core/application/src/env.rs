@@ -35,7 +35,7 @@ use lightning_interfaces::types::{
     Value,
 };
 use lightning_interfaces::{
-    BlockStoreInterface,
+    BlockstoreInterface,
     IncrementalPutInterface,
     SyncQueryRunnerInterface,
 };
@@ -483,11 +483,11 @@ impl Default for Env<UpdatePerm> {
 /// The socket that receives all update transactions
 pub struct UpdateWorker<C: Collection> {
     env: Env<UpdatePerm>,
-    blockstore: C::BlockStoreInterface,
+    blockstore: C::BlockstoreInterface,
 }
 
 impl<C: Collection> UpdateWorker<C> {
-    pub fn new(env: Env<UpdatePerm>, blockstore: C::BlockStoreInterface) -> Self {
+    pub fn new(env: Env<UpdatePerm>, blockstore: C::BlockstoreInterface) -> Self {
         Self { env, blockstore }
     }
 }
