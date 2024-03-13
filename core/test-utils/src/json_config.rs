@@ -4,7 +4,7 @@ use std::sync::Mutex;
 
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::{ConfigConsumer, ConfigProviderInterface};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{to_value, Value};
 
 #[derive(Default)]
@@ -18,6 +18,31 @@ impl From<Value> for JsonConfigProvider {
         Self {
             value: Mutex::new(map),
         }
+    }
+}
+
+impl JsonConfigProvider {
+    /// Insert a configuration into the config, returning the previous entry if it existed.
+    #[inline(always)]
+    pub fn insert<K: Into<String>, V: Serialize>(
+        &mut self,
+        key: K,
+        value: V,
+    ) -> Option<serde_json::Value> {
+        self.value
+            .lock()
+            .unwrap()
+            .insert(key.into(), to_value(value).unwrap())
+    }
+
+    /// Helper to inline an insertion for a config consumer during construction
+    #[inline(always)]
+    pub fn with<T: ConfigConsumer>(mut self, value: T::Config) -> Self {
+        if self.insert(T::KEY, value).is_some() {
+            panic!("attempted to insert duplicate entry for {}", T::KEY)
+        }
+
+        self
     }
 }
 
