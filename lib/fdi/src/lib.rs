@@ -25,9 +25,15 @@ pub use event::Eventstore;
 pub use executor::Executor;
 pub use ext::MethodExt;
 pub use extractor::{Cloned, Consume, Extractor};
-pub use graph::DependencyGraph;
+pub use graph::{BuildGraph, DependencyGraph};
 pub use method::Method;
 pub use provider::{Provider, ProviderGuard, Ref, RefMut};
 
 #[cfg(test)]
 mod tests;
+
+impl<C> BuildGraph for infusion::Blank<C> {
+    fn build_graph() -> DependencyGraph {
+        DependencyGraph::new()
+    }
+}
