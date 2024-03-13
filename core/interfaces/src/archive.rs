@@ -12,7 +12,7 @@ use crate::types::{
     TransactionReceipt,
     TransactionRequest,
 };
-use crate::{ApplicationInterface, BlockStoreInterface, ConfigProviderInterface};
+use crate::{ApplicationInterface, BlockstoreInterface, ConfigProviderInterface};
 
 pub type ArchiveSocket<C> = Socket<ArchiveRequest, anyhow::Result<ArchiveResponse<C>>>;
 pub type IndexSocket = Socket<IndexRequest, anyhow::Result<()>>;
@@ -53,7 +53,7 @@ pub trait ArchiveInterface<C: Collection>:
     fn _init(
         config: ::ConfigProviderInterface,
         app: ::ApplicationInterface,
-        blockstore: ::BlockStoreInterface,
+        blockstore: ::BlockstoreInterface,
     ) {
         let sqr = app.sync_query();
         Self::init(config.get::<Self>(), sqr, blockstore.clone())
@@ -64,7 +64,7 @@ pub trait ArchiveInterface<C: Collection>:
     fn init(
         config: Self::Config,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
-        blockstore: c!(C::BlockStoreInterface),
+        blockstore: c!(C::BlockstoreInterface),
     ) -> anyhow::Result<Self>;
 
     /// Returns a socket that can be used to query about data that has been archived

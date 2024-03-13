@@ -8,7 +8,7 @@ use tokio::sync::broadcast;
 
 use crate::infu_collection::Collection;
 use crate::{
-    BlockStoreInterface,
+    BlockstoreInterface,
     ConfigConsumer,
     ConfigProviderInterface,
     PoolInterface,
@@ -16,14 +16,14 @@ use crate::{
     ShutdownWaiter,
 };
 
-pub type BlockStoreServerSocket =
+pub type BlockstoreServerSocket =
     Socket<ServerRequest, broadcast::Receiver<Result<(), PeerRequestError>>>;
 
 #[infusion::service]
-pub trait BlockStoreServerInterface<C: Collection>: Sized + Send + Sync + ConfigConsumer {
+pub trait BlockstoreServerInterface<C: Collection>: Sized + Send + Sync + ConfigConsumer {
     fn _init(
         config: ::ConfigProviderInterface,
-        blockstre: ::BlockStoreInterface,
+        blockstre: ::BlockstoreInterface,
         pool: ::PoolInterface,
         rep_aggregator: ::ReputationAggregatorInterface,
     ) {
@@ -37,7 +37,7 @@ pub trait BlockStoreServerInterface<C: Collection>: Sized + Send + Sync + Config
 
     fn init(
         config: Self::Config,
-        blockstore: C::BlockStoreInterface,
+        blockstore: C::BlockstoreInterface,
         pool: &C::PoolInterface,
         rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
     ) -> anyhow::Result<Self>;
@@ -47,5 +47,5 @@ pub trait BlockStoreServerInterface<C: Collection>: Sized + Send + Sync + Config
     fn start(this: RefMut<Self>, waiter: Cloned<ShutdownWaiter>)
     -> impl Future<Output = ()> + Send;
 
-    fn get_socket(&self) -> BlockStoreServerSocket;
+    fn get_socket(&self) -> BlockstoreServerSocket;
 }

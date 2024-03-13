@@ -24,9 +24,9 @@ use lightning_interfaces::types::{
     ServerRequest,
 };
 use lightning_interfaces::{
-    BlockStoreInterface,
-    BlockStoreServerInterface,
-    BlockStoreServerSocket,
+    BlockstoreInterface,
+    BlockstoreServerInterface,
+    BlockstoreServerSocket,
     Cloned,
     ConfigConsumer,
     IncrementalPutInterface,
@@ -56,15 +56,15 @@ type ServerRequestTask = Task<ServerRequest, broadcast::Receiver<Result<(), Peer
 
 const REQUEST_TIMEOUT: Duration = Duration::from_millis(1000);
 
-pub struct BlockStoreServer<C: Collection> {
+pub struct BlockstoreServer<C: Collection> {
     inner: Option<BlockstoreServerInner<C>>,
-    socket: BlockStoreServerSocket,
+    socket: BlockstoreServerSocket,
 }
 
-impl<C: Collection> BlockStoreServerInterface<C> for BlockStoreServer<C> {
+impl<C: Collection> BlockstoreServerInterface<C> for BlockstoreServer<C> {
     fn init(
         config: Self::Config,
-        blockstore: C::BlockStoreInterface,
+        blockstore: C::BlockstoreInterface,
         pool: &C::PoolInterface,
         rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
     ) -> Result<Self> {
@@ -93,14 +93,14 @@ impl<C: Collection> BlockStoreServerInterface<C> for BlockStoreServer<C> {
         waiter.run_until_shutdown(inner.start()).await;
     }
 
-    fn get_socket(&self) -> BlockStoreServerSocket {
+    fn get_socket(&self) -> BlockstoreServerSocket {
         self.socket.clone()
     }
 }
 
 #[allow(clippy::type_complexity)]
 pub struct BlockstoreServerInner<C: Collection> {
-    blockstore: C::BlockStoreInterface,
+    blockstore: C::BlockstoreInterface,
     request_rx: mpsc::Receiver<ServerRequestTask>,
     max_conc_req: usize,
     max_conc_res: usize,
@@ -113,7 +113,7 @@ pub struct BlockstoreServerInner<C: Collection> {
 impl<C: Collection> BlockstoreServerInner<C> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        blockstore: C::BlockStoreInterface,
+        blockstore: C::BlockstoreInterface,
         request_rx: mpsc::Receiver<ServerRequestTask>,
         max_conc_req: usize,
         max_conc_res: usize,
@@ -346,7 +346,7 @@ impl std::fmt::Display for ErrorResponse {
 async fn handle_request<C: Collection>(
     peer: NodeIndex,
     peer_request: PeerRequest,
-    blockstore: C::BlockStoreInterface,
+    blockstore: C::BlockstoreInterface,
     mut request: <c!(C::PoolInterface::Responder) as ResponderInterface>::Request,
     num_responses: Arc<AtomicUsize>,
     rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
@@ -405,7 +405,7 @@ async fn handle_request<C: Collection>(
 async fn send_request<C: Collection>(
     peer: NodeIndex,
     request: PeerRequest,
-    blockstore: C::BlockStoreInterface,
+    blockstore: C::BlockstoreInterface,
     pool_requester: c!(C::PoolInterface::Requester),
     rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
 ) -> Result<PeerRequest, ErrorResponse> {
@@ -481,7 +481,7 @@ async fn send_request<C: Collection>(
     }
 }
 
-impl<C: Collection> ConfigConsumer for BlockStoreServer<C> {
+impl<C: Collection> ConfigConsumer for BlockstoreServer<C> {
     const KEY: &'static str = "blockstore-server";
 
     type Config = Config;

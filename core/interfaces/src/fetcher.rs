@@ -3,8 +3,8 @@ use lightning_types::{FetcherRequest, FetcherResponse};
 
 use crate::infu_collection::Collection;
 use crate::{
-    BlockStoreInterface,
-    BlockStoreServerInterface,
+    BlockstoreInterface,
+    BlockstoreServerInterface,
     ConfigConsumer,
     ConfigProviderInterface,
     OriginProviderInterface,
@@ -20,8 +20,8 @@ pub trait FetcherInterface<C: Collection>:
 {
     fn _init(
         config: ::ConfigProviderInterface,
-        blockstore: ::BlockStoreInterface,
-        blockstore_server: ::BlockStoreServerInterface,
+        blockstore: ::BlockstoreInterface,
+        blockstore_server: ::BlockstoreServerInterface,
         resolver: ::ResolverInterface,
         origin: ::OriginProviderInterface,
     ) {
@@ -37,8 +37,8 @@ pub trait FetcherInterface<C: Collection>:
     /// Initialize the fetcher.
     fn init(
         config: Self::Config,
-        blockstore: C::BlockStoreInterface,
-        blockstore_server: &C::BlockStoreServerInterface,
+        blockstore: C::BlockstoreInterface,
+        blockstore_server: &C::BlockstoreServerInterface,
         resolver: C::ResolverInterface,
         origin: &C::OriginProviderInterface,
     ) -> anyhow::Result<Self>;

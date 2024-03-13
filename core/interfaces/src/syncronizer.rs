@@ -6,7 +6,7 @@ use tokio::sync::mpsc::Receiver;
 use crate::infu_collection::Collection;
 use crate::{
     ApplicationInterface,
-    BlockStoreServerInterface,
+    BlockstoreServerInterface,
     ConfigConsumer,
     ConfigProviderInterface,
     KeystoreInterface,
@@ -24,7 +24,7 @@ pub trait SyncronizerInterface<C: Collection>:
     fn _init(
         config: ::ConfigProviderInterface,
         app: ::ApplicationInterface,
-        blockstore_server: ::BlockStoreServerInterface,
+        blockstore_server: ::BlockstoreServerInterface,
         keystore: ::KeystoreInterface,
         notifier: ::NotifierInterface,
     ) {
@@ -44,7 +44,7 @@ pub trait SyncronizerInterface<C: Collection>:
     fn init(
         config: Self::Config,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
-        blockstore_server: &C::BlockStoreServerInterface,
+        blockstore_server: &C::BlockstoreServerInterface,
         keystore: C::KeystoreInterface,
         rx_epoch_change: Receiver<Notification>,
     ) -> anyhow::Result<Self>;

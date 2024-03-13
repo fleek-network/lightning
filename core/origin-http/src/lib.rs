@@ -7,14 +7,14 @@ use std::time::Duration;
 use fast_sri::IntegrityMetadata;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{Blake3Hash, CompressionAlgorithm};
-use lightning_interfaces::{BlockStoreInterface, IncrementalPutInterface};
+use lightning_interfaces::{BlockstoreInterface, IncrementalPutInterface};
 use reqwest::{Client, Url};
 
 pub use crate::config::Config;
 
 pub struct HttpOrigin<C: Collection> {
     client: Client,
-    blockstore: C::BlockStoreInterface,
+    blockstore: C::BlockstoreInterface,
 }
 
 impl<C: Collection> Clone for HttpOrigin<C> {
@@ -27,7 +27,7 @@ impl<C: Collection> Clone for HttpOrigin<C> {
 }
 
 impl<C: Collection> HttpOrigin<C> {
-    pub fn new(_: Config, blockstore: C::BlockStoreInterface) -> anyhow::Result<Self> {
+    pub fn new(_: Config, blockstore: C::BlockstoreInterface) -> anyhow::Result<Self> {
         let client = Client::new();
         Ok(Self { client, blockstore })
     }

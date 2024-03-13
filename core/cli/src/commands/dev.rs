@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::{anyhow, Context, Result};
 use lightning_interfaces::infu_collection::{Collection, Node};
-use lightning_interfaces::BlockStoreServerInterface;
+use lightning_interfaces::BlockstoreServerInterface;
 use lightning_node::config::TomlConfigProvider;
 use lightning_types::{Blake3Hash, NodePorts};
 use lightning_utils::rpc::rpc_request;
@@ -125,7 +125,7 @@ async fn fetch<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>>(
     tracing::info!("Starting the node.");
     node.start().await;
 
-    let blockstore = node.provider.get::<C::BlockStoreServerInterface>();
+    let blockstore = node.provider.get::<C::BlockstoreServerInterface>();
 
     let socket = blockstore.get_socket();
 

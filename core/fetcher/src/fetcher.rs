@@ -12,9 +12,9 @@ use lightning_interfaces::types::{
     ServerRequest,
 };
 use lightning_interfaces::{
-    BlockStoreInterface,
-    BlockStoreServerInterface,
-    BlockStoreServerSocket,
+    BlockstoreInterface,
+    BlockstoreServerInterface,
+    BlockstoreServerSocket,
     ConfigConsumer,
     FetcherInterface,
     FetcherSocket,
@@ -43,8 +43,8 @@ impl<C: Collection> FetcherInterface<C> for Fetcher<C> {
     /// Initialize the fetcher.
     fn init(
         config: Self::Config,
-        blockstore: C::BlockStoreInterface,
-        blockstore_server: &C::BlockStoreServerInterface,
+        blockstore: C::BlockstoreInterface,
+        blockstore_server: &C::BlockstoreServerInterface,
         resolver: C::ResolverInterface,
         origin: &C::OriginProviderInterface,
     ) -> anyhow::Result<Self> {
@@ -105,8 +105,8 @@ struct FetcherInner<C: Collection> {
     #[allow(clippy::type_complexity)]
     socket_rx: Arc<Mutex<Option<mpsc::Receiver<Task<FetcherRequest, FetcherResponse>>>>>,
     origin_socket: OriginProviderSocket,
-    blockstore: C::BlockStoreInterface,
-    blockstore_server_socket: BlockStoreServerSocket,
+    blockstore: C::BlockstoreInterface,
+    blockstore_server_socket: BlockstoreServerSocket,
     resolver: C::ResolverInterface,
     shutdown_rx: Arc<Mutex<Option<mpsc::Receiver<()>>>>,
 }

@@ -19,7 +19,7 @@ use lightning_application::genesis::{Genesis, GenesisAccount, GenesisNode};
 use lightning_application::query_runner::QueryRunner;
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
-use lightning_blockstore_server::{BlockStoreServer, Config as BlockServerConfig};
+use lightning_blockstore_server::{BlockstoreServer, Config as BlockServerConfig};
 use lightning_fetcher::config::Config as FetcherConfig;
 use lightning_fetcher::fetcher::Fetcher;
 use lightning_indexer::Indexer;
@@ -40,8 +40,8 @@ use lightning_interfaces::types::{
 use lightning_interfaces::{
     partial,
     ApplicationInterface,
-    BlockStoreInterface,
-    BlockStoreServerInterface,
+    BlockstoreInterface,
+    BlockstoreServerInterface,
     FetcherInterface,
     IndexerInterface,
     KeystoreInterface,
@@ -103,8 +103,8 @@ partial!(TestBinding {
     ApplicationInterface = Application<Self>;
     FetcherInterface = Fetcher<Self>;
     RpcInterface = Rpc<Self>;
-    BlockStoreInterface = Blockstore<Self>;
-    BlockStoreServerInterface = BlockStoreServer<Self>;
+    BlockstoreInterface = Blockstore<Self>;
+    BlockstoreServerInterface = BlockstoreServer<Self>;
     OriginProviderInterface = OriginDemuxer<Self>;
     KeystoreInterface = EphemeralKeystore<Self>;
     SignerInterface = Signer<Self>;
@@ -170,7 +170,7 @@ fn init_rpc(app: Application<TestBinding>, port: u16) -> Result<(Rpc<TestBinding
     )
     .unwrap();
 
-    let blockstore_server = BlockStoreServer::<TestBinding>::init(
+    let blockstore_server = BlockstoreServer::<TestBinding>::init(
         BlockServerConfig::default(),
         blockstore.clone(),
         &pool,

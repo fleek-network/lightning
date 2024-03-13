@@ -24,7 +24,7 @@ static MB: usize = 1024 * 1024;
 partial!(TestBinding {
     KeystoreInterface = EphemeralKeystore<Self>;
     SignerInterface = Signer<Self>;
-    BlockStoreInterface = Blockstore<Self>;
+    BlockstoreInterface = Blockstore<Self>;
     ConfigProviderInterface = JsonConfigProvider;
     HandshakeInterface = Handshake<Self>;
     ServiceExecutorInterface = ServiceExecutor<Self>;

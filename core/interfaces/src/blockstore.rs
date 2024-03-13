@@ -24,7 +24,7 @@ pub struct ContentChunk {
 /// us to perform incremental verification over an stream of the content, along with performance
 /// benefits.
 ///
-/// To understand the requirements of the BlockStore it is necessary to understand a little bit
+/// To understand the requirements of the Blockstore it is necessary to understand a little bit
 /// about Blake3 and how it hashes a file.
 ///
 /// Imagine we give a 5KiB file to Blake3 to hash, the algorithm chunks the file into chunks of
@@ -83,7 +83,7 @@ pub struct ContentChunk {
 /// we use it at the chunk level, we don't compress the entire file and then perform the chunking,
 /// we chunk first, and compress each chunk later for obvious technical reasons.
 #[infusion::service]
-pub trait BlockStoreInterface<C: Collection>: Clone + Send + Sync + ConfigConsumer {
+pub trait BlockstoreInterface<C: Collection>: Clone + Send + Sync + ConfigConsumer {
     fn _init(config: ::ConfigProviderInterface) {
         let config = config.get::<Self>();
         Self::init(config)
@@ -180,7 +180,7 @@ pub trait BlockStoreInterface<C: Collection>: Clone + Send + Sync + ConfigConsum
     }
 }
 
-/// The interface for the writer to a [`BlockStoreInterface`].
+/// The interface for the writer to a [`BlockstoreInterface`].
 #[infusion::blank]
 pub trait IncrementalPutInterface: Send {
     /// Write the proof for the buffer.
@@ -198,11 +198,11 @@ pub trait IncrementalPutInterface: Send {
     fn is_finished(&self) -> bool;
 
     /// Finalize the write, try to write all of the content to the file system or any other
-    /// underlying storage medium used to implement the [`BlockStoreInterface`].
+    /// underlying storage medium used to implement the [`BlockstoreInterface`].
     async fn finalize(self) -> Result<Blake3Hash, PutFinalizeError>;
 }
 
-/// The interface for the directory writer to a [`BlockStoreInterface`].
+/// The interface for the directory writer to a [`BlockstoreInterface`].
 #[infusion::blank]
 pub trait IncrementalDirInterface: Send {
     /// Write the proof for the next entry. Should not be called in the trusted mode.

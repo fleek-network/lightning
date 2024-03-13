@@ -13,7 +13,7 @@ use hyper_rustls::{ConfigBuilderExt, HttpsConnector};
 use libipld::pb::PbNode;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{Blake3Hash, CompressionAlgorithm};
-use lightning_interfaces::{BlockStoreInterface, IncrementalPutInterface};
+use lightning_interfaces::{BlockstoreInterface, IncrementalPutInterface};
 use tokio::time::timeout;
 use tokio_util::io::StreamReader;
 use tracing::info;
@@ -27,7 +27,7 @@ const GATEWAY_TIMEOUT: Duration = Duration::from_millis(1000);
 pub struct IPFSOrigin<C: Collection> {
     client: Arc<Client<HttpsConnector<HttpConnector>, Body>>,
     gateways: Arc<Vec<Gateway>>,
-    blockstore: C::BlockStoreInterface,
+    blockstore: C::BlockstoreInterface,
 }
 
 impl<C: Collection> Clone for IPFSOrigin<C> {
@@ -41,7 +41,7 @@ impl<C: Collection> Clone for IPFSOrigin<C> {
 }
 
 impl<C: Collection> IPFSOrigin<C> {
-    pub fn new(config: Config, blockstore: C::BlockStoreInterface) -> Result<Self> {
+    pub fn new(config: Config, blockstore: C::BlockstoreInterface) -> Result<Self> {
         // Prepare the TLS client config
         let tls = rustls::ClientConfig::builder()
             .with_safe_defaults()

@@ -13,7 +13,7 @@ use lightning_interfaces::{
     ArchiveInterface,
     ArchiveRequest,
     ArchiveResponse,
-    BlockStoreInterface,
+    BlockstoreInterface,
     IndexRequest,
     WithStartAndShutdown,
 };
@@ -25,7 +25,7 @@ use crate::config::Config;
 partial!(TestBinding {
     ApplicationInterface = Application<Self>;
     ArchiveInterface = Archive<Self>;
-    BlockStoreInterface = Blockstore<Self>;
+    BlockstoreInterface = Blockstore<Self>;
 });
 
 async fn init_archive(path: &str) -> (Archive<TestBinding>, Application<TestBinding>, PathBuf) {

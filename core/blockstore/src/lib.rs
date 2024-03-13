@@ -27,7 +27,7 @@ mod tests {
     use lightning_interfaces::{
         partial,
         ApplicationInterface,
-        BlockStoreInterface,
+        BlockstoreInterface,
         ConsensusInterface,
         ForwarderInterface,
         IncrementalPutInterface,
@@ -71,7 +71,7 @@ mod tests {
 
     partial!(TestBinding {
         ApplicationInterface = Application<Self>;
-        BlockStoreInterface = Blockstore<Self>;
+        BlockstoreInterface = Blockstore<Self>;
         KeystoreInterface = EphemeralKeystore<Self>;
         SignerInterface = Signer<Self>;
         ConsensusInterface = MockConsensus<Self>;

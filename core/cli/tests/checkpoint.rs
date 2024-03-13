@@ -13,7 +13,7 @@ use lightning_archive::archive::Archive;
 use lightning_archive::config::Config as ArchiveConfig;
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
-use lightning_blockstore_server::{BlockStoreServer, Config as BlockStoreServerConfig};
+use lightning_blockstore_server::{BlockstoreServer, Config as BlockstoreServerConfig};
 use lightning_broadcast::{Broadcast, Config as BroadcastConfig};
 use lightning_consensus::config::Config as ConsensusConfig;
 use lightning_consensus::consensus::Consensus;
@@ -96,7 +96,7 @@ fn build_config(
             .expect("Failed to resolve path"),
     });
 
-    config.inject::<BlockStoreServer<FinalTypes>>(BlockStoreServerConfig::default());
+    config.inject::<BlockstoreServer<FinalTypes>>(BlockstoreServerConfig::default());
 
     config.inject::<Handshake<FinalTypes>>(HandshakeConfig {
         // TODO: figure out how to have e2e testing for the different transports (browser oriented)

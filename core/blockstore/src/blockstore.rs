@@ -13,7 +13,7 @@ use bytes::{BufMut, BytesMut};
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{Blake3Hash, CompressionAlgoSet, CompressionAlgorithm};
 use lightning_interfaces::{
-    BlockStoreInterface,
+    BlockstoreInterface,
     ConfigConsumer,
     ContentChunk,
     IncrementalPutInterface,
@@ -58,7 +58,7 @@ impl<C: Collection> ConfigConsumer for Blockstore<C> {
     type Config = Config;
 }
 
-impl<C: Collection> BlockStoreInterface<C> for Blockstore<C> {
+impl<C: Collection> BlockstoreInterface<C> for Blockstore<C> {
     type SharedPointer<T: ?Sized + Send + Sync> = Arc<T>;
     type Put = Putter<Self, C>;
     type DirPut = infusion::Blank<()>;

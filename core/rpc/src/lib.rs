@@ -47,7 +47,7 @@ pub(crate) struct Data<C: Collection> {
     pub query_runner: c!(C::ApplicationInterface::SyncExecutor),
     pub mempool_socket: MempoolSocket,
     pub fetcher_socket: FetcherSocket,
-    pub _blockstore: C::BlockStoreInterface,
+    pub _blockstore: C::BlockstoreInterface,
     pub node_public_key: NodePublicKey,
     pub consensus_public_key: ConsensusPublicKey,
     /// If this is some it means the node is in archive mode
@@ -256,7 +256,7 @@ impl<C: Collection> RpcInterface<C> for Rpc<C> {
         config: Self::Config,
         mempool: MempoolSocket,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
-        blockstore: C::BlockStoreInterface,
+        blockstore: C::BlockstoreInterface,
         fetcher: &C::FetcherInterface,
         keystore: C::KeystoreInterface,
         archive_socket: Option<ArchiveSocket<C>>,

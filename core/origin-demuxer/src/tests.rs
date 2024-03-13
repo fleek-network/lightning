@@ -14,7 +14,7 @@ use lightning_interfaces::types::{ImmutablePointer, NodePorts, OriginProvider};
 use lightning_interfaces::{
     partial,
     ApplicationInterface,
-    BlockStoreInterface,
+    BlockstoreInterface,
     ConsensusInterface,
     ForwarderInterface,
     IndexerInterface,
@@ -35,7 +35,7 @@ use crate::OriginDemuxer;
 
 partial!(TestBinding {
     ApplicationInterface = Application<Self>;
-    BlockStoreInterface = Blockstore<Self>;
+    BlockstoreInterface = Blockstore<Self>;
     KeystoreInterface = EphemeralKeystore<Self>;
     SignerInterface = Signer<Self>;
     ConsensusInterface = MockConsensus<Self>;

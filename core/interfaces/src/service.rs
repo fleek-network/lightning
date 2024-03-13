@@ -1,7 +1,7 @@
 use infusion::c;
 use tokio::net::UnixStream;
 
-use crate::blockstore::BlockStoreInterface;
+use crate::blockstore::BlockstoreInterface;
 use crate::infu_collection::Collection;
 use crate::types::ServiceId;
 use crate::{
@@ -24,7 +24,7 @@ pub trait ServiceExecutorInterface<C: Collection>:
 {
     fn _init(
         config: ::ConfigProviderInterface,
-        blockstore: ::BlockStoreInterface,
+        blockstore: ::BlockstoreInterface,
         fetcher: ::FetcherInterface,
         app: ::ApplicationInterface,
     ) {
@@ -42,7 +42,7 @@ pub trait ServiceExecutorInterface<C: Collection>:
     /// Initialize the service executor.
     fn init(
         config: Self::Config,
-        blockstore: &C::BlockStoreInterface,
+        blockstore: &C::BlockstoreInterface,
         fetcher_socket: FetcherSocket,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
     ) -> anyhow::Result<Self>;

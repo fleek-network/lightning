@@ -14,7 +14,7 @@ use lightning_interfaces::types::NodePorts;
 use lightning_interfaces::{
     partial,
     ApplicationInterface,
-    BlockStoreInterface,
+    BlockstoreInterface,
     ConsensusInterface,
     ForwarderInterface,
     IndexerInterface,
@@ -34,7 +34,7 @@ use crate::{get_url_and_sri, HttpOrigin};
 
 partial!(TestBinding {
     ApplicationInterface = Application<Self>;
-    BlockStoreInterface = Blockstore<Self>;
+    BlockstoreInterface = Blockstore<Self>;
     KeystoreInterface = EphemeralKeystore<Self>;
     SignerInterface = Signer<Self>;
     ConsensusInterface = MockConsensus<Self>;
