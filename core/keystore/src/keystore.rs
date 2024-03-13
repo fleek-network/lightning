@@ -12,8 +12,9 @@ use fleek_crypto::{
     NodeSecretKey,
     SecretKey,
 };
+use lightning_interfaces::fdi::{BuildGraph, DependencyGraph};
 use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::{ConfigConsumer, KeystoreInterface};
+use lightning_interfaces::{ConfigConsumer, ConfigProviderInterface, KeystoreInterface};
 use tracing::info;
 use triomphe::Arc;
 
@@ -31,8 +32,10 @@ impl<C> ConfigConsumer for Keystore<C> {
     type Config = KeystoreConfig;
 }
 
-impl<C: Collection> KeystoreInterface<C> for Keystore<C> {
-    fn init(config: Self::Config) -> anyhow::Result<Self> {
+impl<C: Collection> Keystore<C> {
+    /// Initialize the keystore
+    fn init(config: &C::ConfigProviderInterface) -> anyhow::Result<Self> {
+        let config = config.get::<Self>();
         let node = Arc::new(if config.node_key_path.exists() {
             let encoded =
                 read_to_string(&config.node_key_path).context("Failed to read node pem file")?;
@@ -62,7 +65,15 @@ impl<C: Collection> KeystoreInterface<C> for Keystore<C> {
             _p: PhantomData,
         })
     }
+}
 
+impl<C: Collection> BuildGraph for Keystore<C> {
+    fn build_graph() -> lightning_interfaces::fdi::DependencyGraph {
+        DependencyGraph::default().with(Self::init)
+    }
+}
+
+impl<C: Collection> KeystoreInterface<C> for Keystore<C> {
     fn get_ed25519_pk(&self) -> NodePublicKey {
         self.node.0
     }

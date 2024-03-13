@@ -64,11 +64,11 @@ impl<C: Collection> Node<C> {
         let graph = DependencyGraph::new()
             .with_value(waiter)
             .with_value(Blank::<C>::default())
+            .with_module::<C::KeystoreInterface>()
             .with_module::<C::BlockstoreServerInterface>()
             .with_module::<C::ForwarderInterface>()
             .with_module::<C::TopologyInterface>()
             // TODO: Refactor the rest of start/shutdown/inits:
-            .with(C::KeystoreInterface::infu_initialize_hack)
             .with(
                 C::BlockstoreInterface::infu_initialize_hack
                     .on("_post", C::BlockstoreInterface::infu_post_hack),
