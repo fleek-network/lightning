@@ -8,6 +8,7 @@ use affair::{AsyncWorker, Executor, TokioSpawn};
 use axum::extract::State;
 use axum::routing::post;
 use axum::{Json, Router};
+use fdi::{BuildGraph, DependencyGraph};
 use fleek_crypto::ConsensusPublicKey;
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::types::{Block, Event, TransactionRequest};
@@ -83,6 +84,24 @@ impl<C> ConfigConsumer for MockForwarder<C> {
     const KEY: &'static str = "consensus";
     /// Just take the same config as mock consensus
     type Config = Config;
+}
+
+impl<C: Collection> BuildGraph for MockForwarder<C> {
+    fn build_graph() -> DependencyGraph {
+        use lightning_interfaces::{ConfigProviderInterface, KeystoreInterface};
+
+        DependencyGraph::new().with_infallible(
+            |provider: &C::ConfigProviderInterface,
+             app: &C::ApplicationInterface,
+             keystore: &C::KeystoreInterface| {
+                Self::init(
+                    provider.get::<Self>(),
+                    keystore.get_bls_pk(),
+                    app.sync_query(),
+                )
+            },
+        )
+    }
 }
 
 struct MempoolSocketWorker {

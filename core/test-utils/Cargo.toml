@@ -6,6 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+fdi = { path = "../../lib/fdi" }
 lightning-interfaces = { path = "../interfaces" }
 fleek-crypto.workspace = true
 affair.workspace = true

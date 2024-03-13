@@ -4,6 +4,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
 use affair::{AsyncWorker, Executor, TokioSpawn};
+use fdi::{BuildGraph, DependencyGraph};
 use fleek_crypto::ConsensusPublicKey;
 use lightning_interfaces::application::ExecutionEngineSocket;
 // TODO(qti3e): Should we deprecate this?
@@ -45,6 +46,16 @@ impl<C: Collection> ForwarderInterface<C> for MockForwarder<C> {
 
     fn mempool_socket(&self) -> MempoolSocket {
         self.0.clone()
+    }
+}
+
+impl<C: Collection> BuildGraph for MockForwarder<C> {
+    fn build_graph() -> DependencyGraph {
+        DependencyGraph::new().with_infallible(|| {
+            let tx = CHANNEL.get_or_init(|| broadcast::channel(128).0);
+            let socket = TokioSpawn::spawn_async(MempoolSocketWorker { sender: tx.clone() });
+            MockForwarder::<C>(socket, PhantomData)
+        })
     }
 }
 
