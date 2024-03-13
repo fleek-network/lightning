@@ -1,5 +1,6 @@
 use affair::Socket;
 use anyhow::Result;
+use fdi::BuildGraph;
 use fleek_crypto::ConsensusPublicKey;
 use infusion::{c, service};
 use lightning_types::TransactionRequest;
@@ -18,7 +19,9 @@ use crate::{ApplicationInterface, ConfigConsumer, ConfigProviderInterface, Keyst
 pub type MempoolSocket = Socket<TransactionRequest, ()>;
 
 #[service]
-pub trait ForwarderInterface<C: Collection>: ConfigConsumer + Sized + Send + 'static {
+pub trait ForwarderInterface<C: Collection>:
+    BuildGraph + ConfigConsumer + Sized + Send + 'static
+{
     fn _init(
         provider: ::ConfigProviderInterface,
         app: ::ApplicationInterface,

@@ -6,7 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-lightning-interfaces = {path="../interfaces"}
+fdi = { path = "../../lib/fdi" }
+lightning-interfaces = { path = "../interfaces" }
 lightning-rep-collector = { path = "../rep-collector" }
 fleek-crypto.workspace = true
 affair.workspace = true
@@ -23,7 +24,7 @@ rand_distr = "0.4.3"
 rand_chacha = "0.3"
 
 # Mock Connection Pool
-lightning-schema = {path="../schema"}
+lightning-schema = { path = "../schema" }
 dashmap = "5.5.0"
 futures.workspace = true
 

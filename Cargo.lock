@@ -5823,6 +5823,7 @@ version = "0.0.0"
 dependencies = [
  "affair",
  "anyhow",
+ "fdi",
  "fleek-crypto",
  "futures",
  "infusion",
@@ -6414,6 +6415,7 @@ dependencies = [
  "anyhow",
  "axum 0.6.20",
  "ethers",
+ "fdi",
  "fleek-crypto",
  "hp-fixed",
  "lightning-interfaces",
@@ -6821,6 +6823,7 @@ dependencies = [
  "anyhow",
  "axum 0.6.20",
  "dashmap",
+ "fdi",
  "fleek-crypto",
  "futures",
  "hp-fixed",
