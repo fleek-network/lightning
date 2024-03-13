@@ -165,4 +165,6 @@ async fn test_submission() {
             }
         }
     }
+
+    node.shutdown().await;
 }
