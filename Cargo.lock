@@ -5652,6 +5652,7 @@ dependencies = [
  "anyhow",
  "blake3-tree",
  "bytes",
+ "fdi",
  "fleek-crypto",
  "infusion",
  "lightning-application",
