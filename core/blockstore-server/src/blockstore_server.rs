@@ -1,9 +1,12 @@
+//! TODO: Once affair supports a `UnorderedWorker` trait, we should use that
+//!       to simplify and correct the `Socket` usage here to avoid `raw_bounded`.
+
 use std::borrow::Cow;
 use std::collections::{HashMap, VecDeque};
 use std::mem;
 use std::net::SocketAddr;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use affair::{Socket, Task};
@@ -24,9 +27,11 @@ use lightning_interfaces::{
     BlockStoreInterface,
     BlockStoreServerInterface,
     BlockStoreServerSocket,
+    Cloned,
     ConfigConsumer,
     IncrementalPutInterface,
     PoolInterface,
+    RefMut,
     RejectReason,
     ReputationAggregatorInterface,
     ReputationReporterInterface,
@@ -35,11 +40,11 @@ use lightning_interfaces::{
     ResponderInterface,
     ResponseInterface,
     ServiceScope,
-    WithStartAndShutdown,
+    ShutdownWaiter,
 };
 use lightning_metrics::increment_counter;
 use serde::{Deserialize, Serialize};
-use tokio::sync::{broadcast, mpsc, Notify};
+use tokio::sync::{broadcast, mpsc};
 use tokio::task::JoinSet;
 use tokio::time::timeout;
 use tokio_stream::StreamExt;
@@ -52,10 +57,8 @@ type ServerRequestTask = Task<ServerRequest, broadcast::Receiver<Result<(), Peer
 const REQUEST_TIMEOUT: Duration = Duration::from_millis(1000);
 
 pub struct BlockStoreServer<C: Collection> {
-    inner: Arc<BlockstoreServerInner<C>>,
+    inner: Option<BlockstoreServerInner<C>>,
     socket: BlockStoreServerSocket,
-    is_running: Arc<AtomicBool>,
-    shutdown_notify: Arc<Notify>,
 }
 
 impl<C: Collection> BlockStoreServerInterface<C> for BlockStoreServer<C> {
@@ -65,11 +68,9 @@ impl<C: Collection> BlockStoreServerInterface<C> for BlockStoreServer<C> {
         pool: &C::PoolInterface,
         rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
     ) -> Result<Self> {
-        let shutdown_notify = Arc::new(Notify::new());
-
         let (pool_requester, pool_responder) = pool.open_req_res(ServiceScope::BlockstoreServer);
         let (socket, request_rx) = Socket::raw_bounded(2048);
-        let inner = BlockstoreServerInner::<C>::new(
+        let inner = Some(BlockstoreServerInner::<C>::new(
             blockstore,
             request_rx,
             config.max_conc_req,
@@ -77,15 +78,19 @@ impl<C: Collection> BlockStoreServerInterface<C> for BlockStoreServer<C> {
             pool_requester,
             pool_responder,
             rep_reporter,
-            shutdown_notify.clone(),
-        );
+        ));
 
-        Ok(Self {
-            inner: Arc::new(inner),
-            socket,
-            is_running: Arc::new(AtomicBool::new(false)),
-            shutdown_notify,
-        })
+        Ok(Self { inner, socket })
+    }
+
+    /// Start the system, should only be called once
+    async fn start(mut this: RefMut<Self>, waiter: Cloned<ShutdownWaiter>) {
+        let inner = this
+            .inner
+            .take()
+            .expect("start should never be called twice");
+        drop(this);
+        waiter.run_until_shutdown(inner.start()).await;
     }
 
     fn get_socket(&self) -> BlockStoreServerSocket {
@@ -93,45 +98,16 @@ impl<C: Collection> BlockStoreServerInterface<C> for BlockStoreServer<C> {
     }
 }
 
-impl<C: Collection> WithStartAndShutdown for BlockStoreServer<C> {
-    /// Returns true if this system is running or not.
-    fn is_running(&self) -> bool {
-        self.is_running.load(Ordering::Relaxed)
-    }
-
-    /// Start the system, should not do anything if the system is already
-    /// started.
-    async fn start(&self) {
-        if !self.is_running() {
-            let inner = self.inner.clone();
-            let is_running = self.is_running.clone();
-            tokio::spawn(async move {
-                inner.start().await;
-                is_running.store(false, Ordering::Relaxed);
-            });
-            self.is_running.store(true, Ordering::Relaxed);
-        } else {
-            error!("Can not start blockstore server because it is already running");
-        }
-    }
-
-    /// Send the shutdown signal to the system.
-    async fn shutdown(&self) {
-        self.shutdown_notify.notify_one();
-    }
-}
-
 #[allow(clippy::type_complexity)]
 pub struct BlockstoreServerInner<C: Collection> {
     blockstore: C::BlockStoreInterface,
-    request_rx: Arc<Mutex<Option<mpsc::Receiver<ServerRequestTask>>>>,
+    request_rx: mpsc::Receiver<ServerRequestTask>,
     max_conc_req: usize,
     max_conc_res: usize,
     num_responses: Arc<AtomicUsize>,
     pool_requester: c!(C::PoolInterface::Requester),
-    pool_responder: Arc<Mutex<Option<c!(C::PoolInterface::Responder)>>>,
+    pool_responder: c!(C::PoolInterface::Responder),
     rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
-    shutdown_notify: Arc<Notify>,
 }
 
 impl<C: Collection> BlockstoreServerInner<C> {
@@ -144,36 +120,29 @@ impl<C: Collection> BlockstoreServerInner<C> {
         pool_requester: c!(C::PoolInterface::Requester),
         pool_responder: c!(C::PoolInterface::Responder),
         rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
-        shutdown_notify: Arc<Notify>,
     ) -> Self {
         Self {
             blockstore,
-            request_rx: Arc::new(Mutex::new(Some(request_rx))),
+            request_rx,
             max_conc_req,
             max_conc_res,
-            num_responses: Arc::new(AtomicUsize::new(0)),
+            num_responses: AtomicUsize::new(0).into(),
             pool_requester,
-            pool_responder: Arc::new(Mutex::new(Some(pool_responder))),
+            pool_responder,
             rep_reporter,
-            shutdown_notify,
         }
     }
 
-    pub async fn start(&self) {
+    pub async fn start(mut self) {
         let mut pending_requests: HashMap<
             PeerRequest,
             broadcast::Sender<Result<(), PeerRequestError>>,
         > = HashMap::new();
-        let mut request_rx = self.request_rx.lock().unwrap().take().unwrap();
-        let mut pool_responder = self.pool_responder.lock().unwrap().take().unwrap();
         let mut tasks = JoinSet::new();
         let mut queue = VecDeque::new();
         loop {
             tokio::select! {
-                _ = self.shutdown_notify.notified() => {
-                    break;
-                }
-                req = pool_responder.get_next_request() => {
+                req = self.pool_responder.get_next_request() => {
                     match req {
                         Ok((req_header, responder)) => {
                             // TODO(matthias): find out which peer the request came from
@@ -212,7 +181,7 @@ impl<C: Collection> BlockstoreServerInner<C> {
                         }
                     }
                 }
-                task = request_rx.recv() => {
+                task = self.request_rx.recv() => {
                     if let Some(task) = task {
                         let peer_request = PeerRequest { hash: task.request.hash };
                         let rx = if let Some(tx) = pending_requests.get(&peer_request) {
@@ -277,8 +246,6 @@ impl<C: Collection> BlockstoreServerInner<C> {
                 }
             }
         }
-        *self.request_rx.lock().unwrap() = Some(request_rx);
-        *self.pool_responder.lock().unwrap() = Some(pool_responder);
     }
 }
 
