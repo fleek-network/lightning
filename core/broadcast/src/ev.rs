@@ -12,6 +12,7 @@ use std::collections::HashSet;
 use bytes::Bytes;
 use fleek_crypto::{NodePublicKey, NodeSecretKey, NodeSignature, PublicKey, SecretKey};
 use ink_quill::ToDigest;
+use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::schema::broadcast::{Advr, Frame, Message, MessageInternedId, Want};
 use lightning_interfaces::schema::LightningMessage;
 use lightning_interfaces::types::{Digest, NodeIndex, Topic};
@@ -21,6 +22,7 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 use tracing::{debug, error, info, trace};
 
+use crate::backend::LightningBackend;
 use crate::command::{Command, CommandReceiver, CommandSender, SharedMessage};
 use crate::db::Database;
 use crate::interner::Interner;
@@ -85,22 +87,6 @@ impl<B: BroadcastBackend> Context<B> {
 
     pub fn get_command_sender(&self) -> CommandSender {
         self.command_tx.clone()
-    }
-
-    /// Spawn the event loop returning a oneshot sender which can be used by the caller,
-    /// when it is time for us to shutdown and exit the event loop.
-    ///
-    /// The context is preserved and not destroyed on the shutdown. And can be retrieved
-    /// again by awaiting the `JoinHandle`.
-    pub fn spawn(self) -> (oneshot::Sender<()>, JoinHandle<Self>) {
-        let (shutdown_tx, shutdown) = oneshot::channel();
-        let handle = tokio::spawn(async move {
-            info!("spawning broadcast event loop");
-            let tmp = main_loop(shutdown, self).await;
-            info!("broadcast shut down sucessfully");
-            tmp
-        });
-        (shutdown_tx, handle)
     }
 
     #[inline]
@@ -396,54 +382,71 @@ impl<B: BroadcastBackend> Context<B> {
     fn now() -> u64 {
         B::now()
     }
-}
 
-/// Runs the main loop of the broadcast algorithm. This is our main central worker.
-async fn main_loop<B: BroadcastBackend>(
-    mut shutdown: tokio::sync::oneshot::Receiver<()>,
-    mut ctx: Context<B>,
-) -> Context<B> {
-    info!("Starting broadcast for {}", ctx.pk);
+    async fn run(mut self, mut shutdown: tokio::sync::oneshot::Receiver<()>) -> Self {
+        info!("Starting broadcast for {}", self.pk);
 
-    // During initialization the application state might have not had loaded, and at
-    // that point we might not have inserted the node index of the currently running
-    // node. Let's give it another shot here.
-    //
-    // We need the node index because when we're sending messages out (when the current
-    // node is the origin of the message.), we have to put our own id as the origin.
-    if let Some(node_index) = ctx.backend.get_node_index(&ctx.pk) {
-        let _ = ctx.current_node_index.set(node_index);
-    }
+        // During initialization the application state might have not had loaded, and at
+        // that point we might not have inserted the node index of the currently running
+        // node. Let's give it another shot here.
+        //
+        // We need the node index because when we're sending messages out (when the current
+        // node is the origin of the message.), we have to put our own id as the origin.
+        if let Some(node_index) = self.backend.get_node_index(&self.pk) {
+            let _ = self.current_node_index.set(node_index);
+        }
 
-    loop {
-        debug!("waiting for next event.");
-        tokio::select! {
-            // We kind of care about the priority of these events. Or do we?
-            // TODO(qti3e): Evaluate this.
-            biased;
+        loop {
+            debug!("waiting for next event.");
+            tokio::select! {
+                // We kind of care about the priority of these events. Or do we?
+                // TODO(qti3e): Evaluate this.
+                biased;
 
-            // Prioritize the shutdown signal over everything.
-            _ = &mut shutdown => {
-                info!("exiting event loop");
-                break;
-            },
+                // Prioritize the shutdown signal over everything.
+                _ = &mut shutdown => {
+                    info!("exiting event loop");
+                    break;
+                },
 
-            // A command has been sent from the mainland. Process it.
-            Some(command) = ctx.command_rx.recv() => {
-                trace!("received command in event loop");
-                ctx.handle_command(command);
-            },
-            Some((sender, payload)) = ctx.backend.receive() => {
-                ctx.handle_frame_payload(sender, payload);
-            }
-            requests = ctx.pending_store.tick() => {
-                ctx.handle_pending_tick(requests);
+                // A command has been sent from the mainland. Process it.
+                Some(command) = self.command_rx.recv() => {
+                    trace!("received command in event loop");
+                    self.handle_command(command);
+                },
+                Some((sender, payload)) = self.backend.receive() => {
+                    self.handle_frame_payload(sender, payload);
+                }
+                requests = self.pending_store.tick() => {
+                    self.handle_pending_tick(requests);
+                }
             }
         }
-    }
 
-    // Handover over the context.
-    ctx
+        // Handover over the context.
+        self
+    }
+}
+
+impl<C: Collection> Context<LightningBackend<C>> {
+    /// Spawn the event loop returning a oneshot sender which can be used by the caller,
+    /// when it is time for us to shutdown and exit the event loop.
+    ///
+    /// The context is preserved and not destroyed on the shutdown. And can be retrieved
+    /// again by awaiting the `JoinHandle`.
+    pub fn spawn(self) -> (oneshot::Sender<()>, JoinHandle<Self>)
+    where
+        Self: Send,
+    {
+        let (shutdown_tx, shutdown) = oneshot::channel();
+        let handle = tokio::spawn(async move {
+            info!("spawning broadcast event loop");
+            let tmp = self.run(shutdown).await;
+            info!("broadcast shut down sucessfully");
+            tmp
+        });
+        (shutdown_tx, handle)
+    }
 }
 
 /// Map each topic to a fixed size number.

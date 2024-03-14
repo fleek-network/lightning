@@ -16,7 +16,7 @@ use lightning_interfaces::{
     Weight,
 };
 
-pub trait BroadcastBackend: Send + Sync + 'static {
+pub trait BroadcastBackend: 'static {
     fn send_to_all<F: Fn(NodeIndex) -> bool + Send + Sync + 'static>(
         &self,
         payload: Bytes,
