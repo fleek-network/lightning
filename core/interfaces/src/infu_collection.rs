@@ -64,6 +64,7 @@ impl<C: Collection> Node<C> {
         let graph = DependencyGraph::new()
             .with_value(waiter)
             .with_value(Blank::<C>::default())
+            .with_module::<C::FetcherInterface>()
             .with_module::<C::KeystoreInterface>()
             .with_module::<C::BlockstoreServerInterface>()
             .with_module::<C::ForwarderInterface>()
@@ -172,11 +173,6 @@ impl<C: Collection> Node<C> {
                     .on("_post", C::SignerInterface::infu_post_hack)
                     .on("start", |c: &C::SignerInterface| block_on(c.start()))
                     .on("shutdown", |c: &C::SignerInterface| block_on(c.shutdown())),
-            )
-            .with(
-                C::FetcherInterface::infu_initialize_hack
-                    .on("start", |c: &C::FetcherInterface| block_on(c.start()))
-                    .on("shutdown", |c: &C::FetcherInterface| block_on(c.shutdown())),
             )
             .with(
                 C::PoolInterface::infu_initialize_hack

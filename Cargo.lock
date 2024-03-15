@@ -5793,6 +5793,7 @@ dependencies = [
  "bytes",
  "cid 0.10.1",
  "fleek-crypto",
+ "futures",
  "infusion",
  "lightning-application",
  "lightning-blockstore",
