@@ -383,7 +383,7 @@ impl<B: BroadcastBackend> Context<B> {
         B::now()
     }
 
-    async fn run(mut self, mut shutdown: tokio::sync::oneshot::Receiver<()>) -> Self {
+    pub async fn run(mut self, mut shutdown: tokio::sync::oneshot::Receiver<()>) -> Self {
         info!("Starting broadcast for {}", self.pk);
 
         // During initialization the application state might have not had loaded, and at

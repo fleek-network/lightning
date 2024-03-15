@@ -15,9 +15,10 @@ mod stats;
 #[cfg(test)]
 mod tests;
 
-pub use backend::BroadcastBackend;
+pub use backend::{BroadcastBackend, SimulonBackend};
 pub use broadcast::Broadcast;
 pub use config::Config;
+pub use db::Database;
 #[doc(hidden)]
 pub use ev::Context;
 pub use pubsub::PubSubI;

@@ -5603,6 +5603,7 @@ dependencies = [
  "quick_cache",
  "rand 0.8.5",
  "serde",
+ "simulon",
  "smallvec",
  "ta",
  "tokio",
@@ -10560,11 +10561,15 @@ version = "0.0.8"
 dependencies = [
  "arrayref",
  "bincode",
+ "bytes",
  "derive_more",
+ "fleek-crypto",
  "futures",
  "futures-task",
  "fxhash",
  "indicatif",
+ "lightning-broadcast",
+ "lightning-topology",
  "num",
  "num_cpus",
  "rand 0.8.5",
@@ -10575,6 +10580,7 @@ dependencies = [
  "serde",
  "spin 0.9.8",
  "thiserror",
+ "tokio",
 ]
 
 [[package]]

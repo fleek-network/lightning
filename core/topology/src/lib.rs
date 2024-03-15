@@ -1,6 +1,7 @@
 pub mod clustering;
 pub mod config;
 mod core;
+pub use core::{build_latency_matrix, suggest_connections_from_latency_matrix, Connections};
 pub mod divisive;
 pub mod pairing;
 

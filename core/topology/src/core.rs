@@ -15,6 +15,15 @@ pub enum Connections {
     Hierarchy(Vec<Vec<Vec<usize>>>),
 }
 
+impl Connections {
+    pub fn get(&self, node_index: usize) -> Vec<Vec<usize>> {
+        match self {
+            Connections::All(conns) => conns.clone(),
+            Connections::Hierarchy(conns) => conns[node_index].clone(),
+        }
+    }
+}
+
 /// Build a latency matrix according to the current application state.
 /// Returns the matrix, a map of node ids to public keys, and an optional node index for
 /// ourselves if we're included in the topology.
