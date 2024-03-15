@@ -16,7 +16,6 @@ pub struct OriginFetcher<C: Collection> {
     origin_socket: OriginProviderSocket,
     resolver: C::ResolverInterface,
     capacity: usize,
-    shutdown_rx: oneshot::Receiver<()>,
 }
 
 impl<C: Collection> OriginFetcher<C> {
@@ -25,7 +24,6 @@ impl<C: Collection> OriginFetcher<C> {
         origin_socket: OriginProviderSocket,
         rx: mpsc::Receiver<OriginRequest>,
         resolver: C::ResolverInterface,
-        shutdown_rx: oneshot::Receiver<()>,
     ) -> Self {
         Self {
             tasks: JoinSet::new(),
@@ -34,7 +32,6 @@ impl<C: Collection> OriginFetcher<C> {
             origin_socket,
             resolver,
             capacity,
-            shutdown_rx,
         }
     }
 
@@ -43,9 +40,6 @@ impl<C: Collection> OriginFetcher<C> {
             HashMap::new();
         loop {
             tokio::select! {
-                _ = &mut self.shutdown_rx => {
-                    break;
-                }
                 request = self.rx.recv() => {
                     if let Some(request) = request {
                         let uri = request.pointer.uri.clone();
