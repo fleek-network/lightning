@@ -9,6 +9,7 @@ edition = "2021"
 lightning-interfaces = { path = "../interfaces" }
 blake3-tree = { path = "../../lib/blake3-tree" }
 lightning-metrics = { path = "../metrics" }
+futures.workspace = true
 infusion.workspace = true
 serde.workspace = true
 anyhow.workspace = true
@@ -27,12 +28,12 @@ lightning-origin-ipfs = { path = "../origin-ipfs" }
 lightning-resolver = { path = "../resolver" }
 lightning-blockstore-server = { path = "../blockstore-server" }
 lightning-pool = { path = "../pool" }
-lightning-application = { path="../application", features = ["test"] }
-lightning-signer = {path="../signer"}
-lightning-test-utils = { path="../test-utils" }
-lightning-broadcast = { path="../broadcast" }
-lightning-notifier = {path="../notifier"}
-lightning-topology = {path="../topology"}
-lightning-rep-collector = {path="../rep-collector"}
+lightning-application = { path = "../application", features = ["test"] }
+lightning-signer = { path = "../signer" }
+lightning-test-utils = { path = "../test-utils" }
+lightning-broadcast = { path = "../broadcast" }
+lightning-notifier = { path = "../notifier" }
+lightning-topology = { path = "../topology" }
+lightning-rep-collector = { path = "../rep-collector" }
 fleek-crypto.workspace = true
 cid.workspace = true
