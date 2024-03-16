@@ -10,16 +10,21 @@ repository = "https://github.com/fleek-network/lightning"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tokio = { version="1.28", features=["rt", "sync", "macros"]}
+tokio = { version = "1.28", features = ["rt", "sync", "macros"] }
 futures = "0.3"
 async-trait = "0.1"
 crossbeam = "0.8"
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
-tokio = { version="1.28", features=["rt", "sync", "macros", "rt-multi-thread"]}
+tokio = { version = "1.28", features = [
+    "rt",
+    "sync",
+    "macros",
+    "rt-multi-thread",
+    "time",
+] }
 
 [[bench]]
 name = "bench"
 harness = false
-
