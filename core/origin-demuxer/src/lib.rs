@@ -3,37 +3,24 @@ mod demuxer;
 #[cfg(test)]
 mod tests;
 
-use std::sync::Arc;
+use std::marker::PhantomData;
 
-use affair::Socket;
+use affair::{Executor, TokioSpawn};
 use demuxer::Demuxer;
-use derive_more::IsVariant;
+use lightning_interfaces::fdi::{BuildGraph, DependencyGraph};
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::{
     ConfigConsumer,
+    ConfigProviderInterface,
     OriginProviderInterface,
     OriginProviderSocket,
-    WithStartAndShutdown,
 };
-use tokio::sync::{Mutex, Notify};
-use tokio::task::JoinHandle;
 
 pub use crate::config::Config;
 
-#[derive(IsVariant)]
-enum Status<C: Collection> {
-    Running {
-        handle: JoinHandle<Demuxer<C>>,
-        shutdown: Arc<Notify>,
-    },
-    NotRunning {
-        demuxer: Demuxer<C>,
-    },
-}
-
 pub struct OriginDemuxer<C: Collection> {
-    status: Mutex<Option<Status<C>>>,
     socket: OriginProviderSocket,
+    _collection: PhantomData<C>,
 }
 
 impl<C: Collection> ConfigConsumer for OriginDemuxer<C> {
@@ -41,54 +28,29 @@ impl<C: Collection> ConfigConsumer for OriginDemuxer<C> {
     type Config = Config;
 }
 
-impl<C: Collection> WithStartAndShutdown for OriginDemuxer<C> {
-    fn is_running(&self) -> bool {
-        self.status.blocking_lock().as_ref().unwrap().is_running()
-    }
-
-    async fn start(&self) {
-        let mut guard = self.status.lock().await;
-        let status = guard.take().unwrap();
-        let next_status = if let Status::NotRunning { demuxer } = status {
-            let (handle, shutdown) = demuxer.spawn();
-            Status::Running { handle, shutdown }
-        } else {
-            status
-        };
-        *guard = Some(next_status);
-    }
-
-    async fn shutdown(&self) {
-        let mut guard = self.status.lock().await;
-        let status = guard.take().unwrap();
-        let next_status = if let Status::Running { handle, shutdown } = status {
-            shutdown.notify_one();
-            let demuxer = match handle.await {
-                Ok(demuxer) => demuxer,
-                Err(e) => {
-                    std::panic::resume_unwind(e.into_panic());
-                },
-            };
-            Status::NotRunning { demuxer }
-        } else {
-            status
-        };
-        *guard = Some(next_status);
+impl<C: Collection> OriginDemuxer<C> {
+    pub fn new(
+        config: &C::ConfigProviderInterface,
+        blockstore: &C::BlockstoreInterface,
+    ) -> anyhow::Result<Self> {
+        let config = config.get::<Self>();
+        let demuxer = Demuxer::<C>::new(config, blockstore.clone())?;
+        let socket = TokioSpawn::spawn_async_unordered(demuxer);
+        Ok(Self {
+            socket,
+            _collection: PhantomData,
+        })
     }
 }
 
 impl<C: Collection> OriginProviderInterface<C> for OriginDemuxer<C> {
-    fn init(config: Config, blockstore: C::BlockstoreInterface) -> anyhow::Result<Self> {
-        let (socket, rx) = Socket::raw_bounded(2048);
-        Ok(Self {
-            status: Mutex::new(Some(Status::NotRunning {
-                demuxer: Demuxer::new(config, blockstore, rx)?,
-            })),
-            socket,
-        })
-    }
-
     fn get_socket(&self) -> OriginProviderSocket {
         self.socket.clone()
+    }
+}
+
+impl<C: Collection> BuildGraph for OriginDemuxer<C> {
+    fn build_graph() -> DependencyGraph {
+        DependencyGraph::default().with(Self::new)
     }
 }
