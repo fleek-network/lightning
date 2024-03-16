@@ -334,6 +334,7 @@ async fn run_unordered_async<'a, H: AsyncWorkerUnordered + 'a>(
         futures.push(Box::pin(fut));
 
         'inner: loop {
+            dbg!(futures.len());
             tokio::select! {
                 maybe_event = rx.recv() => {
                     let Some(event) = maybe_event else {
@@ -343,7 +344,7 @@ async fn run_unordered_async<'a, H: AsyncWorkerUnordered + 'a>(
                     futures.push(Box::pin(fut));
                 },
                 _ = futures.next() => {
-                    if futures.is_empty() {
+                    if dbg!(futures.is_empty()) {
                         continue 'outer;
                     }
                 }
@@ -451,6 +452,7 @@ impl<Req, Res> Unpin for WeakSocket<Req, Res> {}
 #[cfg(test)]
 mod tests {
     use std::sync::Mutex;
+    use std::time::Duration;
 
     use super::*;
 
@@ -523,5 +525,30 @@ mod tests {
 
         assert_eq!(socket.run(2).await.unwrap(), 20);
         assert_eq!(TAPE.lock().unwrap().as_ref(), vec![10, 13, 18, 20]);
+    }
+
+    #[tokio::test]
+    async fn test_async_unordered() {
+        #[derive(Default)]
+        struct Worker {}
+        impl AsyncWorkerUnordered for Worker {
+            type Request = u32;
+            type Response = u32;
+
+            async fn handle(&self, req: Self::Request) -> u32 {
+                let (tx, rx) = tokio::sync::oneshot::channel();
+                tokio::spawn(async move {
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                    tx.send(req).unwrap();
+                });
+                rx.await.unwrap()
+            }
+        }
+
+        let socket = TokioSpawn::spawn_async_unordered(Worker::default());
+        let res = socket.run(0).await;
+        assert_eq!(res.unwrap(), 0);
+        let res = socket.run(1).await;
+        assert_eq!(res.unwrap(), 1);
     }
 }
