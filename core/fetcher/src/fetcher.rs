@@ -115,11 +115,8 @@ impl<C: Collection> FetcherWorker<C> {
             .await
             .expect("Failed to send origin request");
 
-        let res = response_rx
-            .await?
-            .recv()
-            .await?
-            .context("failed to fetch from origin");
+        let mut res = response_rx.await?;
+        let res = res.recv().await?.context("failed to fetch from origin");
 
         if res.is_ok() {
             increment_counter!(
