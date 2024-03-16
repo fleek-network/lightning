@@ -53,6 +53,7 @@ impl<C: Collection> WithStartAndShutdown for Broadcast<C> {
     }
 
     async fn start(&self) {
+        dbg!("here");
         let mut guard = self.status.lock().await;
 
         // This is an unneeded binding. But my rust-analyzer (not rustc) assumes
@@ -109,6 +110,7 @@ impl<C: Collection> BroadcastInterface<C> for Broadcast<C> {
         rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
         pool: &c!(C::PoolInterface),
     ) -> anyhow::Result<Self> {
+        dbg!("x");
         let sk = keystore.get_ed25519_sk();
         let event_handler = pool.open_event(ServiceScope::Broadcast);
 

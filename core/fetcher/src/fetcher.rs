@@ -115,8 +115,11 @@ impl<C: Collection> FetcherWorker<C> {
             .await
             .expect("Failed to send origin request");
 
+        println!("sent request");
         let mut res = response_rx.await?;
+        println!("waiting for broadcast response");
         let res = res.recv().await?.context("failed to fetch from origin");
+        println!("got broadcast response");
 
         if res.is_ok() {
             increment_counter!(

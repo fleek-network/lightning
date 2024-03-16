@@ -268,6 +268,7 @@ impl<B: BroadcastBackend> Context<B> {
     /// a pubsub object.
     fn handle_command(&mut self, command: Command) {
         debug!("handling broadcast command {command:?}");
+        println!("Command!");
 
         match command {
             Command::Recv(cmd) => {
@@ -275,6 +276,7 @@ impl<B: BroadcastBackend> Context<B> {
                 self.incoming_messages[index].respond_to_recv_request(cmd.last_seen, cmd.response);
             },
             Command::Send(cmd) => {
+                println!("Command Send!");
                 let node_index = self
                     .backend
                     .get_node_index(&self.pk)
@@ -294,6 +296,7 @@ impl<B: BroadcastBackend> Context<B> {
                     (digest, tmp)
                 };
 
+                println!("X sending hash");
                 let _ = cmd.response.send(digest);
 
                 let id = self.interner.insert(digest);
@@ -403,6 +406,7 @@ async fn main_loop<B: BroadcastBackend>(
     mut shutdown: tokio::sync::oneshot::Receiver<()>,
     mut ctx: Context<B>,
 ) -> Context<B> {
+    println!("broadcast loop");
     info!("Starting broadcast for {}", ctx.pk);
 
     // During initialization the application state might have not had loaded, and at

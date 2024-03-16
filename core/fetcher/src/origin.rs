@@ -62,12 +62,18 @@ impl<C: Collection> OriginFetcher<C> {
                     }
                 }
                 Some(res) = self.tasks.join_next() => {
+                    dbg!(&res);
                     match res {
                         Ok(Ok(SuccessResponse { pointer, hash })) => {
                             let uri = pointer.uri.clone();
+                            println!("publishing...");
                             self.resolver.publish(hash, &[pointer]).await;
+                            println!("published");
                             if let Some(tx) = pending_requests.remove(&uri) {
+                                println!("sending");
                                 tx.send(Ok(hash)).expect("Failed to send hash");
+                            } else {
+                                println!("empty");
                             }
                         }
                         Ok(Err(e)) => {
@@ -96,8 +102,9 @@ impl<C: Collection> OriginFetcher<C> {
     async fn spawn(&mut self, pointer: ImmutablePointer) {
         let origin_socket = self.origin_socket.clone();
         self.tasks.spawn(async move {
+            println!("-----");
             match &pointer.origin {
-                OriginProvider::IPFS => match origin_socket.run(pointer.clone()).await {
+                OriginProvider::IPFS => match dbg!(origin_socket.run(pointer.clone()).await) {
                     Ok(Ok(hash)) => Ok(SuccessResponse { pointer, hash }),
                     Ok(Err(_)) => Err(ErrorResponse::OriginFetchError(pointer.uri)),
                     Err(_) => Err(ErrorResponse::OriginSocketError),
@@ -113,6 +120,7 @@ pub struct OriginRequest {
     pub response: oneshot::Sender<broadcast::Receiver<Result<Blake3Hash, OriginError>>>,
 }
 
+#[derive(Debug)]
 struct SuccessResponse {
     pointer: ImmutablePointer,
     hash: Blake3Hash,
