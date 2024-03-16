@@ -1,10 +1,10 @@
 use affair::Socket;
 use anyhow;
+use fdi::BuildGraph;
 use lightning_types::ImmutablePointer;
 
 use crate::infu_collection::Collection;
 use crate::types::Blake3Hash;
-use crate::{BlockstoreInterface, ConfigConsumer, ConfigProviderInterface, WithStartAndShutdown};
 
 /// A socket for submitting a fetch request to an origin.
 pub type OriginProviderSocket = Socket<ImmutablePointer, anyhow::Result<Blake3Hash>>;
@@ -13,16 +13,7 @@ pub type OriginProviderSocket = Socket<ImmutablePointer, anyhow::Result<Blake3Ha
 /// a modular way, and [`OriginProvider`] can be something like a provider for resolving
 /// *IPFS* files.
 #[infusion::service]
-pub trait OriginProviderInterface<C: Collection>:
-    ConfigConsumer + WithStartAndShutdown + Sized + Send + Sync
-{
-    fn _init(config: ::ConfigProviderInterface, blockstore: ::BlockstoreInterface) {
-        Self::init(config.get::<Self>(), blockstore.clone())
-    }
-
-    /// Initialize the origin service.
-    fn init(config: Self::Config, blockstore: C::BlockstoreInterface) -> anyhow::Result<Self>;
-
+pub trait OriginProviderInterface<C: Collection>: BuildGraph + Sized + Send + Sync {
     /// Returns a socket for submitting a fetch request to an origin.
     fn get_socket(&self) -> OriginProviderSocket;
 }
