@@ -70,6 +70,7 @@ impl<C: Collection> Node<C> {
             .with_module::<C::ForwarderInterface>()
             .with_module::<C::TopologyInterface>()
             .with_module::<C::IndexerInterface>()
+            .with_module::<C::OriginProviderInterface>()
             // TODO: Refactor the rest of start/shutdown/inits:
             .with(
                 C::BlockstoreInterface::infu_initialize_hack
@@ -116,15 +117,6 @@ impl<C: Collection> Node<C> {
                 C::HandshakeInterface::infu_initialize_hack
                     .on("start", |c: &C::HandshakeInterface| block_on(c.start()))
                     .on("shutdown", |c: &C::HandshakeInterface| {
-                        block_on(c.shutdown())
-                    }),
-            )
-            .with(
-                C::OriginProviderInterface::infu_initialize_hack
-                    .on("start", |c: &C::OriginProviderInterface| {
-                        block_on(c.start())
-                    })
-                    .on("shutdown", |c: &C::OriginProviderInterface| {
                         block_on(c.shutdown())
                     }),
             )
