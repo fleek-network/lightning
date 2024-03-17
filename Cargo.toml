@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 members = ["core/*", "lib/*", "services/*", "services/ai/examples/rust/*"]
-exclude = ["etc/global-metrics", "lib/cdk", "lib/blake3-js"]
+exclude = ["etc/global-metrics", "lib/cdk", "lib/blake3-js", "lib/cdk-x-platform-test"]
 
 [workspace.package]
 version = "0.1.0"
