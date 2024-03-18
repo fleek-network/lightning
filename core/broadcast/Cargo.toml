@@ -37,6 +37,7 @@ lightning-pool = { path = "../pool" }
 lightning-notifier = { path = "../notifier" }
 lightning-rep-collector = { path = "../rep-collector" }
 lightning-topology = { path = "../topology" }
+bincode.workspace = true
 
 [[example]]
 name = "simulation"

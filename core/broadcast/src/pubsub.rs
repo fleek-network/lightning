@@ -26,7 +26,7 @@ pub struct Event<T> {
 }
 
 impl<T: LightningMessage + Clone> PubSubI<T> {
-    pub(crate) fn new(topic: Topic, command_sender: CommandSender) -> Self {
+    pub fn new(topic: Topic, command_sender: CommandSender) -> Self {
         Self {
             topic,
             command_sender,

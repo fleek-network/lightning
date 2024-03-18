@@ -2,15 +2,19 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 
-use bytes::Bytes;
+use bytes::{BufMut, Bytes, BytesMut};
 use fleek_crypto::{NodePublicKey, NodeSecretKey, SecretKey};
-use lightning_broadcast::{Context, Database, SimulonBackend};
+use lightning_broadcast::{Context, Database, PubSubI, SimulonBackend};
+use lightning_interfaces::schema::AutoImplSerde;
+use lightning_interfaces::types::Topic;
+use lightning_interfaces::PubSub;
 use lightning_topology::{
     build_latency_matrix,
     suggest_connections_from_latency_matrix,
     Connections,
 };
 use rand::Rng;
+use serde::{Deserialize, Serialize};
 use simulon::api::{OwnedWriter, RemoteAddr};
 use simulon::latency::LatencyProvider;
 use simulon::simulation::SimulationBuilder;
@@ -20,6 +24,8 @@ type TopologyConnections = Arc<Connections>;
 type SecretKeyMappings = Arc<HashMap<usize, NodeSecretKey>>;
 type KeyMappings = Arc<HashMap<NodeIndex, NodePublicKey>>;
 type IndexMappings = Arc<HashMap<NodePublicKey, NodeIndex>>;
+
+const N: usize = 1500;
 
 async fn exec(n: usize) {
     let node_index = *RemoteAddr::whoami();
@@ -74,12 +80,45 @@ async fn exec(n: usize) {
     // message task
     let (msg_sender_tx, mut msg_sender_rx) = tokio::sync::mpsc::channel(1024);
     let (msg_recv_tx, msg_recv_rx) = tokio::sync::mpsc::channel(1024);
-    simulon::api::spawn(async move {
-        //enum Connections {
-        //    One(OwnedWriter),
-        //    Two(OwnedWriter, OwnedWriter),
-        //}
 
+    let backend = SimulonBackend::new(
+        msg_sender_tx,
+        msg_recv_rx,
+        peers,
+        key_to_index,
+        index_to_key,
+    );
+    let ctx = Context::new(Database::default(), secret_key.clone(), backend);
+    let command_sender = ctx.get_command_sender();
+    let mut pub_sub = PubSubI::<Message>::new(Topic::Debug, command_sender);
+
+    let (cmd_sender_tx, mut cmd_sender_rx) = tokio::sync::mpsc::channel(1024);
+    simulon::api::spawn(async move {
+        loop {
+            tokio::select! {
+                msg = pub_sub.recv() => {
+                    if let Some(msg) = msg {
+                        simulon::api::emit(msg.id.to_string());
+                    }
+                }
+                msg = cmd_sender_rx.recv() => {
+                    if let Some((peer, msg)) = msg {
+                        if peer == N {
+                            // this message is from the client
+                            pub_sub
+                                .send(&msg, None)
+                                .await
+                                .expect("Failed to broadcast message");
+                        }
+                    } else {
+                        // should we do anything here?
+                    }
+                }
+            }
+        }
+    });
+
+    simulon::api::spawn(async move {
         let mut writers = HashMap::<usize, OwnedWriter>::new();
         loop {
             tokio::select! {
@@ -88,13 +127,14 @@ async fn exec(n: usize) {
                         let peer_index = *conn.remote();
                         let (mut reader, writer) = conn.split();
                         let msg_recv_tx_ = msg_recv_tx.clone();
+                        let cmd_sender_tx_ = cmd_sender_tx.clone();
                         simulon::api::spawn(async move {
                             let index = *reader.remote();
-                            while let Some(msg) = reader.recv().await {
-                                msg_recv_tx_.send((index as NodeIndex, msg)).await.expect("Failed to send");
+                            while let Some(msg) = reader.recv::<Message>().await {
+                                cmd_sender_tx_.send((index, msg.clone())).await.expect("Failed to send");
+                                msg_recv_tx_.send((index as NodeIndex, msg.into())).await.expect("Failed to send");
                             }
                         });
-
                         writers.insert(peer_index, writer);
                     }
                 }
@@ -104,22 +144,16 @@ async fn exec(n: usize) {
                             writer.write::<Bytes>(&payload);
                         }
                     }
+
                 }
             }
         }
     });
-    let backend = SimulonBackend::new(
-        msg_sender_tx,
-        msg_recv_rx,
-        peers,
-        key_to_index,
-        index_to_key,
-    );
-    let (tx, rx) = tokio::sync::oneshot::channel();
-    let ctx = Context::new(Database::default(), secret_key.clone(), backend);
+
+    let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
     simulon::api::spawn(async move {
-        ctx.run(rx).await;
-        let _tx = tx; // prevent the node from shutting down by keeping the shutdown sender alive
+        ctx.run(shutdown_rx).await;
+        let _tx = shutdown_tx; // prevent the node from shutting down by keeping the shutdown sender alive
     });
 }
 
@@ -129,7 +163,7 @@ async fn run_client(n: usize) {
     let mut rng = rand::thread_rng();
     simulon::api::sleep(Duration::from_secs(5)).await;
 
-    for _ in 0.. {
+    for i in 0.. {
         let index = rng.gen_range(0..n);
         let addr = simulon::api::RemoteAddr::from_global_index(index);
 
@@ -137,14 +171,14 @@ async fn run_client(n: usize) {
             .await
             .expect("Connection failed.");
 
-        conn.write(&Bytes::from_static(b"hello world"));
+        let msg = Message { id: i };
+        conn.write(&msg);
 
         simulon::api::sleep(Duration::from_secs(5)).await;
     }
 }
 
 pub fn main() {
-    const N: usize = 1500;
     let secret_keys: HashMap<usize, NodeSecretKey> = (0..N)
         .map(|index| (index, NodeSecretKey::generate()))
         .collect();
@@ -186,4 +220,20 @@ pub fn main() {
         .enable_progress_bar()
         .run(Duration::from_secs(120));
     println!("Took {} ms", time.elapsed().as_millis());
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct Message {
+    id: usize,
+}
+
+impl AutoImplSerde for Message {}
+
+impl From<Message> for Bytes {
+    fn from(value: Message) -> Self {
+        let bytes = bincode::serialize(&value).unwrap();
+        let mut buf = BytesMut::with_capacity(bytes.len());
+        buf.put_slice(&bytes);
+        buf.into()
+    }
 }
