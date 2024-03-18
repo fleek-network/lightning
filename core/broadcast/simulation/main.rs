@@ -92,7 +92,7 @@ async fn exec(n: usize) {
     let command_sender = ctx.get_command_sender();
     let mut pub_sub = PubSubI::<Message>::new(Topic::Debug, command_sender);
 
-    let (cmd_sender_tx, mut cmd_sender_rx) = tokio::sync::mpsc::channel(1024);
+    let (cmd_sender_tx, mut cmd_sender_rx) = tokio::sync::mpsc::channel::<(usize, Message)>(1024);
     simulon::api::spawn(async move {
         loop {
             tokio::select! {
@@ -105,6 +105,7 @@ async fn exec(n: usize) {
                     if let Some((peer, msg)) = msg {
                         if peer == N {
                             // this message is from the client
+                            simulon::api::emit(msg.id.to_string());
                             pub_sub
                                 .send(&msg, None)
                                 .await
