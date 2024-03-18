@@ -170,13 +170,11 @@ impl BroadcastBackend for SimulonBackend {
         self.pubkey_to_index.get(node).copied()
     }
 
-    fn report_sat(&self, _peer: NodeIndex, _weight: Weight) {
-        todo!()
-    }
+    fn report_sat(&self, _peer: NodeIndex, _weight: Weight) {}
 
     fn now() -> u64 {
         // TODO(matthias): revisit this cast
-        simulon::api::now() as u64
+        (simulon::api::now() / 1000) as u64
     }
 
     fn sleep(duration: Duration) -> impl Future<Output = ()> + Send {

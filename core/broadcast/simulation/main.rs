@@ -51,16 +51,6 @@ async fn exec(n: usize) {
 
     let (conn_tx, mut conn_rx) = tokio::sync::mpsc::channel(16);
 
-    // listener task for node connections.
-    let tmp = conn_tx.clone();
-    simulon::api::spawn(async move {
-        let conn_tx = tmp;
-        let mut listener = simulon::api::listen(80);
-        while let Some(conn) = listener.accept().await {
-            conn_tx.send(conn).await.expect("Failed to send");
-        }
-    });
-
     // dial tasks
     for peer in &peers {
         if *peer > node_index {
@@ -81,6 +71,7 @@ async fn exec(n: usize) {
     let (msg_sender_tx, mut msg_sender_rx) = tokio::sync::mpsc::channel(1024);
     let (msg_recv_tx, msg_recv_rx) = tokio::sync::mpsc::channel(1024);
 
+    assert!(!peers.is_empty());
     let backend = SimulonBackend::new(
         msg_sender_tx,
         msg_recv_rx,
@@ -88,33 +79,41 @@ async fn exec(n: usize) {
         key_to_index,
         index_to_key,
     );
-    let ctx = Context::new(Database::default(), secret_key.clone(), backend);
-    let command_sender = ctx.get_command_sender();
-    let mut pub_sub = PubSubI::<Message>::new(Topic::Debug, command_sender);
 
-    let (cmd_sender_tx, mut cmd_sender_rx) = tokio::sync::mpsc::channel::<(usize, Message)>(1024);
+    let ctx = Context::new(Database::default(), secret_key.clone(), backend);
+    let ctx_command_sender = ctx.get_command_sender();
+
+    // listener task for node + client connections.
+    let tmp = conn_tx.clone();
+    simulon::api::spawn(async move {
+        let conn_tx = tmp;
+        let mut listener = simulon::api::listen(80);
+        while let Some(mut conn) = listener.accept().await {
+            if *conn.remote() == n {
+                // Handle the client connection differently.
+                let pub_sub = PubSubI::<Message>::new(Topic::Debug, ctx_command_sender.clone());
+                simulon::api::spawn(async move {
+                    while let Some(msg) = conn.recv::<Message>().await {
+                        simulon::api::emit(msg.id.to_string());
+                        pub_sub
+                            .send(&msg, None)
+                            .await
+                            .expect("Could not send the message");
+                    }
+                });
+            } else {
+                conn_tx.send(conn).await.expect("Failed to send");
+            }
+        }
+    });
+
+    // The task to recv message from the broadcast. This will make broadcast propagate the message
+    // further.
+    let mut pub_sub = PubSubI::<Message>::new(Topic::Debug, ctx.get_command_sender());
     simulon::api::spawn(async move {
         loop {
-            tokio::select! {
-                msg = pub_sub.recv() => {
-                    if let Some(msg) = msg {
-                        simulon::api::emit(msg.id.to_string());
-                    }
-                }
-                msg = cmd_sender_rx.recv() => {
-                    if let Some((peer, msg)) = msg {
-                        if peer == N {
-                            // this message is from the client
-                            simulon::api::emit(msg.id.to_string());
-                            pub_sub
-                                .send(&msg, None)
-                                .await
-                                .expect("Failed to broadcast message");
-                        }
-                    } else {
-                        // should we do anything here?
-                    }
-                }
+            if let Some(msg) = pub_sub.recv().await {
+                simulon::api::emit(msg.id.to_string());
             }
         }
     });
@@ -128,12 +127,10 @@ async fn exec(n: usize) {
                         let peer_index = *conn.remote();
                         let (mut reader, writer) = conn.split();
                         let msg_recv_tx_ = msg_recv_tx.clone();
-                        let cmd_sender_tx_ = cmd_sender_tx.clone();
                         simulon::api::spawn(async move {
-                            let index = *reader.remote();
-                            while let Some(msg) = reader.recv::<Message>().await {
-                                cmd_sender_tx_.send((index, msg.clone())).await.expect("Failed to send");
-                                msg_recv_tx_.send((index as NodeIndex, msg.into())).await.expect("Failed to send");
+                            let index = *reader.remote() as NodeIndex;
+                            while let Some(msg) = reader.recv::<Bytes>().await {
+                                msg_recv_tx_.send((index, msg)).await.expect("Failed to send");
                             }
                         });
                         writers.insert(peer_index, writer);
@@ -145,7 +142,6 @@ async fn exec(n: usize) {
                             writer.write::<Bytes>(&payload);
                         }
                     }
-
                 }
             }
         }
@@ -154,8 +150,11 @@ async fn exec(n: usize) {
     let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
     simulon::api::spawn(async move {
         ctx.run(shutdown_rx).await;
-        let _tx = shutdown_tx; // prevent the node from shutting down by keeping the shutdown sender alive
     });
+    simulon::api::spawn(async move {
+        simulon::api::sleep(Duration::from_secs(1800)).await;
+        shutdown_tx.send(()).expect("failed to shutdown");
+    })
 }
 
 /// Start a client loop which picks a random node and sends a message to it every
@@ -210,7 +209,7 @@ pub fn main() {
     let connections = suggest_connections_from_latency_matrix(0, matrix, &mappings, 9, 8);
 
     let time = std::time::Instant::now();
-    SimulationBuilder::new(|| simulon::api::spawn(exec(N)))
+    let report = SimulationBuilder::new(|| simulon::api::spawn(exec(N)))
         .with_nodes(N + 1)
         .set_latency_provider(lat_provider)
         .with_state(Arc::new(connections))
@@ -221,6 +220,7 @@ pub fn main() {
         .enable_progress_bar()
         .run(Duration::from_secs(120));
     println!("Took {} ms", time.elapsed().as_millis());
+    println!("{:#?}", report.log);
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
