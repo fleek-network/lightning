@@ -5600,6 +5600,7 @@ dependencies = [
  "lightning-test-utils",
  "lightning-topology",
  "mini-moka",
+ "plotters",
  "quick_cache",
  "rand 0.8.5",
  "serde",

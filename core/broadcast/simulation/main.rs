@@ -1,4 +1,5 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -13,11 +14,20 @@ use lightning_topology::{
     suggest_connections_from_latency_matrix,
     Connections,
 };
+use plotters::style::full_palette::TEAL_600;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use simulon::api::{OwnedWriter, RemoteAddr};
 use simulon::latency::LatencyProvider;
 use simulon::simulation::SimulationBuilder;
+
+use crate::plotting::{
+    get_nodes_reached_per_timestep,
+    get_nodes_reached_per_timestep_summary,
+    plot_bar_chart,
+};
+
+mod plotting;
 
 type NodeIndex = u32;
 type TopologyConnections = Arc<Connections>;
@@ -220,7 +230,23 @@ pub fn main() {
         .enable_progress_bar()
         .run(Duration::from_secs(120));
     println!("Took {} ms", time.elapsed().as_millis());
-    println!("{:#?}", report.log);
+
+    let steps_to_num_nodes = get_nodes_reached_per_timestep(&report.log.emitted, N, true);
+    let steps_to_num_nodes = get_nodes_reached_per_timestep_summary(&steps_to_num_nodes);
+
+    let precision_in_ms = 5;
+    let output_path = PathBuf::from("simulation/images/percentage_nodes_reached.png");
+    plot_bar_chart(
+        steps_to_num_nodes,
+        precision_in_ms,
+        "Percentage of nodes reached by message per time step",
+        &format!("Time steps in {precision_in_ms} [ms]"),
+        "Average percentage of nodes reached",
+        TEAL_600,
+        true,
+        &output_path,
+    );
+    println!("Plot saved to {output_path:?}");
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
