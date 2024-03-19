@@ -10,7 +10,7 @@ use std::cell::OnceCell;
 use std::collections::HashSet;
 
 use bytes::Bytes;
-use fleek_crypto::{NodePublicKey, NodeSecretKey, NodeSignature, PublicKey, SecretKey};
+use fleek_crypto::NodeSignature;
 use ink_quill::ToDigest;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::schema::broadcast::{Advr, Frame, Message, MessageInternedId, Want};
@@ -54,16 +54,13 @@ pub struct Context<B: BroadcastBackend> {
     command_rx: CommandReceiver,
     // Pending store.
     pending_store: PendingStore<B>,
-    sk: NodeSecretKey,
-    pk: NodePublicKey,
     current_node_index: OnceCell<NodeIndex>,
     backend: B,
 }
 
 impl<B: BroadcastBackend> Context<B> {
-    pub fn new(db: Database, sk: NodeSecretKey, backend: B) -> Self {
+    pub fn new(db: Database, backend: B) -> Self {
         let (command_tx, command_rx) = mpsc::unbounded_channel();
-        let pk = sk.to_pk();
         Self {
             db,
             interner: Interner::new(Interner::MAX_CAPACITY),
@@ -78,8 +75,6 @@ impl<B: BroadcastBackend> Context<B> {
             command_tx,
             command_rx,
             pending_store: PendingStore::new(),
-            sk,
-            pk,
             current_node_index: OnceCell::new(), // will be set upon spawn.
             backend,
         }
@@ -87,11 +82,6 @@ impl<B: BroadcastBackend> Context<B> {
 
     pub fn get_command_sender(&self) -> CommandSender {
         self.command_tx.clone()
-    }
-
-    #[inline]
-    fn get_node_pk(&self, index: NodeIndex) -> Option<NodePublicKey> {
-        self.backend.get_node_pk(index)
     }
 
     /// Handle a message sent from another node.
@@ -178,7 +168,7 @@ impl<B: BroadcastBackend> Context<B> {
     }
 
     fn handle_message(&mut self, sender: NodeIndex, msg: Message) {
-        let Some(origin_pk) = self.get_node_pk(msg.origin) else {
+        let Some(origin_pk) = self.backend.get_node_pk(msg.origin) else {
             self.stats.report(
                 sender,
                 ConnectionStats {
@@ -208,7 +198,7 @@ impl<B: BroadcastBackend> Context<B> {
             return;
         };
 
-        if !origin_pk.verify(&msg.signature, &digest) {
+        if !B::verify(&origin_pk, &msg.signature, &digest) {
             self.stats.report(
                 sender,
                 ConnectionStats {
@@ -263,7 +253,7 @@ impl<B: BroadcastBackend> Context<B> {
             Command::Send(cmd) => {
                 let node_index = self
                     .backend
-                    .get_node_index(&self.pk)
+                    .get_our_index()
                     .expect("Tried to send message before node index was available");
                 let node_index = self.current_node_index.get_or_init(|| node_index);
 
@@ -276,7 +266,7 @@ impl<B: BroadcastBackend> Context<B> {
                         payload: cmd.payload,
                     };
                     let digest = tmp.to_digest();
-                    tmp.signature = self.sk.sign(&digest);
+                    tmp.signature = self.backend.sign(digest);
                     (digest, tmp)
                 };
 
@@ -384,7 +374,7 @@ impl<B: BroadcastBackend> Context<B> {
     }
 
     pub async fn run(mut self, mut shutdown: tokio::sync::oneshot::Receiver<()>) -> Self {
-        info!("Starting broadcast for {}", self.pk);
+        info!("Starting broadcast for node");
 
         // During initialization the application state might have not had loaded, and at
         // that point we might not have inserted the node index of the currently running
@@ -392,7 +382,7 @@ impl<B: BroadcastBackend> Context<B> {
         //
         // We need the node index because when we're sending messages out (when the current
         // node is the origin of the message.), we have to put our own id as the origin.
-        if let Some(node_index) = self.backend.get_node_index(&self.pk) {
+        if let Some(node_index) = self.backend.get_our_index() {
             let _ = self.current_node_index.set(node_index);
         }
 

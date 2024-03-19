@@ -112,9 +112,8 @@ impl<C: Collection> BroadcastInterface<C> for Broadcast<C> {
         let sk = keystore.get_ed25519_sk();
         let event_handler = pool.open_event(ServiceScope::Broadcast);
 
-        let backend = LightningBackend::new(sqr, rep_reporter, event_handler);
-
-        let ctx = Context::new(Database::default(), sk, backend);
+        let backend = LightningBackend::new(sqr, rep_reporter, event_handler, sk);
+        let ctx = Context::new(Database::default(), backend);
 
         Ok(Self {
             command_sender: ctx.get_command_sender(),

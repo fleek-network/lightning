@@ -4,7 +4,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use bytes::{BufMut, Bytes, BytesMut};
-use fleek_crypto::{NodePublicKey, NodeSecretKey, SecretKey};
 use lightning_broadcast::{Context, Database, PubSubI, SimulonBackend};
 use lightning_interfaces::schema::AutoImplSerde;
 use lightning_interfaces::types::Topic;
@@ -31,9 +30,6 @@ mod plotting;
 
 type NodeIndex = u32;
 type TopologyConnections = Arc<Connections>;
-type SecretKeyMappings = Arc<HashMap<usize, NodeSecretKey>>;
-type KeyMappings = Arc<HashMap<NodeIndex, NodePublicKey>>;
-type IndexMappings = Arc<HashMap<NodePublicKey, NodeIndex>>;
 
 const N: usize = 1500;
 
@@ -52,12 +48,6 @@ async fn exec(n: usize) {
         .copied()
         .filter(|index| *index != node_index)
         .collect::<HashSet<_>>();
-
-    let secret_keys = simulon::api::with_state(SecretKeyMappings::clone);
-    let index_to_key = simulon::api::with_state(KeyMappings::clone);
-    let key_to_index = simulon::api::with_state(IndexMappings::clone);
-
-    let secret_key = secret_keys.get(&node_index).unwrap();
 
     let (conn_tx, mut conn_rx) = tokio::sync::mpsc::channel(16);
 
@@ -82,15 +72,9 @@ async fn exec(n: usize) {
     let (msg_recv_tx, msg_recv_rx) = tokio::sync::mpsc::channel(1024);
 
     assert!(!peers.is_empty());
-    let backend = SimulonBackend::new(
-        msg_sender_tx,
-        msg_recv_rx,
-        peers,
-        key_to_index,
-        index_to_key,
-    );
+    let backend = SimulonBackend::new(msg_sender_tx, msg_recv_rx, peers);
 
-    let ctx = Context::new(Database::default(), secret_key.clone(), backend);
+    let ctx = Context::new(Database::default(), backend);
     let ctx_command_sender = ctx.get_command_sender();
 
     // listener task for node + client connections.
@@ -189,33 +173,18 @@ async fn run_client(n: usize) {
 }
 
 pub fn main() {
-    let secret_keys: HashMap<usize, NodeSecretKey> = (0..N)
-        .map(|index| (index, NodeSecretKey::generate()))
-        .collect();
-    let index_to_key: HashMap<NodeIndex, NodePublicKey> = secret_keys
-        .iter()
-        .map(|(index, key)| (*index as NodeIndex, key.to_pk()))
-        .collect();
-    let key_to_index: HashMap<NodePublicKey, NodeIndex> = index_to_key
-        .iter()
-        .map(|(index, key)| (*key, *index))
-        .collect();
-
     let mut lat_provider = simulon::latency::ConstLatencyProvider(Duration::from_millis(1));
 
     let mut latencies = HashMap::new();
     for i in 0..(N - 1) {
         for j in (i + 1)..N {
             let lat = lat_provider.get(i, j);
-            let key_i = index_to_key.get(&(i as NodeIndex)).unwrap();
-            let key_j = index_to_key.get(&(j as NodeIndex)).unwrap();
-            latencies.insert((*key_i, *key_j), lat);
+            latencies.insert((i, j), lat);
         }
     }
 
-    let valid_pubkeys: BTreeSet<NodePublicKey> = index_to_key.values().copied().collect();
-    let dummy_key = NodeSecretKey::generate().to_pk();
-    let (matrix, mappings, _) = build_latency_matrix(dummy_key, latencies, valid_pubkeys);
+    let valid_pubkeys: BTreeSet<usize> = (0..N).collect();
+    let (matrix, mappings, _) = build_latency_matrix(usize::MAX, latencies, valid_pubkeys);
     let connections = suggest_connections_from_latency_matrix(0, matrix, &mappings, 9, 8);
 
     let time = std::time::Instant::now();
@@ -223,9 +192,6 @@ pub fn main() {
         .with_nodes(N + 1)
         .set_latency_provider(lat_provider)
         .with_state(Arc::new(connections))
-        .with_state(Arc::new(secret_keys))
-        .with_state(Arc::new(index_to_key))
-        .with_state(Arc::new(key_to_index))
         .set_node_metrics_rate(Duration::ZERO)
         .enable_progress_bar()
         .run(Duration::from_secs(120));
