@@ -1,30 +1,39 @@
-use std::sync::{Arc, Mutex, Weak};
-
 use futures::Future;
 use futures_task::{Poll, Waker};
+use parking_lot::Mutex;
+use triomphe::Arc;
 
 /// A future that we can wake up from anywhere.
-pub struct DeferredFuture<T>(Arc<Inner<T>>);
+pub struct DeferredFuture<T>(Arc<Mutex<Inner<T>>>);
 
 /// The waker of a [`DeferredFuture`].
-pub struct DeferredFutureWaker<T>(Weak<Inner<T>>);
+pub struct DeferredFutureWaker<T>(Arc<Mutex<Inner<T>>>);
 
-struct Inner<T>(Mutex<(Option<T>, Option<Waker>)>);
+struct Inner<T> {
+    value: Option<T>,
+    waker: Option<Waker>,
+}
 
 impl<T> DeferredFuture<T> {
     #[inline(always)]
     pub fn new() -> Self {
-        DeferredFuture(Arc::new(Inner(Mutex::new((None, None)))))
+        DeferredFuture(Arc::new(Mutex::new(Inner {
+            value: None,
+            waker: None,
+        })))
     }
 
     #[inline(always)]
     pub fn resolved(value: T) -> Self {
-        DeferredFuture(Arc::new(Inner(Mutex::new((Some(value), None)))))
+        DeferredFuture(Arc::new(Mutex::new(Inner {
+            value: Some(value),
+            waker: None,
+        })))
     }
 
     #[inline(always)]
     pub fn waker(&self) -> DeferredFutureWaker<T> {
-        DeferredFutureWaker(Arc::downgrade(&self.0))
+        DeferredFutureWaker(self.0.clone())
     }
 }
 
@@ -35,12 +44,12 @@ impl<T> Future for DeferredFuture<T> {
         self: std::pin::Pin<&mut Self>,
         cx: &mut futures_task::Context<'_>,
     ) -> futures_task::Poll<Self::Output> {
-        let mut guard = self.0.0.lock().unwrap();
+        let mut guard = self.0.lock();
 
-        if let Some(value) = guard.0.take() {
+        if let Some(value) = guard.value.take() {
             Poll::Ready(value)
         } else {
-            guard.1 = Some(cx.waker().clone());
+            guard.waker = Some(cx.waker().clone());
             Poll::Pending
         }
     }
@@ -50,12 +59,10 @@ impl<T> DeferredFutureWaker<T> {
     /// Wake up the future.
     #[inline(always)]
     pub fn wake(&self, value: T) {
-        if let Some(inner) = self.0.upgrade() {
-            let mut guard = inner.0.lock().unwrap();
-            guard.0 = Some(value);
-            if let Some(waker) = guard.1.take() {
-                waker.wake();
-            }
+        let mut guard = self.0.lock();
+        guard.value = Some(value);
+        if let Some(waker) = guard.waker.take() {
+            waker.wake();
         }
     }
 }

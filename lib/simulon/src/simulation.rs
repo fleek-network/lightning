@@ -1,11 +1,11 @@
 use std::any::Any;
 use std::cell::UnsafeCell;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::Duration;
 
 use indicatif::ProgressBar;
+use triomphe::Arc;
 
 use crate::latency::{DefaultLatencyProvider, LatencyProvider};
 use crate::message::Message;

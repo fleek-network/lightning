@@ -1,9 +1,9 @@
 use std::cell::RefCell;
 use std::collections::{BinaryHeap, HashMap, VecDeque};
-use std::sync::Arc;
 
 use futures::executor::LocalPool;
 use fxhash::FxHashMap;
+use triomphe::Arc;
 
 use crate::api::{ConnectError, RemoteAddr};
 use crate::future::{DeferredFuture, DeferredFutureWaker};
