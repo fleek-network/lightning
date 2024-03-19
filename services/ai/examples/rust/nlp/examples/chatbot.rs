@@ -19,7 +19,15 @@ const EOS: usize = 50256;
 
 #[tokio::main]
 async fn main() {
-    let tokenizer = Tokenizer::from_file("tokenizer.json").unwrap();
+    let mut args = std::env::args();
+    args.next();
+
+    let Some(tokenizer_path) = args.next() else {
+        println!("missing tokenizer path argument");
+        std::process::exit(1);
+    };
+
+    let tokenizer = Tokenizer::from_file(tokenizer_path).unwrap();
 
     let target: SocketAddr = "127.0.0.1:4221".parse().unwrap();
     let transport = TcpTransport::new(target);
