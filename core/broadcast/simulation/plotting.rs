@@ -94,6 +94,11 @@ pub fn plot_bar_chart(
     error_bars: bool,
     output_path: &std::path::Path,
 ) {
+    if let Some(directory) = output_path.parent() {
+        if !directory.exists() {
+            std::fs::create_dir_all(directory).expect("Failed to create directory");
+        }
+    }
     let (means, std_devs): (Vec<_>, Vec<_>) = data.into_iter().unzip();
     let means: Vec<i32> = means
         .chunks(precision_in_ms)

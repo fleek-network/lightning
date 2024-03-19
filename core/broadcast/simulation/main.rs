@@ -202,6 +202,7 @@ pub fn main() {
 
     let precision_in_ms = 5;
     let output_path = PathBuf::from("simulation/images/percentage_nodes_reached.png");
+
     plot_bar_chart(
         steps_to_num_nodes,
         precision_in_ms,
