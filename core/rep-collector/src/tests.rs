@@ -125,6 +125,7 @@ async fn test_query() {
     let app = Application::<TestBinding>::init(
         AppConfig {
             genesis: Some(genesis),
+            genesis_path: None,
             mode: Mode::Test,
             testnet: false,
             storage: StorageConfig::InMemory,
@@ -286,6 +287,7 @@ async fn test_submit_measurements() {
     let app = Application::<TestBinding>::init(
         AppConfig {
             genesis: Some(genesis),
+            genesis_path: None,
             mode: Mode::Test,
             testnet: false,
             storage: StorageConfig::InMemory,
@@ -477,6 +479,7 @@ async fn test_reputation_calculation_and_query() {
     let app = Application::<TestBinding>::init(
         AppConfig {
             genesis: Some(genesis),
+            genesis_path: None,
             mode: Mode::Test,
             testnet: false,
             storage: StorageConfig::InMemory,

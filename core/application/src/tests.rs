@@ -557,6 +557,7 @@ fn test_genesis() -> Genesis {
 fn init_app(config: Option<Config>) -> (ExecutionEngineSocket, QueryRunner) {
     let config = config.or(Some(Config {
         genesis: None,
+        genesis_path: None,
         mode: Mode::Dev,
         testnet: false,
         storage: StorageConfig::InMemory,
@@ -629,6 +630,7 @@ fn init_app_with_params(
     }
     let config = Config {
         genesis: Some(genesis),
+        genesis_path: None,
         mode: Mode::Test,
         testnet: false,
         storage: StorageConfig::InMemory,
@@ -643,6 +645,7 @@ fn init_app_with_params(
 fn test_config(genesis: Genesis) -> Config {
     Config {
         genesis: Some(genesis),
+        genesis_path: None,
         mode: Mode::Test,
         testnet: false,
         storage: StorageConfig::InMemory,

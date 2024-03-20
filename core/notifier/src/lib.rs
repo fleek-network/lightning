@@ -162,6 +162,7 @@ mod tests {
         genesis.epoch_time = epoch_time;
         let config = Config {
             genesis: Some(genesis),
+            genesis_path: None,
             mode: Mode::Test,
             testnet: false,
             storage: StorageConfig::InMemory,

@@ -182,6 +182,7 @@ async fn init_rpc_without_consensus(
         Some(genesis) => Application::<TestBinding>::init(
             AppConfig {
                 genesis: Some(genesis),
+                genesis_path: None,
                 mode: Mode::Test,
                 testnet: false,
                 storage: StorageConfig::InMemory,

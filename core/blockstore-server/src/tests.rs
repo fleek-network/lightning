@@ -134,6 +134,7 @@ async fn get_peers(
     let app = Application::<TestBinding>::init(
         AppConfig {
             genesis: Some(genesis),
+            genesis_path: None,
             mode: Mode::Test,
             testnet: false,
             storage: StorageConfig::InMemory,

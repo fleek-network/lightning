@@ -101,6 +101,7 @@ async fn init_service_executor(
     let app = Application::<TestBinding>::init(
         AppConfig {
             genesis: Some(genesis),
+            genesis_path: None,
             mode: Mode::Test,
             testnet: false,
             storage: StorageConfig::InMemory,

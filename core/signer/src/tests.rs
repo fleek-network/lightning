@@ -68,6 +68,7 @@ async fn test_send_two_txs_in_a_row() {
     let app = Application::<TestBinding>::init(
         AppConfig {
             genesis: Some(genesis),
+            genesis_path: None,
             mode: Mode::Test,
             testnet: false,
             storage: StorageConfig::InMemory,
@@ -170,6 +171,7 @@ async fn test_retry_send() {
     let app = Application::<TestBinding>::init(
         AppConfig {
             genesis: Some(genesis),
+            genesis_path: None,
             mode: Mode::Test,
             testnet: false,
             storage: StorageConfig::InMemory,

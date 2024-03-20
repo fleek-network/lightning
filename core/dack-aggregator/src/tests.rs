@@ -80,6 +80,7 @@ async fn init_aggregator(path: PathBuf) -> Node<TestBinding> {
     let app = Application::<TestBinding>::init(
         AppConfig {
             genesis: Some(genesis),
+            genesis_path: None,
             mode: Mode::Test,
             testnet: false,
             storage: StorageConfig::InMemory,

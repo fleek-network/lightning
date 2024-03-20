@@ -14,6 +14,7 @@ pub enum Mode {
 #[derive(Serialize, Deserialize)]
 pub struct Config {
     pub genesis: Option<Genesis>,
+    pub genesis_path: Option<ResolvedPathBuf>,
     pub mode: Mode,
     pub testnet: bool,
     pub storage: StorageConfig,
@@ -25,6 +26,7 @@ impl Config {
     pub fn test() -> Self {
         Self {
             genesis: None,
+            genesis_path: None,
             mode: Mode::Dev,
             testnet: false,
             storage: StorageConfig::InMemory,
@@ -38,6 +40,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             genesis: None,
+            genesis_path: None,
             mode: Mode::Prod,
             testnet: true,
             storage: StorageConfig::RocksDb,

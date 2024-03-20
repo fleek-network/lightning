@@ -53,6 +53,7 @@ fn build_config(
     config.inject::<Application<FinalTypes>>(AppConfig {
         mode: Mode::Prod,
         genesis: Some(genesis),
+        genesis_path: None,
         testnet: false,
         storage: StorageConfig::RocksDb,
         db_path: Some(path.join("data/app_db").try_into().unwrap()),
@@ -198,6 +199,7 @@ async fn node_checkpointing() -> Result<()> {
     let app_config_temp = AppConfig {
         mode: Mode::Prod,
         genesis: Some(genesis.clone()),
+        genesis_path: None,
         testnet: false,
         storage: StorageConfig::RocksDb,
         db_path: Some(path.join("data/app_db_temp").try_into().unwrap()),

@@ -251,7 +251,15 @@ impl Env<UpdatePerm> {
             if metadata_table.get(Metadata::Epoch).is_some() {
                 return false;
             }
-            let mut genesis = Genesis::load().unwrap();
+
+            let mut genesis = if let Some(genesis_path) = &config.genesis_path {
+                let genesis_string = std::fs::read_to_string(genesis_path).expect("Error reading Genesis path");
+
+                toml::from_str(&genesis_string).expect("Failed to parse genesis file")
+
+            } else {
+                Genesis::load().unwrap()
+            };
 
             match &config.mode {
                 Mode::Dev => {
