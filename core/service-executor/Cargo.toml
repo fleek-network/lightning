@@ -39,19 +39,18 @@ default = []
 services = [ "dep:fleek-service-fetcher", "dep:fleek-service-js-poc", "dep:fleek-service-ai"]
 
 [dev-dependencies]
-lightning-fetcher = { path = "../fetcher" }
-lightning-origin-demuxer = { path = "../origin-demuxer" }
-lightning-origin-ipfs = { path = "../origin-ipfs" }
-lightning-broadcast = { path="../broadcast" }
-lightning-blockstore = { path = "../blockstore" }
-lightning-blockstore-server = { path = "../blockstore-server" }
-lightning-signer = {path="../signer"}
-lightning-resolver = { path = "../resolver" }
-lightning-application = { path="../application", features = ["test"] }
-lightning-pool = { path = "../pool" }
-lightning-notifier = {path="../notifier"}
-lightning-topology = {path="../topology"}
-lightning-test-utils = { path="../test-utils" }
-lightning-rep-collector = {path="../rep-collector"}
 hp-fixed.workspace = true
-serial_test = "3.0.0"
+lightning-test-utils = { path="../test-utils" }
+lightning-blockstore = { path = "../blockstore" }
+lightning-signer = {path="../signer"}
+lightning-application = { path="../application", features = ["test"] }
+lightning-notifier = {path="../notifier"}
+#lightning-fetcher = { path = "../fetcher" }
+#lightning-origin-demuxer = { path = "../origin-demuxer" }
+#lightning-origin-ipfs = { path = "../origin-ipfs" }
+#lightning-broadcast = { path="../broadcast" }
+#lightning-blockstore-server = { path = "../blockstore-server" }
+#lightning-resolver = { path = "../resolver" }
+#lightning-pool = { path = "../pool" }
+#lightning-topology = {path="../topology"}
+#lightning-rep-collector = {path="../rep-collector"}

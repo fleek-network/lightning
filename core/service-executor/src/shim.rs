@@ -1,32 +1,33 @@
 use std::marker::PhantomData;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 use fxhash::FxHashSet;
 use infusion::c;
+use lightning_interfaces::fdi::{BuildGraph, DependencyGraph, MethodExt};
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::ServiceId;
 use lightning_interfaces::{
     ApplicationInterface,
     BlockstoreInterface,
+    Cloned,
     ConfigConsumer,
+    ConfigProviderInterface,
     ExecutorProviderInterface,
-    FetcherSocket,
+    FetcherInterface,
     ServiceExecutorInterface,
-    WithStartAndShutdown,
+    ShutdownWaiter,
 };
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
 use tokio::net::UnixStream;
-use tokio::sync::Notify;
 use tracing::{error, trace};
 use triomphe::Arc;
 
 use crate::service::{spawn_service, Context, ServiceCollection};
 
+#[derive(Clone)]
 pub struct ServiceExecutor<C: Collection> {
-    config: ServiceExecutorConfig,
-    is_running: Arc<AtomicBool>,
+    config: Arc<ServiceExecutorConfig>,
     collection: ServiceCollection,
     ctx: Arc<Context<C>>,
     p: PhantomData<C>,
@@ -69,31 +70,47 @@ pub struct Provider {
     collection: ServiceCollection,
 }
 
-impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
-    type Provider = Provider;
-
+impl<C: Collection> ServiceExecutor<C> {
+    /// Initialize the service executor.
     fn init(
-        config: Self::Config,
+        config: &C::ConfigProviderInterface,
         blockstore: &C::BlockstoreInterface,
-        fetcher_socket: FetcherSocket,
-        query_runner: c!(C::ApplicationInterface::SyncExecutor),
+        fetcher: &C::FetcherInterface,
+        Cloned(query_runner): Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
     ) -> anyhow::Result<Self> {
+        let config = Arc::new(config.get::<Self>());
+
         let ctx = Arc::new(Context {
-            kill: Arc::new(Notify::new()),
             blockstore_path: blockstore.get_root_dir(),
             ipc_path: config.ipc_path.to_path_buf(),
-            fetcher_socket,
+            fetcher_socket: fetcher.get_socket(),
             query_runner,
         });
 
         Ok(ServiceExecutor {
             config,
-            is_running: Arc::new(AtomicBool::new(false)),
             collection: ServiceCollection::default(),
             ctx,
             p: PhantomData,
         })
     }
+
+    async fn start(Cloned(this): Cloned<Self>, Cloned(waiter): Cloned<ShutdownWaiter>) {
+        for &id in this.config.services.iter() {
+            let handle = spawn_service(id, this.ctx.clone(), waiter.clone()).await;
+            this.collection.insert(id, handle);
+        }
+    }
+}
+
+impl<C: Collection> BuildGraph for ServiceExecutor<C> {
+    fn build_graph() -> lightning_interfaces::fdi::DependencyGraph {
+        DependencyGraph::default().with(Self::init.on("start", Self::start.block_on()))
+    }
+}
+
+impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
+    type Provider = Provider;
 
     fn get_provider(&self) -> Self::Provider {
         Provider {
@@ -121,26 +138,6 @@ impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
             },
             _ => eprintln!("Service {id} not found."),
         }
-    }
-}
-
-impl<C: Collection> WithStartAndShutdown for ServiceExecutor<C> {
-    fn is_running(&self) -> bool {
-        self.is_running.load(Ordering::Relaxed)
-    }
-
-    async fn start(&self) {
-        self.is_running.store(true, Ordering::Relaxed);
-
-        for &id in self.config.services.iter() {
-            let handle = spawn_service(id, self.ctx.clone()).await;
-            self.collection.insert(id, handle);
-        }
-    }
-
-    async fn shutdown(&self) {
-        self.is_running.store(false, Ordering::Relaxed);
-        self.ctx.kill.notify_waiters();
     }
 }
 
