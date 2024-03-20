@@ -66,6 +66,16 @@ impl<C: Collection> Handshake<C> {
     ) {
         let run = this.status.take().expect("restart not implemented.");
 
+        if let Some(path) = &self.config.ebpf_socket_path {
+            if std::env::consts::OS != "linux" {
+                panic!("eBPF is a Linux-only feature");
+            }
+            let stream = UnixStream::connect(path)
+                .await
+                .expect("failed to connect to eBPF service socket");
+            run.ctx.set_ebpf_service_socket(stream);
+        }
+
         // Spawn transports in parallel for accepting incoming handshakes.
         let routers = this
             .config
@@ -132,6 +142,7 @@ pub struct Context<P: ExecutorProviderInterface> {
     pub(crate) shutdown: ShutdownWaiter,
     connection_counter: Arc<AtomicU64>,
     connections: Arc<DashMap<u64, ConnectionEntry>>,
+    ebpf_socket: Option<Arc<UnixStream>>,
 }
 
 struct ConnectionEntry {
@@ -151,6 +162,7 @@ impl<P: ExecutorProviderInterface> Context<P> {
             shutdown: waiter,
             connection_counter: AtomicU64::new(0).into(),
             connections: DashMap::new().into(),
+            ebpf_socket: None,
         }
     }
 
@@ -284,5 +296,9 @@ impl<P: ExecutorProviderInterface> Context<P> {
 
     pub fn cleanup_connection(&self, connection_id: u64) {
         self.connections.remove(&connection_id);
+    }
+
+    pub fn set_ebpf_service_socket(&mut self, stream: UnixStream) {
+        self.ebpf_socket.replace(Arc::new(stream));
     }
 }
