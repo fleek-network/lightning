@@ -32,6 +32,7 @@ str0m = "0.4.1"
 wtransport = { version = "0.1.9", features = ["dangerous-configuration"] }
 rand = "0.8"
 rcgen = "0.11"
+resolved-pathbuf.workspace = true
 ring = "0.16"
 time = "0.3"
 tower = "0.4"
