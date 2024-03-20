@@ -1,6 +1,7 @@
 #![allow(unused, dead_code)] // file is wip
 use std::cell::RefCell;
 use std::collections::{BTreeMap, VecDeque};
+use std::fmt::Debug;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
@@ -123,16 +124,35 @@ struct ControlledBackendInner {
     outgoing: RefCell<VecDeque<Out>>,
 }
 
-#[derive(Debug)]
+struct ToAll {
+    pub frame: Frame,
+    pub filter: Box<dyn Fn(NodeIndex) -> bool + Send + Sync + 'static>,
+}
+
+#[derive(Debug, Clone)]
+struct ToOne {
+    pub frame: Frame,
+    pub destination: NodeIndex,
+}
+
 enum Out {
-    ToAll {
-        frame: Frame,
-        // filter: IgnoreBox<dyn Fn(NodeIndex) -> bool + Send + Sync + 'static>,
-    },
-    ToOne {
-        frame: Frame,
-        destination: NodeIndex,
-    },
+    ToAll(ToAll),
+    ToOne(ToOne),
+}
+
+impl Debug for Out {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Out::ToAll(ToAll { frame, .. }) => {
+                f.debug_struct("ToAll").field("frame", &frame).finish()
+            },
+            Out::ToOne(ToOne { frame, destination }) => f
+                .debug_struct("ToOne")
+                .field("frame", &frame)
+                .field("destination", destination)
+                .finish(),
+        }
+    }
 }
 
 impl BroadcastBackend for ControlledBackend {
@@ -145,19 +165,19 @@ impl BroadcastBackend for ControlledBackend {
     ) {
         let mut outgoing = self.inner.outgoing.borrow_mut();
         let frame = Frame::decode(&payload).unwrap();
-        outgoing.push_front(Out::ToAll {
+        outgoing.push_front(Out::ToAll(ToAll {
             frame,
-            // filter: Box::new(filter),
-        });
+            filter: Box::new(filter),
+        }));
     }
 
     fn send_to_one(&self, node: NodeIndex, payload: Bytes) {
         let mut outgoing = self.inner.outgoing.borrow_mut();
         let frame = Frame::decode(&payload).unwrap();
-        outgoing.push_front(Out::ToOne {
+        outgoing.push_front(Out::ToOne(ToOne {
             frame,
             destination: node,
-        });
+        }));
     }
 
     fn receive(&mut self) -> impl Future<Output = Option<(NodeIndex, Bytes)>> + Send {
@@ -271,6 +291,31 @@ fn demo() {
             digest,
         }),
     );
+
+    let x = RUNTIME.with(|rt| rt.fast_forward());
+    println!("{x:?}");
+    let messages = backend.take_messages();
+    println!("{:?}", messages);
+
+    let x = RUNTIME.with(|rt| rt.fast_forward());
+    println!("{x:?}");
+    let messages = backend.take_messages();
+    println!("{:?}", messages);
+
+    let x = RUNTIME.with(|rt| rt.fast_forward());
+    println!("{x:?}");
+    let messages = backend.take_messages();
+    println!("{:?}", messages);
+
+    let x = RUNTIME.with(|rt| rt.fast_forward());
+    println!("{x:?}");
+    let messages = backend.take_messages();
+    println!("{:?}", messages);
+
+    let x = RUNTIME.with(|rt| rt.fast_forward());
+    println!("{x:?}");
+    let messages = backend.take_messages();
+    println!("{:?}", messages);
 
     let x = RUNTIME.with(|rt| rt.fast_forward());
     println!("{x:?}");
