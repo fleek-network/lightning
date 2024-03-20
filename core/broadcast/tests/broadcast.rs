@@ -69,6 +69,16 @@ impl Runtime {
     /// go over sleeps. So probably in the broadcast event loop codebase this will return at a
     /// sleep.
     pub fn run_until_stalled(&self) {
+        // wake up any sleep task that have reached their time.
+        let now = self.now();
+        let mut wakers_map = self.wakers.borrow_mut();
+        while matches!(wakers_map.first_entry(), Some(e) if e.key() <= &now) {
+            for waker in wakers_map.pop_first().unwrap().1 {
+                waker.send(());
+            }
+        }
+        drop(wakers_map);
+
         let started = Instant::now();
         self.clock.borrow_mut().started = started;
         self.executor.borrow_mut().run_until_stalled();
@@ -82,7 +92,7 @@ impl Runtime {
         let started = self.now();
         self.run_until_stalled();
         if let Some((time, wakers)) = self.wakers.borrow_mut().pop_first() {
-            self.clock.borrow_mut().time += time;
+            self.clock.borrow_mut().time = time;
             for waker in wakers {
                 waker.send(()).expect("Could not wake up sleep");
             }
