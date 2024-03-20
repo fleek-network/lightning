@@ -213,7 +213,7 @@ impl BroadcastBackend for SimulonBackend {
 
     #[inline(always)]
     fn now() -> u64 {
-        (simulon::api::now() / 1000) as u64
+        (simulon::api::now() / 1_000_000) as u64
     }
 
     #[inline(always)]
