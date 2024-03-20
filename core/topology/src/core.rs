@@ -53,6 +53,10 @@ pub fn build_latency_matrix<K: Hash + Eq + Copy>(
                 let latency: i32 = latency.as_millis().try_into().unwrap_or(i32::MAX);
                 matrix[[*index_lhs, *index_rhs]] = latency;
                 matrix[[*index_rhs, *index_lhs]] = latency;
+            } else if let Some(latency) = latencies.get(&(*pubkey_rhs, *pubkey_lhs)) {
+                let latency: i32 = latency.as_millis().try_into().unwrap_or(i32::MAX);
+                matrix[[*index_lhs, *index_rhs]] = latency;
+                matrix[[*index_rhs, *index_lhs]] = latency;
             } else {
                 matrix[[*index_lhs, *index_rhs]] = max_latency;
                 matrix[[*index_rhs, *index_lhs]] = max_latency;
