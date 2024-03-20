@@ -5864,6 +5864,7 @@ dependencies = [
  "mock",
  "rand 0.8.5",
  "rcgen 0.11.3",
+ "resolved-pathbuf",
  "ring 0.16.20",
  "serde",
  "serde_json",
