@@ -8,7 +8,12 @@ use fleek_crypto::ClientPublicKey;
 use fn_sdk::ipc_types::{self, IpcMessage, IpcRequest, DELIMITER_SIZE};
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::{ApplicationInterface, FetcherSocket, SyncQueryRunnerInterface};
+use lightning_interfaces::{
+    ApplicationInterface,
+    FetcherSocket,
+    ShutdownWaiter,
+    SyncQueryRunnerInterface,
+};
 use lightning_schema::LightningMessage;
 use tokio::io::{self, Interest};
 use tokio::net::{UnixListener, UnixStream};
@@ -21,7 +26,6 @@ use triomphe::Arc;
 
 /// The shared object with every service.
 pub struct Context<C: Collection> {
-    pub kill: Arc<Notify>,
     pub blockstore_path: PathBuf,
     pub ipc_path: PathBuf,
     pub fetcher_socket: FetcherSocket,
@@ -32,6 +36,7 @@ impl<C: Collection> Context<C> {
     pub async fn run(&self, request: ipc_types::Request) -> ipc_types::Response {
         match request {
             ipc_types::Request::QueryClientBandwidth { pk } => {
+                println!("got bw req");
                 let balance = self
                     .query_runner
                     .client_key_to_account_key(&ClientPublicKey(pk.into()))
@@ -43,6 +48,7 @@ impl<C: Collection> Context<C> {
                 ipc_types::Response::QueryClientBandwidth { balance }
             },
             ipc_types::Request::QueryClientFLK { pk } => {
+                println!("got client flk request");
                 let balance = self
                     .query_runner
                     .client_key_to_account_key(&ClientPublicKey(pk.into()))
@@ -115,7 +121,11 @@ impl ServiceCollection {
 pub struct ServiceHandle {}
 
 #[allow(unused)]
-pub async fn spawn_service<C: Collection>(id: u32, cx: Arc<Context<C>>) -> ServiceHandle {
+pub async fn spawn_service<C: Collection>(
+    id: u32,
+    cx: Arc<Context<C>>,
+    waiter: ShutdownWaiter,
+) -> ServiceHandle {
     tracing::info!("Initializing service {id}");
 
     let ipc_dir = cx.ipc_path.join(format!("service-{id}"));
@@ -146,22 +156,29 @@ pub async fn spawn_service<C: Collection>(id: u32, cx: Arc<Context<C>>) -> Servi
 
     panic_report::add_context(format!("service_{id}"), format!("{cmd:?}"));
 
-    let kill_notify = cx.kill.clone();
     let cmd_permit = Arc::new(Notify::new());
     let permit = cmd_permit.clone();
     let conn_path = ipc_dir.join("conn");
 
     #[cfg(not(test))]
-    tokio::spawn(async move {
-        // Wait until we have the UDS listener listening.
-        permit.notified().await;
-        tracing::trace!("Starting the child process for service '{id}'.");
-        run_command(format!("service-{id}"), cmd, kill_notify, conn_path).await;
-        tracing::trace!("Exiting service '{id}' execution loop.");
-    });
+    {
+        let waiter = waiter.clone();
+        tokio::spawn(async move {
+            // Wait until we have the UDS listener listening.
+            permit.notified().await;
+            tracing::trace!("Starting the child process for service '{id}'.");
+            run_command(format!("service-{id}"), cmd, waiter, conn_path).await;
+            tracing::trace!("Exiting service '{id}' execution loop.");
+        });
+    }
 
     tokio::spawn(async move {
-        run_ctrl_loop(&ipc_dir, cx, cmd_permit).await;
+        let waiter2 = waiter.clone();
+        waiter
+            .run_until_shutdown(async move {
+                run_ctrl_loop(&ipc_dir, cx, cmd_permit, waiter2).await;
+            })
+            .await;
     });
 
     ServiceHandle {}
@@ -171,6 +188,7 @@ async fn run_ctrl_loop<C: Collection>(
     ipc_path: &Path,
     ctx: Arc<Context<C>>,
     cmd_permit: Arc<Notify>,
+    waiter: ShutdownWaiter,
 ) {
     let ctrl_path = ipc_path.join("ctrl");
 
@@ -180,31 +198,22 @@ async fn run_ctrl_loop<C: Collection>(
     let listener = UnixListener::bind(ctrl_path).expect("Failed to bind to IPC socket.");
     cmd_permit.notify_one();
 
-    pin! {
-        let kill_fut = ctx.kill.notified();
-    };
-
     // Every time the service process is restarted (due to failures). The next one will attempt to
     // create a new connection to the same socket and here we will catch it.
-    loop {
-        tokio::select! {
-            biased;
-            _ = &mut kill_fut => {
-                break;
-            },
-            Ok((stream, _)) = listener.accept() => {
-                let ctx = ctx.clone();
-                tokio::spawn(async move {
+    while let Ok((stream, _)) = listener.accept().await {
+        // spawn a new task to handle the stream
+        let ctx = ctx.clone();
+        let waiter = waiter.clone();
+        tokio::spawn(async move {
+            waiter
+                .run_until_shutdown(async move {
                     if let Err(e) = handle_stream(stream, ctx).await {
                         tracing::error!("Error while handling the unix stream: {e:?}");
                     }
-                });
-            }
-        }
+                })
+                .await
+        });
     }
-
-    // We got the kill signal. So let's do some cleanup.
-    drop(listener);
 }
 
 #[instrument(skip(stream, ctx))]
@@ -223,18 +232,10 @@ async fn handle_stream<C: Collection>(
 
     let mut task_set = JoinSet::<IpcMessage>::new();
 
-    pin! {
-        let kill_fut = ctx.kill.notified();
-    }
-
     'outer: loop {
         // Theres no messages to write
         let ready = if write_buffer.is_empty() {
             tokio::select! {
-                biased;
-                _ = &mut kill_fut => {
-                    break 'outer;
-                },
                 Some(msg) = task_set.join_next() => {
                     match msg {
                         Ok(msg) => {
@@ -252,19 +253,13 @@ async fn handle_stream<C: Collection>(
                 },
             }
         } else {
-            tokio::select! {
-                biased;
-                _ = &mut kill_fut => {
-                    break 'outer;
-                },
-                ready_result = stream.ready(Interest::READABLE | Interest::WRITABLE) => {
-                    ready_result?
-                }
-            }
+            stream
+                .ready(Interest::READABLE | Interest::WRITABLE)
+                .await?
         };
 
-        // dont try to write more than 1 response because the (async) tasks take a while we want to
-        // get them started asap
+        // dont try to write more than 1 response because the (async) tasks take a while we
+        // want to get them started asap
         if ready.is_writable() && !write_buffer.is_empty() {
             while write_buffer_pos < write_buffer.len() {
                 match stream.try_write(&write_buffer[write_buffer_pos..]) {
@@ -287,8 +282,9 @@ async fn handle_stream<C: Collection>(
             }
         }
 
-        // these might take awhile so we want to get them kicked off asap, if theres multiple
-        // messages in the stream then this will handle them all before moving on
+        // these might take awhile so we want to get them kicked off asap, if theres
+        // multiple messages in the stream then this will handle them all
+        // before moving on
         if ready.is_readable() {
             let mut reading_len = true;
 
@@ -366,11 +362,11 @@ async fn handle_stream<C: Collection>(
 async fn run_command(
     name: String,
     mut command: Command,
-    kill: Arc<Notify>,
+    kill: ShutdownWaiter,
     conn_uds_path: PathBuf,
 ) {
     pin! {
-        let kill_fut = kill.notified();
+        let kill_fut = kill.wait_for_shutdown();
     };
 
     command

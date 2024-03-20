@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use affair::Socket;
 use fleek_crypto::{
     AccountOwnerSecretKey,
     ClientPublicKey,
@@ -14,255 +13,76 @@ use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisAccount};
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
-use lightning_blockstore_server::{BlockstoreServer, Config as BlockServerConfig};
-use lightning_broadcast::{Broadcast, Config as BroadcastConfig};
-use lightning_fetcher::config::Config as FetcherConfig;
-use lightning_fetcher::fetcher::Fetcher;
-use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::types::Topic;
-use lightning_interfaces::{
-    partial,
-    ApplicationInterface,
-    BlockstoreInterface,
-    BlockstoreServerInterface,
-    BroadcastInterface,
-    FetcherInterface,
-    KeystoreInterface,
-    NotifierInterface,
-    OriginProviderInterface,
-    PoolInterface,
-    ReputationAggregatorInterface,
-    ResolverInterface,
-    ServiceExecutorInterface,
-    SignerInterface,
-    TopologyInterface,
-    WithStartAndShutdown,
-};
+use lightning_interfaces::infu_collection::{Collection, Node};
+use lightning_interfaces::{fdi, partial};
 use lightning_notifier::Notifier;
-use lightning_origin_demuxer::{Config as DemuxerOriginConfig, OriginDemuxer};
-use lightning_origin_ipfs::config::{Gateway, Protocol};
-use lightning_origin_ipfs::Config as IPFSOriginConfig;
-use lightning_pool::{muxer, Config as PoolConfig, PoolProvider};
-use lightning_rep_collector::aggregator::ReputationAggregator;
-use lightning_rep_collector::config::Config as RepCollConfig;
-use lightning_resolver::config::Config as ResolverConfig;
-use lightning_resolver::resolver::Resolver;
 use lightning_signer::Signer;
+use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
-use lightning_topology::{Config as TopologyConfig, Topology};
-use serial_test::serial;
-use tokio::sync::mpsc;
 
 use crate::shim::{ServiceExecutor, ServiceExecutorConfig};
 
 partial!(TestBinding {
+    ConfigProviderInterface = JsonConfigProvider;
     ServiceExecutorInterface = ServiceExecutor<Self>;
-    FetcherInterface = Fetcher<Self>;
-    OriginProviderInterface = OriginDemuxer<Self>;
-    BroadcastInterface = Broadcast<Self>;
-    BlockstoreInterface = Blockstore<Self>;
-    BlockstoreServerInterface = BlockstoreServer<Self>;
-    KeystoreInterface = EphemeralKeystore<Self>;
-    SignerInterface = Signer<Self>;
-    ResolverInterface = Resolver<Self>;
-    ApplicationInterface = Application<Self>;
-    PoolInterface = PoolProvider<Self>;
     NotifierInterface = Notifier<Self>;
-    TopologyInterface = Topology<Self>;
-    ReputationAggregatorInterface = ReputationAggregator<Self>;
+    KeystoreInterface = EphemeralKeystore<Self>;
+    BlockstoreInterface = Blockstore<Self>;
+    SignerInterface = Signer<Self>;
+    ApplicationInterface = Application<Self>;
+    //FetcherInterface = Fetcher<Self>;
+    //OriginProviderInterface = OriginDemuxer<Self>;
+    //BroadcastInterface = Broadcast<Self>;
+    //BlockstoreServerInterface = BlockstoreServer<Self>;
+    //ResolverInterface = Resolver<Self>;
+    //PoolInterface = PoolProvider<Self>;
+    //TopologyInterface = Topology<Self>;
+    //ReputationAggregatorInterface = ReputationAggregator<Self>;
 });
 
-struct Peer<C: Collection> {
-    service_exec: C::ServiceExecutorInterface,
-    _fetcher: C::FetcherInterface,
-    _pool: C::PoolInterface,
-    _broadcast: C::BroadcastInterface,
-    _blockstore_server: C::BlockstoreServerInterface,
-    _rep_aggregator: C::ReputationAggregatorInterface,
-    _signer: C::SignerInterface,
-    _origin_provider: C::OriginProviderInterface,
-    _blockstore: C::BlockstoreInterface,
-}
-
+/// Initialize and start a node, with the service initialized but left unstarted,
+/// so that the consumer of this function can implement services in the test.
 async fn init_service_executor(
     genesis: Genesis,
     path: PathBuf,
     pool_port: u16,
     gateway_port: u16,
     service_id: u32,
-) -> (Peer<TestBinding>, Application<TestBinding>) {
-    let blockstore = Blockstore::<TestBinding>::init(BlockstoreConfig {
-        root: path.join("dummy_blockstore").try_into().unwrap(),
-    })
-    .unwrap();
-
-    let app = Application::<TestBinding>::init(
-        AppConfig {
-            genesis: Some(genesis),
-            mode: Mode::Test,
-            testnet: false,
-            storage: StorageConfig::InMemory,
-            db_path: None,
-            db_options: None,
-        },
-        blockstore,
+) -> Node<TestBinding> {
+    let node = Node::<TestBinding>::init_with_provider(
+        fdi::Provider::default().with(
+            JsonConfigProvider::default()
+                .with::<Blockstore<TestBinding>>(BlockstoreConfig {
+                    root: path.join("dummy_blockstore").try_into().unwrap(),
+                })
+                .with::<Application<TestBinding>>(AppConfig {
+                    genesis: Some(genesis),
+                    mode: Mode::Test,
+                    testnet: false,
+                    storage: StorageConfig::InMemory,
+                    db_path: None,
+                    db_options: None,
+                })
+                .with::<ServiceExecutor<TestBinding>>(ServiceExecutorConfig {
+                    services: [service_id].into_iter().collect(),
+                    ipc_path: path.join("ipc").try_into().unwrap(),
+                }),
+        ),
     )
-    .unwrap();
-    app.start().await;
+    .expect("failed to initialize node");
 
-    let (_, query_runner) = (app.transaction_executor(), app.sync_query());
-    let keystore = EphemeralKeystore::default();
+    node.start().await;
 
-    let mut signer = Signer::<TestBinding>::init(
-        Default::default(),
-        keystore.clone(),
-        query_runner.clone(),
-        Socket::raw_bounded(128).0,
-    )
-    .unwrap();
-
-    let notifier = Notifier::<TestBinding>::init(&app);
-    let topology = Topology::<TestBinding>::init(
-        TopologyConfig::default(),
-        keystore.get_ed25519_pk(),
-        notifier.clone(),
-        query_runner.clone(),
-    )
-    .unwrap();
-
-    let rep_coll_config = RepCollConfig {
-        reporter_buffer_size: 1,
-    };
-    let rep_aggregator = ReputationAggregator::<TestBinding>::init(
-        rep_coll_config,
-        signer.get_socket(),
-        notifier.clone(),
-        query_runner.clone(),
-    )
-    .unwrap();
-
-    let config = PoolConfig {
-        max_idle_timeout: Duration::from_secs(5),
-        address: format!("0.0.0.0:{}", pool_port).parse().unwrap(),
-        ..Default::default()
-    };
-    let pool = PoolProvider::<TestBinding, muxer::quinn::QuinnMuxer>::init(
-        config,
-        keystore.clone(),
-        query_runner.clone(),
-        notifier.clone(),
-        topology.get_receiver(),
-        rep_aggregator.get_reporter(),
-    )
-    .unwrap();
-
-    let broadcast = Broadcast::<TestBinding>::init(
-        BroadcastConfig::default(),
-        query_runner.clone(),
-        keystore.clone(),
-        rep_aggregator.get_reporter(),
-        &pool,
-    )
-    .unwrap();
-
-    let (new_block_tx, new_block_rx) = mpsc::channel(10);
-
-    signer.provide_new_block_notify(new_block_rx);
-    notifier.notify_on_new_block(new_block_tx);
-
-    let resolver_path = path.join("resolver");
-    let config = ResolverConfig {
-        store_path: resolver_path.try_into().unwrap(),
-    };
-    let resolver = Resolver::<TestBinding>::init(
-        config,
-        keystore,
-        broadcast.get_pubsub(Topic::Resolver),
-        app.sync_query(),
-    )
-    .unwrap();
-    resolver.start().await;
-
-    let blockstore = Blockstore::<TestBinding>::init(BlockstoreConfig {
-        root: path.join("blockstore").try_into().unwrap(),
-    })
-    .unwrap();
-
-    let demuxer_config = DemuxerOriginConfig {
-        ipfs: IPFSOriginConfig {
-            gateways: vec![Gateway {
-                protocol: Protocol::Http,
-                authority: format!("127.0.0.1:{}", gateway_port),
-            }],
-            gateway_timeout: Duration::from_millis(5000),
-        },
-        ..Default::default()
-    };
-    let origin_provider =
-        OriginDemuxer::<TestBinding>::init(demuxer_config, blockstore.clone()).unwrap();
-
-    let blockstore_server = BlockstoreServer::<TestBinding>::init(
-        BlockServerConfig::default(),
-        blockstore.clone(),
-        &pool,
-        rep_aggregator.get_reporter(),
-    )
-    .unwrap();
-
-    let fetcher = Fetcher::<TestBinding>::init(
-        FetcherConfig {
-            max_conc_origin_req: 3,
-        },
-        blockstore.clone(),
-        &blockstore_server,
-        resolver,
-        &origin_provider,
-    )
-    .unwrap();
-
-    std::env::set_var("BLOCKSTORE_PATH", path.join("blockstore"));
+    // setup environment for [`fn_sdk::init_from_env`]
+    std::env::set_var("BLOCKSTORE_PATH", path.join("dummy_blockstore"));
     std::env::set_var(
         "IPC_PATH",
         path.join("ipc").join(format!("service-{}", service_id)),
     );
-    let config = ServiceExecutorConfig {
-        services: [service_id].into_iter().collect(),
-        ipc_path: path.join("ipc").try_into().unwrap(),
-    };
-
-    let service_exec = ServiceExecutor::<TestBinding>::init(
-        config,
-        &blockstore,
-        fetcher.get_socket(),
-        query_runner,
-    )
-    .unwrap();
-
-    broadcast.start().await;
-    origin_provider.start().await;
-    signer.start().await;
-    fetcher.start().await;
-    pool.start().await;
-    rep_aggregator.start().await;
-    blockstore_server.start().await;
-
-    let peer = Peer::<TestBinding> {
-        service_exec,
-        _fetcher: fetcher,
-        _pool: pool,
-        _broadcast: broadcast,
-        _blockstore_server: blockstore_server,
-        _rep_aggregator: rep_aggregator,
-        _signer: signer,
-        _origin_provider: origin_provider,
-        _blockstore: blockstore,
-    };
-
-    (peer, app)
+    node
 }
 
 #[tokio::test]
-#[serial]
 async fn test_query_client_info() {
     let path = std::env::temp_dir().join("lightning-service-ex-test-1");
     if path.exists() {
@@ -284,9 +104,8 @@ async fn test_query_client_info() {
         bandwidth_balance: 27,
     });
 
-    let (node, _app) = init_service_executor(genesis, path.clone(), 30309, 40309, 1069).await;
-    node.service_exec.start().await;
-    tokio::time::sleep(Duration::from_secs(4)).await;
+    let mut node = init_service_executor(genesis, path.clone(), 30309, 40309, 1069).await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     // Start the service
     fn_sdk::ipc::init_from_env();
@@ -302,10 +121,10 @@ async fn test_query_client_info() {
     if path.exists() {
         std::fs::remove_dir_all(&path).unwrap();
     }
+    node.shutdown().await;
 }
 
 #[tokio::test]
-#[serial]
 async fn test_query_missing_client_info() {
     let path = std::env::temp_dir().join("lightning-service-ex-test-2");
     if path.exists() {
@@ -318,9 +137,8 @@ async fn test_query_missing_client_info() {
 
     let genesis = Genesis::load().unwrap();
 
-    let (node, _app) = init_service_executor(genesis, path.clone(), 30310, 40310, 1070).await;
-    node.service_exec.start().await;
-    tokio::time::sleep(Duration::from_secs(4)).await;
+    let mut node = init_service_executor(genesis, path.clone(), 30310, 40310, 1070).await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     // Start the service
     fn_sdk::ipc::init_from_env();
@@ -336,4 +154,6 @@ async fn test_query_missing_client_info() {
     if path.exists() {
         std::fs::remove_dir_all(&path).unwrap();
     }
+
+    node.shutdown().await
 }

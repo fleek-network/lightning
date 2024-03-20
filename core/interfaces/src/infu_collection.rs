@@ -71,6 +71,7 @@ impl<C: Collection> Node<C> {
             .with_module::<C::TopologyInterface>()
             .with_module::<C::IndexerInterface>()
             .with_module::<C::OriginProviderInterface>()
+            .with_module::<C::ServiceExecutorInterface>()
             // TODO: Refactor the rest of start/shutdown/inits:
             .with(
                 C::BlockstoreInterface::infu_initialize_hack
@@ -152,15 +153,6 @@ impl<C: Collection> Node<C> {
                     .on("shutdown", |c: &C::RpcInterface| block_on(c.shutdown())),
             )
             .with(
-                C::ServiceExecutorInterface::infu_initialize_hack
-                    .on("start", |c: &C::ServiceExecutorInterface| {
-                        block_on(c.start())
-                    })
-                    .on("shutdown", |c: &C::ServiceExecutorInterface| {
-                        block_on(c.shutdown())
-                    }),
-            )
-            .with(
                 C::SignerInterface::infu_initialize_hack
                     .on("_post", C::SignerInterface::infu_post_hack)
                     .on("start", |c: &C::SignerInterface| block_on(c.start()))
@@ -208,9 +200,16 @@ impl<C: Collection> Node<C> {
             .shutdown
             .take()
             .expect("cannot call shutdown more than once");
-        let handle = tokio::spawn(async move { shutdown.shutdown().await });
+
+        shutdown.shutdown().await;
+
+        println!("triggering legacy");
         self.provider.trigger("shutdown");
-        handle.await.unwrap();
+        println!("finished triggering legacy shutdown event");
+
+        println!("triggering shutdown");
+
+        println!("finished triggering shutdown controller");
     }
 
     /// Fill the configuration provider with the default configuration without performing any
