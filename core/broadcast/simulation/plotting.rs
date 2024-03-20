@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use fxhash::FxHashMap;
 use plotters::prelude::*;
 
@@ -32,20 +34,16 @@ pub fn get_nodes_reached_per_timestep(
     emitted: &FxHashMap<String, FxHashMap<u128, u32>>,
     num_nodes_total: usize,
     cumulative: bool,
-) -> FxHashMap<u128, Vec<f64>> {
-    let mut steps_to_num_nodes = FxHashMap::<u128, Vec<f64>>::default();
+    precision_in_ms: u128,
+) -> BTreeMap<u128, Vec<f64>> {
+    let mut steps_to_num_nodes = BTreeMap::<u128, Vec<f64>>::new();
     for timesteps in emitted.values() {
         let min_step = *timesteps.keys().min().unwrap();
-
-        let mut steps: Vec<u128> = timesteps.keys().copied().collect();
-        if cumulative {
-            // processing the steps in order is only necessary for the cumulative plot
-            steps.sort();
-        }
+        let max_step = *timesteps.keys().max().unwrap();
 
         let mut sum = 0.0;
-        for step in steps {
-            let num_nodes = timesteps.get(&step).unwrap();
+        for step in min_step..(max_step + 1) {
+            let num_nodes = timesteps.get(&step).unwrap_or(&0);
             let perc = (*num_nodes) as f64 / num_nodes_total as f64;
             let value = if cumulative {
                 sum += perc;
@@ -53,8 +51,10 @@ pub fn get_nodes_reached_per_timestep(
             } else {
                 perc
             };
+            let normalized_step = step - min_step;
+            let normalized_step = (normalized_step / precision_in_ms) * precision_in_ms;
             steps_to_num_nodes
-                .entry(step - min_step)
+                .entry(normalized_step)
                 .or_default()
                 .push(value);
         }
@@ -63,22 +63,14 @@ pub fn get_nodes_reached_per_timestep(
 }
 
 pub fn get_nodes_reached_per_timestep_summary(
-    timesteps_to_num_nodes: &FxHashMap<u128, Vec<f64>>,
+    timesteps_to_num_nodes: &BTreeMap<u128, Vec<f64>>,
 ) -> Vec<(i32, i32)> {
     let mut steps_to_num_nodes_mean_var = Vec::new();
 
-    let mut num_taken = 0;
-    let mut index = 0;
-    while num_taken < timesteps_to_num_nodes.len() {
-        if let Some(num_nodes) = timesteps_to_num_nodes.get(&index) {
-            num_taken += 1;
-            let mean = get_mean(num_nodes).unwrap();
-            let std_dev = get_std_dev(num_nodes).unwrap();
-            steps_to_num_nodes_mean_var.push(((mean * 1000.) as i32, (std_dev * 1000.) as i32));
-        } else {
-            steps_to_num_nodes_mean_var.push((0, 0));
-        }
-        index += 1;
+    for num_nodes in timesteps_to_num_nodes.values() {
+        let mean = get_mean(num_nodes).unwrap();
+        let std_dev = get_std_dev(num_nodes).unwrap();
+        steps_to_num_nodes_mean_var.push(((mean * 1000.) as i32, (std_dev * 1000.) as i32));
     }
     steps_to_num_nodes_mean_var
 }
@@ -86,7 +78,6 @@ pub fn get_nodes_reached_per_timestep_summary(
 #[allow(clippy::too_many_arguments)]
 pub fn plot_bar_chart(
     data: Vec<(i32, i32)>, // (mean, std_dev)
-    precision_in_ms: usize,
     title: &str,
     x_label: &str,
     y_label: &str,
@@ -100,15 +91,6 @@ pub fn plot_bar_chart(
         }
     }
     let (means, std_devs): (Vec<_>, Vec<_>) = data.into_iter().unzip();
-    let means: Vec<i32> = means
-        .chunks(precision_in_ms)
-        .map(|chunk| chunk.iter().sum())
-        .collect();
-
-    let std_devs: Vec<i32> = std_devs
-        .chunks(precision_in_ms)
-        .map(|chunk| chunk.iter().sum())
-        .collect();
 
     let max_x = means.len();
     let max_y = 1000;

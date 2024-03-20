@@ -197,15 +197,15 @@ pub fn main() {
         .run(Duration::from_secs(120));
     println!("Took {} ms", time.elapsed().as_millis());
 
-    let steps_to_num_nodes = get_nodes_reached_per_timestep(&report.log.emitted, N, true);
+    let precision_in_ms = 5;
+    let steps_to_num_nodes =
+        get_nodes_reached_per_timestep(&report.log.emitted, N, true, precision_in_ms);
     let steps_to_num_nodes = get_nodes_reached_per_timestep_summary(&steps_to_num_nodes);
 
-    let precision_in_ms = 5;
     let output_path = PathBuf::from("simulation/images/percentage_nodes_reached.png");
 
     plot_bar_chart(
         steps_to_num_nodes,
-        precision_in_ms,
         "Percentage of nodes reached by message per time step",
         &format!("Time steps in {precision_in_ms} [ms]"),
         "Average percentage of nodes reached",
