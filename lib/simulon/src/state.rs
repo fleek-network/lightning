@@ -309,10 +309,11 @@ impl NodeState {
     }
 
     pub fn emit(&mut self, key: String) {
-        assert!(
-            self.emitted.insert(key, self.time).is_none(),
-            "Node has already emitted the event."
-        );
+        if self.emitted.contains_key(&key) {
+            println!("Event already emitted. node={} key={key}", self.node_id);
+            return;
+        }
+        self.emitted.insert(key, self.time);
     }
 
     fn close_local_connection(&mut self, rid: ResourceId) {

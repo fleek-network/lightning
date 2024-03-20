@@ -168,6 +168,13 @@ impl<B: BroadcastBackend> Context<B> {
     }
 
     fn handle_message(&mut self, sender: NodeIndex, msg: Message) {
+        let digest = msg.to_digest();
+
+        if self.db.is_propagated(&digest) {
+            // we have seen the message and accepted it already.
+            return;
+        }
+
         let Some(origin_pk) = self.backend.get_node_pk(msg.origin) else {
             self.stats.report(
                 sender,
@@ -178,8 +185,6 @@ impl<B: BroadcastBackend> Context<B> {
             );
             return;
         };
-
-        let digest = msg.to_digest();
 
         let Some(id) = self.db.get_id(&digest) else {
             // We got a message without being advertised first. Although we can technically

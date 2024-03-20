@@ -17,6 +17,7 @@ use plotters::style::full_palette::TEAL_600;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use simulon::api::{OwnedWriter, RemoteAddr};
+use simulon::latency::ping::ClampNormalDistribution;
 use simulon::latency::LatencyProvider;
 use simulon::simulation::SimulationBuilder;
 
@@ -168,12 +169,14 @@ async fn run_client(n: usize) {
         let msg = Message { id: i };
         conn.write(&msg);
 
-        simulon::api::sleep(Duration::from_secs(5)).await;
+        simulon::api::sleep(Duration::from_secs(1)).await;
     }
 }
 
 pub fn main() {
-    let mut lat_provider = simulon::latency::ConstLatencyProvider(Duration::from_millis(1));
+    let mut lat_provider =
+        simulon::latency::PingDataLatencyProvider::<ClampNormalDistribution>::default();
+    lat_provider.init(N);
 
     let mut latencies = HashMap::new();
     for i in 0..(N - 1) {
