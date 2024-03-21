@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::Bytes;
 use lightning_broadcast::{Context, Database, PubSubI, SimulonBackend};
 use lightning_interfaces::schema::AutoImplSerde;
 use lightning_interfaces::types::Topic;
@@ -225,12 +225,3 @@ struct Message {
 }
 
 impl AutoImplSerde for Message {}
-
-impl From<Message> for Bytes {
-    fn from(value: Message) -> Self {
-        let bytes = bincode::serialize(&value).unwrap();
-        let mut buf = BytesMut::with_capacity(bytes.len());
-        buf.put_slice(&bytes);
-        buf.into()
-    }
-}

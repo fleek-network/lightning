@@ -5580,7 +5580,6 @@ dependencies = [
  "affair",
  "anyhow",
  "arrayref",
- "bincode",
  "bytes",
  "dashmap",
  "derive_more",
