@@ -5,7 +5,7 @@ exclude = [
     "lib/cdk",
     "lib/blake3-js",
     "lib/cdk-x-platform-test",
-    "etc/ebpf/tea",
+    "etc/ebpf/cli",
     "etc/ebpf/ebpf",
     "etc/ebpf/common",
     "etc/global-metrics",

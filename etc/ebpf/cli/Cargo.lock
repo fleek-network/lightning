@@ -260,6 +260,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "ebpf-cli"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "aya",
+ "aya-log",
+ "clap",
+ "common",
+ "env_logger",
+ "libc",
+ "log",
+ "tokio",
+]
+
+[[package]]
 name = "env_filter"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -498,21 +513,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
-]
-
-[[package]]
-name = "tea"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "aya",
- "aya-log",
- "clap",
- "common",
- "env_logger",
- "libc",
- "log",
- "tokio",
 ]
 
 [[package]]

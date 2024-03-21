@@ -1,5 +1,5 @@
 [package]
-name = "tea"
+name = "ebpf-cli"
 version = "0.0.0"
 edition = "2021"
 authors = ["M. Meier <miguel@fleek.xyz>"]
@@ -16,5 +16,5 @@ log = "0.4"
 tokio = { version = "1.28", features = ["macros", "rt", "rt-multi-thread", "net", "signal"] }
 
 [[bin]]
-name = "xdp-lightning-app"
-path = "src/bin/xdp_lightning_app.rs"
+name = "xdp-simple"
+path = "src/bin/xdp_simple.rs"

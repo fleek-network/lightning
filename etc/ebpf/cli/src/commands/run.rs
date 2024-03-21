@@ -24,7 +24,7 @@ pub fn run(target: Target, release: bool, xdp_args: Vec<String>) -> Result<(), a
     build_userspace_application(release)?;
 
     let mode = if release { "release" } else { "debug" };
-    let bin_path = format!("target/{mode}/xdp-lightning-app");
+    let bin_path = format!("target/{mode}/xdp-simple");
 
     let mut xdp_args = xdp_args.iter().map(String::as_str).collect();
 

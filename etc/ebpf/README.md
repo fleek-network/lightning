@@ -2,7 +2,7 @@
 
 ## Packages
 
-- `tea` - (Tool for eBPF Applications) is a cli for building and running 
+- `cli` - cli for building and running 
 eBPF kernel-space and user-space programs. 
 Its main purpose is to inform us of user-space application requirements for 
 the lightning integration.
