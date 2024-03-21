@@ -6432,6 +6432,7 @@ dependencies = [
  "panic-report",
  "resolved-pathbuf",
  "serde",
+ "serial_test",
  "tokio",
  "tracing",
  "triomphe",

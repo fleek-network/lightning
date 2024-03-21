@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 use std::time::Duration;
+use serial_test::serial;
 
 use fleek_crypto::{
     AccountOwnerSecretKey,
@@ -45,8 +46,6 @@ partial!(TestBinding {
 async fn init_service_executor(
     genesis: Genesis,
     path: PathBuf,
-    pool_port: u16,
-    gateway_port: u16,
     service_id: u32,
 ) -> Node<TestBinding> {
     let node = Node::<TestBinding>::init_with_provider(
@@ -83,6 +82,7 @@ async fn init_service_executor(
 }
 
 #[tokio::test]
+#[serial]
 async fn test_query_client_info() {
     let path = std::env::temp_dir().join("lightning-service-ex-test-1");
     if path.exists() {
@@ -103,9 +103,10 @@ async fn test_query_client_info() {
         stables_balance: 0,
         bandwidth_balance: 27,
     });
+    genesis.node_info.clear();
 
-    let mut node = init_service_executor(genesis, path.clone(), 30309, 40309, 1069).await;
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    let mut node = init_service_executor(genesis, path.clone(), 1069).await;
+    tokio::time::sleep(Duration::from_secs(2)).await;
 
     // Start the service
     fn_sdk::ipc::init_from_env();
@@ -125,6 +126,7 @@ async fn test_query_client_info() {
 }
 
 #[tokio::test]
+#[serial]
 async fn test_query_missing_client_info() {
     let path = std::env::temp_dir().join("lightning-service-ex-test-2");
     if path.exists() {
@@ -135,10 +137,11 @@ async fn test_query_missing_client_info() {
     let secret_key = ConsensusSecretKey::generate();
     let client_pk = ClientPublicKey(secret_key.to_pk().0);
 
-    let genesis = Genesis::load().unwrap();
+    let mut genesis = Genesis::load().unwrap();
+    genesis.node_info.clear();
 
-    let mut node = init_service_executor(genesis, path.clone(), 30310, 40310, 1070).await;
-    tokio::time::sleep(Duration::from_millis(500)).await;
+    let mut node = init_service_executor(genesis, path.clone(), 1070).await;
+    tokio::time::sleep(Duration::from_secs(2)).await;
 
     // Start the service
     fn_sdk::ipc::init_from_env();
