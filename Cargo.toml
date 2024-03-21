@@ -8,6 +8,7 @@ exclude = [
     "etc/ebpf/cli",
     "etc/ebpf/ebpf",
     "etc/ebpf/common",
+    "etc/ebpf/service",
     "etc/global-metrics",
 ]
 
