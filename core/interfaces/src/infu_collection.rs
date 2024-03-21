@@ -64,6 +64,7 @@ impl<C: Collection> Node<C> {
         let graph = DependencyGraph::new()
             .with_value(waiter)
             .with_value(Blank::<C>::default())
+            .with_module::<C::PingerInterface>()
             .with_module::<C::FetcherInterface>()
             .with_module::<C::KeystoreInterface>()
             .with_module::<C::BlockstoreServerInterface>()
@@ -169,11 +170,6 @@ impl<C: Collection> Node<C> {
                             drop(waiter);
                         }).spawn(),
                     ),
-            )
-            .with(
-                C::PingerInterface::infu_initialize_hack
-                    .on("start", |c: &C::PingerInterface| block_on(c.start()))
-                    .on("shutdown", |c: &C::PingerInterface| block_on(c.shutdown())),
             );
 
         let vis = graph.viz("Lightning Dependency Graph");

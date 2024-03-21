@@ -1,23 +1,26 @@
+// TODO(qti3e): Someone has to rework this file.
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use anyhow::anyhow;
-use fleek_crypto::{NodeSecretKey, SecretKey};
+use fleek_crypto::NodePublicKey;
+use lightning_interfaces::common::ShutdownWaiter;
+use lightning_interfaces::fdi::{BuildGraph, Cloned, DependencyGraph, MethodExt};
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::types::{NodeIndex, NodeInfo};
 use lightning_interfaces::{
     ApplicationInterface,
     ConfigConsumer,
+    ConfigProviderInterface,
     KeystoreInterface,
     Notification,
     NotifierInterface,
     PingerInterface,
+    RefMut,
     ReputationAggregatorInterface,
     ReputationReporterInterface,
     SyncQueryRunnerInterface,
-    WithStartAndShutdown,
 };
 use lightning_metrics::histogram;
 use lightning_utils::application::QueryRunnerExt;
@@ -25,7 +28,7 @@ use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
 use tokio::net::UdpSocket;
-use tokio::sync::{mpsc, OnceCell};
+use tokio::sync::mpsc;
 use tracing::{error, info};
 
 use crate::config::Config;
@@ -34,122 +37,101 @@ use crate::config::Config;
 const TIMEOUT: Duration = Duration::from_secs(15);
 
 pub struct Pinger<C: Collection> {
-    inner: Arc<PingerInner<C>>,
-    is_running: Arc<AtomicBool>,
-    shutdown_tx: mpsc::Sender<()>,
+    inner: Option<PingerInner<C>>,
 }
 
-impl<C: Collection> PingerInterface<C> for Pinger<C> {
-    fn init(
-        config: Self::Config,
-        query_runner: c!(C::ApplicationInterface::SyncExecutor),
-        rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
-        notifier: C::NotifierInterface,
-        keystore: C::KeystoreInterface,
+impl<C: Collection> Pinger<C> {
+    pub fn new(
+        config_provider: &C::ConfigProviderInterface,
+        app: &C::ApplicationInterface,
+        rep_aggregator: &C::ReputationAggregatorInterface,
+        keystore: &C::KeystoreInterface,
+        Cloned(notifier): Cloned<C::NotifierInterface>,
+        Cloned(shutdown_waiter): Cloned<ShutdownWaiter>,
     ) -> anyhow::Result<Self> {
+        let config = config_provider.get::<Self>();
+        let query_runner = app.sync_query();
+        let rep_reporter = rep_aggregator.get_reporter();
+
         let (notifier_tx, notifier_rx) = mpsc::channel(10);
         notifier.notify_on_new_epoch(notifier_tx);
 
-        let (shutdown_tx, shutdown_rx) = mpsc::channel(10);
-        let node_sk = keystore.get_ed25519_sk();
+        let node_pk = keystore.get_ed25519_pk();
         let inner = PingerInner::<C>::new(
             config,
-            node_sk,
+            node_pk,
             query_runner,
             rep_reporter,
             notifier_rx,
-            shutdown_rx,
+            shutdown_waiter,
         );
-        Ok(Self {
-            inner: Arc::new(inner),
-            is_running: Arc::new(AtomicBool::new(false)),
-            shutdown_tx,
-        })
+
+        Ok(Self { inner: Some(inner) })
+    }
+
+    pub async fn start(mut this: RefMut<Self>) {
+        this.inner
+            .take()
+            .expect("Pinger already started")
+            .run()
+            .await;
     }
 }
 
-impl<C: Collection> WithStartAndShutdown for Pinger<C> {
-    fn is_running(&self) -> bool {
-        self.is_running.load(Ordering::Relaxed)
-    }
+impl<C: Collection> PingerInterface<C> for Pinger<C> {}
 
-    async fn start(&self) {
-        if !self.is_running() {
-            let inner = self.inner.clone();
-            let is_running = self.is_running.clone();
-            tokio::spawn(async move {
-                inner.start().await;
-                is_running.store(false, Ordering::Relaxed);
-            });
-            self.is_running.store(true, Ordering::Relaxed);
-        } else {
-            error!("Cannot start pinger because it is already running");
-        }
-    }
-
-    async fn shutdown(&self) {
-        self.shutdown_tx
-            .send(())
-            .await
-            .expect("Failed to send shutdown signal");
+impl<C: Collection> BuildGraph for Pinger<C> {
+    fn build_graph() -> DependencyGraph {
+        DependencyGraph::new().with(Self::new.on("start", Self::start.spawn()))
     }
 }
 
 struct PingerInner<C: Collection> {
     config: Config,
-    node_index: OnceCell<NodeIndex>,
-    node_sk: NodeSecretKey,
+    node_pk: NodePublicKey,
     query_runner: c!(C::ApplicationInterface::SyncExecutor),
     rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
-    notifier_rx: Mutex<Option<mpsc::Receiver<Notification>>>,
-    shutdown_rx: Mutex<Option<mpsc::Receiver<()>>>,
+    notifier_rx: mpsc::Receiver<Notification>,
+    shutdown_waiter: ShutdownWaiter,
 }
 
 impl<C: Collection> PingerInner<C> {
     fn new(
         config: Config,
-        node_sk: NodeSecretKey,
+        node_pk: NodePublicKey,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
         notifier_rx: mpsc::Receiver<Notification>,
-        shutdown_rx: mpsc::Receiver<()>,
+        shutdown_waiter: ShutdownWaiter,
     ) -> Self {
         Self {
             config,
-            node_index: OnceCell::new(),
-            node_sk,
+            node_pk,
             query_runner,
             rep_reporter,
-            notifier_rx: Mutex::new(Some(notifier_rx)),
-            shutdown_rx: Mutex::new(Some(shutdown_rx)),
+            notifier_rx,
+            shutdown_waiter,
         }
     }
 
-    async fn start(&self) {
-        let mut shutdown_rx = self.shutdown_rx.lock().unwrap().take().unwrap();
-
+    async fn run(mut self) {
         // Note(matthias): should a node be able to respond to pings before it knows its node index?
         // In my opinion it should not because it is not fully functioning.
-        if !self.node_index.initialized() {
-            let mut interval = tokio::time::interval(Duration::from_secs(60));
-            let pk = self.node_sk.to_pk();
-            loop {
-                tokio::select! {
-                    _ = shutdown_rx.recv() => {
-                        *self.shutdown_rx.lock().unwrap() = Some(shutdown_rx);
-                        return;
-                    }
-                    _ = interval.tick() => {
-                        if let Some(index) = self.query_runner.pubkey_to_index(&pk) {
-                            self.node_index.set(index).expect("Failed to set once cell");
-                            break;
-                        }
+        let mut interval = tokio::time::interval(Duration::from_secs(60));
+        let node_index = loop {
+            tokio::select! {
+                _ = self.shutdown_waiter.wait_for_shutdown() => {
+                    return;
+                }
+                _ = interval.tick() => {
+                    if let Some(index) = self.query_runner.pubkey_to_index(&self.node_pk) {
+                        break index;
                     }
                 }
             }
-        }
+        };
+
         // At this point we can assume that the node knows its index.
-        let node_index = *self.node_index.get().unwrap();
 
         let mut buf = [0; 1024];
         let (timeout_tx, mut timeout_rx) = mpsc::channel(1024);
@@ -171,14 +153,12 @@ impl<C: Collection> PingerInner<C> {
         let mut rng = SmallRng::from_entropy();
         let mut node_registry = self.get_node_registry(&mut rng);
         let mut cursor = 0;
-
         let mut pending_req: HashMap<(NodeIndex, u32), Instant> = HashMap::with_capacity(128);
-        let mut notifier_rx = self.notifier_rx.lock().unwrap().take().unwrap();
 
         loop {
             tokio::select! {
-                _ = shutdown_rx.recv() => {
-                    break;
+                _ = self.shutdown_waiter.wait_for_shutdown() => {
+                    return;
                 }
                 res = socket.recv_from(&mut buf) => {
                     match res {
@@ -257,7 +237,7 @@ impl<C: Collection> PingerInner<C> {
                         }
                     }
                 }
-                epoch_notify = notifier_rx.recv() => {
+                epoch_notify = self.notifier_rx.recv() => {
                     if let Some(Notification::NewEpoch) = epoch_notify {
                         info!("Configuring for new epoch");
                         node_registry = self.get_node_registry(&mut rng);
@@ -266,9 +246,6 @@ impl<C: Collection> PingerInner<C> {
                 }
             }
         }
-
-        *self.shutdown_rx.lock().unwrap() = Some(shutdown_rx);
-        *self.notifier_rx.lock().unwrap() = Some(notifier_rx);
     }
 
     fn get_node_registry(&self, rng: &mut SmallRng) -> Vec<NodeIndex> {
