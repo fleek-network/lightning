@@ -10,16 +10,19 @@ use blake3_tree::blake3::Hash;
 use blake3_tree::utils::{HashTree, HashVec};
 use blake3_tree::IncrementalVerifier;
 use bytes::{BufMut, BytesMut};
+use lightning_interfaces::fdi::{BuildGraph, Cloned, DependencyGraph, MethodExt};
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{Blake3Hash, CompressionAlgoSet, CompressionAlgorithm};
 use lightning_interfaces::{
     BlockstoreInterface,
     ConfigConsumer,
+    ConfigProviderInterface,
     ContentChunk,
     IncrementalPutInterface,
     PutFeedProofError,
     PutFinalizeError,
     PutWriteError,
+    RefMut,
 };
 use parking_lot::RwLock;
 use resolved_pathbuf::ResolvedPathBuf;
@@ -58,12 +61,23 @@ impl<C: Collection> ConfigConsumer for Blockstore<C> {
     type Config = Config;
 }
 
-impl<C: Collection> BlockstoreInterface<C> for Blockstore<C> {
-    type SharedPointer<T: ?Sized + Send + Sync> = Arc<T>;
-    type Put = Putter<Self, C>;
-    type DirPut = infusion::Blank<()>;
+impl<C: Collection> BuildGraph for Blockstore<C> {
+    fn build_graph() -> DependencyGraph {
+        DependencyGraph::new().with(Self::new.on(
+            "_post",
+            |mut this: RefMut<Self>, Cloned(indexer): Cloned<C::IndexerInterface>| {
+                this.provide_indexer(indexer);
+            },
+        ))
+    }
+}
 
-    fn init(config: Self::Config) -> anyhow::Result<Self> {
+impl<C: Collection> Blockstore<C> {
+    fn new(config_provider: &C::ConfigProviderInterface) -> anyhow::Result<Self> {
+        Self::init(config_provider.get::<Self>())
+    }
+
+    pub fn init(config: Config) -> anyhow::Result<Self> {
         let root = config.root.to_path_buf();
         let internal_dir = root.join(INTERNAL_DIR);
         let block_dir = root.join(BLOCK_DIR);
@@ -83,9 +97,15 @@ impl<C: Collection> BlockstoreInterface<C> for Blockstore<C> {
 
     /// Provide the blockstore with the indexer after initialization, this function
     /// should only be called once.
-    fn provide_indexer(&mut self, indexer: C::IndexerInterface) {
+    pub fn provide_indexer(&mut self, indexer: C::IndexerInterface) {
         assert!(self.indexer.set(indexer).is_ok());
     }
+}
+
+impl<C: Collection> BlockstoreInterface<C> for Blockstore<C> {
+    type SharedPointer<T: ?Sized + Send + Sync> = Arc<T>;
+    type Put = Putter<Self, C>;
+    type DirPut = infusion::Blank<()>;
 
     async fn get_tree(&self, cid: &Blake3Hash) -> Option<Self::SharedPointer<HashTree>> {
         let data = self.fetch(INTERNAL_DIR, cid, None).await?;
