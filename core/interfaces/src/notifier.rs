@@ -1,10 +1,9 @@
 use std::time::Duration;
 
-use infusion::{c, ok};
+use fdi::BuildGraph;
 use tokio::sync::mpsc;
 
 use crate::infu_collection::Collection;
-use crate::ApplicationInterface;
 
 #[derive(Debug, PartialEq)]
 pub enum Notification {
@@ -14,13 +13,11 @@ pub enum Notification {
 }
 
 #[infusion::service]
-pub trait NotifierInterface<C: Collection>: Sync + Send + Clone {
+pub trait NotifierInterface<C: Collection>: BuildGraph + Sync + Send + Clone {
     type Emitter: Emitter;
 
-    fn _init(app: ::ApplicationInterface) {
-        ok!(Self::init(app))
-    }
-    fn init(app: &c!(C::ApplicationInterface)) -> Self;
+    // fn init(app: &c!(C::ApplicationInterface)) -> Self;
+
     /// Returns a reference to the emitter end of this notifier. Should only be used if we are
     /// interested (and responsible) for triggering a notification around new epoch.
     fn get_emitter(&self) -> Self::Emitter;
@@ -39,6 +36,7 @@ pub trait Emitter: Clone + Send + Sync + 'static {
     /// Notify the waiters about new block.
     fn new_block(&self);
 
-    /// Shutdown the emmiter and close any open tasks
+    /// Shutdown the emmiter and close any open tasks.
+    // TODO(qti3e): Should this simply use shutdown_waiter?
     fn shutdown(&self);
 }
