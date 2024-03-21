@@ -36,7 +36,6 @@ impl<C: Collection> Context<C> {
     pub async fn run(&self, request: ipc_types::Request) -> ipc_types::Response {
         match request {
             ipc_types::Request::QueryClientBandwidth { pk } => {
-                println!("got bw req");
                 let balance = self
                     .query_runner
                     .client_key_to_account_key(&ClientPublicKey(pk.into()))
@@ -48,7 +47,6 @@ impl<C: Collection> Context<C> {
                 ipc_types::Response::QueryClientBandwidth { balance }
             },
             ipc_types::Request::QueryClientFLK { pk } => {
-                println!("got client flk request");
                 let balance = self
                     .query_runner
                     .client_key_to_account_key(&ClientPublicKey(pk.into()))

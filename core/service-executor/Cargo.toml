@@ -45,6 +45,7 @@ lightning-blockstore = { path = "../blockstore" }
 lightning-signer = {path="../signer"}
 lightning-application = { path="../application", features = ["test"] }
 lightning-notifier = {path="../notifier"}
+serial_test = "3.0"
 #lightning-fetcher = { path = "../fetcher" }
 #lightning-origin-demuxer = { path = "../origin-demuxer" }
 #lightning-origin-ipfs = { path = "../origin-ipfs" }
