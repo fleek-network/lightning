@@ -26,6 +26,7 @@ lightning-blockstore-server = { path = "../blockstore-server" }
 lightning-resolver = { path = "../resolver" }
 lightning-archive = { path = "../archive" }
 lightning-pinger = { path = "../pinger" }
+lightning-test-utils = { path = "../test-utils" }
 mock = { path = "../mock" }
 infusion.workspace = true
 tokio.workspace = true
@@ -39,9 +40,7 @@ serde.workspace = true
 rand.workspace = true
 hp-fixed.workspace = true
 serial_test = "3.0.0"
-simplelog = "0.12.1"
 tracing.workspace = true
-chrono = "0.4.26"
 fleek-blake3 = "1.5"
 
 toml = "0.7"

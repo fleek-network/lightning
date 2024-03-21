@@ -3,8 +3,9 @@ use std::time::{Duration, SystemTime};
 
 use anyhow::Result;
 use lightning_e2e::swarm::Swarm;
-use lightning_e2e::utils::{logging, rpc};
+use lightning_e2e::utils::rpc;
 use lightning_interfaces::types::{NodeInfo, Participation};
+use lightning_test_utils::logging;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde_json::json;
 use serial_test::serial;

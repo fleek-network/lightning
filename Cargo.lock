@@ -5729,7 +5729,6 @@ name = "lightning-e2e"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "chrono",
  "clap 4.4.12",
  "fleek-blake3",
  "fleek-crypto",
@@ -5755,6 +5754,7 @@ dependencies = [
  "lightning-service-executor",
  "lightning-signer",
  "lightning-syncronizer",
+ "lightning-test-utils",
  "lightning-topology",
  "mock",
  "rand 0.8.5",
@@ -5764,7 +5764,6 @@ dependencies = [
  "serde",
  "serde_json",
  "serial_test",
- "simplelog",
  "tokio",
  "toml 0.7.8",
  "tracing",
@@ -6397,6 +6396,7 @@ dependencies = [
  "affair",
  "anyhow",
  "axum 0.6.20",
+ "chrono",
  "ethers",
  "fleek-crypto",
  "hp-fixed",
@@ -6404,7 +6404,9 @@ dependencies = [
  "rand 0.8.5",
  "serde",
  "serde_json",
+ "simplelog",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -7701,9 +7703,9 @@ dependencies = [
 
 [[package]]
 name = "num_threads"
-version = "0.1.6"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2819ce041d2ee131036f4fc9d6ae7ae125a3a40e97ba64d04fe799ad9dabbb44"
+checksum = "5c7398b9c8b70908f6371f47ed36737907c87c52af34c268fed0bf0ceb92ead9"
 dependencies = [
  "libc",
 ]
@@ -10547,9 +10549,9 @@ dependencies = [
 
 [[package]]
 name = "simplelog"
-version = "0.12.1"
+version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "acee08041c5de3d5048c8b3f6f13fafb3026b24ba43c6a695a0c76179b844369"
+checksum = "16257adbfaef1ee58b1363bdc0664c9b8e1e30aed86049635fb5f147d065a9c0"
 dependencies = [
  "log",
  "termcolor",

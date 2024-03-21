@@ -7,9 +7,10 @@ use fleek_crypto::PublicKey;
 use lightning_application::app::Application;
 use lightning_e2e::swarm::Swarm;
 use lightning_e2e::utils::networking::PortAssigner;
-use lightning_e2e::utils::{logging, shutdown};
+use lightning_e2e::utils::shutdown;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::partial;
+use lightning_test_utils::logging;
 use lightning_topology::Topology;
 use resolved_pathbuf::ResolvedPathBuf;
 
