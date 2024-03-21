@@ -6,10 +6,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-lightning-interfaces = { path="../interfaces" }
+lightning-interfaces = { path = "../interfaces" }
 bincode.workspace = true
 resolved-pathbuf.workspace = true
-blake3-tree = { path = "../../lib/blake3-tree"}
+blake3-tree = { path = "../../lib/blake3-tree" }
 anyhow.workspace = true
 trait-variant = "0.1"
 bytes.workspace = true
@@ -23,12 +23,3 @@ tokio.workspace = true
 derive_more = "0.99"
 arrayref = "0.3"
 infusion.workspace = true
-
-[dev-dependencies]
-fleek-crypto.workspace = true
-lightning-test-utils = { path="../test-utils" }
-lightning-signer = { path="../signer" }
-lightning-application = { path="../application", features = ["test"] }
-lightning-rep-collector = { path="../rep-collector" }
-lightning-indexer = { path = "../indexer" }
-lightning-notifier = { path="../notifier" }

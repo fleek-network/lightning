@@ -5,12 +5,12 @@ use std::sync::Arc;
 
 use blake3_tree::directory::DirectoryEntry;
 use blake3_tree::utils::HashTree;
+use fdi::BuildGraph;
 use thiserror::Error;
 
 use crate::config::ConfigConsumer;
 use crate::infu_collection::Collection;
 use crate::types::{Blake3Hash, CompressionAlgoSet, CompressionAlgorithm};
-use crate::{ConfigProviderInterface, IndexerInterface};
 
 /// A chunk of content (usually 256KiB) with a compression tag which determines
 /// the compression algorithm that was used to compress this data.
@@ -83,16 +83,9 @@ pub struct ContentChunk {
 /// we use it at the chunk level, we don't compress the entire file and then perform the chunking,
 /// we chunk first, and compress each chunk later for obvious technical reasons.
 #[infusion::service]
-pub trait BlockstoreInterface<C: Collection>: Clone + Send + Sync + ConfigConsumer {
-    fn _init(config: ::ConfigProviderInterface) {
-        let config = config.get::<Self>();
-        Self::init(config)
-    }
-
-    fn _post(&mut self, c: ::IndexerInterface) {
-        self.provide_indexer(c.clone())
-    }
-
+pub trait BlockstoreInterface<C: Collection>:
+    BuildGraph + Clone + Send + Sync + ConfigConsumer
+{
     /// The block store has the ability to use a smart pointer to avoid duplicating
     /// the same content multiple times in memory, this can be used for when multiple
     /// services want access to the same buffer of data.
@@ -103,11 +96,6 @@ pub trait BlockstoreInterface<C: Collection>: Clone + Send + Sync + ConfigConsum
 
     /// The incremental putter which can be used to insert directory headers to block store.
     type DirPut: IncrementalDirInterface;
-
-    /// Create a new block store from the given configuration values.
-    fn init(config: Self::Config) -> anyhow::Result<Self>;
-
-    fn provide_indexer(&mut self, indexer: C::IndexerInterface);
 
     /// Returns the Blake3 tree associated with the given CID. Returns [`None`] if the content
     /// is not present in our block store.

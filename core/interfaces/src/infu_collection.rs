@@ -64,6 +64,7 @@ impl<C: Collection> Node<C> {
         let graph = DependencyGraph::new()
             .with_value(waiter)
             .with_value(Blank::<C>::default())
+            .with_module::<C::BlockstoreInterface>()
             .with_module::<C::NotifierInterface>()
             .with_module::<C::PingerInterface>()
             .with_module::<C::FetcherInterface>()
@@ -75,10 +76,6 @@ impl<C: Collection> Node<C> {
             .with_module::<C::OriginProviderInterface>()
             .with_module::<C::ServiceExecutorInterface>()
             // TODO: Refactor the rest of start/shutdown/inits:
-            .with(
-                C::BlockstoreInterface::infu_initialize_hack
-                    .on("_post", C::BlockstoreInterface::infu_post_hack),
-            )
             .with(
                 <C::ApplicationInterface as ApplicationInterface<C>>::infu_initialize_hack
                     .on("start", |c: &C::ApplicationInterface| block_on(c.start()))
