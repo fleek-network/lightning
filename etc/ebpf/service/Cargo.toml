@@ -8,10 +8,10 @@ authors = ["M. Meier <miguel@fleek.xyz>"]
 anyhow = { version = "1.0", optional = true }
 aya = { git = "https://github.com/aya-rs/aya", features = ["async_tokio"], optional = true }
 aya-log = { git = "https://github.com/aya-rs/aya", optional = true }
-common = { path = "../common", optional = true }
+common = { path = "../common", features = ["userspace"], optional = true }
 libc = { version = "0.2", optional = true }
 log = { version = "0.4", optional = true }
-tokio = { version = "1.28", features = ["macros", "rt", "rt-multi-thread", "net", "signal"], optional = true }
+tokio = { version = "1.28", features = ["macros", "rt", "rt-multi-thread", "net", "sync"], optional = true }
 
 [features]
 default = []
