@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize)]
 pub struct Config {
     pub address: SocketAddr,
-    /// The number of times that we ping each peer per epoch.
-    //pub num_pings_per_peer: u16,
+    // /// The number of times that we ping each peer per epoch.
+    // pub num_pings_per_peer: u16,
     /// The interval for sending pings.
     pub ping_interval: Duration,
 }

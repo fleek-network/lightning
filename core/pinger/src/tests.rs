@@ -188,6 +188,8 @@ async fn init_pinger() -> Pinger<TestBinding> {
     .unwrap()
 }
 
+// This test doesn't do anything useful for us anymore (since there is no start and shutdown)
+// so it will be removed in the next commit. This comment is only temp note.
 #[tokio::test]
 async fn test_shutdown_and_start_again() {
     let pinger = init_pinger().await;
