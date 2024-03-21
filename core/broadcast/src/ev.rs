@@ -224,7 +224,7 @@ impl<B: BroadcastBackend> Context<B> {
 
         let now = Self::now();
         // only insert metrics for pseudo-valid timestamps (not in the future)
-        if msg.timestamp > now {
+        if msg.timestamp < now {
             increment_counter!(
                 "broadcast_message_received_count",
                 Some("Counter for messages received over time")
@@ -232,7 +232,7 @@ impl<B: BroadcastBackend> Context<B> {
             histogram!(
                 "broadcast_message_received_time",
                 Some("Time taken to receive messages from the originator"),
-                (msg.timestamp - now) as f64 / 1000.
+                (now - msg.timestamp) as f64 / 1000.
             );
         }
 
