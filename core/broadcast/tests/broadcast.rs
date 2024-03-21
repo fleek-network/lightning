@@ -15,10 +15,13 @@ use lightning_broadcast::{BroadcastBackend, Context, Database, PubSubI};
 use lightning_interfaces::schema::broadcast::{Advr, Frame, Message, MessageInternedId, Want};
 use lightning_interfaces::schema::{AutoImplSerde, LightningMessage};
 use lightning_interfaces::types::{NodeIndex, Topic};
+use lightning_interfaces::{BroadcastEventInterface, PubSub};
+use lightning_test_utils::logging;
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 
 const VALID_SIGN: NodeSignature = NodeSignature([0; 64]);
+const ONE_HOUR: Duration = Duration::from_secs(3600);
 
 thread_local! {
     static RUNTIME: Runtime = Runtime::new();
@@ -31,7 +34,9 @@ struct Runtime {
 }
 
 struct ClockInfo {
-    started: Instant,
+    // the time the current active execution started. is only Some during excution and now()
+    // will be adjusted based on this and self.time.
+    started: Option<Instant>,
     time: u128,
 }
 
@@ -39,7 +44,7 @@ impl Runtime {
     pub fn new() -> Self {
         Self {
             clock: RefCell::new(ClockInfo {
-                started: Instant::now(),
+                started: None,
                 time: 0,
             }),
             executor: RefCell::new(LocalPool::new()),
@@ -61,8 +66,11 @@ impl Runtime {
     // Returns the time in nanoseconds.
     pub fn now(&self) -> u128 {
         let clock_info = self.clock.borrow_mut();
-        let out = Instant::now() - clock_info.started;
-        clock_info.time + out.as_nanos()
+        if let Some(started) = clock_info.started {
+            clock_info.time + (Instant::now() - started).as_nanos()
+        } else {
+            clock_info.time
+        }
     }
 
     /// Run the runtime until there is no more async progress to be made. However this does not
@@ -74,15 +82,17 @@ impl Runtime {
         let mut wakers_map = self.wakers.borrow_mut();
         while matches!(wakers_map.first_entry(), Some(e) if e.key() <= &now) {
             for waker in wakers_map.pop_first().unwrap().1 {
-                waker.send(());
+                let _ = waker.send(());
             }
         }
         drop(wakers_map);
 
         let started = Instant::now();
-        self.clock.borrow_mut().started = started;
+        self.clock.borrow_mut().started = Some(started);
         self.executor.borrow_mut().run_until_stalled();
-        self.clock.borrow_mut().time = (Instant::now() - started).as_nanos();
+        let mut clock = self.clock.borrow_mut();
+        clock.time = (Instant::now() - started).as_nanos();
+        clock.started = None;
     }
 
     /// Drive the event loop forward and wake up the first sleep futures at the earliest time, but
@@ -91,10 +101,18 @@ impl Runtime {
     pub fn fast_forward(&self) -> Duration {
         let started = self.now();
         self.run_until_stalled();
-        if let Some((time, wakers)) = self.wakers.borrow_mut().pop_first() {
-            self.clock.borrow_mut().time = time;
-            for waker in wakers {
-                waker.send(()).expect("Could not wake up sleep");
+        let mut fast_forward = true;
+        while fast_forward {
+            if let Some((time, wakers)) = self.wakers.borrow_mut().pop_first() {
+                self.clock.borrow_mut().time = time;
+                for waker in wakers {
+                    if waker.send(()).is_ok() {
+                        // we woke up at least one sleep sucessfully, so we gotta stop here.
+                        fast_forward = false;
+                    }
+                }
+            } else {
+                fast_forward = false;
             }
         }
         Duration::from_nanos((self.now() - started) as u64)
@@ -105,6 +123,7 @@ impl Runtime {
     pub fn run_to_completion(&self) {
         loop {
             self.fast_forward();
+            self.run_until_stalled();
             if self.wakers.borrow().is_empty() {
                 break;
             }
@@ -131,7 +150,7 @@ struct ControlledBackend {
 #[derive(Default)]
 struct ControlledBackendInner {
     ingested: RefCell<VecDeque<(NodeIndex, Bytes)>>,
-    outgoing: RefCell<VecDeque<Out>>,
+    outgoing: RefCell<Vec<Out>>,
 }
 
 struct ToAll {
@@ -175,7 +194,7 @@ impl BroadcastBackend for ControlledBackend {
     ) {
         let mut outgoing = self.inner.outgoing.borrow_mut();
         let frame = Frame::decode(&payload).unwrap();
-        outgoing.push_front(Out::ToAll(ToAll {
+        outgoing.push(Out::ToAll(ToAll {
             frame,
             filter: Box::new(filter),
         }));
@@ -184,7 +203,7 @@ impl BroadcastBackend for ControlledBackend {
     fn send_to_one(&self, node: NodeIndex, payload: Bytes) {
         let mut outgoing = self.inner.outgoing.borrow_mut();
         let frame = Frame::decode(&payload).unwrap();
-        outgoing.push_front(Out::ToOne(ToOne {
+        outgoing.push(Out::ToOne(ToOne {
             frame,
             destination: node,
         }));
@@ -233,10 +252,10 @@ impl ControlledBackend {
         let mut payload = Vec::new();
         frame.encode(&mut payload).expect("Faield to serialize");
         let mut ingested = self.inner.ingested.borrow_mut();
-        ingested.push_front((from, payload.into()));
+        ingested.push_back((from, payload.into()));
     }
 
-    pub fn take_messages(&self) -> VecDeque<Out> {
+    pub fn take_messages(&self) -> Vec<Out> {
         std::mem::take(&mut *self.inner.outgoing.borrow_mut())
     }
 }
@@ -248,42 +267,43 @@ struct ExampleMessage {
 
 impl AutoImplSerde for ExampleMessage {}
 
-impl From<ExampleMessage> for Bytes {
+impl From<ExampleMessage> for Vec<u8> {
     fn from(value: ExampleMessage) -> Self {
-        let bytes = bincode::serialize(&value).unwrap();
-        let mut buf = BytesMut::with_capacity(bytes.len());
-        buf.put_slice(&bytes);
-        buf.into()
+        let mut result = Vec::new();
+        value.encode(&mut result).unwrap();
+        result
     }
 }
 
-fn spawn_context() -> (
-    oneshot::Sender<()>,
-    PubSubI<ExampleMessage>,
-    ControlledBackend,
-) {
+fn spawn_context(duration: Duration) -> (PubSubI<ExampleMessage>, ControlledBackend) {
     let backend = ControlledBackend::default();
     let ctx = Context::new(Database::default(), backend.clone());
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
     let pubsub = PubSubI::<ExampleMessage>::new(Topic::Debug, ctx.get_command_sender());
     RUNTIME.with(|rt| {
         rt.spawn(async move {
+            ControlledBackend::sleep(duration).await;
+            shutdown_tx.send(());
+        });
+        rt.spawn(async move {
             ctx.run(shutdown_rx).await;
         })
     });
-    (shutdown_tx, pubsub, backend)
+    (pubsub, backend)
 }
 
 #[test]
 fn demo() {
-    let (_shutdown_tx, pubsub, backend) = spawn_context();
+    logging::setup();
+
+    let (pubsub, backend) = spawn_context(ONE_HOUR);
 
     let msg = Message {
         origin: 1,
         signature: VALID_SIGN,
         topic: Topic::Debug,
         timestamp: 0,
-        payload: Bytes::from(ExampleMessage { id: 0 }).into(),
+        payload: Vec::from(ExampleMessage { id: 0 }),
     };
 
     let digest = msg.to_digest();
