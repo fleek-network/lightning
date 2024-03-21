@@ -1,7 +1,6 @@
 use std::net::SocketAddr;
 use std::path::PathBuf;
 
-use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
 
 use crate::transports;
@@ -13,7 +12,7 @@ pub struct HandshakeConfig {
     pub transports: Vec<TransportConfig>,
     pub http_address: SocketAddr,
     pub https: Option<HttpsConfig>,
-    pub ebpf_socket_path: Option<ResolvedPathBuf>,
+    pub use_ebpf_service: bool,
 }
 
 impl Default for HandshakeConfig {
@@ -27,12 +26,7 @@ impl Default for HandshakeConfig {
             ],
             http_address: ([0, 0, 0, 0], 4220).into(),
             https: None,
-            #[cfg(not(target_os = "Linux"))]
-            ebpf_socket_path: None,
-            #[cfg(target_os = "Linux")]
-            ebpf_socket_path: "~/.lightning/ebpf"
-                .try_into()
-                .expect("Failed to resolve path"),
+            use_ebpf_service: false,
         }
     }
 }
