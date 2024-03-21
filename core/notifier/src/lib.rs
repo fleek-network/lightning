@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
+use lightning_interfaces::fdi::{BuildGraph, DependencyGraph};
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::notifier::{Notification, NotifierInterface};
 use lightning_interfaces::{ApplicationInterface, Emitter};
@@ -38,18 +39,26 @@ impl<C: Collection> Notifier<C> {
     }
 }
 
+impl<C: Collection> Notifier<C> {
+    fn new(app: &c![C::ApplicationInterface]) -> Self {
+        Self {
+            query_runner: app.sync_query(),
+            notify: Default::default(),
+        }
+    }
+}
+
+impl<C: Collection> BuildGraph for Notifier<C> {
+    fn build_graph() -> DependencyGraph {
+        DependencyGraph::new().with_infallible(Self::new)
+    }
+}
+
 impl<C: Collection> NotifierInterface<C> for Notifier<C> {
     type Emitter = NotificationsEmitter;
 
     fn get_emitter(&self) -> Self::Emitter {
         self.notify.clone()
-    }
-
-    fn init(app: &c![C::ApplicationInterface]) -> Self {
-        Self {
-            query_runner: app.sync_query(),
-            notify: Default::default(),
-        }
     }
 
     fn notify_on_new_block(&self, tx: mpsc::Sender<Notification>) {
@@ -178,7 +187,7 @@ mod tests {
     async fn test_before_epoch_change() {
         let (_, app) = init_app(3000);
 
-        let notifier = Notifier::<TestBinding>::init(&app);
+        let notifier = Notifier::<TestBinding>::new(&app);
 
         // Request to be notified 1 sec before the epoch ends.
         let (tx, mut rx) = mpsc::channel(2048);
@@ -197,7 +206,7 @@ mod tests {
     async fn test_notify_on_epoch_change() {
         let (_, app) = init_app(3000);
 
-        let notifier = Notifier::<TestBinding>::init(&app);
+        let notifier = Notifier::<TestBinding>::new(&app);
 
         // Request to be notified about new epoch.
         let (tx, mut rx) = mpsc::channel(10);
@@ -216,7 +225,7 @@ mod tests {
     async fn test_notify_on_new_block() {
         let (_, app) = init_app(3000);
 
-        let notifier = Notifier::<TestBinding>::init(&app);
+        let notifier = Notifier::<TestBinding>::new(&app);
 
         // Request to be notified about new block.
         let (tx, mut rx) = mpsc::channel(10);

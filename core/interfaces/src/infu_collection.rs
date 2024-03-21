@@ -64,6 +64,7 @@ impl<C: Collection> Node<C> {
         let graph = DependencyGraph::new()
             .with_value(waiter)
             .with_value(Blank::<C>::default())
+            .with_module::<C::NotifierInterface>()
             .with_module::<C::PingerInterface>()
             .with_module::<C::FetcherInterface>()
             .with_module::<C::KeystoreInterface>()
@@ -78,7 +79,6 @@ impl<C: Collection> Node<C> {
                 C::BlockstoreInterface::infu_initialize_hack
                     .on("_post", C::BlockstoreInterface::infu_post_hack),
             )
-            .with(C::NotifierInterface::infu_initialize_hack)
             .with(
                 <C::ApplicationInterface as ApplicationInterface<C>>::infu_initialize_hack
                     .on("start", |c: &C::ApplicationInterface| block_on(c.start()))
