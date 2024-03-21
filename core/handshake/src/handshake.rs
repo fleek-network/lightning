@@ -1,6 +1,7 @@
 use std::sync::atomic::AtomicU64;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use anyhow::Context as AnyhowContext;
 use async_channel::{bounded, Sender};
 use axum::{Extension, Router};
 use axum_server::Handle;
@@ -21,6 +22,7 @@ use lightning_interfaces::{
 };
 use lightning_schema::handshake::{HandshakeRequestFrame, TerminationReason};
 use rand::RngCore;
+use resolved_pathbuf::ResolvedPathBuf;
 use tokio::net::UnixStream;
 use tokio::sync::Mutex;
 use tracing::warn;
@@ -88,10 +90,14 @@ impl<C: Collection> WithStartAndShutdown for Handshake<C> {
         let mut guard = self.status.lock().await;
         let run = guard.as_mut().expect("restart not implemented.");
 
-        if let Some(path) = &self.config.ebpf_socket_path {
+        if self.config.use_ebpf_service {
             if std::env::consts::OS != "linux" {
                 panic!("eBPF is a Linux-only feature");
             }
+            let path: ResolvedPathBuf = "~/.lightning/ebpf"
+                .try_into()
+                .context("failed to resolve path")
+                .unwrap();
             let stream = UnixStream::connect(path)
                 .await
                 .expect("failed to connect to eBPF service socket");
