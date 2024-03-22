@@ -90,6 +90,9 @@ pub trait BroadcastEventInterface<T: LightningMessage>: Send + Sync {
     /// should not advertise the message to other peers.
     fn propagate(self);
 
+    /// Accept the message without propagating it.
+    fn accept(self);
+
     /// This method should be called when the body of the message would suggest
     /// that the originator MUST have been another node.
     fn mark_invalid_sender(self);

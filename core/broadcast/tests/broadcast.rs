@@ -250,7 +250,7 @@ impl BroadcastBackend for ControlledBackend {
 impl ControlledBackend {
     pub fn push_frame(&self, from: NodeIndex, frame: Frame) {
         let mut payload = Vec::new();
-        frame.encode(&mut payload).expect("Faield to serialize");
+        frame.encode(&mut payload).expect("Failed to serialize");
         let mut ingested = self.inner.ingested.borrow_mut();
         ingested.push_back((from, payload.into()));
     }
@@ -290,6 +290,19 @@ fn spawn_context(duration: Duration) -> (PubSubI<ExampleMessage>, ControlledBack
         })
     });
     (pubsub, backend)
+}
+
+fn timeout<F>(duration: Duration, future: F) -> impl Future<Output = Result<F::Output, ()>>
+where
+    F: Future,
+{
+    let sleep = RUNTIME.with(|rt| rt.sleep(duration));
+    async move {
+        tokio::select! {
+            _ = sleep => { Err(()) },
+            out = future => { Ok(out) }
+        }
+    }
 }
 
 #[test]
@@ -351,4 +364,72 @@ fn demo() {
     println!("{x:?}");
     let messages = backend.take_messages();
     println!("{:?}", messages);
+}
+
+#[test]
+fn test_reject_message() {
+    // In this test we send two messages with the same digest to the event loop of the broadcast.
+    // The pubsub receiver (outside of broadcast) rejects the first message.
+    // After listening to the pubsub again, the pubsub receiver should still receive the second
+    // message that was sent.
+    let (mut pubsub, backend) = spawn_context(ONE_HOUR);
+
+    let msg = Message {
+        origin: 99,
+        signature: VALID_SIGN,
+        topic: Topic::Debug,
+        timestamp: 0,
+        payload: ExampleMessage { id: 0 }.into(), // invalid origin
+    };
+    let digest = msg.to_digest();
+    let adv = Frame::Advr(Advr {
+        interned_id: 0,
+        digest,
+    });
+
+    backend.push_frame(1, adv);
+    backend.push_frame(1, Frame::Message(msg));
+
+    let x = RUNTIME.with(|rt| rt.fast_forward());
+
+    let msg = Message {
+        origin: 2,
+        signature: VALID_SIGN,
+        topic: Topic::Debug,
+        timestamp: 0,
+        payload: ExampleMessage { id: 0 }.into(), // valid origin
+    };
+    let digest = msg.to_digest();
+    let adv = Frame::Advr(Advr {
+        interned_id: 0,
+        digest,
+    });
+
+    backend.push_frame(2, adv);
+    backend.push_frame(2, Frame::Message(msg));
+
+    let x = RUNTIME.with(|rt| rt.fast_forward());
+    println!("{x:?}");
+
+    RUNTIME.with(|rt| {
+        rt.spawn(async move {
+            let Ok(event) = timeout(Duration::from_millis(5000), pubsub.recv_event()).await else {
+                panic!("Message did not arrive in time");
+            };
+            let mut event = event.unwrap();
+            let msg = event.take().unwrap();
+            assert_eq!(msg.id, 0);
+            // Reject the message
+            event.mark_invalid_sender();
+
+            // Since we rejected the message, we should receive the other message with the same
+            // digest
+            let Ok(msg) = timeout(Duration::from_millis(5000), pubsub.recv_event()).await else {
+                panic!("Message did not arrive in time");
+            };
+            assert_eq!(msg.unwrap().take().unwrap().id, 0);
+        });
+
+        rt.run_to_completion();
+    });
 }

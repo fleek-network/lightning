@@ -236,13 +236,19 @@ impl<B: BroadcastBackend> Context<B> {
             );
         }
 
+        if !self.db.is_processing(&digest) {
+            // only make the message available to receive for pubsub if we aren't currently
+            // processing a message with the same digest
+            self.incoming_messages[topic_index].insert(shared);
+        }
         // Insert the message into the database for future lookups.
         self.db.insert_message(&digest, msg);
         // Mark message as received for RTT measurements.
         self.pending_store.received_message(sender, id);
         // Report a satisfactory interaction when we receive a message.
+
+        // TODO(matthias): we should move this to where we accept/propagate the message
         self.backend.report_sat(sender, Weight::Weak);
-        self.incoming_messages[topic_index].insert(shared);
     }
 
     /// Handle a command sent from the mainland. Can be the broadcast object or
@@ -283,6 +289,19 @@ impl<B: BroadcastBackend> Context<B> {
                 // Start advertising the message.
                 self.advertise(id, digest, cmd.filter);
             },
+            Command::Accept(cmd) => {
+                let Some(id) = self.db.get_id(&cmd.digest) else {
+                    debug_assert!(
+                        false,
+                        "We should not be trying to accept a message we don't know the id of."
+                    );
+                    return;
+                };
+                self.db.accept_message(&cmd.digest);
+
+                // Remove the received message from the pending store.
+                self.pending_store.remove_message(id);
+            },
             Command::Propagate(cmd) => {
                 let Some(id) = self.db.get_id(&cmd.digest) else {
                     debug_assert!(
@@ -307,8 +326,19 @@ impl<B: BroadcastBackend> Context<B> {
                     Some("Number of messages we have initialized propagation to our peers for.")
                 )
             },
-            Command::MarkInvalidSender(_digest) => {
+            Command::MarkInvalidSender(digest) => {
                 error!("Received message from invalid sender");
+                self.db.reject_message(&digest);
+                // Get the next message from the queue for this digest (if exists).
+                if let Some(next_msg) = self.db.get_message(&digest) {
+                    let topic_index = topic_to_index(next_msg.topic);
+                    let shared = SharedMessage {
+                        digest,
+                        origin: next_msg.origin,
+                        payload: next_msg.payload.into(),
+                    };
+                    self.incoming_messages[topic_index].insert(shared);
+                }
                 // TODO(qti3e): There is more to do here.
             },
         }

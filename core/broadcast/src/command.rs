@@ -37,6 +37,12 @@ pub struct SendCmd {
     pub response: oneshot::Sender<Digest>,
 }
 
+/// A accept call from a pubsub.
+#[derive(Debug)]
+pub struct AcceptCmd {
+    pub digest: Digest,
+}
+
 /// A propagate call from a pubsub.
 #[derive(Debug)]
 pub struct PropagateCmd {
@@ -53,6 +59,11 @@ pub enum Command {
     Recv(RecvCmd),
     /// Send a message under the given topic and with the given payload.
     Send(SendCmd),
+    /// Send a command to the event loop to accept a message, without propagating it.
+    ///
+    /// The broadcast does not advertise a message unless the subscribers
+    /// decides to do so.
+    Accept(AcceptCmd),
     /// Send a command to the event loop to cause a propagation of a
     /// previously seen message.
     ///

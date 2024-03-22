@@ -8,7 +8,7 @@ use lightning_interfaces::{BroadcastEventInterface, PubSub};
 use tokio::sync::oneshot;
 use tracing::{debug, info};
 
-use crate::command::{Command, CommandSender, PropagateCmd, RecvCmd, SendCmd};
+use crate::command::{AcceptCmd, Command, CommandSender, PropagateCmd, RecvCmd, SendCmd};
 
 pub struct PubSubI<T: LightningMessage + Clone> {
     topic: Topic,
@@ -23,6 +23,7 @@ pub struct Event<T> {
     message: Option<T>,
     originator: NodeIndex,
     command_sender: CommandSender,
+    rejected: bool,
 }
 
 impl<T: LightningMessage + Clone> PubSubI<T> {
@@ -156,6 +157,7 @@ impl<T: LightningMessage + Clone> PubSub<T> for PubSubI<T> {
                     message: Some(decoded),
                     originator: msg.origin,
                     command_sender: self.command_sender.clone(),
+                    rejected: false,
                 };
                 return Some(event);
             } else {
@@ -184,7 +186,12 @@ impl<T: LightningMessage> BroadcastEventInterface<T> for Event<T> {
         }));
     }
 
-    fn mark_invalid_sender(self) {
+    fn accept(mut self) {
+        self.accept_internal()
+    }
+
+    fn mark_invalid_sender(mut self) {
+        self.rejected = true;
         let _ = self
             .command_sender
             .send(Command::MarkInvalidSender(self.digest));
@@ -192,5 +199,21 @@ impl<T: LightningMessage> BroadcastEventInterface<T> for Event<T> {
 
     fn get_digest(&self) -> Digest {
         self.digest
+    }
+}
+
+impl<T> Event<T> {
+    fn accept_internal(&mut self) {
+        let _ = self.command_sender.send(Command::Accept(AcceptCmd {
+            digest: self.digest,
+        }));
+    }
+}
+
+impl<T> Drop for Event<T> {
+    fn drop(&mut self) {
+        if !self.rejected {
+            self.accept_internal()
+        }
     }
 }
