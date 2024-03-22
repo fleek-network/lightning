@@ -1,36 +1,15 @@
-use std::collections::VecDeque;
-
 use lightning_interfaces::schema::broadcast::{Message, MessageInternedId};
 use lightning_interfaces::types::Digest;
 use quick_cache::unsync::Cache;
-use tracing::{error, warn};
 
 // TODO: Make this persist.
 pub struct Database {
-    data: Cache<Digest, Queue>,
-}
-
-//struct Entry {
-//    id: MessageInternedId,
-//    message: Option<Message>,
-//    state: State,
-//}
-
-struct Queue {
-    id: MessageInternedId,
-    messages: VecDeque<Entry>,
+    data: Cache<Digest, Entry>,
 }
 
 struct Entry {
-    message: Message,
-    state: State,
-}
-
-#[derive(PartialEq, Eq)]
-enum State {
-    Processing,
-    Accepted,
-    Propagated, // this includes accepted
+    id: Option<MessageInternedId>,
+    message: Option<Message>,
 }
 
 impl Default for Database {
@@ -44,51 +23,28 @@ impl Default for Database {
 }
 
 impl Database {
-    /// Insert a message with all the information we have about it. And set propagated to true.
-    pub fn insert_with_message(&mut self, id: MessageInternedId, digest: Digest, message: Message) {
-        // TODO(matthias): do we have to check if there is already an entry for this digest?
-        //let mut q = VecDeque::new();
-        //q.push_back(Entry {
-        //    id,
-        //    message: Some(message),
-        //    state: State::Propagated,
-        //});
-        //self.data.insert(digest, q);
-        let mut messages = VecDeque::new();
-        messages.push_back(Entry {
-            message,
-            state: State::Propagated,
-        });
-        self.data.insert(digest, Queue { id, messages })
-    }
-
     /// Insert the id for a digest.
     pub fn insert_id(&mut self, id: MessageInternedId, digest: Digest) {
-        let contains = self.data.get(&digest).map(|_| true).unwrap_or(false);
-        if !contains {
-            self.data.insert(
-                digest,
-                Queue {
-                    id,
-                    messages: VecDeque::new(),
-                },
-            );
-        } else {
-            // TODO(matthias): should we overwrite the id?
-            warn!("Database already contains an id for this digest, overwriting id.");
-            let Some(mut e) = self.data.get_mut(&digest) else {
-                return;
-            };
-            e.id = id;
-        }
+        #[cfg(debug_assertions)]
+        assert!(
+            self.data.get_mut(&digest).is_none(),
+            "Digest should not have an id now."
+        );
+        self.data.insert(
+            digest,
+            Entry {
+                id: Some(id),
+                message: None,
+            },
+        );
     }
 
-    /// Takes &mut self and uses get_mut() for performance. We save some atomic operations in
-    /// quick_cache and we are returning a clone anyway
-    pub fn get_message(&mut self, digest: &Digest) -> Option<Message> {
-        self.data
-            .get_mut(digest)
-            .and_then(|q| q.messages.front().map(|e| e.message.clone()))
+    /// Insert the payload of a message known with the given digest.
+    pub fn insert_message(&mut self, digest: &Digest, message: Message) {
+        let Some(mut e) = self.data.get_mut(digest) else {
+            panic!("We should not be inserting payload of what we have not seen.");
+        };
+        e.message = Some(message);
     }
 
     /// Takes &mut self and uses get_mut() for performance. We save some atomic operations in
@@ -96,102 +52,19 @@ impl Database {
     pub fn get_id(&mut self, digest: &Digest) -> Option<MessageInternedId> {
         // We use get_mut here because we are cloning anyway and it is more effecient for
         // quick_cache
-        self.data.get_mut(digest).map(|q| q.id)
+        self.data.get_mut(digest).and_then(|e| e.id)
     }
 
-    /// Returns true if we have already propagated a message. Which is the final state a message
-    /// could be in. The highest level of *having seen a message*.
-    /// takes &mut self so we can use get_mut() on our cache which is more performant
-    pub fn is_propagated(&mut self, digest: &Digest) -> bool {
-        self.data
-            .get_mut(digest)
-            .map(|q| {
-                q.messages
-                    .front()
-                    .map(|e| e.state == State::Propagated)
-                    .unwrap_or(false)
-            })
-            .unwrap_or(false)
+    /// Takes &mut self and uses get_mut() for performance. We save some atomic operations in
+    /// quick_cache and we are returning a clone anyway
+    pub fn get_message(&mut self, digest: &Digest) -> Option<Message> {
+        self.data.get_mut(digest).and_then(|e| e.message.clone())
     }
 
-    /// Returns true if we are currently processing a message for this digest.
-    /// takes &mut self so we can use get_mut() on our cache which is more performant.
-    pub fn is_processing(&mut self, digest: &Digest) -> bool {
-        self.data
-            .get_mut(digest)
-            .map(|q| {
-                q.messages
-                    .front()
-                    .map(|e| e.state == State::Processing)
-                    .unwrap_or(false)
-            })
-            .unwrap_or(false)
-    }
-
-    /// Mark the message known with the given digest as propagated.
-    pub fn mark_propagated(&mut self, digest: &Digest) {
-        self.mark_message(digest, State::Propagated)
-    }
-
-    /// Accept the message known with the given digest, without propagating it.
-    pub fn accept_message(&mut self, digest: &Digest) {
-        self.mark_message(digest, State::Accepted)
-    }
-
-    /// Reject the message known with the given digest.
-    pub fn reject_message(&mut self, digest: &Digest) {
-        let Some(mut q) = self.data.get_mut(digest) else {
-            debug_assert!(false, "We should not reject a message we haven't seen.");
-            return;
-        };
-        if q.messages.pop_front().is_none() {
-            debug_assert!(false, "We should not reject a message we haven't seen.");
-        }
-    }
-
-    /// Insert the payload of a message known with the given digest.
-    pub fn insert_message(&mut self, digest: &Digest, message: Message) {
-        let Some(mut q) = self.data.get_mut(digest) else {
-            error!("This should never happen...call Dalton");
-            debug_assert!(
-                false,
-                "We should not be inserting payload of what we have not seen."
-            );
-            return;
-        };
-
-        q.messages.push_back(Entry {
-            message,
-            state: State::Processing,
-        })
-    }
-
-    /// Mark the message known with the given digest as specified.
-    fn mark_message(&mut self, digest: &Digest, state: State) {
-        let Some(mut q) = self.data.get_mut(digest) else {
-            debug_assert!(
-                false,
-                "We should not mark a message we haven't seen propagated/accepted."
-            );
-            return;
-        };
-        match q.messages.pop_front() {
-            Some(mut msg) => {
-                // The message was accepted with finality, we can remove all messages.
-                q.messages.clear();
-
-                // We still store the propagated/accepted message because a peer might request a
-                // consensus parcel from us.
-                msg.state = state;
-                q.messages.push_back(msg);
-            },
-            None => {
-                debug_assert!(
-                    false,
-                    "We should not mark a message we haven't seen as propagated/accepted."
-                );
-            },
-        }
+    /// Takes &mut self and uses get_mut() for performance. We save some atomic operations in
+    /// quick_cache and we are returning a clone anyway
+    pub fn contains_message(&mut self, digest: &Digest) -> bool {
+        self.get_message(digest).is_some()
     }
 }
 
@@ -229,7 +102,8 @@ mod test {
                 sixty_thousand = Some((digest, message.clone()));
             }
 
-            db.insert_with_message(0, digest, message);
+            db.insert_id(0, digest);
+            db.insert_message(&digest, message);
             // Read it once each so it evicts in a predictable order
             db.get_message(&digest);
         }

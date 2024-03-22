@@ -409,7 +409,6 @@ fn test_reject_message() {
     backend.push_frame(2, Frame::Message(msg));
 
     let x = RUNTIME.with(|rt| rt.fast_forward());
-    println!("{x:?}");
 
     RUNTIME.with(|rt| {
         rt.spawn(async move {
@@ -434,9 +433,11 @@ fn test_reject_message() {
     });
 }
 
-fn message_accept_or_propagate_helper(propagate: bool) {
+#[test]
+#[should_panic(expected = "finished")]
+fn test_propagate_message() {
     // In this test we send two messages with the same digest to the event loop of the broadcast.
-    // The pubsub receiver (outside of broadcast) accepts/propagates the first message.
+    // The pubsub receiver (outside of broadcast) propagates the first message.
     // After listening to the pubsub again, the pubsub receiver should not receive the second
     // message that was sent.
     let (mut pubsub, backend) = spawn_context(ONE_HOUR);
@@ -486,14 +487,10 @@ fn message_accept_or_propagate_helper(propagate: bool) {
             let msg = event.take().unwrap();
             assert_eq!(msg.id, 0);
 
-            // Accept/propagate the message
-            if propagate {
-                event.propagate();
-            } else {
-                event.accept();
-            }
+            // Propagate the message
+            event.propagate();
 
-            // Since we accepted/propagated the message, we should not receive another message with
+            // Since we propagated the message, we should not receive another message with
             // the same digest
             assert!(pubsub.recv_event().await.is_none());
             panic!("finished");
@@ -505,16 +502,4 @@ fn message_accept_or_propagate_helper(propagate: bool) {
 
         rt.run_to_completion();
     });
-}
-
-#[test]
-#[should_panic(expected = "finished")]
-fn test_accept_message() {
-    message_accept_or_propagate_helper(false);
-}
-
-#[test]
-#[should_panic(expected = "finished")]
-fn test_propagate_message() {
-    message_accept_or_propagate_helper(true);
 }

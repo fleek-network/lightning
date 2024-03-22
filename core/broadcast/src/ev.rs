@@ -7,7 +7,7 @@
 //! the entire thing in a central event loop.
 
 use std::cell::OnceCell;
-use std::collections::HashSet;
+use std::collections::{HashSet, VecDeque};
 
 use bytes::Bytes;
 use fleek_crypto::NodeSignature;
@@ -52,8 +52,10 @@ pub struct Context<B: BroadcastBackend> {
     command_tx: CommandSender,
     /// Receiving end of the commands.
     command_rx: CommandReceiver,
-    // Pending store.
+    /// Pending store.
     pending_store: PendingStore<B>,
+    /// Incoming messages with the same digest
+    processing: im::HashMap<Digest, VecDeque<Message>>,
     current_node_index: OnceCell<NodeIndex>,
     backend: B,
 }
@@ -75,6 +77,7 @@ impl<B: BroadcastBackend> Context<B> {
             command_tx,
             command_rx,
             pending_store: PendingStore::new(),
+            processing: im::HashMap::new(),
             current_node_index: OnceCell::new(), // will be set upon spawn.
             backend,
         }
@@ -116,7 +119,7 @@ impl<B: BroadcastBackend> Context<B> {
         let digest = advr.digest;
 
         // If we have already propagated a message we really don't care about it anymore.
-        if self.db.is_propagated(&digest) {
+        if self.db.contains_message(&digest) {
             trace!("skipping {digest:?}");
             return;
         }
@@ -170,8 +173,8 @@ impl<B: BroadcastBackend> Context<B> {
     fn handle_message(&mut self, sender: NodeIndex, msg: Message) {
         let digest = msg.to_digest();
 
-        if self.db.is_propagated(&digest) {
-            // we have seen the message and accepted it already.
+        if self.db.contains_message(&digest) {
+            // we have seen the message and propagated it already.
             return;
         }
 
@@ -236,18 +239,27 @@ impl<B: BroadcastBackend> Context<B> {
             );
         }
 
-        if !self.db.is_processing(&digest) {
-            // only make the message available to receive for pubsub if we aren't currently
-            // processing a message with the same digest
-            self.incoming_messages[topic_index].insert(shared);
+        match self.processing.entry(digest) {
+            im::hashmap::Entry::Vacant(e) => {
+                let mut q = VecDeque::new();
+                q.push_back(msg);
+                e.insert(q);
+            },
+            im::hashmap::Entry::Occupied(mut e) => {
+                e.get_mut().push_back(msg);
+                return;
+            },
         }
-        // Insert the message into the database for future lookups.
-        self.db.insert_message(&digest, msg);
+
+        // only make the message available to receive for pubsub if we aren't currently
+        // processing a message with the same digest
+        self.incoming_messages[topic_index].insert(shared);
+
         // Mark message as received for RTT measurements.
         self.pending_store.received_message(sender, id);
-        // Report a satisfactory interaction when we receive a message.
 
-        // TODO(matthias): we should move this to where we accept/propagate the message
+        // TODO(matthias): we should move this to where we propagate the message
+        // Report a satisfactory interaction when we receive a message.
         self.backend.report_sat(sender, Weight::Weak);
     }
 
@@ -284,20 +296,26 @@ impl<B: BroadcastBackend> Context<B> {
                 let _ = cmd.response.send(digest);
 
                 let id = self.interner.insert(digest);
-                self.db.insert_with_message(id, digest, message);
+                self.db.insert_id(id, digest);
+                self.db.insert_message(&digest, message);
 
                 // Start advertising the message.
                 self.advertise(id, digest, cmd.filter);
             },
-            Command::Accept(cmd) => {
-                let Some(id) = self.db.get_id(&cmd.digest) else {
+            Command::CleanUp(digest) => {
+                let Some(id) = self.db.get_id(&digest) else {
                     debug_assert!(
                         false,
-                        "We should not be trying to accept a message we don't know the id of."
+                        "We should not be trying to clean up a digest we don't know the id of."
                     );
                     return;
                 };
-                self.db.accept_message(&cmd.digest);
+                if self.processing.remove(&digest).is_none() {
+                    debug_assert!(
+                        false,
+                        "We should not be trying to clean up a digest we don't know the id of."
+                    );
+                }
 
                 // Remove the received message from the pending store.
                 self.pending_store.remove_message(id);
@@ -311,9 +329,22 @@ impl<B: BroadcastBackend> Context<B> {
                     return;
                 };
 
-                // Mark the message as propagated. This will make us lose any interest for future
-                // advertisements of this message.
-                self.db.mark_propagated(&cmd.digest);
+                // Insert the message into the database for future lookups.
+                let Some(mut q) = self.processing.remove(&cmd.digest) else {
+                    debug_assert!(
+                        false,
+                        "We should not be trying to propagate a message we don't have."
+                    );
+                    return;
+                };
+                let Some(msg) = q.pop_front() else {
+                    debug_assert!(
+                        false,
+                        "We should not be trying to propagate a message we don't have."
+                    );
+                    return;
+                };
+                self.db.insert_message(&cmd.digest, msg);
 
                 // Remove the received message from the pending store.
                 self.pending_store.remove_message(id);
@@ -328,14 +359,23 @@ impl<B: BroadcastBackend> Context<B> {
             },
             Command::MarkInvalidSender(digest) => {
                 error!("Received message from invalid sender");
-                self.db.reject_message(&digest);
-                // Get the next message from the queue for this digest (if exists).
-                if let Some(next_msg) = self.db.get_message(&digest) {
+                let Some(q) = self.processing.get_mut(&digest) else {
+                    debug_assert!(
+                        false,
+                        "We should not be trying to reject a message we don't have."
+                    );
+                    return;
+                };
+                // Remove invalid message
+                q.pop_front();
+
+                // Move on to the next message in the queue if one exists.
+                if let Some(next_msg) = q.front() {
                     let topic_index = topic_to_index(next_msg.topic);
                     let shared = SharedMessage {
                         digest,
                         origin: next_msg.origin,
-                        payload: next_msg.payload.into(),
+                        payload: next_msg.payload.clone().into(),
                     };
                     self.incoming_messages[topic_index].insert(shared);
                 }

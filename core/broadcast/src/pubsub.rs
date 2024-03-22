@@ -8,7 +8,7 @@ use lightning_interfaces::{BroadcastEventInterface, PubSub};
 use tokio::sync::oneshot;
 use tracing::{debug, info};
 
-use crate::command::{AcceptCmd, Command, CommandSender, PropagateCmd, RecvCmd, SendCmd};
+use crate::command::{Command, CommandSender, PropagateCmd, RecvCmd, SendCmd};
 
 pub struct PubSubI<T: LightningMessage + Clone> {
     topic: Topic,
@@ -23,7 +23,7 @@ pub struct Event<T> {
     message: Option<T>,
     originator: NodeIndex,
     command_sender: CommandSender,
-    rejected: bool,
+    clean_up: bool,
 }
 
 impl<T: LightningMessage + Clone> PubSubI<T> {
@@ -157,7 +157,7 @@ impl<T: LightningMessage + Clone> PubSub<T> for PubSubI<T> {
                     message: Some(decoded),
                     originator: msg.origin,
                     command_sender: self.command_sender.clone(),
-                    rejected: false,
+                    clean_up: true,
                 };
                 return Some(event);
             } else {
@@ -179,19 +179,16 @@ impl<T: LightningMessage> BroadcastEventInterface<T> for Event<T> {
         self.message.take()
     }
 
-    fn propagate(self) {
+    fn propagate(mut self) {
+        self.clean_up = false;
         let _ = self.command_sender.send(Command::Propagate(PropagateCmd {
             digest: self.digest,
             filter: None,
         }));
     }
 
-    fn accept(mut self) {
-        self.accept_internal()
-    }
-
     fn mark_invalid_sender(mut self) {
-        self.rejected = true;
+        self.clean_up = false;
         let _ = self
             .command_sender
             .send(Command::MarkInvalidSender(self.digest));
@@ -202,18 +199,10 @@ impl<T: LightningMessage> BroadcastEventInterface<T> for Event<T> {
     }
 }
 
-impl<T> Event<T> {
-    fn accept_internal(&mut self) {
-        let _ = self.command_sender.send(Command::Accept(AcceptCmd {
-            digest: self.digest,
-        }));
-    }
-}
-
 impl<T> Drop for Event<T> {
     fn drop(&mut self) {
-        if !self.rejected {
-            self.accept_internal()
+        if self.clean_up {
+            let _ = self.command_sender.send(Command::CleanUp(self.digest));
         }
     }
 }
