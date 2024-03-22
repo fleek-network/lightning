@@ -433,3 +433,84 @@ fn test_reject_message() {
         rt.run_to_completion();
     });
 }
+
+fn message_accept_or_propagate_helper(propagate: bool) {
+    // In this test we send two messages with the same digest to the event loop of the broadcast.
+    // The pubsub receiver (outside of broadcast) accepts/propagates the first message.
+    // After listening to the pubsub again, the pubsub receiver should not receive the second
+    // message that was sent.
+    let (mut pubsub, backend) = spawn_context(ONE_HOUR);
+
+    let msg = Message {
+        origin: 99,
+        signature: VALID_SIGN,
+        topic: Topic::Debug,
+        timestamp: 0,
+        payload: ExampleMessage { id: 0 }.into(), // invalid origin
+    };
+    let digest = msg.to_digest();
+    let adv = Frame::Advr(Advr {
+        interned_id: 0,
+        digest,
+    });
+
+    backend.push_frame(1, adv);
+    backend.push_frame(1, Frame::Message(msg));
+
+    let x = RUNTIME.with(|rt| rt.fast_forward());
+
+    let msg = Message {
+        origin: 2,
+        signature: VALID_SIGN,
+        topic: Topic::Debug,
+        timestamp: 0,
+        payload: ExampleMessage { id: 0 }.into(), // valid origin
+    };
+    let digest = msg.to_digest();
+    let adv = Frame::Advr(Advr {
+        interned_id: 0,
+        digest,
+    });
+
+    backend.push_frame(2, adv);
+    backend.push_frame(2, Frame::Message(msg));
+
+    let x = RUNTIME.with(|rt| rt.fast_forward());
+
+    RUNTIME.with(|rt| {
+        rt.spawn(async move {
+            let Ok(event) = timeout(Duration::from_millis(5000), pubsub.recv_event()).await else {
+                panic!("Message did not arrive in time");
+            };
+            let mut event = event.unwrap();
+            let msg = event.take().unwrap();
+            assert_eq!(msg.id, 0);
+
+            // Accept/propagate the message
+            if propagate {
+                event.propagate();
+            } else {
+                event.accept();
+            }
+
+            // Since we accepted/propagated the message, we should not receive another message with
+            // the same digest
+            assert!(pubsub.recv_event().await.is_none());
+            // Note: outside of this testground, the call to `recv_event` would not resolve if
+            // there aren't anys messages. Since we fast forward the runtime, the context will
+            // shutdown.
+        });
+
+        rt.run_to_completion();
+    });
+}
+
+#[test]
+fn test_accept_message() {
+    message_accept_or_propagate_helper(false);
+}
+
+#[test]
+fn test_propagate_message() {
+    message_accept_or_propagate_helper(true);
+}
