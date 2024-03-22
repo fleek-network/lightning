@@ -496,6 +496,8 @@ fn message_accept_or_propagate_helper(propagate: bool) {
             // Since we accepted/propagated the message, we should not receive another message with
             // the same digest
             assert!(pubsub.recv_event().await.is_none());
+            panic!("finished");
+
             // Note: outside of this testground, the call to `recv_event` would not resolve if
             // there aren't anys messages. Since we fast forward the runtime, the context will
             // shutdown.
@@ -506,11 +508,13 @@ fn message_accept_or_propagate_helper(propagate: bool) {
 }
 
 #[test]
+#[should_panic(expected = "finished")]
 fn test_accept_message() {
     message_accept_or_propagate_helper(false);
 }
 
 #[test]
+#[should_panic(expected = "finished")]
 fn test_propagate_message() {
     message_accept_or_propagate_helper(true);
 }
