@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use aya::maps::{HashMap, MapData};
 use common::IpPortKey;
-use log::error;
+use log::{error, info};
 use tokio::net::UnixListener;
 use tokio::sync::Mutex;
 
@@ -27,7 +27,9 @@ impl Server {
                 Ok((stream, _addr)) => {
                     let block_list = self.block_list.clone();
                     tokio::spawn(async move {
-                        let _ = Connection::new(stream, block_list).handle().await;
+                        if let Err(e) = Connection::new(stream, block_list).handle().await {
+                            info!("connection handler failed: {e:?}");
+                        }
                     });
                 },
                 Err(e) => {
