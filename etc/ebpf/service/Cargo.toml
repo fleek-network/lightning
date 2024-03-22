@@ -8,6 +8,7 @@ authors = ["M. Meier <miguel@fleek.xyz>"]
 anyhow = { version = "1.0", optional = true }
 aya = { git = "https://github.com/aya-rs/aya", features = ["async_tokio"], optional = true }
 aya-log = { git = "https://github.com/aya-rs/aya", optional = true }
+bytes = { version = "1.6"}
 common = { path = "../common", features = ["userspace"], optional = true }
 libc = { version = "0.2", optional = true }
 log = { version = "0.4", optional = true }
