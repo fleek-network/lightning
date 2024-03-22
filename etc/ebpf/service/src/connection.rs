@@ -27,8 +27,8 @@ impl<T: BorrowMut<MapData>> Connection<T> {
                 let mut map = self.block_list.lock().await;
                 map.insert(
                     IpPortKey {
-                        ip: message.ip.into(),
-                        port: message.port.unwrap_or(0) as u32,
+                        ip: (*message.addr.ip()).into(),
+                        port: message.addr.port() as u32,
                     },
                     0,
                     0,
@@ -37,8 +37,8 @@ impl<T: BorrowMut<MapData>> Connection<T> {
             Pf::REMOVE => {
                 let mut map = self.block_list.lock().await;
                 map.remove(&IpPortKey {
-                    ip: message.ip.into(),
-                    port: message.port.unwrap_or(0) as u32,
+                    ip: (*message.addr.ip()).into(),
+                    port: message.addr.port() as u32,
                 })?;
             },
             op => {
@@ -58,7 +58,7 @@ impl<T: BorrowMut<MapData>> Connection<T> {
                     while bytes_read < 7 {
                         match self.socket.try_read(&mut read_buf) {
                             Ok(0) => {
-                                break;
+                                return Ok(());
                             },
                             Ok(n) => {
                                 bytes_read += n;
