@@ -1,5 +1,5 @@
 #[cfg(feature = "service")]
 mod connection;
-mod message;
+mod schema;
 #[cfg(feature = "service")]
 mod server;
