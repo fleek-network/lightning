@@ -9,7 +9,7 @@ use tokio::io::Interest;
 use tokio::net::UnixStream;
 use tokio::sync::Mutex;
 
-use crate::message::Pf;
+use crate::schema::Pf;
 
 pub struct Connection<T> {
     socket: UnixStream,
