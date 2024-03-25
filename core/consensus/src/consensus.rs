@@ -1,15 +1,12 @@
 use std::collections::BTreeMap;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use derive_more::{From, IsVariant, TryInto};
 use fleek_crypto::{ConsensusPublicKey, NodePublicKey, SecretKey};
-use lightning_interfaces::application::ExecutionEngineSocket;
-use lightning_interfaces::common::WithStartAndShutdown;
 use lightning_interfaces::config::ConfigConsumer;
 use lightning_interfaces::consensus::ConsensusInterface;
-use lightning_interfaces::fdi::{BuildGraph, DependencyGraph};
+use lightning_interfaces::fdi::{BuildGraph, DependencyGraph, MethodExt};
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::signer::{SignerInterface, SubmitTxSocket};
 use lightning_interfaces::types::{Epoch, EpochInfo, Event, Topic, UpdateMethod};
@@ -17,13 +14,14 @@ use lightning_interfaces::{
     ApplicationInterface,
     ArchiveInterface,
     BroadcastInterface,
+    Cloned,
     ConfigProviderInterface,
     Emitter,
-    IndexSocket,
     KeystoreInterface,
     NotifierInterface,
     PubSub,
     RpcInterface,
+    ShutdownWaiter,
     SyncQueryRunnerInterface,
 };
 use lightning_schema::AutoImplSerde;
@@ -49,28 +47,19 @@ use crate::narwhal::{NarwhalArgs, NarwhalService};
 
 pub struct Consensus<C: Collection> {
     /// Inner state of the consensus
-    /// todo(dalton): We can probably get a little more efficient then a mutex here
-    /// maybe a once box
     #[allow(clippy::type_complexity)]
-    epoch_state: Mutex<
-        Option<
-            EpochState<
-                c![C::ApplicationInterface::SyncExecutor],
-                c![C::BroadcastInterface::PubSub<PubSubMsg>],
-                c![C::NotifierInterface::Emitter],
-            >,
+    epoch_state: Option<
+        EpochState<
+            c![C::ApplicationInterface::SyncExecutor],
+            c![C::BroadcastInterface::PubSub<PubSubMsg>],
+            c![C::NotifierInterface::Emitter],
         >,
     >,
     /// Timestamp of the narwhal certificate that caused an epoch change
     /// is sent through this channel to notify that epoch chould change.
     reconfigure_notify: Arc<Notify>,
-    /// Called from the shutdown function to notify the start event loop to
-    /// exit.
-    shutdown_notify: Arc<Notify>,
     /// To notify the epoch state when consensus is shutting down
     shutdown_notify_epoch_state: Arc<Notify>,
-    /// bool indicating if narwhal is running
-    is_running: AtomicBool,
 }
 
 /// This struct contains mutable state only for the current epoch.
@@ -323,31 +312,24 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
 }
 
 impl<C: Collection> Consensus<C> {
-    /// Returns true if this system is running or not.
-    fn is_running(&self) -> bool {
-        self.is_running.load(Ordering::Relaxed)
-    }
-
     /// Start the system, should not do anything if the system is already
     /// started.
-    async fn start(&mut self) {
+    fn start(&mut self, Cloned(waiter): Cloned<ShutdownWaiter>) {
         let reconfigure_notify = self.reconfigure_notify.clone();
-        let shutdown_notify = self.shutdown_notify.clone();
+        let shutdown_notify_epoch_state = self.shutdown_notify_epoch_state.clone();
 
         let mut epoch_state = self
             .epoch_state
-            .lock()
-            .expect("Mutex poisened")
             .take()
             .expect("Consensus was tried to start before initialization");
-
-        self.is_running.store(true, Ordering::Relaxed);
 
         task::spawn(async move {
             let edge_node = epoch_state.spawn_edge_consensus(reconfigure_notify.clone());
             epoch_state.start_current_epoch().await;
-            let shutdown_future = shutdown_notify.notified();
+
+            let shutdown_future = waiter.wait_for_shutdown();
             pin!(shutdown_future);
+
             loop {
                 let reconfigure_future = reconfigure_notify.notified();
 
@@ -367,14 +349,10 @@ impl<C: Collection> Consensus<C> {
                     }
                 }
             }
-        });
-    }
 
-    /// Send the shutdown signal to the system.
-    async fn shutdown(&mut self) {
-        self.shutdown_notify.notify_one();
-        self.shutdown_notify_epoch_state.notify_one();
-        self.is_running.store(false, Ordering::Relaxed);
+            // Notify the epoch state that it is time to shutdown.
+            shutdown_notify_epoch_state.notify_waiters();
+        });
     }
 }
 
@@ -385,14 +363,11 @@ impl<C: Collection> ConfigConsumer for Consensus<C> {
 
 impl<C: Collection> BuildGraph for Consensus<C> {
     fn build_graph() -> DependencyGraph {
-        DependencyGraph::new()
-        // .with(
-        //     C::ConsensusInterface::infu_initialize_hack
-        //         .on("start", |c: &C::ConsensusInterface| block_on(c.start()))
-        //         .on("shutdown", |c: &C::ConsensusInterface| {
-        //             block_on(c.shutdown())
-        //         }),
-        // )
+        DependencyGraph::new().with(
+            Self::init
+                .on("_post", Self::post_init)
+                .on("start", Self::start),
+        )
     }
 }
 
@@ -401,8 +376,10 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
 }
 
 impl<C: Collection> Consensus<C> {
-    fn _xinit(
-        config: &C::ConfigProviderInterface,
+    /// Create a new consensus service with the provided config and executor.
+    #[allow(clippy::too_many_arguments)]
+    fn init(
+        config_provider: &C::ConfigProviderInterface,
         keystore: &C::KeystoreInterface,
         signer: &C::SignerInterface,
         app: &C::ApplicationInterface,
@@ -410,38 +387,12 @@ impl<C: Collection> Consensus<C> {
         archive: &C::ArchiveInterface,
         notifier: &C::NotifierInterface,
     ) -> anyhow::Result<Self> {
+        let config = config_provider.get::<Self>();
         let executor = app.transaction_executor();
-
-        let sqr = app.sync_query();
+        let query_runner = app.sync_query();
         let pubsub = broadcast.get_pubsub(Topic::Consensus);
-        Self::xxx_init(
-            config.get::<Self>(),
-            keystore.clone(),
-            signer,
-            executor,
-            sqr,
-            pubsub,
-            archive.index_socket(),
-            notifier,
-        )
-    }
+        let indexer_socket = archive.index_socket();
 
-    fn _xpost(&mut self, rpc: &C::RpcInterface) {
-        self.set_event_tx(rpc.event_tx());
-    }
-
-    /// Create a new consensus service with the provided config and executor.
-    #[allow(clippy::too_many_arguments)]
-    fn xxx_init(
-        config: Config,
-        keystore: C::KeystoreInterface,
-        signer: &C::SignerInterface,
-        executor: ExecutionEngineSocket,
-        query_runner: c!(C::ApplicationInterface::SyncExecutor),
-        pubsub: c!(C::BroadcastInterface::PubSub<PubSubMsg>),
-        indexer_socket: Option<IndexSocket>,
-        notifier: &c!(C::NotifierInterface),
-    ) -> anyhow::Result<Self> {
         // Spawn the registry for narwhal
         let registry = Registry::new();
         // Init the metrics for narwhal
@@ -471,7 +422,6 @@ impl<C: Collection> Consensus<C> {
             notifier.get_emitter(),
         ));
 
-        let shutdown_notify = Arc::new(Notify::new());
         let shutdown_notify_epoch_state = Arc::new(Notify::new());
 
         let epoch_state = EpochState::new(
@@ -488,21 +438,17 @@ impl<C: Collection> Consensus<C> {
         );
 
         Ok(Self {
-            epoch_state: Mutex::new(Some(epoch_state)),
+            epoch_state: Some(epoch_state),
             reconfigure_notify,
-            shutdown_notify,
             shutdown_notify_epoch_state,
-            is_running: AtomicBool::new(false),
         })
     }
 
-    fn set_event_tx(&mut self, tx: tokio::sync::mpsc::Sender<Vec<Event>>) {
+    fn post_init(&mut self, rpc: &C::RpcInterface) {
         self.epoch_state
-            .lock()
-            .expect("Mutex poisened")
             .as_mut()
             .expect("Consensus was tried to start before initialization")
-            .set_event_tx(tx);
+            .set_event_tx(rpc.event_tx());
     }
 }
 
