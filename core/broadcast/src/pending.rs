@@ -108,12 +108,23 @@ impl<B: BroadcastBackend> PendingStore<B> {
         requests
             .into_iter()
             .filter_map(|(id, pub_keys)| {
-                let pub_keys: Vec<NodeIndex> = pub_keys.iter().copied().collect();
+                let mut pub_keys: Vec<NodeIndex> = pub_keys.iter().copied().collect();
                 if pub_keys.is_empty() {
                     None
                 } else if pub_keys.len() == 1 {
                     Some((id, pub_keys[0]))
                 } else {
+                    // If we already sent a request for this id (that timed out), we don't want to
+                    // send another request for this id to the same peer (unless that peer is the
+                    // only peer that advertised that digest to us).
+                    if let Some(requests) = self.request_map.get(&id) {
+                        if let Some(req) = requests.back() {
+                            if let Some(index) = pub_keys.iter().position(|x| *x == req.node) {
+                                pub_keys.swap_remove(index);
+                            }
+                        }
+                    }
+
                     let mut max_val: f64 = 0.0;
                     let weights: Vec<f64> = pub_keys
                         .iter()
