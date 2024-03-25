@@ -15,10 +15,10 @@ impl EbpfServiceFrame {
     const MAC: u8 = 1;
 }
 
-impl TryFrom<Bytes> for EbpfServiceFrame {
+impl TryFrom<&[u8]> for EbpfServiceFrame {
     type Error = io::Error;
 
-    fn try_from(mut value: Bytes) -> Result<Self, Self::Error> {
+    fn try_from(mut value: &[u8]) -> Result<Self, Self::Error> {
         if value.is_empty() {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
@@ -88,10 +88,10 @@ impl Pf {
     }
 }
 
-impl TryFrom<Bytes> for Pf {
+impl TryFrom<&[u8]> for Pf {
     type Error = io::Error;
 
-    fn try_from(mut value: Bytes) -> Result<Self, Self::Error> {
+    fn try_from(mut value: &[u8]) -> Result<Self, Self::Error> {
         if value.len() != 7 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
