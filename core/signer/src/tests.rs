@@ -1,41 +1,39 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::BTreeMap;
 use std::time::Duration;
 
-use fleek_crypto::{AccountOwnerSecretKey, PublicKey, SecretKey};
+use fleek_crypto::{AccountOwnerSecretKey, SecretKey};
 use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisNode};
-use lightning_interfaces::application::ApplicationInterface;
-use lightning_interfaces::common::WithStartAndShutdown;
-use lightning_interfaces::consensus::ConsensusInterface;
-use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::signer::SignerInterface;
+use lightning_interfaces::fdi::Provider;
+use lightning_interfaces::infu_collection::{Collection, Node};
 use lightning_interfaces::types::{NodePorts, UpdateMethod};
 use lightning_interfaces::{
     partial,
-    ForwarderInterface,
+    ApplicationInterface,
     KeystoreInterface,
-    NotifierInterface,
+    SignerInterface,
     SyncQueryRunnerInterface,
 };
 use lightning_notifier::Notifier;
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus, MockForwarder};
+use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
-use tokio::sync::mpsc;
 
 use crate::Signer;
 
 partial!(TestBinding {
+    ConfigProviderInterface = JsonConfigProvider;
     KeystoreInterface = EphemeralKeystore<Self>;
     SignerInterface = Signer<Self>;
     ApplicationInterface = Application<Self>;
     ConsensusInterface = MockConsensus<Self>;
+    ForwarderInterface = MockForwarder<Self>;
     NotifierInterface = Notifier<Self>;
 });
 
-#[tokio::test]
-async fn test_send_two_txs_in_a_row() {
-    let keystore = EphemeralKeystore::default();
+fn build_node(transactions_to_lose: &[u32]) -> Node<TestBinding> {
+    let keystore = EphemeralKeystore::<TestBinding>::default();
     let (consensus_secret_key, node_secret_key) =
         (keystore.get_bls_sk(), keystore.get_ed25519_sk());
 
@@ -65,67 +63,44 @@ async fn test_send_two_txs_in_a_row() {
         true,
     ));
 
-    let app = Application::<TestBinding>::init(
-        AppConfig {
-            genesis: Some(genesis),
-            mode: Mode::Test,
-            testnet: false,
-            storage: StorageConfig::InMemory,
-            db_path: None,
-            db_options: None,
-        },
-        Default::default(),
+    Node::<TestBinding>::init_with_provider(
+        Provider::default().with(keystore).with(
+            JsonConfigProvider::default()
+                .with::<Application<TestBinding>>(AppConfig {
+                    genesis: Some(genesis),
+                    mode: Mode::Test,
+                    testnet: false,
+                    storage: StorageConfig::InMemory,
+                    db_path: None,
+                    db_options: None,
+                })
+                .with::<MockConsensus<TestBinding>>(ConsensusConfig {
+                    min_ordering_time: 0,
+                    max_ordering_time: 2,
+                    probability_txn_lost: 0.0,
+                    transactions_to_lose: transactions_to_lose.iter().copied().collect(),
+                    new_block_interval: Duration::from_secs(5),
+                }),
+        ),
     )
-    .unwrap();
-    app.start().await;
+    .expect("Failed to init node.")
+}
 
-    let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
+fn get_our_nonce<C: Collection>(node: &Node<C>) -> u64 {
+    let query_runner = node.provider.get::<C::ApplicationInterface>().sync_query();
+    let node_public_key = node.provider.get::<C::KeystoreInterface>().get_ed25519_pk();
+    let node_idx = query_runner.pubkey_to_index(&node_public_key).unwrap();
+    query_runner
+        .get_node_info::<u64>(&node_idx, |n| n.nonce)
+        .unwrap()
+}
 
-    let forwarder = MockForwarder::<TestBinding>::init(
-        Default::default(),
-        consensus_public_key,
-        query_runner.clone(),
-    )
-    .unwrap();
-    let mut signer = Signer::<TestBinding>::init(
-        Default::default(),
-        keystore.clone(),
-        query_runner.clone(),
-        forwarder.mempool_socket(),
-    )
-    .unwrap();
+#[tokio::test]
+async fn test_send_two_txs_in_a_row() {
+    let node = build_node(&[]);
+    node.start().await;
 
-    let signer_socket = signer.get_socket();
-
-    let notifier = Notifier::<TestBinding>::init(&app);
-
-    let consensus_config = ConsensusConfig {
-        min_ordering_time: 0,
-        max_ordering_time: 2,
-        probability_txn_lost: 0.0,
-        transactions_to_lose: HashSet::new(),
-        new_block_interval: Duration::from_secs(5),
-    };
-
-    let consensus = MockConsensus::<TestBinding>::init(
-        consensus_config,
-        keystore.clone(),
-        &signer,
-        update_socket,
-        query_runner.clone(),
-        infusion::Blank::default(),
-        None,
-        &notifier,
-    )
-    .unwrap();
-
-    let (new_block_tx, new_block_rx) = mpsc::channel(10);
-
-    signer.provide_new_block_notify(new_block_rx);
-    notifier.notify_on_new_block(new_block_tx);
-
-    signer.start().await;
-    consensus.start().await;
+    let signer_socket = node.provider.get::<Signer<TestBinding>>().get_socket();
 
     // Send two transactions to the signer.
     let update_method = UpdateMethod::SubmitReputationMeasurements {
@@ -140,106 +115,16 @@ async fn test_send_two_txs_in_a_row() {
     // Each transaction will take at most 2 seconds to get ordered.
     // Therefore, after 5 seconds, the nonce should be 2.
     tokio::time::sleep(Duration::from_secs(5)).await;
-    let node_idx = query_runner.pubkey_to_index(&node_public_key).unwrap();
-    let new_nonce = query_runner
-        .get_node_info::<u64>(&node_idx, |n| n.nonce)
-        .unwrap();
+    let new_nonce = get_our_nonce(&node);
     assert_eq!(new_nonce, 2);
 }
 
 #[tokio::test]
 async fn test_retry_send() {
-    let keystore = EphemeralKeystore::default();
-    let (consensus_secret_key, node_secret_key) =
-        (keystore.get_bls_sk(), keystore.get_ed25519_sk());
+    let node = build_node(&[2]);
+    node.start().await;
 
-    let mut genesis = Genesis::load().unwrap();
-    let node_public_key = node_secret_key.to_pk();
-    let consensus_public_key = consensus_secret_key.to_pk();
-    let owner_secret_key = AccountOwnerSecretKey::generate();
-    let owner_public_key = owner_secret_key.to_pk();
-
-    genesis.node_info.push(GenesisNode::new(
-        owner_public_key.into(),
-        node_public_key,
-        "127.0.0.1".parse().unwrap(),
-        consensus_public_key,
-        "127.0.0.1".parse().unwrap(),
-        node_public_key,
-        NodePorts {
-            primary: 48000,
-            worker: 48101,
-            mempool: 48102,
-            rpc: 48103,
-            pool: 48104,
-            pinger: 48106,
-            handshake: Default::default(),
-        },
-        None,
-        true,
-    ));
-
-    let app = Application::<TestBinding>::init(
-        AppConfig {
-            genesis: Some(genesis),
-            mode: Mode::Test,
-            testnet: false,
-            storage: StorageConfig::InMemory,
-            db_path: None,
-            db_options: None,
-        },
-        Default::default(),
-    )
-    .unwrap();
-    app.start().await;
-
-    let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
-
-    let forwarder = MockForwarder::<TestBinding>::init(
-        Default::default(),
-        consensus_public_key,
-        query_runner.clone(),
-    )
-    .unwrap();
-    let mut signer = Signer::<TestBinding>::init(
-        Default::default(),
-        keystore.clone(),
-        query_runner.clone(),
-        forwarder.mempool_socket(),
-    )
-    .unwrap();
-
-    let signer_socket = signer.get_socket();
-
-    let notifier = Notifier::<TestBinding>::init(&app);
-
-    let consensus_config = ConsensusConfig {
-        min_ordering_time: 0,
-        max_ordering_time: 2,
-        probability_txn_lost: 0.0,
-        transactions_to_lose: HashSet::from([2]), // drop the 2nd transaction arriving
-        new_block_interval: Duration::from_secs(5),
-    };
-
-    let consensus = MockConsensus::<TestBinding>::init(
-        consensus_config,
-        keystore.clone(),
-        &signer,
-        update_socket,
-        query_runner.clone(),
-        infusion::Blank::default(),
-        None,
-        &notifier,
-    )
-    .unwrap();
-
-    let (new_block_tx, new_block_rx) = mpsc::channel(10);
-
-    signer.provide_new_block_notify(new_block_rx);
-    notifier.notify_on_new_block(new_block_tx);
-
-    signer.start().await;
-    consensus.start().await;
+    let signer_socket = node.provider.get::<Signer<TestBinding>>().get_socket();
 
     // Send two transactions to the signer. The OptIn transaction was chosen arbitrarily.
     let update_method = UpdateMethod::OptIn {};
@@ -256,9 +141,6 @@ async fn test_retry_send() {
     // transaction, and then it will resend all following transactions.
     // Hence, the application nonce should be 3 after some time.
     tokio::time::sleep(Duration::from_secs(15)).await;
-    let node_idx = query_runner.pubkey_to_index(&node_public_key).unwrap();
-    let new_nonce = query_runner
-        .get_node_info::<u64>(&node_idx, |n| n.nonce)
-        .unwrap();
+    let new_nonce = get_our_nonce(&node);
     assert_eq!(new_nonce, 3);
 }

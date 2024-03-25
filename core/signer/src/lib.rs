@@ -99,17 +99,25 @@ impl<C: Collection> Signer<C> {
         }
     }
 
-    pub fn start(
-        &self,
+    pub async fn start(
+        this: Ref<Self>,
         notifier: Ref<C::NotifierInterface>,
         Cloned(query_runner): Cloned<c![C::ApplicationInterface::SyncExecutor]>,
     ) {
         let (tx, rx) = mpsc::channel(16);
         notifier.notify_on_new_block(tx);
-        let worker = self.worker.clone();
+        let worker = this.worker.clone();
+
+        // Initialize the worker's state.
+        let mut guard = worker.state.lock().await;
+        let mut node_index = LazyNodeIndex::new(guard.node_public_key);
+        let chain_id = query_runner.get_chain_id();
+        let nonce = node_index.query_nonce(&query_runner);
+        guard.init_state(chain_id, nonce);
+        drop(guard);
 
         tokio::spawn(async move {
-            new_block_task(worker, rx, query_runner).await;
+            new_block_task(node_index, worker, rx, query_runner).await;
         });
     }
 }
@@ -278,7 +286,7 @@ impl AsyncWorker for SignerWorker {
 
 impl<C: Collection> BuildGraph for Signer<C> {
     fn build_graph() -> DependencyGraph {
-        DependencyGraph::new().with_infallible(Self::init.on("start", Self::start))
+        DependencyGraph::new().with_infallible(Self::init.on("start", Self::start.block_on()))
     }
 }
 
@@ -290,33 +298,16 @@ struct PendingTransaction {
 }
 
 async fn new_block_task<Q: SyncQueryRunnerInterface>(
+    mut node_index: LazyNodeIndex,
     worker: SignerWorker,
     mut notifier: mpsc::Receiver<Notification>,
     query_runner: Q,
 ) {
-    // Initialize the worker's state.
-    let (mut node_index, mut prev_application_nonce) = {
-        let mut guard = worker.state.lock().await;
-
-        let mut node_index = LazyNodeIndex::new(guard.node_public_key);
-        let base_nonce = node_index.query_nonce(&query_runner);
-
-        let chain_id = query_runner.get_chain_id();
-        guard.init_state(chain_id, base_nonce);
-        (node_index, base_nonce)
-    };
-
     while let Some(_notification) = notifier.recv().await {
-        let tmp = node_index.query_nonce(&query_runner);
-        if tmp == prev_application_nonce {
-            continue;
-        }
-        prev_application_nonce = tmp;
-
-        // Sync the state only if the nonce has changed.
+        let nonce = node_index.query_nonce(&query_runner);
+        // TODO(qti3e): Get the lock only if we have to. Timeout should get sep from block.
+        // Right now we are relying on the existence of new blocks to handle timeout.
         let mut guard = worker.state.lock().await;
-        guard
-            .sync_with_application(prev_application_nonce, &query_runner)
-            .await;
+        guard.sync_with_application(nonce, &query_runner).await;
     }
 }
