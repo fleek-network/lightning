@@ -123,12 +123,12 @@ impl<T: BorrowMut<MapData>> Connection<T> {
                         },
                     }
 
-                    read_buf.resize(8, 0);
-                    bytes_read = 0;
-                    frame_len = 0;
-
                     break 'read;
                 }
+
+                read_buf.resize(8, 0);
+                bytes_read = 0;
+                frame_len = 0;
             }
         }
     }
