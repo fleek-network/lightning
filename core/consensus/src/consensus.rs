@@ -9,17 +9,21 @@ use lightning_interfaces::application::ExecutionEngineSocket;
 use lightning_interfaces::common::WithStartAndShutdown;
 use lightning_interfaces::config::ConfigConsumer;
 use lightning_interfaces::consensus::ConsensusInterface;
+use lightning_interfaces::fdi::{BuildGraph, DependencyGraph};
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::signer::{SignerInterface, SubmitTxSocket};
-use lightning_interfaces::types::{Epoch, EpochInfo, Event, UpdateMethod};
+use lightning_interfaces::types::{Epoch, EpochInfo, Event, Topic, UpdateMethod};
 use lightning_interfaces::{
     ApplicationInterface,
+    ArchiveInterface,
     BroadcastInterface,
+    ConfigProviderInterface,
     Emitter,
     IndexSocket,
     KeystoreInterface,
     NotifierInterface,
     PubSub,
+    RpcInterface,
     SyncQueryRunnerInterface,
 };
 use lightning_schema::AutoImplSerde;
@@ -318,7 +322,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
     }
 }
 
-impl<C: Collection> WithStartAndShutdown for Consensus<C> {
+impl<C: Collection> Consensus<C> {
     /// Returns true if this system is running or not.
     fn is_running(&self) -> bool {
         self.is_running.load(Ordering::Relaxed)
@@ -326,7 +330,7 @@ impl<C: Collection> WithStartAndShutdown for Consensus<C> {
 
     /// Start the system, should not do anything if the system is already
     /// started.
-    async fn start(&self) {
+    async fn start(&mut self) {
         let reconfigure_notify = self.reconfigure_notify.clone();
         let shutdown_notify = self.shutdown_notify.clone();
 
@@ -367,7 +371,7 @@ impl<C: Collection> WithStartAndShutdown for Consensus<C> {
     }
 
     /// Send the shutdown signal to the system.
-    async fn shutdown(&self) {
+    async fn shutdown(&mut self) {
         self.shutdown_notify.notify_one();
         self.shutdown_notify_epoch_state.notify_one();
         self.is_running.store(false, Ordering::Relaxed);
@@ -376,21 +380,65 @@ impl<C: Collection> WithStartAndShutdown for Consensus<C> {
 
 impl<C: Collection> ConfigConsumer for Consensus<C> {
     const KEY: &'static str = "consensus";
-
     type Config = Config;
+}
+
+impl<C: Collection> BuildGraph for Consensus<C> {
+    fn build_graph() -> DependencyGraph {
+        DependencyGraph::new()
+        // .with(
+        //     C::ConsensusInterface::infu_initialize_hack
+        //         .on("start", |c: &C::ConsensusInterface| block_on(c.start()))
+        //         .on("shutdown", |c: &C::ConsensusInterface| {
+        //             block_on(c.shutdown())
+        //         }),
+        // )
+    }
 }
 
 impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
     type Certificate = PubSubMsg;
+}
+
+impl<C: Collection> Consensus<C> {
+    fn _xinit(
+        config: &C::ConfigProviderInterface,
+        keystore: &C::KeystoreInterface,
+        signer: &C::SignerInterface,
+        app: &C::ApplicationInterface,
+        broadcast: &C::BroadcastInterface,
+        archive: &C::ArchiveInterface,
+        notifier: &C::NotifierInterface,
+    ) -> anyhow::Result<Self> {
+        let executor = app.transaction_executor();
+
+        let sqr = app.sync_query();
+        let pubsub = broadcast.get_pubsub(Topic::Consensus);
+        Self::xxx_init(
+            config.get::<Self>(),
+            keystore.clone(),
+            signer,
+            executor,
+            sqr,
+            pubsub,
+            archive.index_socket(),
+            notifier,
+        )
+    }
+
+    fn _xpost(&mut self, rpc: &C::RpcInterface) {
+        self.set_event_tx(rpc.event_tx());
+    }
 
     /// Create a new consensus service with the provided config and executor.
-    fn init(
-        config: Self::Config,
+    #[allow(clippy::too_many_arguments)]
+    fn xxx_init(
+        config: Config,
         keystore: C::KeystoreInterface,
         signer: &C::SignerInterface,
         executor: ExecutionEngineSocket,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
-        pubsub: c!(C::BroadcastInterface::PubSub<Self::Certificate>),
+        pubsub: c!(C::BroadcastInterface::PubSub<PubSubMsg>),
         indexer_socket: Option<IndexSocket>,
         notifier: &c!(C::NotifierInterface),
     ) -> anyhow::Result<Self> {
