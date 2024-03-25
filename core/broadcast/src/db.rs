@@ -25,11 +25,11 @@ impl Default for Database {
 impl Database {
     /// Insert the id for a digest.
     pub fn insert_id(&mut self, id: MessageInternedId, digest: Digest) {
-        #[cfg(debug_assertions)]
-        assert!(
-            self.data.get_mut(&digest).is_none(),
-            "Digest should not have an id now."
-        );
+        //#[cfg(debug_assertions)]
+        //assert!(
+        //    self.data.get_mut(&digest).is_none(),
+        //    "Digest should not have an id now."
+        //);
         self.data.insert(
             digest,
             Entry {

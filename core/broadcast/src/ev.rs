@@ -55,7 +55,7 @@ pub struct Context<B: BroadcastBackend> {
     /// Pending store.
     pending_store: PendingStore<B>,
     /// Incoming messages with the same digest
-    processing: im::HashMap<Digest, VecDeque<Message>>,
+    processing: im::HashMap<Digest, VecDeque<MessageWithSender>>,
     current_node_index: OnceCell<NodeIndex>,
     backend: B,
 }
@@ -218,7 +218,6 @@ impl<B: BroadcastBackend> Context<B> {
         }
 
         let topic_index = topic_to_index(msg.topic);
-
         let shared = SharedMessage {
             digest,
             origin: msg.origin,
@@ -239,14 +238,18 @@ impl<B: BroadcastBackend> Context<B> {
             );
         }
 
+        let msg_with_sender = MessageWithSender {
+            message: msg,
+            sender,
+        };
         match self.processing.entry(digest) {
             im::hashmap::Entry::Vacant(e) => {
                 let mut q = VecDeque::new();
-                q.push_back(msg);
+                q.push_back(msg_with_sender);
                 e.insert(q);
             },
             im::hashmap::Entry::Occupied(mut e) => {
-                e.get_mut().push_back(msg);
+                e.get_mut().push_back(msg_with_sender);
                 return;
             },
         }
@@ -257,10 +260,6 @@ impl<B: BroadcastBackend> Context<B> {
 
         // Mark message as received for RTT measurements.
         self.pending_store.received_message(sender, id);
-
-        // TODO(matthias): we should move this to where we propagate the message
-        // Report a satisfactory interaction when we receive a message.
-        self.backend.report_sat(sender, Weight::Weak);
     }
 
     /// Handle a command sent from the mainland. Can be the broadcast object or
@@ -313,7 +312,7 @@ impl<B: BroadcastBackend> Context<B> {
                 if self.processing.remove(&digest).is_none() {
                     debug_assert!(
                         false,
-                        "We should not be trying to clean up a digest we don't know the id of."
+                        "We should not be trying to clean up a digest we don't have."
                     );
                 }
 
@@ -329,7 +328,6 @@ impl<B: BroadcastBackend> Context<B> {
                     return;
                 };
 
-                // Insert the message into the database for future lookups.
                 let Some(mut q) = self.processing.remove(&cmd.digest) else {
                     debug_assert!(
                         false,
@@ -344,13 +342,17 @@ impl<B: BroadcastBackend> Context<B> {
                     );
                     return;
                 };
-                self.db.insert_message(&cmd.digest, msg);
+                // Insert the message into the database for future lookups.
+                self.db.insert_message(&cmd.digest, msg.message);
 
                 // Remove the received message from the pending store.
                 self.pending_store.remove_message(id);
 
                 // Continue with advertising this message to the connected peers.
                 self.advertise(id, cmd.digest, cmd.filter);
+
+                // Report a satisfactory interaction when we receive a message.
+                self.backend.report_sat(msg.sender, Weight::Weak);
 
                 increment_counter!(
                     "broadcast_messages_propagated",
@@ -371,11 +373,11 @@ impl<B: BroadcastBackend> Context<B> {
 
                 // Move on to the next message in the queue if one exists.
                 if let Some(next_msg) = q.front() {
-                    let topic_index = topic_to_index(next_msg.topic);
+                    let topic_index = topic_to_index(next_msg.message.topic);
                     let shared = SharedMessage {
                         digest,
-                        origin: next_msg.origin,
-                        payload: next_msg.payload.clone().into(),
+                        origin: next_msg.message.origin,
+                        payload: next_msg.message.payload.clone().into(),
                     };
                     self.incoming_messages[topic_index].insert(shared);
                 }
@@ -522,4 +524,10 @@ fn topic_to_index(topic: Topic) -> usize {
         Topic::Resolver => 1,
         Topic::Debug => 2,
     }
+}
+
+#[derive(Clone)]
+struct MessageWithSender {
+    message: Message,
+    sender: NodeIndex,
 }
