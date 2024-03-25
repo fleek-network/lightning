@@ -294,8 +294,34 @@ impl<B: BroadcastBackend> Context<B> {
 
                 let _ = cmd.response.send(digest);
 
-                let id = self.interner.insert(digest);
-                self.db.insert_id(id, digest);
+                if self.db.contains_message(&digest) {
+                    // If we already received and accepted the message, we also advertised it.
+                    // We don't need to send again.
+                    return;
+                }
+
+                let id = if let Some(id) = self.db.get_id(&digest) {
+                    // If the id exist already in the db, we have to check if it is still valid.
+                    // An id is valid if the interner still has a digest for it, and this digest
+                    // matches the message digest.
+                    match self.interner.get(id) {
+                        Some(existing_digest) if *existing_digest == digest => {
+                            // no need to update the id
+                            id
+                        },
+                        _ => {
+                            let id = self.interner.insert(digest);
+                            self.db.update_id(id, &digest);
+                            id
+                        },
+                    }
+                } else {
+                    // If the db does not contain the id, we can simply assign a new one and insert
+                    // it into the db.
+                    let id = self.interner.insert(digest);
+                    self.db.insert_id(id, digest);
+                    id
+                };
                 self.db.insert_message(&digest, message);
 
                 // Start advertising the message.

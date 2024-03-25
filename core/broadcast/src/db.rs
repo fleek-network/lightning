@@ -25,11 +25,11 @@ impl Default for Database {
 impl Database {
     /// Insert the id for a digest.
     pub fn insert_id(&mut self, id: MessageInternedId, digest: Digest) {
-        //#[cfg(debug_assertions)]
-        //assert!(
-        //    self.data.get_mut(&digest).is_none(),
-        //    "Digest should not have an id now."
-        //);
+        #[cfg(debug_assertions)]
+        assert!(
+            self.data.get_mut(&digest).is_none(),
+            "Digest should not have an id now."
+        );
         self.data.insert(
             digest,
             Entry {
@@ -37,6 +37,14 @@ impl Database {
                 message: None,
             },
         );
+    }
+
+    /// Update the id for a digest.
+    pub fn update_id(&mut self, id: MessageInternedId, digest: &Digest) {
+        let Some(mut e) = self.data.get_mut(digest) else {
+            panic!("We should not try to update an id if the id does not exist.");
+        };
+        e.id = Some(id);
     }
 
     /// Insert the payload of a message known with the given digest.
