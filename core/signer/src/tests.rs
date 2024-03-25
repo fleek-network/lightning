@@ -303,13 +303,7 @@ async fn test_sign_raw_digest() {
         query_runner.clone(),
     )
     .unwrap();
-    let mut signer = Signer::<TestBinding>::init(
-        Default::default(),
-        keystore.clone(),
-        query_runner.clone(),
-        forwarder.mempool_socket(),
-    )
-    .unwrap();
+    let mut signer = Signer::<TestBinding>::init(&keystore, &forwarder).unwrap();
     let notifier = Notifier::<TestBinding>::init(&app);
 
     let (new_block_tx, new_block_rx) = mpsc::channel(10);

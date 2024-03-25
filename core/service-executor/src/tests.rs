@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 use std::time::Duration;
-use serial_test::serial;
 
 use fleek_crypto::{
     AccountOwnerSecretKey,
@@ -20,6 +19,7 @@ use lightning_notifier::Notifier;
 use lightning_signer::Signer;
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
+use serial_test::serial;
 
 use crate::shim::{ServiceExecutor, ServiceExecutorConfig};
 

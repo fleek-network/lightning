@@ -1,21 +1,19 @@
-mod config;
-
 #[cfg(test)]
 pub mod tests;
 
 use std::collections::VecDeque;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::marker::PhantomData;
+use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
-use affair::{Socket, Task};
-pub use config::SignerConfig;
-use fleek_crypto::{NodePublicKey, NodeSecretKey, NodeSignature, SecretKey, TransactionSender};
-use lightning_interfaces::common::{ToDigest, WithStartAndShutdown};
-use lightning_interfaces::config::ConfigConsumer;
+use affair::{AsyncWorker, Executor, Socket, TokioSpawn};
+use fleek_crypto::{NodePublicKey, NodeSecretKey, SecretKey, TransactionSender};
+use lightning_interfaces::common::ToDigest;
+use lightning_interfaces::fdi::{BuildGraph, DependencyGraph, MethodExt};
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::signer::{SignerInterface, SubmitTxSocket};
 use lightning_interfaces::types::{
+    NodeIndex,
     TransactionResponse,
     UpdateMethod,
     UpdatePayload,
@@ -23,13 +21,17 @@ use lightning_interfaces::types::{
 };
 use lightning_interfaces::{
     ApplicationInterface,
+    Cloned,
+    ForwarderInterface,
     KeystoreInterface,
     MempoolSocket,
     Notification,
+    NotifierInterface,
+    Ref,
     SyncQueryRunnerInterface,
 };
 use lightning_utils::application::QueryRunnerExt;
-use tokio::sync::{mpsc, Notify};
+use tokio::sync::{mpsc, Mutex};
 use tracing::error;
 
 // If a transaction does not get ordered, the signer will try to resend it.
@@ -45,77 +47,84 @@ const TIMEOUT: Duration = Duration::from_secs(3);
 const MAX_RETRIES: u8 = 3;
 
 pub struct Signer<C: Collection> {
-    inner: Arc<SignerInner>,
     socket: Socket<UpdateMethod, u64>,
-    is_running: Arc<AtomicBool>,
-    mempool_socket: MempoolSocket,
-    query_runner: c![C::ApplicationInterface::SyncExecutor],
-    new_block_rx: Arc<Mutex<Option<mpsc::Receiver<Notification>>>>,
-    shutdown_notify: Arc<Notify>,
+    worker: SignerWorker,
+    _c: PhantomData<C>,
 }
 
-impl<C: Collection> WithStartAndShutdown for Signer<C> {
-    /// Returns true if this system is running or not.
-    fn is_running(&self) -> bool {
-        self.is_running.load(Ordering::Relaxed)
-    }
+#[derive(Clone)]
+struct SignerWorker {
+    state: Arc<Mutex<SignerState>>,
+}
 
-    /// Start the system, should not do anything if the system is already
-    /// started.
-    async fn start(&self) {
-        if !self.is_running.load(Ordering::Relaxed) {
-            let inner = self.inner.clone();
-            //let rx = self.rx.lock().unwrap().take().unwrap();
-            let mempool_socket = self.mempool_socket.clone();
-            let query_runner = self.query_runner.clone();
-            let shutdown_notify = self.shutdown_notify.clone();
+struct SignerState {
+    node_secret_key: NodeSecretKey,
+    node_public_key: NodePublicKey,
+    mempool_socket: MempoolSocket,
+    chain_id: Option<u32>,
+    base_nonce: u64,
+    next_nonce: u64,
+    next_secondary_nonce: u128,
+    base_timestamp: Option<SystemTime>,
+    pending_transactions: VecDeque<PendingTransaction>,
+}
 
-            let is_running = self.is_running.clone();
-            tokio::spawn(async move {
-                inner
-                    .handle(shutdown_notify, mempool_socket, query_runner)
-                    .await;
-                is_running.store(false, Ordering::Relaxed);
-            });
-            self.is_running.store(true, Ordering::Relaxed);
+struct LazyNodeIndex {
+    node_public_key: NodePublicKey,
+    node_index: Option<NodeIndex>,
+}
+
+impl<C: Collection> Signer<C> {
+    pub fn init(keystore: &C::KeystoreInterface, forwarder: &C::ForwarderInterface) -> Self {
+        let state = SignerState {
+            node_secret_key: keystore.get_ed25519_sk(),
+            node_public_key: keystore.get_ed25519_pk(),
+            mempool_socket: forwarder.mempool_socket(),
+            chain_id: None,
+            base_nonce: 0,
+            next_nonce: 0,
+            next_secondary_nonce: 0,
+            base_timestamp: None,
+            pending_transactions: VecDeque::new(),
+        };
+
+        let worker = SignerWorker {
+            state: Arc::new(Mutex::new(state)),
+        };
+
+        let socket = TokioSpawn::spawn_async(worker.clone());
+
+        Self {
+            socket,
+            worker,
+            _c: PhantomData,
         }
     }
 
-    /// Send the shutdown signal to the system.
-    async fn shutdown(&self) {
-        self.shutdown_notify.notify_one();
+    pub async fn start(
+        this: Ref<Self>,
+        notifier: Ref<C::NotifierInterface>,
+        Cloned(query_runner): Cloned<c![C::ApplicationInterface::SyncExecutor]>,
+    ) {
+        let (tx, rx) = mpsc::channel(16);
+        notifier.notify_on_new_block(tx);
+        let worker = this.worker.clone();
+
+        // Initialize the worker's state.
+        let mut guard = worker.state.lock().await;
+        let mut node_index = LazyNodeIndex::new(guard.node_public_key);
+        let chain_id = query_runner.get_chain_id();
+        let (nonce, secondary_nonce) = node_index.query_nonce(&query_runner);
+        guard.init_state(chain_id, nonce, secondary_nonce);
+        drop(guard);
+
+        tokio::spawn(async move {
+            new_block_task(node_index, worker, rx, query_runner).await;
+        });
     }
 }
 
 impl<C: Collection> SignerInterface<C> for Signer<C> {
-    /// Initialize the signature service.
-    fn init(
-        _config: Self::Config,
-        keystore: C::KeystoreInterface,
-        query_runner: c![C::ApplicationInterface::SyncExecutor],
-        mempool_socket: MempoolSocket,
-    ) -> anyhow::Result<Self> {
-        let (socket, rx) = Socket::raw_bounded(2048);
-        let new_block_rx = Arc::new(Mutex::new(None));
-        let inner = SignerInner::init::<C>(keystore, rx, new_block_rx.clone())?;
-        Ok(Self {
-            inner: Arc::new(inner),
-            socket,
-            is_running: Arc::new(AtomicBool::new(false)),
-            mempool_socket,
-            query_runner,
-            new_block_rx,
-            shutdown_notify: Arc::new(Notify::new()),
-        })
-    }
-
-    // Provide the signer service with a new block notifications channel's receiver to get notified
-    // when a block of transactions has been processed at the application.
-    fn provide_new_block_notify(&mut self, new_block_rx: mpsc::Receiver<Notification>) {
-        let mut notifier = self.new_block_rx.lock().unwrap();
-        *notifier = Some(new_block_rx)
-    }
-
     /// Returns a socket that can be used to submit transactions to the mempool, these
     /// transactions are signed by the node and a proper nonce is assigned by the
     /// implementation.
@@ -126,215 +135,127 @@ impl<C: Collection> SignerInterface<C> for Signer<C> {
     fn get_socket(&self) -> SubmitTxSocket {
         self.socket.clone()
     }
-
-    /// Sign the provided raw digest and return a signature.
-    ///
-    /// # Safety
-    ///
-    /// This function is unsafe to use without proper reasoning, which is trivial since
-    /// this function is responsible for signing arbitrary messages from other parts of
-    /// the system.
-    fn sign_raw_digest(&self, digest: &[u8; 32]) -> NodeSignature {
-        self.inner.node_secret_key.sign(digest)
-    }
 }
 
-#[allow(clippy::type_complexity)]
-struct SignerInner {
-    node_secret_key: NodeSecretKey,
-    node_public_key: NodePublicKey,
-    rx: Arc<Mutex<Option<mpsc::Receiver<Task<UpdateMethod, u64>>>>>,
-    new_block_rx: Arc<Mutex<Option<mpsc::Receiver<Notification>>>>,
-}
-
-impl SignerInner {
-    fn init<C: Collection>(
-        keystore: C::KeystoreInterface,
-        rx: mpsc::Receiver<Task<UpdateMethod, u64>>,
-        new_block_rx: Arc<Mutex<Option<mpsc::Receiver<Notification>>>>,
-    ) -> anyhow::Result<Self> {
-        let node_secret_key = keystore.get_ed25519_sk();
-        let node_public_key = node_secret_key.to_pk();
-
-        Ok(Self {
-            node_secret_key,
-            node_public_key,
-            rx: Arc::new(Mutex::new(Some(rx))),
-            new_block_rx,
-        })
+impl SignerState {
+    fn init_state(&mut self, chain_id: u32, base_nonce: u64, secondary_nonce: u128) {
+        self.base_nonce = base_nonce;
+        self.next_nonce = base_nonce + 1;
+        self.next_secondary_nonce = secondary_nonce + 1;
+        self.chain_id = Some(chain_id);
     }
 
-    async fn handle<Q: SyncQueryRunnerInterface>(
-        self: Arc<Self>,
-        shutdown_notify: Arc<Notify>,
-        mempool_socket: MempoolSocket,
-        query_runner: Q,
-    ) {
-        let mut pending_transactions = VecDeque::new();
-        let mut base_timestamp = None;
-        let chain_id = query_runner.get_chain_id();
-        let app_nonce = query_runner
-            .pubkey_to_index(&self.node_public_key)
-            .and_then(|node_index| query_runner.get_node_info::<u64>(&node_index, |n| n.nonce))
-            .unwrap_or(0);
+    async fn sign_new_tx(&mut self, method: UpdateMethod) -> u64 {
+        let assigned_nonce = self.next_nonce;
+        let update_payload = UpdatePayload {
+            sender: TransactionSender::NodeMain(self.node_public_key),
+            method,
+            nonce: assigned_nonce,
+            secondary_nonce: self.next_secondary_nonce,
+            chain_id: self.chain_id.unwrap(),
+        };
 
-        let app_second_nonce = query_runner
-            .pubkey_to_index(&self.node_public_key)
-            .and_then(|node_index| {
-                query_runner.get_node_info::<u128>(&node_index, |n| n.secondary_nonce)
-            })
-            .unwrap_or(0);
+        let digest = update_payload.to_digest();
+        let signature = self.node_secret_key.sign(&digest);
+        let update_request = UpdateRequest {
+            signature: signature.into(),
+            payload: update_payload,
+        };
 
-        let mut base_nonce = app_nonce;
-        let mut next_nonce = app_nonce + 1;
-        let mut next_secondary_nonce = app_second_nonce + 1;
-
-        let mut rx = self.rx.lock().unwrap().take().unwrap();
-        let mut new_block_rx = self
-            .new_block_rx
-            .lock()
-            .unwrap()
-            .take()
-            .expect("New block notification channel must be opened");
-
-        let shutdown_future = shutdown_notify.notified();
-        tokio::pin!(shutdown_future);
-
-        loop {
-            tokio::select! {
-                task = rx.recv() => {
-                    let Some(task) = task else {
-                        continue;
-                    };
-                    let update_method = task.request.clone();
-                    task.respond(next_nonce);
-                    let update_payload = UpdatePayload {
-                        sender:  TransactionSender::NodeMain(self.node_public_key),
-                        method: update_method,
-                        nonce: next_nonce,
-                        secondary_nonce: next_secondary_nonce,
-                        chain_id
-                    };
-                    let digest = update_payload.to_digest();
-                    let signature = self.node_secret_key.sign(&digest);
-                    let update_request = UpdateRequest {
-                        signature: signature.into(),
-                        payload: update_payload,
-                    };
-
-                    if let Err(e) = mempool_socket.enqueue(update_request.clone().into())
-                        .await
-                        .map_err(|r| anyhow::anyhow!(format!("{r:?}")))
-                    {
-                        error!("Failed to send transaction to mempool: {e:?}");
-                    }
-
-                    // Optimistically increment nonce
-                    next_nonce += 1;
-                    // Always increment secondary nonce
-                    next_secondary_nonce += 1;
-
-                    let timestamp = SystemTime::now();
-                    pending_transactions.push_back(PendingTransaction {
-                        update_request,
-                        timestamp,
-                        tries: 1,
-                    });
-                    // Set timer
-                    if base_timestamp.is_none() {
-                        base_timestamp = Some(timestamp);
-                    }
-                }
-                notification = new_block_rx.recv() => {
-                    if let Some(Notification::NewBlock) = notification {
-                        SignerInner::sync_with_application(
-                            &self.node_public_key,
-                            &self.node_secret_key,
-                            &query_runner,
-                            &mempool_socket,
-                            &mut base_nonce,
-                            &mut next_nonce,
-                            &mut next_secondary_nonce,
-                            &mut base_timestamp,
-                            &mut pending_transactions
-                        ).await
-                    } else {
-                        panic!("Got unexpected notification from Notifier: {:?}", notification)
-                    }
-                }
-                _ = &mut shutdown_future => break,
-            }
-        }
-        *self.rx.lock().unwrap() = Some(rx);
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    async fn sync_with_application<Q: SyncQueryRunnerInterface>(
-        node_public_key: &NodePublicKey,
-        node_secret_key: &NodeSecretKey,
-        query_runner: &Q,
-        mempool_socket: &MempoolSocket,
-        base_nonce: &mut u64,
-        next_nonce: &mut u64,
-        next_secondary_nonce: &mut u128,
-        base_timestamp: &mut Option<SystemTime>,
-        pending_transactions: &mut VecDeque<PendingTransaction>,
-    ) {
-        // If node_info does not exist for the node, there is no point in sending a transaction
-        // because it will revert. However, this can still be useful for testing.
-        let app_nonce = query_runner
-            .pubkey_to_index(node_public_key)
-            .and_then(|node_index| query_runner.get_node_info::<u64>(&node_index, |n| n.nonce))
-            .unwrap_or(0);
-
-        // All transactions in range [base_nonce, app_nonce] have
-        // been ordered, so we can remove them from `pending_transactions`.
-        *base_nonce = app_nonce;
-        while !pending_transactions.is_empty()
-            && pending_transactions[0].update_request.payload.nonce <= app_nonce
+        if let Err(e) = self
+            .mempool_socket
+            .enqueue(update_request.clone().into())
+            .await
+            .map_err(|r| anyhow::anyhow!(format!("{r:?}")))
         {
-            pending_transactions.pop_front();
+            error!("Failed to send transaction to mempool: {e:?}");
         }
-        if pending_transactions.is_empty() {
-            *base_timestamp = None;
-        } else if let Some(base_timestamp_) = base_timestamp {
-            if base_timestamp_.elapsed().unwrap() >= TIMEOUT {
+
+        // Optimistically increment nonce
+        self.next_nonce += 1;
+
+        // Always increment secondary nonce
+        self.next_secondary_nonce += 1;
+
+        let timestamp = SystemTime::now();
+        self.pending_transactions.push_back(PendingTransaction {
+            update_request,
+            timestamp,
+            tries: 1,
+        });
+
+        // Set timer
+        if self.base_timestamp.is_none() {
+            self.base_timestamp = Some(timestamp);
+        }
+
+        assigned_nonce
+    }
+
+    async fn sync_with_application<Q>(
+        &mut self,
+        application_nonce: u64,
+        secondary_nonce: u128,
+        query_runner: &Q,
+    ) where
+        Q: SyncQueryRunnerInterface,
+    {
+        // All transactions in range [base_nonce, application_nonce] have
+        // been ordered, so we can remove them from `pending_transactions`.
+        self.base_nonce = application_nonce;
+        // If the next secondary nonce is now greater than our next sec nonce, we update it.
+        self.next_secondary_nonce = self.next_secondary_nonce.max(secondary_nonce + 1);
+
+        while !self.pending_transactions.is_empty()
+            && self.pending_transactions[0].update_request.payload.nonce <= application_nonce
+        {
+            self.pending_transactions.pop_front();
+        }
+
+        if self.pending_transactions.is_empty() {
+            self.base_timestamp = None;
+        } else if let Some(base_timestamp) = self.base_timestamp {
+            if base_timestamp.elapsed().unwrap() >= TIMEOUT {
                 // At this point we assume that the transactions in the buffer will never get
                 // ordered.
-                *base_timestamp = None;
+                self.base_timestamp = None;
                 // Reset `next_nonce` to the nonce the application is expecting.
-                *next_nonce = *base_nonce + 1;
+                self.next_nonce = self.base_nonce + 1;
                 // Resend all transactions in the buffer.
 
-                pending_transactions.retain_mut(|tx| {
+                self.pending_transactions.retain_mut(|tx| {
                     if let TransactionResponse::Revert(_) =
                         query_runner.simulate_txn(tx.update_request.clone().into())
                     {
                         // If transaction reverts, don't retry.
                         false
                     } else if tx.tries < MAX_RETRIES {
-                        if tx.update_request.payload.nonce != *next_nonce {
-                            tx.update_request.payload.nonce = *next_nonce;
-                            tx.update_request.payload.secondary_nonce = *next_secondary_nonce;
+                        if tx.update_request.payload.nonce != self.next_nonce {
+                            tx.update_request.payload.nonce = self.next_nonce;
+                            tx.update_request.payload.secondary_nonce = self.next_secondary_nonce;
+
                             let digest = tx.update_request.payload.to_digest();
-                            let signature = node_secret_key.sign(&digest);
+                            let signature = self.node_secret_key.sign(&digest);
                             tx.update_request.signature = signature.into();
                         }
+
                         // Update timestamp to resending time.
                         tx.timestamp = SystemTime::now();
-                        if base_timestamp.is_none() {
-                            *base_timestamp = Some(tx.timestamp);
+                        if self.base_timestamp.is_none() {
+                            self.base_timestamp = Some(tx.timestamp);
                         }
-                        *next_nonce += 1;
-                        *next_secondary_nonce += 1;
+
+                        self.next_nonce += 1;
+                        self.next_secondary_nonce += 1;
                         true
                     } else {
                         false
                     }
                 });
 
-                for pending_tx in pending_transactions.iter_mut() {
-                    if let Err(e) = mempool_socket
+                for pending_tx in self.pending_transactions.iter_mut() {
+                    if let Err(e) = self
+                        .mempool_socket
                         .run(pending_tx.update_request.clone().into())
                         .await
                         .map_err(|r| anyhow::anyhow!(format!("{r:?}")))
@@ -349,6 +270,47 @@ impl SignerInner {
     }
 }
 
+impl LazyNodeIndex {
+    fn new(node_public_key: NodePublicKey) -> Self {
+        Self {
+            node_public_key,
+            node_index: None,
+        }
+    }
+
+    /// Query the application layer for the last nonce and returns it.
+    fn query_nonce<Q>(&mut self, query_runner: &Q) -> (u64, u128)
+    where
+        Q: SyncQueryRunnerInterface,
+    {
+        if self.node_index.is_none() {
+            self.node_index = query_runner.pubkey_to_index(&self.node_public_key);
+        }
+
+        self.node_index
+            .and_then(|node_index| {
+                query_runner.get_node_info(&node_index, |n| (n.nonce, n.secondary_nonce))
+            })
+            .unwrap_or((0, 0))
+    }
+}
+
+impl AsyncWorker for SignerWorker {
+    type Request = UpdateMethod;
+    type Response = u64;
+
+    async fn handle(&mut self, method: UpdateMethod) -> u64 {
+        let mut state = self.state.lock().await;
+        state.sign_new_tx(method).await
+    }
+}
+
+impl<C: Collection> BuildGraph for Signer<C> {
+    fn build_graph() -> DependencyGraph {
+        DependencyGraph::new().with_infallible(Self::init.on("start", Self::start.block_on()))
+    }
+}
+
 #[derive(Clone)]
 struct PendingTransaction {
     pub update_request: UpdateRequest,
@@ -356,8 +318,19 @@ struct PendingTransaction {
     pub tries: u8,
 }
 
-impl<C: Collection> ConfigConsumer for Signer<C> {
-    const KEY: &'static str = "signer";
-
-    type Config = SignerConfig;
+async fn new_block_task<Q: SyncQueryRunnerInterface>(
+    mut node_index: LazyNodeIndex,
+    worker: SignerWorker,
+    mut notifier: mpsc::Receiver<Notification>,
+    query_runner: Q,
+) {
+    while let Some(_notification) = notifier.recv().await {
+        let (nonce, secondary_nonce) = node_index.query_nonce(&query_runner);
+        // TODO(qti3e): Get the lock only if we have to. Timeout should get sep from block.
+        // Right now we are relying on the existence of new blocks to handle timeout.
+        let mut guard = worker.state.lock().await;
+        guard
+            .sync_with_application(nonce, secondary_nonce, &query_runner)
+            .await;
+    }
 }
