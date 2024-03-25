@@ -158,24 +158,26 @@ pub enum ProtocolParams {
     EpochTime = 0,
     /// The size of the committee
     CommitteeSize = 1,
+    /// The amount of nodes allowed to participate in the network
+    NodeCount = 2,
     /// The min FLK a node has to stake to participate in the network
-    MinimumNodeStake = 2,
+    MinimumNodeStake = 3,
     /// The time in epochs a node has to be staked to participate in the network
-    EligibilityTime = 3,
+    EligibilityTime = 4,
     /// The time in epochs a node has to wait to withdraw after unstaking
-    LockTime = 4,
+    LockTime = 5,
     /// The percentage of the reward pool the protocol gets
-    ProtocolShare = 5,
+    ProtocolShare = 6,
     /// The percentage of the reward pool goes to edge nodes
-    NodeShare = 6,
+    NodeShare = 7,
     /// The percentage of the reward pool goes to edge nodes
-    ServiceBuilderShare = 7,
+    ServiceBuilderShare = 8,
     /// The maximum target inflation rate in a year
-    MaxInflation = 8,
+    MaxInflation = 9,
     /// The max multiplier on rewards for locking
-    MaxBoost = 9,
+    MaxBoost = 10,
     /// The max amount of time tokens can be locked
-    MaxStakeLockTime = 10,
+    MaxStakeLockTime = 11,
 }
 
 #[rustfmt::skip]
