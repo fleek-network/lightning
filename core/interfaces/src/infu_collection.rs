@@ -151,12 +151,6 @@ impl<C: Collection> Node<C> {
                     .on("start", |c: &C::RpcInterface| block_on(c.start()))
                     .on("shutdown", |c: &C::RpcInterface| block_on(c.shutdown())),
             )
-            // .with(
-            //     C::SignerInterface::infu_initialize_hack
-            //         .on("_post", C::SignerInterface::infu_post_hack)
-            //         .on("start", |c: &C::SignerInterface| block_on(c.start()))
-            //         .on("shutdown", |c: &C::SignerInterface| block_on(c.shutdown())),
-            // )
             .with(
                 C::PoolInterface::infu_initialize_hack
                     .on("start", |c: &C::PoolInterface| block_on(c.start()))
