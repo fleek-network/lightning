@@ -1,10 +1,8 @@
 use std::borrow::BorrowMut;
-use std::convert::Infallible;
 use std::sync::Arc;
 
 use anyhow::bail;
 use aya::maps::{HashMap, MapData};
-use bytes::Bytes;
 use common::IpPortKey;
 use log::error;
 use tokio::io::Interest;
