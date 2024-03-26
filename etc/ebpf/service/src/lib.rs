@@ -1,3 +1,4 @@
+mod client;
 #[cfg(feature = "service")]
 mod connection;
 mod schema;
