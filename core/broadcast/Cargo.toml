@@ -40,5 +40,6 @@ lightning-topology = { path = "../topology" }
 plotters = "0.3"
 
 [[example]]
-name = "simulation"
+name = "main"
 path = "simulation/main.rs"
+
