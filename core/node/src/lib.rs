@@ -1,5 +1,6 @@
 pub mod config;
 
+use infusion::Blank;
 use lightning_application::app::Application;
 use lightning_archive::archive::Archive;
 use lightning_blockstore::blockstore::Blockstore;
@@ -30,7 +31,6 @@ use lightning_service_executor::shim::ServiceExecutor;
 use lightning_signer::Signer;
 use lightning_syncronizer::syncronizer::Syncronizer;
 use lightning_topology::Topology;
-use mock::consensus::{MockConsensus, MockForwarder};
 
 use crate::config::TomlConfigProvider;
 
@@ -70,10 +70,10 @@ impl CollectionBase for FinalTypes {
 
 pub struct UseMockConsensusMarker;
 impl ForwarderInterfaceContainer for UseMockConsensusMarker {
-    type ForwarderInterface<C: Collection> = MockForwarder<C>;
+    type ForwarderInterface<C: Collection> = Blank<C>;
 }
 impl ConsensusInterfaceContainer for UseMockConsensusMarker {
-    type ConsensusInterface<C: Collection> = MockConsensus<C>;
+    type ConsensusInterface<C: Collection> = Blank<C>;
 }
 
 pub type WithMockConsensus<O = FinalTypes> = ConsensusInterfaceModifier<
