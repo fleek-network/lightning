@@ -13,6 +13,26 @@ pub enum EbpfServiceFrame {
 impl EbpfServiceFrame {
     const PF: u8 = 0;
     const MAC: u8 = 1;
+
+    // Serialize the frame prefixed with the length of the frame.
+    pub fn serialize_len_delimit(self) -> Bytes {
+        match self {
+            EbpfServiceFrame::Mac => {
+                let mut result = BytesMut::with_capacity(8 + 1);
+                result.put_u64(1);
+                result.put_u8(EbpfServiceFrame::MAC);
+                result.freeze()
+            },
+            EbpfServiceFrame::Pf(pf) => {
+                let mut result = BytesMut::with_capacity(8 + 8);
+                result.put_u64(8);
+                result.put_u8(EbpfServiceFrame::PF);
+                pf.serialize(&mut result)
+                    .expect("Buffer capacity is hard-coded");
+                result.freeze()
+            },
+        }
+    }
 }
 
 impl TryFrom<&[u8]> for EbpfServiceFrame {
@@ -41,25 +61,6 @@ impl TryFrom<&[u8]> for EbpfServiceFrame {
         };
 
         Ok(frame)
-    }
-}
-
-impl From<EbpfServiceFrame> for Bytes {
-    fn from(value: EbpfServiceFrame) -> Self {
-        match value {
-            EbpfServiceFrame::Mac => {
-                let mut result = BytesMut::with_capacity(1);
-                result.put_u8(EbpfServiceFrame::MAC);
-                result.freeze()
-            },
-            EbpfServiceFrame::Pf(pf) => {
-                let mut result = BytesMut::with_capacity(8);
-                result.put_u8(EbpfServiceFrame::PF);
-                pf.serialize(&mut result)
-                    .expect("Buffer capacity is hard-coded");
-                result.freeze()
-            },
-        }
     }
 }
 
