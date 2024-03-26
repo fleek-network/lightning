@@ -1,5 +1,6 @@
 use plotters::prelude::*;
 
+#[allow(unused)]
 #[allow(clippy::too_many_arguments)]
 pub fn plot_bar_chart(
     data: Vec<(i32, i32)>, // (mean, std_dev)

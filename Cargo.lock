@@ -322,6 +322,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "080e9890a082662b09c1ad45f567faeeb47f22b5fb23895fbe1e651e718e25ca"
 
 [[package]]
+name = "approx"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cab112f0a86d568ea0e627cc1d6be74a1e9cd55214684db5561995f6dad897c6"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "arc-swap"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5605,6 +5614,7 @@ dependencies = [
  "serde",
  "simulon",
  "smallvec",
+ "statrs",
  "ta",
  "tokio",
  "tokio-util 0.7.10",
@@ -7113,6 +7123,35 @@ name = "naive-timer"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "034a0ad7deebf0c2abcf2435950a6666c3c15ea9d8fad0c0f48efa8a7f843fed"
+
+[[package]]
+name = "nalgebra"
+version = "0.29.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d506eb7e08d6329505faa8a3a00a5dcc6de9f76e0c77e4b75763ae3c770831ff"
+dependencies = [
+ "approx",
+ "matrixmultiply",
+ "nalgebra-macros",
+ "num-complex",
+ "num-rational",
+ "num-traits",
+ "rand 0.8.5",
+ "rand_distr",
+ "simba",
+ "typenum",
+]
+
+[[package]]
+name = "nalgebra-macros"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "01fcc0b8149b4632adc89ac3b7b31a12fb6099a0317a4eb2ebff574ef7de7218"
+dependencies = [
+ "proc-macro2 1.0.74",
+ "quote 1.0.35",
+ "syn 1.0.109",
+]
 
 [[package]]
 name = "nanorand"
@@ -9856,6 +9895,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f98d2aa92eebf49b69786be48e4477826b256916e84a57ff2a4f21923b48eb4c"
 
 [[package]]
+name = "safe_arch"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f398075ce1e6a179b46f51bd88d0598b92b00d3551f1a2d4ac49e771b56ac354"
+dependencies = [
+ "bytemuck",
+]
+
+[[package]]
 name = "safetensors"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10523,6 +10571,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "simba"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f0b7840f121a46d63066ee7a99fc81dcabbc6105e437cae43528cea199b5a05f"
+dependencies = [
+ "approx",
+ "num-complex",
+ "num-traits",
+ "paste",
+ "wide",
+]
+
+[[package]]
 name = "simd-adler32"
 version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10825,6 +10886,19 @@ name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
+
+[[package]]
+name = "statrs"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d08e5e1748192713cc281da8b16924fb46be7b0c2431854eadc785823e5696e"
+dependencies = [
+ "approx",
+ "lazy_static",
+ "nalgebra",
+ "num-traits",
+ "rand 0.8.5",
+]
 
 [[package]]
 name = "stdext"
@@ -12536,6 +12610,16 @@ dependencies = [
  "once_cell",
  "rustix",
  "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "wide"
+version = "0.7.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "89beec544f246e679fc25490e3f8e08003bc4bf612068f325120dad4cea02c1c"
+dependencies = [
+ "bytemuck",
+ "safe_arch",
 ]
 
 [[package]]

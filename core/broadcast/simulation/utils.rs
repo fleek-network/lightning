@@ -2,7 +2,15 @@ use std::collections::BTreeMap;
 
 use fxhash::FxHashMap;
 
-fn get_mean(data: &[f64]) -> Option<f64> {
+#[derive(Debug, Clone)]
+pub struct Summary {
+    pub mean: f64,
+    pub variance: f64,
+    pub n: usize,
+}
+
+#[allow(unused)]
+pub fn get_mean(data: &[f64]) -> Option<f64> {
     if data.is_empty() {
         return None;
     }
@@ -10,7 +18,8 @@ fn get_mean(data: &[f64]) -> Option<f64> {
     Some(sum / data.len() as f64)
 }
 
-fn get_std_dev(data: &[f64]) -> Option<f64> {
+#[allow(unused)]
+pub fn get_variance(data: &[f64]) -> Option<f64> {
     match (get_mean(data), data.len()) {
         (Some(data_mean), count) if count > 0 => {
             let variance = data
@@ -23,12 +32,13 @@ fn get_std_dev(data: &[f64]) -> Option<f64> {
                 .sum::<f64>()
                 / count as f64;
 
-            Some(variance.sqrt())
+            Some(variance)
         },
         _ => None,
     }
 }
 
+#[allow(unused)]
 pub fn get_nodes_reached_per_timestep(
     emitted: &FxHashMap<String, FxHashMap<u128, u32>>,
     num_nodes_total: usize,
@@ -61,15 +71,21 @@ pub fn get_nodes_reached_per_timestep(
     steps_to_num_nodes
 }
 
+#[allow(unused)]
 pub fn get_nodes_reached_per_timestep_summary(
     timesteps_to_num_nodes: &BTreeMap<u128, Vec<f64>>,
-) -> Vec<(i32, i32)> {
+) -> Vec<Summary> {
     let mut steps_to_num_nodes_mean_var = Vec::new();
 
     for num_nodes in timesteps_to_num_nodes.values() {
         let mean = get_mean(num_nodes).unwrap();
-        let std_dev = get_std_dev(num_nodes).unwrap();
-        steps_to_num_nodes_mean_var.push(((mean * 1000.) as i32, (std_dev * 1000.) as i32));
+        let variance = get_variance(num_nodes).unwrap();
+        let summary = Summary {
+            mean,
+            variance,
+            n: num_nodes.len(),
+        };
+        steps_to_num_nodes_mean_var.push(summary);
     }
     steps_to_num_nodes_mean_var
 }

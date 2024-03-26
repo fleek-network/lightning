@@ -48,11 +48,20 @@ pub fn main() {
     let steps_to_num_nodes =
         get_nodes_reached_per_timestep(&report.log.emitted, N, true, precision_in_ms);
     let steps_to_num_nodes = get_nodes_reached_per_timestep_summary(&steps_to_num_nodes);
+    let mean_and_std_dev: Vec<(i32, i32)> = steps_to_num_nodes
+        .into_iter()
+        .map(|s| {
+            (
+                ((s.mean * 1000.0) as i32),
+                ((s.variance.sqrt() * 1000.0) as i32),
+            )
+        })
+        .collect();
 
     let output_path = PathBuf::from("simulation/images/percentage_nodes_reached.png");
 
     plot_bar_chart(
-        steps_to_num_nodes,
+        mean_and_std_dev,
         "Percentage of nodes reached by message per time step",
         &format!("Time steps in {precision_in_ms} [ms]"),
         "Average percentage of nodes reached",
@@ -60,4 +69,13 @@ pub fn main() {
         true,
         &output_path,
     );
+    println!("Plot saved to {output_path:?}");
+    let mut bytes_sent = 0;
+    let mut bytes_recv = 0;
+    report.node.iter().for_each(|node| {
+        bytes_sent += node.total.bytes_sent;
+        bytes_recv += node.total.bytes_received;
+    });
+    println!("Bytes sent: {bytes_sent}");
+    println!("Bytes recv: {bytes_recv}");
 }
