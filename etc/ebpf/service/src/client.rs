@@ -8,7 +8,7 @@ use tokio::net::UnixStream;
 
 use crate::schema::{EbpfServiceFrame, Pf};
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct EbpfSvcClient {
     inner: Option<UnixStream>,
 }

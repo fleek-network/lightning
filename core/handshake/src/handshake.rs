@@ -6,6 +6,7 @@ use async_channel::{bounded, Sender};
 use axum::{Extension, Router};
 use axum_server::Handle;
 use dashmap::DashMap;
+use ebpf_service::client::EbpfSvcClient;
 use fleek_crypto::NodePublicKey;
 use fn_sdk::header::{write_header, ConnectionHeader};
 use futures::stream::FuturesUnordered;
@@ -147,7 +148,7 @@ pub struct Context<P: ExecutorProviderInterface> {
     pub(crate) shutdown: ShutdownWaiter,
     connection_counter: Arc<AtomicU64>,
     connections: Arc<DashMap<u64, ConnectionEntry>>,
-    ebpf_socket: Option<Arc<UnixStream>>,
+    ebpf_socket: OnceCell<Arc<EbpfSvcClient>>,
 }
 
 struct ConnectionEntry {
@@ -167,7 +168,7 @@ impl<P: ExecutorProviderInterface> Context<P> {
             shutdown: waiter,
             connection_counter: AtomicU64::new(0).into(),
             connections: DashMap::new().into(),
-            ebpf_socket: None,
+            ebpf_socket: OnceCell::new(),
         }
     }
 
@@ -304,6 +305,13 @@ impl<P: ExecutorProviderInterface> Context<P> {
     }
 
     pub fn set_ebpf_service_socket(&mut self, stream: UnixStream) {
-        self.ebpf_socket.replace(Arc::new(stream));
+        let mut client = EbpfSvcClient::new();
+        // This was meant accommodate the init and start steps of the trait
+        // but since this/self object is clone, we wrap it in an arc but now we can't
+        // call init because we need a mutable. Let's improve this after big refactor.
+        client.init(stream);
+        self.ebpf_socket
+            .set(Arc::new(client))
+            .expect("to only be set once");
     }
 }
