@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::{Duration, Instant};
 
+use bytesbuffer::Buffer;
 use dashmap::DashMap;
 use fleek_crypto::ClientPublicKey;
 use fn_sdk::ipc_types::{self, IpcMessage, IpcRequest};
@@ -218,7 +219,7 @@ async fn handle_stream<C: Collection>(
     let mut read_len = 0;
 
     // outgoing IpcMessages
-    let mut write_buffer = Vec::<u8>::new();
+    let mut write_buffer = Buffer::new();
     let mut write_buffer_pos = 0;
 
     let mut task_set = JoinSet::<IpcMessage>::new();
@@ -345,7 +346,7 @@ async fn handle_stream<C: Collection>(
 
                 let request = IpcRequest::decode(&read_buffer)?;
 
-                // we need to resize to 4 bytes or else the first part of the read loop may bring in
+                // we need to resize to 8 bytes or else the first part of the read loop may bring in
                 // too many bytes
                 read_buffer.resize(8, 0);
                 read_len = 0;

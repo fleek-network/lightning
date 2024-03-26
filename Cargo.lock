@@ -1375,6 +1375,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "bytesbuffer"
+version = "0.1.0"
+
+[[package]]
 name = "bzip2"
 version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3825,6 +3829,7 @@ dependencies = [
  "arrayvec",
  "blake3-tree",
  "bytes",
+ "bytesbuffer",
  "derive_more",
  "fleek-crypto",
  "hp-fixed",
@@ -6313,6 +6318,7 @@ dependencies = [
  "arrayref",
  "bincode",
  "bytes",
+ "bytesbuffer",
  "dashmap",
  "fleek-crypto",
  "fleek-service-ai",

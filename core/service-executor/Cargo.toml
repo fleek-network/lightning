@@ -9,6 +9,7 @@ edition.workspace = true
 lightning-interfaces = { path = "../interfaces" }
 lightning-schema = { path = "../schema" }
 fn-sdk = { path = "../../lib/sdk" }
+bytesbuffer = { path = "../../lib/bytesbuffer" }
 infusion.workspace = true
 fleek-crypto.workspace = true
 tokio.workspace = true

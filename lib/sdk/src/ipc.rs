@@ -11,6 +11,7 @@
 use std::error::Error;
 use std::path::PathBuf;
 
+use bytesbuffer::Buffer;
 use lightning_schema::LightningMessage;
 use tokio::io::{self, Interest};
 use tokio::net::{UnixListener, UnixStream};
@@ -77,7 +78,7 @@ pub(crate) async fn spawn_service_loop_inner(
     // deallocate however we might want to consider using a fixed size
 
     // IpcRequest
-    let mut write_buffer = Vec::<u8>::new();
+    let mut write_buffer = Buffer::new();
     let mut write_buffer_pos = 0_usize;
     // IpcMessage
     let mut read_buffer = vec![0; 8];
