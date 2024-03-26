@@ -21,18 +21,14 @@ use simulon::latency::ping::ClampNormalDistribution;
 use simulon::latency::LatencyProvider;
 use simulon::simulation::SimulationBuilder;
 
-use crate::plotting::{
-    get_nodes_reached_per_timestep,
-    get_nodes_reached_per_timestep_summary,
-    plot_bar_chart,
-};
+use crate::plotting::plot_bar_chart;
+use crate::utils::{get_nodes_reached_per_timestep, get_nodes_reached_per_timestep_summary};
 
 mod plotting;
+mod utils;
 
 type NodeIndex = u32;
 type TopologyConnections = Arc<Connections>;
-
-const N: usize = 1500;
 
 async fn exec(n: usize) {
     let node_index = *RemoteAddr::whoami();
@@ -174,6 +170,7 @@ async fn run_client(n: usize) {
 }
 
 pub fn main() {
+    const N: usize = 1500;
     let mut lat_provider =
         simulon::latency::PingDataLatencyProvider::<ClampNormalDistribution>::default();
     lat_provider.init(N);
