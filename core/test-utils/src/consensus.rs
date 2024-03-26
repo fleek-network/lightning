@@ -1,36 +1,30 @@
 use std::collections::HashSet;
 use std::marker::PhantomData;
-use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
 use affair::{AsyncWorker, Executor, TokioSpawn};
-use fdi::{BuildGraph, DependencyGraph};
+use fdi::{BuildGraph, Cloned, DependencyGraph, MethodExt};
 use lightning_interfaces::application::ExecutionEngineSocket;
-// TODO(qti3e): Should we deprecate this?
 use lightning_interfaces::config::ConfigConsumer;
 use lightning_interfaces::consensus::ConsensusInterface;
 use lightning_interfaces::infu_collection::{c, Collection};
-use lightning_interfaces::types::{Block, Event, TransactionRequest};
+use lightning_interfaces::types::{Block, TransactionRequest};
 use lightning_interfaces::{
     ApplicationInterface,
-    BroadcastInterface,
+    ConfigProviderInterface,
     Emitter,
     ForwarderInterface,
-    IndexSocket,
     MempoolSocket,
     NotifierInterface,
-    SyncQueryRunnerInterface,
-    WithStartAndShutdown,
+    ShutdownWaiter,
 };
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use tokio::sync::{broadcast, mpsc};
 use tokio::time::{interval, sleep};
-
-static CHANNEL: OnceLock<broadcast::Sender<TransactionRequest>> = OnceLock::new();
 
 /// A mock forwarder that sends transactions. MUST ALWAYS be used alongside [`MockConsensus`].
 pub struct MockForwarder<C>(MempoolSocket, PhantomData<C>);
+
 impl<C: Collection> ForwarderInterface<C> for MockForwarder<C> {
     fn mempool_socket(&self) -> MempoolSocket {
         self.0.clone()
@@ -39,181 +33,118 @@ impl<C: Collection> ForwarderInterface<C> for MockForwarder<C> {
 
 impl<C: Collection> BuildGraph for MockForwarder<C> {
     fn build_graph() -> DependencyGraph {
-        DependencyGraph::new().with_infallible(|| {
-            let tx = CHANNEL.get_or_init(|| broadcast::channel(128).0);
-            let socket = TokioSpawn::spawn_async(MempoolSocketWorker { sender: tx.clone() });
-            MockForwarder::<C>(socket, PhantomData)
+        DependencyGraph::new().with_infallible(|consensus: &MockConsensus<C>| {
+            MockForwarder::<C>(consensus.socket.clone(), PhantomData)
         })
-    }
-}
-
-impl<C> ConfigConsumer for MockForwarder<C> {
-    const KEY: &'static str = "consensus";
-    /// Just take the same config as mock consensus
-    type Config = Config;
-}
-
-struct MempoolSocketWorker {
-    sender: broadcast::Sender<TransactionRequest>,
-}
-
-impl AsyncWorker for MempoolSocketWorker {
-    type Request = TransactionRequest;
-    type Response = ();
-
-    async fn handle(&mut self, req: Self::Request) -> Self::Response {
-        let sender = self.sender.clone();
-        sender
-            .send(req)
-            .expect("MockConsensus: Could not send to the consensus socket.");
     }
 }
 
 /// Mock consensus. MUST ALWAYS be used with [`MockForwarder`]
 #[allow(clippy::type_complexity)]
 pub struct MockConsensus<C: Collection> {
-    inner: Arc<
-        MockConsensusInner<
-            c![C::ApplicationInterface::SyncExecutor],
-            c![C::NotifierInterface::Emitter],
-        >,
-    >,
-    is_running: Arc<Mutex<bool>>,
-    shutdown_tx: Arc<Mutex<Option<mpsc::Sender<()>>>>,
-    rx: Arc<Mutex<Option<broadcast::Receiver<TransactionRequest>>>>,
+    socket: MempoolSocket,
+    notifier: c![C::NotifierInterface::Emitter],
+    config: Config,
 }
 
-struct MockConsensusInner<Q: SyncQueryRunnerInterface + 'static, NE: Emitter> {
-    _query_runner: Q,
+struct MockConsensusWorker<NE: Emitter> {
     executor: ExecutionEngineSocket,
     config: Config,
     notifier: NE,
+    tx_count: u32,
 }
 
 impl<C: Collection> ConsensusInterface<C> for MockConsensus<C> {
     type Certificate = ();
-
-    /// Create a new consensus service with the provided config and executor.
-    fn init(
-        config: Self::Config,
-        _keystore: C::KeystoreInterface,
-        _signer: &C::SignerInterface,
-        executor: ExecutionEngineSocket,
-        query_runner: c!(C::ApplicationInterface::SyncExecutor),
-        _pubsub: c!(C::BroadcastInterface::PubSub<Self::Certificate>),
-        _indexer_socket: Option<IndexSocket>,
-        notifier: &c!(C::NotifierInterface),
-    ) -> anyhow::Result<Self> {
-        let rx = CHANNEL
-            .get_or_init(|| broadcast::channel(128).0)
-            .subscribe();
-
-        let inner = MockConsensusInner {
-            _query_runner: query_runner,
-            executor,
-            config,
-            notifier: notifier.get_emitter(),
-        };
-        Ok(Self {
-            inner: Arc::new(inner),
-
-            is_running: Arc::new(Mutex::new(false)),
-            shutdown_tx: Arc::new(Mutex::new(None)),
-            rx: Arc::new(Mutex::new(Some(rx))),
-        })
-    }
-
-    fn set_event_tx(&mut self, _tx: mpsc::Sender<Vec<Event>>) {}
-}
-
-impl<C: Collection> WithStartAndShutdown for MockConsensus<C> {
-    /// Returns true if this system is running or not.
-    fn is_running(&self) -> bool {
-        *self.is_running.lock().unwrap()
-    }
-
-    /// Start the system, should not do anything if the system is already
-    /// started.
-    async fn start(&self) {
-        if !*self.is_running.lock().unwrap() {
-            let (shutdown_tx, shutdown_rx) = mpsc::channel(1);
-            let inner = self.inner.clone();
-            let rx = self.rx.lock().unwrap().take().unwrap();
-            tokio::spawn(async move { inner.handle(rx, shutdown_rx).await });
-            *self.shutdown_tx.lock().unwrap() = Some(shutdown_tx);
-            *self.is_running.lock().unwrap() = true;
-        }
-    }
-
-    /// Send the shutdown signal to the system.
-    async fn shutdown(&self) {
-        let shutdown_tx = self.get_shutdown_tx();
-        if let Some(shutdown_tx) = shutdown_tx {
-            shutdown_tx.send(()).await.unwrap();
-        }
-        *self.is_running.lock().unwrap() = false;
-    }
-}
-
-impl<C: Collection> MockConsensus<C> {
-    fn get_shutdown_tx(&self) -> Option<mpsc::Sender<()>> {
-        self.shutdown_tx.lock().unwrap().take()
-    }
 }
 
 impl<C: Collection> ConfigConsumer for MockConsensus<C> {
     const KEY: &'static str = "consensus";
-
     type Config = Config;
 }
 
-impl<Q: SyncQueryRunnerInterface, NE: Emitter> MockConsensusInner<Q, NE> {
-    async fn handle(
-        self: Arc<Self>,
-        mut rx: broadcast::Receiver<TransactionRequest>,
-        mut shutdown_rx: mpsc::Receiver<()>,
-    ) {
-        let mut tx_count = 0;
-        let mut interval = interval(self.config.new_block_interval);
-        loop {
-            tokio::select! {
-                // fine to unwrap since the channel is static and will always be alive
-                Ok(task) = rx.recv() => {
-                    // Randomly wait before ordering the transaction to make it more realistic.
-                    let range = self.config.min_ordering_time..self.config.max_ordering_time;
-                    let ordering_duration = rand::thread_rng().gen_range(range);
-                    sleep(Duration::from_secs(ordering_duration)).await;
-                    // Randomly drop a transaction so we can handle this case.
-                    if rand::thread_rng().gen_bool(self.config.probability_txn_lost) {
-                        continue;
-                    }
-                    let update_request = task;
-                    tx_count += 1;
+impl<C: Collection> BuildGraph for MockConsensus<C> {
+    fn build_graph() -> DependencyGraph {
+        DependencyGraph::new()
+            .with_infallible(Self::new.on("start", fdi::consume(Self::start).spawn()))
+    }
+}
 
-                    if self.config.transactions_to_lose.contains(&tx_count) {
-                        continue;
-                    }
+impl<C: Collection> MockConsensus<C> {
+    /// Create a new consensus service with the provided config and executor.
+    pub fn new(
+        config: &C::ConfigProviderInterface,
+        app: &C::ApplicationInterface,
+        notifier: &c!(C::NotifierInterface),
+    ) -> Self {
+        let config = config.get::<Self>();
+        let executor = app.transaction_executor();
+        let notifier = notifier.get_emitter();
 
-                    let block = Block {
-                        transactions: vec![update_request],
-                        digest: [0;32]
-                    };
+        let worker = MockConsensusWorker {
+            executor,
+            config: config.clone(),
+            notifier: notifier.clone(),
+            tx_count: 0,
+        };
 
-                    let _res = self.executor
-                        .run(block)
-                        .await
-                        .map_err(|r| anyhow::anyhow!(format!("{r:?}")))
-                        .unwrap();
+        let socket = TokioSpawn::spawn_async(worker);
 
-                    self.notifier.new_block();
-                }
-                _ = interval.tick() => {
-                    // Lets pretend that a new block arrived.
-                    self.notifier.new_block();
-                }
-                _ = shutdown_rx.recv() => break,
-            }
+        Self {
+            socket,
+            config,
+            notifier,
         }
+    }
+
+    async fn start(self, Cloned(waiter): Cloned<ShutdownWaiter>) {
+        let mut interval = interval(self.config.new_block_interval);
+        waiter
+            .run_until_shutdown(async move {
+                loop {
+                    interval.tick().await;
+                    self.notifier.new_block();
+                }
+            })
+            .await;
+    }
+}
+
+impl<NE: Emitter> AsyncWorker for MockConsensusWorker<NE> {
+    type Request = TransactionRequest;
+    type Response = ();
+
+    async fn handle(&mut self, task: Self::Request) {
+        // Randomly wait before ordering the transaction to make it more realistic.
+        let range = self.config.min_ordering_time..self.config.max_ordering_time;
+        let ordering_duration = rand::thread_rng().gen_range(range);
+        sleep(Duration::from_secs(ordering_duration)).await;
+
+        // Randomly drop a transaction so we can handle this case.
+        if rand::thread_rng().gen_bool(self.config.probability_txn_lost) {
+            return;
+        }
+
+        let update_request = task;
+        self.tx_count += 1;
+
+        if self.config.transactions_to_lose.contains(&self.tx_count) {
+            return;
+        }
+
+        let block = Block {
+            transactions: vec![update_request],
+            digest: [0; 32],
+        };
+
+        let _res = self
+            .executor
+            .run(block)
+            .await
+            .map_err(|r| anyhow::anyhow!(format!("{r:?}")))
+            .unwrap();
+
+        self.notifier.new_block();
     }
 }
 
