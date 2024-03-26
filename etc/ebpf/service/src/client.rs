@@ -1,7 +1,9 @@
+use std::io;
 use std::net::SocketAddrV4;
 
 use bytes::Bytes;
-use tokio::io::{Interest, Ready};
+use log::error;
+use tokio::io::Interest;
 use tokio::net::UnixStream;
 
 use crate::schema::{EbpfServiceFrame, Pf};
@@ -23,7 +25,9 @@ impl EbpfSvcClient {
     pub async fn add_to_block_list(&self, addr: SocketAddrV4) {
         if let Some(stream) = &self.inner {
             let frame = EbpfServiceFrame::Pf(Pf { op: Pf::ADD, addr });
-            let _ = Self::send(stream, frame.serialize_len_delimit());
+            if let Err(e) = Self::send(stream, frame.serialize_len_delimit()).await {
+                error!("failed to add to the block-list: {e:?}");
+            }
         }
     }
 
@@ -33,11 +37,13 @@ impl EbpfSvcClient {
                 op: Pf::REMOVE,
                 addr,
             });
-            let _ = Self::send(stream, frame.serialize_len_delimit());
+            if let Err(e) = Self::send(stream, frame.serialize_len_delimit()).await {
+                error!("failed to remove from the block-list: {e:?}");
+            }
         }
     }
 
-    async fn send(stream: &UnixStream, bytes: Bytes) -> anyhow::Result<()> {
+    async fn send(stream: &UnixStream, bytes: Bytes) -> io::Result<()> {
         let mut bytes_to_write = 0;
         loop {
             stream.ready(Interest::WRITABLE).await?;
