@@ -17,4 +17,4 @@ tokio = { version = "1.28", features = ["macros", "rt", "rt-multi-thread", "net"
 [features]
 default = ["client"]
 client = ["bytes", "log", "tokio"]
-service = ["aya/async_tokio", "aya-log", "bytes", "libc", "tokio", "log", "anyhow", "common"]
+server = ["aya/async_tokio", "aya-log", "bytes", "libc", "tokio", "log", "anyhow", "common"]

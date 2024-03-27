@@ -11,8 +11,8 @@ pub struct SharedState {
 }
 
 impl SharedState {
-    pub fn new(block_list: Arc<Mutex<HashMap<MapData, IpPortKey, u32>>>) -> Self {
-        Self { block_list }
+    pub fn new(block_list: HashMap<MapData, IpPortKey, u32>) -> Self {
+        Self { block_list: Arc::new(Mutex::new(block_list)) }
     }
 
     pub async fn blocklist_add(&mut self, addr: SocketAddrV4) -> anyhow::Result<()> {
