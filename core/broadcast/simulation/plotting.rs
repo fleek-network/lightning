@@ -104,7 +104,7 @@ pub fn line_plot(
 ) -> anyhow::Result<()> {
     if let Some(directory) = output_path.parent() {
         if !directory.exists() {
-            std::fs::create_dir_all(directory).expect("Failed to create directory");
+            std::fs::create_dir_all(directory)?;
         }
     }
 
@@ -175,7 +175,7 @@ pub fn line_plot(
             },
         ))?
         .label(format!("{line_index}"))
-        .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], color));
+        .legend(move |(x, y)| PathElement::new(vec![(x, y), (x, y)], color));
 
         ctx.draw_series(line_data.iter().map(|(x, (mean, var))| {
             let s = var.sqrt();
