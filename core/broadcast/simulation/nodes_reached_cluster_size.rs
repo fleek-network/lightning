@@ -18,6 +18,12 @@ mod utils;
 
 const EPS: f64 = 1e-8;
 
+struct ExperimentData {
+    timestep: usize,
+    bytes_sent: u64,
+    bytes_received: u64,
+}
+
 pub fn main() {
     // we repeat the experiment to average out the randomness
     let num_trials = 5;
@@ -28,8 +34,8 @@ pub fn main() {
     // messages to `nodes_reached_threshold`
     let significance_level = 0.05;
 
-    // HashMap::<num_nodes, HashMap<cluster_size, Vec<first_timestep_nodes_reached for each trial>>>
-    let mut data = HashMap::<usize, HashMap<usize, Vec<usize>>>::new();
+    // HashMap::<num_nodes, HashMap<cluster_size, Vec<ExperimentData>>>
+    let mut data = HashMap::<usize, HashMap<usize, Vec<ExperimentData>>>::new();
     for n in num_nodes {
         for cluster_size in cluster_sizes {
             for _trial in 0..num_trials {
@@ -73,11 +79,22 @@ pub fn main() {
                     if p < significance_level {
                         // we reject the null hypothesis: this is the first time step where the
                         // average number of nodes reached is significantly larger than 90%
+
+                        let mut bytes_sent = 0;
+                        let mut bytes_received = 0;
+                        report.node.iter().for_each(|node| {
+                            bytes_sent += node.total.bytes_sent;
+                            bytes_received += node.total.bytes_received;
+                        });
                         data.entry(n)
                             .or_default()
                             .entry(cluster_size)
                             .or_default()
-                            .push(step_in_millis);
+                            .push(ExperimentData {
+                                timestep: step_in_millis,
+                                bytes_sent,
+                                bytes_received,
+                            });
                         break;
                     }
                 }
@@ -86,25 +103,30 @@ pub fn main() {
     }
 
     //// BTreeMap::<num_nodes, BTreeMap<cluster_size, (mean, variance)>>
-    let mut data_avg = BTreeMap::<usize, BTreeMap<usize, (f64, f64)>>::new();
-    let mut min_x = usize::MAX;
-    let mut max_x = usize::MIN;
-    let mut min_y = f64::MAX;
-    let mut max_y = f64::MIN;
+    let mut data_timesteps = BTreeMap::<usize, BTreeMap<usize, (f64, f64)>>::new();
+    let mut data_bytes = BTreeMap::<usize, BTreeMap<usize, (f64, f64)>>::new();
+
     for (n, cluster_size_map) in data.into_iter() {
-        for (cluster_size, timesteps) in cluster_size_map.into_iter() {
-            let timesteps_float: Vec<f64> = timesteps.into_iter().map(|x| x as f64).collect();
+        for (cluster_size, experiment_data) in cluster_size_map.into_iter() {
+            let timesteps_float: Vec<f64> =
+                experiment_data.iter().map(|d| d.timestep as f64).collect();
             let mean = utils::get_mean(&timesteps_float).unwrap();
             let variance = utils::get_variance(&timesteps_float).unwrap();
-            data_avg
+            data_timesteps
                 .entry(n)
                 .or_default()
                 .insert(cluster_size, (mean, variance));
 
-            min_x = min_x.min(cluster_size);
-            max_x = max_x.max(cluster_size);
-            min_y = min_y.min(mean - variance);
-            max_y = max_y.max(mean + variance);
+            let bytes_float: Vec<f64> = experiment_data
+                .iter()
+                .map(|d| (d.bytes_sent + d.bytes_received) as f64)
+                .collect();
+            let mean = utils::get_mean(&bytes_float).unwrap();
+            let variance = utils::get_variance(&bytes_float).unwrap();
+            data_bytes
+                .entry(n)
+                .or_default()
+                .insert(cluster_size, (mean, variance));
         }
     }
 
@@ -128,17 +150,24 @@ pub fn main() {
 
     let output_path = PathBuf::from("simulation/plots/nodes_reached_cluster_size.png");
     line_plot(
-        &data_avg,
-        min_x,
-        max_x,
-        min_y,
-        max_y,
+        &data_timesteps,
         &format!(
             "Average propagation time of a message to reach at least {}% nodes",
             (nodes_reached_threshold * 100.0) as u32
         ),
         "Cluster size",
         "Time in ms",
+        true,
+        &output_path,
+    )
+    .unwrap();
+
+    let output_path = PathBuf::from("simulation/plots/cluster_size_bytes_sent_recv.png");
+    line_plot(
+        &data_timesteps,
+        "Bytes sent and received",
+        "Cluster size",
+        "Bytes send + bytes received",
         true,
         &output_path,
     )

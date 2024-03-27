@@ -76,10 +76,6 @@ pub fn plot_bar_chart(
 #[allow(clippy::too_many_arguments)]
 pub fn line_plot(
     data: &BTreeMap<usize, BTreeMap<usize, (f64, f64)>>,
-    min_x: usize,
-    max_x: usize,
-    min_y: f64,
-    max_y: f64,
     title: &str,
     x_label: &str,
     y_label: &str,
@@ -91,6 +87,22 @@ pub fn line_plot(
             std::fs::create_dir_all(directory).expect("Failed to create directory");
         }
     }
+
+    let mut min_x = usize::MAX;
+    let mut max_x = usize::MIN;
+
+    let mut min_y = f64::MAX;
+    let mut max_y = f64::MIN;
+    data.iter().for_each(|(_, m)| {
+        m.iter().for_each(|(k, (m, s))| {
+            min_x = min_x.min(*k);
+            max_x = max_x.max(*k);
+
+            min_y = min_y.min(m - s);
+            max_y = max_y.max(m + s);
+        });
+    });
+
     let root_area = BitMapBackend::new(output_path, (1000, 800)).into_drawing_area();
     root_area.fill(&WHITE)?;
 
