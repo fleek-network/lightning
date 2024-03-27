@@ -13,6 +13,7 @@ common = { path = "../common", features = ["userspace"] }
 env_logger = "0.11"
 libc = "0.2"
 log = "0.4"
+ebpf-service = { path = "../service", default-features = false, features = ["service"] }
 tokio = { version = "1.28", features = ["macros", "rt", "rt-multi-thread", "net", "signal"] }
 
 [[bin]]
