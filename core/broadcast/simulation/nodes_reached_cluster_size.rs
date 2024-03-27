@@ -35,6 +35,9 @@ pub fn main() {
     // messages to `nodes_reached_threshold`
     let significance_level = 0.05;
 
+    let propagation_speed_weight = 0.5;
+    assert!((0.0..=1.0).contains(&propagation_speed_weight));
+
     let pb =
         ProgressBar::new((num_nodes.len() * cluster_sizes.len() * (num_trials as usize)) as u64);
     println!("Running simulation...");
@@ -121,16 +124,28 @@ pub fn main() {
     let mut data_timesteps = BTreeMap::<usize, BTreeMap<usize, (f64, f64)>>::new();
     let mut data_bytes = BTreeMap::<usize, BTreeMap<usize, (f64, f64)>>::new();
 
-    for (n, cluster_size_map) in data.into_iter() {
-        for (cluster_size, experiment_data) in cluster_size_map.into_iter() {
+    let mut timestep_min = usize::MAX;
+    let mut timestep_max = usize::MIN;
+    let mut bytes_min = u64::MAX;
+    let mut bytes_max = u64::MIN;
+
+    for (n, cluster_size_map) in data.iter() {
+        for (cluster_size, experiment_data) in cluster_size_map.iter() {
+            for d in experiment_data {
+                timestep_min = timestep_min.min(d.timestep);
+                timestep_max = timestep_max.max(d.timestep);
+                bytes_min = bytes_min.min(d.bytes_received + d.bytes_sent);
+                bytes_max = bytes_max.max(d.bytes_received + d.bytes_sent);
+            }
+
             let timesteps_float: Vec<f64> =
                 experiment_data.iter().map(|d| d.timestep as f64).collect();
             let mean = utils::get_mean(&timesteps_float).unwrap();
             let variance = utils::get_variance(&timesteps_float).unwrap();
             data_timesteps
-                .entry(n)
+                .entry(*n)
                 .or_default()
-                .insert(cluster_size, (mean, variance));
+                .insert(*cluster_size, (mean, variance));
 
             let bytes_float: Vec<f64> = experiment_data
                 .iter()
@@ -139,9 +154,9 @@ pub fn main() {
             let mean = utils::get_mean(&bytes_float).unwrap();
             let variance = utils::get_variance(&bytes_float).unwrap();
             data_bytes
-                .entry(n)
+                .entry(*n)
                 .or_default()
-                .insert(cluster_size, (mean, variance));
+                .insert(*cluster_size, (mean, variance));
         }
     }
 
@@ -167,6 +182,51 @@ pub fn main() {
         "Bytes sent and received",
         "Cluster size",
         "Bytes send + bytes received",
+        true,
+        false,
+        &output_path,
+    )
+    .unwrap();
+    println!("Plot saved to {output_path:?}");
+
+    // Combine the two metrics
+
+    // BTreeMap::<num_nodes, BTreeMap<cluster_size, (mean, variance)>>
+    let mut data_timesteps_bytes = BTreeMap::<usize, BTreeMap<usize, (f64, f64)>>::new();
+    for (n, cluster_size_map) in data.iter() {
+        for (cluster_size, experiment_data) in cluster_size_map.iter() {
+            let timesteps_and_bytes: Vec<f64> = experiment_data
+                .iter()
+                .map(|d| {
+                    let timestep = d.timestep as f64;
+                    let bytes_transfered = d.bytes_sent as f64 + d.bytes_received as f64;
+                    let timestep_norm = (timestep - timestep_min as f64)
+                        / (timestep_max as f64 - timestep_min as f64);
+
+                    let bytes_transfered_norm = (bytes_transfered - bytes_min as f64)
+                        / (bytes_max as f64 - bytes_min as f64);
+                    timestep_norm * propagation_speed_weight
+                        + (1.0 - propagation_speed_weight) * bytes_transfered_norm
+                })
+                .collect();
+            let mean = utils::get_mean(&timesteps_and_bytes).unwrap();
+            let variance = utils::get_variance(&timesteps_and_bytes).unwrap();
+            data_timesteps_bytes
+                .entry(*n)
+                .or_default()
+                .insert(*cluster_size, (mean, variance));
+        }
+    }
+
+    let output_path = PathBuf::from("simulation/plots/nodes_reached_and_bytes_cluster_size.png");
+    line_plot(
+        &data_timesteps,
+        &format!(
+            "Average propagation time of a message to reach at least {}% nodes and bytes transfered",
+            (nodes_reached_threshold * 100.0) as u32
+        ),
+        "Cluster size",
+        "Time in ms + bytes transfered",
         true,
         false,
         &output_path,
