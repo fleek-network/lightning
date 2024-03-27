@@ -6,3 +6,5 @@ mod connection;
 mod schema;
 #[cfg(feature = "service")]
 pub mod server;
+#[cfg(feature = "service")]
+mod state;
