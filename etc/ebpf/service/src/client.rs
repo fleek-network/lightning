@@ -22,7 +22,7 @@ impl EbpfSvcClient {
         self.inner = Some(stream);
     }
 
-    pub async fn add_to_block_list(&self, addr: SocketAddrV4) {
+    pub async fn blocklist_add(&self, addr: SocketAddrV4) {
         if let Some(stream) = &self.inner {
             let frame = EbpfServiceFrame::Pf(Pf { op: Pf::ADD, addr });
             if let Err(e) = Self::send(stream, frame.serialize_len_delimit()).await {
@@ -31,7 +31,7 @@ impl EbpfSvcClient {
         }
     }
 
-    pub async fn remove_from_block_list(&self, addr: SocketAddrV4) {
+    pub async fn blocklist_remove(&self, addr: SocketAddrV4) {
         if let Some(stream) = &self.inner {
             let frame = EbpfServiceFrame::Pf(Pf {
                 op: Pf::REMOVE,
