@@ -268,7 +268,22 @@ dependencies = [
  "aya-log",
  "clap",
  "common",
+ "ebpf-service",
  "env_logger",
+ "libc",
+ "log",
+ "tokio",
+]
+
+[[package]]
+name = "ebpf-service"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "aya",
+ "aya-log",
+ "bytes",
+ "common",
  "libc",
  "log",
  "tokio",
