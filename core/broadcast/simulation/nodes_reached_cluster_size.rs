@@ -143,7 +143,7 @@ pub fn main() {
 
     let output_path = PathBuf::from("simulation/plots/nodes_reached_cluster_size.png");
     line_plot(
-        &data_avg,
+        &data_timesteps,
         &format!(
             "Average propagation time of a message to reach at least {}% nodes",
             (nodes_reached_threshold * 100.0) as u32
@@ -157,7 +157,7 @@ pub fn main() {
 
     let output_path = PathBuf::from("simulation/plots/cluster_size_bytes_sent_recv.png");
     line_plot(
-        &data_timesteps,
+        &data_bytes,
         "Bytes sent and received",
         "Cluster size",
         "Bytes send + bytes received",
