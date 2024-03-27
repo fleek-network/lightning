@@ -58,7 +58,7 @@ pub fn main() {
         })
         .collect();
 
-    let output_path = PathBuf::from("simulation/images/percentage_nodes_reached.png");
+    let output_path = PathBuf::from("simulation/plots/percentage_nodes_reached.png");
 
     plot_bar_chart(
         mean_and_std_dev,

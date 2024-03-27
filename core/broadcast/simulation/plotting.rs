@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use plotters::prelude::*;
 
 #[allow(unused)]
@@ -23,6 +25,7 @@ pub fn plot_bar_chart(
 
     let root_area = BitMapBackend::new(output_path, (1000, 800)).into_drawing_area();
     root_area.fill(&WHITE).unwrap();
+    let root_area = root_area.titled(title, ("sans-serif", 35)).unwrap();
 
     fn y_label_fmt(x: &i32) -> String {
         format!("{}", x / 10)
@@ -30,8 +33,7 @@ pub fn plot_bar_chart(
 
     let mut ctx = ChartBuilder::on(&root_area)
         .set_label_area_size(LabelAreaPosition::Left, 80)
-        .set_label_area_size(LabelAreaPosition::Bottom, 60)
-        .caption(title, ("sans-serif", 35))
+        .set_label_area_size(LabelAreaPosition::Bottom, 80)
         .build_cartesian_2d((0..max_x).into_segmented(), 0..max_y)
         .unwrap();
 
@@ -68,4 +70,88 @@ pub fn plot_bar_chart(
         }))
         .unwrap();
     }
+}
+
+#[allow(unused)]
+#[allow(clippy::too_many_arguments)]
+pub fn line_plot(
+    data: &BTreeMap<usize, BTreeMap<usize, (f64, f64)>>,
+    min_x: usize,
+    max_x: usize,
+    min_y: f64,
+    max_y: f64,
+    title: &str,
+    x_label: &str,
+    y_label: &str,
+    error_bars: bool,
+    output_path: &std::path::Path,
+) -> anyhow::Result<()> {
+    if let Some(directory) = output_path.parent() {
+        if !directory.exists() {
+            std::fs::create_dir_all(directory).expect("Failed to create directory");
+        }
+    }
+    let root_area = BitMapBackend::new(output_path, (1000, 800)).into_drawing_area();
+    root_area.fill(&WHITE)?;
+
+    let root_area = root_area.titled(title, ("sans-serif", 35))?;
+
+    let mut ctx = ChartBuilder::on(&root_area)
+        .margin(30)
+        .set_label_area_size(LabelAreaPosition::Left, 100)
+        .set_label_area_size(LabelAreaPosition::Bottom, 80)
+        .build_cartesian_2d(min_x..max_x, min_y..max_y)
+        .unwrap();
+
+    ctx.configure_mesh()
+        .x_desc(x_label)
+        .y_desc(y_label)
+        .x_label_style(("sans-serif", 25))
+        .y_label_style(("sans-serif", 25))
+        .draw()?;
+
+    let color_map = ViridisRGBA {};
+    let min_line_index = *data.keys().min().unwrap() as f64;
+    let max_line_index = *data.keys().max().unwrap() as f64;
+    for (line_index, line_data) in data {
+        let color =
+            color_map.get_color_normalized(*line_index as f64, min_line_index, max_line_index);
+        ctx.draw_series(LineSeries::new(
+            line_data.iter().map(|(x, (mean, _))| (*x, *mean)),
+            ShapeStyle {
+                color,
+                filled: false,
+                stroke_width: 4,
+            },
+        ))?
+        .label(format!("{line_index}"))
+        .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], color));
+
+        ctx.draw_series(line_data.iter().map(|(x, (mean, var))| {
+            let s = var.sqrt();
+            ErrorBar::new_vertical(
+                *x,
+                mean - s,
+                *mean,
+                mean + s,
+                ShapeStyle {
+                    color: BLACK.into(),
+                    filled: true,
+                    stroke_width: 2,
+                },
+                20,
+            )
+        }))?;
+    }
+
+    ctx.configure_series_labels()
+        .label_font(("sans-serif", 20, &WHITE))
+        .background_style(ShapeStyle {
+            color: BLACK.into(),
+            filled: true,
+            stroke_width: 4,
+        })
+        .draw()?;
+
+    Ok(())
 }
