@@ -35,7 +35,6 @@ pub fn main() {
     let significance_level = 0.05;
 
     // HashMap::<num_nodes, HashMap<cluster_size, Vec<ExperimentData>>>
-
     let data: HashMap<usize, HashMap<usize, Vec<ExperimentData>>> = num_nodes
         .into_iter()
         .map(|n| {
@@ -151,6 +150,7 @@ pub fn main() {
         "Cluster size",
         "Time in ms",
         true,
+        false,
         &output_path,
     )
     .unwrap();
@@ -162,6 +162,7 @@ pub fn main() {
         "Cluster size",
         "Bytes send + bytes received",
         true,
+        false,
         &output_path,
     )
     .unwrap();

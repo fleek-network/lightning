@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use plotters::prelude::*;
+use plotters::style::full_palette::{RED_800, TEAL_600};
 
 #[allow(unused)]
 #[allow(clippy::too_many_arguments)]
@@ -11,40 +12,59 @@ pub fn plot_bar_chart(
     y_label: &str,
     color: RGBColor,
     error_bars: bool,
+    darkmode: bool,
     output_path: &std::path::Path,
-) {
+) -> anyhow::Result<()> {
     if let Some(directory) = output_path.parent() {
         if !directory.exists() {
-            std::fs::create_dir_all(directory).expect("Failed to create directory");
+            std::fs::create_dir_all(directory)?;
         }
     }
     let (means, std_devs): (Vec<_>, Vec<_>) = data.into_iter().unzip();
+
+    let (bg_color, primary_color) = if darkmode {
+        (BLACK, WHITE)
+    } else {
+        (WHITE, BLACK)
+    };
 
     let max_x = means.len();
     let max_y = 1000;
 
     let root_area = BitMapBackend::new(output_path, (1000, 800)).into_drawing_area();
-    root_area.fill(&WHITE).unwrap();
-    let root_area = root_area.titled(title, ("sans-serif", 35)).unwrap();
+    root_area.fill(&bg_color).unwrap();
+    let title_style = TextStyle::from(("sans-serif", 35).into_font()).color(&primary_color);
+    let root_area = root_area.titled(title, title_style)?;
 
     fn y_label_fmt(x: &i32) -> String {
         format!("{}", x / 10)
     }
 
     let mut ctx = ChartBuilder::on(&root_area)
-        .set_label_area_size(LabelAreaPosition::Left, 80)
+        .margin(30)
+        .set_label_area_size(LabelAreaPosition::Left, 100)
         .set_label_area_size(LabelAreaPosition::Bottom, 80)
-        .build_cartesian_2d((0..max_x).into_segmented(), 0..max_y)
-        .unwrap();
+        .build_cartesian_2d((0..max_x).into_segmented(), 0..max_y)?;
 
     ctx.configure_mesh()
         .y_label_formatter(&y_label_fmt)
         .x_desc(x_label)
         .y_desc(y_label)
-        .x_label_style(("sans-serif", 25))
-        .y_label_style(("sans-serif", 25))
-        .draw()
-        .unwrap();
+        .axis_style(ShapeStyle {
+            color: primary_color.into(),
+            filled: false,
+            stroke_width: 1,
+        })
+        .axis_desc_style(("sans-serif", 25, &primary_color))
+        .label_style(("sans-serif", 25, &primary_color))
+        .x_label_style(("sans-serif", 25, &primary_color))
+        .y_label_style(("sans-serif", 25, &primary_color))
+        .bold_line_style(ShapeStyle {
+            color: primary_color.into(),
+            filled: false,
+            stroke_width: 1,
+        })
+        .draw()?;
 
     ctx.draw_series((0..).zip(means.iter()).map(|(x, y)| {
         let x0 = SegmentValue::Exact(x);
@@ -52,8 +72,7 @@ pub fn plot_bar_chart(
         let mut bar = Rectangle::new([(x0, 0), (x1, *y)], color.filled());
         bar.set_margin(0, 0, 5, 5);
         bar
-    }))
-    .unwrap();
+    }))?;
 
     if error_bars {
         let len = means.len() as i32;
@@ -64,12 +83,12 @@ pub fn plot_bar_chart(
                 m - s,
                 m,
                 m + s,
-                BLACK.filled(),
+                RED_800.filled(),
                 10,
             )
-        }))
-        .unwrap();
+        }))?;
     }
+    Ok(())
 }
 
 #[allow(unused)]
@@ -80,6 +99,7 @@ pub fn line_plot(
     x_label: &str,
     y_label: &str,
     error_bars: bool,
+    darkmode: bool,
     output_path: &std::path::Path,
 ) -> anyhow::Result<()> {
     if let Some(directory) = output_path.parent() {
@@ -103,23 +123,41 @@ pub fn line_plot(
         });
     });
 
-    let root_area = BitMapBackend::new(output_path, (1000, 800)).into_drawing_area();
-    root_area.fill(&WHITE)?;
+    let (bg_color, primary_color) = if darkmode {
+        (BLACK, WHITE)
+    } else {
+        (WHITE, BLACK)
+    };
 
-    let root_area = root_area.titled(title, ("sans-serif", 35))?;
+    let root_area = BitMapBackend::new(output_path, (1000, 800)).into_drawing_area();
+    root_area.fill(&bg_color)?;
+
+    let title_style = TextStyle::from(("sans-serif", 35).into_font()).color(&primary_color);
+    let root_area = root_area.titled(title, title_style)?;
 
     let mut ctx = ChartBuilder::on(&root_area)
         .margin(30)
         .set_label_area_size(LabelAreaPosition::Left, 100)
         .set_label_area_size(LabelAreaPosition::Bottom, 80)
-        .build_cartesian_2d(min_x..max_x, min_y..max_y)
-        .unwrap();
+        .build_cartesian_2d(min_x..max_x, min_y..max_y)?;
 
     ctx.configure_mesh()
         .x_desc(x_label)
         .y_desc(y_label)
-        .x_label_style(("sans-serif", 25))
-        .y_label_style(("sans-serif", 25))
+        .axis_style(ShapeStyle {
+            color: primary_color.into(),
+            filled: false,
+            stroke_width: 1,
+        })
+        .axis_desc_style(("sans-serif", 25, &primary_color))
+        .label_style(("sans-serif", 25, &primary_color))
+        .x_label_style(("sans-serif", 25, &primary_color))
+        .y_label_style(("sans-serif", 25, &primary_color))
+        .bold_line_style(ShapeStyle {
+            color: primary_color.into(),
+            filled: false,
+            stroke_width: 1,
+        })
         .draw()?;
 
     let color_map = ViridisRGBA {};
@@ -147,7 +185,7 @@ pub fn line_plot(
                 *mean,
                 mean + s,
                 ShapeStyle {
-                    color: BLACK.into(),
+                    color: TEAL_600.into(),
                     filled: true,
                     stroke_width: 2,
                 },
@@ -157,9 +195,9 @@ pub fn line_plot(
     }
 
     ctx.configure_series_labels()
-        .label_font(("sans-serif", 20, &WHITE))
+        .label_font(("sans-serif", 20, &bg_color))
         .background_style(ShapeStyle {
-            color: BLACK.into(),
+            color: primary_color.into(),
             filled: true,
             stroke_width: 4,
         })

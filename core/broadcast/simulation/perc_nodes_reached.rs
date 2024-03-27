@@ -67,8 +67,10 @@ pub fn main() {
         "Average percentage of nodes reached",
         TEAL_600,
         true,
+        false,
         &output_path,
-    );
+    )
+    .unwrap();
     println!("Plot saved to {output_path:?}");
     let mut bytes_sent = 0;
     let mut bytes_recv = 0;
