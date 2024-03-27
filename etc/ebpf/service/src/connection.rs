@@ -1,46 +1,32 @@
-use std::borrow::BorrowMut;
-use std::sync::Arc;
-
 use anyhow::bail;
-use aya::maps::{HashMap, MapData};
-use common::IpPortKey;
 use log::error;
 use tokio::io::Interest;
 use tokio::net::UnixStream;
-use tokio::sync::Mutex;
 
 use crate::schema::{EbpfServiceFrame, Pf};
+use crate::state::SharedState;
 
-pub struct Connection<T> {
+pub struct Connection {
     socket: UnixStream,
-    block_list: Arc<Mutex<HashMap<T, IpPortKey, u32>>>,
+    shared_state: SharedState,
 }
 
-impl<T: BorrowMut<MapData>> Connection<T> {
-    pub fn new(socket: UnixStream, block_list: Arc<Mutex<HashMap<T, IpPortKey, u32>>>) -> Self {
-        Self { socket, block_list }
+impl Connection {
+    pub fn new(socket: UnixStream, shared_state: SharedState) -> Self {
+        Self {
+            socket,
+            shared_state,
+        }
     }
 
     #[inline]
     async fn pf_handle(&mut self, message: Pf) -> anyhow::Result<()> {
         match message.op {
             Pf::ADD => {
-                let mut map = self.block_list.lock().await;
-                map.insert(
-                    IpPortKey {
-                        ip: (*message.addr.ip()).into(),
-                        port: message.addr.port() as u32,
-                    },
-                    0,
-                    0,
-                )?;
+                self.shared_state.blocklist_add(message.addr).await?;
             },
             Pf::REMOVE => {
-                let mut map = self.block_list.lock().await;
-                map.remove(&IpPortKey {
-                    ip: (*message.addr.ip()).into(),
-                    port: message.addr.port() as u32,
-                })?;
+                self.shared_state.blocklist_remove(message.addr).await?;
             },
             op => {
                 bail!("invalid op: {op:?}");

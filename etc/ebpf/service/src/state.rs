@@ -1,4 +1,3 @@
-use core::borrow::BorrowMut;
 use std::net::SocketAddrV4;
 use std::sync::Arc;
 
@@ -7,15 +6,12 @@ use common::IpPortKey;
 use tokio::sync::Mutex;
 
 #[derive(Clone)]
-pub struct SharedState<B> {
-    block_list: Arc<Mutex<HashMap<B, IpPortKey, u32>>>,
+pub struct SharedState {
+    block_list: Arc<Mutex<HashMap<MapData, IpPortKey, u32>>>,
 }
 
-impl<B> SharedState<B>
-where
-    B: BorrowMut<MapData>,
-{
-    pub fn new(block_list: Arc<Mutex<HashMap<B, IpPortKey, u32>>>) -> Self {
+impl SharedState {
+    pub fn new(block_list: Arc<Mutex<HashMap<MapData, IpPortKey, u32>>>) -> Self {
         Self { block_list }
     }
 

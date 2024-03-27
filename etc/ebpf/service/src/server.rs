@@ -1,23 +1,19 @@
-use std::sync::Arc;
-
-use aya::maps::{HashMap, MapData};
-use common::IpPortKey;
 use log::{error, info};
 use tokio::net::UnixListener;
-use tokio::sync::Mutex;
 
 use crate::connection::Connection;
+use crate::state::SharedState;
 
 pub struct Server {
     listener: UnixListener,
-    block_list: Arc<Mutex<HashMap<MapData, IpPortKey, u32>>>,
+    shared_state: SharedState,
 }
 
 impl Server {
-    pub fn new(listener: UnixListener, block_list: HashMap<MapData, IpPortKey, u32>) -> Self {
+    pub fn new(listener: UnixListener, shared_state: SharedState) -> Self {
         Self {
             listener,
-            block_list: Arc::new(Mutex::new(block_list)),
+            shared_state,
         }
     }
 
@@ -25,9 +21,9 @@ impl Server {
         loop {
             match self.listener.accept().await {
                 Ok((stream, _addr)) => {
-                    let block_list = self.block_list.clone();
+                    let shared_state = self.shared_state.clone();
                     tokio::spawn(async move {
-                        if let Err(e) = Connection::new(stream, block_list).handle().await {
+                        if let Err(e) = Connection::new(stream, shared_state).handle().await {
                             info!("connection handler failed: {e:?}");
                         }
                     });
