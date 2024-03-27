@@ -381,14 +381,10 @@ impl<L: LatencyProvider> Simulation<L> {
     }
 
     fn stop_threads(&mut self) {
-        let frame = self.state.frame.load(Ordering::Relaxed);
         self.state.frame.store(usize::MAX, Ordering::Relaxed);
-
         while let Some(handle) = self.workers.pop() {
             handle.join().expect("Worker thread paniced.");
         }
-
-        self.state.frame.store(frame, Ordering::Relaxed);
     }
 }
 
