@@ -1,10 +1,10 @@
 #[cfg(feature = "client")]
 pub mod client;
-#[cfg(feature = "service")]
+#[cfg(feature = "server")]
 mod connection;
-#[cfg(any(feature = "client", feature = "service"))]
-mod schema;
-#[cfg(feature = "service")]
+#[cfg(any(feature = "client", feature = "server"))]
+pub mod schema;
+#[cfg(feature = "server")]
 pub mod server;
-#[cfg(feature = "service")]
-mod state;
+#[cfg(feature = "server")]
+pub mod state;

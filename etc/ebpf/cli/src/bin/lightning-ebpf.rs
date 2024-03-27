@@ -1,5 +1,3 @@
-use std::net::SocketAddrV4;
-
 use anyhow::Context;
 use aya::maps::HashMap;
 use aya::programs::{Xdp, XdpFlags};
@@ -10,6 +8,7 @@ use common::IpPortKey;
 use ebpf_service::server::Server;
 use tokio::net::UnixListener;
 use tokio::signal;
+use ebpf_service::state::SharedState;
 
 #[derive(Debug, Parser)]
 struct Opts {
@@ -50,7 +49,8 @@ async fn main() -> anyhow::Result<()> {
         HashMap::try_from(handle.take_map("BLOCK_LIST").unwrap())?;
 
     let listener = UnixListener::bind(".lightning/ebpf")?;
-    let server = Server::new(listener, blocklist);
+    let shared_state = SharedState::new(blocklist);
+    let server = Server::new(listener, shared_state);
 
     log::info!("Enter Ctrl-C to shutdown");
 
