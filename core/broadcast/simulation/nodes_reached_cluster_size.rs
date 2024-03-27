@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
+use indicatif::ProgressBar;
 use lightning_topology::{build_latency_matrix, suggest_connections_from_latency_matrix};
 use plotting::line_plot;
 use simulon::latency::ping::ClampNormalDistribution;
@@ -34,6 +35,9 @@ pub fn main() {
     // messages to `nodes_reached_threshold`
     let significance_level = 0.05;
 
+    let pb =
+        ProgressBar::new((num_nodes.len() * cluster_sizes.len() * (num_trials as usize)) as u64);
+    println!("Running simulation...");
     // HashMap::<num_nodes, HashMap<cluster_size, Vec<ExperimentData>>>
     let data: HashMap<usize, HashMap<usize, Vec<ExperimentData>>> = num_nodes
         .into_iter()
@@ -72,7 +76,6 @@ pub fn main() {
                             .set_latency_provider(lat_provider)
                             .with_state(Arc::new(connections))
                             .set_node_metrics_rate(Duration::ZERO)
-                            .enable_progress_bar()
                             .run(Duration::from_secs(120));
 
                     let steps_to_num_nodes =
@@ -106,6 +109,8 @@ pub fn main() {
                             break;
                         }
                     }
+
+                    pb.inc(1);
                 }
             }
             (n, data_cluster_size)
@@ -154,6 +159,7 @@ pub fn main() {
         &output_path,
     )
     .unwrap();
+    println!("Plot saved to {output_path:?}");
 
     let output_path = PathBuf::from("simulation/plots/cluster_size_bytes_sent_recv.png");
     line_plot(
@@ -166,4 +172,5 @@ pub fn main() {
         &output_path,
     )
     .unwrap();
+    println!("Plot saved to {output_path:?}");
 }

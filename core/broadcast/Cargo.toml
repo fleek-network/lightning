@@ -39,6 +39,7 @@ lightning-rep-collector = { path = "../rep-collector" }
 lightning-topology = { path = "../topology" }
 plotters = "0.3"
 statrs = "0.16"
+indicatif = "0.17"
 
 [[example]]
 name = "perc_nodes_reached"
