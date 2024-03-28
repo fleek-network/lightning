@@ -6,9 +6,9 @@ use aya_log::BpfLogger;
 use clap::Parser;
 use common::IpPortKey;
 use ebpf_service::server::Server;
+use ebpf_service::state::SharedState;
 use tokio::net::UnixListener;
 use tokio::signal;
-use ebpf_service::state::SharedState;
 
 #[derive(Debug, Parser)]
 struct Opts {

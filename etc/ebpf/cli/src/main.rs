@@ -1,18 +1,16 @@
 mod cli;
 mod commands;
 
-use std::process::exit;
-
+use anyhow::Context;
 use clap::Parser;
 use cli::Cli;
 
-fn main() {
+fn main() -> anyhow::Result<()> {
     let opts = Cli::parse();
 
-    let ret = opts.exec();
-
-    if let Err(e) = ret {
-        println!("{e:?}");
-        exit(1);
-    }
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .context("failed to build runtime")?
+        .block_on(opts.exec())
 }

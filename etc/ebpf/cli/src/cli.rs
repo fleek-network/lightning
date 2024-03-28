@@ -1,6 +1,7 @@
 use clap::Parser;
 
-use crate::commands::{build, run};
+use crate::commands::pf::PfSubCmd;
+use crate::commands::{build, pf, run};
 
 #[derive(Debug, Parser)]
 pub struct Cli {
@@ -9,7 +10,7 @@ pub struct Cli {
 }
 
 impl Cli {
-    pub fn exec(self) -> anyhow::Result<()> {
+    pub async fn exec(self) -> anyhow::Result<()> {
         match self.command {
             Command::Build { target, release } => build::build_bpf_program(target, release),
             Command::Run {
@@ -17,6 +18,8 @@ impl Cli {
                 release,
                 xdp_args,
             } => run::run(target, release, xdp_args),
+            Command::Pf(PfSubCmd::Allow { addr }) => pf::allow(addr).await,
+            Command::Pf(PfSubCmd::Block { addr }) => pf::block(addr).await,
         }
     }
 }
@@ -44,6 +47,8 @@ pub enum Command {
         #[clap(name = "xdp-args", last = true)]
         xdp_args: Vec<String>,
     },
+    #[clap(subcommand)]
+    Pf(PfSubCmd),
 }
 
 #[derive(Debug, Copy, Clone)]
