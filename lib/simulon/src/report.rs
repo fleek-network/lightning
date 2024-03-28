@@ -5,7 +5,7 @@ use fxhash::FxHashMap;
 use replace_with::replace_with_or_abort;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Default, Serialize, Add)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, Add)]
 pub struct Report {
     /// The number of simulated frames.
     pub frames: u64,
@@ -21,7 +21,7 @@ pub struct Report {
     pub node: VecWithAdd<NodeMetrics>,
 }
 
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Log {
     pub emitted: FxHashMap<String, FxHashMap<u128, u32>>,
 }

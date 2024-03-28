@@ -1,11 +1,12 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use indicatif::ProgressBar;
 use lightning_topology::{build_latency_matrix, suggest_connections_from_latency_matrix};
 use plotting::line_plot;
+use serde::{Deserialize, Serialize};
 use simulon::latency::ping::ClampNormalDistribution;
 use simulon::latency::LatencyProvider;
 use simulon::report::Report;
@@ -20,6 +21,7 @@ mod utils;
 
 const EPS: f64 = 1e-8;
 
+#[derive(Serialize, Deserialize)]
 struct ExperimentData {
     timestep: usize,
     bytes_sent: u64,
@@ -37,6 +39,7 @@ pub fn main() {
     // significance level for t-test when comparing the mean across
     // messages to `nodes_reached_threshold`
     let significance_level = 0.05;
+    let raw_data_path = PathBuf::from("simulation/raw_data/");
 
     let propagation_speed_weight = 0.5;
     assert!((0.0..=1.0).contains(&propagation_speed_weight));
@@ -87,7 +90,7 @@ pub fn main() {
                             .set_latency_provider(lat_provider)
                             .with_state(Arc::new(connections))
                             .set_node_metrics_rate(Duration::ZERO)
-                            .run(Duration::from_secs(30));
+                            .run(Duration::from_secs(120));
 
                     let steps_to_num_nodes =
                         get_nodes_reached_per_timestep(&report.log.emitted, n, true, 1);
@@ -147,6 +150,19 @@ pub fn main() {
             (n, data_cluster_size)
         })
         .collect();
+
+    let raw_data = bincode::serialize(&data).expect("Failed to serialize raw data");
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_millis();
+
+    if !raw_data_path.exists() {
+        std::fs::create_dir_all(&raw_data_path).expect("Failed to create directory");
+    }
+    let raw_data_path = raw_data_path.join(format!("{timestamp}.bin"));
+    std::fs::write(&raw_data_path, raw_data).expect("Failed to write raw data to disk");
+    println!("Raw data saved to {raw_data_path:?}");
 
     // BTreeMap::<num_nodes, BTreeMap<cluster_size, (mean, variance)>>
     let mut data_timesteps = BTreeMap::<usize, BTreeMap<usize, (f64, f64)>>::new();
