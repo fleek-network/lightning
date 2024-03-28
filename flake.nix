@@ -22,7 +22,7 @@
   outputs = { self, nixpkgs, crane, fenix, flake-utils, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        pkgs = nixpkgs.legacyPackages.${system};
+        pkgs = (import nixpkgs { inherit system; });
         inherit (pkgs) lib;
         craneLib = crane.lib.${system}.overrideToolchain
           (fenix.packages.${system}.fromToolchainFile {
@@ -82,6 +82,7 @@
               bzip2.dev
               lz4.dev
               onnxruntime
+              mold-wrapped
 
               (pkgs.writeShellScriptBin "git" ''
                 # hack to fix `git rev-parse HEAD` when building in sandbox
@@ -110,6 +111,13 @@
           SNAPPY_LIB_DIR = "${pkgs.snappy.out}/lib";
           ORT_LIB_LOCATION = "${pkgs.onnxruntime}";
 
+          # Enable mold linker
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER =
+            "${pkgs.clang}/bin/clang";
+          CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER = "${pkgs.clang}/bin/clang";
+          RUSTFLAGS =
+            "--cfg tokio_unstable -Clink-arg=-fuse-ld=${pkgs.mold-wrapped}/bin/mold";
+
           # for some reason this stuff isn't propagated to the dev shell
           shellHook = ''
             export LIBCLANG_PATH="${pkgs.libclang.lib}/lib"
@@ -124,6 +132,10 @@
             export BZIP2_LIB_DIR="${pkgs.bzip2.dev}"
             export SNAPPY_LIB_DIR="${pkgs.snappy.out}/lib"
             export ORT_LIB_LOCATION="${pkgs.onnxruntime}"
+
+            export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER="${pkgs.clang}/bin/clang"
+            export CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER="${pkgs.clang}/bin/clang"
+            export RUSTFLAGS="--cfg tokio_unstable -Clink-arg=-fuse-ld=${pkgs.mold-wrapped}/bin/mold"
           '';
         };
 
@@ -134,7 +146,7 @@
             "rustc"
           ]);
 
-        # Build *just* the cargo dependencies, so we can reuse all of that 
+        # Build *just* the cargo dependencies, so we can reuse all of that
         # work (e.g. via cachix or github artifacts) when running in CI
         cargoArtifacts = craneLib.buildDepsOnly (commonArgs);
 
