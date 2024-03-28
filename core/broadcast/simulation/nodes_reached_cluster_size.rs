@@ -8,6 +8,7 @@ use lightning_topology::{build_latency_matrix, suggest_connections_from_latency_
 use plotting::line_plot;
 use simulon::latency::ping::ClampNormalDistribution;
 use simulon::latency::LatencyProvider;
+use simulon::report::Report;
 use simulon::simulation::SimulationBuilder;
 use statrs::distribution::{ContinuousCDF, StudentsT};
 
@@ -23,13 +24,15 @@ struct ExperimentData {
     timestep: usize,
     bytes_sent: u64,
     bytes_received: u64,
+    #[allow(unused)]
+    report: Report,
 }
 
 pub fn main() {
     // we repeat the experiment to average out the randomness
-    let num_trials = 5;
+    let num_trials = 4;
     let num_nodes = [1000, 2000, 5000, 10_000];
-    let cluster_sizes = [4, 8, 12, 16, 20, 24, 28, 32];
+    let cluster_sizes = [4, 8, 12, 16, 24, 32];
     let nodes_reached_threshold = 0.9;
     // significance level for t-test when comparing the mean across
     // messages to `nodes_reached_threshold`
@@ -37,6 +40,11 @@ pub fn main() {
 
     let propagation_speed_weight = 0.5;
     assert!((0.0..=1.0).contains(&propagation_speed_weight));
+
+    // for debugging
+    //let num_trials = 2;
+    //let num_nodes = [1000, 2000];
+    //let cluster_sizes = [8, 12];
 
     let pb =
         ProgressBar::new((num_nodes.len() * cluster_sizes.len() * (num_trials as usize)) as u64);
@@ -79,7 +87,7 @@ pub fn main() {
                             .set_latency_provider(lat_provider)
                             .with_state(Arc::new(connections))
                             .set_node_metrics_rate(Duration::ZERO)
-                            .run(Duration::from_secs(120));
+                            .run(Duration::from_secs(30));
 
                     let steps_to_num_nodes =
                         get_nodes_reached_per_timestep(&report.log.emitted, n, true, 1);
@@ -87,6 +95,25 @@ pub fn main() {
                         get_nodes_reached_per_timestep_summary(&steps_to_num_nodes);
 
                     for (step_in_millis, s) in steps_to_num_nodes.into_iter().enumerate() {
+                        // for debugging
+                        //if s.mean >= nodes_reached_threshold {
+                        //    let mut bytes_sent = 0;
+                        //    let mut bytes_received = 0;
+                        //    report.node.iter().for_each(|node| {
+                        //        bytes_sent += node.total.bytes_sent;
+                        //        bytes_received += node.total.bytes_received;
+                        //    });
+                        //    data_cluster_size.entry(cluster_size).or_default().push(
+                        //        ExperimentData {
+                        //            timestep: step_in_millis,
+                        //            bytes_sent,
+                        //            bytes_received,
+                        //            report,
+                        //        },
+                        //    );
+                        //    break;
+                        //}
+
                         let tdist = StudentsT::new(0.0, 1.0, (n - 1) as f64).unwrap();
                         let t = (nodes_reached_threshold - s.mean)
                             / ((s.variance / s.n as f64).sqrt() + EPS);
@@ -107,6 +134,7 @@ pub fn main() {
                                     timestep: step_in_millis,
                                     bytes_sent,
                                     bytes_received,
+                                    report,
                                 },
                             );
                             break;
@@ -126,16 +154,18 @@ pub fn main() {
 
     let mut timestep_min = usize::MAX;
     let mut timestep_max = usize::MIN;
-    let mut bytes_min = u64::MAX;
-    let mut bytes_max = u64::MIN;
+    let mut mega_bytes_min = f64::MAX;
+    let mut mega_bytes_max = f64::MIN;
 
     for (n, cluster_size_map) in data.iter() {
         for (cluster_size, experiment_data) in cluster_size_map.iter() {
             for d in experiment_data {
+                let mega_bytes_transfered =
+                    (d.bytes_received as f64) / 1e6 + (d.bytes_sent as f64) / 1e6;
                 timestep_min = timestep_min.min(d.timestep);
                 timestep_max = timestep_max.max(d.timestep);
-                bytes_min = bytes_min.min(d.bytes_received + d.bytes_sent);
-                bytes_max = bytes_max.max(d.bytes_received + d.bytes_sent);
+                mega_bytes_min = mega_bytes_min.min(mega_bytes_transfered);
+                mega_bytes_max = mega_bytes_max.max(mega_bytes_transfered);
             }
 
             let timesteps_float: Vec<f64> =
@@ -147,12 +177,12 @@ pub fn main() {
                 .or_default()
                 .insert(*cluster_size, (mean, variance));
 
-            let bytes_float: Vec<f64> = experiment_data
+            let mega_bytes_float: Vec<f64> = experiment_data
                 .iter()
-                .map(|d| (d.bytes_sent + d.bytes_received) as f64)
+                .map(|d| (d.bytes_received as f64) / 1e6 + (d.bytes_sent as f64) / 1e6)
                 .collect();
-            let mean = utils::get_mean(&bytes_float).unwrap();
-            let variance = utils::get_variance(&bytes_float).unwrap();
+            let mean = utils::get_mean(&mega_bytes_float).unwrap();
+            let variance = utils::get_variance(&mega_bytes_float).unwrap();
             data_bytes
                 .entry(*n)
                 .or_default()
@@ -176,12 +206,12 @@ pub fn main() {
     .unwrap();
     println!("Plot saved to {output_path:?}");
 
-    let output_path = PathBuf::from("simulation/plots/cluster_size_bytes_sent_recv.png");
+    let output_path = PathBuf::from("simulation/plots/cluster_size_mb_transfered.png");
     line_plot(
         &data_bytes,
-        "Bytes sent and received",
+        "Megabytes transfered",
         "Cluster size",
-        "Bytes send + bytes received",
+        "Megabytes send + bytes received",
         true,
         false,
         &output_path,
@@ -199,14 +229,15 @@ pub fn main() {
                 .iter()
                 .map(|d| {
                     let timestep = d.timestep as f64;
-                    let bytes_transfered = d.bytes_sent as f64 + d.bytes_received as f64;
+                    let mega_bytes_transfered =
+                        (d.bytes_received as f64) / 1e6 + (d.bytes_sent as f64) / 1e6;
+
                     let timestep_norm = (timestep - timestep_min as f64)
                         / (timestep_max as f64 - timestep_min as f64);
-
-                    let bytes_transfered_norm = (bytes_transfered - bytes_min as f64)
-                        / (bytes_max as f64 - bytes_min as f64);
+                    let mega_bytes_transfered_norm = (mega_bytes_transfered - mega_bytes_min)
+                        / (mega_bytes_max - mega_bytes_min);
                     timestep_norm * propagation_speed_weight
-                        + (1.0 - propagation_speed_weight) * bytes_transfered_norm
+                        + (1.0 - propagation_speed_weight) * mega_bytes_transfered_norm
                 })
                 .collect();
             let mean = utils::get_mean(&timesteps_and_bytes).unwrap();
@@ -218,15 +249,15 @@ pub fn main() {
         }
     }
 
-    let output_path = PathBuf::from("simulation/plots/nodes_reached_and_bytes_cluster_size.png");
+    let output_path = PathBuf::from("simulation/plots/nodes_reached_and_data_cluster_size.png");
     line_plot(
         &data_timesteps,
         &format!(
-            "Average propagation time of a message to reach at least {}% nodes and bytes transfered",
+            "Average propagation time of a message to reach at least {}% nodes and data transfered",
             (nodes_reached_threshold * 100.0) as u32
         ),
         "Cluster size",
-        "Time in ms + bytes transfered",
+        "Time in ms + data transfered",
         true,
         false,
         &output_path,

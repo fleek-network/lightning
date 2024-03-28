@@ -132,13 +132,13 @@ pub fn line_plot(
     let root_area = BitMapBackend::new(output_path, (1000, 800)).into_drawing_area();
     root_area.fill(&bg_color)?;
 
-    let title_style = TextStyle::from(("sans-serif", 35).into_font()).color(&primary_color);
+    let title_style = TextStyle::from(("sans-serif", 25).into_font()).color(&primary_color);
     let root_area = root_area.titled(title, title_style)?;
 
     let mut ctx = ChartBuilder::on(&root_area)
-        .margin(30)
-        .set_label_area_size(LabelAreaPosition::Left, 100)
-        .set_label_area_size(LabelAreaPosition::Bottom, 80)
+        .margin(40)
+        .set_label_area_size(LabelAreaPosition::Left, 120)
+        .set_label_area_size(LabelAreaPosition::Bottom, 100)
         .build_cartesian_2d(min_x..max_x, min_y..max_y)?;
 
     ctx.configure_mesh()
@@ -175,7 +175,16 @@ pub fn line_plot(
             },
         ))?
         .label(format!("{line_index}"))
-        .legend(move |(x, y)| PathElement::new(vec![(x, y), (x, y)], color));
+        .legend(move |(x, y)| {
+            PathElement::new(
+                vec![(x, y), (x + 20, y)],
+                ShapeStyle {
+                    color,
+                    filled: false,
+                    stroke_width: 4,
+                },
+            )
+        });
 
         ctx.draw_series(line_data.iter().map(|(x, (mean, var))| {
             let s = var.sqrt();
@@ -199,7 +208,7 @@ pub fn line_plot(
         .background_style(ShapeStyle {
             color: primary_color.into(),
             filled: true,
-            stroke_width: 4,
+            stroke_width: 2,
         })
         .draw()?;
 
