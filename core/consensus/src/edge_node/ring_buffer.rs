@@ -2,26 +2,32 @@ use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 
 use lightning_interfaces::types::{Digest as BroadcastDigest, NodeIndex};
-use lightning_interfaces::ToDigest;
+use lightning_interfaces::{BroadcastEventInterface, ToDigest};
 
 use super::transaction_store::Parcel;
+use crate::consensus::PubSubMsg;
 use crate::execution::{AuthenticStampedParcel, Digest};
 
-#[derive(Clone)]
-pub struct ParcelWrapper {
+pub struct ParcelWrapper<T: BroadcastEventInterface<PubSubMsg>> {
     pub(crate) parcel: Option<Parcel>,
     pub(crate) attestations: Option<HashSet<NodeIndex>>,
+    pub(crate) parcel_event: Option<T>,
+    pub(crate) attestation_events: Option<HashMap<NodeIndex, T>>,
 }
 
-pub struct RingBuffer {
-    ring: Vec<HashMap<Digest, ParcelWrapper>>,
+pub struct RingBuffer<T: BroadcastEventInterface<PubSubMsg>> {
+    ring: Vec<HashMap<Digest, ParcelWrapper<T>>>,
     pointer: usize,
 }
 
-impl RingBuffer {
+impl<T: BroadcastEventInterface<PubSubMsg>> RingBuffer<T> {
     pub fn new() -> Self {
         RingBuffer {
-            ring: vec![HashMap::with_capacity(100); 3],
+            ring: vec![
+                HashMap::with_capacity(100),
+                HashMap::with_capacity(100),
+                HashMap::with_capacity(100),
+            ],
             pointer: 1,
         }
     }
@@ -57,7 +63,7 @@ impl RingBuffer {
         originator: NodeIndex,
         message_digest: Option<BroadcastDigest>,
     ) {
-        self.store_parcel_internal(self.pointer, parcel, originator, message_digest);
+        self.store_parcel_internal(self.pointer, parcel, originator, message_digest, None);
     }
 
     // Store a parcel from the next epoch. These parcels will be verified once the epoch changes.
@@ -66,19 +72,26 @@ impl RingBuffer {
         parcel: AuthenticStampedParcel,
         originator: NodeIndex,
         message_digest: Option<BroadcastDigest>,
+        event: T,
     ) {
-        self.store_parcel_internal(self.next_pointer(), parcel, originator, message_digest);
+        self.store_parcel_internal(
+            self.next_pointer(),
+            parcel,
+            originator,
+            message_digest,
+            Some(event),
+        );
     }
 
     // Store an attestation from the current epoch.
     pub fn add_attestation(&mut self, digest: Digest, node_index: NodeIndex) {
-        self.add_attestation_internal(self.pointer, digest, node_index);
+        self.add_attestation_internal(self.pointer, digest, node_index, None);
     }
 
     // Stores an attestation from the next epoch. After the epoch change we have to verify if this
     // attestation originated from a committee member.
-    pub fn add_pending_attestation(&mut self, digest: Digest, node_index: NodeIndex) {
-        self.add_attestation_internal(self.next_pointer(), digest, node_index);
+    pub fn add_pending_attestation(&mut self, digest: Digest, node_index: NodeIndex, event: T) {
+        self.add_attestation_internal(self.next_pointer(), digest, node_index, Some(event));
     }
 
     // When the epoch changes, the parcels from the current epochs become
@@ -93,15 +106,26 @@ impl RingBuffer {
             if let Some(parcel) = &mut wrapper.parcel {
                 if !committee.contains(&parcel.originator) {
                     wrapper.parcel = None;
+                    if let Some(event) = wrapper.parcel_event.take() {
+                        event.mark_invalid_sender();
+                    }
                 }
             }
 
             if let Some(attns) = &mut wrapper.attestations {
-                let valid_attn: HashSet<NodeIndex> = attns
+                let (valid_attn, invalid_attn): (HashSet<_>, HashSet<_>) = attns
                     .iter()
                     .copied()
-                    .filter(|node_index| committee.contains(node_index))
-                    .collect();
+                    .partition(|node_index| committee.contains(node_index));
+
+                if let Some(mut events) = wrapper.attestation_events.take() {
+                    invalid_attn.into_iter().for_each(|node_index| {
+                        if let Some(event) = events.remove(&node_index) {
+                            event.mark_invalid_sender();
+                        }
+                    })
+                }
+
                 if valid_attn.is_empty() {
                     wrapper.attestations = None;
                 } else {
@@ -128,6 +152,7 @@ impl RingBuffer {
         parcel: AuthenticStampedParcel,
         originator: NodeIndex,
         message_digest: Option<BroadcastDigest>,
+        event: Option<T>,
     ) {
         let digest = parcel.to_digest();
         // We are explicitly matching the entry here instead of using `and_modify` together with
@@ -141,6 +166,8 @@ impl RingBuffer {
                         message_digest,
                     }),
                     attestations: None,
+                    parcel_event: event,
+                    attestation_events: None,
                 });
             },
             Entry::Occupied(mut entry) => match &mut entry.get_mut().parcel {
@@ -160,7 +187,13 @@ impl RingBuffer {
         }
     }
 
-    fn add_attestation_internal(&mut self, pointer: usize, digest: Digest, node_index: NodeIndex) {
+    fn add_attestation_internal(
+        &mut self,
+        pointer: usize,
+        digest: Digest,
+        node_index: NodeIndex,
+        event: Option<T>,
+    ) {
         self.ring[pointer]
             .entry(digest)
             .and_modify(|wrapper| match &mut wrapper.attestations {
@@ -174,6 +207,8 @@ impl RingBuffer {
             .or_insert(ParcelWrapper {
                 parcel: None,
                 attestations: Some(HashSet::from([node_index])),
+                parcel_event: None,
+                attestation_events: event.map(|t| std::iter::once((node_index, t)).collect()),
             });
     }
 

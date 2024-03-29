@@ -1,8 +1,10 @@
-use lightning_interfaces::ToDigest;
+use lightning_interfaces::types::{Digest as BroadcastDigest, NodeIndex};
+use lightning_interfaces::{BroadcastEventInterface, ToDigest};
 use narwhal_types::{Batch, BatchAPI, Transaction};
 use rand::Rng;
 use sui_protocol_config::{Chain, ProtocolConfig, ProtocolVersion};
 
+use crate::consensus::PubSubMsg;
 use crate::edge_node::ring_buffer::RingBuffer;
 use crate::execution::{AuthenticStampedParcel, Digest};
 
@@ -69,7 +71,7 @@ fn test_to_digest_reorder_batches() {
 
 #[test]
 fn test_ring_buffer_store_get_parcel() {
-    let mut ring_buffer = RingBuffer::new();
+    let mut ring_buffer = RingBuffer::<Event>::new();
     let parcel = generate_random_parcel(2, 1, 2, None);
     let digest = parcel.to_digest();
     ring_buffer.store_parcel(parcel, 99, None);
@@ -82,7 +84,7 @@ fn test_ring_buffer_store_get_parcel() {
 
 #[test]
 fn test_ring_buffer_store_get_att() {
-    let mut ring_buffer = RingBuffer::new();
+    let mut ring_buffer = RingBuffer::<Event>::new();
     let parcel = generate_random_parcel(2, 1, 2, None);
     let digest = parcel.to_digest();
     ring_buffer.add_attestation(digest, 4);
@@ -96,10 +98,15 @@ fn test_ring_buffer_store_get_att() {
 
 #[test]
 fn test_ring_buffer_epoch_change() {
-    let mut ring_buffer = RingBuffer::new();
+    let mut ring_buffer = RingBuffer::<Event>::new();
     let parcel = generate_random_parcel(2, 1, 2, None);
     let digest = parcel.to_digest();
-    ring_buffer.store_pending_parcel(parcel, 2, None);
+    let event = Event {
+        originator: 1,
+        message: None,
+        digest,
+    };
+    ring_buffer.store_pending_parcel(parcel, 2, None, event);
 
     // Since the added parcel is pending, it should not be returned here.
     assert!(ring_buffer.get_parcel(&digest).is_none());
@@ -131,10 +138,15 @@ fn test_ring_buffer_epoch_change() {
 
 #[test]
 fn test_ring_buffer_invalid_parcel() {
-    let mut ring_buffer = RingBuffer::new();
+    let mut ring_buffer = RingBuffer::<Event>::new();
     let parcel = generate_random_parcel(2, 1, 2, None);
     let digest = parcel.to_digest();
-    ring_buffer.store_pending_parcel(parcel, 8, None);
+    let event = Event {
+        originator: 1,
+        message: None,
+        digest,
+    };
+    ring_buffer.store_pending_parcel(parcel, 8, None, event);
 
     // Since the added parcel is pending, it should not be returned here.
     assert!(ring_buffer.get_parcel(&digest).is_none());
@@ -144,4 +156,28 @@ fn test_ring_buffer_invalid_parcel() {
     let new_committee = vec![0, 1, 2, 3];
     ring_buffer.change_epoch(&new_committee);
     assert!(ring_buffer.get_parcel(&digest).is_none());
+}
+
+struct Event {
+    originator: NodeIndex,
+    message: Option<PubSubMsg>,
+    digest: BroadcastDigest,
+}
+
+impl BroadcastEventInterface<PubSubMsg> for Event {
+    fn originator(&self) -> NodeIndex {
+        self.originator
+    }
+
+    fn take(&mut self) -> Option<PubSubMsg> {
+        self.message.take()
+    }
+
+    fn propagate(self) {}
+
+    fn mark_invalid_sender(self) {}
+
+    fn get_digest(&self) -> Digest {
+        self.digest
+    }
 }

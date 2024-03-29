@@ -149,9 +149,37 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                         }
 
                         let msg_digest = msg.get_digest();
-                        // propagate here now that we know its good and before we do async work
-
                         let parcel_digest = parcel.to_digest();
+                        let from_next_epoch = parcel.epoch == epoch + 1;
+                        let last_executed = parcel.last_executed;
+
+                        let mut event = None;
+                        if pending_requests.remove(&parcel_digest).is_none() && !from_next_epoch {
+                            // We only want to propagate parcels that we did not request and that
+                            // are not from the next epoch.
+                            msg.propagate();
+                        } else {
+                            event = Some(msg);
+                        }
+
+                        if from_next_epoch {
+                            // if the parcel is from the next epoch, we optimistically
+                            // store it and check if it's from a validator once we change epochs.
+
+                            // Note: this unwrap is safe. If `from_next_epoch=true`, then `event`
+                            // will always be `Some`. Unfortunately, the borrow checker cannot
+                            // figure this out on its own if we use `msg` directly here.
+                            txn_store.store_pending_parcel(
+                                parcel,
+                                originator,
+                                msg_digest,
+                                event.unwrap()
+                            );
+                        } else {
+                            // only propagate normal parcels, not parcels we requested, and not
+                            // parcels that we optimistically accept from the next epoch
+                            txn_store.store_parcel(parcel, originator, Some(msg_digest));
+                        }
 
                         // Check if we requested this parcel
                         if pending_requests.remove(&parcel_digest).is_some() {
@@ -159,24 +187,12 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                             // we have to set a timeout for the previous parcel, because
                             // swallow the Err return in the loop of `try_execute`.
                             set_parcel_timer(
-                                parcel.last_executed,
+                                last_executed,
                                 txn_store.get_timeout(),
                                 timeout_tx.clone(),
                                 &mut pending_timeouts,
                             ).await;
                             info!("Received requested parcel with digest: {parcel_digest:?}");
-                        } else {
-                            // only propagate normal parcels, not the ones we requested
-                            msg.propagate();
-                        }
-
-                        if parcel.epoch == epoch + 1 {
-                            // if the parcel is from the next epoch, we optimistically
-                            // store it and check if it's from a validator once we change
-                            // epochs
-                            txn_store.store_pending_parcel(parcel, originator, msg_digest);
-                        } else {
-                            txn_store.store_parcel(parcel, originator, Some(msg_digest));
                         }
 
                         if !on_committee {
@@ -228,17 +244,28 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                             continue;
                         }
 
-                        // propagate msg as soon as we know its good
-                        msg.propagate();
+                        let from_next_epoch = att.epoch == epoch + 1;
+                        let mut event = None;
+                        if !from_next_epoch {
+                            msg.propagate();
+                        } else {
+                            event = Some(msg);
+                        }
 
                         if !on_committee {
                             info!("Received parcel attestation from gossip as an edge node");
 
-                            if att.epoch == epoch + 1 {
+                            if from_next_epoch {
                                 // if the attestation is from the next epoch, we optimistically
-                                // store it and check if it's from a validator once we change
-                                // epochs
-                                txn_store.add_pending_attestation(att.digest, att.node_index);
+                                // store it and check if it's from a validator once we change epochs
+                                // Note: this unwrap is safe. If `from_next_epoch=true`, then `event`
+                                // will always be `Some`. Unfortunately, the borrow checker cannot
+                                // figure this out on its own if we use `msg` directly here.
+                                txn_store.add_pending_attestation(
+                                    att.digest,
+                                    att.node_index,
+                                    event.unwrap()
+                                );
                             } else {
                                 txn_store.add_attestation(
                                     att.digest,

@@ -3,10 +3,11 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use lightning_interfaces::types::{Digest as BroadcastDigest, NodeIndex};
-use lightning_interfaces::{Emitter, SyncQueryRunnerInterface};
+use lightning_interfaces::{BroadcastEventInterface, Emitter, SyncQueryRunnerInterface};
 use lightning_utils::application::QueryRunnerExt;
 
 use super::ring_buffer::RingBuffer;
+use crate::consensus::PubSubMsg;
 use crate::execution::{AuthenticStampedParcel, Digest, Execution};
 
 // Exponentially moving average parameter for estimating the time between executions of parcels.
@@ -17,8 +18,8 @@ const TBE_EMA: f64 = 0.125;
 const MIN_TBE: Duration = Duration::from_secs(30);
 const MAX_TBE: Duration = Duration::from_secs(40);
 
-pub struct TransactionStore {
-    parcels: RingBuffer,
+pub struct TransactionStore<T: BroadcastEventInterface<PubSubMsg>> {
+    parcels: RingBuffer<T>,
     executed: HashSet<Digest>,
     pending: HashSet<Digest>,
     last_executed_timestamp: Option<SystemTime>,
@@ -37,7 +38,7 @@ pub struct Parcel {
     pub message_digest: Option<BroadcastDigest>,
 }
 
-impl TransactionStore {
+impl<T: BroadcastEventInterface<PubSubMsg>> TransactionStore<T> {
     pub fn new() -> Self {
         Self {
             parcels: RingBuffer::new(),
@@ -79,9 +80,10 @@ impl TransactionStore {
         parcel: AuthenticStampedParcel,
         originator: NodeIndex,
         message_digest: BroadcastDigest,
+        event: T,
     ) {
         self.parcels
-            .store_pending_parcel(parcel, originator, Some(message_digest));
+            .store_pending_parcel(parcel, originator, Some(message_digest), event);
     }
 
     pub fn add_attestation(&mut self, digest: Digest, node_index: NodeIndex) {
@@ -90,8 +92,9 @@ impl TransactionStore {
 
     // Stores an attestation from the next epoch. After the epoch change we have to verify if this
     // attestation originated from a committee member.
-    pub fn add_pending_attestation(&mut self, digest: Digest, node_index: NodeIndex) {
-        self.parcels.add_pending_attestation(digest, node_index);
+    pub fn add_pending_attestation(&mut self, digest: Digest, node_index: NodeIndex, event: T) {
+        self.parcels
+            .add_pending_attestation(digest, node_index, event);
     }
 
     pub fn change_epoch(&mut self, committee: &[NodeIndex]) {
