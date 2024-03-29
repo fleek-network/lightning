@@ -103,10 +103,13 @@ impl<T: BroadcastEventInterface<PubSubMsg>> RingBuffer<T> {
         // Remove invalid parcels/attestations from the hash map.
         let next_pointer = self.next_pointer();
         self.ring[next_pointer].retain(|_, wrapper| {
+            let parcel_event = wrapper.parcel_event.take();
+            let attn_events = wrapper.attestation_events.take();
+
             if let Some(parcel) = &mut wrapper.parcel {
                 if !committee.contains(&parcel.originator) {
                     wrapper.parcel = None;
-                    if let Some(event) = wrapper.parcel_event.take() {
+                    if let Some(event) = parcel_event {
                         event.mark_invalid_sender();
                     }
                 }
@@ -118,7 +121,7 @@ impl<T: BroadcastEventInterface<PubSubMsg>> RingBuffer<T> {
                     .copied()
                     .partition(|node_index| committee.contains(node_index));
 
-                if let Some(mut events) = wrapper.attestation_events.take() {
+                if let Some(mut events) = attn_events {
                     invalid_attn.into_iter().for_each(|node_index| {
                         if let Some(event) = events.remove(&node_index) {
                             event.mark_invalid_sender();
