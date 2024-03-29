@@ -113,6 +113,7 @@ impl From<&GenesisNode> for NodeInfo {
             stake: value.stake.clone(),
             participation: Participation::True,
             nonce: 0,
+            secondary_nonce: 0,
             ports: value.ports.clone(),
         }
     }

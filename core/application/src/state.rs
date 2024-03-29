@@ -619,6 +619,7 @@ impl<B: Backend> State<B> {
                         ports,
                         participation: Participation::False,
                         nonce: 0,
+                        secondary_nonce: 0,
                     };
                     self.create_node(node);
                 } else {
@@ -1526,7 +1527,9 @@ impl<B: Backend> State<B> {
             TransactionSender::NodeMain(node) => {
                 if let Some(index) = self.pub_key_to_index.get(&node) {
                     if let Some(info) = self.node_info.get(&index) {
-                        if txn.payload.nonce != info.nonce + 1 {
+                        if txn.payload.nonce != info.nonce + 1
+                            || txn.payload.secondary_nonce <= info.secondary_nonce
+                        {
                             return Err(ExecutionError::InvalidNonce);
                         }
                     } else {
@@ -1539,7 +1542,9 @@ impl<B: Backend> State<B> {
             TransactionSender::NodeConsensus(node) => {
                 if let Some(index) = self.consensus_key_to_index.get(&node) {
                     if let Some(info) = self.node_info.get(&index) {
-                        if txn.payload.nonce != info.nonce + 1 {
+                        if txn.payload.nonce != info.nonce + 1
+                            || txn.payload.secondary_nonce <= info.secondary_nonce
+                        {
                             return Err(ExecutionError::InvalidNonce);
                         }
                     }

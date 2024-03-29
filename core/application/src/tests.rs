@@ -742,6 +742,7 @@ fn prepare_update_request_node(
     let payload = UpdatePayload {
         sender: secret_key.to_pk().into(),
         nonce,
+        secondary_nonce: nonce as u128, // we can probably use the nonce as the secondary nonce here
         method,
         chain_id: CHAIN_ID,
     };
@@ -763,6 +764,7 @@ fn prepare_update_request_consensus(
     let payload = UpdatePayload {
         sender: secret_key.to_pk().into(),
         nonce,
+        secondary_nonce: nonce as u128, // we can probably use the nonce as the secondary nonce here
         method,
         chain_id: CHAIN_ID,
     };
@@ -784,6 +786,7 @@ fn prepare_update_request_account(
     let payload = UpdatePayload {
         sender: secret_key.to_pk().into(),
         nonce,
+        secondary_nonce: nonce as u128, // we can probably use the nonce as the secondary nonce here
         method,
         chain_id: CHAIN_ID,
     };
@@ -3872,6 +3875,7 @@ async fn test_invalid_chain_id() {
     let payload = UpdatePayload {
         sender: secret_key.to_pk().into(),
         nonce: 1,
+        secondary_nonce: 1,
         method: UpdateMethod::OptIn {},
         chain_id,
     };
@@ -3882,4 +3886,76 @@ async fn test_invalid_chain_id() {
         payload: payload.clone(),
     };
     expect_tx_revert!(update, &update_socket, ExecutionError::InvalidChainId);
+}
+
+#[tokio::test]
+async fn test_reject_invalid_secondary_nonce() {
+    let committee_size = 4;
+    let (committee, keystore) = create_genesis_committee(committee_size);
+    let (update_socket, query_runner) = test_init_app(committee);
+    let mut rng = random::get_seedable_rng();
+
+    let mut measurements = BTreeMap::new();
+    let _ = update_reputation_measurements(
+        &query_runner,
+        &mut measurements,
+        &keystore[1].node_secret_key.to_pk(),
+        reputation::generate_reputation_measurements(&mut rng, 0.1),
+    );
+
+    // TODO(matthias): update `prepare_update_request_node` helper method to accept the secondary
+    // nonce?
+    //let update = prepare_update_request_node(
+    //    UpdateMethod::SubmitReputationMeasurements { measurements },
+    //    &NodeSecretKey::generate(),
+    //    1,
+    //);
+
+    let payload = UpdatePayload {
+        sender: keystore[0].node_secret_key.to_pk().into(),
+        nonce: 1,
+        secondary_nonce: 0,
+        method: UpdateMethod::SubmitReputationMeasurements { measurements },
+        chain_id: CHAIN_ID,
+    };
+    let digest = payload.to_digest();
+    let signature = keystore[0].node_secret_key.sign(&digest);
+    let req = UpdateRequest {
+        signature: signature.into(),
+        payload,
+    };
+
+    expect_tx_revert!(req, &update_socket, ExecutionError::InvalidNonce);
+}
+
+#[tokio::test]
+async fn test_accept_valid_secondary_nonce() {
+    let committee_size = 4;
+    let (committee, keystore) = create_genesis_committee(committee_size);
+    let (update_socket, query_runner) = test_init_app(committee);
+    let mut rng = random::get_seedable_rng();
+
+    let mut measurements = BTreeMap::new();
+    let _ = update_reputation_measurements(
+        &query_runner,
+        &mut measurements,
+        &keystore[1].node_secret_key.to_pk(),
+        reputation::generate_reputation_measurements(&mut rng, 0.1),
+    );
+
+    let payload = UpdatePayload {
+        sender: keystore[0].node_secret_key.to_pk().into(),
+        nonce: 1,
+        secondary_nonce: 99,
+        method: UpdateMethod::SubmitReputationMeasurements { measurements },
+        chain_id: CHAIN_ID,
+    };
+    let digest = payload.to_digest();
+    let signature = keystore[0].node_secret_key.sign(&digest);
+    let req = UpdateRequest {
+        signature: signature.into(),
+        payload,
+    };
+
+    expect_tx_success!(req, &update_socket);
 }

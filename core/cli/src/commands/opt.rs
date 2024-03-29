@@ -83,6 +83,7 @@ async fn opt_in<C: Collection>(config_path: ResolvedPathBuf) -> Result<()> {
         UpdateMethod::OptIn {},
         secret_key,
         node_info.nonce + 1,
+        node_info.secondary_nonce + 1,
         chain_id,
     );
 
@@ -139,6 +140,7 @@ async fn opt_out<C: Collection>(config_path: ResolvedPathBuf) -> Result<()> {
         UpdateMethod::OptOut {},
         secret_key,
         node_info.nonce + 1,
+        node_info.secondary_nonce + 1,
         chain_id,
     );
 
@@ -244,11 +246,13 @@ fn create_update_request(
     method: UpdateMethod,
     secret_key: NodeSecretKey,
     nonce: u64,
+    secondary_nonce: u128,
     chain_id: ChainId,
 ) -> UpdateRequest {
     let payload = UpdatePayload {
         sender: TransactionSender::NodeMain(secret_key.to_pk()),
         nonce,
+        secondary_nonce,
         method,
         chain_id,
     };

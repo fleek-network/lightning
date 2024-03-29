@@ -173,12 +173,21 @@ impl SignerInner {
         let mut pending_transactions = VecDeque::new();
         let mut base_timestamp = None;
         let chain_id = query_runner.get_chain_id();
-        let application_nonce = query_runner
+        let app_nonce = query_runner
             .pubkey_to_index(&self.node_public_key)
             .and_then(|node_index| query_runner.get_node_info::<u64>(&node_index, |n| n.nonce))
             .unwrap_or(0);
-        let mut base_nonce = application_nonce;
-        let mut next_nonce = application_nonce + 1;
+
+        let app_second_nonce = query_runner
+            .pubkey_to_index(&self.node_public_key)
+            .and_then(|node_index| {
+                query_runner.get_node_info::<u128>(&node_index, |n| n.secondary_nonce)
+            })
+            .unwrap_or(0);
+
+        let mut base_nonce = app_nonce;
+        let mut next_nonce = app_nonce + 1;
+        let mut next_secondary_nonce = app_second_nonce + 1;
 
         let mut rx = self.rx.lock().unwrap().take().unwrap();
         let mut new_block_rx = self
@@ -203,6 +212,7 @@ impl SignerInner {
                         sender:  TransactionSender::NodeMain(self.node_public_key),
                         method: update_method,
                         nonce: next_nonce,
+                        secondary_nonce: next_secondary_nonce,
                         chain_id
                     };
                     let digest = update_payload.to_digest();
@@ -221,6 +231,9 @@ impl SignerInner {
 
                     // Optimistically increment nonce
                     next_nonce += 1;
+                    // Always increment secondary nonce
+                    next_secondary_nonce += 1;
+
                     let timestamp = SystemTime::now();
                     pending_transactions.push_back(PendingTransaction {
                         update_request,
@@ -241,6 +254,7 @@ impl SignerInner {
                             &mempool_socket,
                             &mut base_nonce,
                             &mut next_nonce,
+                            &mut next_secondary_nonce,
                             &mut base_timestamp,
                             &mut pending_transactions
                         ).await
@@ -262,21 +276,22 @@ impl SignerInner {
         mempool_socket: &MempoolSocket,
         base_nonce: &mut u64,
         next_nonce: &mut u64,
+        next_secondary_nonce: &mut u128,
         base_timestamp: &mut Option<SystemTime>,
         pending_transactions: &mut VecDeque<PendingTransaction>,
     ) {
         // If node_info does not exist for the node, there is no point in sending a transaction
         // because it will revert. However, this can still be useful for testing.
-        let application_nonce = query_runner
+        let app_nonce = query_runner
             .pubkey_to_index(node_public_key)
             .and_then(|node_index| query_runner.get_node_info::<u64>(&node_index, |n| n.nonce))
             .unwrap_or(0);
 
-        // All transactions in range [base_nonce, application_nonce] have
+        // All transactions in range [base_nonce, app_nonce] have
         // been ordered, so we can remove them from `pending_transactions`.
-        *base_nonce = application_nonce;
+        *base_nonce = app_nonce;
         while !pending_transactions.is_empty()
-            && pending_transactions[0].update_request.payload.nonce <= application_nonce
+            && pending_transactions[0].update_request.payload.nonce <= app_nonce
         {
             pending_transactions.pop_front();
         }
@@ -300,6 +315,7 @@ impl SignerInner {
                     } else if tx.tries < MAX_RETRIES {
                         if tx.update_request.payload.nonce != *next_nonce {
                             tx.update_request.payload.nonce = *next_nonce;
+                            tx.update_request.payload.secondary_nonce = *next_secondary_nonce;
                             let digest = tx.update_request.payload.to_digest();
                             let signature = node_secret_key.sign(&digest);
                             tx.update_request.signature = signature.into();
@@ -310,6 +326,7 @@ impl SignerInner {
                             *base_timestamp = Some(tx.timestamp);
                         }
                         *next_nonce += 1;
+                        *next_secondary_nonce += 1;
                         true
                     } else {
                         false

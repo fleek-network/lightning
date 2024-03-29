@@ -216,6 +216,9 @@ pub struct NodeInfo {
     /// The nonce of the node. Added to each transaction before signed to prevent replays and
     /// enforce ordering
     pub nonce: u64,
+    /// The secondary nonce. This nonce is used to invalidate transactions that we already sent to
+    /// the mempool in case we have to resent a transaction with an updated nonce.
+    pub secondary_nonce: u128,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, schemars::JsonSchema)]
