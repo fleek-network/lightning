@@ -9,7 +9,6 @@ use plotting::line_plot;
 use serde::{Deserialize, Serialize};
 use simulon::latency::ping::ClampNormalDistribution;
 use simulon::latency::LatencyProvider;
-use simulon::report::Report;
 use simulon::simulation::SimulationBuilder;
 use statrs::distribution::{ContinuousCDF, StudentsT};
 
