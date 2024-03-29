@@ -30,7 +30,3 @@ rpath = false
 lto = true
 panic = "abort"
 codegen-units = 1
-
-[[bin]]
-name = "packet_filter"
-path = "src/bin/packet_filter.rs"

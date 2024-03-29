@@ -1,14 +1,10 @@
-// Monitoring and Mandatory Access Control using LSM.
-#![no_std]
-#![no_main]
-
-use aya_bpf::bindings;
-use aya_bpf::cty::{c_char, c_int};
+use aya_bpf::cty::c_int;
 use aya_bpf::macros::lsm;
 use aya_bpf::programs::LsmContext;
 use aya_log_ebpf::info;
-use ebpf::vmlinux;
-use ebpf::vmlinux::{cred, task_struct};
+
+use crate::vmlinux;
+use crate::vmlinux::{cred, task_struct};
 
 const PATH_LEN: usize = 64;
 
@@ -48,9 +44,9 @@ pub fn file_open(ctx: LsmContext) -> i32 {
 }
 
 unsafe fn try_file_open(ctx: LsmContext) -> Result<i32, i32> {
-    let mut buf = [0u8; PATH_LEN];
+    let buf = [0u8; PATH_LEN];
     let path = {
-        let file: *const vmlinux::file = ctx.arg(0);
+        let _file: *const vmlinux::file = ctx.arg(0);
         let len = {
             // Todo: We need to use the file's inode or dentry
             // to find the parent directories and validate the access.
@@ -70,9 +66,4 @@ unsafe fn try_file_open(ctx: LsmContext) -> Result<i32, i32> {
     }
 
     Ok(0)
-}
-
-#[panic_handler]
-fn panic(_info: &core::panic::PanicInfo) -> ! {
-    unsafe { core::hint::unreachable_unchecked() }
 }

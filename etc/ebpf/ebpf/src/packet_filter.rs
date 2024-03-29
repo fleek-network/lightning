@@ -1,6 +1,3 @@
-#![no_std]
-#![no_main]
-
 use core::mem;
 
 use aya_bpf::bindings::xdp_action;
@@ -94,9 +91,4 @@ fn not_allowed_for_port(ip: u32, port: u16) -> bool {
 
 fn not_allowed(ip: u32) -> bool {
     unsafe { BLOCK_LIST.get(&IpPortKey { ip, port: 0 }).is_some() }
-}
-
-#[panic_handler]
-fn panic(_info: &core::panic::PanicInfo) -> ! {
-    unsafe { core::hint::unreachable_unchecked() }
 }
