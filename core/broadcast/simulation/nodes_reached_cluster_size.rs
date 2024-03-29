@@ -26,8 +26,8 @@ struct ExperimentData {
     timestep: usize,
     bytes_sent: u64,
     bytes_received: u64,
-    #[allow(unused)]
-    report: Report,
+    //#[allow(unused)]
+    //report: Report,
 }
 
 pub fn main() {
@@ -137,7 +137,7 @@ pub fn main() {
                                     timestep: step_in_millis,
                                     bytes_sent,
                                     bytes_received,
-                                    report,
+                                    //report,
                                 },
                             );
                             break;
