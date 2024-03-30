@@ -77,6 +77,7 @@ impl<C: Collection> Node<C> {
             .with_module::<C::IndexerInterface>()
             .with_module::<C::OriginProviderInterface>()
             .with_module::<C::ServiceExecutorInterface>()
+            .with_module::<C::DeliveryAcknowledgmentAggregatorInterface>()
             // TODO: Refactor the rest of start/shutdown/inits:
             .with(
                 <C::ApplicationInterface as ApplicationInterface<C>>::infu_initialize_hack
@@ -113,16 +114,6 @@ impl<C: Collection> Node<C> {
                     .on("shutdown", |c: &C::HandshakeInterface| {
                         block_on(c.shutdown())
                     }),
-            )
-            .with(
-                C::DeliveryAcknowledgmentAggregatorInterface::infu_initialize_hack.on(
-                    "start",
-                    |daa: &C::DeliveryAcknowledgmentAggregatorInterface| {
-                        block_on(daa.start())
-                    },
-                ).on("shutdown", |daa: Consume<C::DeliveryAcknowledgmentAggregatorInterface>| {
-                    block_on(daa.shutdown())
-                }),
             )
             .with(
                 C::ReputationAggregatorInterface::infu_initialize_hack

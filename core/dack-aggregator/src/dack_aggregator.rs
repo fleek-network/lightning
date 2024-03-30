@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 use std::marker::PhantomData;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
 
 use affair::{Socket, Task};
+use lightning_interfaces::fdi::{self, BuildGraph, MethodExt};
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::{
     DeliveryAcknowledgment,
@@ -12,25 +11,66 @@ use lightning_interfaces::types::{
     MAX_DELIVERY_ACKNOWLEDGMENTS,
 };
 use lightning_interfaces::{
+    Cloned,
     ConfigConsumer,
+    ConfigProviderInterface,
     DeliveryAcknowledgmentAggregatorInterface,
     DeliveryAcknowledgmentSocket,
+    ShutdownWaiter,
+    SignerInterface,
     SubmitTxSocket,
-    WithStartAndShutdown,
 };
 use lightning_metrics::increment_counter_by;
 use queue_file::QueueFile;
-use tokio::sync::{mpsc, Notify};
+use tokio::sync::mpsc;
 use tracing::error;
 
 use crate::config::Config;
 
 pub struct DeliveryAcknowledgmentAggregator<C: Collection> {
-    inner: Arc<AggregatorInner>,
+    inner: Option<AggregatorInner>,
     socket: DeliveryAcknowledgmentSocket,
-    is_running: Arc<AtomicBool>,
-    shutdown_notify: Arc<Notify>,
     _marker: PhantomData<C>,
+}
+
+impl<C: Collection> DeliveryAcknowledgmentAggregator<C> {
+    /// Initialize a new delivery acknowledgment aggregator.
+    fn init(
+        config: &C::ConfigProviderInterface,
+        signer: &C::SignerInterface,
+    ) -> anyhow::Result<Self> {
+        let (socket, socket_rx) = Socket::raw_bounded(2048);
+        let inner = AggregatorInner::new(config.get::<Self>(), signer.get_socket(), socket_rx)?;
+
+        Ok(Self {
+            inner: Some(inner),
+            socket,
+            _marker: PhantomData,
+        })
+    }
+
+    async fn start(mut this: fdi::RefMut<Self>, Cloned(shutdown): Cloned<ShutdownWaiter>) {
+        let inner = this.inner.take().expect("can only call start once");
+        drop(this);
+
+        shutdown
+            .run_until_shutdown(async move { inner.start().await })
+            .await;
+    }
+}
+
+impl<C: Collection> BuildGraph for DeliveryAcknowledgmentAggregator<C> {
+    fn build_graph() -> lightning_interfaces::fdi::DependencyGraph {
+        fdi::DependencyGraph::default().with(Self::init.on("start", Self::start.spawn()))
+    }
+}
+
+impl<C: Collection> DeliveryAcknowledgmentAggregatorInterface<C>
+    for DeliveryAcknowledgmentAggregator<C>
+{
+    fn socket(&self) -> DeliveryAcknowledgmentSocket {
+        self.socket.clone()
+    }
 }
 
 struct AggregatorInner {
@@ -38,31 +78,8 @@ struct AggregatorInner {
     #[allow(unused)]
     submit_tx: SubmitTxSocket,
     #[allow(clippy::type_complexity)]
-    socket_rx: Arc<Mutex<Option<mpsc::Receiver<Task<DeliveryAcknowledgment, ()>>>>>,
-    queue: Arc<Mutex<Option<QueueFile>>>,
-    shutdown_notify: Arc<Notify>,
-}
-
-impl<C: Collection> DeliveryAcknowledgmentAggregatorInterface<C>
-    for DeliveryAcknowledgmentAggregator<C>
-{
-    fn init(config: Self::Config, submit_tx: SubmitTxSocket) -> anyhow::Result<Self> {
-        let (socket, socket_rx) = Socket::raw_bounded(2048);
-        let shutdown_notify = Arc::new(Notify::new());
-        let inner = AggregatorInner::new(config, submit_tx, socket_rx, shutdown_notify.clone())?;
-
-        Ok(Self {
-            inner: Arc::new(inner),
-            socket,
-            is_running: Arc::new(AtomicBool::new(false)),
-            shutdown_notify,
-            _marker: PhantomData,
-        })
-    }
-
-    fn socket(&self) -> DeliveryAcknowledgmentSocket {
-        self.socket.clone()
-    }
+    socket_rx: mpsc::Receiver<Task<DeliveryAcknowledgment, ()>>,
+    queue: QueueFile,
 }
 
 impl AggregatorInner {
@@ -70,33 +87,26 @@ impl AggregatorInner {
         config: Config,
         submit_tx: SubmitTxSocket,
         socket_rx: mpsc::Receiver<Task<DeliveryAcknowledgment, ()>>,
-        shutdown_notify: Arc<Notify>,
     ) -> anyhow::Result<Self> {
         let queue = QueueFile::open(&config.db_path)?;
         Ok(Self {
             config,
             submit_tx,
-            socket_rx: Arc::new(Mutex::new(Some(socket_rx))),
-            queue: Arc::new(Mutex::new(Some(queue))),
-            shutdown_notify,
+            socket_rx,
+            queue,
         })
     }
 
-    async fn start(&self) {
-        let mut socket_rx = self.socket_rx.lock().unwrap().take().unwrap();
-        let mut queue = self.queue.lock().unwrap().take().unwrap();
+    async fn start(mut self) {
         let mut interval = tokio::time::interval(self.config.submit_interval);
         loop {
             tokio::select! {
-                _ = self.shutdown_notify.notified() => {
-                    break;
-                }
-                task = socket_rx.recv() => {
+                task = self.socket_rx.recv() => {
                     if let Some(task) = task {
                         match bincode::serialize(&task.request) {
                             Ok(dack_bytes) => {
                                 task.respond(());
-                                if let Err(e) = queue.add(&dack_bytes) {
+                                if let Err(e) = self.queue.add(&dack_bytes) {
                                     // TODO(matthias): this should be a telemetry event log
                                     error!("Failed to write DACK to disk: {e:?}");
                                 }
@@ -114,7 +124,7 @@ impl AggregatorInner {
                     let mut metadata = HashMap::new();
                     let mut commodity = HashMap::new();
                     let mut num_dacks_taken = 0;
-                    for dack_bytes in queue.iter() {
+                    for dack_bytes in self.queue.iter() {
                         match bincode::deserialize::<DeliveryAcknowledgment>(&dack_bytes) {
                             Ok(dack) => {
                                 let num_dacks = proofs.get(&dack.service_id).map_or(0, |p| p.len());
@@ -167,39 +177,13 @@ impl AggregatorInner {
                     (0..num_dacks_taken).for_each(|_| {
                         // TODO(matthias): should we only remove them after we verified that the transaction was
                         // ordered?
-                        if let Err(e) = queue.remove() {
+                        if let Err(e) = self.queue.remove() {
                             error!("Failed to remove DACK from queue: {e:?}");
                         }
                     });
                 }
             }
         }
-        *self.socket_rx.lock().unwrap() = Some(socket_rx);
-        *self.queue.lock().unwrap() = Some(queue);
-    }
-}
-
-impl<C: Collection> WithStartAndShutdown for DeliveryAcknowledgmentAggregator<C> {
-    fn is_running(&self) -> bool {
-        self.is_running.load(Ordering::Relaxed)
-    }
-
-    async fn start(&self) {
-        if !self.is_running() {
-            let inner = self.inner.clone();
-            let is_running = self.is_running.clone();
-            tokio::spawn(async move {
-                inner.start().await;
-                is_running.store(false, Ordering::Relaxed);
-            });
-            self.is_running.store(true, Ordering::Relaxed);
-        } else {
-            error!("Cannot start delivery aggregator because it is already running");
-        }
-    }
-
-    async fn shutdown(&self) {
-        self.shutdown_notify.notify_one();
     }
 }
 

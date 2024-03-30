@@ -5812,6 +5812,7 @@ dependencies = [
  "lightning-notifier",
  "lightning-signer",
  "lightning-test-utils",
+ "lightning-utils",
  "queue-file",
  "resolved-pathbuf",
  "serde",

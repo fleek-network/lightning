@@ -125,7 +125,6 @@ impl<NE: Emitter> AsyncWorker for MockConsensusWorker<NE> {
             return;
         }
 
-        let update_request = task;
         self.tx_count += 1;
 
         if self.config.transactions_to_lose.contains(&self.tx_count) {
@@ -133,7 +132,7 @@ impl<NE: Emitter> AsyncWorker for MockConsensusWorker<NE> {
         }
 
         let block = Block {
-            transactions: vec![update_request],
+            transactions: vec![task],
             digest: [0; 32],
         };
 

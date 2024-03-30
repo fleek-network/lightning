@@ -34,7 +34,7 @@ impl<C> ConfigConsumer for Keystore<C> {
 
 impl<C: Collection> Keystore<C> {
     /// Initialize the keystore
-    fn init(config: &C::ConfigProviderInterface) -> anyhow::Result<Self> {
+    pub fn init(config: &C::ConfigProviderInterface) -> anyhow::Result<Self> {
         let config = config.get::<Self>();
         let node = Arc::new(if config.node_key_path.exists() {
             let encoded =

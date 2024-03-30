@@ -3,49 +3,42 @@ use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 
 use fleek_crypto::{AccountOwnerSecretKey, SecretKey};
+use infusion::c;
 use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisNode};
-use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::infu_collection::{Collection, Node};
 use lightning_interfaces::types::{DeliveryAcknowledgment, DeliveryAcknowledgmentProof, NodePorts};
 use lightning_interfaces::{
+    fdi,
     partial,
     ApplicationInterface,
-    ConsensusInterface,
     DeliveryAcknowledgmentAggregatorInterface,
-    ForwarderInterface,
     KeystoreInterface,
-    NotifierInterface,
-    SignerInterface,
     SyncQueryRunnerInterface,
-    WithStartAndShutdown,
 };
 use lightning_notifier::Notifier;
 use lightning_signer::Signer;
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus, MockForwarder};
+use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
-use tokio::sync::mpsc;
+use lightning_utils::application::QueryRunnerExt;
 
 use crate::{Config, DeliveryAcknowledgmentAggregator};
 
 partial!(TestBinding {
-    ApplicationInterface = Application<Self>;
-    ConsensusInterface = MockConsensus<Self>;
+    ConfigProviderInterface = JsonConfigProvider;
     KeystoreInterface = EphemeralKeystore<Self>;
-    SignerInterface = Signer<Self>;
-    DeliveryAcknowledgmentAggregatorInterface = DeliveryAcknowledgmentAggregator<Self>;
+    ApplicationInterface = Application<Self>;
     NotifierInterface = Notifier<Self>;
+    SignerInterface = Signer<Self>;
+    ForwarderInterface = MockForwarder<Self>;
+    ConsensusInterface = MockConsensus<Self>;
+    DeliveryAcknowledgmentAggregatorInterface = DeliveryAcknowledgmentAggregator<Self>;
 });
 
-struct Node<C: Collection> {
-    _signer: C::SignerInterface,
-    _app: C::ApplicationInterface,
-    _consensus: C::ConsensusInterface,
-    aggregator: C::DeliveryAcknowledgmentAggregatorInterface,
-}
-
 async fn init_aggregator(path: PathBuf) -> Node<TestBinding> {
-    let keystore = EphemeralKeystore::default();
+    let keystore = EphemeralKeystore::<TestBinding>::default();
     let (consensus_secret_key, node_secret_key) =
         (keystore.get_bls_sk(), keystore.get_ed25519_sk());
     let node_public_key = node_secret_key.to_pk();
@@ -54,8 +47,7 @@ async fn init_aggregator(path: PathBuf) -> Node<TestBinding> {
     let owner_public_key = owner_secret_key.to_pk();
 
     let mut genesis = Genesis::load().unwrap();
-
-    genesis.node_info.push(GenesisNode::new(
+    genesis.node_info = vec![GenesisNode::new(
         owner_public_key.into(),
         node_public_key,
         "127.0.0.1".parse().unwrap(),
@@ -73,7 +65,7 @@ async fn init_aggregator(path: PathBuf) -> Node<TestBinding> {
         },
         None,
         true,
-    ));
+    )];
 
     let epoch_start = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
@@ -82,77 +74,33 @@ async fn init_aggregator(path: PathBuf) -> Node<TestBinding> {
     genesis.epoch_start = epoch_start;
     genesis.epoch_time = 4000; // millis
 
-    let app = Application::<TestBinding>::init(
-        AppConfig {
-            genesis: Some(genesis),
-            mode: Mode::Test,
-            testnet: false,
-            storage: StorageConfig::InMemory,
-            db_path: None,
-            db_options: None,
-        },
-        Default::default(),
+    Node::<TestBinding>::init_with_provider(
+        fdi::Provider::default()
+            .with(
+                JsonConfigProvider::default()
+                    .with::<Application<TestBinding>>(AppConfig {
+                        genesis: Some(genesis),
+                        mode: Mode::Test,
+                        testnet: false,
+                        storage: StorageConfig::InMemory,
+                        db_path: None,
+                        db_options: None,
+                    })
+                    .with::<MockConsensus<TestBinding>>(ConsensusConfig {
+                        min_ordering_time: 0,
+                        max_ordering_time: 1,
+                        probability_txn_lost: 0.0,
+                        transactions_to_lose: HashSet::new(),
+                        new_block_interval: Duration::from_secs(5),
+                    })
+                    .with::<DeliveryAcknowledgmentAggregator<TestBinding>>(Config {
+                        submit_interval: Duration::from_secs(1),
+                        db_path: path.try_into().unwrap(),
+                    }),
+            )
+            .with(keystore),
     )
-    .unwrap();
-    app.start().await;
-
-    let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
-
-    let forwarder = MockForwarder::<TestBinding>::init(
-        Default::default(),
-        keystore.get_bls_pk(),
-        query_runner.clone(),
-    )
-    .unwrap();
-    let mut signer = Signer::<TestBinding>::init(
-        Default::default(),
-        keystore.clone(),
-        query_runner.clone(),
-        forwarder.mempool_socket(),
-    )
-    .unwrap();
-    let notifier = Notifier::<TestBinding>::init(&app);
-
-    let consensus_config = ConsensusConfig {
-        min_ordering_time: 0,
-        max_ordering_time: 1,
-        probability_txn_lost: 0.0,
-        transactions_to_lose: HashSet::new(),
-        new_block_interval: Duration::from_secs(5),
-    };
-    let consensus = MockConsensus::<TestBinding>::init(
-        consensus_config,
-        keystore,
-        &signer,
-        update_socket,
-        query_runner.clone(),
-        infusion::Blank::default(),
-        None,
-        &notifier,
-    )
-    .unwrap();
-
-    let (new_block_tx, new_block_rx) = mpsc::channel(10);
-
-    signer.provide_new_block_notify(new_block_rx);
-    notifier.notify_on_new_block(new_block_tx);
-
-    signer.start().await;
-    consensus.start().await;
-
-    let config = Config {
-        submit_interval: Duration::from_secs(1),
-        db_path: path.try_into().unwrap(),
-    };
-
-    let aggregator =
-        DeliveryAcknowledgmentAggregator::<TestBinding>::init(config, signer.get_socket()).unwrap();
-    Node::<TestBinding> {
-        _signer: signer,
-        _app: app,
-        _consensus: consensus,
-        aggregator,
-    }
+    .unwrap()
 }
 
 #[tokio::test]
@@ -162,22 +110,12 @@ async fn test_shutdown_and_start_again() {
     if path.exists() {
         std::fs::remove_file(&path).unwrap();
     }
-    let node = init_aggregator(path.clone()).await;
 
-    assert!(!node.aggregator.is_running());
-    node.aggregator.start().await;
-    assert!(node.aggregator.is_running());
-    node.aggregator.shutdown().await;
-    // Since shutdown is no longer doing async operations we need to wait a millisecond for it to
-    // finish shutting down
-    tokio::time::sleep(Duration::from_millis(1)).await;
-    assert!(!node.aggregator.is_running());
+    let mut node = init_aggregator(path.clone()).await;
 
-    node.aggregator.start().await;
-    assert!(node.aggregator.is_running());
-    node.aggregator.shutdown().await;
-    tokio::time::sleep(Duration::from_millis(1)).await;
-    assert!(!node.aggregator.is_running());
+    node.start().await;
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    node.shutdown().await;
 
     if path.exists() {
         std::fs::remove_file(path).unwrap();
@@ -191,12 +129,19 @@ async fn test_submit_dack() {
     if path.exists() {
         std::fs::remove_file(&path).unwrap();
     }
-    let node = init_aggregator(path.clone()).await;
 
-    let query_runner = node._app.sync_query();
+    let mut node = init_aggregator(path.clone()).await;
+    node.start().await;
+    tokio::time::sleep(Duration::from_secs(1)).await;
 
-    let socket = node.aggregator.socket();
-    node.aggregator.start().await;
+    let query_runner = node
+        .provider
+        .get::<c!(TestBinding::ApplicationInterface::SyncExecutor)>();
+
+    let socket = node
+        .provider
+        .get::<DeliveryAcknowledgmentAggregator<TestBinding>>()
+        .socket();
 
     let service_id = 0;
     let commodity = 10;
@@ -210,8 +155,12 @@ async fn test_submit_dack() {
     // Wait for aggregator to submit txn.
     tokio::time::sleep(Duration::from_secs(2)).await;
 
-    let total_served = query_runner.get_total_served(&0);
-    assert_eq!(total_served.unwrap().served[service_id as usize], commodity);
+    let total_served = query_runner
+        .get_total_served(&query_runner.get_current_epoch())
+        .expect("there to be total served information");
+    assert_eq!(total_served.served[service_id as usize], commodity);
+
+    node.shutdown().await;
 
     if path.exists() {
         std::fs::remove_file(path).unwrap();

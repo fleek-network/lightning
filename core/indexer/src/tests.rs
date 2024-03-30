@@ -100,7 +100,7 @@ async fn test_submission() {
     genesis.epoch_start = epoch_start;
     genesis.epoch_time = 4000; // millis
 
-    let node = Node::<TestBinding>::init_with_provider(
+    let mut node = Node::<TestBinding>::init_with_provider(
         Provider::default()
             .with(
                 JsonConfigProvider::default()
