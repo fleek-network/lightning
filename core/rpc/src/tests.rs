@@ -1,7 +1,6 @@
 use std::net::SocketAddr;
 use std::time::Duration;
 
-use affair::{Executor, Socket, TokioSpawn, Worker};
 use anyhow::Result;
 use fleek_crypto::{
     AccountOwnerSecretKey,
@@ -18,12 +17,10 @@ use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisAccount, GenesisNode};
 use lightning_application::query_runner::QueryRunner;
 use lightning_blockstore::blockstore::Blockstore;
-use lightning_blockstore::config::Config as BlockstoreConfig;
-use lightning_blockstore_server::{BlockstoreServer, Config as BlockServerConfig};
-use lightning_fetcher::config::Config as FetcherConfig;
+use lightning_blockstore_server::BlockstoreServer;
 use lightning_fetcher::fetcher::Fetcher;
 use lightning_indexer::Indexer;
-use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::infu_collection::{Collection, Node};
 use lightning_interfaces::types::{
     Blake3Hash,
     EpochInfo,
@@ -34,36 +31,23 @@ use lightning_interfaces::types::{
     ProtocolParams,
     Staking,
     TotalServed,
-    TransactionRequest,
     Value,
 };
 use lightning_interfaces::{
+    fdi,
     partial,
-    ApplicationInterface,
     BlockstoreInterface,
-    BlockstoreServerInterface,
-    FetcherInterface,
-    IndexerInterface,
-    KeystoreInterface,
-    MempoolSocket,
-    NotifierInterface,
-    OriginProviderInterface,
     PagingParams,
-    PoolInterface,
-    ReputationAggregatorInterface,
     RpcInterface,
-    SignerInterface,
     SyncQueryRunnerInterface,
-    TopologyInterface,
-    WithStartAndShutdown,
 };
 use lightning_notifier::Notifier;
 use lightning_origin_demuxer::OriginDemuxer;
-use lightning_pool::{muxer, Config as PoolConfig, PoolProvider};
+use lightning_pool::PoolProvider;
 use lightning_rep_collector::ReputationAggregator;
 use lightning_signer::Signer;
+use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
-use lightning_topology::{Config as TopologyConfig, Topology};
 use lightning_types::Event;
 use lightning_utils::application::QueryRunnerExt;
 use lightning_utils::rpc as utils;
@@ -82,24 +66,8 @@ struct RpcSuccessResponse<T> {
     result: T,
 }
 
-/// get mempool socket for test cases that do not require consensus
-#[derive(Default)]
-pub struct MockWorker;
-
-impl MockWorker {
-    fn mempool_socket() -> MempoolSocket {
-        TokioSpawn::spawn(MockWorker)
-    }
-}
-
-impl Worker for MockWorker {
-    type Request = TransactionRequest;
-    type Response = ();
-
-    fn handle(&mut self, _req: Self::Request) -> Self::Response {}
-}
-
 partial!(TestBinding {
+    ConfigProviderInterface = JsonConfigProvider;
     ApplicationInterface = Application<Self>;
     FetcherInterface = Fetcher<Self>;
     RpcInterface = Rpc<Self>;
@@ -114,138 +82,48 @@ partial!(TestBinding {
     IndexerInterface = Indexer<Self>;
 });
 
-struct AppState {
-    blockstore: Blockstore<TestBinding>,
+struct TestNode {
+    inner: Node<TestBinding>,
 }
 
-fn init_rpc(app: Application<TestBinding>, port: u16) -> Result<(Rpc<TestBinding>, AppState)> {
-    let mut blockstore = Blockstore::<TestBinding>::init(BlockstoreConfig::default()).unwrap();
-
-    let ipfs_origin =
-        OriginDemuxer::<TestBinding>::init(Default::default(), blockstore.clone()).unwrap();
-
-    let keystore = EphemeralKeystore::default();
-    let signer = Signer::<TestBinding>::init(
-        Default::default(),
-        keystore.clone(),
-        app.sync_query(),
-        Socket::raw_bounded(128).0,
-    )
-    .unwrap();
-
-    let indexer = Indexer::<TestBinding>::init(
-        Default::default(),
-        app.sync_query(),
-        keystore.clone(),
-        &signer,
-    )
-    .unwrap();
-
-    blockstore.provide_indexer(indexer);
-
-    let notifier = Notifier::<TestBinding>::init(&app);
-    let rep_aggregator = ReputationAggregator::<TestBinding>::init(
-        Default::default(),
-        signer.get_socket(),
-        notifier.clone(),
-        app.sync_query(),
-    )
-    .unwrap();
-
-    let topology = Topology::<TestBinding>::init(
-        TopologyConfig::default(),
-        keystore.get_ed25519_pk(),
-        notifier.clone(),
-        app.sync_query(),
-    )
-    .unwrap();
-
-    let pool = PoolProvider::<TestBinding, muxer::quinn::QuinnMuxer>::init(
-        PoolConfig::default(),
-        keystore.clone(),
-        app.sync_query(),
-        notifier,
-        topology.get_receiver(),
-        rep_aggregator.get_reporter(),
-    )
-    .unwrap();
-
-    let blockstore_server = BlockstoreServer::<TestBinding>::init(
-        BlockServerConfig::default(),
-        blockstore.clone(),
-        &pool,
-        rep_aggregator.get_reporter(),
-    )
-    .unwrap();
-
-    let fetcher = Fetcher::<TestBinding>::init(
-        FetcherConfig::default(),
-        blockstore.clone(),
-        &blockstore_server,
-        Default::default(),
-        &ipfs_origin,
-    )
-    .unwrap();
-
-    let rpc = Rpc::<TestBinding>::init(
-        RpcConfig::default_with_port(port),
-        MockWorker::mempool_socket(),
-        app.sync_query(),
-        blockstore.clone(),
-        &fetcher,
-        keystore,
-        None,
-    )?;
-
-    Ok((rpc, AppState { blockstore }))
+impl TestNode {
+    async fn shutdown(mut self) {
+        self.inner.shutdown().await
+    }
+    fn rpc(&self) -> fdi::Ref<Rpc<TestBinding>> {
+        self.inner.provider.get()
+    }
+    fn query_runner(&self) -> fdi::Ref<QueryRunner> {
+        self.inner.provider.get()
+    }
+    fn blockstore(&self) -> fdi::Ref<Blockstore<TestBinding>> {
+        self.inner.provider.get()
+    }
 }
 
-async fn init_rpc_without_consensus(
-    genesis: Option<Genesis>,
-    port: u16,
-) -> Result<(Rpc<TestBinding>, QueryRunner)> {
-    let blockstore = Blockstore::<TestBinding>::init(BlockstoreConfig::default()).unwrap();
-    let app = match genesis {
-        Some(genesis) => Application::<TestBinding>::init(
-            AppConfig {
-                genesis: Some(genesis),
-                mode: Mode::Test,
-                testnet: false,
-                storage: StorageConfig::InMemory,
-                db_path: None,
-                db_options: None,
-            },
-            blockstore,
-        )
-        .unwrap(),
-        None => Application::<TestBinding>::init(AppConfig::test(), blockstore).unwrap(),
-    };
+async fn init_rpc(genesis: Option<Genesis>, rpc_port: u16) -> TestNode {
+    let app_config = genesis
+        .map(|gen| AppConfig {
+            genesis: Some(gen),
+            mode: Mode::Test,
+            testnet: false,
+            storage: StorageConfig::InMemory,
+            db_path: None,
+            db_options: None,
+        })
+        .unwrap_or(AppConfig::test());
 
-    let query_runner = app.sync_query();
-    app.start().await;
+    let node = Node::<TestBinding>::init_with_provider(
+        fdi::Provider::default().with(
+            JsonConfigProvider::default()
+                .with::<Rpc<TestBinding>>(RpcConfig::default_with_port(rpc_port))
+                .with::<Application<TestBinding>>(app_config),
+        ),
+    )
+    .expect("failed to initialize node");
+    node.start().await;
 
-    let (rpc, _) = init_rpc(app, port).unwrap();
-    Ok((rpc, query_runner))
-}
-
-async fn init_rpc_app_test(port: u16) -> Result<(Rpc<TestBinding>, QueryRunner)> {
-    let blockstore = Blockstore::<TestBinding>::init(BlockstoreConfig::default()).unwrap();
-    let app = Application::<TestBinding>::init(AppConfig::test(), blockstore).unwrap();
-    let query_runner = app.sync_query();
-    app.start().await;
-
-    // Init rpc service
-    let (rpc, _) = init_rpc(app, port).unwrap();
-
-    Ok((rpc, query_runner))
-}
-
-async fn init_admin_rpc_app_test(port: u16) -> Result<(Rpc<TestBinding>, AppState)> {
-    let blockstore = Blockstore::<TestBinding>::init(BlockstoreConfig::default()).unwrap();
-    let app = Application::<TestBinding>::init(AppConfig::test(), blockstore).unwrap();
-    app.start().await;
-
-    init_rpc(app, port)
+    TestNode { inner: node }
 }
 
 async fn wait_for_server_start(port: u16) -> Result<()> {
@@ -298,17 +176,7 @@ fn client(url: SocketAddr) -> HttpClient {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_ping() -> Result<()> {
     let port = 30000;
-    let (rpc, _) = init_rpc_without_consensus(None, port).await.unwrap();
-    rpc.start().await;
-
-    let handle = rpc.handle.lock().await;
-
-    assert!(
-        !handle
-            .as_ref()
-            .expect("RPC server to be there")
-            .is_stopped()
-    );
+    let node = init_rpc(None, port).await;
 
     wait_for_server_start(port).await?;
 
@@ -328,6 +196,8 @@ async fn test_rpc_ping() -> Result<()> {
     } else {
         panic!("Request failed with status: {}", response.status());
     }
+
+    node.shutdown().await;
 
     Ok(())
 }
@@ -349,11 +219,8 @@ async fn test_rpc_get_flk_balance() -> Result<()> {
     });
 
     let port = 30001;
-    let (rpc, _) = init_rpc_without_consensus(Some(genesis), port)
-        .await
-        .unwrap();
+    let node = init_rpc(Some(genesis), port).await;
 
-    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -372,6 +239,7 @@ async fn test_rpc_get_flk_balance() -> Result<()> {
     .await?;
     assert_eq!(HpUfixed::<18>::from(1_000_u32), response.result);
 
+    node.shutdown().await;
     Ok(())
 }
 
@@ -385,7 +253,6 @@ async fn test_rpc_get_reputation() -> Result<()> {
     let consensus_public_key = consensus_secret_key.to_pk();
 
     let mut genesis = Genesis::load().unwrap();
-
     let mut genesis_node = GenesisNode::new(
         owner_public_key.into(),
         node_public_key,
@@ -409,12 +276,10 @@ async fn test_rpc_get_reputation() -> Result<()> {
     // Init application service and store reputation score in application state.
     genesis_node.reputation = Some(46);
     genesis.node_info.push(genesis_node);
-    let port = 30002;
-    let (rpc, _query_runner) = init_rpc_without_consensus(Some(genesis), port)
-        .await
-        .unwrap();
 
-    rpc.start().await;
+    let port = 30002;
+    let node = init_rpc(Some(genesis), port).await;
+
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -432,6 +297,8 @@ async fn test_rpc_get_reputation() -> Result<()> {
     )
     .await?;
     assert_eq!(Some(46), response.result);
+
+    node.shutdown().await;
 
     Ok(())
 }
@@ -455,7 +322,6 @@ async fn test_rpc_get_staked() -> Result<()> {
         locked: 0_u32.into(),
         locked_until: 0,
     };
-
     let node_info = GenesisNode::new(
         eth_address,
         node_public_key,
@@ -475,16 +341,12 @@ async fn test_rpc_get_staked() -> Result<()> {
         Some(staking),
         false,
     );
-
     genesis.node_info.push(node_info);
 
     let port = 30003;
-    let (rpc, _) = init_rpc_without_consensus(Some(genesis), port)
-        .await
-        .unwrap();
-
-    rpc.start().await;
+    let node = init_rpc(Some(genesis), port).await;
     wait_for_server_start(port).await?;
+
     let req = json!({
         "jsonrpc": "2.0",
         "method":"flk_get_staked",
@@ -500,6 +362,8 @@ async fn test_rpc_get_staked() -> Result<()> {
     )
     .await?;
     assert_eq!(HpUfixed::<18>::from(1_000_u32), response.result);
+
+    node.shutdown().await;
 
     Ok(())
 }
@@ -521,11 +385,8 @@ async fn test_rpc_get_stables_balance() -> Result<()> {
     });
 
     let port = 30004;
-    let (rpc, _) = init_rpc_without_consensus(Some(genesis), port)
-        .await
-        .unwrap();
+    let node = init_rpc(Some(genesis), port).await;
 
-    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -543,6 +404,8 @@ async fn test_rpc_get_stables_balance() -> Result<()> {
     )
     .await?;
     assert_eq!(HpUfixed::<6>::from(2_00_u32), response.result);
+
+    node.shutdown().await;
 
     Ok(())
 }
@@ -589,11 +452,8 @@ async fn test_rpc_get_stake_locked_until() -> Result<()> {
     genesis.node_info.push(node_info);
 
     let port = 30005;
-    let (rpc, _) = init_rpc_without_consensus(Some(genesis), port)
-        .await
-        .unwrap();
+    let node = init_rpc(Some(genesis), port).await;
 
-    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -611,6 +471,8 @@ async fn test_rpc_get_stake_locked_until() -> Result<()> {
     )
     .await?;
     assert_eq!(365, response.result);
+
+    node.shutdown().await;
 
     Ok(())
 }
@@ -653,15 +515,11 @@ async fn test_rpc_get_locked_time() -> Result<()> {
         Some(staking),
         false,
     );
-
     genesis.node_info.push(node_info);
 
     let port = 30006;
-    let (rpc, _) = init_rpc_without_consensus(Some(genesis), port)
-        .await
-        .unwrap();
+    let node = init_rpc(Some(genesis), port).await;
 
-    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -679,6 +537,8 @@ async fn test_rpc_get_locked_time() -> Result<()> {
     )
     .await?;
     assert_eq!(2, response.result);
+
+    node.shutdown().await;
 
     Ok(())
 }
@@ -721,21 +581,19 @@ async fn test_rpc_get_locked() -> Result<()> {
         Some(staking),
         false,
     );
-
     genesis.node_info.push(node_info);
 
     let port = 30007;
-    let (rpc, _) = init_rpc_without_consensus(Some(genesis), port)
-        .await
-        .unwrap();
+    let node = init_rpc(Some(genesis), port).await;
 
-    rpc.start().await;
     wait_for_server_start(port).await?;
 
-    let client = client(rpc.config.addr());
+    let client = client(node.rpc().config.addr());
 
     let res = crate::api::FleekApiClient::get_locked(&client, node_public_key, None).await?;
     assert_eq!(HpUfixed::<18>::from(500_u32), res);
+
+    node.shutdown().await;
 
     Ok(())
 }
@@ -757,11 +615,8 @@ async fn test_rpc_get_bandwidth_balance() -> Result<()> {
     });
 
     let port = 30008;
-    let (rpc, _) = init_rpc_without_consensus(Some(genesis), port)
-        .await
-        .unwrap();
+    let node = init_rpc(Some(genesis), port).await;
 
-    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -779,6 +634,8 @@ async fn test_rpc_get_bandwidth_balance() -> Result<()> {
     )
     .await?;
     assert_eq!(10_000, response.result);
+
+    node.shutdown().await;
 
     Ok(())
 }
@@ -821,15 +678,11 @@ async fn test_rpc_get_node_info() -> Result<()> {
         Some(staking),
         false,
     );
-
     genesis.node_info.push(node_info.clone());
 
     let port = 30009;
-    let (rpc, _) = init_rpc_without_consensus(Some(genesis), port)
-        .await
-        .unwrap();
+    let node = init_rpc(Some(genesis), port).await;
 
-    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -848,15 +701,16 @@ async fn test_rpc_get_node_info() -> Result<()> {
     .await?;
     assert_eq!(Some(NodeInfo::from(&node_info)), response.result);
 
+    node.shutdown().await;
+
     Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_staking_amount() -> Result<()> {
     let port = 30010;
-    let (rpc, query_runner) = init_rpc_app_test(port).await.unwrap();
+    let node = init_rpc(None, port).await;
 
-    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -873,7 +727,9 @@ async fn test_rpc_get_staking_amount() -> Result<()> {
         req.to_string(),
     )
     .await?;
-    assert_eq!(query_runner.get_staking_amount(), response.result);
+    assert_eq!(node.query_runner().get_staking_amount(), response.result);
+
+    node.shutdown().await;
 
     Ok(())
 }
@@ -881,9 +737,8 @@ async fn test_rpc_get_staking_amount() -> Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_committee_members() -> Result<()> {
     let port = 30011;
-    let (rpc, query_runner) = init_rpc_app_test(port).await.unwrap();
+    let node = init_rpc(None, port).await;
 
-    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -900,7 +755,9 @@ async fn test_rpc_get_committee_members() -> Result<()> {
         req.to_string(),
     )
     .await?;
-    assert_eq!(query_runner.get_committee_members(), response.result);
+    assert_eq!(node.query_runner().get_committee_members(), response.result);
+
+    node.shutdown().await;
 
     Ok(())
 }
@@ -908,9 +765,8 @@ async fn test_rpc_get_committee_members() -> Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_epoch() -> Result<()> {
     let port = 30012;
-    let (rpc, query_runner) = init_rpc_app_test(port).await.unwrap();
+    let node = init_rpc(None, port).await;
 
-    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -927,7 +783,9 @@ async fn test_rpc_get_epoch() -> Result<()> {
         req.to_string(),
     )
     .await?;
-    assert_eq!(query_runner.get_current_epoch(), response.result);
+    assert_eq!(node.query_runner().get_current_epoch(), response.result);
+
+    node.shutdown().await;
 
     Ok(())
 }
@@ -935,9 +793,8 @@ async fn test_rpc_get_epoch() -> Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_epoch_info() -> Result<()> {
     let port = 30013;
-    let (rpc, query_runner) = init_rpc_app_test(port).await.unwrap();
+    let node = init_rpc(None, port).await;
 
-    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -954,7 +811,9 @@ async fn test_rpc_get_epoch_info() -> Result<()> {
         req.to_string(),
     )
     .await?;
-    assert_eq!(query_runner.get_epoch_info(), response.result);
+    assert_eq!(node.query_runner().get_epoch_info(), response.result);
+
+    node.shutdown().await;
 
     Ok(())
 }
@@ -962,9 +821,8 @@ async fn test_rpc_get_epoch_info() -> Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_total_supply() -> Result<()> {
     let port = 30014;
-    let (rpc, query_runner) = init_rpc_app_test(port).await.unwrap();
+    let node = init_rpc(None, port).await;
 
-    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -982,12 +840,14 @@ async fn test_rpc_get_total_supply() -> Result<()> {
     )
     .await?;
 
-    let total_supply = match query_runner.get_metadata(&Metadata::TotalSupply) {
+    let total_supply = match node.query_runner().get_metadata(&Metadata::TotalSupply) {
         Some(Value::HpUfixed(s)) => s,
         _ => panic!("TotalSupply is set genesis and should never be empty"),
     };
 
     assert_eq!(total_supply, response.result);
+
+    node.shutdown().await;
 
     Ok(())
 }
@@ -995,9 +855,8 @@ async fn test_rpc_get_total_supply() -> Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_year_start_supply() -> Result<()> {
     let port = 30015;
-    let (rpc, query_runner) = init_rpc_app_test(port).await.unwrap();
+    let node = init_rpc(None, port).await;
 
-    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -1015,12 +874,14 @@ async fn test_rpc_get_year_start_supply() -> Result<()> {
     )
     .await?;
 
-    let supply_year_start = match query_runner.get_metadata(&Metadata::SupplyYearStart) {
+    let supply_year_start = match node.query_runner().get_metadata(&Metadata::SupplyYearStart) {
         Some(Value::HpUfixed(s)) => s,
         _ => panic!("SupplyYearStart is set genesis and should never be empty"),
     };
 
     assert_eq!(supply_year_start, response.result);
+
+    node.shutdown().await;
 
     Ok(())
 }
@@ -1028,9 +889,8 @@ async fn test_rpc_get_year_start_supply() -> Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_protocol_fund_address() -> Result<()> {
     let port = 30016;
-    let (rpc, query_runner) = init_rpc_app_test(port).await.unwrap();
+    let node = init_rpc(None, port).await;
 
-    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -1048,12 +908,17 @@ async fn test_rpc_get_protocol_fund_address() -> Result<()> {
     )
     .await?;
 
-    let protocol_account = match query_runner.get_metadata(&Metadata::ProtocolFundAddress) {
+    let protocol_account = match node
+        .query_runner()
+        .get_metadata(&Metadata::ProtocolFundAddress)
+    {
         Some(Value::AccountPublicKey(s)) => s,
         _ => panic!("AccountPublicKey is set genesis and should never be empty"),
     };
 
     assert_eq!(protocol_account, response.result);
+
+    node.shutdown().await;
 
     Ok(())
 }
@@ -1061,9 +926,8 @@ async fn test_rpc_get_protocol_fund_address() -> Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_protocol_params() -> Result<()> {
     let port = 30017;
-    let (rpc, query_runner) = init_rpc_app_test(port).await.unwrap();
+    let node = init_rpc(None, port).await;
 
-    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let params = ProtocolParams::LockTime;
@@ -1083,9 +947,11 @@ async fn test_rpc_get_protocol_params() -> Result<()> {
     )
     .await?;
     assert_eq!(
-        query_runner.get_protocol_param(&params).unwrap(),
+        node.query_runner().get_protocol_param(&params).unwrap(),
         response.result
     );
+
+    node.shutdown().await;
 
     Ok(())
 }
@@ -1094,7 +960,6 @@ async fn test_rpc_get_protocol_params() -> Result<()> {
 async fn test_rpc_get_total_served() -> Result<()> {
     // Init application service and store total served in application state.
     let mut genesis = Genesis::load().unwrap();
-
     let total_served = TotalServed {
         served: vec![1000],
         reward_pool: 1_000_u32.into(),
@@ -1102,11 +967,8 @@ async fn test_rpc_get_total_served() -> Result<()> {
     genesis.total_served.insert(0, total_served.clone());
 
     let port = 30018;
-    let (rpc, _) = init_rpc_without_consensus(Some(genesis), port)
-        .await
-        .unwrap();
+    let node = init_rpc(Some(genesis), port).await;
 
-    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -1124,6 +986,8 @@ async fn test_rpc_get_total_served() -> Result<()> {
     )
     .await?;
     assert_eq!(total_served, response.result);
+
+    node.shutdown().await;
 
     Ok(())
 }
@@ -1158,7 +1022,6 @@ async fn test_rpc_get_node_served() -> Result<()> {
         None,
         true,
     );
-
     genesis_node.current_epoch_served = Some(NodeServed {
         served: vec![1000],
         ..Default::default()
@@ -1166,11 +1029,8 @@ async fn test_rpc_get_node_served() -> Result<()> {
     genesis.node_info.push(genesis_node);
 
     let port = 30019;
-    let (rpc, _) = init_rpc_without_consensus(Some(genesis), port)
-        .await
-        .unwrap();
+    let node = init_rpc(Some(genesis), port).await;
 
-    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -1188,6 +1048,8 @@ async fn test_rpc_get_node_served() -> Result<()> {
     )
     .await?;
     assert_eq!(vec![1000], response.result.served);
+
+    node.shutdown().await;
 
     Ok(())
 }
@@ -1230,15 +1092,10 @@ async fn test_rpc_is_valid_node() -> Result<()> {
         Some(staking),
         false,
     );
-
     genesis.node_info.push(node_info);
 
     let port = 30020;
-    let (rpc, _) = init_rpc_without_consensus(Some(genesis), port)
-        .await
-        .unwrap();
-
-    rpc.start().await;
+    let node = init_rpc(Some(genesis), port).await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -1256,6 +1113,8 @@ async fn test_rpc_is_valid_node() -> Result<()> {
     )
     .await?;
     assert!(response.result);
+
+    node.shutdown().await;
 
     Ok(())
 }
@@ -1298,7 +1157,6 @@ async fn test_rpc_get_node_registry() -> Result<()> {
         Some(staking),
         false,
     );
-
     genesis.node_info.push(node_info.clone());
 
     let committee_size =
@@ -1310,11 +1168,8 @@ async fn test_rpc_get_node_registry() -> Result<()> {
         );
 
     let port = 30021;
-    let (rpc, _) = init_rpc_without_consensus(Some(genesis), port)
-        .await
-        .unwrap();
+    let node = init_rpc(Some(genesis), port).await;
 
-    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -1337,7 +1192,7 @@ async fn test_rpc_get_node_registry() -> Result<()> {
     let req = json!({
         "jsonrpc": "2.0",
         "method":"flk_get_node_registry",
-        "params": PagingParams{ ignore_stake: true, start: committee_size as u32, limit: 10 },
+        "params": PagingParams { ignore_stake: true, start: committee_size as u32, limit: 10 },
         "id":1,
     });
 
@@ -1349,15 +1204,16 @@ async fn test_rpc_get_node_registry() -> Result<()> {
     .await?;
     assert!(response.result.contains(&NodeInfo::from(&node_info)));
 
+    node.shutdown().await;
+
     Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_admin_rpc_store() -> Result<()> {
     let port = 30022;
-    let (rpc, app) = init_admin_rpc_app_test(port).await.unwrap();
+    let node = init_rpc(None, port).await;
 
-    rpc.start().await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -1376,12 +1232,14 @@ async fn test_admin_rpc_store() -> Result<()> {
     .await?;
 
     let expected_content: Vec<u8> = std::fs::read("../test-utils/files/index.ts").unwrap();
-    let stored_content = app
-        .blockstore
+    let stored_content = node
+        .blockstore()
         .read_all_to_vec(&response.result)
         .await
         .unwrap();
     assert_eq!(expected_content, stored_content);
+
+    node.shutdown().await;
 
     Ok(())
 }
@@ -1403,14 +1261,11 @@ async fn test_rpc_events() -> Result<()> {
     });
 
     let port = 30023;
-    let (rpc, _) = init_rpc_without_consensus(Some(genesis), port)
-        .await
-        .unwrap();
+    let node = init_rpc(Some(genesis), port).await;
 
-    rpc.start().await;
     wait_for_server_start(port).await?;
 
-    let sender = rpc.event_tx();
+    let sender = node.rpc().event_tx();
 
     let client = jsonrpsee::ws_client::WsClientBuilder::default()
         .build(&format!("ws://127.0.0.1:{port}/rpc/v0"))
@@ -1431,6 +1286,8 @@ async fn test_rpc_events() -> Result<()> {
         .expect("can send event");
 
     assert_eq!(sub.next().await.expect("An event from the sub")?, event);
+
+    node.shutdown().await;
 
     Ok(())
 }

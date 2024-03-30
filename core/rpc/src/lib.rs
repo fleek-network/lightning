@@ -1,28 +1,31 @@
-use std::ops::DerefMut;
 use std::sync::Arc;
 
 use fleek_crypto::{ConsensusPublicKey, NodePublicKey};
 use hyper::server::conn::AddrStream;
 use hyper::service::{make_service_fn, service_fn};
-use jsonrpsee::server::{stop_channel, Server as JSONRPCServer, ServerHandle};
+use jsonrpsee::server::{stop_channel, Server as JSONRPCServer};
 use jsonrpsee::{Methods, RpcModule};
+use lightning_interfaces::fdi::MethodExt;
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::types::Event;
 use lightning_interfaces::{
+    fdi,
     ApplicationInterface,
+    ArchiveInterface,
     ArchiveRequest,
     ArchiveResponse,
     ArchiveSocket,
     ConfigConsumer,
+    ConfigProviderInterface,
     FetcherInterface,
     FetcherSocket,
+    ForwarderInterface,
     KeystoreInterface,
     MempoolSocket,
     RpcInterface,
-    WithStartAndShutdown,
+    ShutdownWaiter,
 };
 use reqwest::StatusCode;
-use tokio::sync::Mutex;
 use tower::Service;
 
 use crate::api::AdminApiServer;
@@ -85,16 +88,10 @@ impl<C: Collection> Data<C> {
 
 pub struct Rpc<C: Collection> {
     config: Config,
-
     /// The final RPCModule containting selected methods
     module: RpcModule<()>,
-
     /// RPC module for admin methods.
     admin_module: RpcModule<()>,
-
-    // need interior mutability to support restarts
-    handle: Mutex<Option<ServerHandle>>,
-
     data: Arc<Data<C>>,
 }
 
@@ -110,49 +107,39 @@ async fn metrics() -> (StatusCode, String) {
 }
 
 impl<C: Collection> Rpc<C> {
-    fn create_modules_from_config(
-        config: &Config,
-        data: Arc<Data<C>>,
-    ) -> anyhow::Result<RpcModule<()>> {
-        let mut final_module = RpcModule::new(());
+    /// Initialize the RPC-server, with the given parameters.
+    fn init(
+        config: &C::ConfigProviderInterface,
+        forwarder: &C::ForwarderInterface,
+        blockstore: &C::BlockstoreInterface,
+        fetcher: &C::FetcherInterface,
+        keystore: &C::KeystoreInterface,
+        archive: &C::ArchiveInterface,
+        fdi::Cloned(query_runner): fdi::Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
+    ) -> anyhow::Result<Self> {
+        let config = config.get::<Self>();
+        let data: Arc<Data<C>> = Arc::new(Data {
+            query_runner,
+            mempool_socket: forwarder.mempool_socket(),
+            fetcher_socket: fetcher.get_socket(),
+            _blockstore: blockstore.clone(),
+            node_public_key: keystore.get_ed25519_pk(),
+            consensus_public_key: keystore.get_bls_pk(),
+            archive_socket: archive.archive_socket(),
+            event_handler: EventDistributor::spawn(),
+        });
+        let module = Self::create_modules_from_config(&config, data.clone())?;
+        let admin_module = Self::create_admin_module_from_config(&config, data.clone())?;
 
-        for selection in config.rpc_selection() {
-            match selection {
-                config::RPCModules::Eth => {
-                    final_module.merge(EthApi::new(data.clone()).into_rpc())?;
-                },
-                config::RPCModules::Net => {
-                    final_module.merge(NetApi::new(data.clone()).into_rpc())?;
-                },
-                config::RPCModules::Flk => {
-                    final_module.merge(FleekApi::new(data.clone()).into_rpc())?;
-                },
-                config::RPCModules::Admin => {
-                    // Admin RPC is private and it's set up separately than the public RPCs.
-                },
-            }
-        }
-
-        Ok(final_module)
+        Ok(Self {
+            config,
+            module,
+            admin_module,
+            data,
+        })
     }
 
-    fn create_admin_module_from_config(
-        config: &Config,
-        data: Arc<Data<C>>,
-    ) -> anyhow::Result<RpcModule<()>> {
-        let mut final_module = RpcModule::new(());
-        if config
-            .rpc_selection()
-            .any(|module| matches!(module, config::RPCModules::Admin))
-        {
-            final_module.merge(AdminApi::new(data.clone()).into_rpc())?;
-        }
-        Ok(final_module)
-    }
-}
-
-impl<C: Collection> WithStartAndShutdown for Rpc<C> {
-    async fn start(&self) {
+    fn start(&self, shutdown: fdi::Cloned<ShutdownWaiter>) {
         let (stop, server_handle) = stop_channel();
         let json_rpc_service = JSONRPCServer::builder()
             .to_service_builder()
@@ -227,64 +214,55 @@ impl<C: Collection> WithStartAndShutdown for Rpc<C> {
         let server = hyper::Server::bind(&addr).serve(make_service);
 
         tokio::spawn(async move {
-            let graceful = server.with_graceful_shutdown(async move { stop.shutdown().await });
+            let graceful =
+                server.with_graceful_shutdown(async move { shutdown.wait_for_shutdown().await });
             graceful.await.expect("Rpc Server to start");
+            server_handle.stop().unwrap();
         });
-
-        *self.handle.lock().await = Some(server_handle);
     }
 
-    async fn shutdown(&self) {
-        if let Some(handle) = std::mem::take(self.handle.lock().await.deref_mut()) {
-            match handle.stop() {
-                Ok(_) => (),
-                Err(_) => return,
-            };
+    fn create_modules_from_config(
+        config: &Config,
+        data: Arc<Data<C>>,
+    ) -> anyhow::Result<RpcModule<()>> {
+        let mut final_module = RpcModule::new(());
 
-            handle.stopped().await;
+        for selection in config.rpc_selection() {
+            match selection {
+                config::RPCModules::Eth => {
+                    final_module.merge(EthApi::new(data.clone()).into_rpc())?;
+                },
+                config::RPCModules::Net => {
+                    final_module.merge(NetApi::new(data.clone()).into_rpc())?;
+                },
+                config::RPCModules::Flk => {
+                    final_module.merge(FleekApi::new(data.clone()).into_rpc())?;
+                },
+                config::RPCModules::Admin => {
+                    // Admin RPC is private and it's set up separately than the public RPCs.
+                },
+            }
         }
+
+        Ok(final_module)
     }
 
-    fn is_running(&self) -> bool {
-        // Handle is removed from self when we shutdown server
-        self.handle.blocking_lock().is_some()
+    fn create_admin_module_from_config(
+        config: &Config,
+        data: Arc<Data<C>>,
+    ) -> anyhow::Result<RpcModule<()>> {
+        let mut final_module = RpcModule::new(());
+        if config
+            .rpc_selection()
+            .any(|module| matches!(module, config::RPCModules::Admin))
+        {
+            final_module.merge(AdminApi::new(data.clone()).into_rpc())?;
+        }
+        Ok(final_module)
     }
 }
 
 impl<C: Collection> RpcInterface<C> for Rpc<C> {
-    fn init(
-        config: Self::Config,
-        mempool: MempoolSocket,
-        query_runner: c!(C::ApplicationInterface::SyncExecutor),
-        blockstore: C::BlockstoreInterface,
-        fetcher: &C::FetcherInterface,
-        keystore: C::KeystoreInterface,
-        archive_socket: Option<ArchiveSocket<C>>,
-    ) -> anyhow::Result<Self> {
-        let data: Arc<Data<C>> = Arc::new(Data {
-            query_runner,
-            mempool_socket: mempool,
-            fetcher_socket: fetcher.get_socket(),
-            _blockstore: blockstore,
-            node_public_key: keystore.get_ed25519_pk(),
-            consensus_public_key: keystore.get_bls_pk(),
-            archive_socket,
-            event_handler: EventDistributor::spawn(),
-        });
-
-        let module = Self::create_modules_from_config(&config, data.clone())?;
-
-        let admin_module = Self::create_admin_module_from_config(&config, data.clone())?;
-
-        Ok(Self {
-            config,
-            module,
-            admin_module,
-            handle: Mutex::new(None),
-            data,
-        })
-    }
-
     fn event_tx(&self) -> tokio::sync::mpsc::Sender<Vec<Event>> {
         self.data.event_handler.sender()
     }
@@ -294,4 +272,10 @@ impl<C: Collection> ConfigConsumer for Rpc<C> {
     type Config = crate::config::Config;
 
     const KEY: &'static str = "rpc";
+}
+
+impl<C: Collection> fdi::BuildGraph for Rpc<C> {
+    fn build_graph() -> fdi::DependencyGraph {
+        fdi::DependencyGraph::default().with(Self::init.on("start", Self::start))
+    }
 }

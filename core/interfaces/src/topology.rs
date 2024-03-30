@@ -21,5 +21,6 @@ pub trait TopologyInterface<C: Collection>:
     ///
     /// The list of connections is a 2-dimensional array, the first dimension determines the
     /// closeness of the nodes, the further items are the outer layer of the connections.
+    #[blank = watch::channel(Arc::new(vec![])).1]
     fn get_receiver(&self) -> watch::Receiver<Arc<Vec<Vec<NodePublicKey>>>>;
 }

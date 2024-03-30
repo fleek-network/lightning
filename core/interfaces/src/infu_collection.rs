@@ -78,6 +78,7 @@ impl<C: Collection> Node<C> {
             .with_module::<C::OriginProviderInterface>()
             .with_module::<C::ServiceExecutorInterface>()
             .with_module::<C::DeliveryAcknowledgmentAggregatorInterface>()
+            .with_module::<C::RpcInterface>()
             // TODO: Refactor the rest of start/shutdown/inits:
             .with(
                 <C::ApplicationInterface as ApplicationInterface<C>>::infu_initialize_hack
@@ -130,11 +131,6 @@ impl<C: Collection> Node<C> {
                     .on("shutdown", |c: &C::ResolverInterface| {
                         block_on(c.shutdown())
                     }),
-            )
-            .with(
-                C::RpcInterface::infu_initialize_hack
-                    .on("start", |c: &C::RpcInterface| block_on(c.start()))
-                    .on("shutdown", |c: &C::RpcInterface| block_on(c.shutdown())),
             )
             .with(
                 C::PoolInterface::infu_initialize_hack
