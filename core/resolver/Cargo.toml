@@ -28,3 +28,4 @@ lightning-notifier = { path = "../notifier" }
 lightning-topology = { path = "../topology" }
 fleek-crypto.workspace = true
 infusion.workspace = true
+tracing-test = { version = "0.2", features = ["no-env-filter"] }

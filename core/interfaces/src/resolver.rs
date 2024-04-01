@@ -1,47 +1,14 @@
-use infusion::c;
+use fdi::BuildGraph;
 use lightning_schema::broadcast::ResolvedImmutablePointerRecord;
 
 use crate::infu_collection::Collection;
 use crate::types::{Blake3Hash, ImmutablePointer};
-use crate::{
-    ApplicationInterface,
-    BroadcastInterface,
-    ConfigConsumer,
-    ConfigProviderInterface,
-    KeystoreInterface,
-    WithStartAndShutdown,
-};
 
 /// The resolver is responsible to resolve an FNIP (Fleek Network Immutable Pointer),
 /// into a Blake3 hash of the content.
 #[infusion::service]
-pub trait ResolverInterface<C: Collection>:
-    Sized + Send + Sync + Clone + ConfigConsumer + WithStartAndShutdown
-{
-    fn _init(
-        config: ::ConfigProviderInterface,
-        broadcast: ::BroadcastInterface,
-        keystore: ::KeystoreInterface,
-        app: ::ApplicationInterface,
-    ) {
-        let pubsub = broadcast.get_pubsub(crate::types::Topic::Resolver);
-        Self::init(
-            config.get::<Self>(),
-            keystore.clone(),
-            pubsub,
-            app.sync_query(),
-        )
-    }
-
+pub trait ResolverInterface<C: Collection>: BuildGraph + Sized + Send + Sync + Clone {
     type OriginFinder: OriginFinderAsyncIter;
-
-    /// Initialize and return the resolver service.
-    fn init(
-        config: Self::Config,
-        keystore: C::KeystoreInterface,
-        pubsub: c!(C::BroadcastInterface::PubSub<ResolvedImmutablePointerRecord>),
-        query_runner: c!(C::ApplicationInterface::SyncExecutor),
-    ) -> anyhow::Result<Self>;
 
     /// Publish new records into the resolver global hash table about us witnessing
     /// the given blake3 hash from resolving the following pointers.

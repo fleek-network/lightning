@@ -1,24 +1,26 @@
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use fleek_crypto::{NodeSecretKey, PublicKey, SecretKey};
+use lightning_interfaces::fdi::{self, BuildGraph, MethodExt};
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::schema::broadcast::ResolvedImmutablePointerRecord;
-use lightning_interfaces::types::{Blake3Hash, ImmutablePointer, NodeIndex};
+use lightning_interfaces::types::{Blake3Hash, ImmutablePointer, NodeIndex, Topic};
 use lightning_interfaces::{
     ApplicationInterface,
     BroadcastInterface,
+    Cloned,
     ConfigConsumer,
+    ConfigProviderInterface,
     KeystoreInterface,
     PubSub,
     ResolverInterface,
+    ShutdownWaiter,
     SyncQueryRunnerInterface,
     ToDigest,
-    WithStartAndShutdown,
 };
 use rocksdb::{Options, DB};
-use tokio::sync::{Notify, OnceCell};
-use tracing::{error, warn};
+use tokio::sync::OnceCell;
+use tracing::warn;
 
 use crate::config::Config;
 use crate::origin_finder::OriginFinder;
@@ -29,8 +31,6 @@ const URI_TO_B3: &str = "uri_to_b3";
 #[derive(Clone)]
 pub struct Resolver<C: Collection> {
     inner: Arc<ResolverInner<C>>,
-    is_running: Arc<AtomicBool>,
-    shutdown_notify: Arc<Notify>,
 }
 
 impl<C: Collection> ConfigConsumer for Resolver<C> {
@@ -39,45 +39,17 @@ impl<C: Collection> ConfigConsumer for Resolver<C> {
     type Config = Config;
 }
 
-impl<C: Collection> WithStartAndShutdown for Resolver<C> {
-    /// Returns true if this system is running or not.
-    fn is_running(&self) -> bool {
-        self.is_running.load(Ordering::Relaxed)
-    }
-
-    /// Start the system, should not do anything if the system is already
-    /// started.
-    async fn start(&self) {
-        if !self.is_running() {
-            let inner = self.inner.clone();
-            let is_running = self.is_running.clone();
-            tokio::spawn(async move {
-                inner.start().await;
-                is_running.store(false, Ordering::Relaxed);
-            });
-            self.is_running.store(true, Ordering::Relaxed);
-        } else {
-            error!("Can not start resolver because it already running");
-        }
-    }
-
-    /// Send the shutdown signal to the system.
-    async fn shutdown(&self) {
-        self.shutdown_notify.notify_one();
-    }
-}
-
-impl<C: Collection> ResolverInterface<C> for Resolver<C> {
-    type OriginFinder = OriginFinder;
-
+impl<C: Collection> Resolver<C> {
     /// Initialize and return the resolver service.
     fn init(
-        config: Self::Config,
-        keystore: C::KeystoreInterface,
-        pubsub: c!(C::BroadcastInterface::PubSub<ResolvedImmutablePointerRecord>),
-        query_runner: c!(C::ApplicationInterface::SyncExecutor),
+        config: &C::ConfigProviderInterface,
+        broadcast: &C::BroadcastInterface,
+        keystore: &C::KeystoreInterface,
+        Cloned(query_runner): Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
     ) -> anyhow::Result<Self> {
+        let config = config.get::<Self>();
         let node_sk = keystore.get_ed25519_sk();
+        let pubsub = broadcast.get_pubsub(Topic::Resolver);
 
         let mut db_options = Options::default();
         db_options.create_if_missing(true);
@@ -90,22 +62,34 @@ impl<C: Collection> ResolverInterface<C> for Resolver<C> {
                 .expect("Was not able to create Resolver DB"),
         );
 
-        let shutdown_notify = Arc::new(Notify::new());
         let inner = ResolverInner {
             pubsub,
             node_sk,
             node_index: OnceCell::new(),
             db,
-            shutdown_notify: shutdown_notify.clone(),
             query_runner,
         };
 
         Ok(Self {
             inner: Arc::new(inner),
-            is_running: Arc::new(AtomicBool::new(false)),
-            shutdown_notify,
         })
     }
+
+    /// Start the system, should not do anything if the system is already
+    /// started.
+    async fn start(this: fdi::Cloned<Self>, waiter: fdi::Cloned<ShutdownWaiter>) {
+        waiter.run_until_shutdown(this.inner.start()).await;
+    }
+}
+
+impl<C: Collection> BuildGraph for Resolver<C> {
+    fn build_graph() -> fdi::DependencyGraph {
+        fdi::DependencyGraph::default().with(Self::init.on("start", Self::start.spawn()))
+    }
+}
+
+impl<C: Collection> ResolverInterface<C> for Resolver<C> {
+    type OriginFinder = OriginFinder;
 
     /// Publish new records into the resolver global hash table about us witnessing
     /// the given blake3 hash from resolving the following pointers.
@@ -136,7 +120,6 @@ struct ResolverInner<C: Collection> {
     node_sk: NodeSecretKey,
     node_index: OnceCell<NodeIndex>,
     db: Arc<DB>,
-    shutdown_notify: Arc<Notify>,
     query_runner: c!(C::ApplicationInterface::SyncExecutor),
 }
 
@@ -144,25 +127,19 @@ impl<C: Collection> ResolverInner<C> {
     async fn start(&self) {
         let mut pubsub = self.pubsub.clone();
         let db = self.db.clone();
-        let shutdown_notify = self.shutdown_notify.clone();
 
-        loop {
-            tokio::select! {
-                _ = shutdown_notify.notified() => break,
-                Some(record) = pubsub.recv() => {
-                    match self.query_runner.index_to_pubkey(&record.originator) {
-                        Some(peer_public_key) => {
-                            let digest = record.to_digest();
-                            peer_public_key.verify(&record.signature, &digest);
-                            if peer_public_key.verify(&record.signature, &digest) {
-                                ResolverInner::<C>::store_mapping(record, &db);
-                            } else {
-                                warn!("Received record with invalid signature")
-                            }
-                        },
-                        None => warn!("Received record from unknown node index"),
+        while let Some(record) = pubsub.recv().await {
+            match self.query_runner.index_to_pubkey(&record.originator) {
+                Some(peer_public_key) => {
+                    let digest = record.to_digest();
+                    peer_public_key.verify(&record.signature, &digest);
+                    if peer_public_key.verify(&record.signature, &digest) {
+                        ResolverInner::<C>::store_mapping(record, &db);
+                    } else {
+                        warn!("Received record with invalid signature")
                     }
-                }
+                },
+                None => warn!("Received record from unknown node index"),
             }
         }
     }

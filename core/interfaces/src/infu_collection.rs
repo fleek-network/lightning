@@ -76,6 +76,7 @@ impl<C: Collection> Node<C> {
             .with_module::<C::ForwarderInterface>()
             .with_module::<C::TopologyInterface>()
             .with_module::<C::IndexerInterface>()
+            .with_module::<C::ResolverInterface>()
             .with_module::<C::OriginProviderInterface>()
             .with_module::<C::ServiceExecutorInterface>()
             .with_module::<C::DeliveryAcknowledgmentAggregatorInterface>()
@@ -120,13 +121,6 @@ impl<C: Collection> Node<C> {
                     }),
             )
             .with(
-                <C::ResolverInterface as ResolverInterface<C>>::infu_initialize_hack
-                    .on("start", |c: &C::ResolverInterface| block_on(c.start()))
-                    .on("shutdown", |c: &C::ResolverInterface| {
-                        block_on(c.shutdown())
-                    }),
-            )
-            .with(
                 C::PoolInterface::infu_initialize_hack
                     .on("start", |c: &C::PoolInterface| block_on(c.start()))
                     .on(
@@ -164,15 +158,9 @@ impl<C: Collection> Node<C> {
             .take()
             .expect("cannot call shutdown more than once");
 
-        shutdown.shutdown().await;
-
-        println!("triggering legacy");
+        let fut = shutdown.shutdown();
         self.provider.trigger("shutdown");
-        println!("finished triggering legacy shutdown event");
-
-        println!("triggering shutdown");
-
-        println!("finished triggering shutdown controller");
+        fut.await;
     }
 
     /// Fill the configuration provider with the default configuration without performing any
