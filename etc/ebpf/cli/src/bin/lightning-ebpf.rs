@@ -25,11 +25,11 @@ async fn main() -> anyhow::Result<()> {
 
     #[cfg(debug_assertions)]
     let mut handle = Bpf::load(include_bytes_aligned!(
-        "../../../ebpf/target/bpfel-unknown-none/debug/packet_filter"
+        "../../../ebpf/target/bpfel-unknown-none/debug/ebpf"
     ))?;
     #[cfg(not(debug_assertions))]
     let mut handle = Bpf::load(include_bytes_aligned!(
-        "../../../ebpf/target/bpfel-unknown-none/release/packet_filter"
+        "../../../ebpf/target/bpfel-unknown-none/release/ebpf"
     ))?;
 
     if let Err(e) = BpfLogger::init(&mut handle) {
