@@ -21,6 +21,13 @@ impl Eventstore {
         }
     }
 
+    /// Extend the current event store with another event store's events with the given name.
+    pub fn extend_only(&mut self, event: &'static str, other: &mut Eventstore) {
+        if let Some(handlers) = other.handlers.remove(event) {
+            self.handlers.entry(event).or_default().extend(handlers);
+        }
+    }
+
     /// Return a set of all of the dependencies required to trigger an event.
     pub fn get_dependencies(&self, event: &'static str) -> IndexSet<Param> {
         let mut result = IndexSet::new();
