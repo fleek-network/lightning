@@ -214,6 +214,7 @@ macro_rules! change_epoch {
             UpdateMethod::ChangeEpoch { epoch: $epoch },
             $secret_key,
             $nonce,
+            None,
         );
         run_update!(req, $socket)
     }};
@@ -269,6 +270,7 @@ macro_rules! submit_reputation_measurements {
             },
             $secret_key,
             $nonce,
+            None,
         );
         expect_tx_success!(req, $socket)
     }};
@@ -738,11 +740,13 @@ fn prepare_update_request_node(
     method: UpdateMethod,
     secret_key: &NodeSecretKey,
     nonce: u64,
+    secondary_nonce: Option<u128>,
 ) -> UpdateRequest {
+    let secondary_nonce = secondary_nonce.unwrap_or(nonce as u128);
     let payload = UpdatePayload {
         sender: secret_key.to_pk().into(),
         nonce,
-        secondary_nonce: nonce as u128, // we can probably use the nonce as the secondary nonce here
+        secondary_nonce,
         method,
         chain_id: CHAIN_ID,
     };
@@ -941,6 +945,7 @@ fn prepare_pod_request(
         },
         secret_key,
         nonce,
+        None,
     )
 }
 
@@ -971,7 +976,7 @@ fn prepare_change_epoch_request(
     secret_key: &NodeSecretKey,
     nonce: u64,
 ) -> UpdateRequest {
-    prepare_update_request_node(UpdateMethod::ChangeEpoch { epoch }, secret_key, nonce)
+    prepare_update_request_node(UpdateMethod::ChangeEpoch { epoch }, secret_key, nonce, None)
 }
 
 /// Prepare an `UpdateRequest` for `UpdateMethod::Transfer` signed with `AccountOwnerSecretKey`.
@@ -1023,6 +1028,7 @@ fn prepare_content_registry_update(
         UpdateMethod::UpdateContentRegistry { updates },
         secret_key,
         nonce,
+        None,
     )
 }
 
@@ -1306,7 +1312,7 @@ async fn test_change_epoch_reverts_node_does_not_exist() {
     let node_secret_key = NodeSecretKey::generate();
     let change_epoch = UpdateMethod::ChangeEpoch { epoch: 0 };
 
-    let update = prepare_update_request_node(change_epoch, &node_secret_key, 1);
+    let update = prepare_update_request_node(change_epoch, &node_secret_key, 1, None);
     expect_tx_revert!(update, &update_socket, ExecutionError::NodeDoesNotExist);
 }
 
@@ -1335,7 +1341,7 @@ async fn test_change_epoch_reverts_insufficient_stake() {
     );
 
     let change_epoch = UpdateMethod::ChangeEpoch { epoch: 0 };
-    let update = prepare_update_request_node(change_epoch, &node_secret_key, 1);
+    let update = prepare_update_request_node(change_epoch, &node_secret_key, 1, None);
     expect_tx_revert!(update, &update_socket, ExecutionError::InsufficientStake);
 }
 
@@ -1351,7 +1357,7 @@ async fn test_epoch_change_reverts_epoch_already_changed() {
     assert_eq!(query_runner.get_epoch_info().epoch, 1);
 
     let change_epoch = UpdateMethod::ChangeEpoch { epoch: 0 };
-    let update = prepare_update_request_node(change_epoch, &keystore[0].node_secret_key, 2);
+    let update = prepare_update_request_node(change_epoch, &keystore[0].node_secret_key, 2, None);
     expect_tx_revert!(update, &update_socket, ExecutionError::EpochAlreadyChanged);
 }
 
@@ -1363,7 +1369,7 @@ async fn test_epoch_change_reverts_epoch_has_not_started() {
     let (update_socket, _query_runner) = test_init_app(committee);
 
     let change_epoch = UpdateMethod::ChangeEpoch { epoch: 1 };
-    let update = prepare_update_request_node(change_epoch, &keystore[0].node_secret_key, 1);
+    let update = prepare_update_request_node(change_epoch, &keystore[0].node_secret_key, 1, None);
     expect_tx_revert!(update, &update_socket, ExecutionError::EpochHasNotStarted);
 }
 
@@ -1391,7 +1397,7 @@ async fn test_epoch_change_reverts_not_committee_member() {
     );
 
     let change_epoch = UpdateMethod::ChangeEpoch { epoch: 0 };
-    let update = prepare_update_request_node(change_epoch, &node_secret_key, 1);
+    let update = prepare_update_request_node(change_epoch, &node_secret_key, 1, None);
     expect_tx_revert!(update, &update_socket, ExecutionError::NotCommitteeMember);
 }
 
@@ -1403,11 +1409,12 @@ async fn test_epoch_change_reverts_already_signaled() {
     let (update_socket, _query_runner) = test_init_app(committee);
 
     let change_epoch = UpdateMethod::ChangeEpoch { epoch: 0 };
-    let update = prepare_update_request_node(change_epoch.clone(), &keystore[0].node_secret_key, 1);
+    let update =
+        prepare_update_request_node(change_epoch.clone(), &keystore[0].node_secret_key, 1, None);
     expect_tx_success!(update, &update_socket);
 
     // Second update
-    let update = prepare_update_request_node(change_epoch, &keystore[0].node_secret_key, 2);
+    let update = prepare_update_request_node(change_epoch, &keystore[0].node_secret_key, 2, None);
     expect_tx_revert!(update, &update_socket, ExecutionError::AlreadySignaled);
 }
 
@@ -1467,6 +1474,7 @@ async fn test_submit_rep_measurements_too_many_times() {
             },
             &keystore[0].node_secret_key,
             1 + i as u64,
+            None,
         );
         expect_tx_success!(req, &update_socket);
     }
@@ -1474,6 +1482,7 @@ async fn test_submit_rep_measurements_too_many_times() {
         UpdateMethod::SubmitReputationMeasurements { measurements: map },
         &keystore[0].node_secret_key,
         1 + MAX_MEASUREMENTS_SUBMIT as u64,
+        None,
     );
     expect_tx_revert!(
         req,
@@ -1820,7 +1829,7 @@ async fn test_submit_pod_reverts_node_does_not_exist() {
         proofs: vec![DeliveryAcknowledgmentProof],
         metadata: None,
     };
-    let update = prepare_update_request_node(submit_pod, &node_secret_key, 1);
+    let update = prepare_update_request_node(submit_pod, &node_secret_key, 1, None);
     expect_tx_revert!(update, &update_socket, ExecutionError::NodeDoesNotExist);
 }
 
@@ -1854,7 +1863,7 @@ async fn test_submit_pod_reverts_insufficient_stake() {
         proofs: vec![DeliveryAcknowledgmentProof],
         metadata: None,
     };
-    let update = prepare_update_request_node(submit_pod, &node_secret_key, 1);
+    let update = prepare_update_request_node(submit_pod, &node_secret_key, 1, None);
     expect_tx_revert!(update, &update_socket, ExecutionError::InsufficientStake);
 }
 
@@ -1962,7 +1971,7 @@ async fn test_change_protocol_params_reverts_not_account_key() {
 
     // Assert that reverts for Node Key
     let update =
-        prepare_update_request_node(change_method.clone(), &keystore[0].node_secret_key, 1);
+        prepare_update_request_node(change_method.clone(), &keystore[0].node_secret_key, 1, None);
     expect_tx_revert!(update, &update_socket, ExecutionError::OnlyAccountOwner);
     assert_eq!(
         query_runner.get_protocol_param(&param).unwrap(),
@@ -2433,7 +2442,7 @@ async fn test_revert_transfer_not_account_key() {
 
     // Check that trying to transfer funds with Node Key reverts
     let node_secret_key = &keystore[0].node_secret_key;
-    let update_node_key = prepare_update_request_node(transfer.clone(), node_secret_key, 1);
+    let update_node_key = prepare_update_request_node(transfer.clone(), node_secret_key, 1, None);
     expect_tx_revert!(
         update_node_key,
         &update_socket,
@@ -2546,7 +2555,7 @@ async fn test_revert_deposit_not_account_key() {
 
     // Check that trying to deposit funds with Node Key reverts
     let node_secret_key = &keystore[0].node_secret_key;
-    let update_node_key = prepare_update_request_node(deposit.clone(), node_secret_key, 1);
+    let update_node_key = prepare_update_request_node(deposit.clone(), node_secret_key, 1, None);
     expect_tx_revert!(
         update_node_key,
         &update_socket,
@@ -2610,7 +2619,7 @@ async fn test_opt_in_reverts_node_does_not_exist() {
     // Unknown Node Key (without Stake)
     let node_secret_key = NodeSecretKey::generate();
     let opt_in = UpdateMethod::OptIn {};
-    let update = prepare_update_request_node(opt_in, &node_secret_key, 1);
+    let update = prepare_update_request_node(opt_in, &node_secret_key, 1, None);
     expect_tx_revert!(update, &update_socket, ExecutionError::NodeDoesNotExist);
 }
 
@@ -2639,7 +2648,7 @@ async fn test_opt_in_reverts_insufficient_stake() {
     );
 
     let opt_in = UpdateMethod::OptIn {};
-    let update = prepare_update_request_node(opt_in, &node_secret_key, 1);
+    let update = prepare_update_request_node(opt_in, &node_secret_key, 1, None);
     expect_tx_revert!(update, &update_socket, ExecutionError::InsufficientStake);
     assert_ne!(
         get_node_participation(&query_runner, &node_secret_key.to_pk()),
@@ -2676,7 +2685,7 @@ async fn test_opt_in_works() {
     );
 
     let opt_in = UpdateMethod::OptIn {};
-    let update = prepare_update_request_node(opt_in, &node_secret_key, 1);
+    let update = prepare_update_request_node(opt_in, &node_secret_key, 1, None);
     expect_tx_success!(update, &update_socket);
 
     assert_eq!(
@@ -2709,7 +2718,7 @@ async fn test_opt_out_reverts_node_does_not_exist() {
     // Unknown Node Key (without Stake)
     let node_secret_key = NodeSecretKey::generate();
     let opt_out = UpdateMethod::OptOut {};
-    let update = prepare_update_request_node(opt_out, &node_secret_key, 1);
+    let update = prepare_update_request_node(opt_out, &node_secret_key, 1, None);
     expect_tx_revert!(update, &update_socket, ExecutionError::NodeDoesNotExist);
 }
 
@@ -2738,7 +2747,7 @@ async fn test_opt_out_reverts_insufficient_stake() {
     );
 
     let opt_out = UpdateMethod::OptOut {};
-    let update = prepare_update_request_node(opt_out, &node_secret_key, 1);
+    let update = prepare_update_request_node(opt_out, &node_secret_key, 1, None);
     expect_tx_revert!(update, &update_socket, ExecutionError::InsufficientStake);
     assert_ne!(
         get_node_participation(&query_runner, &node_secret_key.to_pk()),
@@ -2775,7 +2784,7 @@ async fn test_opt_out_works() {
     );
 
     let opt_out = UpdateMethod::OptOut {};
-    let update = prepare_update_request_node(opt_out, &node_secret_key, 1);
+    let update = prepare_update_request_node(opt_out, &node_secret_key, 1, None);
     expect_tx_success!(update, &update_socket);
 
     assert_eq!(
@@ -2804,7 +2813,7 @@ async fn test_revert_stake_not_account_key() {
 
     // Check that trying to Stake funds with Node Key reverts
     let node_secret_key = &keystore[0].node_secret_key;
-    let update_node_key = prepare_update_request_node(stake.clone(), node_secret_key, 1);
+    let update_node_key = prepare_update_request_node(stake.clone(), node_secret_key, 1, None);
     expect_tx_revert!(
         update_node_key,
         &update_socket,
@@ -2984,7 +2993,7 @@ async fn test_stake_lock_reverts_not_account_key() {
 
     // Check that trying to StakeLock funds with Node Key reverts
     let node_secret_key = &keystore[0].node_secret_key;
-    let update_node_key = prepare_update_request_node(stake_lock.clone(), node_secret_key, 1);
+    let update_node_key = prepare_update_request_node(stake_lock.clone(), node_secret_key, 1, None);
     expect_tx_revert!(
         update_node_key,
         &update_socket,
@@ -3120,7 +3129,7 @@ async fn test_unstake_reverts_not_account_key() {
 
     // Check that trying to Unstake funds with Node Key reverts
     let node_secret_key = &keystore[0].node_secret_key;
-    let update_node_key = prepare_update_request_node(unstake.clone(), node_secret_key, 1);
+    let update_node_key = prepare_update_request_node(unstake.clone(), node_secret_key, 1, None);
     expect_tx_revert!(
         update_node_key,
         &update_socket,
@@ -3191,7 +3200,7 @@ async fn test_withdraw_unstaked_reverts_not_account_key() {
     // Check that trying to Stake funds with Node Key reverts
     let node_secret_key = &keystore[0].node_secret_key;
     let update_node_key =
-        prepare_update_request_node(withdraw_unstaked.clone(), node_secret_key, 1);
+        prepare_update_request_node(withdraw_unstaked.clone(), node_secret_key, 1, None);
     expect_tx_revert!(
         update_node_key,
         &update_socket,
@@ -3373,6 +3382,7 @@ async fn test_submit_reputation_measurements_reverts_node_does_not_exist() {
         UpdateMethod::SubmitReputationMeasurements { measurements },
         &NodeSecretKey::generate(),
         1,
+        None,
     );
 
     expect_tx_revert!(update, &update_socket, ExecutionError::NodeDoesNotExist);
@@ -3413,6 +3423,7 @@ async fn test_submit_reputation_measurements_reverts_insufficient_stake() {
         UpdateMethod::SubmitReputationMeasurements { measurements },
         &node_secret_key,
         1,
+        None,
     );
 
     expect_tx_revert!(update, &update_socket, ExecutionError::InsufficientStake);
@@ -3451,6 +3462,7 @@ async fn test_submit_reputation_measurements_too_many_measurements() {
         UpdateMethod::SubmitReputationMeasurements { measurements },
         &node_secret_key,
         1,
+        None,
     );
 
     expect_tx_revert!(update, &update_socket, ExecutionError::TooManyMeasurements);
@@ -3903,29 +3915,10 @@ async fn test_reject_invalid_secondary_nonce() {
         reputation::generate_reputation_measurements(&mut rng, 0.1),
     );
 
-    // TODO(matthias): update `prepare_update_request_node` helper method to accept the secondary
-    // nonce?
-    //let update = prepare_update_request_node(
-    //    UpdateMethod::SubmitReputationMeasurements { measurements },
-    //    &NodeSecretKey::generate(),
-    //    1,
-    //);
+    let method = UpdateMethod::SubmitReputationMeasurements { measurements };
+    let request = prepare_update_request_node(method, &keystore[0].node_secret_key, 1, Some(0));
 
-    let payload = UpdatePayload {
-        sender: keystore[0].node_secret_key.to_pk().into(),
-        nonce: 1,
-        secondary_nonce: 0,
-        method: UpdateMethod::SubmitReputationMeasurements { measurements },
-        chain_id: CHAIN_ID,
-    };
-    let digest = payload.to_digest();
-    let signature = keystore[0].node_secret_key.sign(&digest);
-    let req = UpdateRequest {
-        signature: signature.into(),
-        payload,
-    };
-
-    expect_tx_revert!(req, &update_socket, ExecutionError::InvalidNonce);
+    expect_tx_revert!(request, &update_socket, ExecutionError::InvalidNonce);
 }
 
 #[tokio::test]
@@ -3943,19 +3936,8 @@ async fn test_accept_valid_secondary_nonce() {
         reputation::generate_reputation_measurements(&mut rng, 0.1),
     );
 
-    let payload = UpdatePayload {
-        sender: keystore[0].node_secret_key.to_pk().into(),
-        nonce: 1,
-        secondary_nonce: 99,
-        method: UpdateMethod::SubmitReputationMeasurements { measurements },
-        chain_id: CHAIN_ID,
-    };
-    let digest = payload.to_digest();
-    let signature = keystore[0].node_secret_key.sign(&digest);
-    let req = UpdateRequest {
-        signature: signature.into(),
-        payload,
-    };
+    let method = UpdateMethod::SubmitReputationMeasurements { measurements };
+    let request = prepare_update_request_node(method, &keystore[0].node_secret_key, 1, Some(99));
 
-    expect_tx_success!(req, &update_socket);
+    expect_tx_success!(request, &update_socket);
 }
