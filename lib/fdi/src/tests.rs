@@ -1,6 +1,7 @@
 use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::hash::Hash;
+use std::sync::atomic::AtomicUsize;
 
 use crate::dyn_method::DynMethod;
 use crate::{
@@ -344,4 +345,45 @@ fn demo_bounded() {
     let mut provider = Provider::default();
     graph.init_all(&mut provider).unwrap();
     provider.trigger("start");
+}
+
+#[test]
+fn test_ref_mut_downgrade() {
+    static DROP_CALLED: AtomicUsize = AtomicUsize::new(0);
+
+    struct Value {
+        _value: String,
+    }
+
+    impl Drop for Value {
+        fn drop(&mut self) {
+            DROP_CALLED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
+
+    let provider = Provider::default();
+    provider.insert(Value {
+        _value: "Hello".into(),
+    });
+
+    let mut_ref = provider.get_mut::<Value>();
+    let imut_ref1 = mut_ref.downgrade();
+    let imut_ref2 = provider.get::<Value>();
+    drop((imut_ref1, imut_ref2));
+
+    // We should be able to lock again.
+    let imut_ref1 = provider.get::<Value>();
+    let imut_ref2 = provider.get::<Value>();
+    drop((imut_ref1, imut_ref2));
+
+    // We should be able to get exclusive lock again.
+    let mut_ref = provider.get_mut::<Value>();
+    let imut_ref1 = mut_ref.downgrade();
+    // after downgrade we should be able to get another shared lock.
+    let imut_ref2 = provider.get::<Value>();
+    drop((imut_ref1, imut_ref2));
+
+    assert_eq!(0, DROP_CALLED.load(std::sync::atomic::Ordering::Relaxed));
+    drop(provider);
+    assert_eq!(1, DROP_CALLED.load(std::sync::atomic::Ordering::Relaxed));
 }

@@ -2,9 +2,10 @@ use std::any::Any;
 use std::cell::UnsafeCell;
 use std::collections::HashMap;
 use std::marker::PhantomData;
+use std::mem::MaybeUninit;
 use std::ops::{Deref, DerefMut};
 
-use parking_lot::lock_api::RawRwLock as RawRwLockTrait;
+use parking_lot::lock_api::{RawRwLock as RawRwLockTrait, RawRwLockDowngrade};
 use parking_lot::{Mutex, RawRwLock, RwLock};
 use triomphe::Arc;
 
@@ -252,6 +253,30 @@ impl ProviderGuard {
         's: 'e,
     {
         E::extract(self)
+    }
+}
+
+impl<T: 'static> RefMut<T> {
+    #[inline]
+    pub fn downgrade(mut self) -> Ref<T> {
+        // SAFETY: Since we follow with mem::forget() it does not matter that we insert invalid
+        // (null) bytes in place. Since no destructor is going to be called.
+        #[allow(invalid_value)]
+        let entry = std::mem::replace(&mut self.entry, unsafe {
+            MaybeUninit::zeroed().assume_init()
+        });
+        std::mem::forget(self);
+
+        // SAFETY: We own an exclusive lock right now. So it must be possible and safe to downgrade
+        // it to a shared lock.
+        unsafe {
+            entry.0.downgrade();
+        }
+
+        Ref {
+            entry,
+            _t: PhantomData,
+        }
     }
 }
 
