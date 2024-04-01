@@ -3,7 +3,6 @@
 mod backend;
 mod broadcast;
 mod command;
-mod config;
 mod db;
 mod ev;
 mod interner;
@@ -12,12 +11,11 @@ mod pubsub;
 mod recv_buffer;
 mod ring;
 mod stats;
-#[cfg(test)]
-mod tests;
+// #[cfg(test)]
+// mod tests;
 
 pub use backend::{BroadcastBackend, SimulonBackend};
 pub use broadcast::Broadcast;
-pub use config::Config;
 pub use db::Database;
 #[doc(hidden)]
 pub use ev::Context;

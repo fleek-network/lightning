@@ -16,10 +16,9 @@ use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::schema::broadcast::{Advr, Frame, Message, MessageInternedId, Want};
 use lightning_interfaces::schema::LightningMessage;
 use lightning_interfaces::types::{Digest, NodeIndex, Topic};
-use lightning_interfaces::Weight;
+use lightning_interfaces::{ShutdownWaiter, Weight};
 use lightning_metrics::{histogram, increment_counter};
 use tokio::sync::{mpsc, oneshot};
-use tokio::task::JoinHandle;
 use tracing::{debug, error, info, trace};
 
 use crate::backend::LightningBackend;
@@ -527,18 +526,21 @@ impl<C: Collection> Context<LightningBackend<C>> {
     ///
     /// The context is preserved and not destroyed on the shutdown. And can be retrieved
     /// again by awaiting the `JoinHandle`.
-    pub fn spawn(self) -> (oneshot::Sender<()>, JoinHandle<Self>)
+    pub fn spawn(self, waiter: ShutdownWaiter)
     where
         Self: Send,
     {
         let (shutdown_tx, shutdown) = oneshot::channel();
-        let handle = tokio::spawn(async move {
+        tokio::spawn(async move {
             info!("spawning broadcast event loop");
             let tmp = self.run(shutdown).await;
             info!("broadcast shut down sucessfully");
             tmp
         });
-        (shutdown_tx, handle)
+        tokio::spawn(async move {
+            waiter.wait_for_shutdown().await;
+            shutdown_tx.send(()).expect("failed to send shutdown.");
+        });
     }
 }
 

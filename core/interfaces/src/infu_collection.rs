@@ -64,6 +64,7 @@ impl<C: Collection> Node<C> {
         let graph = DependencyGraph::new()
             .with_value(waiter)
             .with_value(Blank::<C>::default())
+            .with_module::<C::BroadcastInterface>()
             .with_module::<C::ConsensusInterface>()
             .with_module::<C::SignerInterface>()
             .with_module::<C::BlockstoreInterface>()
@@ -94,13 +95,6 @@ impl<C: Collection> Node<C> {
                 C::SyncronizerInterface::infu_initialize_hack
                     .on("start", |c: &C::SyncronizerInterface| block_on(c.start()))
                     .on("shutdown", |c: &C::SyncronizerInterface| {
-                        block_on(c.shutdown())
-                    }),
-            )
-            .with(
-                C::BroadcastInterface::infu_initialize_hack
-                    .on("start", |c: &C::BroadcastInterface| block_on(c.start()))
-                    .on("shutdown", |c: &C::BroadcastInterface| {
                         block_on(c.shutdown())
                     }),
             )

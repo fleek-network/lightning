@@ -1,58 +1,22 @@
 use std::collections::HashSet;
 
 use anyhow::Result;
-use infusion::c;
+use fdi::BuildGraph;
 use lightning_schema::LightningMessage;
 use lightning_types::{Digest, NodeIndex};
 
 use crate::infu_collection::Collection;
 use crate::types::Topic;
-use crate::{
-    ApplicationInterface,
-    ConfigConsumer,
-    ConfigProviderInterface,
-    KeystoreInterface,
-    PoolInterface,
-    ReputationAggregatorInterface,
-    WithStartAndShutdown,
-};
 
 /// The gossip system in Fleek Network implements the functionality of broadcasting
 /// messages to the rest of the nodes in the network.
 #[infusion::service]
-pub trait BroadcastInterface<C: Collection>:
-    WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync
-{
-    fn _init(
-        config: ::ConfigProviderInterface,
-        app: ::ApplicationInterface,
-        keystore: ::KeystoreInterface,
-        rep_aggregator: ::ReputationAggregatorInterface,
-        pool: ::PoolInterface,
-    ) {
-        Self::init(
-            config.get::<Self>(),
-            app.sync_query(),
-            keystore.clone(),
-            rep_aggregator.get_reporter(),
-            pool,
-        )
-    }
-
+pub trait BroadcastInterface<C: Collection>: BuildGraph + Sized + Send {
     /// The message type to be encoded/decoded for networking.
     type Message: LightningMessage;
 
     /// Pubsub topic for sending and receiving messages on a topic
     type PubSub<T: LightningMessage + Clone>: PubSub<T> = infusion::Blank<T>;
-
-    /// Initialize the gossip system with the config and the topology object..
-    fn init(
-        config: Self::Config,
-        sqr: c!(C::ApplicationInterface::SyncExecutor),
-        keystore: C::KeystoreInterface,
-        rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
-        pool: &c!(C::PoolInterface),
-    ) -> Result<Self>;
 
     /// Get a send and receiver for messages in a pub-sub topic.
     #[blank = Default::default()]
