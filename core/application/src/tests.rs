@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
 use std::net::IpAddr;
 use std::str::FromStr;
@@ -60,6 +61,7 @@ use lightning_interfaces::{
 };
 use lightning_test_utils::{random, reputation};
 use lightning_utils::application::QueryRunnerExt;
+use rand::seq::SliceRandom;
 
 use crate::app::Application;
 use crate::config::{Config, Mode, StorageConfig};
@@ -505,6 +507,7 @@ fn test_genesis() -> Genesis {
         epoch_start: 1684276288383,
         epoch_time: 120000,
         committee_size: 10,
+        node_count: 10,
         min_stake: 1000,
         eligibility_time: 1,
         lock_time: 5,
@@ -3940,4 +3943,89 @@ async fn test_accept_valid_secondary_nonce() {
     let request = prepare_update_request_node(method, &keystore[0].node_secret_key, 1, Some(99));
 
     expect_tx_success!(request, &update_socket);
+}
+
+// (dalton) Since the quick sort used to select the winners of the auctions takes &self of the whole
+// state, since it has to do reputation lookups on the compare nodes side of things I am going to
+// repeate the modified quick sort algorithm here so we can have unit tests on just the actual
+// algoritm
+#[test]
+fn test_quick_sort() {
+    let nodes = quick_sort_mock_node_list();
+    // We want the top 1000 nodes so the algorithm will find us and return the pivot from the bottom
+    // 9000
+    let k = 9000;
+    let r = nodes.len() - 1;
+    let winners = quick_sort_repeated(nodes, 0, r, k);
+
+    assert_eq!(winners.len(), 1000);
+
+    for node in winners {
+        // Node indexes 9000-10000 should be the winners of the auction in this test
+        assert!(node.0 > 8999);
+    }
+}
+
+fn quick_sort_repeated(
+    mut nodes: Vec<(NodeIndex, NodeInfo)>,
+    l: usize,
+    r: usize,
+    k: usize,
+) -> Vec<(NodeIndex, NodeInfo)> {
+    let pivot = quick_sort_partition_repeated(&mut nodes, l, r);
+
+    match pivot.cmp(&(k - 1)) {
+        Ordering::Equal => nodes[pivot + 1..].to_vec(),
+        Ordering::Greater => quick_sort_repeated(nodes, l, pivot - 1, k),
+        _ => quick_sort_repeated(nodes, pivot + 1, r, k),
+    }
+}
+
+fn quick_sort_partition_repeated(nodes: &mut [(NodeIndex, NodeInfo)], l: usize, r: usize) -> usize {
+    let pivot = nodes[r].clone();
+    let mut i = l;
+
+    for j in l..r {
+        if compare_nodes_repeated(&nodes[j].1, &pivot.1) {
+            nodes.swap(j, i);
+            i += 1;
+        }
+    }
+    nodes.swap(i, r);
+
+    i
+}
+
+fn compare_nodes_repeated(left: &NodeInfo, right: &NodeInfo) -> bool {
+    left.stake.staked <= right.stake.staked
+}
+
+// Provides list of 10k nodes each one staking one more than the last
+fn quick_sort_mock_node_list() -> Vec<(NodeIndex, NodeInfo)> {
+    let mut nodes = Vec::with_capacity(10_000);
+    for i in 0..10_000 {
+        nodes.push((
+            i,
+            NodeInfo {
+                owner: [0; 20].into(),
+                public_key: [0; 32].into(),
+                consensus_key: [0; 96].into(),
+                staked_since: 0,
+                stake: Staking {
+                    staked: i.into(),
+                    stake_locked_until: 0,
+                    locked: HpUfixed::zero(),
+                    locked_until: 0,
+                },
+                domain: [0, 0, 0, 0].into(),
+                worker_domain: [0, 0, 0, 0].into(),
+                worker_public_key: [0; 32].into(),
+                participation: Participation::True,
+                nonce: 0,
+                ports: Default::default(),
+            },
+        ));
+    }
+    nodes.shuffle(&mut rand::thread_rng());
+    nodes
 }

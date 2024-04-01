@@ -22,6 +22,7 @@ pub struct Genesis {
     pub epoch_start: u64,
     pub epoch_time: u64,
     pub committee_size: u64,
+    pub node_count: u64,
     pub min_stake: u64,
     pub eligibility_time: u64,
     pub lock_time: Epoch,

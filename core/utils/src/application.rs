@@ -142,6 +142,26 @@ pub trait QueryRunnerExt: SyncQueryRunnerInterface {
         })
     }
 
+    /// Gets the current active node set for a given epoch
+    fn get_active_nodes(&self) -> Vec<NodeInfoWithIndex> {
+        let current_epoch = self.get_current_epoch();
+
+        let node_indexes = self
+            .get_committe_info(&current_epoch, |committee| committee.active_node_set)
+            .unwrap_or_default();
+
+        node_indexes
+            .iter()
+            .filter_map(|index| {
+                self.get_node_info(index, |node_info| node_info)
+                    .map(|info| NodeInfoWithIndex {
+                        index: *index,
+                        info,
+                    })
+            })
+            .collect()
+    }
+
     /// Returns the amount that is required to be a valid node in the network.
     fn get_staking_amount(&self) -> u128 {
         self.get_protocol_param(&ProtocolParams::MinimumNodeStake)

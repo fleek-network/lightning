@@ -345,10 +345,14 @@ impl Env<UpdatePerm> {
                 ProtocolParams::CommitteeSize,
                 genesis.committee_size as u128,
             );
+            param_table.insert(
+                ProtocolParams::NodeCount,
+                genesis.node_count as u128
+            );
 
             let epoch_end: u64 = genesis.epoch_time + genesis.epoch_start;
             let mut committee_members = Vec::with_capacity(4);
-
+            let mut active_nodes = Vec::with_capacity(genesis.node_info.len());
             // add node info
             for node in genesis.node_info {
                 let mut node_info = NodeInfo::from(&node);
@@ -380,16 +384,19 @@ impl Env<UpdatePerm> {
                 if node.genesis_committee{
                     committee_members.push(node_index);
                 }
-
+                active_nodes.push(node_index);
             }
+
             metadata_table.insert(Metadata::GenesisCommittee,
                  Value::GenesisCommittee(committee_members.clone()));
             committee_table.insert(
                 0,
                 Committee {
                     ready_to_change: Vec::with_capacity(committee_members.len()),
-                    members: committee_members,
+                    members: committee_members.clone(),
                     epoch_end_timestamp: epoch_end,
+                    // Todo(dont just use the committee members for first set)
+                    active_node_set: active_nodes
                 },
             );
 

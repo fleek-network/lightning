@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 use anyhow::anyhow;
 use fleek_crypto::{NodeSecretKey, SecretKey};
 use lightning_interfaces::infu_collection::{c, Collection};
-use lightning_interfaces::types::{NodeIndex, NodeInfo, Participation};
+use lightning_interfaces::types::{NodeIndex, NodeInfo};
 use lightning_interfaces::{
     ApplicationInterface,
     ConfigConsumer,
@@ -274,9 +274,8 @@ impl<C: Collection> PingerInner<C> {
     fn get_node_registry(&self, rng: &mut SmallRng) -> Vec<NodeIndex> {
         let mut nodes: Vec<NodeIndex> = self
             .query_runner
-            .get_node_registry(None)
+            .get_active_nodes()
             .into_iter()
-            .filter(|node| node.info.participation == Participation::True)
             .map(|node| node.index)
             .collect();
         nodes.shuffle(rng);

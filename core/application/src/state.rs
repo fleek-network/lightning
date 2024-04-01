@@ -844,25 +844,13 @@ impl<B: Backend> State<B> {
                 self.executed_digests.remove(&digest);
             }
 
-            // calculate the next epoch endstamp
-            let epoch_duration = self.parameters.get(&ProtocolParams::EpochTime).unwrap_or(1);
-
-            let new_epoch_end = current_committee.epoch_end_timestamp + epoch_duration as u64;
-            // Save the old committee so we can see who signaled
             self.committee_info.set(current_epoch, current_committee);
             // Get new committee
             let new_committee = self.choose_new_committee();
             // increment epoch
             current_epoch += 1;
 
-            self.committee_info.set(
-                current_epoch,
-                Committee {
-                    ready_to_change: Vec::with_capacity(new_committee.len()),
-                    members: new_committee,
-                    epoch_end_timestamp: new_epoch_end,
-                },
-            );
+            self.committee_info.set(current_epoch, new_committee);
 
             self.metadata
                 .set(Metadata::Epoch, Value::Epoch(current_epoch));
@@ -1065,14 +1053,10 @@ impl<B: Backend> State<B> {
     }
 
     fn get_node_registry(&self) -> BTreeMap<NodeIndex, NodeInfo> {
-        let minimum_stake = self
-            .parameters
-            .get(&ProtocolParams::MinimumNodeStake)
-            .unwrap_or(0);
         self.node_info
             .keys()
             .filter_map(|key| self.node_info.get(&key).map(|node| (key, node)))
-            .filter(|(_, node)| node.stake.staked >= minimum_stake.into())
+            .filter(|(_, node)| node.stake.staked > HpUfixed::zero())
             .collect()
     }
 
@@ -1352,6 +1336,71 @@ impl<B: Backend> State<B> {
         self.mint_and_transfer_flk(&emissions * &protocol_share, protocol_owner);
     }
 
+    /// Settles the auction for the current epoch and returns a list of the active set of nodes
+    /// Uses quick sort algorithm for effecient sorting
+    fn settle_auction(&self, nodes: Vec<(NodeIndex, NodeInfo)>) -> Vec<(NodeIndex, NodeInfo)> {
+        // Safe unwrap set at genesis
+        let node_count = self.parameters.get(&ProtocolParams::NodeCount).unwrap() as usize;
+        let total_nodes = nodes.len();
+
+        if total_nodes <= node_count {
+            return nodes;
+        }
+        // Quick sort algo will find smallest kth nodes so we need to subtract target node count
+        // from total
+        let k = total_nodes - node_count;
+        let r = total_nodes - 1;
+
+        self.quick_sort_nodes(nodes, 0, r, k)
+    }
+
+    /// Used by settle_auction. Modified quick sort algorithm that will give us the kth highest
+    /// staked nodes with our own custom compare function where we can have custom tiebreakers for
+    /// reputation and things of that natrue
+    fn quick_sort_nodes(
+        &self,
+        mut nodes: Vec<(NodeIndex, NodeInfo)>,
+        l: usize,
+        r: usize,
+        k: usize,
+    ) -> Vec<(NodeIndex, NodeInfo)> {
+        let pivot = self.partition_nodes(&mut nodes, l, r);
+
+        match pivot.cmp(&(k - 1)) {
+            Ordering::Equal => nodes[pivot + 1..].to_vec(),
+            Ordering::Greater => self.quick_sort_nodes(nodes, l, pivot - 1, k),
+            _ => self.quick_sort_nodes(nodes, pivot + 1, r, k),
+        }
+    }
+
+    /// Partition part of the quick sort algorithm used to settle auctions
+    fn partition_nodes(&self, nodes: &mut [(NodeIndex, NodeInfo)], l: usize, r: usize) -> usize {
+        let pivot = nodes[r].clone();
+        let mut i = l;
+
+        for j in l..r {
+            if self.compare_nodes_in_auction(&nodes[j], &pivot) {
+                nodes.swap(j, i);
+                i += 1;
+            }
+        }
+        nodes.swap(i, r);
+
+        i
+    }
+
+    /// The compare function in our auction settlement. Here we will have the logic that decides who
+    /// wins the staking auction
+    fn compare_nodes_in_auction(
+        &self,
+        left: &(NodeIndex, NodeInfo),
+        right: &(NodeIndex, NodeInfo),
+    ) -> bool {
+        // todo(dalton): This is where we add tiebreakers like reputation score. Or modifiers on the
+        // stake
+        left.1.stake.staked <= right.1.stake.staked
+    }
+
     fn calculate_emissions(&self) -> HpUfixed<18> {
         let percentage_divisor = HpUfixed::<18>::from(100_u64);
         let inflation_percent: HpUfixed<18> = self
@@ -1444,52 +1493,71 @@ impl<B: Backend> State<B> {
         HpUfixed::<3>::min(&max_boost, &boost).to_owned()
     }
 
-    fn choose_new_committee(&self) -> Vec<NodeIndex> {
+    fn choose_new_committee(&self) -> Committee {
         let epoch = match self.metadata.get(&Metadata::Epoch) {
             Some(Value::Epoch(epoch)) => epoch,
             _ => 0,
         };
 
-        let mut node_registry: Vec<NodeIndex> = self
+        let node_registry: Vec<(NodeIndex, NodeInfo)> = self
             .get_node_registry()
-            .keys()
-            .copied()
-            // The unwrap is safe because `node_registry` contains only valid node indices.
-            .filter(|index| self.node_info.get(index).unwrap().participation == Participation::True)
-            .collect();
-        let committee_size = self.parameters.get(&ProtocolParams::CommitteeSize).unwrap();
-        let num_of_nodes = node_registry.len() as u128;
-        // if total number of nodes are less than committee size, all nodes are part of committee
-        if committee_size >= num_of_nodes {
-            return node_registry;
-        }
-
-        let committee = self.committee_info.get(&epoch).unwrap();
-        let epoch_end = committee.epoch_end_timestamp;
-        let public_key = {
-            if !committee.members.is_empty() {
-                let mid_index = committee.members.len() / 2;
-                self.node_info
-                    .get(&committee.members[mid_index])
-                    .unwrap()
-                    .public_key
-            } else {
-                NodePublicKey([1u8; 32])
-            }
-        };
-
-        let mut hasher = Hasher::new();
-        hasher.update(&public_key.0);
-        hasher.update(&epoch_end.to_be_bytes());
-        let result = hasher.finalize();
-        let mut seed = [0u8; 32];
-        seed.copy_from_slice(&result.as_bytes()[0..32]);
-        let mut rng: StdRng = SeedableRng::from_seed(seed);
-        node_registry.shuffle(&mut rng);
-        node_registry
             .into_iter()
-            .take(committee_size.try_into().unwrap())
-            .collect()
+            .filter(|index| index.1.participation == Participation::True)
+            .collect();
+
+        let committee_size = self.parameters.get(&ProtocolParams::CommitteeSize).unwrap();
+
+        let mut active_nodes: Vec<NodeIndex> = self
+            .settle_auction(node_registry)
+            .iter()
+            .map(|node| node.0)
+            .collect();
+
+        let num_of_nodes: u128 = active_nodes.len() as u128;
+        // if total number of nodes are less than committee size, all nodes are part of committee
+        let committee = if committee_size >= num_of_nodes {
+            active_nodes.clone()
+            //   return node_registry;
+        } else {
+            let committee_table = self.committee_info.get(&epoch).unwrap();
+            let epoch_end = committee_table.epoch_end_timestamp;
+            let public_key = {
+                if !committee_table.members.is_empty() {
+                    let mid_index = committee_table.members.len() / 2;
+                    self.node_info
+                        .get(&committee_table.members[mid_index])
+                        .unwrap()
+                        .public_key
+                } else {
+                    NodePublicKey([1u8; 32])
+                }
+            };
+
+            let mut hasher = Hasher::new();
+            hasher.update(&public_key.0);
+            hasher.update(&epoch_end.to_be_bytes());
+            let result = hasher.finalize();
+            let mut seed = [0u8; 32];
+            seed.copy_from_slice(&result.as_bytes()[0..32]);
+            let mut rng: StdRng = SeedableRng::from_seed(seed);
+            active_nodes.shuffle(&mut rng);
+            active_nodes
+                .iter()
+                .take(committee_size.try_into().unwrap())
+                .copied()
+                .collect()
+        };
+        let epoch_length = self.parameters.get(&ProtocolParams::EpochTime).unwrap();
+
+        let epoch_end_timestamp =
+            self.committee_info.get(&epoch).unwrap().epoch_end_timestamp + epoch_length as u64;
+
+        Committee {
+            ready_to_change: Vec::with_capacity(committee.len()),
+            members: committee,
+            epoch_end_timestamp,
+            active_node_set: active_nodes,
+        }
     }
 
     /// This function takes in the Transaction and verifies the Signature matches the Sender. It

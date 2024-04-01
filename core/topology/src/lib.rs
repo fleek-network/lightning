@@ -16,7 +16,6 @@ use anyhow::anyhow;
 pub use config::Config;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::infu_collection::{c, Collection};
-use lightning_interfaces::types::Participation;
 use lightning_interfaces::{
     ApplicationInterface,
     ConfigConsumer,
@@ -53,9 +52,8 @@ impl<C: Collection> TopologyInner<C> {
         let latencies = self.query.get_current_latencies();
         let valid_pubkeys: BTreeSet<NodePublicKey> = self
             .query
-            .get_node_registry(None)
+            .get_active_nodes()
             .into_iter()
-            .filter(|node_info| node_info.info.participation == Participation::True)
             .map(|node_info| node_info.info.public_key)
             .collect();
         let min_nodes = self.min_nodes;

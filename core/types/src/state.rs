@@ -350,6 +350,7 @@ pub struct Committee {
     pub members: Vec<NodeIndex>,
     pub ready_to_change: Vec<NodeIndex>,
     pub epoch_end_timestamp: u64,
+    pub active_node_set: Vec<NodeIndex>,
 }
 
 impl TranscriptBuilderInput for Service {
