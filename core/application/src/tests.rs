@@ -4023,6 +4023,7 @@ fn quick_sort_mock_node_list() -> Vec<(NodeIndex, NodeInfo)> {
                 participation: Participation::True,
                 nonce: 0,
                 ports: Default::default(),
+                secondary_nonce: 0
             },
         ));
     }
