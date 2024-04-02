@@ -355,7 +355,9 @@ impl Env<UpdatePerm> {
             let mut active_nodes = Vec::with_capacity(genesis.node_info.len());
             // add node info
             for node in genesis.node_info {
-                let node_info = NodeInfo::from(&node);
+                let mut node_info = NodeInfo::from(&node);
+
+                node_info.stake.staked = std::cmp::max(node_info.stake.staked, genesis.min_stake.into());
 
                 let node_index = match metadata_table.get(Metadata::NextNodeIndex) {
                     Some(Value::NextNodeIndex(index)) => index,
