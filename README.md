@@ -105,3 +105,48 @@ $ curl -X POST -H "Content-Type: application/json" -d '{
     }' http://127.0.0.1:4069/rpc/v0
 # Response: {"jsonrpc":"2.0","result":"pong","id":1}
 ```
+
+# Nix
+
+The project provides a nix flake for a determanistic development and build environment.
+
+Nix (with flakes enabled) can be easily installed with https://github.com/DeterminateSystems/nix-installer
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
+```
+
+## Development shell
+
+A development environment can be used with:
+
+```bash
+nix develop github:fleek-network/lightning
+
+# For a local repo
+nix develop .
+```
+
+## Build
+
+The project can be built in a pure offline environment with:
+
+```bash
+nix build github:fleek-network/lightning
+
+# For a local repo
+nix build .
+```
+
+## Shell environment
+
+A shell can also be spawned with the `lightning-node` binary provided in the path:
+
+> Note: until we provide a cachix cache from ci, the node will be built locally before entering the shell
+
+```bash
+nix shell github:fleek-network/lightning
+
+# For a local repo
+nix shell .
+```
