@@ -1,18 +1,11 @@
 use aya_bpf::cty::c_int;
-use aya_bpf::macros::{lsm, map};
-use aya_bpf::maps::HashMap;
+use aya_bpf::macros::lsm;
 use aya_bpf::programs::LsmContext;
 use aya_log_ebpf::info;
 use common::File;
 
-use crate::vmlinux;
 use crate::vmlinux::{cred, task_struct};
-
-// Todo: replace with HashMapOfMaps or HashMapOfArrays when aya adds support.
-#[map]
-static BINARY_FILES: HashMap<File, u64> = HashMap::<File, u64>::with_max_entries(1024, 0);
-#[map]
-static PROCESSES: HashMap<u64, u64> = HashMap::<u64, u64>::with_max_entries(1024, 0);
+use crate::{maps, vmlinux};
 
 #[lsm(hook = "task_alloc")]
 pub fn task_alloc(ctx: LsmContext) -> i32 {
@@ -69,7 +62,7 @@ unsafe fn try_file_open(ctx: LsmContext) -> Result<i32, i32> {
 unsafe fn validate_by_pid(ctx: &LsmContext, file: &File) -> bool {
     let pid = aya_bpf::helpers::bpf_get_current_pid_tgid();
     info!(ctx, "Process {} attempting to open file", pid);
-    if let Some(f_inode) = PROCESSES.get(&pid) {
+    if let Some(f_inode) = maps::PROCESSES.get(&pid) {
         return f_inode == &file.inode_n;
     }
     // Todo: get binary path otherwise.

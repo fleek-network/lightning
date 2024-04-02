@@ -2,6 +2,7 @@
 #![no_main]
 
 mod lsm;
+mod maps;
 mod packet_filter;
 #[allow(non_camel_case_types)]
 #[allow(non_upper_case_globals)]

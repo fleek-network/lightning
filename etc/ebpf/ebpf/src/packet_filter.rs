@@ -1,8 +1,7 @@
 use core::mem;
 
 use aya_bpf::bindings::xdp_action;
-use aya_bpf::macros::{map, xdp};
-use aya_bpf::maps::HashMap;
+use aya_bpf::macros::xdp;
 use aya_bpf::programs::XdpContext;
 use aya_log_ebpf::info;
 use common::IpPortKey;
@@ -12,10 +11,9 @@ use network_types::ip::{IpProto, Ipv4Hdr};
 use network_types::tcp::TcpHdr;
 use network_types::udp::UdpHdr;
 
-type XdpAction = xdp_action::Type;
+use crate::maps;
 
-#[map]
-static BLOCK_LIST: HashMap<IpPortKey, u32> = HashMap::<IpPortKey, u32>::with_max_entries(1024, 0);
+type XdpAction = xdp_action::Type;
 
 #[xdp]
 pub fn xdp_packet_filter(ctx: XdpContext) -> u32 {
@@ -80,7 +78,7 @@ fn ptr_at<T>(ctx: &XdpContext, offset: usize) -> Result<*const T, ()> {
 
 fn not_allowed_for_port(ip: u32, port: u16) -> bool {
     unsafe {
-        BLOCK_LIST
+        maps::BLOCK_LIST
             .get(&IpPortKey {
                 ip,
                 port: port as u32,
@@ -90,5 +88,5 @@ fn not_allowed_for_port(ip: u32, port: u16) -> bool {
 }
 
 fn not_allowed(ip: u32) -> bool {
-    unsafe { BLOCK_LIST.get(&IpPortKey { ip, port: 0 }).is_some() }
+    unsafe { maps::BLOCK_LIST.get(&IpPortKey { ip, port: 0 }).is_some() }
 }
