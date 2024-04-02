@@ -18,6 +18,7 @@ pub type TopologyConnections = Arc<Connections>;
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Message {
     id: usize,
+    payload: Vec<u8>,
 }
 
 impl AutoImplSerde for Message {}
@@ -154,7 +155,10 @@ pub async fn run_client(n: usize) {
             .await
             .expect("Connection failed.");
 
-        let msg = Message { id: i };
+        let msg = Message {
+            id: i,
+            payload: vec![0; 512],
+        };
         conn.write(&msg);
 
         simulon::api::sleep(Duration::from_secs(1)).await;
