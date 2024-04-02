@@ -62,14 +62,14 @@ pub struct GenesisService {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GenesisNode {
-    owner: EthAddress,
+    pub owner: EthAddress,
     pub primary_public_key: NodePublicKey,
-    consensus_public_key: ConsensusPublicKey,
+    pub consensus_public_key: ConsensusPublicKey,
     pub primary_domain: IpAddr,
-    worker_domain: IpAddr,
-    worker_public_key: NodePublicKey,
+    pub worker_domain: IpAddr,
+    pub worker_public_key: NodePublicKey,
     pub ports: NodePorts,
-    stake: Staking,
+    pub stake: Staking,
     pub reputation: Option<u8>,
     pub current_epoch_served: Option<NodeServed>,
     pub genesis_committee: bool,

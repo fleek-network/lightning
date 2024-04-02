@@ -159,6 +159,7 @@ pub struct SwarmBuilder {
     syncronizer_delta: Option<Duration>,
     archiver: bool,
     use_persistence: bool,
+    additional_nodes: Option<Vec<SwarmNode>>,
     committee_size: Option<u64>,
 }
 
@@ -218,6 +219,11 @@ impl SwarmBuilder {
         self
     }
 
+    pub fn with_additional_nodes(mut self, nodes: Vec<SwarmNode>) -> Self {
+        self.additional_nodes = Some(nodes);
+        self
+    }
+
     pub fn build(self) -> Swarm {
         let num_nodes = self.num_nodes.expect("Number of nodes must be provided.");
         let directory = self.directory.expect("Directory must be provided.");
@@ -242,41 +248,41 @@ impl SwarmBuilder {
         // we can pass to the containerized nodes.
         let mut tmp_nodes = Vec::with_capacity(num_nodes);
 
-        for index in 0..num_nodes {
+        let mut index = 0;
+        let mut committee_size = 0;
+
+        let mut additional_nodes = self.additional_nodes.unwrap_or_default();
+        if additional_nodes.len() > num_nodes {
+            panic!(
+                "Number of nodes is {num_nodes}, but {} additional nodes were specified.",
+                additional_nodes.len()
+            );
+        }
+
+        while index < num_nodes {
+            let node = additional_nodes.pop();
+
+            let stake = node.clone().and_then(|node| node.stake).unwrap_or(Staking {
+                staked: HpUfixed::<18>::from(genesis.min_stake),
+                ..Default::default()
+            });
+            let reputation_score = node.clone().and_then(|node| node.reputation_score);
+            let is_committee = node.map(|node| node.is_committee).unwrap_or(false);
+            if committee_size == genesis.committee_size && is_committee {
+                panic!(
+                    "Committee size is set to {}. Too many additional nodes that are on the committee were specified.",
+                    genesis.committee_size
+                )
+            }
+            let is_committee = is_committee || committee_size < genesis.committee_size;
+            if is_committee {
+                committee_size += 1;
+            }
+
             let root = directory.join(format!("node-{index}"));
             fs::create_dir_all(&root).expect("Failed to create node directory");
 
-            let ports = NodePorts {
-                primary: port_assigner
-                    .get_port(min_port, max_port, Transport::Udp)
-                    .expect("Could not get port"),
-                worker: port_assigner
-                    .get_port(min_port, max_port, Transport::Udp)
-                    .expect("Could not get port"),
-                mempool: port_assigner
-                    .get_port(min_port, max_port, Transport::Tcp)
-                    .expect("Could not get port"),
-                rpc: port_assigner
-                    .get_port(min_port, max_port, Transport::Tcp)
-                    .expect("Could not get port"),
-                pool: port_assigner
-                    .get_port(min_port, max_port, Transport::Udp)
-                    .expect("Could not get port"),
-                pinger: port_assigner
-                    .get_port(min_port, max_port, Transport::Udp)
-                    .expect("Could not get port"),
-                handshake: lightning_interfaces::types::HandshakePorts {
-                    http: port_assigner
-                        .get_port(min_port, max_port, Transport::Tcp)
-                        .expect("Could not get port"),
-                    webrtc: port_assigner
-                        .get_port(min_port, max_port, Transport::Udp)
-                        .expect("Could not get port"),
-                    webtransport: port_assigner
-                        .get_port(min_port, max_port, Transport::Udp)
-                        .expect("Could not get port"),
-                },
-            };
+            let ports = assign_ports(&mut port_assigner, min_port, max_port);
             let config = build_config(
                 &root,
                 ports.clone(),
@@ -292,28 +298,29 @@ impl SwarmBuilder {
 
             let is_committee = (index as u64) < genesis.committee_size;
 
-            let node_info = GenesisNode::new(
-                owner_eth,
-                node_pk,
-                "127.0.0.1".parse().unwrap(),
-                consensus_pk,
-                "127.0.0.1".parse().unwrap(),
-                node_pk,
+            let node_info = GenesisNode {
+                owner: owner_eth,
+                primary_public_key: node_pk,
+                consensus_public_key: consensus_pk,
+                primary_domain: "127.0.0.1".parse().unwrap(),
+                worker_domain: "127.0.0.1".parse().unwrap(),
+                worker_public_key: node_pk,
                 ports,
-                Some(Staking {
-                    staked: HpUfixed::<18>::from(genesis.min_stake),
-                    ..Default::default()
-                }),
-                is_committee,
-            );
+                stake,
+                reputation: reputation_score,
+                current_epoch_served: None,
+                genesis_committee: is_committee,
+            };
+
             genesis.node_info.push(node_info);
 
             tmp_nodes.push((owner_sk, node_pk, config));
+
+            index += 1;
         }
 
         // Now that we have built the configuration of all nodes and also have compiled the
         // proper genesis config. We can inject the genesis config.
-
         let mut nodes = HashMap::new();
         for (index, (owner_sk, node_pk, config)) in tmp_nodes.into_iter().enumerate() {
             let is_committee = (index as u64) < genesis.committee_size;
@@ -337,6 +344,40 @@ impl SwarmBuilder {
         }
 
         Swarm { nodes, directory }
+    }
+}
+
+fn assign_ports(port_assigner: &mut PortAssigner, min_port: u16, max_port: u16) -> NodePorts {
+    NodePorts {
+        primary: port_assigner
+            .get_port(min_port, max_port, Transport::Udp)
+            .expect("Could not get port"),
+        worker: port_assigner
+            .get_port(min_port, max_port, Transport::Udp)
+            .expect("Could not get port"),
+        mempool: port_assigner
+            .get_port(min_port, max_port, Transport::Tcp)
+            .expect("Could not get port"),
+        rpc: port_assigner
+            .get_port(min_port, max_port, Transport::Tcp)
+            .expect("Could not get port"),
+        pool: port_assigner
+            .get_port(min_port, max_port, Transport::Udp)
+            .expect("Could not get port"),
+        pinger: port_assigner
+            .get_port(min_port, max_port, Transport::Udp)
+            .expect("Could not get port"),
+        handshake: lightning_interfaces::types::HandshakePorts {
+            http: port_assigner
+                .get_port(min_port, max_port, Transport::Tcp)
+                .expect("Could not get port"),
+            webrtc: port_assigner
+                .get_port(min_port, max_port, Transport::Udp)
+                .expect("Could not get port"),
+            webtransport: port_assigner
+                .get_port(min_port, max_port, Transport::Udp)
+                .expect("Could not get port"),
+        },
     }
 }
 
@@ -440,4 +481,12 @@ fn generate_and_store_node_secret(
     let keystore = Keystore::<FinalTypes>::init(config.get::<Keystore<FinalTypes>>())
         .expect("failed to load keystore");
     (keystore.get_ed25519_pk(), keystore.get_bls_pk())
+}
+
+/// Used to add more nodes to the swarm with specific settings.
+#[derive(Clone)]
+pub struct SwarmNode {
+    pub reputation_score: Option<u8>,
+    pub stake: Option<Staking>,
+    pub is_committee: bool,
 }
