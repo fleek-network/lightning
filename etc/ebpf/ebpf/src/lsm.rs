@@ -1,12 +1,20 @@
 use aya_bpf::cty::c_int;
-use aya_bpf::macros::lsm;
+use aya_bpf::macros::{lsm, map};
+use aya_bpf::maps::HashMap;
 use aya_bpf::programs::LsmContext;
 use aya_log_ebpf::info;
+use common::File;
 
 use crate::vmlinux;
 use crate::vmlinux::{cred, task_struct};
 
-const PATH_LEN: usize = 64;
+// Todo: replace with HashMapOfMaps or HashMapOfArrays when aya adds support.
+#[map]
+static FILE_OPEN_ALLOWED: HashMap<u64, u32> = HashMap::<u64, u32>::with_max_entries(1024, 0);
+#[map]
+static BINARY_FILES: HashMap<File, u64> = HashMap::<File, u64>::with_max_entries(1024, 0);
+#[map]
+static PROCESSES: HashMap<i32, u64> = HashMap::<i32, u64>::with_max_entries(1024, 0);
 
 #[lsm(hook = "task_alloc")]
 pub fn task_alloc(ctx: LsmContext) -> i32 {
@@ -44,26 +52,8 @@ pub fn file_open(ctx: LsmContext) -> i32 {
 }
 
 unsafe fn try_file_open(ctx: LsmContext) -> Result<i32, i32> {
-    let buf = [0u8; PATH_LEN];
-    let path = {
-        let _file: *const vmlinux::file = ctx.arg(0);
-        let len = {
-            // Todo: We need to use the file's inode or dentry
-            // to find the parent directories and validate the access.
-            PATH_LEN
-        };
-        if len >= PATH_LEN {
-            // Todo: revisit.
-            return Err(0);
-        }
-        // Todo: revisit.
-        core::str::from_utf8(&buf[..len]).map_err(|_| -1)?
-    };
-
-    // Todo: add other directories.
-    if path.starts_with("/proc/") || path.starts_with("/sys/") || path.contains(".lightning") {
-        return Err(-1);
-    }
-
+    let pid = aya_bpf::helpers::bpf_get_current_pid_tgid();
+    let _file: *const vmlinux::file = ctx.arg(0);
+    info!(&ctx, "Process {} attempting to open file", pid);
     Ok(0)
 }
