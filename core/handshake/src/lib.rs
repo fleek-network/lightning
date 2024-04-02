@@ -2,7 +2,6 @@
 
 mod http;
 mod proxy;
-mod shutdown;
 
 pub mod config;
 pub mod handshake;

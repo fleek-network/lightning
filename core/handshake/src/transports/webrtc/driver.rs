@@ -3,6 +3,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, Result};
 use dashmap::DashMap;
+use lightning_interfaces::ShutdownWaiter;
 use str0m::channel::{ChannelData, ChannelId};
 use str0m::net::{Protocol, Receive, Transmit};
 use str0m::{Event, IceConnectionState, Input, Output, Rtc};
@@ -13,7 +14,6 @@ use tracing::{error, trace, warn};
 use triomphe::Arc;
 
 use crate::schema::{HandshakeRequestFrame, RequestFrame};
-use crate::shutdown::ShutdownWaiter;
 
 /// Driver for our webrtc server.
 pub(crate) struct WebRtcDriver {

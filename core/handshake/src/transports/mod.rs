@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use axum::Router;
 use bytes::{BufMut, Bytes, BytesMut};
 use fn_sdk::header::TransportDetail;
-use lightning_interfaces::ExecutorProviderInterface;
+use lightning_interfaces::{ExecutorProviderInterface, ShutdownWaiter};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -13,7 +13,6 @@ use self::webtransport::{WebTransportReceiver, WebTransportSender};
 use crate::config::TransportConfig;
 use crate::handshake::Context;
 use crate::schema;
-use crate::shutdown::ShutdownWaiter;
 use crate::transports::http::{HttpReceiver, HttpSender};
 
 pub mod http;

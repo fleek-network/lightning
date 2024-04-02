@@ -5,14 +5,13 @@ use axum::routing::get;
 use axum::Router;
 use bytes::{BufMut, Bytes, BytesMut};
 use dashmap::DashMap;
-use lightning_interfaces::ExecutorProviderInterface;
+use lightning_interfaces::{ExecutorProviderInterface, ShutdownWaiter};
 use lightning_metrics::increment_counter;
 use serde::{Deserialize, Serialize};
 use tokio::sync::OnceCell;
 
 use super::{Transport, TransportReceiver, TransportSender};
 use crate::schema;
-use crate::shutdown::ShutdownWaiter;
 
 static LISTENERS: OnceCell<
     DashMap<u16, tokio::sync::mpsc::Sender<(MockTransportSender, MockTransportReceiver)>>,
@@ -167,14 +166,14 @@ impl TransportReceiver for MockTransportReceiver {
 #[cfg(test)]
 mod tests {
     use fleek_crypto::{ClientPublicKey, ClientSignature};
+    use lightning_interfaces::ShutdownController;
     use lightning_service_executor::shim::Provider;
 
     use super::*;
-    use crate::shutdown::ShutdownNotifier;
 
     #[tokio::test]
     async fn handshake() -> anyhow::Result<()> {
-        let notifier = ShutdownNotifier::default();
+        let notifier = ShutdownController::default();
         // Todo: use mock provider instead?
         let mut server =
             MockTransport::bind::<Provider>(notifier.waiter(), MockTransportConfig { port: 420 })

@@ -1,11 +1,13 @@
 use std::future::Future;
-use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
+use std::ops::ControlFlow;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 pub use fdi::{Cloned, Consume, Ref, RefMut};
+use futures::future::{select, Either};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio::sync::Notify;
 use tracing::trace;
+use triomphe::Arc;
 
 struct ShutdownInner {
     notify: Notify,
@@ -66,7 +68,7 @@ impl ShutdownController {
         // and one waiter that the provider uses as a dependency..
         let mut count;
         while {
-            count = Arc::strong_count(&self.inner);
+            count = Arc::count(&self.inner);
             count > 2
         } {
             trace!("Waiting for {} shutdown waiter(s) to drop", count - 2);
@@ -83,15 +85,53 @@ impl ShutdownController {
 pub struct ShutdownWaiter(Arc<ShutdownInner>);
 
 impl ShutdownWaiter {
+    #[inline(always)]
+    pub fn is_shutdown(&self) -> bool {
+        self.0.is_shutdown.load(Ordering::Relaxed)
+    }
+
+    #[inline]
+    pub async fn fold_until_shutdown<F, O, T, R>(&self, init: T, mut task: F) -> Option<R>
+    where
+        F: FnMut(T) -> O,
+        O: Future<Output = ControlFlow<R, T>>,
+    {
+        if self.is_shutdown() {
+            return None;
+        }
+
+        let mut notified = Box::pin(self.0.notify.notified());
+        let mut current = init;
+
+        loop {
+            let output = Box::pin(task(current));
+            match select(notified, output).await {
+                Either::Left(_) => return None,
+                Either::Right((ControlFlow::Break(ret), _)) => {
+                    return Some(ret);
+                },
+                Either::Right((ControlFlow::Continue(new), tmp)) => {
+                    current = new;
+                    notified = tmp;
+                },
+            }
+        }
+    }
+
+    #[inline]
+    pub async fn run_task_until_shutdown<F, O, R>(&self, mut task: F) -> Option<R>
+    where
+        F: FnMut() -> O,
+        O: Future<Output = ControlFlow<R>>,
+    {
+        self.fold_until_shutdown((), |_| task()).await
+    }
+
     /// Standalone function to wait until the shutdown signal is received.
     /// This function is 100% cancel safe and will always return immediately
     /// if shutdown has already happened.
     pub async fn wait_for_shutdown(&self) {
-        if self
-            .0
-            .is_shutdown
-            .load(std::sync::atomic::Ordering::Relaxed)
-        {
+        if self.is_shutdown() {
             // There was a missed notify event, so we immediately return
             return;
         }

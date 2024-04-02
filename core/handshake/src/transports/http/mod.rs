@@ -9,7 +9,7 @@ use axum::Router;
 use bytes::{Bytes, BytesMut};
 pub use config::Config;
 use fn_sdk::header::TransportDetail;
-use lightning_interfaces::ExecutorProviderInterface;
+use lightning_interfaces::{ExecutorProviderInterface, ShutdownWaiter};
 use lightning_schema::handshake::{
     HandshakeRequestFrame,
     HandshakeResponse,
@@ -20,7 +20,6 @@ use lightning_schema::handshake::{
 use tokio::sync::oneshot;
 use tracing::warn;
 
-use crate::shutdown::ShutdownWaiter;
 use crate::transports::{Transport, TransportReceiver, TransportSender};
 
 pub struct HttpTransport {}

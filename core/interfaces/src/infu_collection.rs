@@ -65,6 +65,7 @@ impl<C: Collection> Node<C> {
             .with_value(waiter)
             .with_value(Blank::<C>::default())
             .with_module::<C::BroadcastInterface>()
+            .with_module::<C::HandshakeInterface>()
             .with_module::<C::ConsensusInterface>()
             .with_module::<C::SignerInterface>()
             .with_module::<C::BlockstoreInterface>()
@@ -103,13 +104,6 @@ impl<C: Collection> Node<C> {
                 C::ArchiveInterface::infu_initialize_hack
                     .on("start", |c: &C::ArchiveInterface| block_on(c.start()))
                     .on("shutdown", |c: &C::ArchiveInterface| block_on(c.shutdown())),
-            )
-            .with(
-                C::HandshakeInterface::infu_initialize_hack
-                    .on("start", |c: &C::HandshakeInterface| block_on(c.start()))
-                    .on("shutdown", |c: &C::HandshakeInterface| {
-                        block_on(c.shutdown())
-                    }),
             )
             .with(
                 C::ReputationAggregatorInterface::infu_initialize_hack

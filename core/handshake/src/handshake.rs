@@ -10,25 +10,27 @@ use fn_sdk::header::{write_header, ConnectionHeader};
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use infusion::c;
+use lightning_interfaces::fdi::{BuildGraph, DependencyGraph, MethodExt};
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::{
+    Cloned,
     ConfigConsumer,
+    ConfigProviderInterface,
+    Consume,
     ExecutorProviderInterface,
     HandshakeInterface,
     KeystoreInterface,
     ServiceExecutorInterface,
-    WithStartAndShutdown,
+    ShutdownWaiter,
 };
 use lightning_schema::handshake::{HandshakeRequestFrame, TerminationReason};
 use rand::RngCore;
-use tokio::sync::Mutex;
 use tracing::warn;
 use triomphe::Arc;
 
 use crate::config::HandshakeConfig;
 use crate::http::{self, spawn_http_server, spawn_https_server};
 use crate::proxy::{Proxy, State};
-use crate::shutdown::{ShutdownNotifier, ShutdownWaiter};
 use crate::transports::{
     spawn_transport_by_config,
     TransportPair,
@@ -37,63 +39,50 @@ use crate::transports::{
 };
 
 pub struct Handshake<C: Collection> {
-    status: Mutex<Option<Run<C>>>,
+    status: Option<Run<C>>,
     config: HandshakeConfig,
     pk: NodePublicKey,
 }
 
 struct Run<C: Collection> {
     ctx: Context<c![C::ServiceExecutorInterface::Provider]>,
-    shutdown: ShutdownNotifier,
     // The axum_server Server API (TLS server) does not have a `with_graceful_shutdown`
     // similarly to axum Server. The only way to shut it down gracefully is via its Handle API.
     handle: Handle,
 }
 
-impl<C: Collection> HandshakeInterface<C> for Handshake<C> {
-    fn init(
-        config: Self::Config,
-        keystore: C::KeystoreInterface,
-        provider: c![C::ServiceExecutorInterface::Provider],
-    ) -> anyhow::Result<Self> {
-        let shutdown = ShutdownNotifier::default();
+impl<C: Collection> HandshakeInterface<C> for Handshake<C> {}
+
+impl<C: Collection> Handshake<C> {
+    pub fn new(
+        config: &C::ConfigProviderInterface,
+        keystore: &C::KeystoreInterface,
+        service_executor: &C::ServiceExecutorInterface,
+        Cloned(waiter): Cloned<ShutdownWaiter>,
+    ) -> Self {
+        let config = config.get::<Self>();
+        let provider = service_executor.get_provider();
         let pk = keystore.get_ed25519_pk();
-        let ctx = Context::new(provider, shutdown.waiter());
+        let ctx = Context::new(provider, waiter);
         let handle = Handle::new();
 
-        Ok(Self {
-            status: Mutex::new(Some(Run::<C> {
-                ctx,
-                shutdown,
-                handle,
-            })),
+        Self {
+            status: Some(Run::<C> { ctx, handle }),
             config,
             pk,
-        })
-    }
-}
-
-impl<C: Collection> ConfigConsumer for Handshake<C> {
-    const KEY: &'static str = "handshake";
-    type Config = HandshakeConfig;
-}
-
-impl<C: Collection> WithStartAndShutdown for Handshake<C> {
-    fn is_running(&self) -> bool {
-        self.status.blocking_lock().is_some()
+        }
     }
 
-    async fn start(&self) {
-        let mut guard = self.status.lock().await;
-        let run = guard.as_mut().expect("restart not implemented.");
+    async fn start(Consume(mut this): Consume<Self>, Cloned(waiter): Cloned<ShutdownWaiter>) {
+        let run = this.status.take().expect("restart not implemented.");
 
         // Spawn transports in parallel for accepting incoming handshakes.
-        let routers = self
+        let routers = this
             .config
             .transports
             .iter()
             .map(|config| {
-                spawn_transport_by_config(run.shutdown.waiter(), run.ctx.clone(), config.clone())
+                spawn_transport_by_config(waiter.clone(), run.ctx.clone(), config.clone())
             })
             .collect::<FuturesUnordered<_>>()
             .filter_map(|res| async move { res.expect("failed to bind transport") })
@@ -108,27 +97,36 @@ impl<C: Collection> WithStartAndShutdown for Handshake<C> {
             }
             let router = router
                 .layer(Extension(run.ctx.clone()))
-                .route_layer(http::fleek_node_response_header(self.pk));
+                .route_layer(http::fleek_node_response_header(this.pk));
 
             // Start optional HTTPS server.
-            if let Some(https) = self.config.https.clone() {
+            if let Some(https) = this.config.https.clone() {
                 let https_router = router.clone();
                 let handle = run.handle.clone();
                 tokio::spawn(async move { spawn_https_server(https_router, https, handle).await });
             }
 
             // Start HTTP server.
-            let waiter = run.shutdown.waiter();
-            let http_addr = self.config.http_address;
-            tokio::spawn(async move { spawn_http_server(http_addr, router, waiter).await });
+            let waiter2 = waiter.clone();
+            let http_addr = this.config.http_address;
+            tokio::spawn(async move { spawn_http_server(http_addr, router, waiter2).await });
+
+            // Shutdown the handle.
+            waiter.wait_for_shutdown().await;
+            run.handle.graceful_shutdown(Some(Duration::from_secs(2)));
         }
     }
+}
 
-    async fn shutdown(&self) {
-        let run = self.status.lock().await.take().expect("already shutdown.");
-        run.shutdown.shutdown();
-        run.handle.graceful_shutdown(Some(Duration::from_secs(2)));
+impl<C: Collection> BuildGraph for Handshake<C> {
+    fn build_graph() -> DependencyGraph {
+        DependencyGraph::new().with_infallible(Self::new.on("start", Self::start.spawn()))
     }
+}
+
+impl<C: Collection> ConfigConsumer for Handshake<C> {
+    const KEY: &'static str = "handshake";
+    type Config = HandshakeConfig;
 }
 
 pub struct TokenState {
@@ -296,62 +294,5 @@ impl<P: ExecutorProviderInterface> Context<P> {
 
     pub fn cleanup_connection(&self, connection_id: u64) {
         self.connections.remove(&connection_id);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::time::Duration;
-
-    use anyhow::Result;
-    use lightning_blockstore::blockstore::Blockstore;
-    use lightning_interfaces::{partial, BlockstoreInterface};
-    use lightning_service_executor::shim::{ServiceExecutor, ServiceExecutorConfig};
-    use lightning_test_utils::keys::EphemeralKeystore;
-
-    use super::*;
-
-    partial!(TestBinding {
-        HandshakeInterface = Handshake<Self>;
-        ServiceExecutorInterface = ServiceExecutor<Self>;
-        KeystoreInterface = EphemeralKeystore<Self>;
-        BlockstoreInterface = Blockstore<Self>;
-    });
-
-    #[tokio::test]
-    async fn restart() -> Result<()> {
-        let keystore = EphemeralKeystore::default();
-        let blockstore = Blockstore::init(lightning_blockstore::config::Config::default())?;
-        let service_executor = ServiceExecutor::<TestBinding>::init(
-            ServiceExecutorConfig::test_default(),
-            &blockstore,
-            affair::Socket::raw_bounded(1).0,
-            Default::default(),
-        )?;
-
-        service_executor.start().await;
-
-        // Startup handshake
-        let handshake = Handshake::<TestBinding>::init(
-            HandshakeConfig::default(),
-            keystore.clone(),
-            service_executor.get_provider(),
-        )?;
-        handshake.start().await;
-        tokio::time::sleep(Duration::from_millis(500)).await;
-        // Shutdown and drop it
-        handshake.shutdown().await;
-        drop(handshake);
-
-        // Start handshake again
-        tokio::time::sleep(Duration::from_millis(500)).await;
-        let handshake = Handshake::<TestBinding>::init(
-            HandshakeConfig::default(),
-            keystore,
-            service_executor.get_provider(),
-        )?;
-        handshake.start().await;
-
-        Ok(())
     }
 }

@@ -5,7 +5,7 @@ use arrayref::array_ref;
 use async_trait::async_trait;
 use axum::Router;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use lightning_interfaces::ExecutorProviderInterface;
+use lightning_interfaces::{ExecutorProviderInterface, ShutdownWaiter};
 use lightning_metrics::increment_counter;
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -16,7 +16,6 @@ use tracing::{info, trace, warn};
 
 use super::{delimit_frame, Transport, TransportReceiver, TransportSender};
 use crate::schema::{self, RES_SERVICE_PAYLOAD_TAG};
-use crate::shutdown::ShutdownWaiter;
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(default)]
@@ -274,18 +273,18 @@ impl TransportReceiver for TcpReceiver {
 #[cfg(test)]
 mod tests {
     use fleek_crypto::{ClientPublicKey, ClientSignature, NodePublicKey, NodeSignature};
+    use lightning_interfaces::ShutdownController;
     use lightning_service_executor::shim::Provider;
     use tokio::io::AsyncWriteExt;
     use tokio::net::TcpStream;
 
     use super::*;
     use crate::schema::{HandshakeRequestFrame, HandshakeResponse};
-    use crate::shutdown::ShutdownNotifier;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn handshake() -> Result<()> {
         // Bind the server
-        let notifier = ShutdownNotifier::default();
+        let notifier = ShutdownController::default();
         let config = TcpConfig {
             address: ([127, 0, 0, 1], 20000).into(),
         };

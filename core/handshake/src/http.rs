@@ -7,11 +7,11 @@ use axum::Router;
 use axum_server::tls_rustls::RustlsConfig;
 use axum_server::Handle;
 use fleek_crypto::NodePublicKey;
+use lightning_interfaces::ShutdownWaiter;
 use tower_http::cors::CorsLayer;
 use tower_http::set_header::SetResponseHeaderLayer;
 
 use crate::config::HttpsConfig;
-use crate::shutdown::ShutdownWaiter;
 
 pub const FLEEK_NODE_HEADER: &str = "x-fleek-node";
 

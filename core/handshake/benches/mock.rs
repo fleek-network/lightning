@@ -176,7 +176,7 @@ fn bench(c: &mut Criterion, clients: usize, title: &str) {
     let rt = Runtime::new().unwrap();
 
     // setup the node with the configurations.
-    let node = rt.block_on(async { setup_node().await });
+    let mut node = rt.block_on(async { setup_node().await });
 
     let clients = {
         let _guard = rt.enter();

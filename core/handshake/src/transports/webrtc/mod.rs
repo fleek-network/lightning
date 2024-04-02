@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use axum::Router;
 use bytes::Bytes;
 use dashmap::DashMap;
-use lightning_interfaces::ExecutorProviderInterface;
+use lightning_interfaces::{ExecutorProviderInterface, ShutdownWaiter};
 use lightning_metrics::increment_counter;
 use serde::{Deserialize, Serialize};
 use stunclient::StunClient;
@@ -20,7 +20,6 @@ use triomphe::Arc;
 use self::driver::{ConnectionMap, WebRtcDriver};
 use super::{Transport, TransportReceiver, TransportSender};
 use crate::schema::{self, HandshakeRequestFrame, RequestFrame};
-use crate::shutdown::ShutdownWaiter;
 use crate::transports::webrtc::signal::router;
 
 /// WebRTC has a maximum payload size of ~64KiB, so we go a little under to be sure it's okay.

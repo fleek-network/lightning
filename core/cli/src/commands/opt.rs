@@ -12,7 +12,7 @@ use fleek_crypto::{
 use lightning_application::genesis::Genesis;
 use lightning_interfaces::config::ConfigProviderInterface;
 use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::{KeystoreInterface, ToDigest};
+use lightning_interfaces::ToDigest;
 use lightning_node::config::TomlConfigProvider;
 use lightning_types::{
     ChainId,
@@ -235,11 +235,12 @@ async fn load_secret_key<C: Collection>(
     config_path: ResolvedPathBuf,
 ) -> Result<(NodePublicKey, NodeSecretKey)> {
     let provider = TomlConfigProvider::<C>::load_or_write_config(config_path).await?;
-    let config = provider.get::<C::KeystoreInterface>();
-    C::KeystoreInterface::init(config).map(|keystore| {
-        let sk = keystore.get_ed25519_sk();
-        (sk.to_pk(), sk)
-    })
+    let _config = provider.get::<C::KeystoreInterface>();
+    todo!()
+    // C::KeystoreInterface::init(config).map(|keystore| {
+    //     let sk = keystore.get_ed25519_sk();
+    //     (sk.to_pk(), sk)
+    // })
 }
 
 fn create_update_request(

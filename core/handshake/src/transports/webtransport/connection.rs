@@ -5,6 +5,7 @@ use anyhow::Result;
 use bytes::Bytes;
 use fleek_crypto::{NodeSecretKey, SecretKey};
 use futures::StreamExt;
+use lightning_interfaces::ShutdownWaiter;
 use tokio::sync::mpsc::Sender;
 use tokio_util::codec::{FramedRead, LengthDelimitedCodec};
 use tracing::{error, info};
@@ -13,7 +14,6 @@ use wtransport::endpoint::IncomingSession;
 use wtransport::{Endpoint, RecvStream, SendStream};
 
 use crate::schema::HandshakeRequestFrame;
-use crate::shutdown::ShutdownWaiter;
 use crate::transports::webtransport::{self, WebTransportConfig};
 
 pub type FramedStreamRx = FramedRead<RecvStream, LengthDelimitedCodec>;

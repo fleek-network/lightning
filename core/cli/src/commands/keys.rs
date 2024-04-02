@@ -13,6 +13,7 @@ pub async fn exec<C: Collection>(cmd: KeySubCmd, config_path: ResolvedPathBuf) -
 
     match cmd {
         KeySubCmd::Generate => C::KeystoreInterface::generate_keys(config, false),
-        KeySubCmd::Show => C::KeystoreInterface::init(config).map(|_| ()),
+        // KeySubCmd::Show => C::KeystoreInterface::init(config).map(|_| ()),
+        _ => todo!(),
     }
 }
