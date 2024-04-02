@@ -150,3 +150,12 @@ nix shell github:fleek-network/lightning
 # For a local repo
 nix shell .
 ```
+
+The binary can also be ran directly:
+
+```bash
+nix run github:fleek-network/lightning
+
+# For a local repo
+nix shell .
+```
