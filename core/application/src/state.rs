@@ -1391,14 +1391,24 @@ impl<B: Backend> State<B> {
 
     /// The compare function in our auction settlement. Here we will have the logic that decides who
     /// wins the staking auction
+    /// pos is the the current position in the partition and pivot is the current pivot being compared against
+    /// should return true if current position is less than pivot
     fn compare_nodes_in_auction(
         &self,
-        left: &(NodeIndex, NodeInfo),
-        right: &(NodeIndex, NodeInfo),
+        pos: &(NodeIndex, NodeInfo),
+        pivot: &(NodeIndex, NodeInfo),
     ) -> bool {
         // todo(dalton): This is where we add tiebreakers like reputation score. Or modifiers on the
         // stake
-        left.1.stake.staked <= right.1.stake.staked
+        match pos.1.stake.staked.cmp(&pivot.1.stake.staked){
+            Ordering::Less => true,
+            Ordering::Greater => false,
+            Ordering::Equal => {
+                // If they are equal fall back to whichever one has the highest reputation score
+                // If pos is less than or equal we return true, otherwise false to so this is sorted correctly
+                self.rep_scores.get(&pos.0).unwrap_or_default() <= self.rep_scores.get(&pivot.0).unwrap_or_default()
+            }
+        }
     }
 
     fn calculate_emissions(&self) -> HpUfixed<18> {
