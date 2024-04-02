@@ -356,11 +356,12 @@ impl Env<UpdatePerm> {
             // add node info
             for node in genesis.node_info {
                 let mut node_info = NodeInfo::from(&node);
-                node_info.stake.staked = genesis.min_stake.into();
+
                 let node_index = match metadata_table.get(Metadata::NextNodeIndex) {
                     Some(Value::NextNodeIndex(index)) => index,
                     _ => 0,
                 };
+
                 consensus_key_to_index_table.insert(node_info.consensus_key, node_index);
                 pub_key_to_index_table.insert(node_info.public_key, node_index);
                 node_table.insert(node_index, node_info);
