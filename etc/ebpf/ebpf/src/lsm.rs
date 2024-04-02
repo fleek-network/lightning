@@ -10,11 +10,9 @@ use crate::vmlinux::{cred, task_struct};
 
 // Todo: replace with HashMapOfMaps or HashMapOfArrays when aya adds support.
 #[map]
-static FILE_OPEN_ALLOWED: HashMap<u64, u32> = HashMap::<u64, u32>::with_max_entries(1024, 0);
-#[map]
 static BINARY_FILES: HashMap<File, u64> = HashMap::<File, u64>::with_max_entries(1024, 0);
 #[map]
-static PROCESSES: HashMap<i32, u64> = HashMap::<i32, u64>::with_max_entries(1024, 0);
+static PROCESSES: HashMap<u64, u64> = HashMap::<u64, u64>::with_max_entries(1024, 0);
 
 #[lsm(hook = "task_alloc")]
 pub fn task_alloc(ctx: LsmContext) -> i32 {
@@ -52,8 +50,28 @@ pub fn file_open(ctx: LsmContext) -> i32 {
 }
 
 unsafe fn try_file_open(ctx: LsmContext) -> Result<i32, i32> {
+    let kfile: *const vmlinux::file = ctx.arg(0);
+    // Todo: why does this helper return a long?
+    let inode = aya_bpf::helpers::bpf_probe_read_kernel(&(*kfile).f_inode).map_err(|_| -1i32)?;
+    let inode_n = aya_bpf::helpers::bpf_probe_read_kernel(&(*inode).i_ino).map_err(|_| -1i32)?;
+    // Todo: Get device for regular and special files.
+    let file = File {
+        inode_n,
+        dev: 0,
+        rdev: 0,
+    };
+    match validate_by_pid(&ctx, &file) {
+        true => Ok(0),
+        false => Ok(-1),
+    }
+}
+
+unsafe fn validate_by_pid(ctx: &LsmContext, file: &File) -> bool {
     let pid = aya_bpf::helpers::bpf_get_current_pid_tgid();
-    let _file: *const vmlinux::file = ctx.arg(0);
-    info!(&ctx, "Process {} attempting to open file", pid);
-    Ok(0)
+    info!(ctx, "Process {} attempting to open file", pid);
+    if let Some(f_inode) = PROCESSES.get(&pid) {
+        return f_inode == &file.inode_n;
+    }
+    // Todo: get binary path otherwise.
+    false
 }
