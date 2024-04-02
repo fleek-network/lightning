@@ -102,6 +102,13 @@ impl Swarm {
             .collect()
     }
 
+    pub fn get_genesis_stakes(&self) -> HashMap<NodePublicKey, Staking> {
+        self.nodes
+            .iter()
+            .map(|(pubkey, node)| (*pubkey, node.get_genesis_stake()))
+            .collect()
+    }
+
     pub fn get_genesis_committee_rpc_addresses(&self) -> HashMap<NodePublicKey, String> {
         self.nodes
             .iter()
@@ -159,7 +166,7 @@ pub struct SwarmBuilder {
     syncronizer_delta: Option<Duration>,
     archiver: bool,
     use_persistence: bool,
-    additional_nodes: Option<Vec<SwarmNode>>,
+    specific_nodes: Option<Vec<SwarmNode>>,
     committee_size: Option<u64>,
 }
 
@@ -219,8 +226,8 @@ impl SwarmBuilder {
         self
     }
 
-    pub fn with_additional_nodes(mut self, nodes: Vec<SwarmNode>) -> Self {
-        self.additional_nodes = Some(nodes);
+    pub fn with_specific_nodes(mut self, nodes: Vec<SwarmNode>) -> Self {
+        self.specific_nodes = Some(nodes);
         self
     }
 
@@ -251,16 +258,16 @@ impl SwarmBuilder {
         let mut index = 0;
         let mut committee_size = 0;
 
-        let mut additional_nodes = self.additional_nodes.unwrap_or_default();
-        if additional_nodes.len() > num_nodes {
+        let mut specific_nodes = self.specific_nodes.unwrap_or_default();
+        if specific_nodes.len() > num_nodes {
             panic!(
                 "Number of nodes is {num_nodes}, but {} additional nodes were specified.",
-                additional_nodes.len()
+                specific_nodes.len()
             );
         }
 
         while index < num_nodes {
-            let node = additional_nodes.pop();
+            let node = specific_nodes.pop();
 
             let stake = node.clone().and_then(|node| node.stake).unwrap_or(Staking {
                 staked: HpUfixed::<18>::from(genesis.min_stake),
@@ -306,7 +313,7 @@ impl SwarmBuilder {
                 worker_domain: "127.0.0.1".parse().unwrap(),
                 worker_public_key: node_pk,
                 ports,
-                stake,
+                stake: stake.clone(),
                 reputation: reputation_score,
                 current_epoch_served: None,
                 genesis_committee: is_committee,
@@ -314,7 +321,7 @@ impl SwarmBuilder {
 
             genesis.node_info.push(node_info);
 
-            tmp_nodes.push((owner_sk, node_pk, config));
+            tmp_nodes.push((owner_sk, node_pk, config, is_committee, stake));
 
             index += 1;
         }
@@ -322,8 +329,9 @@ impl SwarmBuilder {
         // Now that we have built the configuration of all nodes and also have compiled the
         // proper genesis config. We can inject the genesis config.
         let mut nodes = HashMap::new();
-        for (index, (owner_sk, node_pk, config)) in tmp_nodes.into_iter().enumerate() {
-            let is_committee = (index as u64) < genesis.committee_size;
+        for (index, (owner_sk, node_pk, config, is_committee, stake)) in
+            tmp_nodes.into_iter().enumerate()
+        {
             let root = directory.join(format!("node-{index}"));
             let storage = if self.use_persistence {
                 StorageConfig::RocksDb
@@ -339,7 +347,7 @@ impl SwarmBuilder {
                 db_options: None,
             });
 
-            let node = ContainerizedNode::new(config, owner_sk, index, is_committee);
+            let node = ContainerizedNode::new(config, owner_sk, index, is_committee, stake);
             nodes.insert(node_pk, node);
         }
 

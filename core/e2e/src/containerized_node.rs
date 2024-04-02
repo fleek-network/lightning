@@ -2,7 +2,7 @@ use std::sync::Mutex;
 
 use fleek_crypto::AccountOwnerSecretKey;
 use lightning_blockstore::blockstore::Blockstore;
-use lightning_interfaces::types::Blake3Hash;
+use lightning_interfaces::types::{Blake3Hash, Staking};
 use lightning_interfaces::ConfigProviderInterface;
 use lightning_node::config::TomlConfigProvider;
 use lightning_node::FinalTypes;
@@ -17,6 +17,7 @@ pub struct ContainerizedNode {
     container: Mutex<Option<Container<FinalTypes>>>,
     runtime_type: RuntimeType,
     index: usize,
+    genesis_stake: Staking,
     is_genesis_committee: bool,
 }
 
@@ -26,6 +27,7 @@ impl ContainerizedNode {
         owner_secret_key: AccountOwnerSecretKey,
         index: usize,
         is_genesis_committee: bool,
+        genesis_stake: Staking,
     ) -> Self {
         Self {
             config,
@@ -33,6 +35,7 @@ impl ContainerizedNode {
             container: Default::default(),
             runtime_type: RuntimeType::MultiThreaded,
             index,
+            genesis_stake,
             is_genesis_committee,
         }
     }
@@ -65,6 +68,10 @@ impl ContainerizedNode {
 
     pub fn get_index(&self) -> usize {
         self.index
+    }
+
+    pub fn get_genesis_stake(&self) -> Staking {
+        self.genesis_stake.clone()
     }
 
     pub fn take_ckpt_rx(&self) -> Option<oneshot::Receiver<Blake3Hash>> {
