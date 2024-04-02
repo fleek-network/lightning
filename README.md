@@ -154,8 +154,8 @@ nix shell .
 The binary can also be ran directly:
 
 ```bash
-nix run github:fleek-network/lightning
+nix run github:fleek-network/lightning -- run -v
 
 # For a local repo
-nix shell .
+nix run . -- run -v
 ```
