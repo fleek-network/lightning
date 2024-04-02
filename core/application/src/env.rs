@@ -357,7 +357,8 @@ impl Env<UpdatePerm> {
             for node in genesis.node_info {
                 let mut node_info = NodeInfo::from(&node);
 
-                node_info.stake.staked = std::cmp::max(node_info.stake.staked, genesis.min_stake.into());
+                node_info.stake.staked = std::cmp::max(
+                    node_info.stake.staked, genesis.min_stake.into());
 
                 let node_index = match metadata_table.get(Metadata::NextNodeIndex) {
                     Some(Value::NextNodeIndex(index)) => index,
