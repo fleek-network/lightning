@@ -160,6 +160,7 @@ pub struct SwarmBuilder {
     min_port: Option<u16>,
     max_port: Option<u16>,
     num_nodes: Option<usize>,
+    node_count_param: Option<u64>,
     epoch_start: Option<u64>,
     epoch_time: Option<u64>,
     port_assigner: Option<PortAssigner>,
@@ -178,6 +179,12 @@ impl SwarmBuilder {
 
     pub fn with_num_nodes(mut self, num_nodes: usize) -> Self {
         self.num_nodes = Some(num_nodes);
+        self
+    }
+
+    /// Sets the protocol param node_count on the swarms genesis
+    pub fn with_node_count_param(mut self, num_nodes: u64) -> Self {
+        self.node_count_param = Some(num_nodes);
         self
     }
 
@@ -247,6 +254,7 @@ impl SwarmBuilder {
         genesis.epoch_start = self.epoch_start.unwrap_or(genesis.epoch_start);
         genesis.epoch_time = self.epoch_time.unwrap_or(genesis.epoch_time);
         genesis.committee_size = self.committee_size.unwrap_or(genesis.committee_size);
+        genesis.node_count = self.node_count_param.unwrap_or(genesis.node_count);
 
         // Make sure the test directory exists by recursively creating it.
         fs::create_dir_all(&directory).expect("Failed to create swarm directory");
@@ -270,7 +278,7 @@ impl SwarmBuilder {
             let node = specific_nodes.pop();
 
             let stake = node.clone().and_then(|node| node.stake).unwrap_or(Staking {
-                staked: HpUfixed::<18>::from(genesis.min_stake),
+                staked: HpUfixed::<18>::from(genesis.min_stake + 1000_u64),
                 ..Default::default()
             });
             let reputation_score = node.clone().and_then(|node| node.reputation_score);
