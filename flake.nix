@@ -29,13 +29,6 @@
             sha256 = "4HfRQx49hyuJ8IjBWSty3OXCLOmeaZF5qZAXW6QiQNI=";
           });
 
-        llvmCraneLib = craneLib.overrideToolchain
-          (fenix.packages.${system}.complete.withComponents [
-            "cargo"
-            "llvm-tools"
-            "rustc"
-          ]);
-
         # Allow markdown and bin files for some `include!()` uses
         markdownFilter = path: _type: builtins.match ".*md$" path != null;
         binFilter = path: _type: builtins.match ".*bin$" path != null;
@@ -136,16 +129,16 @@
           # Check formatting
           fmt = craneLib.cargoFmt { inherit (commonArgs) pname src; };
 
+          # Check doc tests
+          doc = craneLib.cargoDoc (commonArgs // { inherit cargoArtifacts; });
+
           # Check clippy lints
           clippy = craneLib.cargoClippy (commonArgs // {
             inherit cargoArtifacts;
-            cargoExtraArgs = "--debug";
             cargoClippyExtraArgs =
               "--all-targets --all-features -- -Dclippy::all -Dwarnings";
+            CARGO_PROFILE = "dev";
           });
-
-          # Check doc tests
-          doc = craneLib.cargoDoc (commonArgs // { inherit cargoArtifacts; });
 
           # Run tests with cargo-nextest
           nextest = craneLib.cargoNextest (commonArgs // {
