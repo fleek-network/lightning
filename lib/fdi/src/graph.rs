@@ -14,8 +14,6 @@ use crate::{Eventstore, MethodExt, Provider};
 pub struct DependencyGraph {
     touched: bool,
     constructors: HashMap<Ty, DynMethod<Result<Object>>>,
-    /// The captured result of [DynMethod::events] for every constructor we have.
-    constructor_events: HashMap<Ty, Eventstore>,
     pub(crate) graph: IndexMap<Ty, IndexSet<Param>>,
     ordered: Rc<Vec<Ty>>,
 }
@@ -192,9 +190,6 @@ impl DependencyGraph {
             );
         }
 
-        if let Some(events) = method.events() {
-            self.constructor_events.insert(tid, events);
-        }
         self.graph
             .insert(tid, method.dependencies().iter().copied().collect());
         self.constructors.insert(tid, method);
@@ -394,20 +389,6 @@ impl DependencyGraph {
         Ok(())
     }
 
-    /// By default an event handler is bound to a constructor and is not registered unless the
-    /// constructor method is called. This method registers (or activates) all of the handlers
-    /// for an event with a certain name even if the constructor is not yet called.
-    ///
-    /// This could be useful for when an event is meant to serve a pre-initilization role.
-    ///
-    /// Note that this method does not trigger the events but only activates them.
-    pub fn register_all_handlers(&mut self, provider: &mut Provider, event: &'static str) {
-        let mut event_store = provider.get_mut::<Eventstore>();
-        for events in self.constructor_events.values_mut() {
-            event_store.extend_only(event, events);
-        }
-    }
-
     fn construct_internal(&mut self, ty: Ty, provider: &mut Provider) -> Result<()> {
         if provider.contains_ty(&ty) {
             return Ok(());
@@ -420,6 +401,7 @@ impl DependencyGraph {
 
         let name = constructor.name();
         let rt_name = constructor.ty().name();
+        let maybe_events = constructor.events();
         let value = constructor.call(provider);
 
         let value = value.with_context(|| {
@@ -428,7 +410,7 @@ impl DependencyGraph {
 
         provider.insert_raw(ty, value);
 
-        if let Some(events) = self.constructor_events.remove(&ty) {
+        if let Some(events) = maybe_events {
             let mut event_store = provider.get_mut::<Eventstore>();
             event_store.extend(events);
         }
