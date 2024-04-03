@@ -24,13 +24,21 @@ impl Connection {
         match message.src {
             FileOpenSrc::Pid(pid) => {
                 if message.op == FileOpen::ALLOW {
-                    self.shared_state.file_allow_open(pid).await
+                    self.shared_state.file_allow_open_for_proc(pid).await
                 } else {
-                    self.shared_state.file_block_open(pid).await
+                    self.shared_state.file_block_open_for_proc(pid).await
                 }
             },
-            FileOpenSrc::Bin { .. } => {
-                unimplemented!()
+            FileOpenSrc::Bin { inode, dev, rdev } => {
+                if message.op == FileOpen::ALLOW {
+                    self.shared_state
+                        .file_allow_open_for_binf(inode, dev, rdev)
+                        .await
+                } else {
+                    self.shared_state
+                        .file_block_open_for_binf(inode, dev, rdev)
+                        .await
+                }
             },
         }
     }
