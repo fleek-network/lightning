@@ -14,23 +14,21 @@ use std::sync::{Arc, Mutex};
 use anyhow::anyhow;
 pub use config::Config;
 use fleek_crypto::NodePublicKey;
-use lightning_interfaces::fdi::{BuildGraph, DependencyGraph, MethodExt};
+use lightning_interfaces::fdi::{self, BuildGraph, DependencyGraph, MethodExt};
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::{
     ApplicationInterface,
-    Cloned,
     ConfigConsumer,
     ConfigProviderInterface,
     KeystoreInterface,
     Notification,
     NotifierInterface,
-    RefMut,
     ShutdownWaiter,
     TopologyInterface,
 };
 use lightning_utils::application::QueryRunnerExt;
-use tokio::sync::{mpsc, watch, Notify};
-use tracing::{error, info};
+use tokio::sync::{mpsc, watch};
+use tracing::error;
 
 pub struct Topology<C: Collection> {
     inner: Arc<TopologyInner<C>>,
@@ -44,7 +42,6 @@ struct TopologyInner<C: Collection> {
     our_public_key: NodePublicKey,
     target_k: usize,
     min_nodes: usize,
-    shutdown_notify: Arc<Notify>,
 }
 
 impl<C: Collection> TopologyInner<C> {
@@ -84,28 +81,22 @@ impl<C: Collection> TopologyInner<C> {
         if let Err(e) = self.topology_tx.send(Arc::new(conns)) {
             error!("All receivers have been dropped: {e:?}");
         }
+
         let mut notifier_rx = self.notifier_rx.lock().unwrap().take().unwrap();
-        loop {
-            tokio::select! {
-                _ = self.shutdown_notify.notified() => {
-                    break;
-                }
-                notify = notifier_rx.recv() => {
-                    let Some(notify) = notify else {
-                        info!("Notifier was dropped");
-                        break;
-                    };
-                    if let Notification::NewEpoch = notify {
-                        // This only fails if joining the blocking task fails, which only
-                        // happens if something is already wrong.
-                        let conns = self.suggest_connections().await.expect("Failed to compute topology");
-                        if let Err(e) = self.topology_tx.send(Arc::new(conns)) {
-                            error!("All receivers have been dropped: {e:?}");
-                        }
-                    }
+        while let Some(notify) = notifier_rx.recv().await {
+            if let Notification::NewEpoch = notify {
+                // This only fails if joining the blocking task fails, which only
+                // happens if something is already wrong.
+                let conns = self
+                    .suggest_connections()
+                    .await
+                    .expect("Failed to compute topology");
+                if let Err(e) = self.topology_tx.send(Arc::new(conns)) {
+                    error!("All receivers have been dropped: {e:?}");
                 }
             }
         }
+
         *self.notifier_rx.lock().unwrap() = Some(notifier_rx);
     }
 }
@@ -121,14 +112,14 @@ impl<C: Collection> Topology<C> {
         config: &C::ConfigProviderInterface,
         signer: &C::KeystoreInterface,
         notifier: &C::NotifierInterface,
-        Cloned(query): Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
+        fdi::Cloned(query): fdi::Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
     ) -> anyhow::Result<Self> {
         let config = config.get::<Self>();
         let (notifier_tx, notifier_rx) = mpsc::channel(16);
         notifier.notify_on_new_epoch(notifier_tx);
 
         let (topology_tx, topology_rx) = watch::channel(Arc::new(Vec::new()));
-        let shutdown_notify = Arc::new(Notify::new());
+
         let inner = TopologyInner {
             target_k: config.testing_target_k,
             min_nodes: config.testing_min_nodes,
@@ -137,14 +128,13 @@ impl<C: Collection> Topology<C> {
             topology_tx,
             topology_rx,
             our_public_key: signer.get_ed25519_pk(),
-            shutdown_notify: shutdown_notify.clone(),
         };
         Ok(Self {
             inner: Arc::new(inner),
         })
     }
 
-    async fn start(this: RefMut<Self>, waiter: Cloned<ShutdownWaiter>) {
+    async fn start(this: fdi::Ref<Self>, waiter: fdi::Cloned<ShutdownWaiter>) {
         let inner = this.inner.clone();
         drop(this);
 

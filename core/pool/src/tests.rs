@@ -5,47 +5,45 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use affair::Socket;
 use bytes::Bytes;
 use fleek_crypto::{AccountOwnerSecretKey, NodePublicKey, SecretKey};
 use futures::StreamExt;
 use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisNode};
-use lightning_interfaces::infu_collection::Collection;
+use lightning_application::query_runner::QueryRunner;
+use lightning_interfaces::infu_collection::{Collection, Node};
 use lightning_interfaces::types::{NodeIndex, NodePorts};
 use lightning_interfaces::{
+    fdi,
     partial,
     ApplicationInterface,
     EventHandlerInterface,
     KeystoreInterface,
-    NotifierInterface,
     PoolInterface,
-    ReputationAggregatorInterface,
     RequestInterface,
     RequesterInterface,
     ResponderInterface,
     ResponseInterface,
     ServiceScope,
-    SignerInterface,
     SyncQueryRunnerInterface,
     TopologyInterface,
-    WithStartAndShutdown,
 };
 use lightning_notifier::Notifier;
 use lightning_rep_collector::ReputationAggregator;
 use lightning_signer::Signer;
+use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
-use lightning_topology::{Config as TopologyConfig, Topology};
+use lightning_topology::Topology;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
-use tokio_util::sync::CancellationToken;
 
 use crate::endpoint::EndpointTask;
 use crate::event::{Event, EventReceiver, Param};
-use crate::{muxer, provider, Config, PoolProvider};
+use crate::{provider, Config, PoolProvider};
 
 partial!(TestBinding {
+    ConfigProviderInterface = JsonConfigProvider;
     ApplicationInterface = Application<Self>;
     PoolInterface = PoolProvider<Self>;
     KeystoreInterface = EphemeralKeystore<Self>;
@@ -55,17 +53,25 @@ partial!(TestBinding {
     ReputationAggregatorInterface = ReputationAggregator<Self>;
 });
 
-pub struct Peer<C: Collection> {
-    // We hold on to the rep aggregator and notifier so
-    // that they do not get dropped and cause a
-    // race condition which causes the pool to stop.
-    _rep_aggregator: C::ReputationAggregatorInterface,
-    _notifier: C::NotifierInterface,
-    _signer: Signer<C>,
-    pool: C::PoolInterface,
-    topology: C::TopologyInterface,
+pub struct Peer {
+    inner: Node<TestBinding>,
     pub node_public_key: NodePublicKey,
     pub node_index: NodeIndex,
+}
+
+impl Peer {
+    fn app(&self) -> fdi::Ref<Application<TestBinding>> {
+        self.inner.provider.get()
+    }
+    fn topology(&self) -> fdi::Ref<Topology<TestBinding>> {
+        self.inner.provider.get()
+    }
+    fn pool(&self) -> fdi::Ref<PoolProvider<TestBinding>> {
+        self.inner.provider.get()
+    }
+    fn notifier(&self) -> fdi::Ref<Notifier<TestBinding>> {
+        self.inner.provider.get()
+    }
 }
 
 struct PathBuffWrapper(PathBuf);
@@ -83,11 +89,7 @@ async fn get_pools(
     port_offset: u16,
     num_peers: usize,
     state_server_address_port: Option<u16>,
-) -> (
-    Vec<Peer<TestBinding>>,
-    Application<TestBinding>,
-    PathBuffWrapper,
-) {
+) -> (Vec<Peer>, AppConfig, PathBuffWrapper) {
     let mut keystores = Vec::new();
     let mut genesis = Genesis::load().unwrap();
     let path = std::env::temp_dir()
@@ -130,19 +132,14 @@ async fn get_pools(
         ));
     }
 
-    let app = Application::<TestBinding>::init(
-        AppConfig {
-            genesis: Some(genesis),
-            mode: Mode::Test,
-            testnet: false,
-            storage: StorageConfig::InMemory,
-            db_path: None,
-            db_options: None,
-        },
-        Default::default(),
-    )
-    .unwrap();
-    app.start().await;
+    let app_config = AppConfig {
+        genesis: Some(genesis),
+        mode: Mode::Test,
+        testnet: false,
+        storage: StorageConfig::InMemory,
+        db_path: None,
+        db_options: None,
+    };
 
     // Create peers.
     let mut peers = Vec::new();
@@ -151,7 +148,7 @@ async fn get_pools(
             .parse()
             .unwrap();
         let peer = create_peer(
-            &app,
+            app_config.clone(),
             keystore,
             address,
             true,
@@ -160,103 +157,71 @@ async fn get_pools(
         peers.push(peer);
     }
 
-    (peers, app, PathBuffWrapper(path))
+    (peers, app_config, PathBuffWrapper(path))
 }
 
 // Create a peer that is not in state.
-fn create_unknown_peer(app: &Application<TestBinding>, address: SocketAddr) -> Peer<TestBinding> {
+fn create_unknown_peer(app_config: AppConfig, address: SocketAddr) -> Peer {
     let keystore = EphemeralKeystore::default();
-    create_peer(app, keystore, address, false, None)
+    create_peer(app_config, keystore, address, false, None)
 }
 
 fn create_peer(
-    app: &Application<TestBinding>,
+    app_config: AppConfig,
     keystore: EphemeralKeystore<TestBinding>,
     address: SocketAddr,
     in_state: bool,
     state_server_address_port: Option<u16>,
-) -> Peer<TestBinding> {
-    let query_runner = app.sync_query();
+) -> Peer {
     let node_public_key = keystore.get_ed25519_pk();
-    let signer = Signer::<TestBinding>::init(
-        Default::default(),
-        keystore.clone(),
-        query_runner.clone(),
-        Socket::raw_bounded(128).0,
+    let node = Node::<TestBinding>::init_with_provider(
+        fdi::Provider::default()
+            .with(
+                JsonConfigProvider::default()
+                    .with::<PoolProvider<TestBinding>>(Config {
+                        max_idle_timeout: Duration::from_secs(5),
+                        address,
+                        http: state_server_address_port
+                            .map(|port| SocketAddr::from((IpAddr::from([127, 0, 0, 1]), port))),
+                    })
+                    .with::<Application<TestBinding>>(app_config),
+            )
+            .with(keystore),
     )
-    .unwrap();
-    let notifier = Notifier::<TestBinding>::init(app);
-    let topology = Topology::<TestBinding>::init(
-        TopologyConfig::default(),
-        node_public_key,
-        notifier.clone(),
-        query_runner.clone(),
-    )
-    .unwrap();
-    let rep_aggregator = ReputationAggregator::<TestBinding>::init(
-        Default::default(),
-        signer.get_socket(),
-        notifier.clone(),
-        query_runner.clone(),
-    )
-    .unwrap();
-
-    let http = state_server_address_port
-        .map(|port| SocketAddr::from((IpAddr::from([127, 0, 0, 1]), port)));
-
-    let config = Config {
-        max_idle_timeout: Duration::from_secs(5),
-        address,
-        http,
-    };
-    let pool = PoolProvider::<TestBinding, muxer::quinn::QuinnMuxer>::init(
-        config,
-        keystore.clone(),
-        query_runner.clone(),
-        notifier.clone(),
-        topology.get_receiver(),
-        rep_aggregator.get_reporter(),
-    )
-    .unwrap();
+    .expect("failed to init node");
 
     let node_index = if in_state {
-        query_runner.pubkey_to_index(&node_public_key).unwrap()
+        node.provider
+            .get::<QueryRunner>()
+            .pubkey_to_index(&node_public_key)
+            .unwrap()
     } else {
         u32::MAX
     };
 
-    Peer::<TestBinding> {
-        _rep_aggregator: rep_aggregator,
-        _notifier: notifier,
-        _signer: signer,
-        topology,
-        pool,
+    Peer {
+        inner: node,
         node_public_key,
         node_index,
     }
 }
 
 struct EventReceiverTestState {
-    event_tx: Sender<Event>,
+    _event_tx: Sender<Event>,
     endpoint_task_rx: Receiver<EndpointTask>,
-    shutdown: CancellationToken,
     _notifier: Notifier<TestBinding>,
 }
 
-fn event_receiver(
-    app: Application<TestBinding>,
-    peer: &Peer<TestBinding>,
-) -> (EventReceiver<TestBinding>, EventReceiverTestState) {
-    let query_runner = app.sync_query();
-    let topology_rx = peer.topology.get_receiver();
-    let notifier = peer._notifier.clone();
+fn event_receiver(peer: &Peer) -> (EventReceiver<TestBinding>, EventReceiverTestState) {
+    let query_runner = peer.app().sync_query();
+    let topology_rx = peer.topology().get_receiver();
+    let notifier = peer.notifier().clone();
     let pk = peer.node_public_key;
 
     let dial_info = Arc::new(scc::HashMap::default());
-    let (event_tx, event_rx) = mpsc::channel(8);
+    let (_event_tx, event_rx) = mpsc::channel(8);
     let (endpoint_task_tx, endpoint_task_rx) = mpsc::channel(8);
 
-    let shutdown = CancellationToken::new();
     (
         EventReceiver::<TestBinding>::new(
             query_runner,
@@ -266,22 +231,20 @@ fn event_receiver(
             endpoint_task_tx,
             pk,
             dial_info,
-            shutdown.clone(),
         ),
         EventReceiverTestState {
-            event_tx,
+            _event_tx,
             endpoint_task_rx,
             _notifier: notifier,
-            shutdown,
         },
     )
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_send_to_one() {
     // Given: two peers.
-    let (peers, app, path) = get_pools("send_to_one", 48000, 2, None).await;
-    let query_runner = app.sync_query();
+    let (peers, _, path) = get_pools("send_to_one", 48000, 2, None).await;
+    let query_runner = peers[0].app().sync_query();
 
     let node_index1 = query_runner
         .pubkey_to_index(&peers[0].node_public_key)
@@ -290,13 +253,13 @@ async fn test_send_to_one() {
         .pubkey_to_index(&peers[1].node_public_key)
         .unwrap();
 
-    let event_handler1 = peers[0].pool.open_event(ServiceScope::Broadcast);
-    let mut event_handler2 = peers[1].pool.open_event(ServiceScope::Broadcast);
+    let event_handler1 = peers[0].pool().open_event(ServiceScope::Broadcast);
+    let mut event_handler2 = peers[1].pool().open_event(ServiceScope::Broadcast);
 
     for peer in &peers {
-        peer.pool.start().await;
-        peer.topology.start().await;
+        peer.inner.start().await;
     }
+
     // Since we made the topology push based, the pool will start immediately without waiting for
     // the topology to finish calculating. This means that the pool won't connect to other peers
     // until the received the connections from the topology. We have to wait briefly for the
@@ -314,8 +277,8 @@ async fn test_send_to_one() {
     assert_eq!(sender, node_index1);
 
     // Clean up.
-    for peer in &peers {
-        peer.pool.shutdown().await;
+    for mut peer in peers {
+        peer.inner.shutdown().await;
     }
     drop(path);
 }
@@ -325,13 +288,13 @@ async fn test_send_to_all() {
     // Given: a list of peers that are in state and some that are not.
     let port_offset = 49000;
     let (peers, app, path) = get_pools("send_to_all", port_offset, 4, None).await;
-    let unknown_peer = create_unknown_peer(
-        &app,
+    let mut unknown_peer = create_unknown_peer(
+        app,
         format!("0.0.0.0:{}", port_offset + peers.len() as u16)
             .parse()
             .unwrap(),
     );
-    let query_runner = app.sync_query();
+    let query_runner = peers[0].app().sync_query();
 
     // Given: we start known nodes.
     let node_index1 = query_runner
@@ -339,12 +302,11 @@ async fn test_send_to_all() {
         .unwrap();
     let mut event_handlers: Vec<_> = peers
         .iter()
-        .map(|peer| peer.pool.open_event(ServiceScope::Broadcast))
+        .map(|peer| peer.pool().open_event(ServiceScope::Broadcast))
         .collect();
 
     for peer in &peers {
-        peer.pool.start().await;
-        peer.topology.start().await;
+        peer.inner.start().await;
     }
     // Since we made the topology push based, the pool will start immediately without waiting for
     // the topology to finish calculating. This means that the pool won't connect to other peers
@@ -354,9 +316,8 @@ async fn test_send_to_all() {
     tokio::time::sleep(Duration::from_secs(2)).await;
 
     // Given: we start an unknown node.
-    let mut event_handlers_unknown_peer = unknown_peer.pool.open_event(ServiceScope::Broadcast);
-
-    unknown_peer.pool.start().await;
+    let mut event_handlers_unknown_peer = unknown_peer.pool().open_event(ServiceScope::Broadcast);
+    unknown_peer.inner.start().await;
 
     // When: one of the nodes sends a message.
     let msg = Bytes::from("hello");
@@ -381,18 +342,18 @@ async fn test_send_to_all() {
     );
 
     // Clean up.
-    for peer in &peers {
-        peer.pool.shutdown().await;
+    for mut peer in peers {
+        peer.inner.shutdown().await;
     }
-    unknown_peer.pool.shutdown().await;
+    unknown_peer.inner.shutdown().await;
     drop(path);
 }
 
 #[tokio::test]
 async fn test_open_req_res() {
     // Given: two peers.
-    let (peers, app, path) = get_pools("open_req_res", 50000, 2, None).await;
-    let query_runner = app.sync_query();
+    let (peers, _, path) = get_pools("open_req_res", 50000, 2, None).await;
+    let query_runner = peers[0].app().sync_query();
 
     let node_index1 = query_runner
         .pubkey_to_index(&peers[0].node_public_key)
@@ -400,11 +361,12 @@ async fn test_open_req_res() {
     let node_index2 = query_runner
         .pubkey_to_index(&peers[1].node_public_key)
         .unwrap();
-    let (_requester1, mut responder1) = peers[0].pool.open_req_res(ServiceScope::BlockstoreServer);
-    let (requester2, _responder2) = peers[1].pool.open_req_res(ServiceScope::BlockstoreServer);
+    let (_requester1, mut responder1) =
+        peers[0].pool().open_req_res(ServiceScope::BlockstoreServer);
+    let (requester2, _responder2) = peers[1].pool().open_req_res(ServiceScope::BlockstoreServer);
 
     for peer in &peers {
-        peer.pool.start().await;
+        peer.inner.start().await;
     }
 
     // When: one of the peer sends a request to the other peer.
@@ -449,8 +411,8 @@ async fn test_open_req_res() {
     futures::join!(sender_fut, recv_fut);
 
     // Clean up.
-    for peer in &peers {
-        peer.pool.shutdown().await;
+    for mut peer in peers {
+        peer.inner.shutdown().await;
     }
     drop(path);
 }
@@ -458,9 +420,9 @@ async fn test_open_req_res() {
 #[tokio::test]
 async fn test_open_req_res_unknown_peer() {
     // Give: a peer.
-    let (peers, _app, path) = get_pools("test_open_req_res_unknown_peer", 55000, 1, None).await;
-    let (requester1, _responder1) = peers[0].pool.open_req_res(ServiceScope::BlockstoreServer);
-    peers[0].pool.start().await;
+    let (mut peers, _, path) = get_pools("test_open_req_res_unknown_peer", 55000, 1, None).await;
+    let (requester1, _responder1) = peers[0].pool().open_req_res(ServiceScope::BlockstoreServer);
+    peers[0].inner.start().await;
 
     // Given: an index for an unknown node.
     let unknown_index = 6969;
@@ -476,15 +438,15 @@ async fn test_open_req_res_unknown_peer() {
     assert!(matches!(response, _expected_err));
 
     // Clean up.
-    peers[0].pool.shutdown().await;
+    peers[0].inner.shutdown().await;
     drop(path);
 }
 
 #[tokio::test]
 async fn test_log_pool_get_index() {
     // We never bind.
-    let (peers, app, _path) = get_pools("test_log_pool_get_index", 8000, 2, None).await;
-    let (event_receiver, _) = event_receiver(app, &peers[0]);
+    let (peers, _, _path) = get_pools("test_log_pool_get_index", 8000, 2, None).await;
+    let (event_receiver, _) = event_receiver(&peers[0]);
     assert_eq!(event_receiver.handler.get_index(), peers[0].node_index);
 }
 
@@ -492,8 +454,8 @@ async fn test_log_pool_get_index() {
 async fn test_log_pool_update_connections() {
     // Given: a network of 4 nodes.
     // We never bind.
-    let (peers, app, _path) = get_pools("test_log_pool_update_connections", 8000, 4, None).await;
-    let (mut event_receiver, _state) = event_receiver(app, &peers[0]);
+    let (peers, _, path) = get_pools("test_log_pool_update_connections", 8000, 4, None).await;
+    let (mut event_receiver, _state) = event_receiver(&peers[0]);
 
     // When: we tell first node to connect to all the peers.
     // Skip the first one.
@@ -552,14 +514,18 @@ async fn test_log_pool_update_connections() {
         ._update_connections(peers_to_connect.clone());
 
     // Then: Task includes peers to keep and drop.
-    let EndpointTask::Update { keep, drop } = task else {
+    let EndpointTask::Update {
+        keep,
+        drop: drop_vec,
+    } = task
+    else {
         panic!("invalid task");
     };
     assert!(keep.contains_key(&peers[1].node_index));
     assert_eq!(keep.len(), 1);
-    assert!(drop.contains(&peers[2].node_index));
-    assert!(drop.contains(&peers[3].node_index));
-    assert_eq!(drop.len(), 2);
+    assert!(drop_vec.contains(&peers[2].node_index));
+    assert!(drop_vec.contains(&peers[3].node_index));
+    assert_eq!(drop_vec.len(), 2);
 
     // Then: state in the pool includes the expected peers.
     let connections = event_receiver
@@ -583,95 +549,97 @@ async fn test_log_pool_update_connections() {
         .copied()
         .collect::<HashSet<_>>();
     assert!(connections.is_empty());
+    drop(path);
 }
 
 #[tokio::test]
+#[ignore = "A mocked topology is needed to properly test this functionality"]
 async fn test_log_pool_pinning_peers_from_topology() {
-    // Given: a network of 4 nodes.
-    // We never bind.
-    let (peers, app, _path) =
-        get_pools("test_log_pool_pinning_peers_from_topology", 8000, 4, None).await;
-    let (mut event_receiver, mut state) = event_receiver(app, &peers[0]);
+    // // Given: a network of 4 nodes.
+    // // We never bind.
+    // let (peers, app, _path) =
+    //     get_pools("test_log_pool_pinning_peers_from_topology", 8000, 4, None).await;
+    // let (mut event_receiver, mut state) = event_receiver(&peers[0]);
 
-    // Given: a node connects to all.
-    let all_peers = peers[1..]
-        .iter()
-        .map(|peer| peer.node_index)
-        .collect::<HashSet<_>>();
-    event_receiver.handler._update_connections(all_peers);
+    // // Given: a node connects to all.
+    // let all_peers = peers[1..]
+    //     .iter()
+    //     .map(|peer| peer.node_index)
+    //     .collect::<HashSet<_>>();
+    // event_receiver.handler._update_connections(all_peers);
 
-    // When: we send a send-request to one peer.
-    let pinned_peer_index = peers[1].node_index;
-    let (respond, _) = oneshot::channel();
-    state
-        .event_tx
-        .send(Event::SendRequest {
-            dst: pinned_peer_index,
-            service_scope: ServiceScope::BlockstoreServer,
-            request: Bytes::new(),
-            respond,
-        })
-        .await
-        .unwrap();
+    // // When: we send a send-request to one peer.
+    // let pinned_peer_index = peers[1].node_index;
+    // let (respond, _) = oneshot::channel();
+    // state
+    //     .event_tx
+    //     .send(Event::SendRequest {
+    //         dst: pinned_peer_index,
+    //         service_scope: ServiceScope::BlockstoreServer,
+    //         request: Bytes::new(),
+    //         respond,
+    //     })
+    //     .await
+    //     .unwrap();
 
-    // Spawn the receiver.
-    let handle = event_receiver.spawn();
+    // // Spawn the receiver.
+    // let handle = event_receiver.spawn(peers[0].inner.provider.get::<ShutdownWaiter>().clone());
 
-    // We poll the event receiver to move past the initial set up task.
-    let mut task = None;
-    while let Some(next_task) = state.endpoint_task_rx.recv().await {
-        if let next_task @ EndpointTask::SendRequest { .. } = next_task {
-            task = Some(next_task);
-            state.shutdown.cancel();
-            break;
-        }
-    }
-    let task = task.unwrap();
-    assert!(matches!(task, EndpointTask::SendRequest { .. }));
+    // // We poll the event receiver to move past the initial set up task.
+    // let mut task = None;
+    // while let Some(next_task) = state.endpoint_task_rx.recv().await {
+    //     if let next_task @ EndpointTask::SendRequest { .. } = next_task {
+    //         task = Some(next_task);
 
-    // We get the receiver back.
-    let mut event_receiver = handle.await.unwrap();
+    //         break;
+    //     }
+    // }
+    // let task = task.unwrap();
+    // assert!(matches!(task, EndpointTask::SendRequest { .. }));
 
-    // When: we tell pool to disconnect from all current peers.
-    event_receiver.handler._update_connections(HashSet::new());
+    // // We get the receiver back.
+    // let mut event_receiver = handle.await.unwrap();
 
-    // Then: that peer gets pinned and does not get dropped on an update.
-    let connections = event_receiver
-        .handler
-        .pool
-        .keys()
-        .copied()
-        .collect::<HashSet<_>>();
-    let mut expected_peers = HashSet::new();
-    expected_peers.insert(peers[1].node_index);
-    assert_eq!(connections.len(), 1);
-    assert_eq!(expected_peers, connections);
+    // // When: we tell pool to disconnect from all current peers.
+    // event_receiver.handler._update_connections(HashSet::new());
 
-    // When: we unpin the peer and tell the pool to disconnect.
-    event_receiver.handler.clean(peers[1].node_index);
+    // // Then: that peer gets pinned and does not get dropped on an update.
+    // let connections = event_receiver
+    //     .handler
+    //     .pool
+    //     .keys()
+    //     .copied()
+    //     .collect::<HashSet<_>>();
+    // let mut expected_peers = HashSet::new();
+    // expected_peers.insert(peers[1].node_index);
+    // assert_eq!(connections.len(), 1);
+    // assert_eq!(expected_peers, connections);
 
-    // Then: the peer is cleared from the pool state.
-    event_receiver.handler._update_connections(HashSet::new());
-    let connections = event_receiver
-        .handler
-        .pool
-        .keys()
-        .copied()
-        .collect::<HashSet<_>>();
-    assert!(connections.is_empty());
+    // // When: we unpin the peer and tell the pool to disconnect.
+    // event_receiver.handler.clean(peers[1].node_index);
+
+    // // Then: the peer is cleared from the pool state.
+    // event_receiver.handler._update_connections(HashSet::new());
+    // let connections = event_receiver
+    //     .handler
+    //     .pool
+    //     .keys()
+    //     .copied()
+    //     .collect::<HashSet<_>>();
+    // assert!(connections.is_empty());
 }
 
 #[tokio::test]
 async fn test_log_pool_pinning_peers_outside_topology_cluster() {
     // Given: a network of 2 nodes.
-    let (peers, app, _path) = get_pools(
+    let (peers, _, path) = get_pools(
         "test_log_pool_pinning_peers_outside_topology_cluster",
         8000, // We never bind.
         2,
         None,
     )
     .await;
-    let (mut event_receiver, _state) = event_receiver(app, &peers[0]);
+    let (mut event_receiver, _state) = event_receiver(&peers[0]);
 
     // Given: no peers in state.
     let connections = event_receiver
@@ -709,19 +677,20 @@ async fn test_log_pool_pinning_peers_outside_topology_cluster() {
         .copied()
         .collect::<HashSet<_>>();
     assert!(connections.is_empty());
+    drop(path);
 }
 
 #[tokio::test]
 async fn test_log_pool_only_broadcast_to_peers_in_topology_cluster() {
     // Given: a network of 4 nodes.
-    let (peers, app, _path) = get_pools(
+    let (peers, _, path) = get_pools(
         "test_log_pool_only_broadcast_to_peers_in_topology_cluster",
         8000, // We never bind.
         4,
         None,
     )
     .await;
-    let (mut event_receiver, mut state) = event_receiver(app, &peers[0]);
+    let (mut event_receiver, mut state) = event_receiver(&peers[0]);
 
     // Given: we connect to 2 peers.
     let peers_to_connect = peers[1..3]
@@ -776,12 +745,13 @@ async fn test_log_pool_only_broadcast_to_peers_in_topology_cluster() {
             panic!("invalid value expected a broadcast task")
         },
     }
+    drop(path);
 }
 
 #[tokio::test]
 async fn test_log_pool_only_broadcast_to_one_peer() {
     // Given: a network of 4 nodes.
-    let (peers, app, _path) = get_pools(
+    let (peers, _, path) = get_pools(
         "test_log_pool_only_broadcast_to_one_peer",
         8000, // We never bind.
         4,
@@ -790,8 +760,7 @@ async fn test_log_pool_only_broadcast_to_one_peer() {
     .await;
 
     for peer in &peers {
-        peer.pool.start().await;
-        peer.topology.start().await;
+        peer.inner.start().await;
     }
     // Since we made the topology push based, the pool will start immediately without waiting for
     // the topology to finish calculating. This means that the pool won't connect to other peers
@@ -800,7 +769,7 @@ async fn test_log_pool_only_broadcast_to_one_peer() {
     // are no connections.
     tokio::time::sleep(Duration::from_secs(2)).await;
 
-    let (mut event_receiver, mut state) = event_receiver(app, &peers[0]);
+    let (mut event_receiver, mut state) = event_receiver(&peers[0]);
 
     // Given: we connect to all peers.
     let peers_to_connect = peers[1..]
@@ -854,55 +823,22 @@ async fn test_log_pool_only_broadcast_to_one_peer() {
             .await
             .is_err()
     );
+    drop(path);
 }
 
 #[tokio::test]
 async fn test_start_shutdown() {
     // Given: two peers.
-    let (peers, app, _path) = get_pools("start_shutdown", 60000, 2, Some(60010)).await;
-    let query_runner = app.sync_query();
-
-    let node_index1 = query_runner
-        .pubkey_to_index(&peers[0].node_public_key)
-        .unwrap();
-    let node_index2 = query_runner
-        .pubkey_to_index(&peers[1].node_public_key)
-        .unwrap();
-
-    let event_handler1 = peers[0].pool.open_event(ServiceScope::Broadcast);
-    let mut event_handler2 = peers[1].pool.open_event(ServiceScope::Broadcast);
+    let (peers, _, path) = get_pools("start_shutdown", 60000, 2, Some(60010)).await;
 
     // Given: we start the peers.
     for peer in &peers {
-        peer.pool.start().await;
-        peer.topology.start().await;
-    }
-    // Since we made the topology push based, the pool will start immediately without waiting for
-    // the topology to finish calculating. This means that the pool won't connect to other peers
-    // until the received the connections from the topology. We have to wait briefly for the
-    // topology to send the connections, otherwise receiving the message will block, because there
-    // are no connections.
-    tokio::time::sleep(Duration::from_secs(2)).await;
-
-    // Given: we exchange data over the network.
-    let msg = Bytes::from("hello");
-    event_handler1.send_to_one(node_index2, msg.clone());
-    let (sender, recv_msg) = event_handler2.receive().await.unwrap();
-    assert_eq!(recv_msg, msg);
-    assert_eq!(sender, node_index1);
-
-    // When: we shutdown.
-    for peer in &peers {
-        peer.pool.shutdown().await;
+        peer.inner.start().await;
     }
 
-    // Then: we should be able to restart immediately again without issues.
-    for peer in &peers {
-        peer.pool.start().await;
+    // Then: we should be able to cleanly shutdown.
+    for mut peer in peers {
+        peer.inner.shutdown().await;
     }
-
-    // Clean up.
-    for peer in &peers {
-        peer.pool.shutdown().await;
-    }
+    drop(path);
 }

@@ -1,25 +1,13 @@
 use std::io;
-use std::sync::Arc;
 
 use anyhow::{bail, Error};
 use bytes::Bytes;
-use fleek_crypto::NodePublicKey;
+use fdi::BuildGraph;
 use lightning_types::NodeIndex;
 pub use lightning_types::RejectReason;
-use tokio::sync::watch;
 use tokio_stream::Stream;
 
-use crate::infu_collection::{c, Collection};
-use crate::{
-    ApplicationInterface,
-    ConfigConsumer,
-    ConfigProviderInterface,
-    KeystoreInterface,
-    NotifierInterface,
-    ReputationAggregatorInterface,
-    TopologyInterface,
-    WithStartAndShutdown,
-};
+use crate::infu_collection::Collection;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[repr(u8)]
@@ -49,39 +37,10 @@ pub struct RequestHeader {
 
 /// Defines the connection pool.
 #[infusion::service]
-pub trait PoolInterface<C: Collection>:
-    WithStartAndShutdown + ConfigConsumer + Send + Sync + Sized
-{
-    fn _init(
-        config: ::ConfigProviderInterface,
-        keystore: ::KeystoreInterface,
-        app: ::ApplicationInterface,
-        notifier: ::NotifierInterface,
-        topology: ::TopologyInterface,
-        rep_aggregator: ::ReputationAggregatorInterface,
-    ) {
-        Self::init(
-            config.get::<Self>(),
-            keystore.clone(),
-            app.sync_query(),
-            notifier.clone(),
-            topology.get_receiver(),
-            rep_aggregator.get_reporter(),
-        )
-    }
-
+pub trait PoolInterface<C: Collection>: BuildGraph + Send + Sync + Sized {
     type EventHandler: EventHandlerInterface;
     type Requester: RequesterInterface;
     type Responder: ResponderInterface;
-
-    fn init(
-        config: Self::Config,
-        keystore: C::KeystoreInterface,
-        sqr: c!(C::ApplicationInterface::SyncExecutor),
-        notifier: c!(C::NotifierInterface),
-        topology_rx: watch::Receiver<Arc<Vec<Vec<NodePublicKey>>>>,
-        rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
-    ) -> anyhow::Result<Self>;
 
     fn open_event(&self, scope: ServiceScope) -> Self::EventHandler;
 

@@ -3,31 +3,31 @@ use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::Poll;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use bytes::Bytes;
-use fleek_crypto::{NodePublicKey, SecretKey};
 use futures::{SinkExt, Stream};
 use infusion::c;
+use lightning_interfaces::fdi::{BuildGraph, MethodExt};
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::pool::{PoolInterface, RejectReason, ServiceScope};
 use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::{
+    fdi,
     ApplicationInterface,
     ConfigConsumer,
+    ConfigProviderInterface,
     EventHandlerInterface,
     KeystoreInterface,
-    ReputationAggregatorInterface,
     RequestHeader,
     RequestInterface,
     RequesterInterface,
     ResponderInterface,
     ResponseInterface,
-    WithStartAndShutdown,
+    ShutdownWaiter,
+    TopologyInterface,
 };
 use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::{mpsc, oneshot, watch};
-use tokio::task::JoinHandle;
-use tokio_util::sync::CancellationToken;
+use tokio::sync::{mpsc, oneshot};
 
 use crate::config::Config;
 use crate::endpoint::{Endpoint, EndpointTask};
@@ -41,176 +41,24 @@ where
     C: Collection,
     M: MuxerInterface,
 {
-    state: Mutex<Option<State<C, M>>>,
+    #[allow(clippy::type_complexity)]
+    state: Mutex<Option<(Endpoint<C, M>, EventReceiver<C>)>>,
     event_queue: Sender<Event>,
     endpoint_task_queue: Sender<EndpointTask>,
     config: Config,
-    shutdown: CancellationToken,
 }
 
-impl<C, M> PoolProvider<C, M>
-where
-    C: Collection,
-    M: MuxerInterface,
-{
-    fn new(
-        endpoint: Endpoint<C, M>,
-        receiver: EventReceiver<C>,
-        event_queue: Sender<Event>,
-        endpoint_task_queue: Sender<EndpointTask>,
-        config: Config,
-        shutdown: CancellationToken,
-    ) -> Result<Self> {
-        Ok(Self {
-            state: Mutex::new(Some(State::NotRunning { endpoint, receiver })),
-            event_queue,
-            endpoint_task_queue,
-            config,
-            shutdown,
-        })
-    }
-
-    fn register_broadcast_service(
-        &self,
-        service: ServiceScope,
-    ) -> (Sender<Event>, Receiver<(NodeIndex, Bytes)>) {
-        let mut guard = self.state.lock().unwrap();
-        match guard.as_mut().expect("Pool to have a state") {
-            State::Running { .. } => {
-                panic!("failed to start: endpoint is already running");
-            },
-            State::NotRunning { receiver, .. } => (
-                self.event_queue.clone(),
-                receiver.register_broadcast_service(service),
-            ),
-        }
-    }
-
-    fn register_requester_service(
-        &self,
-        service: ServiceScope,
-    ) -> (Sender<Event>, Receiver<(RequestHeader, Request)>) {
-        let mut guard = self.state.lock().unwrap();
-        match guard.as_mut().expect("Pool to have a state") {
-            State::Running { .. } => {
-                panic!("failed to start: endpoint is already running");
-            },
-            State::NotRunning { receiver, .. } => (
-                self.event_queue.clone(),
-                receiver.register_requester_service(service),
-            ),
-        }
-    }
-}
-
-impl<C> WithStartAndShutdown for PoolProvider<C, QuinnMuxer>
-where
-    C: Collection,
-{
-    fn is_running(&self) -> bool {
-        matches!(
-            self.state.lock().unwrap().as_ref(),
-            Some(&State::Running { .. })
-        )
-    }
-
-    async fn start(&self) {
-        let state = {
-            let mut guard = self.state.lock().unwrap();
-            guard.take().expect("There to be a state")
-        };
-
-        let next_state = if let State::NotRunning { endpoint, receiver } = state {
-            if let Some(http_server_address) = self.config.http {
-                let shutdown_http_server = self.shutdown.clone();
-                let event_tx = self.event_queue.clone();
-                let endpoint_task_tx = self.endpoint_task_queue.clone();
-
-                tokio::spawn(async move {
-                    http::spawn_http_server(
-                        http_server_address,
-                        shutdown_http_server,
-                        event_tx,
-                        endpoint_task_tx,
-                    )
-                    .await
-                });
-            }
-
-            State::Running {
-                receiver_handle: receiver.spawn(),
-                endpoint_handle: endpoint.spawn(),
-            }
-        } else {
-            state
-        };
-
-        let mut guard = self.state.lock().unwrap();
-        *guard = Some(next_state);
-    }
-
-    async fn shutdown(&self) {
-        let state = {
-            let mut guard = self.state.lock().unwrap();
-            guard.take().expect("There to be a state")
-        };
-
-        let next_state = if let State::Running {
-            endpoint_handle,
-            receiver_handle,
-        } = state
-        {
-            self.shutdown.cancel();
-            // We shutdown the endpoint first because it will close
-            // the ongoing connection loops that receive input from
-            // the network which in turn may enqueue events in the receiver
-            // queue, preventing it from shutting down.
-            let mut endpoint = endpoint_handle
-                .await
-                .context("endpoint tasked failed")
-                .unwrap();
-            endpoint.shutdown().await;
-            let mut receiver = receiver_handle
-                .await
-                .context("event receiver tasked failed")
-                .unwrap();
-            receiver.shutdown().await;
-
-            State::NotRunning { endpoint, receiver }
-        } else {
-            state
-        };
-
-        let mut guard = self.state.lock().unwrap();
-        *guard = Some(next_state);
-    }
-}
-
-impl<C> ConfigConsumer for PoolProvider<C, QuinnMuxer>
-where
-    C: Collection,
-{
-    const KEY: &'static str = "pool";
-    type Config = Config;
-}
-
-// Todo: An improvement would be to pass a `Muxer` in `init`.
-// See comments in `MuxerInterface`.
-impl<C: Collection> PoolInterface<C> for PoolProvider<C, QuinnMuxer> {
-    type EventHandler = EventHandler;
-    type Requester = Requester;
-    type Responder = Responder;
-
+impl<C: Collection> PoolProvider<C, QuinnMuxer> {
     fn init(
-        config: Self::Config,
-        keystore: C::KeystoreInterface,
-        sync_query: c!(C::ApplicationInterface::SyncExecutor),
-        notifier: c!(C::NotifierInterface),
-        topology_rx: watch::Receiver<Arc<Vec<Vec<NodePublicKey>>>>,
-        _: c!(C::ReputationAggregatorInterface::ReputationReporter),
-    ) -> Result<PoolProvider<C, QuinnMuxer>> {
+        config: &C::ConfigProviderInterface,
+        keystore: &C::KeystoreInterface,
+        notifier: &C::NotifierInterface,
+        topology: &C::TopologyInterface,
+        sync_query: fdi::Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
+    ) -> Result<Self> {
+        let config: Config = config.get::<Self>();
         let sk = keystore.get_ed25519_sk();
-        let public_key = sk.to_pk();
+        let public_key = keystore.get_ed25519_pk();
 
         let mut transport_config = quinn::TransportConfig::default();
         transport_config.max_idle_timeout(Some(config.max_idle_timeout.try_into()?));
@@ -225,37 +73,111 @@ impl<C: Collection> PoolInterface<C> for PoolProvider<C, QuinnMuxer> {
         };
 
         let dial_info = Arc::new(scc::HashMap::default());
-        let shutdown = CancellationToken::new();
         let (endpoint_task_tx, endpoint_task_rx) = mpsc::channel(1024);
         let (event_tx, event_rx) = mpsc::channel(1024);
         let receiver = EventReceiver::<C>::new(
             sync_query.clone(),
-            notifier,
-            topology_rx,
+            notifier.clone(),
+            topology.get_receiver(),
             event_rx,
             endpoint_task_tx.clone(),
             public_key,
             dial_info.clone(),
-            shutdown.clone(),
         );
         let endpoint = Endpoint::<C, QuinnMuxer>::new(
-            sync_query,
+            sync_query.clone(),
             endpoint_task_rx,
             event_tx.clone(),
             dial_info,
             muxer_config,
-            shutdown.clone(),
         );
 
-        PoolProvider::new(
-            endpoint,
-            receiver,
-            event_tx,
-            endpoint_task_tx,
+        Ok(Self {
+            state: Some((endpoint, receiver)).into(),
+            event_queue: event_tx,
+            endpoint_task_queue: endpoint_task_tx,
             config,
-            shutdown,
-        )
+        })
     }
+
+    async fn start(this: fdi::Ref<Self>, fdi::Cloned(shutdown): fdi::Cloned<ShutdownWaiter>) {
+        let (endpoint, receiver) = this
+            .state
+            .lock()
+            .unwrap()
+            .take()
+            .expect("start can only be called once");
+        let event_tx = this.event_queue.clone();
+        let endpoint_task_tx = this.endpoint_task_queue.clone();
+        let config = this.config.clone();
+        drop(this);
+
+        if let Some(http_server_address) = config.http {
+            let shutdown = shutdown.clone();
+            tokio::spawn(async move {
+                http::spawn_http_server(
+                    http_server_address,
+                    shutdown.clone(),
+                    event_tx,
+                    endpoint_task_tx,
+                )
+                .await
+            });
+        }
+
+        endpoint.spawn(shutdown.clone());
+        receiver.spawn(shutdown);
+    }
+
+    fn register_broadcast_service(
+        &self,
+        service: ServiceScope,
+    ) -> (Sender<Event>, Receiver<(NodeIndex, Bytes)>) {
+        if let Some((_, receiver)) = &mut *self.state.lock().unwrap() {
+            (
+                self.event_queue.clone(),
+                receiver.register_broadcast_service(service),
+            )
+        } else {
+            panic!("failed to start: endpoint is already running");
+        }
+    }
+
+    fn register_requester_service(
+        &self,
+        service: ServiceScope,
+    ) -> (Sender<Event>, Receiver<(RequestHeader, Request)>) {
+        if let Some((_, receiver)) = &mut *self.state.lock().unwrap() {
+            (
+                self.event_queue.clone(),
+                receiver.register_requester_service(service),
+            )
+        } else {
+            panic!("failed to start: endpoint is already running");
+        }
+    }
+}
+
+impl<C> ConfigConsumer for PoolProvider<C, QuinnMuxer>
+where
+    C: Collection,
+{
+    const KEY: &'static str = "pool";
+    type Config = Config;
+}
+
+impl<C: Collection> BuildGraph for PoolProvider<C, QuinnMuxer> {
+    fn build_graph() -> fdi::DependencyGraph {
+        fdi::DependencyGraph::new().with(Self::init.on("start", Self::start.spawn()))
+    }
+}
+
+// Todo: An improvement would be to pass a `Muxer` in `init`.
+// See comments in `MuxerInterface`.
+impl<C: Collection> PoolInterface<C> for PoolProvider<C, QuinnMuxer> {
+    type EventHandler = EventHandler;
+    type Requester = Requester;
+    type Responder = Responder;
 
     fn open_event(&self, service: ServiceScope) -> Self::EventHandler {
         let (tx, rx) = self.register_broadcast_service(service);
@@ -513,19 +435,4 @@ impl From<Status> for u8 {
             _ => unreachable!(),
         }
     }
-}
-
-pub enum State<C, M>
-where
-    C: Collection,
-    M: MuxerInterface,
-{
-    NotRunning {
-        receiver: EventReceiver<C>,
-        endpoint: Endpoint<C, M>,
-    },
-    Running {
-        receiver_handle: JoinHandle<EventReceiver<C>>,
-        endpoint_handle: JoinHandle<Endpoint<C, M>>,
-    },
 }

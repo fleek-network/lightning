@@ -12,7 +12,12 @@ use hp_fixed::unsigned::HpUfixed;
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::NodeIndex;
-use lightning_interfaces::{ApplicationInterface, ServiceScope, SyncQueryRunnerInterface};
+use lightning_interfaces::{
+    ApplicationInterface,
+    ServiceScope,
+    ShutdownWaiter,
+    SyncQueryRunnerInterface,
+};
 use lightning_metrics::increment_counter;
 use lightning_utils::application::QueryRunnerExt;
 use tokio::sync::mpsc::error::TryRecvError;
@@ -71,7 +76,6 @@ where
     dial_info: Arc<scc::HashMap<NodeIndex, DialInfo>>,
     /// Config for the multiplexed transport.
     config: M::Config,
-    shutdown: CancellationToken,
 }
 
 impl<C, M> Endpoint<C, M>
@@ -85,7 +89,6 @@ where
         event_queue: Sender<Event>,
         dial_info: Arc<scc::HashMap<NodeIndex, DialInfo>>,
         config: M::Config,
-        shutdown: CancellationToken,
     ) -> Self {
         Self {
             pool: HashMap::new(),
@@ -100,7 +103,6 @@ where
             muxer: None,
             dial_info,
             config,
-            shutdown,
         }
     }
 
@@ -710,81 +712,37 @@ where
         }
     }
 
-    /// Shutdowns workers and clears state.
-    pub async fn shutdown(&mut self) {
-        for (_, handle) in self.pool.iter() {
-            let _ = handle
-                .service_request_tx
-                .clone()
-                .send(connection::Request::Close)
-                .await;
-        }
+    async fn run(&mut self) -> anyhow::Result<()> {
+        let muxer = M::init(self.config.clone())?;
+        self.muxer = Some(muxer.clone());
 
-        for (_, handle) in self.redundant_pool.iter() {
-            let _ = handle
-                .service_request_tx
-                .clone()
-                .send(connection::Request::Close)
-                .await;
-        }
-        self.pending_task.clear();
-        self.connection_buffer.clear();
-
-        // Clean out the queue.
-        while !matches!(self.task_queue.try_recv(), Err(TryRecvError::Empty)) {}
-
-        // Cancel pending connection dials before shutting down
-        let nodes: Vec<NodeIndex> = self.pending_dial.keys().copied().collect();
-        for node in &nodes {
-            self.cancel_dial(node);
-        }
-
-        // Todo: maybe pass a cancel token to connection loop to make this shutdown faster.
-        // Let's wait for connections to drop.
-        while let Ok(Some(_)) =
-            tokio::time::timeout(Duration::from_secs(5), self.ongoing_async_tasks.next()).await
-        {
-        }
-
-        for task in self.ongoing_async_tasks.iter() {
-            task.abort();
-        }
-        self.ongoing_async_tasks.clear();
-
-        // We drop the muxer to unbind the address.
-        self.muxer
-            .take()
-            .expect("start method to have been called")
-            .close()
-            .await;
-    }
-
-    async fn poll(&mut self, muxer: &mut M) {
-        tokio::select! {
-            next = muxer.accept() => {
-                if let Some(connecting) = next {
-                    self.handle_accept(connecting);
-                }
-            }
-            next = self.task_queue.recv() => {
-                if let Some(task) = next {
-                   let _ = self.handle_task(task);
-                }
-            }
-            Some(next) = self.ongoing_async_tasks.next() => {
-                match next {
-                    Ok(task_result) => {
-                       self.handle_finished_async_task(task_result);
+        loop {
+            tokio::select! {
+                next = muxer.accept() => {
+                    if let Some(connecting) = next {
+                        self.handle_accept(connecting);
                     }
-                    Err(e) => {
-                        if e.is_panic() {
-                            tracing::warn!("task panicked: {e:?}")
-                        } else {
-                            // Todo: when task IDs are stable in Tokio
-                            // we could use them to track info
-                            // about the task that failed
-                            // for retries, clean-ups, etc.
-                            tracing::warn!("task exited unexpectedly: {e:?}")
+                }
+                next = self.task_queue.recv() => {
+                    if let Some(task) = next {
+                       let _ = self.handle_task(task);
+                    }
+                }
+                Some(next) = self.ongoing_async_tasks.next() => {
+                    match next {
+                        Ok(task_result) => {
+                           self.handle_finished_async_task(task_result);
+                        }
+                        Err(e) => {
+                            if e.is_panic() {
+                                tracing::warn!("task panicked: {e:?}")
+                            } else {
+                                // Todo: when task IDs are stable in Tokio
+                                // we could use them to track info
+                                // about the task that failed
+                                // for retries, clean-ups, etc.
+                                tracing::warn!("task exited unexpectedly: {e:?}")
+                            }
                         }
                     }
                 }
@@ -792,31 +750,56 @@ where
         }
     }
 
-    pub fn spawn(mut self) -> JoinHandle<Self> {
+    pub fn spawn(mut self, shutdown: ShutdownWaiter) {
         tokio::spawn(async move {
-            let _ = self.run().await;
-            self
-        })
-    }
+            shutdown.run_until_shutdown(self.run()).await;
 
-    pub async fn run(&mut self) -> anyhow::Result<()> {
-        let mut muxer = M::init(self.config.clone())?;
-        self.muxer = Some(muxer.clone());
-        let shutdown = self.shutdown.clone();
-
-        loop {
-            tokio::select! {
-                biased;
-                _ = shutdown.cancelled() => {
-                    break;
-                }
-                // Poll() is used so that branches can be polled randomly
-                // but shutdown can still be polled first.
-                _ = self.poll(&mut muxer) => {}
+            for (_, handle) in self.pool.iter() {
+                let _ = handle
+                    .service_request_tx
+                    .clone()
+                    .send(connection::Request::Close)
+                    .await;
             }
-        }
 
-        Ok(())
+            for (_, handle) in self.redundant_pool.iter() {
+                let _ = handle
+                    .service_request_tx
+                    .clone()
+                    .send(connection::Request::Close)
+                    .await;
+            }
+            self.pending_task.clear();
+            self.connection_buffer.clear();
+
+            // Clean out the queue.
+            while !matches!(self.task_queue.try_recv(), Err(TryRecvError::Empty)) {}
+
+            // Cancel pending connection dials before shutting down
+            let nodes: Vec<NodeIndex> = self.pending_dial.keys().copied().collect();
+            for node in &nodes {
+                self.cancel_dial(node);
+            }
+
+            // Todo: maybe pass a cancel token to connection loop to make this shutdown faster.
+            // Let's wait for connections to drop.
+            while let Ok(Some(_)) =
+                tokio::time::timeout(Duration::from_secs(5), self.ongoing_async_tasks.next()).await
+            {
+            }
+
+            for task in self.ongoing_async_tasks.iter() {
+                task.abort();
+            }
+            self.ongoing_async_tasks.clear();
+
+            // We drop the muxer to unbind the address.
+            self.muxer
+                .take()
+                .expect("start method to have been called")
+                .close()
+                .await;
+        });
     }
 }
 

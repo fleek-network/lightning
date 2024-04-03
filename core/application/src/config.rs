@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::genesis::Genesis;
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Clone, Serialize, Deserialize, Default)]
 pub enum Mode {
     #[default]
     Dev,
@@ -11,7 +11,7 @@ pub enum Mode {
     Prod,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Config {
     pub genesis: Option<Genesis>,
     pub mode: Mode,
@@ -51,7 +51,7 @@ impl Default for Config {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub enum StorageConfig {
     InMemory,
     RocksDb,

@@ -16,12 +16,12 @@ use lightning_interfaces::{
     NotifierInterface,
     RequestHeader,
     ServiceScope,
+    ShutdownWaiter,
 };
 use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot, watch};
 use tokio::task::JoinHandle;
-use tokio_util::sync::CancellationToken;
 use tracing::info;
 use x509_parser::nom::AsBytes;
 
@@ -94,8 +94,6 @@ pub struct EventReceiver<C: Collection> {
     ongoing_async_tasks: FuturesUnordered<JoinHandle<anyhow::Result<()>>>,
     /// Information about attempted connection dials.
     dial_info: Arc<scc::HashMap<NodeIndex, DialInfo>>,
-    /// Our public key.
-    shutdown: CancellationToken,
 }
 
 impl<C> EventReceiver<C>
@@ -111,7 +109,6 @@ where
         pool_queue: Sender<EndpointTask>,
         public_key: NodePublicKey,
         dial_info: Arc<scc::HashMap<NodeIndex, DialInfo>>,
-        shutdown: CancellationToken,
     ) -> Self {
         let (notifier_tx, notifier_rx) = mpsc::channel(16);
         notifier.notify_on_new_epoch(notifier_tx);
@@ -128,7 +125,6 @@ where
             send_request_service_handles: HashMap::new(),
             ongoing_async_tasks: FuturesUnordered::new(),
             dial_info,
-            shutdown,
         }
     }
 
@@ -420,23 +416,18 @@ where
         }
     }
 
-    pub async fn shutdown(&mut self) {
-        self.handler.clear_state();
-
-        for task in self.ongoing_async_tasks.iter() {
-            task.abort();
-        }
-        self.ongoing_async_tasks.clear();
-
-        while !matches!(self.event_queue.try_recv(), Err(TryRecvError::Empty)) {}
-        while !matches!(self.notifier.try_recv(), Err(TryRecvError::Empty)) {}
-    }
-
-    pub fn spawn(mut self) -> JoinHandle<Self> {
+    pub fn spawn(mut self, shutdown: ShutdownWaiter) {
         tokio::spawn(async move {
-            self.run().await;
-            self
-        })
+            shutdown.run_until_shutdown(self.run()).await;
+
+            self.handler.clear_state();
+            for task in self.ongoing_async_tasks.iter() {
+                task.abort();
+            }
+            self.ongoing_async_tasks.clear();
+            while !matches!(self.event_queue.try_recv(), Err(TryRecvError::Empty)) {}
+            while !matches!(self.notifier.try_recv(), Err(TryRecvError::Empty)) {}
+        });
     }
 
     pub async fn run(&mut self) {
@@ -448,10 +439,6 @@ where
 
         loop {
             tokio::select! {
-                biased;
-                _ = self.shutdown.cancelled() => {
-                    break;
-                }
                 next = self.topology_rx.changed() => {
                     if let Err(e) = next {
                         info!("topology was dropped: {e:?}");

@@ -4,10 +4,10 @@ use anyhow::Context;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::{Extension, Router};
+use lightning_interfaces::ShutdownWaiter;
 use tokio::net::TcpListener;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
-use tokio_util::sync::CancellationToken;
 
 use crate::endpoint::EndpointTask;
 use crate::event::Event;
@@ -15,7 +15,7 @@ use crate::state::State;
 
 pub async fn spawn_http_server(
     addr: SocketAddr,
-    shutdown: CancellationToken,
+    shutdown: ShutdownWaiter,
     event_tx: Sender<Event>,
     endpoint_task_tx: Sender<EndpointTask>,
 ) -> anyhow::Result<()> {
@@ -24,7 +24,7 @@ pub async fn spawn_http_server(
         .layer(Extension(event_tx))
         .layer(Extension(endpoint_task_tx));
     let shutdown = async move {
-        shutdown.cancelled().await;
+        shutdown.wait_for_shutdown().await;
     };
     let listener = TcpListener::bind(&addr).await?;
     axum::serve::serve(listener, app.into_make_service())

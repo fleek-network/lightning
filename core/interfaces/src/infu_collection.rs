@@ -73,6 +73,7 @@ impl<C: Collection> Node<C> {
             .with_module::<C::PingerInterface>()
             .with_module::<C::FetcherInterface>()
             .with_module::<C::KeystoreInterface>()
+            .with_module::<C::PoolInterface>()
             .with_module::<C::BlockstoreServerInterface>()
             .with_module::<C::ForwarderInterface>()
             .with_module::<C::TopologyInterface>()
@@ -113,18 +114,6 @@ impl<C: Collection> Node<C> {
                     .on("shutdown", |c: &C::ReputationAggregatorInterface| {
                         block_on(c.shutdown())
                     }),
-            )
-            .with(
-                C::PoolInterface::infu_initialize_hack
-                    .on("start", |c: &C::PoolInterface| block_on(c.start()))
-                    .on(
-                        "shutdown",
-                        (|c: Consume<C::PoolInterface>, waiter: Cloned<ShutdownWaiter>| async move {
-                            c.shutdown().await;
-                            // hack: use waiter as a simple guard to hold off shutdown until this is complete.
-                            drop(waiter);
-                        }).spawn(),
-                    ),
             );
 
         let vis = graph.viz("Lightning Dependency Graph");
