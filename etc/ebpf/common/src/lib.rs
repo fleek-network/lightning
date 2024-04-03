@@ -30,4 +30,4 @@ pub struct FileMetadata {
 }
 
 #[cfg(feature = "userspace")]
-unsafe impl aya::Pod for FileList {}
+unsafe impl aya::Pod for FileMetadata {}

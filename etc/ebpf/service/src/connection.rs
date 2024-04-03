@@ -29,7 +29,7 @@ impl Connection {
                     self.shared_state.file_block_open(pid).await
                 }
             },
-            FileOpenSrc::BinPath(_) => {
+            FileOpenSrc::Bin { .. } => {
                 unimplemented!()
             },
         }

@@ -119,7 +119,7 @@ pub struct FileOpen {
 
 pub enum FileOpenSrc {
     Pid(u64),
-    BinPath(String),
+    Bin { inode: u64, dev: u32, rdev: u32 },
 }
 
 impl FileOpen {
@@ -128,6 +128,8 @@ impl FileOpen {
     /// Block open on file.
     pub const BLOCK: u8 = 1;
 
+    const BIN_VARIANT_SIZE: usize = 16;
+
     pub fn size(&self) -> usize {
         // One for the op and the other for the enum.
         let mut size = 2;
@@ -135,7 +137,7 @@ impl FileOpen {
             FileOpenSrc::Pid(_) => {
                 size += 8;
             },
-            FileOpenSrc::BinPath(path) => size += path.len(),
+            FileOpenSrc::Bin { .. } => size += Self::BIN_VARIANT_SIZE,
         }
         size
     }
@@ -155,9 +157,11 @@ impl FileOpen {
                 buf.put_u8(0);
                 buf.put_u64(pid);
             },
-            FileOpenSrc::BinPath(path) => {
+            FileOpenSrc::Bin { inode, dev, rdev } => {
                 buf.put_u8(1);
-                buf.put_slice(path.as_bytes());
+                buf.put_u64(inode);
+                buf.put_u32(dev);
+                buf.put_u32(rdev);
             },
         }
         Ok(())
@@ -195,12 +199,17 @@ impl TryFrom<&[u8]> for FileOpen {
                 let pid = value.get_u64();
                 FileOpenSrc::Pid(pid)
             },
+            1 if value.remaining() < Self::BIN_VARIANT_SIZE => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "not enough data to read bin file metadata",
+                ));
+            },
             1 => {
-                // Todo: can we avoid the allocation here?
-                let path = String::from_utf8(value.chunk().to_vec()).map_err(|_| {
-                    io::Error::new(io::ErrorKind::InvalidInput, "invalid path string")
-                })?;
-                FileOpenSrc::BinPath(path)
+                let inode = value.get_u64();
+                let dev = value.get_u32();
+                let rdev = value.get_u32();
+                FileOpenSrc::Bin { inode, dev, rdev }
             },
             _ => {
                 return Err(io::Error::new(
