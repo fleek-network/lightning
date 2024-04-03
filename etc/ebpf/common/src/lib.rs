@@ -1,5 +1,7 @@
 #![no_std]
 
+pub const MAX_DEVICES: usize = 4;
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct IpPortKey {
@@ -20,3 +22,12 @@ pub struct File {
 
 #[cfg(feature = "userspace")]
 unsafe impl aya::Pod for File {}
+
+#[derive(Copy, Clone)]
+#[repr(C)]
+pub struct FileMetadata {
+    pub devs: [u32; MAX_DEVICES],
+}
+
+#[cfg(feature = "userspace")]
+unsafe impl aya::Pod for FileList {}

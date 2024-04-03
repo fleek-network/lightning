@@ -30,7 +30,7 @@ unsafe fn try_file_open(ctx: LsmContext) -> Result<i32, i32> {
 unsafe fn validate_by_pid(ctx: &LsmContext, file: &File) -> bool {
     let pid = aya_bpf::helpers::bpf_get_current_pid_tgid();
     info!(ctx, "Process {} attempting to open file", pid);
-    if let Some(f_inode) = maps::PROCESSES_TO_FILE.get(&pid) {
+    if let Some(f_inode) = maps::PROCESS_TO_FILE.get(&pid) {
         return f_inode == &file.inode_n;
     }
     // Todo: get binary path otherwise.
