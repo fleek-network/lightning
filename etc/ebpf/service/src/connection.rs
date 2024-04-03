@@ -3,7 +3,7 @@ use log::error;
 use tokio::io::Interest;
 use tokio::net::UnixStream;
 
-use crate::schema::{EbpfServiceFrame, Pf};
+use crate::schema::{EbpfServiceFrame, FileOpen, FileOpenSrc, Pf};
 use crate::state::SharedState;
 
 pub struct Connection {
@@ -16,6 +16,22 @@ impl Connection {
         Self {
             socket,
             shared_state,
+        }
+    }
+
+    #[inline]
+    async fn file_open_handle(&mut self, message: FileOpen) -> anyhow::Result<()> {
+        match message.src {
+            FileOpenSrc::Pid(pid) => {
+                if message.op == FileOpen::ALLOW {
+                    self.shared_state.file_allow_open(pid).await
+                } else {
+                    self.shared_state.file_block_open(pid).await
+                }
+            },
+            FileOpenSrc::BinPath(_) => {
+                unimplemented!()
+            },
         }
     }
 
@@ -38,7 +54,7 @@ impl Connection {
     #[inline]
     async fn handle_request(&mut self, frame: EbpfServiceFrame) -> anyhow::Result<()> {
         match frame {
-            EbpfServiceFrame::Mac => unimplemented!(),
+            EbpfServiceFrame::FileOpen(file_open) => self.file_open_handle(file_open).await,
             EbpfServiceFrame::Pf(pf) => self.pf_handle(pf).await,
         }
     }
@@ -48,71 +64,69 @@ impl Connection {
         let mut bytes_read = 0;
         let mut frame_len = 0;
         loop {
-            let ready = self.socket.ready(Interest::READABLE).await?;
-            if ready.is_readable() {
-                'read: loop {
-                    while frame_len == 0 && bytes_read < 8 {
-                        match self.socket.try_read(&mut read_buf[bytes_read..]) {
-                            Ok(0) => {
-                                return Ok(());
-                            },
-                            Ok(n) => {
-                                bytes_read += n;
-                            },
-                            Err(e) if e.kind() == tokio::io::ErrorKind::WouldBlock => {
-                                // We received a false positive.
-                                break 'read;
-                            },
-                            Err(e) => {
-                                return Err(e.into());
-                            },
-                        }
-                    }
-
-                    if frame_len == 0 {
-                        let bytes: [u8; 8] = read_buf.as_slice().try_into()?;
-                        frame_len = usize::from_be_bytes(bytes);
-                        // We subtract here to pass entire buffer
-                        // to EbpfServiceFrame deserializer further below.
-                        read_buf.resize(frame_len - 8, 0);
-                        bytes_read = 0;
-                    }
-
-                    while bytes_read < frame_len {
-                        match self.socket.try_read(&mut read_buf[bytes_read..]) {
-                            Ok(0) => {
-                                return Ok(());
-                            },
-                            Ok(n) => {
-                                bytes_read += n;
-                            },
-                            Err(e) if e.kind() == tokio::io::ErrorKind::WouldBlock => {
-                                // We received a false positive.
-                                break 'read;
-                            },
-                            Err(e) => {
-                                return Err(e.into());
-                            },
-                        }
-                    }
-
-                    match EbpfServiceFrame::try_from(read_buf.as_slice()) {
-                        Ok(f) => {
-                            if let Err(e) = self.handle_request(f).await {
-                                error!("failed to handle request: {e:?}");
-                            }
+            self.socket.ready(Interest::READABLE).await?;
+            'read: loop {
+                while frame_len == 0 && bytes_read < 8 {
+                    match self.socket.try_read(&mut read_buf[bytes_read..]) {
+                        Ok(0) => {
+                            return Ok(());
+                        },
+                        Ok(n) => {
+                            bytes_read += n;
+                        },
+                        Err(e) if e.kind() == tokio::io::ErrorKind::WouldBlock => {
+                            // We received a false positive.
+                            break 'read;
                         },
                         Err(e) => {
-                            error!("failed to deserialize frame: {e:?}");
+                            return Err(e.into());
                         },
                     }
-
-                    read_buf.resize(8, 0);
-                    bytes_read = 0;
-                    frame_len = 0;
-
-                    break 'read;
                 }
+
+                if frame_len == 0 {
+                    let bytes: [u8; 8] = read_buf.as_slice().try_into()?;
+                    frame_len = usize::from_be_bytes(bytes);
+                    // We subtract here to pass entire buffer
+                    // to EbpfServiceFrame deserializer further below.
+                    read_buf.resize(frame_len - 8, 0);
+                    bytes_read = 0;
+                }
+
+                while bytes_read < frame_len {
+                    match self.socket.try_read(&mut read_buf[bytes_read..]) {
+                        Ok(0) => {
+                            return Ok(());
+                        },
+                        Ok(n) => {
+                            bytes_read += n;
+                        },
+                        Err(e) if e.kind() == tokio::io::ErrorKind::WouldBlock => {
+                            // We received a false positive.
+                            break 'read;
+                        },
+                        Err(e) => {
+                            return Err(e.into());
+                        },
+                    }
+                }
+
+                match EbpfServiceFrame::try_from(read_buf.as_slice()) {
+                    Ok(f) => {
+                        if let Err(e) = self.handle_request(f).await {
+                            error!("failed to handle request: {e:?}");
+                        }
+                    },
+                    Err(e) => {
+                        error!("failed to deserialize frame: {e:?}");
+                    },
+                }
+
+                read_buf.resize(8, 0);
+                bytes_read = 0;
+                frame_len = 0;
+
+                break 'read;
             }
         }
     }

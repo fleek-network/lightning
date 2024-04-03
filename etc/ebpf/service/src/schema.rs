@@ -4,7 +4,6 @@ use std::net::{Ipv4Addr, SocketAddrV4};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 pub enum EbpfServiceFrame {
-    /// Mandatory access control.
     FileOpen(FileOpen),
     /// Packet filter.
     Pf(Pf),
@@ -19,7 +18,7 @@ impl EbpfServiceFrame {
         match self {
             EbpfServiceFrame::FileOpen(file_open) => {
                 let size = file_open.size();
-                let mut result = BytesMut::with_capacity(8 + file_open.size());
+                let mut result = BytesMut::with_capacity(8 + size);
                 result.put_u64(size as u64);
                 file_open
                     .serialize(&mut result)
@@ -99,7 +98,7 @@ impl TryFrom<&[u8]> for Pf {
     type Error = io::Error;
 
     fn try_from(mut value: &[u8]) -> Result<Self, Self::Error> {
-        if value.len() != 7 {
+        if value.remaining() != 7 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "not enough data to deserialize",
@@ -114,8 +113,8 @@ impl TryFrom<&[u8]> for Pf {
 }
 
 pub struct FileOpen {
-    op: u8,
-    src: FileOpenSrc,
+    pub op: u8,
+    pub src: FileOpenSrc,
 }
 
 pub enum FileOpenSrc {
@@ -169,7 +168,7 @@ impl TryFrom<&[u8]> for FileOpen {
     type Error = io::Error;
 
     fn try_from(mut value: &[u8]) -> Result<Self, Self::Error> {
-        if value.len() < 2 {
+        if value.remaining() < 2 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "not enough data to deserialize",
@@ -195,12 +194,6 @@ impl TryFrom<&[u8]> for FileOpen {
             0 => {
                 let pid = value.get_u64();
                 FileOpenSrc::Pid(pid)
-            },
-            1 if !value.has_remaining() => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "not enough data to read path",
-                ));
             },
             1 => {
                 // Todo: can we avoid the allocation here?
