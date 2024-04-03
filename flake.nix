@@ -139,6 +139,7 @@
           # Check clippy lints
           clippy = craneLib.cargoClippy (commonArgs // {
             inherit cargoArtifacts;
+            cargoExtraArgs = "--debug";
             cargoClippyExtraArgs =
               "--all-targets --all-features -- -Dclippy::all -Dwarnings";
           });
@@ -185,13 +186,6 @@
               "--bin fn-service-2"
             ];
           });
-
-          # Expose for standalone ci step
-          lightning-deps = cargoArtifacts;
-        } // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
-          # Expose for ci
-          lightning-llvm-coverage = llvmCraneLib.cargoLlvmCov
-            (commonArgs // { inherit cargoArtifacts; });
         };
 
         # Allow using `nix run` on the project
