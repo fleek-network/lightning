@@ -16,7 +16,6 @@
     };
 
     flake-utils.url = "github:numtide/flake-utils";
-
   };
 
   outputs = { self, nixpkgs, crane, fenix, flake-utils, ... }:
@@ -157,10 +156,16 @@
 
         # Expose the node and services as packages
         packages = rec {
-          default = lightning-node-full;
+          default = lightning-node;
+
+          # Unified package with the node and all services
+          lightning-node = pkgs.symlinkJoin {
+            name = "lightning-node";
+            paths = [ lightning-node-standalone lightning-services ];
+          };
 
           # Core node binary
-          lightning-node = craneLib.buildPackage (commonArgs // {
+          lightning-node-standalone = craneLib.buildPackage (commonArgs // {
             inherit cargoArtifacts;
             pname = "lightning-node";
             doCheck = false;
@@ -181,18 +186,17 @@
             ];
           });
 
-          # Unified package with the node and all services
-          lightning-node-full = pkgs.symlinkJoin {
-            name = "lightning-node-full";
-            paths = [ lightning-node lightning-services ];
-          };
+          # Expose for standalone ci step
+          lightning-deps = cargoArtifacts;
         } // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
+          # Expose for ci
           lightning-llvm-coverage = llvmCraneLib.cargoLlvmCov
             (commonArgs // { inherit cargoArtifacts; });
         };
 
         # Allow using `nix run` on the project
-        apps.default = flake-utils.lib.mkApp { drv = self.packages.default; };
+        apps.default =
+          flake-utils.lib.mkApp { drv = self.packages.${system}.default; };
 
         # Allow using `nix develop on the project
         devShells.default = craneLib.devShell (commonVars // {
