@@ -1,13 +1,14 @@
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap};
 use std::path::PathBuf;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use fxhash::FxHashMap;
 use indicatif::ProgressBar;
 use lightning_test_utils::plotting;
 use lightning_test_utils::statistics::{get_mean, get_variance};
 use lightning_topology::{build_latency_matrix, suggest_connections_from_latency_matrix};
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use simulon::latency::ping::ClampNormalDistribution;
 use simulon::latency::LatencyProvider;
 
@@ -15,11 +16,17 @@ type NodeId = usize;
 type LatencyMillis = u128;
 type Time = u64;
 
+const ADV_SIZE: usize = 38;
+const WANT_SIZE: usize = 6;
+// the size is 88 bytes w/o payload, but we assume a payload of 512 bytes
+const MSG_SIZE: usize = 600;
+
 struct Graph {
     nodes: Vec<NodeInfo>,
     queue: BinaryHeap<QueueEntry>,
     current_time: Time,
     max_time: Time,
+    num_edges: usize,
 }
 
 #[derive(Clone, Default, Debug)]
@@ -48,6 +55,7 @@ impl Graph {
         latencies: &HashMap<(usize, usize), Duration>,
     ) -> Self {
         let mut nodes = Vec::with_capacity(adj_matrix.len());
+        let mut num_edges = 0;
         for (node, neighbors) in adj_matrix {
             let connections: FxHashMap<NodeId, LatencyMillis> = neighbors
                 .iter()
@@ -61,6 +69,7 @@ impl Graph {
                     (*neighbor, lat.as_millis())
                 })
                 .collect();
+            num_edges += connections.len();
             nodes.push(NodeInfo {
                 connections,
                 nodes_reached: 0,
@@ -74,6 +83,7 @@ impl Graph {
             queue: BinaryHeap::new(),
             current_time: 0,
             max_time: 0,
+            num_edges,
         }
     }
 
@@ -130,19 +140,26 @@ impl Graph {
 }
 
 fn main() {
+    // serialized want: 6 bytes
+    // serialized adv: 38 bytes
+    // serialized msg w/o payload: 88 bytes
+    // serialized msg with 512 byte payload: 600 bytes
+
     let num_trials = 4;
     let num_nodes = [1000, 2000, 5000, 10_000];
     let cluster_sizes = [4, 8, 16, 32, 64];
 
-    //let num_nodes = [1000, 2000];
-    //let cluster_sizes = [4, 8, 16, 32];
+    let num_nodes = [1000, 2000];
+    let cluster_sizes = [4, 8];
+
+    let start = Instant::now();
 
     let pb =
         ProgressBar::new((num_nodes.len() * cluster_sizes.len() * (num_trials as usize)) as u64);
     println!("Running simulation...");
     // HashMap::<num_nodes, HashMap<cluster_size, Vec<ExperimentData>>>
     let data: BTreeMap<usize, BTreeMap<usize, (f64, f64)>> = num_nodes
-        .into_iter()
+        .into_par_iter()
         .map(|n| {
             let mut data_cluster_size = BTreeMap::<usize, (f64, f64)>::new();
             for cluster_size in cluster_sizes {
@@ -198,6 +215,12 @@ fn main() {
                         //    .count();
 
                         propagation_times.push(graph.max_time as f64);
+
+                        // estimate bytes sent over the network
+                        let num_edges = graph.num_edges;
+                        let num_nodes = graph.nodes.len();
+                        let bytes_transfered =
+                            (num_edges / 2) * ADV_SIZE + num_nodes * (WANT_SIZE + MSG_SIZE);
                     }
 
                     pb.inc(1);
@@ -209,6 +232,8 @@ fn main() {
             (n, data_cluster_size)
         })
         .collect();
+
+    println!("Took {} ms", start.elapsed().as_millis());
 
     let output_path = PathBuf::from("simulation/plots/propagation_speed_cluster_size.png");
     plotting::line_plot(
