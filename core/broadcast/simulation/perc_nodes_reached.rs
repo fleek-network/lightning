@@ -3,16 +3,15 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
+use lightning_test_utils::plotting::plot_bar_chart;
 use lightning_topology::{build_latency_matrix, suggest_connections_from_latency_matrix};
 use plotters::style::full_palette::TEAL_600;
 use simulon::latency::ping::ClampNormalDistribution;
 use simulon::latency::LatencyProvider;
 use simulon::simulation::SimulationBuilder;
 
-use crate::plotting::plot_bar_chart;
 use crate::utils::{get_nodes_reached_per_timestep, get_nodes_reached_per_timestep_summary};
 
-mod plotting;
 mod setup;
 mod utils;
 

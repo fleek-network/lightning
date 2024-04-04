@@ -4,8 +4,9 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use indicatif::ProgressBar;
+use lightning_test_utils::plotting::line_plot;
+use lightning_test_utils::statistics::{get_mean, get_variance};
 use lightning_topology::{build_latency_matrix, suggest_connections_from_latency_matrix};
-use plotting::line_plot;
 use serde::{Deserialize, Serialize};
 use simulon::latency::ping::ClampNormalDistribution;
 use simulon::latency::LatencyProvider;
@@ -14,7 +15,6 @@ use statrs::distribution::{ContinuousCDF, StudentsT};
 
 use crate::utils::{get_nodes_reached_per_timestep, get_nodes_reached_per_timestep_summary};
 
-mod plotting;
 mod setup;
 mod utils;
 
@@ -185,8 +185,8 @@ pub fn main() {
 
             let timesteps_float: Vec<f64> =
                 experiment_data.iter().map(|d| d.timestep as f64).collect();
-            let mean = utils::get_mean(&timesteps_float).unwrap();
-            let variance = utils::get_variance(&timesteps_float).unwrap();
+            let mean = get_mean(&timesteps_float).unwrap();
+            let variance = get_variance(&timesteps_float).unwrap();
             data_timesteps
                 .entry(*n)
                 .or_default()
@@ -196,8 +196,8 @@ pub fn main() {
                 .iter()
                 .map(|d| (d.bytes_received as f64) / 1e6 + (d.bytes_sent as f64) / 1e6)
                 .collect();
-            let mean = utils::get_mean(&mega_bytes_float).unwrap();
-            let variance = utils::get_variance(&mega_bytes_float).unwrap();
+            let mean = get_mean(&mega_bytes_float).unwrap();
+            let variance = get_variance(&mega_bytes_float).unwrap();
             data_bytes
                 .entry(*n)
                 .or_default()
@@ -255,8 +255,8 @@ pub fn main() {
                         + (1.0 - propagation_speed_weight) * mega_bytes_transfered_norm
                 })
                 .collect();
-            let mean = utils::get_mean(&timesteps_and_bytes).unwrap();
-            let variance = utils::get_variance(&timesteps_and_bytes).unwrap();
+            let mean = get_mean(&timesteps_and_bytes).unwrap();
+            let variance = get_variance(&timesteps_and_bytes).unwrap();
             data_timesteps_bytes
                 .entry(*n)
                 .or_default()
