@@ -33,6 +33,7 @@ tokio.workspace = true
 infusion.workspace = true
 indicatif = "0.17"
 rayon = "1"
+bincode.workspace = true
 
 [[bench]]
 name = "clustering"

@@ -122,6 +122,7 @@ pub fn line_plot(
             max_y = max_y.max(m + s);
         });
     });
+    min_y = min_y.max(0.0);
 
     let (bg_color, primary_color) = if darkmode {
         (BLACK, WHITE)

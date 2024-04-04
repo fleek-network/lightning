@@ -6427,6 +6427,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "base64 0.21.5",
+ "bincode",
  "criterion",
  "csv",
  "fleek-crypto",

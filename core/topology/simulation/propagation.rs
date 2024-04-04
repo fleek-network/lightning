@@ -1,7 +1,7 @@
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap};
 use std::path::PathBuf;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use fxhash::FxHashMap;
 use indicatif::ProgressBar;
@@ -9,6 +9,7 @@ use lightning_test_utils::plotting;
 use lightning_test_utils::statistics::{get_mean, get_variance};
 use lightning_topology::{build_latency_matrix, suggest_connections_from_latency_matrix};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use serde::{Deserialize, Serialize};
 use simulon::latency::ping::ClampNormalDistribution;
 use simulon::latency::LatencyProvider;
 
@@ -20,6 +21,12 @@ const ADV_SIZE: usize = 38;
 const WANT_SIZE: usize = 6;
 // the size is 88 bytes w/o payload, but we assume a payload of 512 bytes
 const MSG_SIZE: usize = 600;
+
+#[derive(Serialize, Deserialize)]
+struct ExperimentData {
+    propagation_time: Time,
+    bytes_transfered: usize,
+}
 
 struct Graph {
     nodes: Vec<NodeInfo>,
@@ -140,17 +147,10 @@ impl Graph {
 }
 
 fn main() {
-    // serialized want: 6 bytes
-    // serialized adv: 38 bytes
-    // serialized msg w/o payload: 88 bytes
-    // serialized msg with 512 byte payload: 600 bytes
-
     let num_trials = 4;
     let num_nodes = [1000, 2000, 5000, 10_000];
     let cluster_sizes = [4, 8, 16, 32, 64];
-
-    let num_nodes = [1000, 2000];
-    let cluster_sizes = [4, 8];
+    let propagation_speed_weight = 0.5;
 
     let start = Instant::now();
 
@@ -158,12 +158,12 @@ fn main() {
         ProgressBar::new((num_nodes.len() * cluster_sizes.len() * (num_trials as usize)) as u64);
     println!("Running simulation...");
     // HashMap::<num_nodes, HashMap<cluster_size, Vec<ExperimentData>>>
-    let data: BTreeMap<usize, BTreeMap<usize, (f64, f64)>> = num_nodes
+    let data: BTreeMap<usize, BTreeMap<usize, Vec<ExperimentData>>> = num_nodes
         .into_par_iter()
         .map(|n| {
-            let mut data_cluster_size = BTreeMap::<usize, (f64, f64)>::new();
+            let mut data_cluster_size = BTreeMap::<usize, Vec<ExperimentData>>::new();
             for cluster_size in cluster_sizes {
-                let mut propagation_times = Vec::new();
+                let mut exp_data = Vec::new();
                 for _trial in 0..num_trials {
                     // for each trial we want to sample a different topology
                     let mut lat_provider = simulon::latency::PingDataLatencyProvider::<
@@ -214,33 +214,145 @@ fn main() {
                         //    .filter(|node| node.visited_at.is_some())
                         //    .count();
 
-                        propagation_times.push(graph.max_time as f64);
-
                         // estimate bytes sent over the network
                         let num_edges = graph.num_edges;
                         let num_nodes = graph.nodes.len();
                         let bytes_transfered =
                             (num_edges / 2) * ADV_SIZE + num_nodes * (WANT_SIZE + MSG_SIZE);
+                        exp_data.push(ExperimentData {
+                            propagation_time: graph.max_time,
+                            bytes_transfered,
+                        });
                     }
 
                     pb.inc(1);
                 }
-                let mean = get_mean(&propagation_times).unwrap();
-                let var = get_variance(&propagation_times).unwrap();
-                data_cluster_size.insert(cluster_size, (mean, var.sqrt()));
+                data_cluster_size.insert(cluster_size, exp_data);
             }
             (n, data_cluster_size)
         })
         .collect();
 
+    let raw_data_path = PathBuf::from("simulation/raw_data/");
+    let raw_data = bincode::serialize(&data).expect("Failed to serialize raw data");
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_millis();
+
+    if !raw_data_path.exists() {
+        std::fs::create_dir_all(&raw_data_path).expect("Failed to create directory");
+    }
+    let raw_data_path = raw_data_path.join(format!("{timestamp}.bin"));
+    std::fs::write(&raw_data_path, raw_data).expect("Failed to write raw data to disk");
+    println!("Raw data saved to {raw_data_path:?}");
+
     println!("Took {} ms", start.elapsed().as_millis());
 
-    let output_path = PathBuf::from("simulation/plots/propagation_speed_cluster_size.png");
+    // BTreeMap::<num_nodes, BTreeMap<cluster_size, (mean, variance)>>
+    let mut data_prop_time = BTreeMap::<usize, BTreeMap<usize, (f64, f64)>>::new();
+    let mut data_bytes = BTreeMap::<usize, BTreeMap<usize, (f64, f64)>>::new();
+
+    let mut prop_time_min = u64::MAX;
+    let mut prop_time_max = u64::MIN;
+    let mut mega_bytes_min = f64::MAX;
+    let mut mega_bytes_max = f64::MIN;
+
+    for (n, cluster_size_map) in data.iter() {
+        for (cluster_size, experiment_data) in cluster_size_map.iter() {
+            for d in experiment_data {
+                let mega_bytes_transfered = (d.bytes_transfered as f64) / 1e6;
+                prop_time_min = prop_time_min.min(d.propagation_time);
+                prop_time_max = prop_time_max.max(d.propagation_time);
+                mega_bytes_min = mega_bytes_min.min(mega_bytes_transfered);
+                mega_bytes_max = mega_bytes_max.max(mega_bytes_transfered);
+            }
+
+            let prop_time_float: Vec<f64> = experiment_data
+                .iter()
+                .map(|d| d.propagation_time as f64)
+                .collect();
+            let mean = get_mean(&prop_time_float).unwrap();
+            let variance = get_variance(&prop_time_float).unwrap();
+            data_prop_time
+                .entry(*n)
+                .or_default()
+                .insert(*cluster_size, (mean, variance));
+
+            let mega_bytes_float: Vec<f64> = experiment_data
+                .iter()
+                .map(|d| (d.bytes_transfered as f64) / 1e6)
+                .collect();
+            let mean = get_mean(&mega_bytes_float).unwrap();
+            let variance = get_variance(&mega_bytes_float).unwrap();
+            data_bytes
+                .entry(*n)
+                .or_default()
+                .insert(*cluster_size, (mean, variance));
+        }
+    }
+
+    let output_path = PathBuf::from("simulation/plots/propagation_time_cluster_size.png");
     plotting::line_plot(
-        &data,
+        &data_prop_time,
         "Average propagation time of a message to reach all nodes",
         "Cluster size",
         "Time in ms",
+        true,
+        false,
+        &output_path,
+    )
+    .unwrap();
+    println!("Plot saved to {output_path:?}");
+
+    let output_path = PathBuf::from("simulation/plots/cluster_size_data_transfered.png");
+    plotting::line_plot(
+        &data_bytes,
+        "Megabytes transfered",
+        "Cluster size",
+        "Megabytes transfered",
+        true,
+        false,
+        &output_path,
+    )
+    .unwrap();
+    println!("Plot saved to {output_path:?}");
+
+    // Combine the two metrics
+
+    // BTreeMap::<num_nodes, BTreeMap<cluster_size, (mean, variance)>>
+    let mut data_prop_time_bytes = BTreeMap::<usize, BTreeMap<usize, (f64, f64)>>::new();
+    for (n, cluster_size_map) in data.iter() {
+        for (cluster_size, experiment_data) in cluster_size_map.iter() {
+            let prop_time_and_bytes: Vec<f64> = experiment_data
+                .iter()
+                .map(|d| {
+                    let prop_time = d.propagation_time as f64;
+                    let mega_bytes_transfered = (d.bytes_transfered as f64) / 1e6;
+
+                    let prop_time_norm = (prop_time - prop_time_min as f64)
+                        / (prop_time_max as f64 - prop_time_min as f64);
+                    let mega_bytes_transfered_norm = (mega_bytes_transfered - mega_bytes_min)
+                        / (mega_bytes_max - mega_bytes_min);
+                    prop_time_norm * propagation_speed_weight
+                        + (1.0 - propagation_speed_weight) * mega_bytes_transfered_norm
+                })
+                .collect();
+            let mean = get_mean(&prop_time_and_bytes).unwrap();
+            let variance = get_variance(&prop_time_and_bytes).unwrap();
+            data_prop_time_bytes
+                .entry(*n)
+                .or_default()
+                .insert(*cluster_size, (mean, variance));
+        }
+    }
+
+    let output_path = PathBuf::from("simulation/plots/propagation_time_and_data_cluster_size.png");
+    plotting::line_plot(
+        &data_prop_time_bytes,
+        "Average propagation time of a message to reach all nodes + data transfered",
+        "Cluster size",
+        "Time in ms + data transfered",
         true,
         false,
         &output_path,
