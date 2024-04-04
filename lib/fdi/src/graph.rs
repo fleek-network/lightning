@@ -44,9 +44,9 @@ impl DependencyGraph {
     /// # Panics
     ///
     /// If any of the items in `other` is already present in this graph.
-    pub fn expand(mut self, other: DependencyGraph) -> Self {
+    pub fn expand(mut self, mut other: DependencyGraph) -> Self {
         for (tid, method) in other.constructors {
-            self.insert(tid, method);
+            self.insert(tid, method, other.constructor_events.remove(&tid));
         }
         self
     }
@@ -167,12 +167,16 @@ impl DependencyGraph {
         T: 'static,
     {
         self.touched = true;
-        self.insert(Ty::of::<T>(), DynMethod::new(f.map(|v| v.map(to_obj))));
+        self.insert(
+            Ty::of::<T>(),
+            DynMethod::new(f.map(|v| v.map(to_obj))),
+            None,
+        );
         self
     }
 
     /// Internal method to insert a constructor method to this graph.
-    fn insert(&mut self, tid: Ty, method: DynMethod<Result<Object>>) {
+    fn insert(&mut self, tid: Ty, method: DynMethod<Result<Object>>, events: Option<Eventstore>) {
         debug_assert_eq!(method.ty(), Ty::of::<Result<Object>>());
 
         // TODO(qti3e): Right now this is a hack for our Blank use case. We should panic
@@ -192,9 +196,10 @@ impl DependencyGraph {
             );
         }
 
-        if let Some(events) = method.events() {
+        if let Some(events) = events.or_else(|| method.events()) {
             self.constructor_events.insert(tid, events);
         }
+
         self.graph
             .insert(tid, method.dependencies().iter().copied().collect());
         self.constructors.insert(tid, method);
@@ -202,16 +207,19 @@ impl DependencyGraph {
 
     #[inline]
     fn capture_events_from_already_constructed(&mut self, provider: &mut Provider) {
-        let mut collect = Vec::new();
-        for ty in self.constructors.keys() {
-            if provider.contains_ty(ty) {
-                collect.push(*ty);
-            }
-        }
+        let constructed = self
+            .constructors
+            .keys()
+            .copied()
+            .filter(|ty| provider.contains_ty(ty))
+            .collect::<Vec<_>>();
+
         let mut events = provider.get_mut::<Eventstore>();
-        for ty in collect {
-            let method = self.constructors.remove(&ty).unwrap();
-            if let Some(e) = method.events() {
+
+        for ty in constructed {
+            self.constructors.remove(&ty).unwrap();
+
+            if let Some(e) = self.constructor_events.remove(&ty) {
                 events.extend(e);
             }
         }
