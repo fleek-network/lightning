@@ -1,22 +1,25 @@
 use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
-use ratatui::prelude::Rect;
+use ratatui::prelude::{Constraint, Direction, Layout, Rect};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
 use crate::action::Action;
 use crate::components::fps::FpsCounter;
 use crate::components::home::Home;
+use crate::components::side_bar::SideBar;
 use crate::components::Component;
 use crate::config::Config;
 use crate::mode::Mode;
 use crate::tui;
+use crate::tui::Frame;
 
 pub struct App {
     pub config: Config,
     pub tick_rate: f64,
     pub frame_rate: f64,
-    pub components: Vec<Box<dyn Component>>,
+    pub home: Home,
+    pub side_bar: SideBar,
     pub should_quit: bool,
     pub should_suspend: bool,
     pub mode: Mode,
@@ -25,20 +28,35 @@ pub struct App {
 
 impl App {
     pub fn new(tick_rate: f64, frame_rate: f64) -> Result<Self> {
-        let home = Home::new();
-        let fps = FpsCounter::default();
+        let _home = Home::new();
+        let _fps = FpsCounter::default();
+        let side_bar = SideBar::new();
         let config = Config::new()?;
         let mode = Mode::Home;
         Ok(Self {
             tick_rate,
             frame_rate,
-            components: vec![Box::new(home), Box::new(fps)],
+            home: _home,
+            side_bar,
             should_quit: false,
             should_suspend: false,
             config,
             mode,
             last_tick_key_events: Vec::new(),
         })
+    }
+
+    pub fn draw_components(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
+        let main_chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Percentage(15),
+                Constraint::Percentage((100_u16).saturating_sub(15)),
+            ])
+            .split(f.size());
+
+        self.side_bar.draw(f, main_chunks[0])?;
+        Ok(())
     }
 
     pub async fn run(&mut self) -> Result<()> {
@@ -50,17 +68,13 @@ impl App {
         // tui.mouse(true);
         tui.enter()?;
 
-        for component in self.components.iter_mut() {
-            component.register_action_handler(action_tx.clone())?;
-        }
+        self.home.register_action_handler(action_tx.clone())?;
+        self.home.register_config_handler(self.config.clone())?;
+        self.home.init(tui.size()?)?;
 
-        for component in self.components.iter_mut() {
-            component.register_config_handler(self.config.clone())?;
-        }
-
-        for component in self.components.iter_mut() {
-            component.init(tui.size()?)?;
-        }
+        self.side_bar.register_action_handler(action_tx.clone())?;
+        self.side_bar.register_config_handler(self.config.clone())?;
+        self.side_bar.init(tui.size()?)?;
 
         loop {
             if let Some(e) = tui.next().await {
@@ -89,10 +103,10 @@ impl App {
                     },
                     _ => {},
                 }
-                for component in self.components.iter_mut() {
-                    if let Some(action) = component.handle_events(Some(e.clone()))? {
-                        action_tx.send(action)?;
-                    }
+
+                // Todo: Handle events better here for components.
+                if let Some(action) = self.side_bar.handle_events(Some(e.clone()))? {
+                    action_tx.send(action)?;
                 }
             }
 
@@ -110,36 +124,31 @@ impl App {
                     Action::Resize(w, h) => {
                         tui.resize(Rect::new(0, 0, w, h))?;
                         tui.draw(|f| {
-                            for component in self.components.iter_mut() {
-                                let r = component.draw(f, f.size());
-                                if let Err(e) = r {
-                                    action_tx
-                                        .send(Action::Error(format!("Failed to draw: {:?}", e)))
-                                        .unwrap();
-                                }
+                            if let Err(e) = self.draw_components(f, f.size()) {
+                                action_tx
+                                    .send(Action::Error(format!("Failed to draw: {:?}", e)))
+                                    .unwrap();
                             }
                         })?;
                     },
                     Action::Render => {
                         tui.draw(|f| {
-                            for component in self.components.iter_mut() {
-                                let r = component.draw(f, f.size());
-                                if let Err(e) = r {
-                                    action_tx
-                                        .send(Action::Error(format!("Failed to draw: {:?}", e)))
-                                        .unwrap();
-                                }
+                            if let Err(e) = self.draw_components(f, f.size()) {
+                                action_tx
+                                    .send(Action::Error(format!("Failed to draw: {:?}", e)))
+                                    .unwrap();
                             }
                         })?;
                     },
                     _ => {},
                 }
-                for component in self.components.iter_mut() {
-                    if let Some(action) = component.update(action.clone())? {
-                        action_tx.send(action)?
-                    };
+
+                // Todo: Handle events better here for components.
+                if let Some(action) = self.side_bar.update(action.clone())? {
+                    action_tx.send(action)?;
                 }
             }
+
             if self.should_suspend {
                 tui.suspend()?;
                 action_tx.send(Action::Resume)?;
