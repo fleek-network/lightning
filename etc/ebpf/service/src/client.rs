@@ -2,11 +2,10 @@ use std::io;
 use std::net::SocketAddrV4;
 
 use bytes::Bytes;
-use log::error;
 use tokio::io::Interest;
 use tokio::net::UnixStream;
 
-use crate::schema::{EbpfServiceFrame, Pf};
+use crate::schema::{EbpfServiceFrame, FileOpen, FileOpenSrc, Pf};
 
 #[derive(Default, Debug)]
 pub struct EbpfSvcClient {
@@ -22,25 +21,67 @@ impl EbpfSvcClient {
         self.inner = Some(stream);
     }
 
-    pub async fn blocklist_add(&self, addr: SocketAddrV4) {
+    pub async fn blocklist_add(&self, addr: SocketAddrV4) -> io::Result<()> {
         if let Some(stream) = &self.inner {
             let frame = EbpfServiceFrame::Pf(Pf { op: Pf::ADD, addr });
-            if let Err(e) = Self::send(stream, frame.serialize_len_delimit()).await {
-                error!("failed to add to the block-list: {e:?}");
-            }
+            Self::send(stream, frame.serialize_len_delimit()).await?;
         }
+        Ok(())
     }
 
-    pub async fn blocklist_remove(&self, addr: SocketAddrV4) {
+    pub async fn blocklist_remove(&self, addr: SocketAddrV4) -> io::Result<()> {
         if let Some(stream) = &self.inner {
             let frame = EbpfServiceFrame::Pf(Pf {
                 op: Pf::REMOVE,
                 addr,
             });
-            if let Err(e) = Self::send(stream, frame.serialize_len_delimit()).await {
-                error!("failed to remove from the block-list: {e:?}");
-            }
+            Self::send(stream, frame.serialize_len_delimit()).await?;
         }
+        Ok(())
+    }
+
+    pub async fn file_open_allow_proc(&self, pid: u64) -> io::Result<()> {
+        if let Some(stream) = &self.inner {
+            let frame = EbpfServiceFrame::FileOpen(FileOpen {
+                op: FileOpen::ALLOW,
+                src: FileOpenSrc::Pid(pid),
+            });
+            Self::send(stream, frame.serialize_len_delimit()).await?;
+        }
+        Ok(())
+    }
+
+    pub async fn file_open_block_proc(&self, pid: u64) -> io::Result<()> {
+        if let Some(stream) = &self.inner {
+            let frame = EbpfServiceFrame::FileOpen(FileOpen {
+                op: FileOpen::BLOCK,
+                src: FileOpenSrc::Pid(pid),
+            });
+            Self::send(stream, frame.serialize_len_delimit()).await?;
+        }
+        Ok(())
+    }
+
+    pub async fn file_open_allow_bin(&self, inode: u64, dev: u32, rdev: u32) -> io::Result<()> {
+        if let Some(stream) = &self.inner {
+            let frame = EbpfServiceFrame::FileOpen(FileOpen {
+                op: FileOpen::ALLOW,
+                src: FileOpenSrc::Bin { inode, dev, rdev },
+            });
+            Self::send(stream, frame.serialize_len_delimit()).await?;
+        }
+        Ok(())
+    }
+
+    pub async fn file_open_block_bin(&self, inode: u64, dev: u32, rdev: u32) -> io::Result<()> {
+        if let Some(stream) = &self.inner {
+            let frame = EbpfServiceFrame::FileOpen(FileOpen {
+                op: FileOpen::BLOCK,
+                src: FileOpenSrc::Bin { inode, dev, rdev },
+            });
+            Self::send(stream, frame.serialize_len_delimit()).await?;
+        }
+        Ok(())
     }
 
     async fn send(stream: &UnixStream, bytes: Bytes) -> io::Result<()> {
