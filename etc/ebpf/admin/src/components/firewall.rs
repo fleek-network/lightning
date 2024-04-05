@@ -13,18 +13,18 @@ use crate::action::Action;
 use crate::config::{Config, KeyBindings};
 
 #[derive(Default)]
-pub struct NotificationBar {
+pub struct FireWall {
     command_tx: Option<UnboundedSender<Action>>,
     config: Config,
 }
 
-impl NotificationBar {
+impl FireWall {
     pub fn new() -> Self {
         Self::default()
     }
 }
 
-impl Component for NotificationBar {
+impl Component for FireWall {
     fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
         self.command_tx = Some(tx);
         Ok(())
@@ -44,15 +44,7 @@ impl Component for NotificationBar {
     }
 
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
-        let p = Paragraph::new("0 notifications\n")
-            .block(
-                Block::bordered()
-                    .title_alignment(Alignment::Center)
-                    .border_type(BorderType::Rounded),
-            )
-            .style(Style::default().fg(Color::White))
-            .centered();
-        f.render_widget(p, area);
+        f.render_widget(Paragraph::new("hello world"), area);
         Ok(())
     }
 }

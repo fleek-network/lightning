@@ -13,18 +13,18 @@ use crate::action::Action;
 use crate::config::{Config, KeyBindings};
 
 #[derive(Default)]
-pub struct NavigationBar {
+pub struct Summary {
     command_tx: Option<UnboundedSender<Action>>,
     config: Config,
 }
 
-impl NavigationBar {
+impl Summary {
     pub fn new() -> Self {
         Self::default()
     }
 }
 
-impl Component for NavigationBar {
+impl Component for Summary {
     fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
         self.command_tx = Some(tx);
         Ok(())
@@ -44,7 +44,7 @@ impl Component for NavigationBar {
     }
 
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
-        let p = Paragraph::new("Security\n")
+        let p = Paragraph::new("Overview\n")
             .block(
                 Block::bordered()
                     .title_alignment(Alignment::Center)

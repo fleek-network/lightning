@@ -7,11 +7,12 @@ use crate::action::Action;
 use crate::config::Config;
 use crate::tui::{Event, Frame};
 
-pub mod blocklist;
+mod firewall;
 pub mod fps;
 pub mod home;
-pub mod navigation;
-pub mod notification;
+pub mod navigator;
+pub mod prompt;
+pub mod summary;
 
 /// `Component` is a trait that represents a visual and interactive element of the user interface.
 /// Implementors of this trait can be registered with the main application loop and will be able to

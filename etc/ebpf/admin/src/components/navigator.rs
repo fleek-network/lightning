@@ -13,18 +13,18 @@ use crate::action::Action;
 use crate::config::{Config, KeyBindings};
 
 #[derive(Default)]
-pub struct BlockList {
+pub struct Navigator {
     command_tx: Option<UnboundedSender<Action>>,
     config: Config,
 }
 
-impl BlockList {
+impl Navigator {
     pub fn new() -> Self {
         Self::default()
     }
 }
 
-impl Component for BlockList {
+impl Component for Navigator {
     fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
         self.command_tx = Some(tx);
         Ok(())
@@ -44,15 +44,12 @@ impl Component for BlockList {
     }
 
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
-        let p = Paragraph::new("blocklist\n")
-            .block(
-                Block::bordered()
-                    .title_alignment(Alignment::Center)
-                    .border_type(BorderType::Rounded),
-            )
-            .style(Style::default().fg(Color::White))
-            .centered();
-        f.render_widget(p, area);
+        let t = Tabs::new(vec!["Home", "Firewall", "Access", "Network", "System", "Notifications"])
+            .block(Block::default().borders(Borders::ALL))
+            .style(Style::default().white())
+            .highlight_style(Style::default().yellow())
+            .padding(" ", " ");
+        f.render_widget(t, area);
         Ok(())
     }
 }
