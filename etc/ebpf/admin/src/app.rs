@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
 use crate::action::Action;
+use crate::components::firewall::FireWall;
 use crate::components::fps::FpsCounter;
 use crate::components::home::Home;
 use crate::components::navigator::Navigator;
@@ -29,12 +30,14 @@ pub struct App {
     pub summary: Summary,
     pub prompt: Prompt,
     pub navigator: Navigator,
+    pub firewall: FireWall,
 }
 
 impl App {
     pub fn new(tick_rate: f64, frame_rate: f64) -> Result<Self> {
         let _home = Home::new();
-        let _fps = FpsCounter::default();
+        let firewall = FireWall::new();
+        let _fps = FpsCounter::new();
         let summary = Summary::new();
         let prompt = Prompt::new();
         let navigator = Navigator::new();
@@ -47,6 +50,7 @@ impl App {
             summary,
             prompt,
             navigator,
+            firewall,
             should_quit: false,
             should_suspend: false,
             config,
@@ -76,6 +80,13 @@ impl App {
 
         self.navigator.draw(f, right_chunks[0])?;
         self.prompt.draw(f, right_chunks[1])?;
+
+        let content = Layout::default()
+            .vertical_margin(3)
+            .horizontal_margin(3)
+            .constraints([Constraint::Percentage(100)])
+            .split(right_chunks[0]);
+        self.firewall.draw(f, content[0])?;
 
         Ok(())
     }

@@ -44,11 +44,18 @@ impl Component for Navigator {
     }
 
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
-        let t = Tabs::new(vec!["Home", "Firewall", "Access", "Network", "System", "Notifications"])
-            .block(Block::default().borders(Borders::ALL))
-            .style(Style::default().white())
-            .highlight_style(Style::default().yellow())
-            .padding(" ", " ");
+        let t = Tabs::new(vec![
+            "Home",
+            "Firewall",
+            "Access",
+            "Network",
+            "System",
+            "Notifications",
+        ])
+        .block(Block::default().borders(Borders::ALL))
+        .style(Style::default().white())
+        .highlight_style(Style::default().yellow())
+        .padding(" ", " ");
         f.render_widget(t, area);
         Ok(())
     }

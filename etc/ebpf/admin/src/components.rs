@@ -7,7 +7,7 @@ use crate::action::Action;
 use crate::config::Config;
 use crate::tui::{Event, Frame};
 
-mod firewall;
+pub mod firewall;
 pub mod fps;
 pub mod home;
 pub mod navigator;
