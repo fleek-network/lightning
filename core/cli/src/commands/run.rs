@@ -32,10 +32,10 @@ where
 
     node.start().await;
 
-    let mut rx_update_ready = node
+    let mut checkpoint_fut = node
         .provider
         .get::<<C as Collection>::SyncronizerInterface>()
-        .checkpoint_socket();
+        .next_checkpoint_hash();
 
     let shutdown_future = shutdown_controller.wait_for_shutdown();
     pin!(shutdown_future);
@@ -43,7 +43,7 @@ where
     loop {
         tokio::select! {
             _ = &mut shutdown_future => break,
-            Ok(checkpoint_hash) = &mut rx_update_ready => {
+            checkpoint_hash = checkpoint_fut => {
                 // get the checkpoint from the blockstore
                 let checkpoint = node
                 .provider
@@ -57,6 +57,7 @@ where
                 // Sleep for a bit but provide some feedback, some of our proccesses take a few milliseconds to drop from memory
                 warn!("Preparing to load checkpoint, Restarting services");
                 tokio::time::sleep(Duration::from_secs(3)).await;
+
                 // start local env in checkpoint mode to seed database with the new checkpoint
                 C::ApplicationInterface::load_from_checkpoint(
                     &app_config, checkpoint, checkpoint_hash).await?;
@@ -67,10 +68,10 @@ where
                 node.start().await;
 
                 // reseed our rx_update_ready
-                rx_update_ready = node
+                checkpoint_fut = node
                 .provider
                 .get::<<C as Collection>::SyncronizerInterface>()
-                .checkpoint_socket();
+                .next_checkpoint_hash();
             }
         }
     }

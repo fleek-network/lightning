@@ -1,8 +1,8 @@
-use std::sync::Mutex;
 use std::time::{Duration, SystemTime};
 
 use anyhow::{anyhow, bail, Context, Result};
 use fleek_crypto::NodePublicKey;
+use lightning_interfaces::fdi::MethodExt;
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::types::{
     Blake3Hash,
@@ -14,37 +14,40 @@ use lightning_interfaces::types::{
     ServerRequest,
 };
 use lightning_interfaces::{
+    fdi,
     ApplicationInterface,
     BlockstoreServerInterface,
     BlockstoreServerSocket,
     ConfigConsumer,
+    ConfigProviderInterface,
     KeystoreInterface,
     Notification,
+    NotifierInterface,
+    ShutdownWaiter,
     SyncQueryRunnerInterface,
     SyncronizerInterface,
-    WithStartAndShutdown,
 };
 use lightning_metrics::increment_counter;
 use lightning_utils::application::QueryRunnerExt;
 use rand::seq::SliceRandom;
 use serde::de::DeserializeOwned;
+use tokio::sync::broadcast;
 use tokio::sync::mpsc::Receiver;
-use tokio::sync::oneshot;
-use tokio::task::JoinHandle;
-use tracing::info;
 
 use crate::config::Config;
 use crate::rpc::{self, rpc_epoch};
 use crate::utils;
 
 pub struct Syncronizer<C: Collection> {
-    inner: Mutex<Option<SyncronizerInner<C>>>,
-    rx_checkpoint_ready: Mutex<Option<oneshot::Receiver<Blake3Hash>>>,
-    handle: Mutex<Option<JoinHandle<SyncronizerInner<C>>>>,
-    shutdown: Mutex<Option<oneshot::Sender<()>>>,
+    state: State<C>,
 }
 
-pub struct SyncronizerInner<C: Collection> {
+enum State<C: Collection> {
+    Initialized(SyncronizerInner<C>),
+    Running(broadcast::Sender<Blake3Hash>),
+}
+
+struct SyncronizerInner<C: Collection> {
     our_public_key: NodePublicKey,
     query_runner: c![C::ApplicationInterface::SyncExecutor],
     blockstore_server_socket: BlockstoreServerSocket,
@@ -54,58 +57,19 @@ pub struct SyncronizerInner<C: Collection> {
     epoch_change_delta: Duration,
 }
 
-impl<C: Collection> WithStartAndShutdown for Syncronizer<C> {
-    /// Returns true if this system is running or not.
-    fn is_running(&self) -> bool {
-        self.handle.lock().unwrap().is_some()
-    }
-
-    /// Start the system, should not do anything if the system is already
-    /// started.
-    async fn start(&self) {
-        if self.is_running() {
-            info!("Syncronizer is not going to start because its already started");
-            return;
-        }
-
-        let (tx_checkpoint_ready, rx_checkpoint_ready) = oneshot::channel();
-        // We create a new oneshot channel everytime we start.
-        let (tx_shutdown, rx_shutdown) = oneshot::channel();
-        *self.rx_checkpoint_ready.lock().unwrap() = Some(rx_checkpoint_ready);
-        *self.shutdown.lock().unwrap() = Some(tx_shutdown);
-
-        let mut inner = self.inner.lock().unwrap().take().unwrap();
-
-        let handle = tokio::task::spawn(async move {
-            inner.run(tx_checkpoint_ready, rx_shutdown).await;
-
-            inner
-        });
-
-        *self.handle.lock().unwrap() = Some(handle);
-    }
-
-    /// Send the shutdown signal to the system.
-    async fn shutdown(&self) {
-        let handle = self.handle.lock().unwrap().take();
-        let shutdown = self.shutdown.lock().unwrap().take();
-        if let (Some(handle), Some(shutdown)) = (handle, shutdown) {
-            let _ = shutdown.send(());
-
-            *self.inner.lock().unwrap() = Some(handle.await.unwrap());
-        }
-    }
-}
-
-impl<C: Collection> SyncronizerInterface<C> for Syncronizer<C> {
+impl<C: Collection> Syncronizer<C> {
     /// Create a syncronizer service for quickly syncronizing the node state with the chain
     fn init(
-        config: Self::Config,
-        query_runner: c!(C::ApplicationInterface::SyncExecutor),
+        config: &C::ConfigProviderInterface,
+        keystore: &C::KeystoreInterface,
         blockstore_server: &C::BlockstoreServerInterface,
-        keystore: C::KeystoreInterface,
-        rx_epoch_change: Receiver<Notification>,
+        notifier: &C::NotifierInterface,
+        query_runner: fdi::Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
     ) -> Result<Self> {
+        let config = config.get::<Self>();
+        let (tx_epoch_change, rx_epoch_change) = tokio::sync::mpsc::channel(10);
+        notifier.notify_on_new_epoch(tx_epoch_change);
+
         let mut genesis_committee = query_runner.get_genesis_committee();
         // Shuffle this since we often hit this list in order until one responds. This will give our
         // network a bit of diversity on which bootstrap node they try first
@@ -126,7 +90,7 @@ impl<C: Collection> SyncronizerInterface<C> for Syncronizer<C> {
         let inner = SyncronizerInner::new(
             our_public_key,
             genesis_committee,
-            query_runner,
+            query_runner.clone(),
             blockstore_server,
             rx_epoch_change,
             config.epoch_change_delta,
@@ -134,21 +98,27 @@ impl<C: Collection> SyncronizerInterface<C> for Syncronizer<C> {
         )?;
 
         Ok(Self {
-            inner: Mutex::new(Some(inner)),
-            rx_checkpoint_ready: Mutex::new(None),
-            handle: Mutex::new(None),
-            shutdown: Mutex::new(None),
+            state: State::Initialized(inner),
         })
     }
 
-    /// Returns a socket that will send accross the blake3hash of the checkpoint
-    /// Will send it after it has already downloaded from the blockstore server
-    fn checkpoint_socket(&self) -> oneshot::Receiver<Blake3Hash> {
-        self.rx_checkpoint_ready.lock().unwrap().take().unwrap()
-    }
-}
+    /// Start the system, should not do anything if the system is already
+    /// started.
+    async fn start(mut this: fdi::RefMut<Self>, shutdown: fdi::Cloned<ShutdownWaiter>) {
+        let (tx_checkpoint_ready, _) = broadcast::channel(1);
 
-impl<C: Collection> Syncronizer<C> {
+        let state = std::mem::replace(&mut this.state, State::Running(tx_checkpoint_ready.clone()));
+        let State::Initialized(mut inner) = state else {
+            panic!("Syncronizer can only be started once");
+        };
+
+        drop(this);
+
+        shutdown
+            .run_until_shutdown(inner.run(tx_checkpoint_ready))
+            .await;
+    }
+
     fn prelude(
         our_public_key: NodePublicKey,
         genesis_committee: &Vec<(NodeIndex, NodeInfo)>,
@@ -214,6 +184,23 @@ impl<C: Collection> Syncronizer<C> {
     }
 }
 
+impl<C: Collection> fdi::BuildGraph for Syncronizer<C> {
+    fn build_graph() -> fdi::DependencyGraph {
+        fdi::DependencyGraph::new().with(Self::init.on("start", Self::start.spawn()))
+    }
+}
+
+impl<C: Collection> SyncronizerInterface<C> for Syncronizer<C> {
+    /// Returns a socket that will send accross the blake3hash of the checkpoint
+    /// Will send it after it has already downloaded from the blockstore server
+    async fn next_checkpoint_hash(&self) -> Blake3Hash {
+        let State::Running(rx) = &self.state else {
+            panic!("syncronizer must be started");
+        };
+        rx.subscribe().recv().await.unwrap()
+    }
+}
+
 impl<C: Collection> SyncronizerInner<C> {
     fn new(
         our_public_key: NodePublicKey,
@@ -235,11 +222,7 @@ impl<C: Collection> SyncronizerInner<C> {
         })
     }
 
-    async fn run(
-        &mut self,
-        tx_update_ready: oneshot::Sender<Blake3Hash>,
-        mut shutdown: oneshot::Receiver<()>,
-    ) {
+    async fn run(&mut self, tx_update_ready: broadcast::Sender<Blake3Hash>) {
         // When we first start we want to check if we should checkpoint
         if let Ok(checkpoint_hash) = self.try_sync().await {
             // Our blockstore succesfully downloaded the checkpoint lets send up the hash and return
@@ -303,8 +286,6 @@ impl<C: Collection> SyncronizerInner<C> {
                         }
                     }
                 }
-
-                _ = &mut shutdown => return
             }
         }
     }
