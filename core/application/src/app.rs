@@ -6,10 +6,11 @@ use affair::{Executor, TokioSpawn};
 use anyhow::{anyhow, Result};
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::{
+    fdi,
     ApplicationInterface,
     ConfigConsumer,
+    ConfigProviderInterface,
     ExecutionEngineSocket,
-    WithStartAndShutdown,
 };
 use tracing::{error, info};
 
@@ -22,34 +23,13 @@ pub struct Application<C: Collection> {
     collection: PhantomData<C>,
 }
 
-impl<C: Collection> WithStartAndShutdown for Application<C> {
-    /// Returns true if this system is running or not.
-    fn is_running(&self) -> bool {
-        true
-    }
-
-    /// Start the system, should not do anything if the system is already
-    /// started.
-    async fn start(&self) {
-        // No op because application is started in the init
-    }
-
-    /// Send the shutdown signal to the system.
-    async fn shutdown(&self) {}
-}
-
-impl<C: Collection> ConfigConsumer for Application<C> {
-    const KEY: &'static str = "application";
-
-    type Config = Config;
-}
-
-impl<C: Collection> ApplicationInterface<C> for Application<C> {
-    /// The type for the sync query executor.
-    type SyncExecutor = QueryRunner;
-
+impl<C: Collection> Application<C> {
     /// Create a new instance of the application layer using the provided configuration.
-    fn init(config: Self::Config, blockstore: C::BlockstoreInterface) -> Result<Self> {
+    fn init(
+        config: &C::ConfigProviderInterface,
+        blockstore: &C::BlockstoreInterface,
+    ) -> Result<Self> {
+        let config = config.get::<Self>();
         if let StorageConfig::RocksDb = &config.storage {
             assert!(
                 config.db_path.is_some(),
@@ -66,11 +46,31 @@ impl<C: Collection> ApplicationInterface<C> for Application<C> {
         Ok(Self {
             query_runner: env.query_runner(),
             update_socket: Mutex::new(Some(TokioSpawn::spawn_async(UpdateWorker::<C>::new(
-                env, blockstore,
+                env,
+                blockstore.clone(),
             )))),
             collection: PhantomData,
         })
     }
+}
+
+impl<C: Collection> ConfigConsumer for Application<C> {
+    const KEY: &'static str = "application";
+
+    type Config = Config;
+}
+
+impl<C: Collection> fdi::BuildGraph for Application<C> {
+    fn build_graph() -> fdi::DependencyGraph {
+        fdi::DependencyGraph::new()
+            .with(Self::init)
+            .with_infallible(|this: &Self| this.query_runner.clone())
+    }
+}
+
+impl<C: Collection> ApplicationInterface<C> for Application<C> {
+    /// The type for the sync query executor.
+    type SyncExecutor = QueryRunner;
 
     /// Returns a socket that should be used to submit transactions to be executed
     /// by the application layer.
@@ -96,7 +96,7 @@ impl<C: Collection> ApplicationInterface<C> for Application<C> {
     }
 
     async fn load_from_checkpoint(
-        config: &Self::Config,
+        config: &Config,
         checkpoint: Vec<u8>,
         checkpoint_hash: [u8; 32],
     ) -> Result<()> {

@@ -64,6 +64,7 @@ impl<C: Collection> Node<C> {
         let graph = DependencyGraph::new()
             .with_value(waiter)
             .with_value(Blank::<C>::default())
+            .with_module::<C::ApplicationInterface>()
             .with_module::<C::BroadcastInterface>()
             .with_module::<C::HandshakeInterface>()
             .with_module::<C::ConsensusInterface>()
@@ -84,16 +85,6 @@ impl<C: Collection> Node<C> {
             .with_module::<C::DeliveryAcknowledgmentAggregatorInterface>()
             .with_module::<C::RpcInterface>()
             // TODO: Refactor the rest of start/shutdown/inits:
-            .with(
-                <C::ApplicationInterface as ApplicationInterface<C>>::infu_initialize_hack
-                    .on("start", |c: &C::ApplicationInterface| block_on(c.start()))
-                    .on("shutdown", |c: &C::ApplicationInterface| {
-                        block_on(c.shutdown())
-                    }),
-            )
-            .with_infallible(|app: &C::ApplicationInterface| {
-                application::ApplicationInterface::sync_query(app)
-            })
             .with(
                 C::SyncronizerInterface::infu_initialize_hack
                     .on("start", |c: &C::SyncronizerInterface| block_on(c.start()))

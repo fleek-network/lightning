@@ -17,7 +17,7 @@ use fleek_crypto::{
 };
 use hp_fixed::signed::HpFixed;
 use hp_fixed::unsigned::HpUfixed;
-use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::infu_collection::{Collection, Node};
 use lightning_interfaces::types::{
     AccountInfo,
     Blake3Hash,
@@ -52,6 +52,7 @@ use lightning_interfaces::types::{
     MAX_MEASUREMENTS_SUBMIT,
 };
 use lightning_interfaces::{
+    fdi,
     partial,
     ApplicationInterface,
     ExecutionEngineSocket,
@@ -59,6 +60,7 @@ use lightning_interfaces::{
     SyncQueryRunnerInterface,
     ToDigest,
 };
+use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::{random, reputation};
 use lightning_utils::application::QueryRunnerExt;
 use rand::seq::SliceRandom;
@@ -69,6 +71,7 @@ use crate::genesis::{Genesis, GenesisAccount, GenesisNode, GenesisPrices, Genesi
 use crate::query_runner::QueryRunner;
 
 partial!(TestBinding {
+    ConfigProviderInterface = JsonConfigProvider;
     ApplicationInterface = Application<Self>;
 });
 
@@ -573,8 +576,13 @@ fn init_app(config: Option<Config>) -> (ExecutionEngineSocket, QueryRunner) {
 
 /// Initialize application with provided configuration.
 fn do_init_app(config: Config) -> (ExecutionEngineSocket, QueryRunner) {
-    let app = Application::<TestBinding>::init(config, Default::default()).unwrap();
+    let node = Node::<TestBinding>::init_with_provider(
+        fdi::Provider::default()
+            .with(JsonConfigProvider::default().with::<Application<TestBinding>>(config)),
+    )
+    .expect("failed to initialize node");
 
+    let app = node.provider.get::<Application<TestBinding>>();
     (app.transaction_executor(), app.sync_query())
 }
 

@@ -14,6 +14,7 @@ use atomo::{
     StorageBackend,
     StorageBackendConstructor,
 };
+use fdi::BuildGraph;
 use fleek_crypto::{ClientPublicKey, ConsensusPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_types::{
@@ -30,8 +31,6 @@ use lightning_types::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::common::WithStartAndShutdown;
-use crate::config::ConfigConsumer;
 use crate::infu_collection::Collection;
 use crate::types::{
     Block,
@@ -46,7 +45,7 @@ use crate::types::{
     TotalServed,
     TransactionResponse,
 };
-use crate::{BlockstoreInterface, ConfigProviderInterface};
+use crate::ConfigConsumer;
 
 /// The socket that is handled by the application layer and fed by consensus (or other
 /// synchronization systems in place) which executes and persists transactions that
@@ -61,18 +60,10 @@ pub type ExecutionEngineSocket = Socket<Block, BlockExecutionResponse>;
 
 #[infusion::service]
 pub trait ApplicationInterface<C: Collection>:
-    WithStartAndShutdown + ConfigConsumer + Sized + Send + Sync
+    BuildGraph + ConfigConsumer + Sized + Send + Sync
 {
-    fn _init(config: ::ConfigProviderInterface, blockstore: ::BlockstoreInterface) {
-        let config = config.get::<Self>();
-        Self::init(config, blockstore.clone())
-    }
-
     /// The type for the sync query executor.
     type SyncExecutor: SyncQueryRunnerInterface;
-
-    /// Create a new instance of the application layer using the provided configuration.
-    fn init(config: Self::Config, blockstore: C::BlockstoreInterface) -> anyhow::Result<Self>;
 
     /// Returns a socket that should be used to submit transactions to be executed
     /// by the application layer.
