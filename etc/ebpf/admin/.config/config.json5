@@ -4,7 +4,21 @@
       "<q>": "Quit", // Quit the application
       "<Ctrl-d>": "Quit", // Another way to quit
       "<Ctrl-c>": "Quit", // Yet another way to quit
-      "<Ctrl-z>": "Suspend" // Suspend the application
+      "<Ctrl-z>": "Suspend", // Suspend the application
+      "<shift-left>": "NavLeft", // Move left to the next component.
+      "<shift-right>": "NavRight", // Move right to the next component.
+    },
+    "Firewall": {
+      "<q>": "Quit", // Quit the application
+      "<Ctrl-d>": "Quit", // Another way to quit
+      "<Ctrl-c>": "Quit", // Yet another way to quit
+      "<Ctrl-z>": "Suspend", // Suspend the application
+      "<up>": "Up", // Move up to the next component.
+      "<down>": "Down", // Move down to the next component.
+      "<shift-left>": "NavLeft", // Move left to the next component.
+      "<shift-right>": "NavRight", // Move right to the next component.
+      "<a>": "Add", // Add an entry in the block list.
+      "<r>": "Remove", // Remove an entry in the block list.
     },
   }
 }

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use color_eyre::eyre::Result;
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ratatui::prelude::*;
 use ratatui::widgets::*;
 use serde::{Deserialize, Serialize};
@@ -33,6 +33,14 @@ impl Component for Home {
     fn register_config_handler(&mut self, config: Config) -> Result<()> {
         self.config = config;
         Ok(())
+    }
+
+    fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<Action>> {
+        // if let KeyEventKind::Press = key.kind {
+        //     key.code
+        // }
+        //
+        Ok(None)
     }
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {

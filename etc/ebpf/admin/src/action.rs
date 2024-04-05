@@ -16,4 +16,16 @@ pub enum Action {
     Refresh,
     Error(String),
     Help,
+    NavLeft,
+    NavRight,
+    Up,
+    Down,
+    Add,
+    Remove,
+}
+
+impl Action {
+    pub fn is_navigation_action(&self) -> bool {
+        matches!(self, Action::NavLeft | Action::NavRight)
+    }
 }

@@ -46,7 +46,12 @@ impl FireWall {
             ),
         ]
         .into_iter()
-        .map(|(ip, port, proto, author)| Record { ip, port, proto, author })
+        .map(|(ip, port, proto, author)| Record {
+            ip,
+            port,
+            proto,
+            author,
+        })
         .collect();
         let longest_item_len = space_between_columns(&blocklist);
         Self {
@@ -132,7 +137,12 @@ struct Record {
 
 impl Record {
     fn flatten(&self) -> [&str; 4] {
-        [self.ip.as_str(), self.port.as_str(), self.proto.as_str(), self.author.as_str()]
+        [
+            self.ip.as_str(),
+            self.port.as_str(),
+            self.proto.as_str(),
+            self.author.as_str(),
+        ]
     }
 }
 
@@ -163,5 +173,10 @@ fn space_between_columns(items: &HashSet<Record>) -> (u16, u16, u16, u16) {
         .max()
         .unwrap_or(0);
 
-    (ip_len as u16, port_len as u16, proto_len as u16, author_len as u16)
+    (
+        ip_len as u16,
+        port_len as u16,
+        proto_len as u16,
+        author_len as u16,
+    )
 }

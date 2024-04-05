@@ -59,33 +59,67 @@ impl App {
         })
     }
 
-    pub fn draw_components(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
-        let main_chunks = Layout::default()
+    fn update_components(&mut self, action: Action) -> Result<Option<Action>> {
+        let maybe_action = match self.mode {
+            Mode::Home => self.home.update(action.clone())?,
+            Mode::Firewall => self.firewall.update(action.clone())?,
+            Mode::FirewallNewEntry => {
+                unimplemented!()
+            },
+        };
+
+        if maybe_action.is_none() {
+            self.navigator.update(action)
+        } else {
+            Ok(maybe_action)
+        }
+    }
+
+    fn handle_event(&mut self, event: tui::Event) -> Result<Option<Action>> {
+        match self.mode {
+            Mode::Home => self.home.handle_events(Some(event)),
+            Mode::Firewall => self.firewall.handle_events(Some(event)),
+            Mode::FirewallNewEntry => {
+                // We ignore navigation here.
+                unimplemented!()
+            },
+        }
+    }
+
+    fn draw_components(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
+        let body_footer_area = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Percentage((100_u16).saturating_sub(3)),
+                Constraint::Percentage(3),
+            ])
+            .split(f.size());
+
+        self.prompt.draw(f, body_footer_area[1])?;
+
+        let content_area = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
                 Constraint::Percentage(35),
                 Constraint::Percentage((100_u16).saturating_sub(35)),
             ])
-            .split(f.size());
+            .split(body_footer_area[0]);
 
-        self.summary.draw(f, main_chunks[0])?;
+        self.summary.draw(f, content_area[0])?;
 
-        let right_chunks = Layout::default()
+        let navigation_area = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Percentage((100_u16).saturating_sub(10)),
-                Constraint::Percentage(10),
-            ])
-            .split(main_chunks[1]);
+            .constraints([Constraint::Percentage(100)])
+            .split(content_area[1]);
 
-        self.navigator.draw(f, right_chunks[0])?;
-        self.prompt.draw(f, right_chunks[1])?;
+        self.navigator.draw(f, navigation_area[0])?;
 
         let content = Layout::default()
             .vertical_margin(3)
             .horizontal_margin(3)
             .constraints([Constraint::Percentage(100)])
-            .split(right_chunks[0]);
+            .split(navigation_area[0]);
+
         self.firewall.draw(f, content[0])?;
 
         Ok(())
@@ -145,8 +179,7 @@ impl App {
                     _ => {},
                 }
 
-                // Todo: Handle events better here for components.
-                if let Some(action) = self.summary.handle_events(Some(e.clone()))? {
+                if let Some(action) = self.handle_event(e)? {
                     action_tx.send(action)?;
                 }
             }
@@ -185,7 +218,7 @@ impl App {
                 }
 
                 // Todo: Handle events better here for components.
-                if let Some(action) = self.summary.update(action.clone())? {
+                if let Some(action) = self.update_components(action)? {
                     action_tx.send(action)?;
                 }
             }
