@@ -5,9 +5,11 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
 use crate::action::Action;
+use crate::components::blocklist::BlockList;
 use crate::components::fps::FpsCounter;
 use crate::components::home::Home;
-use crate::components::side_bar::SideBar;
+use crate::components::navigation::NavigationBar;
+use crate::components::notification::NotificationBar;
 use crate::components::Component;
 use crate::config::Config;
 use crate::mode::Mode;
@@ -19,7 +21,9 @@ pub struct App {
     pub tick_rate: f64,
     pub frame_rate: f64,
     pub home: Home,
-    pub side_bar: SideBar,
+    pub side_bar: NavigationBar,
+    pub notification_bar: NotificationBar,
+    pub blocklist: BlockList,
     pub should_quit: bool,
     pub should_suspend: bool,
     pub mode: Mode,
@@ -30,7 +34,9 @@ impl App {
     pub fn new(tick_rate: f64, frame_rate: f64) -> Result<Self> {
         let _home = Home::new();
         let _fps = FpsCounter::default();
-        let side_bar = SideBar::new();
+        let side_bar = NavigationBar::new();
+        let notification_bar = NotificationBar::new();
+        let blocklist = BlockList::new();
         let config = Config::new()?;
         let mode = Mode::Home;
         Ok(Self {
@@ -38,6 +44,8 @@ impl App {
             frame_rate,
             home: _home,
             side_bar,
+            notification_bar,
+            blocklist,
             should_quit: false,
             should_suspend: false,
             config,
@@ -56,6 +64,18 @@ impl App {
             .split(f.size());
 
         self.side_bar.draw(f, main_chunks[0])?;
+
+        let right_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Percentage(10),
+                Constraint::Percentage((100_u16).saturating_sub(10)),
+            ])
+            .split(main_chunks[1]);
+
+        self.notification_bar.draw(f, right_chunks[0])?;
+        self.blocklist.draw(f, right_chunks[1])?;
+
         Ok(())
     }
 
@@ -75,6 +95,17 @@ impl App {
         self.side_bar.register_action_handler(action_tx.clone())?;
         self.side_bar.register_config_handler(self.config.clone())?;
         self.side_bar.init(tui.size()?)?;
+
+        self.notification_bar
+            .register_action_handler(action_tx.clone())?;
+        self.notification_bar
+            .register_config_handler(self.config.clone())?;
+        self.notification_bar.init(tui.size()?)?;
+
+        self.blocklist.register_action_handler(action_tx.clone())?;
+        self.blocklist
+            .register_config_handler(self.config.clone())?;
+        self.blocklist.init(tui.size()?)?;
 
         loop {
             if let Some(e) = tui.next().await {
