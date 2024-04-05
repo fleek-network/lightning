@@ -18,7 +18,7 @@ use crate::config::{Config, KeyBindings};
 pub struct FireWall {
     command_tx: Option<UnboundedSender<Action>>,
     blocklist: HashSet<Record>,
-    longest_item_len: (u16, u16, u16),
+    longest_item_len: (u16, u16, u16, u16),
     table_state: TableState,
     config: Config,
 }
@@ -30,20 +30,23 @@ impl FireWall {
                 "192.3.2.1".to_string(),
                 "8080".to_string(),
                 "tcp".to_string(),
+                "2293".to_string(),
             ),
             (
                 "128.102.94.5".to_string(),
                 "9888".to_string(),
                 "udp".to_string(),
+                "2293".to_string(),
             ),
             (
                 "88.1.94.5".to_string(),
                 "9888".to_string(),
                 "tcp".to_string(),
+                "2293".to_string(),
             ),
         ]
         .into_iter()
-        .map(|(ip, port, proto)| Record { ip, port, proto })
+        .map(|(ip, port, proto, author)| Record { ip, port, proto, author })
         .collect();
         let longest_item_len = space_between_columns(&blocklist);
         Self {
@@ -81,7 +84,7 @@ impl Component for FireWall {
             .add_modifier(Modifier::REVERSED)
             .fg(Color::DarkGray);
 
-        let header = ["IP", "Port", "Protocol"]
+        let header = ["IP", "Port", "Protocol", "Pid"]
             .into_iter()
             .map(Cell::from)
             .collect::<Row>()
@@ -106,7 +109,8 @@ impl Component for FireWall {
             [
                 Constraint::Min(self.longest_item_len.0 + 1),
                 Constraint::Min(self.longest_item_len.1 + 1),
-                Constraint::Min(self.longest_item_len.2),
+                Constraint::Min(self.longest_item_len.2 + 1),
+                Constraint::Min(self.longest_item_len.3),
             ],
         )
         .header(header)
@@ -123,15 +127,16 @@ struct Record {
     ip: String,
     port: String,
     proto: String,
+    author: String,
 }
 
 impl Record {
-    fn flatten(&self) -> [&str; 3] {
-        [self.ip.as_str(), self.port.as_str(), self.proto.as_str()]
+    fn flatten(&self) -> [&str; 4] {
+        [self.ip.as_str(), self.port.as_str(), self.proto.as_str(), self.author.as_str()]
     }
 }
 
-fn space_between_columns(items: &HashSet<Record>) -> (u16, u16, u16) {
+fn space_between_columns(items: &HashSet<Record>) -> (u16, u16, u16, u16) {
     let ip_len = items
         .iter()
         .map(|r| r.ip.as_str())
@@ -151,6 +156,12 @@ fn space_between_columns(items: &HashSet<Record>) -> (u16, u16, u16) {
         .map(UnicodeWidthStr::width)
         .max()
         .unwrap_or(0);
+    let author_len = items
+        .iter()
+        .map(|r| r.proto.as_str())
+        .map(UnicodeWidthStr::width)
+        .max()
+        .unwrap_or(0);
 
-    (ip_len as u16, port_len as u16, proto_len as u16)
+    (ip_len as u16, port_len as u16, proto_len as u16, author_len as u16)
 }
