@@ -182,7 +182,6 @@ impl<Q: SyncQueryRunnerInterface, NE: Emitter> Execution<Q, NE> {
     }
 
     pub fn shutdown(&self) {
-        self.notifier.shutdown();
         self.executor.downgrade();
     }
 

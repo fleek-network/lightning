@@ -16,8 +16,6 @@ pub enum Notification {
 pub trait NotifierInterface<C: Collection>: BuildGraph + Sync + Send + Clone {
     type Emitter: Emitter;
 
-    // fn init(app: &c!(C::ApplicationInterface)) -> Self;
-
     /// Returns a reference to the emitter end of this notifier. Should only be used if we are
     /// interested (and responsible) for triggering a notification around new epoch.
     fn get_emitter(&self) -> Self::Emitter;
@@ -28,6 +26,7 @@ pub trait NotifierInterface<C: Collection>: BuildGraph + Sync + Send + Clone {
 
     fn notify_before_epoch_change(&self, duration: Duration, tx: mpsc::Sender<Notification>);
 }
+
 #[infusion::blank]
 pub trait Emitter: Clone + Send + Sync + 'static {
     /// Notify the waiters about epoch change.
@@ -35,8 +34,4 @@ pub trait Emitter: Clone + Send + Sync + 'static {
 
     /// Notify the waiters about new block.
     fn new_block(&self);
-
-    /// Shutdown the emmiter and close any open tasks.
-    // TODO(qti3e): Should this simply use shutdown_waiter?
-    fn shutdown(&self);
 }

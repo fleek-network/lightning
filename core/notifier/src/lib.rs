@@ -4,7 +4,7 @@ use std::time::{Duration, SystemTime};
 use lightning_interfaces::fdi::{BuildGraph, DependencyGraph};
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::notifier::{Notification, NotifierInterface};
-use lightning_interfaces::{ApplicationInterface, Emitter};
+use lightning_interfaces::{ApplicationInterface, Cloned, Emitter, ShutdownWaiter};
 use lightning_utils::application::QueryRunnerExt;
 use tokio::pin;
 use tokio::sync::{mpsc, Notify};
@@ -13,6 +13,7 @@ use tokio::time::sleep;
 pub struct Notifier<C: Collection> {
     query_runner: c![C::ApplicationInterface::SyncExecutor],
     notify: NotificationsEmitter,
+    waiter: ShutdownWaiter,
 }
 
 impl<C: Collection> Clone for Notifier<C> {
@@ -20,6 +21,7 @@ impl<C: Collection> Clone for Notifier<C> {
         Self {
             query_runner: self.query_runner.clone(),
             notify: self.notify.clone(),
+            waiter: self.waiter.clone(),
         }
     }
 }
@@ -40,10 +42,11 @@ impl<C: Collection> Notifier<C> {
 }
 
 impl<C: Collection> Notifier<C> {
-    fn new(app: &c![C::ApplicationInterface]) -> Self {
+    fn new(app: &c![C::ApplicationInterface], Cloned(waiter): Cloned<ShutdownWaiter>) -> Self {
         Self {
             query_runner: app.sync_query(),
             notify: Default::default(),
+            waiter,
         }
     }
 }
@@ -63,23 +66,26 @@ impl<C: Collection> NotifierInterface<C> for Notifier<C> {
 
     fn notify_on_new_block(&self, tx: mpsc::Sender<Notification>) {
         let notify = self.notify.clone();
+        let waiter = self.waiter.clone();
+
         tokio::spawn(async move {
+            let shutdown_future = waiter.wait_for_shutdown();
+            pin!(shutdown_future);
+
             loop {
                 let notify_future = notify.new_block_notify.notified();
-                let shutdown_future = notify.shutdown_notify.notified();
-                pin!(shutdown_future);
                 pin!(notify_future);
 
                 tokio::select! {
-                _ = shutdown_future => {
-                    break;
-                }
-                _ = notify_future => {
-                    if tx.send(Notification::NewBlock).await.is_err() {
-                        // There is no receiver anymore.
-                        return;
+                    _ = &mut shutdown_future => {
+                        break;
                     }
-                }
+                    _ = notify_future => {
+                        if tx.send(Notification::NewBlock).await.is_err() {
+                            // There is no receiver anymore.
+                            return;
+                        }
+                    }
                 }
             }
         });
@@ -87,29 +93,35 @@ impl<C: Collection> NotifierInterface<C> for Notifier<C> {
 
     fn notify_on_new_epoch(&self, tx: mpsc::Sender<Notification>) {
         let notify = self.notify.clone();
+        let waiter = self.waiter.clone();
+
         tokio::spawn(async move {
+            let shutdown_future = waiter.wait_for_shutdown();
+            pin!(shutdown_future);
+
             loop {
                 let notify_future = notify.new_epoch_notify.notified();
-                let shutdown_future = notify.shutdown_notify.notified();
-                pin!(shutdown_future);
                 pin!(notify_future);
 
                 tokio::select! {
-                _ = shutdown_future => {
-                    break;
-                }
-                _ = notify_future => {
-                    if tx.send(Notification::NewEpoch).await.is_err() {
-                        // There is no receiver anymore.
-                        return;
+                    _ = &mut shutdown_future => {
+                        break;
                     }
-                }
+                    _ = notify_future => {
+                        if tx.send(Notification::NewEpoch).await.is_err() {
+                            // There is no receiver anymore.
+                            return;
+                        }
+                    }
                 }
             }
         });
     }
 
     fn notify_before_epoch_change(&self, duration: Duration, tx: mpsc::Sender<Notification>) {
+        // TODO(qti3e): The name of this method is misleading, the other methods subscribe
+        // to an event but this method only emits one thing and returns and yet it take an
+        // mpsc and not a oneshot.
         let until_epoch_end = self.get_until_epoch_end();
         if until_epoch_end > duration {
             tokio::spawn(async move {
@@ -126,7 +138,6 @@ impl<C: Collection> NotifierInterface<C> for Notifier<C> {
 pub struct NotificationsEmitter {
     new_block_notify: Arc<Notify>,
     new_epoch_notify: Arc<Notify>,
-    shutdown_notify: Arc<Notify>,
 }
 
 impl Emitter for NotificationsEmitter {
@@ -136,10 +147,6 @@ impl Emitter for NotificationsEmitter {
 
     fn epoch_changed(&self) {
         self.new_epoch_notify.notify_waiters()
-    }
-
-    fn shutdown(&self) {
-        self.shutdown_notify.notify_waiters()
     }
 }
 
