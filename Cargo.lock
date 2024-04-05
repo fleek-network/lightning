@@ -6447,6 +6447,7 @@ dependencies = [
  "rand 0.8.5",
  "rand_chacha",
  "rayon",
+ "rs-graph",
  "serde",
  "serde_json",
  "simulon",
@@ -9629,6 +9630,18 @@ name = "route-recognizer"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "afab94fb28594581f62d981211a9a4d53cc8130bbcbbb89a0440d9b8e81a7746"
+
+[[package]]
+name = "rs-graph"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5d62f3d9e60505020ee88467096db7aef43bffadb62d6656c911dabd13cb51a2"
+dependencies = [
+ "either",
+ "num-integer",
+ "num-iter",
+ "num-traits",
+]
 
 [[package]]
 name = "rsa"

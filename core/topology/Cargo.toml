@@ -34,6 +34,7 @@ infusion.workspace = true
 indicatif = "0.17"
 rayon = "1"
 bincode.workspace = true
+rs-graph = "0.21"
 
 [[bench]]
 name = "clustering"
@@ -46,3 +47,7 @@ harness = false
 [[example]]
 name = "propagation"
 path = "simulation/propagation.rs"
+
+[[example]]
+name = "connectivity"
+path = "simulation/connectivity.rs"

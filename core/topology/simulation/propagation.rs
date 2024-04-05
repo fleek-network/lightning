@@ -1,17 +1,14 @@
 use std::cmp::Reverse;
-use std::collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap};
+use std::collections::{BTreeMap, BinaryHeap, HashMap, HashSet};
 use std::path::PathBuf;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-
+mod setup;
 use fxhash::FxHashMap;
 use indicatif::ProgressBar;
 use lightning_test_utils::plotting;
 use lightning_test_utils::statistics::{get_mean, get_variance};
-use lightning_topology::{build_latency_matrix, suggest_connections_from_latency_matrix};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
-use simulon::latency::ping::ClampNormalDistribution;
-use simulon::latency::LatencyProvider;
 
 type NodeId = usize;
 type LatencyMillis = u128;
@@ -58,7 +55,7 @@ struct QueueEntry {
 
 impl Graph {
     pub fn new(
-        adj_matrix: &BTreeMap<usize, Vec<usize>>,
+        adj_matrix: &BTreeMap<usize, HashSet<usize>>,
         latencies: &HashMap<(usize, usize), Duration>,
     ) -> Self {
         let mut nodes = Vec::with_capacity(adj_matrix.len());
@@ -166,43 +163,8 @@ fn main() {
                 let mut exp_data = Vec::new();
                 for _trial in 0..num_trials {
                     // for each trial we want to sample a different topology
-                    let mut lat_provider = simulon::latency::PingDataLatencyProvider::<
-                        ClampNormalDistribution,
-                    >::default();
-                    lat_provider.init(n);
-
-                    let valid_pubkeys: BTreeSet<usize> = (0..n).collect();
-                    let mut latencies = HashMap::new();
-                    for i in 0..(n - 1) {
-                        for j in (i + 1)..n {
-                            let lat = lat_provider.get(i, j);
-                            latencies.insert((i, j), lat);
-                        }
-                    }
-
-                    let (matrix, mappings, _) =
-                        build_latency_matrix(usize::MAX, latencies.clone(), valid_pubkeys.clone());
-                    let connections = suggest_connections_from_latency_matrix(
-                        0,
-                        matrix,
-                        &mappings,
-                        9,
-                        cluster_size,
-                    );
-
-                    let adj_matrix: BTreeMap<usize, Vec<usize>> = mappings
-                        .into_iter()
-                        .map(|(index, key)| {
-                            (
-                                key,
-                                connections
-                                    .get(index)
-                                    .into_iter()
-                                    .flatten()
-                                    .collect::<Vec<_>>(),
-                            )
-                        })
-                        .collect();
+                    let (adj_matrix, latencies, valid_pubkeys) =
+                        setup::build_topology(n, cluster_size);
 
                     for node in valid_pubkeys {
                         let mut graph = Graph::new(&adj_matrix, &latencies);
