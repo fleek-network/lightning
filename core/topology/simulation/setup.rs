@@ -47,6 +47,7 @@ pub fn build_topology(num_nodes: usize, cluster_size: usize) -> Topology {
     (adj_list, latencies, valid_pubkeys)
 }
 
+#[allow(unused)]
 pub fn build_graph(adj_list: &BTreeMap<usize, HashSet<usize>>) -> VecGraph<usize> {
     let mut b = VecGraph::<usize>::new_builder();
     let mut nodes = HashMap::new();
