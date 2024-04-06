@@ -103,7 +103,6 @@ impl<C: Collection> MockConsensus<C> {
             .run_until_shutdown(async move {
                 loop {
                     interval.tick().await;
-                    self.notifier.new_block();
                 }
             })
             .await;
@@ -136,14 +135,14 @@ impl<NE: Emitter> AsyncWorker for MockConsensusWorker<NE> {
             digest: [0; 32],
         };
 
-        let _res = self
+        let response = self
             .executor
-            .run(block)
+            .run(block.clone())
             .await
             .map_err(|r| anyhow::anyhow!(format!("{r:?}")))
             .unwrap();
 
-        self.notifier.new_block();
+        self.notifier.new_block(block, response);
     }
 }
 

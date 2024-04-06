@@ -12,7 +12,6 @@ use lightning_interfaces::signer::{SignerInterface, SubmitTxSocket};
 use lightning_interfaces::types::{Epoch, EpochInfo, Event, Topic, UpdateMethod};
 use lightning_interfaces::{
     ApplicationInterface,
-    ArchiveInterface,
     BroadcastInterface,
     Cloned,
     ConfigProviderInterface,
@@ -377,21 +376,18 @@ impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
 
 impl<C: Collection> Consensus<C> {
     /// Create a new consensus service with the provided config and executor.
-    #[allow(clippy::too_many_arguments)]
     fn init(
         config_provider: &C::ConfigProviderInterface,
         keystore: &C::KeystoreInterface,
         signer: &C::SignerInterface,
         app: &C::ApplicationInterface,
         broadcast: &C::BroadcastInterface,
-        archive: &C::ArchiveInterface,
         notifier: &C::NotifierInterface,
     ) -> anyhow::Result<Self> {
         let config = config_provider.get::<Self>();
         let executor = app.transaction_executor();
         let query_runner = app.sync_query();
         let pubsub = broadcast.get_pubsub(Topic::Consensus);
-        let indexer_socket = archive.index_socket();
 
         // Spawn the registry for narwhal
         let registry = Registry::new();
@@ -418,7 +414,6 @@ impl<C: Collection> Consensus<C> {
             reconfigure_notify.clone(),
             tx_narwhal_batches,
             query_runner.clone(),
-            indexer_socket,
             notifier.get_emitter(),
         ));
 

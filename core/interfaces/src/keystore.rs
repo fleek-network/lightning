@@ -10,11 +10,13 @@ pub trait KeystoreInterface<C: Collection>:
 {
     /// Returns the Ed25519 public key
     fn get_ed25519_pk(&self) -> NodePublicKey;
+
     /// Returns the raw Ed25519 secret key. Should be used with caution!
     fn get_ed25519_sk(&self) -> NodeSecretKey;
 
     /// Returns the BLS public key
     fn get_bls_pk(&self) -> ConsensusPublicKey;
+
     /// Returns the raw BLS secret key. Should be used with caution!
     fn get_bls_sk(&self) -> ConsensusSecretKey;
 

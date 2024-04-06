@@ -3,12 +3,10 @@ use std::sync::{Arc, OnceLock};
 use async_trait::async_trait;
 use fastcrypto::hash::HashFunction;
 use fleek_blake3 as blake3;
-use lightning_interfaces::types::{Block, Epoch, Event, Metadata, NodeIndex, TransactionRequest};
+use lightning_interfaces::types::{Block, Epoch, Event, NodeIndex, TransactionRequest};
 use lightning_interfaces::{
     Emitter,
     ExecutionEngineSocket,
-    IndexRequest,
-    IndexSocket,
     SyncQueryRunnerInterface,
     ToDigest,
     TranscriptBuilder,
@@ -70,9 +68,6 @@ pub struct Execution<Q: SyncQueryRunnerInterface, NE: Emitter> {
     /// Query runner to check application state, mainly used to make sure the last executed block
     /// is up to date from time we were an edge node
     query_runner: Q,
-    /// If this socket is present it means the node is in archive node and should send all blocks
-    /// and transactions it executes to the archiver to be indexed
-    index_socket: Option<IndexSocket>,
     /// Notifications emitter
     notifier: NE,
     /// Send the event to the RPC
@@ -85,7 +80,6 @@ impl<Q: SyncQueryRunnerInterface, NE: Emitter> Execution<Q, NE> {
         reconfigure_notify: Arc<Notify>,
         tx_narwhal_batches: mpsc::Sender<(AuthenticStampedParcel, bool)>,
         query_runner: Q,
-        index_socket: Option<IndexSocket>,
         notifier: NE,
     ) -> Self {
         Self {
@@ -93,7 +87,6 @@ impl<Q: SyncQueryRunnerInterface, NE: Emitter> Execution<Q, NE> {
             reconfigure_notify,
             tx_narwhal_batches,
             query_runner,
-            index_socket,
             notifier,
             event_tx: OnceLock::new(),
         }
@@ -117,21 +110,17 @@ impl<Q: SyncQueryRunnerInterface, NE: Emitter> Execution<Q, NE> {
             digest,
         };
 
-        let archive_block = if self.index_socket.is_some() {
-            Some(block.clone())
-        } else {
-            None
-        };
+        let archive_block = block.clone();
 
         // Unfailable
-        let results = self.executor.run(block).await.unwrap();
+        let response = self.executor.run(block).await.unwrap();
         info!("Consensus submitted new block to application");
 
         match self.event_tx.get() {
             Some(tx) => {
                 if let Err(e) = tx
                     .send(
-                        results
+                        response
                             .txn_receipts
                             .iter()
                             .filter_map(|r| r.event.clone())
@@ -147,36 +136,37 @@ impl<Q: SyncQueryRunnerInterface, NE: Emitter> Execution<Q, NE> {
             },
         }
 
-        if results.change_epoch {
+        if response.change_epoch {
             change_epoch = true;
             self.notifier.epoch_changed();
         }
 
-        // If we have the archive socket that means our node is in archive node and we should send
-        // the block and the receipt to be indexed
-        if let (Some(block), Some(socket)) = (archive_block, &self.index_socket) {
-            if let Err(e) = socket.enqueue(IndexRequest::Block(block, results)).await {
-                error!("We could not send a message to the archiver: {e}");
-            }
+        // // If we have the archive socket that means our node is in archive node and we should
+        // send // the block and the receipt to be indexed
+        // if let (Some(block), Some(socket)) = (archive_block, &self.index_socket) {
+        //     if let Err(e) = socket.enqueue(IndexRequest::Block(block, results)).await {
+        //         error!("We could not send a message to the archiver: {e}");
+        //     }
 
-            // At this point we written a checkpoint to disk and updated the last epoch hash
-            if change_epoch {
-                if let Err(e) = socket
-                    .run(IndexRequest::Epoch(
-                        self.query_runner.get_current_epoch(),
-                        self.query_runner
-                            .get_metadata(&Metadata::LastEpochHash)
-                            .expect("We should have a last epoch hash")
-                            .maybe_hash()
-                            .expect("We should have gotten a hash, this is a bug"),
-                    ))
-                    .await
-                {
-                    error!("We could not send a message to the archiver: {e}");
-                }
-            }
-        }
-        self.notifier.new_block();
+        //     // At this point we written a checkpoint to disk and updated the last epoch hash
+        //     if change_epoch {
+        //         if let Err(e) = socket
+        //             .run(IndexRequest::Epoch(
+        //                 self.query_runner.get_current_epoch(),
+        //                 self.query_runner
+        //                     .get_metadata(&Metadata::LastEpochHash)
+        //                     .expect("We should have a last epoch hash")
+        //                     .maybe_hash()
+        //                     .expect("We should have gotten a hash, this is a bug"),
+        //             ))
+        //             .await
+        //         {
+        //             error!("We could not send a message to the archiver: {e}");
+        //         }
+        //     }
+        // }
+
+        self.notifier.new_block(archive_block, response);
 
         change_epoch
     }

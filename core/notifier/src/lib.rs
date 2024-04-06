@@ -4,6 +4,7 @@ use std::time::{Duration, SystemTime};
 use lightning_interfaces::fdi::{BuildGraph, DependencyGraph};
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::notifier::{Notification, NotifierInterface};
+use lightning_interfaces::types::{Block, BlockExecutionResponse};
 use lightning_interfaces::{ApplicationInterface, Cloned, Emitter, ShutdownWaiter};
 use lightning_utils::application::QueryRunnerExt;
 use tokio::pin;
@@ -141,7 +142,7 @@ pub struct NotificationsEmitter {
 }
 
 impl Emitter for NotificationsEmitter {
-    fn new_block(&self) {
+    fn new_block(&self, _block: Block, _response: BlockExecutionResponse) {
         self.new_block_notify.notify_waiters()
     }
 
