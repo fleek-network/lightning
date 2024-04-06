@@ -18,6 +18,7 @@ pub trait NotifierInterface<C: Collection>: BuildGraph + Sync + Send + Clone {
 
     /// Returns a reference to the emitter end of this notifier. Should only be used if we are
     /// interested (and responsible) for triggering a notification around new epoch.
+    #[blank = Default::default()]
     fn get_emitter(&self) -> Self::Emitter;
 
     fn notify_on_new_block(&self, tx: mpsc::Sender<Notification>);

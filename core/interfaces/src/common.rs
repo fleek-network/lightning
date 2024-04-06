@@ -57,7 +57,7 @@ impl ShutdownController {
             .is_shutdown
             .swap(true, std::sync::atomic::Ordering::Relaxed)
         {
-            panic!("cannot call shutdown more than once")
+            panic!("cannot call shutdown more than once");
         }
 
         // Release all pending shutdown waiters
