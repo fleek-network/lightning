@@ -63,6 +63,7 @@ impl App {
         let maybe_action = match self.mode {
             Mode::Home => self.home.update(action.clone())?,
             Mode::Firewall => self.firewall.update(action.clone())?,
+            Mode::FirewallNewEntry => self.firewall.update(action.clone())?,
             _ => None,
         };
 
@@ -77,6 +78,7 @@ impl App {
         match self.mode {
             Mode::Home => self.home.handle_events(Some(event)),
             Mode::Firewall => self.firewall.handle_events(Some(event)),
+            Mode::FirewallNewEntry => self.firewall.handle_events(Some(event)),
             _ => {
                 // We ignore navigation here.
                 Ok(None)
@@ -119,7 +121,7 @@ impl App {
             .split(navigation_area[0]);
 
         match self.mode {
-            Mode::Firewall => {
+            Mode::Firewall | Mode::FirewallNewEntry => {
                 self.firewall.draw(f, content[0])?;
             },
             _ => {},

@@ -20,6 +20,16 @@
       "<a>": "Add", // Add an entry in the block list.
       "<r>": "Remove", // Remove an entry in the block list.
     },
+    "FirewallNewEntry": {
+      "<q>": "Quit", // Quit the application.
+      "<Ctrl-d>": "Quit", // Another way to quit.
+      "<Ctrl-c>": "Quit", // Yet another way to quit.
+      "<Ctrl-z>": "Suspend", // Suspend the application.
+      "<esc>": "Cancel", // Scape mode.
+      "<Ctrl-s>": "Save", // Add an entry in the block list.
+      "<up>": "Up", // Move up to the next component.
+      "<down>": "Down", // Move down to the next component.
+    },
     "Access": {
       "<q>": "Quit", // Quit the application.
       "<Ctrl-d>": "Quit", // Another way to quit.

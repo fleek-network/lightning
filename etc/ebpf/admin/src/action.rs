@@ -25,4 +25,6 @@ pub enum Action {
     Add,
     Remove,
     UpdateMode(Mode),
+    Save,
+    Cancel,
 }
