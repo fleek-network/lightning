@@ -22,6 +22,5 @@ lightning-blockstore = { path = "../blockstore" }
 lightning-indexer = { path = "../indexer" }
 lightning-signer = { path = "../signer" }
 lightning-test-utils = { path = "../test-utils" }
-lightning-notifier = { path = "../notifier" }
 tokio.workspace = true
 

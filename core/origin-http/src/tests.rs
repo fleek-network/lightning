@@ -9,45 +9,37 @@ use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_indexer::Indexer;
-use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::infu_collection::{Collection, Node};
 use lightning_interfaces::types::NodePorts;
-use lightning_interfaces::{
-    partial,
-    ApplicationInterface,
-    BlockstoreInterface,
-    ConsensusInterface,
-    ForwarderInterface,
-    IndexerInterface,
-    KeystoreInterface,
-    NotifierInterface,
-    SignerInterface,
-    WithStartAndShutdown,
-};
-use lightning_notifier::Notifier;
+use lightning_interfaces::{fdi, partial, BlockstoreInterface, KeystoreInterface};
 use lightning_signer::Signer;
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus, MockForwarder};
+use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_test_utils::server;
-use tokio::sync::mpsc;
 
 use crate::{get_url_and_sri, HttpOrigin};
 
 partial!(TestBinding {
+    ConfigProviderInterface = JsonConfigProvider;
     ApplicationInterface = Application<Self>;
     BlockstoreInterface = Blockstore<Self>;
     KeystoreInterface = EphemeralKeystore<Self>;
     SignerInterface = Signer<Self>;
+    ForwarderInterface = MockForwarder<Self>;
     ConsensusInterface = MockConsensus<Self>;
     IndexerInterface = Indexer<Self>;
-    NotifierInterface = Notifier<Self>;
 });
 
 struct AppState {
-    _app: Application<TestBinding>,
-    _signer: Signer<TestBinding>,
-    _consensus: MockConsensus<TestBinding>,
-    blockstore: Blockstore<TestBinding>,
+    node: Node<TestBinding>,
     temp_dir_path: PathBuf,
+}
+
+impl AppState {
+    fn blockstore(&self) -> fdi::Ref<Blockstore<TestBinding>> {
+        self.node.provider.get()
+    }
 }
 
 impl Drop for AppState {
@@ -61,7 +53,7 @@ impl Drop for AppState {
 // Todo: This is the same one used in blockstore, indexer and possbily others
 // so it might be useful to create a test factory.
 async fn create_app_state(test_name: String) -> AppState {
-    let keystore = EphemeralKeystore::default();
+    let keystore = EphemeralKeystore::<TestBinding>::default();
     let (consensus_secret_key, node_secret_key) =
         (keystore.get_bls_sk(), keystore.get_ed25519_sk());
     let node_public_key = node_secret_key.to_pk();
@@ -126,79 +118,37 @@ async fn create_app_state(test_name: String) -> AppState {
 
     let path = std::env::temp_dir().join(test_name);
 
-    let mut blockstore = Blockstore::<TestBinding>::init(BlockstoreConfig {
-        root: path.clone().try_into().unwrap(),
-    })
-    .unwrap();
-
-    let app = Application::<TestBinding>::init(
-        AppConfig {
-            genesis: Some(genesis),
-            mode: Mode::Test,
-            testnet: false,
-            storage: StorageConfig::InMemory,
-            db_path: None,
-            db_options: None,
-        },
-        blockstore.clone(),
+    let node = Node::<TestBinding>::init_with_provider(
+        fdi::Provider::default()
+            .with(
+                JsonConfigProvider::default()
+                    .with::<Blockstore<TestBinding>>(BlockstoreConfig {
+                        root: path.clone().try_into().unwrap(),
+                    })
+                    .with::<Application<TestBinding>>(AppConfig {
+                        genesis: Some(genesis),
+                        mode: Mode::Test,
+                        testnet: false,
+                        storage: StorageConfig::InMemory,
+                        db_path: None,
+                        db_options: None,
+                    })
+                    .with::<MockConsensus<TestBinding>>(ConsensusConfig {
+                        min_ordering_time: 0,
+                        max_ordering_time: 1,
+                        probability_txn_lost: 0.0,
+                        transactions_to_lose: HashSet::new(),
+                        new_block_interval: Duration::from_secs(5),
+                    }),
+            )
+            .with(keystore),
     )
-    .unwrap();
-    app.start().await;
+    .expect("failed to initialize node");
 
-    let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
-
-    let forwarder = MockForwarder::<TestBinding>::init(
-        Default::default(),
-        keystore.get_bls_pk(),
-        query_runner.clone(),
-    )
-    .unwrap();
-    let mut signer = Signer::<TestBinding>::init(
-        Default::default(),
-        keystore.clone(),
-        query_runner.clone(),
-        forwarder.mempool_socket(),
-    )
-    .unwrap();
-    let notifier = Notifier::<TestBinding>::init(&app);
-
-    let consensus_config = ConsensusConfig {
-        min_ordering_time: 0,
-        max_ordering_time: 1,
-        probability_txn_lost: 0.0,
-        transactions_to_lose: HashSet::new(),
-        new_block_interval: Duration::from_secs(5),
-    };
-
-    let consensus = MockConsensus::<TestBinding>::init(
-        consensus_config,
-        keystore.clone(),
-        &signer,
-        update_socket,
-        query_runner.clone(),
-        infusion::Blank::default(),
-        None,
-        &notifier,
-    )
-    .unwrap();
-
-    let (new_block_tx, new_block_rx) = mpsc::channel(10);
-
-    signer.provide_new_block_notify(new_block_rx);
-    notifier.notify_on_new_block(new_block_tx);
-
-    let indexer =
-        Indexer::<TestBinding>::init(Default::default(), query_runner, keystore, &signer).unwrap();
-    blockstore.provide_indexer(indexer);
-
-    signer.start().await;
-    consensus.start().await;
+    node.start().await;
 
     AppState {
-        _app: app,
-        _signer: signer,
-        _consensus: consensus,
-        blockstore,
+        node,
         temp_dir_path: path,
     }
 }
@@ -211,16 +161,18 @@ async fn test_http_origin() {
     // Given: an identifier for some resource.
     let url = "http://127.0.0.1:30233/bar/index.ts".to_string();
     // Given: an origin.
-    let state = create_app_state("test_http_origin".to_string()).await;
+    let mut state = create_app_state("test_http_origin".to_string()).await;
     let origin =
-        HttpOrigin::<TestBinding>::new(Default::default(), state.blockstore.clone()).unwrap();
+        HttpOrigin::<TestBinding>::new(Default::default(), state.blockstore().clone()).unwrap();
 
     // When: we fetch some content using the origin.
     let test_fut = async move {
         let hash = origin.fetch(url.as_bytes()).await.unwrap();
-        let bytes = state.blockstore.read_all_to_vec(&hash).await.unwrap();
+        let bytes = state.blockstore().read_all_to_vec(&hash).await.unwrap();
         // Then: we get the expected content.
         assert_eq!(file, bytes);
+
+        state.node.shutdown().await;
     };
 
     tokio::select! {
@@ -237,16 +189,17 @@ async fn test_http_origin_with_integrity_check() {
     // Given: an identifier for some resource.
     let url = "http://127.0.0.1:30400/bar/index.ts#integrity=sha256-61z/GbpXJljbPypnYd2389IVCTbzU/taXTCVOUR67is=".to_string();
     // Given: an origin.
-    let state = create_app_state("test_http_origin_with_integrity_check".to_string()).await;
+    let mut state = create_app_state("test_http_origin_with_integrity_check".to_string()).await;
     let origin =
-        HttpOrigin::<TestBinding>::new(Default::default(), state.blockstore.clone()).unwrap();
+        HttpOrigin::<TestBinding>::new(Default::default(), state.blockstore().clone()).unwrap();
 
     // When: we fetch some content using the origin.
     let test_fut = async move {
         let hash = origin.fetch(url.as_bytes()).await.unwrap();
-        let bytes = state.blockstore.read_all_to_vec(&hash).await.unwrap();
+        let bytes = state.blockstore().read_all_to_vec(&hash).await.unwrap();
         // Then: we get the expected content.
         assert_eq!(file, bytes);
+        state.node.shutdown().await;
     };
 
     tokio::select! {
@@ -261,10 +214,10 @@ async fn test_http_origin_with_integrity_check_invalid_hash() {
     // Given: an identifier for some resource with an invalid digest.
     let url = "http://127.0.0.1:30401/bar/index.ts#integrity=sha256-23lFzBrGtqXuPufwrMw+G3hWOwdtehDz/izclz/3gVw=".to_string();
     // Given: an origin.
-    let state =
+    let mut state =
         create_app_state("test_http_origin_with_integrity_check_invalid_hash".to_string()).await;
     let origin =
-        HttpOrigin::<TestBinding>::new(Default::default(), state.blockstore.clone()).unwrap();
+        HttpOrigin::<TestBinding>::new(Default::default(), state.blockstore().clone()).unwrap();
 
     // When: we fetch some content using the origin.
     let test_fut = async move {
@@ -278,6 +231,8 @@ async fn test_http_origin_with_integrity_check_invalid_hash() {
                 .as_str(),
             "sri failed: invalid digest"
         );
+
+        state.node.shutdown().await;
     };
 
     tokio::select! {

@@ -6184,7 +6184,6 @@ dependencies = [
  "lightning-blockstore",
  "lightning-indexer",
  "lightning-interfaces",
- "lightning-notifier",
  "lightning-signer",
  "lightning-test-utils",
  "reqwest",
