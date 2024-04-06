@@ -63,9 +63,7 @@ impl App {
         let maybe_action = match self.mode {
             Mode::Home => self.home.update(action.clone())?,
             Mode::Firewall => self.firewall.update(action.clone())?,
-            Mode::FirewallNewEntry => {
-                unimplemented!()
-            },
+            _ => None,
         };
 
         if maybe_action.is_none() {
@@ -79,9 +77,9 @@ impl App {
         match self.mode {
             Mode::Home => self.home.handle_events(Some(event)),
             Mode::Firewall => self.firewall.handle_events(Some(event)),
-            Mode::FirewallNewEntry => {
+            _ => {
                 // We ignore navigation here.
-                unimplemented!()
+                Ok(None)
             },
         }
     }
@@ -120,7 +118,12 @@ impl App {
             .constraints([Constraint::Percentage(100)])
             .split(navigation_area[0]);
 
-        self.firewall.draw(f, content[0])?;
+        match self.mode {
+            Mode::Firewall => {
+                self.firewall.draw(f, content[0])?;
+            },
+            _ => {},
+        }
 
         Ok(())
     }
@@ -206,6 +209,16 @@ impl App {
                         })?;
                     },
                     Action::Render => {
+                        tui.draw(|f| {
+                            if let Err(e) = self.draw_components(f, f.size()) {
+                                action_tx
+                                    .send(Action::Error(format!("Failed to draw: {:?}", e)))
+                                    .unwrap();
+                            }
+                        })?;
+                    },
+                    Action::UpdateMode(mode) => {
+                        self.mode = mode;
                         tui.draw(|f| {
                             if let Err(e) = self.draw_components(f, f.size()) {
                                 action_tx

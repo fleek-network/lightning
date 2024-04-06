@@ -11,16 +11,25 @@ use tokio::sync::mpsc::UnboundedSender;
 use super::{Component, Frame};
 use crate::action::Action;
 use crate::config::{Config, KeyBindings};
+use crate::mode::Mode;
 
 #[derive(Default)]
 pub struct Navigator {
     command_tx: Option<UnboundedSender<Action>>,
+    selected_tab: usize,
+    tabs: Vec<&'static str>,
     config: Config,
 }
 
 impl Navigator {
     pub fn new() -> Self {
-        Self::default()
+        let tabs = vec!["Home", "Firewall", "Access"];
+        Self {
+            tabs,
+            command_tx: None,
+            selected_tab: 0,
+            config: Config::default(),
+        }
     }
 }
 
@@ -36,26 +45,38 @@ impl Component for Navigator {
     }
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
+        let last_selected_tab = self.selected_tab;
         match action {
-            Action::Tick => {},
+            Action::NavLeft => {
+                if self.selected_tab > 0 {
+                    self.selected_tab -= 1;
+                }
+            },
+            Action::NavRight => {
+                if self.selected_tab < self.tabs.len() - 1 {
+                    self.selected_tab += 1;
+                }
+            },
             _ => {},
         }
-        Ok(None)
+        if last_selected_tab != self.selected_tab {
+            Ok(Some(Action::UpdateMode(
+                self.tabs[self.selected_tab]
+                    .parse()
+                    .expect("Modes are hardcoded"),
+            )))
+        } else {
+            Ok(None)
+        }
     }
 
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
-        let t = Tabs::new(vec![
-            "Home",
-            "Firewall",
-            "Access",
-            "Network",
-            "System",
-            "Notifications",
-        ])
-        .block(Block::default().borders(Borders::ALL))
-        .style(Style::default().white())
-        .highlight_style(Style::default().yellow())
-        .padding(" ", " ");
+        let t = Tabs::new(self.tabs.clone())
+            .select(self.selected_tab as usize)
+            .block(Block::default().borders(Borders::ALL))
+            .style(Style::default().white())
+            .highlight_style(Style::default().yellow())
+            .padding(" ", " ");
         f.render_widget(t, area);
         Ok(())
     }
