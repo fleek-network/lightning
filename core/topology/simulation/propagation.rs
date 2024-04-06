@@ -195,7 +195,7 @@ fn main() {
         })
         .collect();
 
-    let raw_data_path = PathBuf::from("simulation/raw_data/");
+    let raw_data_path = PathBuf::from("simulation/raw_data/propagation");
     let raw_data = bincode::serialize(&data).expect("Failed to serialize raw data");
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -254,7 +254,8 @@ fn main() {
         }
     }
 
-    let output_path = PathBuf::from("simulation/plots/propagation_time_cluster_size.png");
+    let output_path =
+        PathBuf::from("simulation/plots/propagation/propagation_time_cluster_size.png");
     plotting::line_plot(
         &data_prop_time,
         "Average propagation time of a message to reach all nodes",
@@ -267,7 +268,8 @@ fn main() {
     .unwrap();
     println!("Plot saved to {output_path:?}");
 
-    let output_path = PathBuf::from("simulation/plots/cluster_size_data_transfered.png");
+    let output_path =
+        PathBuf::from("simulation/plots/propagation/cluster_size_data_transfered.png");
     plotting::line_plot(
         &data_bytes,
         "Megabytes transfered",
@@ -309,7 +311,8 @@ fn main() {
         }
     }
 
-    let output_path = PathBuf::from("simulation/plots/propagation_time_and_data_cluster_size.png");
+    let output_path =
+        PathBuf::from("simulation/plots/propagation/propagation_time_and_data_cluster_size.png");
     plotting::line_plot(
         &data_prop_time_bytes,
         "Average propagation time of a message to reach all nodes + data transfered",
