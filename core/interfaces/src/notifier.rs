@@ -33,8 +33,6 @@ pub trait NotifierInterface<C: Collection>: BuildGraph + Sync + Send + Clone {
     #[blank = Blank::default()]
     fn subscribe_block_executed(&self) -> impl Subscriber<BlockExecutedNotification>;
 
-    fn notify_on_new_block(&self, tx: mpsc::Sender<Notification>);
-
     fn notify_on_new_epoch(&self, tx: mpsc::Sender<Notification>);
 
     fn notify_before_epoch_change(&self, duration: Duration, tx: mpsc::Sender<Notification>);

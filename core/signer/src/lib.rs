@@ -21,17 +21,18 @@ use lightning_interfaces::types::{
 };
 use lightning_interfaces::{
     ApplicationInterface,
+    BlockExecutedNotification,
     Cloned,
     ForwarderInterface,
     KeystoreInterface,
     MempoolSocket,
-    Notification,
     NotifierInterface,
     Ref,
+    Subscriber,
     SyncQueryRunnerInterface,
 };
 use lightning_utils::application::QueryRunnerExt;
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::Mutex;
 use tracing::error;
 
 // If a transaction does not get ordered, the signer will try to resend it.
@@ -106,8 +107,7 @@ impl<C: Collection> Signer<C> {
         notifier: Ref<C::NotifierInterface>,
         Cloned(query_runner): Cloned<c![C::ApplicationInterface::SyncExecutor]>,
     ) {
-        let (tx, rx) = mpsc::channel(16);
-        notifier.notify_on_new_block(tx);
+        let subscriber = notifier.subscribe_block_executed();
         let worker = this.worker.clone();
 
         // Initialize the worker's state.
@@ -119,7 +119,7 @@ impl<C: Collection> Signer<C> {
         drop(guard);
 
         tokio::spawn(async move {
-            new_block_task(node_index, worker, rx, query_runner).await;
+            new_block_task(node_index, worker, subscriber, query_runner).await;
         });
     }
 }
@@ -321,10 +321,10 @@ struct PendingTransaction {
 async fn new_block_task<Q: SyncQueryRunnerInterface>(
     mut node_index: LazyNodeIndex,
     worker: SignerWorker,
-    mut notifier: mpsc::Receiver<Notification>,
+    mut subscriber: impl Subscriber<BlockExecutedNotification>,
     query_runner: Q,
 ) {
-    while let Some(_notification) = notifier.recv().await {
+    while let Some(_notification) = subscriber.last().await {
         let (nonce, secondary_nonce) = node_index.query_nonce(&query_runner);
         // TODO(qti3e): Get the lock only if we have to. Timeout should get sep from block.
         // Right now we are relying on the existence of new blocks to handle timeout.

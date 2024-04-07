@@ -76,33 +76,6 @@ impl<C: Collection> NotifierInterface<C> for Notifier<C> {
         BroadcastSub(self.notify.block_executed.subscribe())
     }
 
-    fn notify_on_new_block(&self, tx: mpsc::Sender<Notification>) {
-        let notify = self.notify.clone();
-        let waiter = self.waiter.clone();
-
-        tokio::spawn(async move {
-            let shutdown_future = waiter.wait_for_shutdown();
-            pin!(shutdown_future);
-
-            loop {
-                let notify_future = notify.new_block_notify.notified();
-                pin!(notify_future);
-
-                tokio::select! {
-                    _ = &mut shutdown_future => {
-                        break;
-                    }
-                    _ = notify_future => {
-                        if tx.send(Notification::NewBlock).await.is_err() {
-                            // There is no receiver anymore.
-                            return;
-                        }
-                    }
-                }
-            }
-        });
-    }
-
     fn notify_on_new_epoch(&self, tx: mpsc::Sender<Notification>) {
         let notify = self.notify.clone();
         let waiter = self.waiter.clone();
