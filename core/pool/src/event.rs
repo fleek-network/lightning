@@ -111,7 +111,8 @@ where
         dial_info: Arc<scc::HashMap<NodeIndex, DialInfo>>,
     ) -> Self {
         let (notifier_tx, notifier_rx) = mpsc::channel(16);
-        notifier.notify_on_new_epoch(notifier_tx);
+        // TODO(qti3e): Use the new notifier.
+        // notifier.notify_on_new_epoch(notifier_tx);
 
         let logical_pool = LogicalPool::<C>::new(sync_query.clone(), public_key);
 

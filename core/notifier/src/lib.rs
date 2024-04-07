@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use lightning_interfaces::fdi::{BuildGraph, DependencyGraph};
@@ -10,12 +9,12 @@ use lightning_interfaces::{
     BlockExecutedNotification,
     Cloned,
     Emitter,
+    EpochChangedNotification,
     ShutdownWaiter,
     Subscriber,
 };
 use lightning_utils::application::QueryRunnerExt;
-use tokio::pin;
-use tokio::sync::{broadcast, mpsc, Notify};
+use tokio::sync::{broadcast, mpsc};
 use tokio::time::sleep;
 
 pub struct Notifier<C: Collection> {
@@ -76,31 +75,8 @@ impl<C: Collection> NotifierInterface<C> for Notifier<C> {
         BroadcastSub(self.notify.block_executed.subscribe())
     }
 
-    fn notify_on_new_epoch(&self, tx: mpsc::Sender<Notification>) {
-        let notify = self.notify.clone();
-        let waiter = self.waiter.clone();
-
-        tokio::spawn(async move {
-            let shutdown_future = waiter.wait_for_shutdown();
-            pin!(shutdown_future);
-
-            loop {
-                let notify_future = notify.new_epoch_notify.notified();
-                pin!(notify_future);
-
-                tokio::select! {
-                    _ = &mut shutdown_future => {
-                        break;
-                    }
-                    _ = notify_future => {
-                        if tx.send(Notification::NewEpoch).await.is_err() {
-                            // There is no receiver anymore.
-                            return;
-                        }
-                    }
-                }
-            }
-        });
+    fn subscribe_epoch_changed(&self) -> impl Subscriber<EpochChangedNotification> {
+        BroadcastSub(self.notify.epoch_changed.subscribe())
     }
 
     fn notify_before_epoch_change(&self, duration: Duration, tx: mpsc::Sender<Notification>) {
@@ -122,24 +98,20 @@ impl<C: Collection> NotifierInterface<C> for Notifier<C> {
 #[derive(Clone)]
 pub struct NotificationsEmitter {
     block_executed: broadcast::Sender<BlockExecutedNotification>,
-    new_block_notify: Arc<Notify>,
-    new_epoch_notify: Arc<Notify>,
+    epoch_changed: broadcast::Sender<EpochChangedNotification>,
 }
 
 impl Default for NotificationsEmitter {
     fn default() -> Self {
         Self {
-            block_executed: broadcast::channel(32).0,
-            new_block_notify: Default::default(),
-            new_epoch_notify: Default::default(),
+            block_executed: broadcast::channel(64).0,
+            epoch_changed: broadcast::channel(16).0,
         }
     }
 }
 
 impl Emitter for NotificationsEmitter {
     fn new_block(&self, block: Block, response: BlockExecutionResponse) {
-        self.new_block_notify.notify_waiters();
-
         // The send could only fail if there are no active listeners at the moment
         // which is something we don't really care about and is expected by us.
         let _ = self
@@ -147,8 +119,11 @@ impl Emitter for NotificationsEmitter {
             .send(BlockExecutedNotification { block, response });
     }
 
-    fn epoch_changed(&self) {
-        self.new_epoch_notify.notify_waiters()
+    fn epoch_changed(&self, current_epoch: u64, last_epoch_hash: [u8; 32]) {
+        let _ = self.epoch_changed.send(EpochChangedNotification {
+            current_epoch,
+            last_epoch_hash,
+        });
     }
 }
 
@@ -204,114 +179,4 @@ where
             }
         }
     }
-}
-
-// #[cfg(test)]
-// mod tests {
-//     use lightning_application::app::Application;
-//     use lightning_application::config::{Config, Mode, StorageConfig};
-//     use lightning_application::genesis::Genesis;
-//     use lightning_interfaces::application::{ApplicationInterface, ExecutionEngineSocket};
-//     use lightning_interfaces::infu_collection::Collection;
-//     use lightning_interfaces::partial;
-
-//     use super::*;
-
-//     partial!(TestBinding {
-//         ApplicationInterface = Application<Self>;
-//         NotifierInterface = Notifier<Self>;
-//     });
-
-//     const EPSILON: f64 = 0.1;
-
-//     fn init_app(epoch_time: u64) -> (ExecutionEngineSocket, Application<TestBinding>) {
-//         let mut genesis = Genesis::load().expect("Failed to load genesis from file.");
-//         let epoch_start = SystemTime::now()
-//             .duration_since(SystemTime::UNIX_EPOCH)
-//             .unwrap()
-//             .as_millis() as u64;
-//         genesis.epoch_start = epoch_start;
-//         genesis.epoch_time = epoch_time;
-//         let config = Config {
-//             genesis: Some(genesis),
-//             mode: Mode::Test,
-//             testnet: false,
-//             storage: StorageConfig::InMemory,
-//             db_path: None,
-//             db_options: None,
-//         };
-
-//         let app = Application::<TestBinding>::init(config, Default::default()).unwrap();
-
-//         (app.transaction_executor(), app)
-//     }
-
-//     #[tokio::test]
-//     async fn test_before_epoch_change() {
-//         let (_, app) = init_app(3000);
-
-//         let notifier = Notifier::<TestBinding>::new(&app);
-
-//         // Request to be notified 1 sec before the epoch ends.
-//         let (tx, mut rx) = mpsc::channel(2048);
-//         let now = SystemTime::now();
-//         notifier.notify_before_epoch_change(Duration::from_secs(1), tx);
-
-//         // The epoch time is 3 secs, the notification will be send 1 sec before the epoch ends,
-//         // hence, the notification should arrive approx. 2 secs after the request was made.
-//         if let Notification::BeforeEpochChange = rx.recv().await.unwrap() {
-//             let elapsed_time = now.elapsed().unwrap();
-//             assert!((elapsed_time.as_secs_f64() - 2.0).abs() < EPSILON);
-//         }
-//     }
-
-//     #[tokio::test]
-//     async fn test_notify_on_epoch_change() {
-//         let (_, app) = init_app(3000);
-
-//         let notifier = Notifier::<TestBinding>::new(&app);
-
-//         // Request to be notified about new epoch.
-//         let (tx, mut rx) = mpsc::channel(10);
-//         notifier.notify_on_new_epoch(tx);
-
-//         // Trigger new epoch Notification
-//         tokio::spawn(async move {
-//             sleep(Duration::from_secs(1)).await;
-//             notifier.get_emitter().epoch_changed();
-//         });
-
-//         assert_eq!(Notification::NewEpoch, rx.recv().await.unwrap());
-//     }
-
-//     #[tokio::test]
-//     async fn test_notify_on_new_block() {
-//         let (_, app) = init_app(3000);
-
-//         let notifier = Notifier::<TestBinding>::new(&app);
-
-//         // Request to be notified about new block.
-//         let (tx, mut rx) = mpsc::channel(10);
-//         notifier.notify_on_new_block(tx);
-
-//         // Trigger new block Notification
-//         tokio::spawn(async move {
-//             sleep(Duration::from_secs(1)).await;
-//             notifier.get_emitter().new_block();
-//         });
-
-//         assert_eq!(Notification::NewBlock, rx.recv().await.unwrap());
-//     }
-// }
-
-#[tokio::test]
-async fn demo() {
-    let (tx, mut rx) = broadcast::channel(3);
-    tx.send(0).unwrap();
-    tx.send(1).unwrap();
-    tx.send(2).unwrap();
-    tx.send(3).unwrap();
-    tx.send(4).unwrap();
-    dbg!(rx.recv().await);
-    dbg!(rx.recv().await);
 }

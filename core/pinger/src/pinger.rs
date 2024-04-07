@@ -54,7 +54,8 @@ impl<C: Collection> Pinger<C> {
         let rep_reporter = rep_aggregator.get_reporter();
 
         let (notifier_tx, notifier_rx) = mpsc::channel(10);
-        notifier.notify_on_new_epoch(notifier_tx);
+        // TODO(qti3e): Use the new notifier.
+        // notifier.notify_on_new_epoch(notifier_tx);
 
         let node_pk = keystore.get_ed25519_pk();
         let inner = PingerInner::<C>::new(

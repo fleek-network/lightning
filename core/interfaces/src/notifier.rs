@@ -20,6 +20,12 @@ pub struct BlockExecutedNotification {
     pub response: BlockExecutionResponse,
 }
 
+#[derive(Clone, Debug)]
+pub struct EpochChangedNotification {
+    pub current_epoch: u64,
+    pub last_epoch_hash: [u8; 32],
+}
+
 /// # Notifier
 #[infusion::service]
 pub trait NotifierInterface<C: Collection>: BuildGraph + Sync + Send + Clone {
@@ -33,7 +39,8 @@ pub trait NotifierInterface<C: Collection>: BuildGraph + Sync + Send + Clone {
     #[blank = Blank::default()]
     fn subscribe_block_executed(&self) -> impl Subscriber<BlockExecutedNotification>;
 
-    fn notify_on_new_epoch(&self, tx: mpsc::Sender<Notification>);
+    #[blank = Blank::default()]
+    fn subscribe_epoch_changed(&self) -> impl Subscriber<EpochChangedNotification>;
 
     fn notify_before_epoch_change(&self, duration: Duration, tx: mpsc::Sender<Notification>);
 }
@@ -41,7 +48,7 @@ pub trait NotifierInterface<C: Collection>: BuildGraph + Sync + Send + Clone {
 #[infusion::blank]
 pub trait Emitter: Clone + Send + Sync + 'static {
     /// Notify the waiters about epoch change.
-    fn epoch_changed(&self);
+    fn epoch_changed(&self, epoch: u64, hash: [u8; 32]);
 
     /// Notify the waiters about new block.
     fn new_block(&self, block: Block, response: BlockExecutionResponse);

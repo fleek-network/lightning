@@ -68,7 +68,8 @@ impl<C: Collection> Syncronizer<C> {
     ) -> Result<Self> {
         let config = config.get::<Self>();
         let (tx_epoch_change, rx_epoch_change) = tokio::sync::mpsc::channel(10);
-        notifier.notify_on_new_epoch(tx_epoch_change);
+        // TODO(qti3e): Use the new notifier.
+        // notifier.notify_on_new_epoch(tx_epoch_change);
 
         let mut genesis_committee = query_runner.get_genesis_committee();
         // Shuffle this since we often hit this list in order until one responds. This will give our

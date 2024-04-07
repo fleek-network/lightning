@@ -142,10 +142,12 @@ struct ReputationAggregatorInner<C: Collection> {
 
 impl<C: Collection> ReputationAggregatorInner<C> {
     async fn start(&self) {
-        self.notifier
-            .notify_before_epoch_change(BEFORE_EPOCH_CHANGE, self.notify_before_epoch_tx.clone());
-        self.notifier
-            .notify_on_new_epoch(self.notify_new_epoch_tx.clone());
+        // TODO(qti3e)
+        // self.notifier
+        //     .notify_before_epoch_change(BEFORE_EPOCH_CHANGE,
+        // self.notify_before_epoch_tx.clone()); self.notifier
+        //     .notify_on_new_epoch(self.notify_new_epoch_tx.clone());
+
         let mut report_rx = self.report_rx.lock().unwrap().take().unwrap();
         let mut notify_before_epoch_rx =
             self.notify_before_epoch_rx.lock().unwrap().take().unwrap();

@@ -116,7 +116,8 @@ impl<C: Collection> Topology<C> {
     ) -> anyhow::Result<Self> {
         let config = config.get::<Self>();
         let (notifier_tx, notifier_rx) = mpsc::channel(16);
-        notifier.notify_on_new_epoch(notifier_tx);
+        // TODO(qti3e): Use the new notifier.
+        // notifier.notify_on_new_epoch(notifier_tx);
 
         let (topology_tx, topology_rx) = watch::channel(Arc::new(Vec::new()));
 
