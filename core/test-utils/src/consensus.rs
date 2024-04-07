@@ -43,6 +43,7 @@ impl<C: Collection> BuildGraph for MockForwarder<C> {
 #[allow(clippy::type_complexity)]
 pub struct MockConsensus<C: Collection> {
     socket: MempoolSocket,
+    executor: ExecutionEngineSocket,
     notifier: c![C::NotifierInterface::Emitter],
     config: Config,
 }
@@ -82,7 +83,7 @@ impl<C: Collection> MockConsensus<C> {
         let notifier = notifier.get_emitter();
 
         let worker = MockConsensusWorker {
-            executor,
+            executor: executor.clone(),
             config: config.clone(),
             notifier: notifier.clone(),
             tx_count: 0,
@@ -92,6 +93,7 @@ impl<C: Collection> MockConsensus<C> {
 
         Self {
             socket,
+            executor,
             config,
             notifier,
         }
@@ -103,6 +105,20 @@ impl<C: Collection> MockConsensus<C> {
             .run_until_shutdown(async move {
                 loop {
                     interval.tick().await;
+
+                    let block = Block {
+                        transactions: vec![],
+                        digest: [0; 32],
+                    };
+
+                    let response = self
+                        .executor
+                        .run(block.clone())
+                        .await
+                        .map_err(|r| anyhow::anyhow!(format!("{r:?}")))
+                        .unwrap();
+
+                    self.notifier.new_block(block, response);
                 }
             })
             .await;
