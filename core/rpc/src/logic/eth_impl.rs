@@ -17,7 +17,7 @@ use fleek_crypto::EthAddress;
 use hp_fixed::unsigned::HpUfixed;
 use jsonrpsee::core::RpcResult;
 use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::{ArchiveRequest, ArchiveResponse, SyncQueryRunnerInterface};
+use lightning_interfaces::{ArchiveInterface, SyncQueryRunnerInterface};
 use lightning_utils::application::QueryRunnerExt;
 use tracing::trace;
 
@@ -113,62 +113,47 @@ impl<C: Collection> EthApiServer for EthApi<C> {
         full: bool,
     ) -> RpcResult<Option<Block<H256>>> {
         trace!(target: "rpc::eth", ?number, ?full, "Serving eth_getBlockByNumber");
-        if let Some(socket) = &self.data.archive_socket {
-            match socket.run(ArchiveRequest::GetBlockByNumber(number)).await {
-                Ok(Ok(ArchiveResponse::Block(block))) => Ok(Some(block.into())),
-                Ok(Ok(ArchiveResponse::None)) => Ok(None),
-                _ => Err(RPCError::custom("Failed to query block".to_string()).into()),
-            }
-        } else {
-            Err(RPCError::custom("Archive socket not initialized".to_string()).into())
+
+        if !self.data.archive.is_active() {
+            return Err(RPCError::custom("Archive socket not initialized".to_string()).into());
         }
+
+        Ok(self
+            .data
+            .archive
+            .get_block_by_number(number)
+            .await
+            .map(|x| x.into()))
     }
 
     async fn block_by_hash(&self, hash: H256, full: bool) -> RpcResult<Option<Block<H256>>> {
         trace!(target: "rpc::eth", ?hash, ?full, "Serving eth_getBlockByHash");
-        if let Some(socket) = &self.data.archive_socket {
-            match socket
-                .run(ArchiveRequest::GetBlockByHash(hash.into()))
-                .await
-            {
-                Ok(Ok(ArchiveResponse::Block(block))) => Ok(Some(block.into())),
-                Ok(Ok(ArchiveResponse::None)) => Ok(None),
-                Ok(Err(e)) => Err(RPCError::custom(format!("Failed to query block: {}", e)).into()),
-                Ok(_) => Err(RPCError::custom(
-                    "Received an invalid response type. this is a bug".to_string(),
-                )
-                .into()),
-                Err(e) => Err(RPCError::from(e).into()),
-            }
-        } else {
-            Err(RPCError::custom("Archive socket not initialized".to_string()).into())
+
+        if !self.data.archive.is_active() {
+            return Err(RPCError::custom("Archive socket not initialized".to_string()).into());
         }
+
+        Ok(self
+            .data
+            .archive
+            .get_block_by_hash(hash.into())
+            .await
+            .map(|x| x.into()))
     }
 
     async fn transaction_receipt(&self, hash: H256) -> RpcResult<Option<TransactionReceipt>> {
         trace!(target: "rpc::eth", ?hash, "Serving eth_getTransactionReceipt");
 
-        if let Some(socket) = &self.data.archive_socket {
-            match socket
-                .run(ArchiveRequest::GetTransactionReceipt(hash.0))
-                .await
-            {
-                Ok(Ok(ArchiveResponse::TransactionReceipt(txn))) => Ok(Some(txn.into())),
-                Ok(Ok(ArchiveResponse::None)) => Ok(None),
-                Ok(Err(e)) => Err(RPCError::custom(format!(
-                    "Failed to query transaction receipt: {}",
-                    e
-                ))
-                .into()),
-                Ok(_) => Err(RPCError::custom(
-                    "Recieved an invalid response type. this is a bug.".to_string(),
-                )
-                .into()),
-                Err(e) => Err(RPCError::from(e).into()),
-            }
-        } else {
-            Err(RPCError::custom("Archive socket not initialized".to_string()).into())
+        if !self.data.archive.is_active() {
+            return Err(RPCError::custom("Archive socket not initialized".to_string()).into());
         }
+
+        Ok(self
+            .data
+            .archive
+            .get_transaction_receipt(hash.into())
+            .await
+            .map(|x| x.into()))
     }
 
     async fn send_raw_transaction(&self, tx: Bytes) -> RpcResult<H256> {

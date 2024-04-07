@@ -1,39 +1,33 @@
-use std::marker::PhantomData;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
-use affair::{Socket, Task};
 use anyhow::{Context, Result};
 use ethers::types::BlockNumber;
+use lightning_interfaces::fdi::{BuildGraph, DependencyGraph, MethodExt};
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::types::{
     Block,
     BlockExecutionResponse,
     BlockReceipt,
     TransactionReceipt,
+    TransactionRequest,
 };
 use lightning_interfaces::{
     ApplicationInterface,
     ArchiveInterface,
-    ArchiveRequest,
-    ArchiveResponse,
-    ArchiveSocket,
     BlockstoreInterface,
+    Cloned,
     ConfigConsumer,
-    IndexRequest,
-    IndexSocket,
+    ConfigProviderInterface,
+    NotifierInterface,
+    ShutdownWaiter,
     SyncQueryRunnerInterface,
-    WithStartAndShutdown,
+    _Subscriber,
 };
 use resolved_pathbuf::ResolvedPathBuf;
 use rocksdb::{Options, DB};
-use tokio::sync::{mpsc, Notify};
-use tracing::error;
+use tokio::pin;
 
 use crate::config::Config;
-
-type ArchiveTask<C> = Task<ArchiveRequest, Result<ArchiveResponse<C>>>;
-type IndexTask = Task<IndexRequest, Result<()>>;
 
 // Column families
 const BLKHASH_TO_BLKNUM: &str = "blkhash_to_blknum";
@@ -47,224 +41,152 @@ const EARLIEST: &str = "earliest";
 
 pub struct Archive<C: Collection> {
     inner: Option<Arc<ArchiveInner<C>>>,
-    /// This socket can be given out to other proccess to query the data that has been archived.
-    /// Will be None if this node is not currently in archive mode
-    archive_socket: Mutex<Option<ArchiveSocket<C>>>,
-    /// This socket can be given out to other process to send things that should be archived,
-    /// realisticlly only consensus should have this. Will return None if the node is not currently
-    /// in archive mode
-    index_socket: Mutex<Option<IndexSocket>>,
-    is_running: Arc<AtomicBool>,
-    shutdown_notify: Option<Arc<Notify>>,
-    _marker: PhantomData<C>,
-}
-
-impl<C: Collection> ArchiveInterface<C> for Archive<C> {
-    fn init(
-        config: Self::Config,
-        _query_runner: c!(C::ApplicationInterface::SyncExecutor),
-        blockstore: C::BlockstoreInterface,
-    ) -> anyhow::Result<Self> {
-        if config.is_archive {
-            let shutdown_notify = Arc::new(Notify::new());
-            let (archive_socket, archive_rx) = Socket::raw_bounded(2048);
-            let (index_socket, index_rx) = Socket::raw_bounded(2048);
-
-            let mut db_options = Options::default();
-            db_options.create_if_missing(true);
-            db_options.create_missing_column_families(true);
-
-            let cf = vec![BLKHASH_TO_BLKNUM, BLKNUM_TO_BLK, TXHASH_TO_TXRCT, MISC];
-            let db = Arc::new(
-                DB::open_cf(&db_options, &config.store_path, cf)
-                    .expect("Failed to create archive db"),
-            );
-
-            let historical_state_dir: ResolvedPathBuf = config
-                .store_path
-                .join("historical")
-                .try_into()
-                .expect("resolved historical dir");
-
-            if !historical_state_dir.is_dir() {
-                std::fs::create_dir_all(&historical_state_dir)
-                    .expect("Failed to create historical dir");
-            }
-
-            let inner = ArchiveInner::<C>::new(
-                archive_rx,
-                index_rx,
-                db,
-                shutdown_notify.clone(),
-                historical_state_dir,
-                blockstore,
-            );
-            Ok(Self {
-                archive_socket: Mutex::new(Some(archive_socket)),
-                index_socket: Mutex::new(Some(index_socket)),
-                inner: Some(Arc::new(inner)),
-                is_running: Arc::new(AtomicBool::new(false)),
-                shutdown_notify: Some(shutdown_notify),
-                _marker: PhantomData,
-            })
-        } else {
-            Ok(Self {
-                archive_socket: Mutex::new(None),
-                index_socket: Mutex::new(None),
-                inner: None,
-                is_running: Arc::new(AtomicBool::new(false)),
-                shutdown_notify: None,
-                _marker: PhantomData,
-            })
-        }
-    }
-
-    fn archive_socket(&self) -> Option<ArchiveSocket<C>> {
-        self.archive_socket.lock().unwrap().clone()
-    }
-
-    fn index_socket(&self) -> Option<IndexSocket> {
-        self.index_socket.lock().unwrap().clone()
-    }
-}
-
-impl<C: Collection> WithStartAndShutdown for Archive<C> {
-    fn is_running(&self) -> bool {
-        self.is_running.load(Ordering::Relaxed)
-    }
-
-    async fn start(&self) {
-        if !self.is_running() {
-            if let Some(inner) = self.inner.clone() {
-                let is_running = self.is_running.clone();
-                tokio::spawn(async move {
-                    inner.start().await;
-                    is_running.store(false, Ordering::Relaxed);
-                });
-                self.is_running.store(true, Ordering::Relaxed);
-            }
-        } else {
-            error!("Can not start archive because it is already running");
-        }
-    }
-
-    async fn shutdown(&self) {
-        if let Some(shutdown_notify) = self.shutdown_notify.clone() {
-            shutdown_notify.notify_one();
-        }
-    }
 }
 
 struct ArchiveInner<C: Collection> {
-    archive_rx: Arc<Mutex<Option<mpsc::Receiver<ArchiveTask<C>>>>>,
-    index_rx: Arc<Mutex<Option<mpsc::Receiver<IndexTask>>>>,
-    db: Arc<DB>,
-    shutdown_notify: Arc<Notify>,
-    _marker: PhantomData<C>,
+    db: DB,
     blockstore: c!(C::BlockstoreInterface),
     /// Handles the rocks db storage for each epoch
     historical_state_dir: ResolvedPathBuf,
 }
 
+impl<C: Collection> BuildGraph for Archive<C> {
+    fn build_graph() -> DependencyGraph {
+        DependencyGraph::new().with_infallible(Self::new.on("start", insertion_task::<C>.spawn()))
+    }
+}
+
+impl<C: Collection> Archive<C> {
+    pub fn new(
+        config_provider: &C::ConfigProviderInterface,
+        blockstore: &C::BlockstoreInterface,
+    ) -> Self {
+        let config = config_provider.get::<Self>();
+
+        if !config.is_archive {
+            return Self { inner: None };
+        }
+
+        let mut db_options = Options::default();
+        db_options.create_if_missing(true);
+        db_options.create_missing_column_families(true);
+
+        let cf = vec![BLKHASH_TO_BLKNUM, BLKNUM_TO_BLK, TXHASH_TO_TXRCT, MISC];
+        let db =
+            DB::open_cf(&db_options, &config.store_path, cf).expect("Failed to create archive db");
+
+        let historical_state_dir: ResolvedPathBuf = config
+            .store_path
+            .join("historical")
+            .try_into()
+            .expect("resolved historical dir");
+
+        if !historical_state_dir.is_dir() {
+            std::fs::create_dir_all(&historical_state_dir)
+                .expect("Failed to create historical dir");
+        }
+
+        let inner = ArchiveInner::<C>::new(db, historical_state_dir, blockstore.clone());
+
+        Self {
+            inner: Some(Arc::new(inner)),
+        }
+    }
+}
+
+impl<C: Collection> ArchiveInterface<C> for Archive<C> {
+    fn is_active(&self) -> bool {
+        self.inner.is_some()
+    }
+
+    async fn get_block_by_hash(&self, hash: [u8; 32]) -> Option<BlockReceipt> {
+        self.inner.as_ref().and_then(|inner| {
+            inner
+                .get_block_by_hash(&hash)
+                .ok()
+                .flatten()
+                .map(|info| info.receipt)
+        })
+    }
+
+    async fn get_block_by_number(&self, number: BlockNumber) -> Option<BlockReceipt> {
+        self.inner.as_ref().and_then(|inner| {
+            inner
+                .get_block_by_block_number(&number)
+                .ok()
+                .flatten()
+                .map(|info| info.receipt)
+        })
+    }
+
+    async fn get_transaction_receipt(&self, hash: [u8; 32]) -> Option<TransactionReceipt> {
+        self.inner
+            .as_ref()
+            .and_then(|inner| inner.get_transaction_receipt(&hash).ok().flatten())
+    }
+
+    async fn get_transaction(&self, hash: [u8; 32]) -> Option<TransactionRequest> {
+        self.inner.as_ref().and_then(|inner| {
+            inner
+                .get_transaction_receipt(&hash)
+                .ok()
+                .flatten()
+                .and_then(|receipt| {
+                    inner
+                        .get_block_by_hash(&receipt.block_hash)
+                        .ok()
+                        .flatten()
+                        .and_then(|info| {
+                            info.block
+                                .transactions
+                                .get(receipt.transaction_index as usize)
+                                .cloned()
+                        })
+                })
+        })
+    }
+
+    async fn get_historical_epoch_state(
+        &self,
+        epoch: u64,
+    ) -> Option<c![C::ApplicationInterface::SyncExecutor]> {
+        self.inner
+            .as_ref()
+            .and_then(|inner| inner.get_historical_query_runner(epoch).ok())
+    }
+}
+
+impl<C: Collection> Clone for Archive<C> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+        }
+    }
+}
+
 /// Main logic to handle archive requests
 impl<C: Collection> ArchiveInner<C> {
     fn new(
-        archive_rx: mpsc::Receiver<Task<ArchiveRequest, Result<ArchiveResponse<C>>>>,
-        index_rx: mpsc::Receiver<Task<IndexRequest, Result<()>>>,
-        db: Arc<DB>,
-        shutdown_notify: Arc<Notify>,
+        db: DB,
         historical_state_dir: ResolvedPathBuf,
         blockstore: c!(C::BlockstoreInterface),
     ) -> Self {
         Self {
-            archive_rx: Arc::new(Mutex::new(Some(archive_rx))),
-            index_rx: Arc::new(Mutex::new(Some(index_rx))),
             db,
-            shutdown_notify,
             historical_state_dir,
             blockstore,
-            _marker: PhantomData,
         }
     }
 
-    async fn start(&self) {
-        let mut archive_rx = self.archive_rx.lock().unwrap().take().unwrap();
-        let mut index_rx = self.index_rx.lock().unwrap().take().unwrap();
-
-        loop {
-            tokio::select! {
-                _ = self.shutdown_notify.notified() => {
-                    break;
-                }
-                Some(archive_task) = archive_rx.recv() => {
-                    let res = self.handle_archive_request(&archive_task.request).await;
-                    archive_task.respond(res);
-                }
-                Some(index_task) = index_rx.recv() => {
-                    let res = self.handle_index_request(index_task.request.clone()).await;
-                    index_task.respond(res);
-                }
-            }
-        }
-        *self.archive_rx.lock().unwrap() = Some(archive_rx);
-        *self.index_rx.lock().unwrap() = Some(index_rx);
-    }
-
-    async fn handle_archive_request(
+    fn get_historical_query_runner(
         &self,
-        archive_request: &ArchiveRequest,
-    ) -> Result<ArchiveResponse<C>> {
-        match archive_request {
-            ArchiveRequest::GetBlockByHash(hash) => match self.get_block_by_hash(hash) {
-                Ok(Some(block)) => Ok(ArchiveResponse::Block(block.receipt)),
-                Ok(None) => Ok(ArchiveResponse::None),
-                Err(e) => Err(e),
-            },
-            ArchiveRequest::GetBlockByNumber(blk_num) => {
-                match self.get_block_by_block_number(blk_num) {
-                    Ok(Some(block)) => Ok(ArchiveResponse::Block(block.receipt)),
-                    Ok(None) => Ok(ArchiveResponse::None),
-                    Err(e) => Err(e),
-                }
-            },
-            ArchiveRequest::GetTransactionReceipt(tx_hash) => {
-                match self.get_transaction_receipt(tx_hash) {
-                    Ok(Some(recepit)) => Ok(ArchiveResponse::TransactionReceipt(recepit)),
-                    Ok(None) => Ok(ArchiveResponse::None),
-                    Err(e) => Err(e),
-                }
-            },
-            ArchiveRequest::GetTransaction(tx_hash) => {
-                let receipt = match self.get_transaction_receipt(tx_hash) {
-                    Ok(Some(recepit)) => recepit,
-                    Ok(None) => return Ok(ArchiveResponse::None),
-                    Err(e) => return Err(e),
-                };
-                let blk_info = match self.get_block_by_hash(&receipt.block_hash) {
-                    Ok(Some(block)) => block,
-                    Ok(None) => return Ok(ArchiveResponse::None),
-                    Err(e) => return Err(e),
-                };
-                match blk_info
-                    .block
-                    .transactions
-                    .get(receipt.transaction_index as usize)
-                {
-                    Some(tx) => Ok(ArchiveResponse::Transaction(tx.clone())),
-                    None => Ok(ArchiveResponse::None),
-                }
-            },
-            ArchiveRequest::GetHistoricalEpochState(epoch) => {
-                let path = self.historical_state_dir.join(epoch.to_string());
-
-                tracing::trace!(target: "archive", "Getting historical epoch state from {:?}", path);
-                let db = <c!(C::ApplicationInterface::SyncExecutor)>::atomo_from_path(path)?;
-                let query_runner = <c!(C::ApplicationInterface::SyncExecutor)>::new(db);
-
-                // return the query runner
-                Ok(ArchiveResponse::HistoricalEpochState(query_runner))
-            },
-        }
+        epoch: u64,
+    ) -> Result<c!(C::ApplicationInterface::SyncExecutor)> {
+        let path = self.historical_state_dir.join(epoch.to_string());
+        tracing::trace!(target: "archive", "Getting historical epoch state from {:?}", path);
+        let db = <c!(C::ApplicationInterface::SyncExecutor)>::atomo_from_path(path)?;
+        let query_runner = <c!(C::ApplicationInterface::SyncExecutor)>::new(db);
+        Ok(query_runner)
     }
 
     fn get_block_by_hash(&self, blk_hash: &[u8; 32]) -> Result<Option<BlockInfo>> {
@@ -328,16 +250,6 @@ impl<C: Collection> ArchiveInner<C> {
                 Ok(Some(receipt))
             },
             None => Ok(None),
-        }
-    }
-}
-
-/// Incoming index requests from execution are sent here
-impl<C: Collection> ArchiveInner<C> {
-    async fn handle_index_request(&self, index_request: IndexRequest) -> Result<()> {
-        match index_request {
-            IndexRequest::Block(block, response) => self.handle_block(block, response),
-            IndexRequest::Epoch(epoch, digest) => self.handle_epoch(epoch, digest).await,
         }
     }
 
@@ -419,6 +331,40 @@ impl<C: Collection> ArchiveInner<C> {
                 .put_cf(&txhash_cf, txn_receipt.transaction_hash, txn_receipt_bytes)?;
         }
         Ok(())
+    }
+}
+
+/// The main loop that listens to notifier events and inserts the data into the db.
+async fn insertion_task<C: Collection>(
+    Cloned(waiter): Cloned<ShutdownWaiter>,
+    Cloned(notifier): Cloned<C::NotifierInterface>,
+    Cloned(archive): Cloned<Archive<C>>,
+) {
+    let Some(inner) = archive.inner else {
+        return;
+    };
+
+    let mut block_executed_sub = notifier.subscribe_block_executed();
+    let mut epoch_changed_sub = notifier.subscribe_epoch_changed();
+    let shutdown_fut = waiter.wait_for_shutdown();
+    pin!(shutdown_fut);
+
+    loop {
+        tokio::select! {
+            biased;
+            _ = &mut shutdown_fut => {
+                break;
+            }
+            Some(n) = epoch_changed_sub.recv() => {
+                let _ = inner.handle_epoch(n.current_epoch, n.last_epoch_hash).await;
+            },
+            Some(n) = block_executed_sub.recv() => {
+                let _ = inner.handle_block(n.block, n.response);
+            },
+            else => {
+                continue;
+            }
+        }
     }
 }
 

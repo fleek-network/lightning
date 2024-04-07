@@ -12,9 +12,6 @@ use lightning_interfaces::{
     fdi,
     ApplicationInterface,
     ArchiveInterface,
-    ArchiveRequest,
-    ArchiveResponse,
-    ArchiveSocket,
     ConfigConsumer,
     ConfigProviderInterface,
     FetcherInterface,
@@ -53,8 +50,7 @@ pub(crate) struct Data<C: Collection> {
     pub _blockstore: C::BlockstoreInterface,
     pub node_public_key: NodePublicKey,
     pub consensus_public_key: ConsensusPublicKey,
-    /// If this is some it means the node is in archive mode
-    pub archive_socket: Option<ArchiveSocket<C>>,
+    pub archive: C::ArchiveInterface,
     pub event_handler: EventDistributor,
 }
 
@@ -63,25 +59,14 @@ impl<C: Collection> Data<C> {
         &self,
         epoch: Option<u64>,
     ) -> Result<c!(C::ApplicationInterface::SyncExecutor), RPCError> {
-        match epoch {
-            Some(epoch) => {
-                if let Some(socket) = &self.archive_socket {
-                    let res = socket
-                        .run(ArchiveRequest::GetHistoricalEpochState(epoch))
-                        .await
-                        .map_err(RPCError::from)?
-                        .map_err(RPCError::from)?;
-
-                    if let ArchiveResponse::HistoricalEpochState(query_runner) = res {
-                        Ok(query_runner.clone())
-                    } else {
-                        Err(RPCError::BadEpoch)
-                    }
-                } else {
-                    Err(RPCError::BadEpoch)
-                }
-            },
-            None => Ok(self.query_runner.clone()),
+        if let Some(epoch) = epoch {
+            if let Some(query_runner) = self.archive.get_historical_epoch_state(epoch).await {
+                Ok(query_runner)
+            } else {
+                Err(RPCError::BadEpoch)
+            }
+        } else {
+            Ok(self.query_runner.clone())
         }
     }
 }
@@ -114,7 +99,7 @@ impl<C: Collection> Rpc<C> {
         blockstore: &C::BlockstoreInterface,
         fetcher: &C::FetcherInterface,
         keystore: &C::KeystoreInterface,
-        archive: &C::ArchiveInterface,
+        fdi::Cloned(archive): fdi::Cloned<c!(C::ArchiveInterface)>,
         fdi::Cloned(query_runner): fdi::Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
     ) -> anyhow::Result<Self> {
         let config = config.get::<Self>();
@@ -125,7 +110,7 @@ impl<C: Collection> Rpc<C> {
             _blockstore: blockstore.clone(),
             node_public_key: keystore.get_ed25519_pk(),
             consensus_public_key: keystore.get_bls_pk(),
-            archive_socket: archive.archive_socket(),
+            archive,
             event_handler: EventDistributor::spawn(),
         });
         let module = Self::create_modules_from_config(&config, data.clone())?;
