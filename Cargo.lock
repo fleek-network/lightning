@@ -5739,7 +5739,6 @@ dependencies = [
  "lightning-syncronizer",
  "lightning-types",
  "lightning-utils",
- "mock",
  "os_info",
  "panic-report",
  "rand 0.8.5",
@@ -5852,7 +5851,6 @@ dependencies = [
  "lightning-syncronizer",
  "lightning-test-utils",
  "lightning-topology",
- "mock",
  "rand 0.8.5",
  "reqwest",
  "resolve-path",
@@ -5956,7 +5954,6 @@ dependencies = [
  "lightning-service-executor",
  "lightning-signer",
  "lightning-test-utils",
- "mock",
  "rand 0.8.5",
  "rcgen 0.11.3",
  "ring 0.16.20",
@@ -6089,7 +6086,6 @@ dependencies = [
  "lightning-signer",
  "lightning-syncronizer",
  "lightning-topology",
- "mock",
  "resolved-pathbuf",
  "toml 0.7.8",
  "tracing",
@@ -6915,34 +6911,6 @@ dependencies = [
  "log",
  "wasi 0.11.0+wasi-snapshot-preview1",
  "windows-sys 0.48.0",
-]
-
-[[package]]
-name = "mock"
-version = "0.1.0"
-dependencies = [
- "affair",
- "anyhow",
- "axum 0.6.20",
- "dashmap",
- "fdi",
- "fleek-crypto",
- "futures",
- "hp-fixed",
- "infusion",
- "lightning-application",
- "lightning-interfaces",
- "lightning-rep-collector",
- "lightning-schema",
- "lightning-signer",
- "rand 0.8.5",
- "rand_chacha",
- "rand_distr",
- "scc",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
 ]
 
 [[package]]

@@ -11,7 +11,6 @@ lightning-interfaces = { path = "../interfaces" }
 lightning-node = { path = "../node" }
 lightning-types = { path = "../types" }
 lightning-utils = { path = "../utils" }
-mock = { path = "../mock" }
 
 # TODO: cli ideally shouldn't depend on this directly
 lightning-application = { path = "../application" }
@@ -58,7 +57,7 @@ fleek-blake3 = "1.5"
 [features]
 default = []
 # Opt-in for compiling services directly inside the node
-services = [ "lightning-node/services" ]
+services = ["lightning-node/services"]
 
 [[bin]]
 name = "lightning-node"

@@ -27,7 +27,6 @@ lightning-resolver = { path = "../resolver" }
 lightning-archive = { path = "../archive" }
 lightning-pinger = { path = "../pinger" }
 lightning-test-utils = { path = "../test-utils" }
-mock = { path = "../mock" }
 infusion.workspace = true
 tokio.workspace = true
 anyhow.workspace = true

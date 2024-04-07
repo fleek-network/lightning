@@ -28,7 +28,7 @@ derive_more = "0.99"
 enum_dispatch = "0.3.12"
 triomphe = "0.1.9"
 smallvec = "1.11"
-axum = { version = "0.7", features = ["macros"]}
+axum = { version = "0.7", features = ["macros"] }
 axum-server = { version = "0.6", features = ["tls-rustls"] }
 str0m = "0.4.1"
 wtransport = { version = "0.1.9", features = ["dangerous-configuration"] }
@@ -45,17 +45,18 @@ base64.workspace = true
 serde_json.workspace = true
 cid.workspace = true
 hex = "0.4"
-url = { version="2.5.0", features = ["serde"] }
+url = { version = "2.5.0", features = ["serde"] }
 
 [dev-dependencies]
 criterion = { version = "0.5.0", features = ["html_reports", "async_tokio"] }
 affair.workspace = true
+lightning-node = { path = "../node" } # for TomlConfigProvider
+lightning-cli = { path = "../cli" }
 lightning-signer = { path = "../signer" }
 lightning-rpc = { path = "../rpc" }
 lightning-service-executor = { path = "../service-executor" }
 lightning-blockstore = { path = "../blockstore/" }
 lightning-test-utils = { path = "../test-utils" }
-mock = { path = "../mock" }
 clap = { version = "4.4.6", features = ["derive"] }
 bincode = "1.3"
 

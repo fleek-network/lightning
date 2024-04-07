@@ -29,7 +29,6 @@ lightning-signer = { path = "../signer" }
 lightning-syncronizer = { path = "../syncronizer" }
 lightning-topology = { path = "../topology" }
 lightning-pinger = { path = "../pinger" }
-mock = { path = "../mock" }
 toml = "0.7"
 infusion.workspace = true
 anyhow.workspace = true
@@ -39,4 +38,4 @@ tracing.workspace = true
 [features]
 default = []
 # Opt-in for compiling services directly inside the node
-services = [ "lightning-service-executor/services" ]
+services = ["lightning-service-executor/services"]
