@@ -7,20 +7,20 @@ use lightning_interfaces::types::{Block, BlockExecutionResponse};
 use lightning_interfaces::{
     ApplicationInterface,
     BlockExecutedNotification,
-    Cloned,
     Emitter,
     EpochChangedNotification,
-    ShutdownWaiter,
     Subscriber,
 };
 use lightning_utils::application::QueryRunnerExt;
 use tokio::sync::{broadcast, mpsc};
 use tokio::time::sleep;
 
+#[cfg(test)]
+mod tests;
+
 pub struct Notifier<C: Collection> {
     query_runner: c![C::ApplicationInterface::SyncExecutor],
     notify: NotificationsEmitter,
-    waiter: ShutdownWaiter,
 }
 
 impl<C: Collection> Clone for Notifier<C> {
@@ -28,7 +28,6 @@ impl<C: Collection> Clone for Notifier<C> {
         Self {
             query_runner: self.query_runner.clone(),
             notify: self.notify.clone(),
-            waiter: self.waiter.clone(),
         }
     }
 }
@@ -49,11 +48,10 @@ impl<C: Collection> Notifier<C> {
 }
 
 impl<C: Collection> Notifier<C> {
-    fn new(app: &c![C::ApplicationInterface], Cloned(waiter): Cloned<ShutdownWaiter>) -> Self {
+    fn new(app: &c![C::ApplicationInterface]) -> Self {
         Self {
             query_runner: app.sync_query(),
             notify: NotificationsEmitter::default(),
-            waiter,
         }
     }
 }
@@ -128,7 +126,7 @@ impl Emitter for NotificationsEmitter {
 }
 
 /// Provides an implementation for [`Subscriber`] backed by a tokio broadcast.
-struct BroadcastSub<T>(broadcast::Receiver<T>);
+pub(crate) struct BroadcastSub<T>(pub broadcast::Receiver<T>);
 
 impl<T> Subscriber<T> for BroadcastSub<T>
 where
@@ -151,7 +149,6 @@ where
             match self.0.try_recv() {
                 Ok(item) => {
                     maybe_last = Some(item);
-                    break;
                 },
                 // We missed a few message because of the channel capacity, trying to recv again
                 // will return an item.
