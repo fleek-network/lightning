@@ -82,7 +82,7 @@ impl<C: Collection> ReputationAggregatorInterface<C> for ReputationAggregator<C>
         let (report_tx, report_rx) =
             buffered_mpsc::buffered_channel(config.reporter_buffer_size, 2048);
         let (notify_before_epoch_tx, notify_before_epoch_rx) = mpsc::channel(128);
-        let (notify_new_epoch_tx, notify_new_epoch_rx) = mpsc::channel(128);
+        let (_notify_new_epoch_tx, notify_new_epoch_rx) = mpsc::channel(128);
         let measurement_manager = MeasurementManager::new();
         let local_reputation_ref = measurement_manager.get_local_reputation_ref();
 
@@ -98,7 +98,7 @@ impl<C: Collection> ReputationAggregatorInterface<C> for ReputationAggregator<C>
             notify_before_epoch_rx: Arc::new(Mutex::new(Some(notify_before_epoch_rx))),
             notify_before_epoch_tx,
             notify_new_epoch_rx: Arc::new(Mutex::new(Some(notify_new_epoch_rx))),
-            notify_new_epoch_tx,
+            _notify_new_epoch_tx,
             _query_runner: query_runner,
             shutdown_notify: shutdown_notify.clone(),
             _config: config,
@@ -134,7 +134,7 @@ struct ReputationAggregatorInner<C: Collection> {
     notify_before_epoch_rx: Arc<Mutex<Option<mpsc::Receiver<Notification>>>>,
     notify_before_epoch_tx: mpsc::Sender<Notification>,
     notify_new_epoch_rx: Arc<Mutex<Option<mpsc::Receiver<Notification>>>>,
-    notify_new_epoch_tx: mpsc::Sender<Notification>,
+    _notify_new_epoch_tx: mpsc::Sender<Notification>,
     _query_runner: c![C::ApplicationInterface::SyncExecutor],
     shutdown_notify: Arc<Notify>,
     _config: Config,

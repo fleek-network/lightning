@@ -22,7 +22,6 @@ use lightning_interfaces::{
     ConfigProviderInterface,
     KeystoreInterface,
     Notification,
-    NotifierInterface,
     ShutdownWaiter,
     SyncQueryRunnerInterface,
     SyncronizerInterface,
@@ -63,11 +62,11 @@ impl<C: Collection> Syncronizer<C> {
         config: &C::ConfigProviderInterface,
         keystore: &C::KeystoreInterface,
         blockstore_server: &C::BlockstoreServerInterface,
-        notifier: &C::NotifierInterface,
+        _notifier: &C::NotifierInterface,
         query_runner: fdi::Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
     ) -> Result<Self> {
         let config = config.get::<Self>();
-        let (tx_epoch_change, rx_epoch_change) = tokio::sync::mpsc::channel(10);
+        let (_tx_epoch_change, rx_epoch_change) = tokio::sync::mpsc::channel(10);
         // TODO(qti3e): Use the new notifier.
         // notifier.notify_on_new_epoch(tx_epoch_change);
 

@@ -13,7 +13,6 @@ use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::{
     ApplicationInterface,
     Notification,
-    NotifierInterface,
     RequestHeader,
     ServiceScope,
     ShutdownWaiter,
@@ -103,14 +102,14 @@ where
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         sync_query: c!(C::ApplicationInterface::SyncExecutor),
-        notifier: c!(C::NotifierInterface),
+        _notifier: c!(C::NotifierInterface),
         topology_rx: watch::Receiver<Arc<Vec<Vec<NodePublicKey>>>>,
         event_queue: Receiver<Event>,
         pool_queue: Sender<EndpointTask>,
         public_key: NodePublicKey,
         dial_info: Arc<scc::HashMap<NodeIndex, DialInfo>>,
     ) -> Self {
-        let (notifier_tx, notifier_rx) = mpsc::channel(16);
+        let (_notifier_tx, notifier_rx) = mpsc::channel(16);
         // TODO(qti3e): Use the new notifier.
         // notifier.notify_on_new_epoch(notifier_tx);
 

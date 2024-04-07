@@ -22,7 +22,6 @@ use lightning_interfaces::{
     ConfigProviderInterface,
     KeystoreInterface,
     Notification,
-    NotifierInterface,
     ShutdownWaiter,
     TopologyInterface,
 };
@@ -111,11 +110,11 @@ impl<C: Collection> Topology<C> {
     fn init(
         config: &C::ConfigProviderInterface,
         signer: &C::KeystoreInterface,
-        notifier: &C::NotifierInterface,
+        _notifier: &C::NotifierInterface,
         fdi::Cloned(query): fdi::Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
     ) -> anyhow::Result<Self> {
         let config = config.get::<Self>();
-        let (notifier_tx, notifier_rx) = mpsc::channel(16);
+        let (_notifier_tx, notifier_rx) = mpsc::channel(16);
         // TODO(qti3e): Use the new notifier.
         // notifier.notify_on_new_epoch(notifier_tx);
 

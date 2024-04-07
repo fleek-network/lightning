@@ -15,7 +15,6 @@ use lightning_interfaces::{
     ConfigProviderInterface,
     KeystoreInterface,
     Notification,
-    NotifierInterface,
     PingerInterface,
     RefMut,
     ReputationAggregatorInterface,
@@ -46,14 +45,14 @@ impl<C: Collection> Pinger<C> {
         app: &C::ApplicationInterface,
         rep_aggregator: &C::ReputationAggregatorInterface,
         keystore: &C::KeystoreInterface,
-        Cloned(notifier): Cloned<C::NotifierInterface>,
+        Cloned(_notifier): Cloned<C::NotifierInterface>,
         Cloned(shutdown_waiter): Cloned<ShutdownWaiter>,
     ) -> anyhow::Result<Self> {
         let config = config_provider.get::<Self>();
         let query_runner = app.sync_query();
         let rep_reporter = rep_aggregator.get_reporter();
 
-        let (notifier_tx, notifier_rx) = mpsc::channel(10);
+        let (_notifier_tx, notifier_rx) = mpsc::channel(10);
         // TODO(qti3e): Use the new notifier.
         // notifier.notify_on_new_epoch(notifier_tx);
 
