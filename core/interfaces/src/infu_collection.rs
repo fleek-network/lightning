@@ -85,12 +85,8 @@ impl<C: Collection> Node<C> {
             .with_module::<C::DeliveryAcknowledgmentAggregatorInterface>()
             .with_module::<C::RpcInterface>()
             .with_module::<C::SyncronizerInterface>()
+            .with_module::<C::ArchiveInterface>()
             // TODO: Refactor the rest of start/shutdown/inits:
-            .with(
-                C::ArchiveInterface::infu_initialize_hack
-                    .on("start", |c: &C::ArchiveInterface| block_on(c.start()))
-                    .on("shutdown", |c: &C::ArchiveInterface| block_on(c.shutdown())),
-            )
             .with(
                 C::ReputationAggregatorInterface::infu_initialize_hack
                     .on("start", |c: &C::ReputationAggregatorInterface| {
