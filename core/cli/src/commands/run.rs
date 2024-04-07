@@ -32,15 +32,16 @@ where
 
     node.start().await;
 
-    let mut checkpoint_fut = node
-        .provider
-        .get::<<C as Collection>::SyncronizerInterface>()
-        .next_checkpoint_hash();
-
     let shutdown_future = shutdown_controller.wait_for_shutdown();
     pin!(shutdown_future);
 
     loop {
+        let syncronizer = node
+            .provider
+            .get::<<C as Collection>::SyncronizerInterface>();
+
+        let checkpoint_fut = syncronizer.next_checkpoint_hash();
+
         tokio::select! {
             _ = &mut shutdown_future => break,
             checkpoint_hash = checkpoint_fut => {
@@ -65,13 +66,9 @@ where
                 //restart the node
                 node = Node::<C>::init(config.clone())
                     .map_err(|e| anyhow::anyhow!("Could not start the node: {e:?}"))?;
+
                 node.start().await;
 
-                // reseed our rx_update_ready
-                checkpoint_fut = node
-                .provider
-                .get::<<C as Collection>::SyncronizerInterface>()
-                .next_checkpoint_hash();
             }
         }
     }
