@@ -4,7 +4,6 @@ use fdi::BuildGraph;
 use infusion::Blank;
 use lightning_types::{Block, BlockExecutionResponse};
 use tokio::sync::mpsc;
-use triomphe::Arc;
 
 use crate::infu_collection::Collection;
 
@@ -31,8 +30,8 @@ pub trait NotifierInterface<C: Collection>: BuildGraph + Sync + Send + Clone {
     #[blank = Default::default()]
     fn get_emitter(&self) -> Self::Emitter;
 
-    // #[blank = Blank::default()]
-    // fn subcribe_block_executed(&self) -> impl Subscriber<BlockExecutedNotification>;
+    #[blank = Blank::default()]
+    fn subscribe_block_executed(&self) -> impl Subscriber<BlockExecutedNotification>;
 
     fn notify_on_new_block(&self, tx: mpsc::Sender<Notification>);
 
@@ -54,11 +53,11 @@ pub trait Emitter: Clone + Send + Sync + 'static {
 pub trait Subscriber<T>: Send + Sync + 'static {
     /// Receive the next notification from this subscriber or returns `None` if we are shutting
     /// down.
-    async fn recv(&self) -> Option<T>;
+    async fn recv(&mut self) -> Option<T>;
 
     /// Jump to the last availabe notification skipping over any pending notifications that are
     /// ready.
     ///
     /// Using this method is similar to a `watch` channel.
-    async fn last(&self) -> Option<T>;
+    async fn last(&mut self) -> Option<T>;
 }
