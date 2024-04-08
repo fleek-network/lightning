@@ -1,8 +1,8 @@
-use std::time::{Duration, SystemTime};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use lightning_interfaces::fdi::{BuildGraph, DependencyGraph};
 use lightning_interfaces::infu_collection::{c, Collection};
-use lightning_interfaces::notifier::{Notification, NotifierInterface};
+use lightning_interfaces::notifier::NotifierInterface;
 use lightning_interfaces::types::{Block, BlockExecutionResponse};
 use lightning_interfaces::{
     ApplicationInterface,
@@ -10,9 +10,11 @@ use lightning_interfaces::{
     Emitter,
     EpochChangedNotification,
     Subscriber,
+    SyncQueryRunnerInterface,
 };
 use lightning_utils::application::QueryRunnerExt;
-use tokio::sync::{broadcast, mpsc};
+use tokio::pin;
+use tokio::sync::broadcast;
 use tokio::time::sleep;
 
 #[cfg(test)]
@@ -20,6 +22,9 @@ mod tests;
 
 pub struct Notifier<C: Collection> {
     query_runner: c![C::ApplicationInterface::SyncExecutor],
+    // TODO(qti3e):
+    // This shouldn't really be owned here. get_emitter should move this out and we should only
+    // keep a Weak reference to the senders (to subscribe).
     notify: NotificationsEmitter,
 }
 
@@ -29,21 +34,6 @@ impl<C: Collection> Clone for Notifier<C> {
             query_runner: self.query_runner.clone(),
             notify: self.notify.clone(),
         }
-    }
-}
-
-impl<C: Collection> Notifier<C> {
-    fn get_until_epoch_end(&self) -> Duration {
-        let epoch_info = self.query_runner.get_epoch_info();
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_millis();
-        let until_epoch_ends: u64 = (epoch_info.epoch_end as u128)
-            .saturating_sub(now)
-            .try_into()
-            .unwrap();
-        Duration::from_millis(until_epoch_ends)
     }
 }
 
@@ -77,19 +67,16 @@ impl<C: Collection> NotifierInterface<C> for Notifier<C> {
         BroadcastSub(self.notify.epoch_changed.subscribe())
     }
 
-    fn notify_before_epoch_change(&self, duration: Duration, tx: mpsc::Sender<Notification>) {
-        // TODO(qti3e): The name of this method is misleading, the other methods subscribe
-        // to an event but this method only emits one thing and returns and yet it take an
-        // mpsc and not a oneshot.
-        let until_epoch_end = self.get_until_epoch_end();
-        if until_epoch_end > duration {
-            tokio::spawn(async move {
-                sleep(until_epoch_end - duration).await;
-                tx.send(Notification::BeforeEpochChange)
-                    .await
-                    .expect("Failed to send notification before epoch change.")
-            });
-        }
+    fn subscribe_before_epoch_change(&self, duration: Duration) -> impl Subscriber<()> {
+        let (sender, rx) = broadcast::channel(8);
+        let epoch_changed = BroadcastSub(self.notify.epoch_changed.subscribe());
+        tokio::spawn(before_epoch_change(
+            sender,
+            self.query_runner.clone(),
+            duration,
+            epoch_changed,
+        ));
+        BroadcastSub(rx)
     }
 }
 
@@ -176,4 +163,78 @@ where
             }
         }
     }
+}
+
+async fn before_epoch_change<Q>(
+    sender: broadcast::Sender<()>,
+    query_runner: Q,
+    duration: Duration,
+    mut epoch_changed: BroadcastSub<EpochChangedNotification>,
+) where
+    Q: SyncQueryRunnerInterface,
+{
+    loop {
+        // We might start at the very end of an epoch or the sleep duration given to us might be
+        // larger than the epoch duration (which should not happen), in these cases we want to skip
+        // this epoch. This loop basically exits as soon as we have are at an epoch where we have
+        // enough time to sleep.
+        let sleep_fut = loop {
+            if sender.receiver_count() == 0 {
+                return;
+            }
+
+            if let Some(duration) = get_sleep_amount(duration, &query_runner) {
+                break sleep(duration);
+            }
+
+            if epoch_changed.recv().await.is_none() {
+                // pre-mature termination.
+                return;
+            }
+        };
+
+        pin!(sleep_fut);
+
+        // Anticipate an unexpected epoch change anytime. In that case the current timer is void
+        // and we start over again. We also exit on two conditions:
+        // 1. If we fail to send a notification out.
+        // 2. If the epoch change subscription returns none.
+        tokio::select! {
+            biased;
+            _ = &mut sleep_fut => {
+                if sender.send(()).is_err() {
+                    return;
+                }
+            },
+            Some(_) = epoch_changed.recv() => {
+                continue;
+            },
+            else => {
+                return;
+            }
+        }
+    }
+}
+
+fn get_sleep_amount(
+    duration: Duration,
+    query_runner: &impl SyncQueryRunnerInterface,
+) -> Option<Duration> {
+    let now = now();
+    let epoch_end = query_runner.get_epoch_info().epoch_end;
+
+    let until_end = Duration::from_millis(epoch_end.saturating_sub(now));
+
+    if duration < until_end {
+        Some(until_end - duration)
+    } else {
+        None
+    }
+}
+
+fn now() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64
 }

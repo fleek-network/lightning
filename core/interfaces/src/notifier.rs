@@ -3,16 +3,8 @@ use std::time::Duration;
 use fdi::BuildGraph;
 use infusion::Blank;
 use lightning_types::{Block, BlockExecutionResponse};
-use tokio::sync::mpsc;
 
 use crate::infu_collection::Collection;
-
-#[derive(Debug, PartialEq)]
-pub enum Notification {
-    NewBlock,
-    NewEpoch,
-    BeforeEpochChange,
-}
 
 #[derive(Clone, Debug)]
 pub struct BlockExecutedNotification {
@@ -42,7 +34,8 @@ pub trait NotifierInterface<C: Collection>: BuildGraph + Sync + Send + Clone {
     #[blank = Blank::default()]
     fn subscribe_epoch_changed(&self) -> impl Subscriber<EpochChangedNotification>;
 
-    fn notify_before_epoch_change(&self, duration: Duration, tx: mpsc::Sender<Notification>);
+    #[blank = Blank::default()]
+    fn subscribe_before_epoch_change(&self, duration: Duration) -> impl Subscriber<()>;
 }
 
 #[infusion::blank]
