@@ -23,6 +23,7 @@ const MSG_SIZE: usize = 600;
 struct ExperimentData {
     propagation_time: Time,
     bytes_transfered: usize,
+    max_visited_at_depth: u8,
 }
 
 struct Graph {
@@ -181,9 +182,16 @@ fn main() {
                         let num_nodes = graph.nodes.len();
                         let bytes_transfered =
                             (num_edges / 2) * ADV_SIZE + num_nodes * (WANT_SIZE + MSG_SIZE);
+                        let max_visited_at_depth = graph
+                            .nodes
+                            .iter()
+                            .map(|node| node.visited_at_depth)
+                            .max()
+                            .unwrap();
                         exp_data.push(ExperimentData {
                             propagation_time: graph.max_time,
                             bytes_transfered,
+                            max_visited_at_depth,
                         });
                     }
 
@@ -214,6 +222,7 @@ fn main() {
     // BTreeMap::<num_nodes, BTreeMap<cluster_size, (mean, variance)>>
     let mut data_prop_time = BTreeMap::<usize, BTreeMap<usize, (f64, f64)>>::new();
     let mut data_bytes = BTreeMap::<usize, BTreeMap<usize, (f64, f64)>>::new();
+    let mut data_visited = BTreeMap::<usize, BTreeMap<usize, (f64, f64)>>::new();
 
     let mut prop_time_min = u64::MAX;
     let mut prop_time_max = u64::MIN;
@@ -251,6 +260,17 @@ fn main() {
                 .entry(*n)
                 .or_default()
                 .insert(*cluster_size, (mean, variance));
+
+            let visited_at_depth_float: Vec<f64> = experiment_data
+                .iter()
+                .map(|d| d.max_visited_at_depth as f64)
+                .collect();
+            let mean = get_mean(&visited_at_depth_float).unwrap();
+            let variance = get_variance(&visited_at_depth_float).unwrap();
+            data_visited
+                .entry(*n)
+                .or_default()
+                .insert(*cluster_size, (mean, variance));
         }
     }
 
@@ -261,6 +281,20 @@ fn main() {
         "Average propagation time of a message to reach all nodes",
         "Cluster size",
         "Time in ms",
+        true,
+        false,
+        &output_path,
+    )
+    .unwrap();
+    println!("Plot saved to {output_path:?}");
+
+    let output_path =
+        PathBuf::from("simulation/plots/propagation/visited_at_depth_time_cluster_size.png");
+    plotting::line_plot(
+        &data_prop_time,
+        "Maximum visited at depth across all nodes for different cluster sizes",
+        "Cluster size",
+        "Max visited at depth",
         true,
         false,
         &output_path,
