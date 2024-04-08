@@ -162,6 +162,10 @@ impl<C: Collection> IPFSOrigin<C> {
 
             match timeout(GATEWAY_TIMEOUT, self.client.request(req)).await {
                 Ok(Ok(res)) => {
+                    if !res.status().is_success() {
+                        info!("Gateway response was not succesful, moving on to the next gateway");
+                        continue;
+                    }
                     return Ok(res.into_body());
                 },
                 Ok(Err(e)) => {
