@@ -225,7 +225,6 @@ fn event_receiver(peer: &Peer) -> (EventReceiver<TestBinding>, EventReceiverTest
     (
         EventReceiver::<TestBinding>::new(
             query_runner,
-            notifier.clone(),
             topology_rx,
             event_rx,
             endpoint_task_tx,
