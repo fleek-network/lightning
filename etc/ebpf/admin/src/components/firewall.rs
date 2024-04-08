@@ -68,7 +68,8 @@ impl FireWall {
 
     fn scroll_down(&mut self) {
         if let Some(cur) = self.table_state.selected() {
-            if cur < self.blocklist.len() - 1 {
+            let len = self.blocklist.len();
+            if len > 0 &&  cur < len - 1 {
                 let cur = cur + 1;
                 self.table_state.select(Some(cur));
                 self.scroll_state = self.scroll_state.position(cur);
@@ -205,6 +206,19 @@ impl Component for FireWall {
         .highlight_style(selected_style)
         .highlight_symbol(Text::from(vec![bar.into()]));
         f.render_stateful_widget(t, area, &mut self.table_state);
+
+        // Render scrollbar.
+        f.render_stateful_widget(
+            Scrollbar::default()
+                .orientation(ScrollbarOrientation::VerticalRight)
+                .begin_symbol(None)
+                .end_symbol(None),
+            area.inner(&Margin {
+                vertical: 1,
+                horizontal: 1,
+            }),
+            &mut self.scroll_state,
+        );
 
         if self.show_new_entry_popup {
             let block = Block::default()
