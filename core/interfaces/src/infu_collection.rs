@@ -1,7 +1,6 @@
 use std::marker::PhantomData;
 
-use fdi::{DependencyGraph, MethodExt, Provider};
-use futures::executor::block_on;
+use fdi::{DependencyGraph, Provider};
 pub use infusion::c;
 use infusion::{collection, Blank};
 
@@ -86,16 +85,7 @@ impl<C: Collection> Node<C> {
             .with_module::<C::RpcInterface>()
             .with_module::<C::SyncronizerInterface>()
             .with_module::<C::ArchiveInterface>()
-            // TODO: Refactor the rest of start/shutdown/inits:
-            .with(
-                C::ReputationAggregatorInterface::infu_initialize_hack
-                    .on("start", |c: &C::ReputationAggregatorInterface| {
-                        block_on(c.start())
-                    })
-                    .on("shutdown", |c: &C::ReputationAggregatorInterface| {
-                        block_on(c.shutdown())
-                    }),
-            );
+            .with_module::<C::ReputationAggregatorInterface>();
 
         let vis = graph.viz("Lightning Dependency Graph");
         println!("{vis}");
@@ -122,9 +112,7 @@ impl<C: Collection> Node<C> {
             .take()
             .expect("cannot call shutdown more than once");
 
-        let fut = shutdown.shutdown();
-        self.provider.trigger("shutdown");
-        fut.await;
+        shutdown.shutdown().await;
     }
 
     /// Fill the configuration provider with the default configuration without performing any

@@ -1,45 +1,17 @@
 use std::time::Duration;
 
-use infusion::c;
+use fdi::BuildGraph;
 use lightning_types::NodeIndex;
 
-use crate::config::ConfigConsumer;
 use crate::infu_collection::Collection;
-use crate::notifier::NotifierInterface;
-use crate::signer::SubmitTxSocket;
-use crate::{ApplicationInterface, ConfigProviderInterface, SignerInterface, WithStartAndShutdown};
 
 #[infusion::service]
-pub trait ReputationAggregatorInterface<C: Collection>:
-    ConfigConsumer + Sized + WithStartAndShutdown
-{
-    fn _init(
-        config: ::ConfigProviderInterface,
-        signer: ::SignerInterface,
-        notifier: ::NotifierInterface,
-        app: ::ApplicationInterface,
-    ) {
-        Self::init(
-            config.get::<Self>(),
-            signer.get_socket(),
-            notifier.clone(),
-            app.sync_query(),
-        )
-    }
-
+pub trait ReputationAggregatorInterface<C: Collection>: BuildGraph {
     /// The reputation reporter can be used by our system to report the reputation of other
     type ReputationReporter: ReputationReporterInterface;
 
     /// The query runner can be used to query the local reputation of other nodes.
     type ReputationQuery: ReputationQueryInteface;
-
-    /// Create a new reputation
-    fn init(
-        config: Self::Config,
-        submit_tx: SubmitTxSocket,
-        notifier: c!(C::NotifierInterface),
-        query_runner: c!(C::ApplicationInterface::SyncExecutor),
-    ) -> anyhow::Result<Self>;
 
     /// Returns a reputation reporter that can be used to capture interactions that we have
     /// with another peer.

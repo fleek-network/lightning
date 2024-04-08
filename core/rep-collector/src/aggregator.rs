@@ -1,11 +1,11 @@
 use std::collections::BTreeMap;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use lightning_interfaces::config::ConfigConsumer;
+use lightning_interfaces::fdi::{Bind, BuildGraph, DependencyGraph, MethodExt};
 use lightning_interfaces::infu_collection::{c, Collection};
-use lightning_interfaces::notifier::{Notification, NotifierInterface};
+use lightning_interfaces::notifier::NotifierInterface;
 use lightning_interfaces::reputation::ReputationAggregatorInterface;
 use lightning_interfaces::signer::SubmitTxSocket;
 use lightning_interfaces::types::{
@@ -15,13 +15,16 @@ use lightning_interfaces::types::{
     MAX_MEASUREMENTS_PER_TX,
 };
 use lightning_interfaces::{
-    ApplicationInterface,
+    Cloned,
+    ConfigProviderInterface,
     ReputationQueryInteface,
     ReputationReporterInterface,
+    ShutdownWaiter,
+    SignerInterface,
+    Subscriber,
     Weight,
-    WithStartAndShutdown,
 };
-use tokio::sync::{mpsc, Notify};
+use tokio::pin;
 use tracing::{error, info};
 
 use crate::buffered_mpsc;
@@ -34,161 +37,65 @@ const BEFORE_EPOCH_CHANGE: Duration = Duration::from_secs(300);
 const BEFORE_EPOCH_CHANGE: Duration = Duration::from_secs(3);
 
 pub struct ReputationAggregator<C: Collection> {
-    inner: Arc<ReputationAggregatorInner<C>>,
-    is_running: Arc<AtomicBool>,
-    shutdown_notify: Arc<Notify>,
+    reporter: MyReputationReporter,
+    query: MyReputationQuery,
+    measurement_manager: Mutex<MeasurementManager>,
+    notifier: c![C::NotifierInterface],
+    submit_tx: SubmitTxSocket,
+    report_rx: buffered_mpsc::BufferedReceiver<ReportMessage>,
 }
 
-impl<C: Collection> WithStartAndShutdown for ReputationAggregator<C> {
-    /// Returns true if this system is running or not.
-    fn is_running(&self) -> bool {
-        self.is_running.load(Ordering::Relaxed)
-    }
-
-    async fn start(&self) {
-        if !self.is_running() {
-            let inner = self.inner.clone();
-            let is_running = self.is_running.clone();
-            tokio::spawn(async move {
-                inner.start().await;
-                is_running.store(false, Ordering::Relaxed);
-            });
-            self.is_running.store(true, Ordering::Relaxed);
-        } else {
-            error!("Cannot start reputation aggregator because it is already running");
-        }
-    }
-
-    /// Send the shutdown signal to the system.
-    async fn shutdown(&self) {
-        self.shutdown_notify.notify_one();
-    }
-}
-
-impl<C: Collection> ReputationAggregatorInterface<C> for ReputationAggregator<C> {
-    /// The reputation reporter can be used by our system to report the reputation of other
-    type ReputationReporter = MyReputationReporter;
-
-    /// The query runner can be used to query the local reputation of other nodes.
-    type ReputationQuery = MyReputationQuery;
-
+impl<C: Collection> ReputationAggregator<C> {
     /// Create a new reputation
-    fn init(
-        config: Config,
-        submit_tx: SubmitTxSocket,
-        notifier: c!(C::NotifierInterface),
-        query_runner: c!(C::ApplicationInterface::SyncExecutor),
+    pub fn new(
+        config: &C::ConfigProviderInterface,
+        signer: &C::SignerInterface,
+        Cloned(notifier): Cloned<C::NotifierInterface>,
     ) -> anyhow::Result<Self> {
+        let config = config.get::<Self>();
+        let submit_tx = signer.get_socket();
+
         let (report_tx, report_rx) =
             buffered_mpsc::buffered_channel(config.reporter_buffer_size, 2048);
-        let (notify_before_epoch_tx, notify_before_epoch_rx) = mpsc::channel(128);
-        let (_notify_new_epoch_tx, notify_new_epoch_rx) = mpsc::channel(128);
         let measurement_manager = MeasurementManager::new();
         let local_reputation_ref = measurement_manager.get_local_reputation_ref();
 
-        let shutdown_notify = Arc::new(Notify::new());
-
-        let inner = ReputationAggregatorInner {
-            report_rx: Arc::new(Mutex::new(Some(report_rx))),
+        Ok(Self {
             reporter: MyReputationReporter::new(report_tx),
             query: MyReputationQuery::new(local_reputation_ref),
-            measurement_manager: Arc::new(Mutex::new(measurement_manager)),
+            measurement_manager: Mutex::new(measurement_manager),
             submit_tx,
             notifier,
-            notify_before_epoch_rx: Arc::new(Mutex::new(Some(notify_before_epoch_rx))),
-            notify_before_epoch_tx,
-            notify_new_epoch_rx: Arc::new(Mutex::new(Some(notify_new_epoch_rx))),
-            _notify_new_epoch_tx,
-            _query_runner: query_runner,
-            shutdown_notify: shutdown_notify.clone(),
-            _config: config,
-        };
-
-        Ok(Self {
-            inner: Arc::new(inner),
-            is_running: Arc::new(AtomicBool::new(false)),
-            shutdown_notify,
+            report_rx,
         })
     }
 
-    /// Returns a reputation reporter that can be used to capture interactions that we have
-    /// with another peer.
-    fn get_reporter(&self) -> Self::ReputationReporter {
-        self.inner.reporter.clone()
-    }
+    pub async fn start(mut self, Cloned(waiter): Cloned<ShutdownWaiter>) {
+        let shutdown_future = waiter.wait_for_shutdown();
+        pin!(shutdown_future);
 
-    /// Returns a reputation query that can be used to answer queries about the local
-    /// reputation we have of another peer.
-    fn get_query(&self) -> Self::ReputationQuery {
-        self.inner.query.clone()
-    }
-}
+        let mut before_epoch_change_sub = self
+            .notifier
+            .subscribe_before_epoch_change(BEFORE_EPOCH_CHANGE);
 
-struct ReputationAggregatorInner<C: Collection> {
-    report_rx: Arc<Mutex<Option<buffered_mpsc::BufferedReceiver<ReportMessage>>>>,
-    reporter: MyReputationReporter,
-    query: MyReputationQuery,
-    measurement_manager: Arc<Mutex<MeasurementManager>>,
-    submit_tx: SubmitTxSocket,
-    notifier: c![C::NotifierInterface],
-    notify_before_epoch_rx: Arc<Mutex<Option<mpsc::Receiver<Notification>>>>,
-    notify_before_epoch_tx: mpsc::Sender<Notification>,
-    notify_new_epoch_rx: Arc<Mutex<Option<mpsc::Receiver<Notification>>>>,
-    _notify_new_epoch_tx: mpsc::Sender<Notification>,
-    _query_runner: c![C::ApplicationInterface::SyncExecutor],
-    shutdown_notify: Arc<Notify>,
-    _config: Config,
-}
-
-impl<C: Collection> ReputationAggregatorInner<C> {
-    async fn start(&self) {
-        // TODO(qti3e)
-        // self.notifier
-        //     .notify_before_epoch_change(BEFORE_EPOCH_CHANGE,
-        // self.notify_before_epoch_tx.clone()); self.notifier
-        //     .notify_on_new_epoch(self.notify_new_epoch_tx.clone());
-
-        let mut report_rx = self.report_rx.lock().unwrap().take().unwrap();
-        let mut notify_before_epoch_rx =
-            self.notify_before_epoch_rx.lock().unwrap().take().unwrap();
-        let mut notify_new_epoch_rx = self.notify_new_epoch_rx.lock().unwrap().take().unwrap();
-        let shutdown_notify = self.shutdown_notify.clone();
         loop {
             tokio::select! {
-                _ = shutdown_notify.notified() => {
+                _ = &mut shutdown_future => {
                     break;
                 }
-                report_msg = report_rx.recv() => {
-                    if let Some(report_msg) = report_msg {
-                        self.handle_report(report_msg);
-                    } else {
-                        error!("Failed to receive message");
-                    }
+                Some(report_msg) = self.report_rx.recv() => {
+                    self.handle_report(report_msg);
                 }
-                notification = notify_before_epoch_rx.recv() => {
-                    if let Some(Notification::BeforeEpochChange) = notification {
-                        self.submit_aggregation().await;
-                        self.measurement_manager.lock().unwrap().clear_measurements();
-                    } else {
-                        error!("Failed to receive message");
-                    }
+                Some(_) = before_epoch_change_sub.recv() => {
+                    self.submit_aggregation().await;
+                    self.measurement_manager.lock().unwrap().clear_measurements();
                 }
-                notification = notify_new_epoch_rx.recv() => {
-                    if let Some(Notification::NewEpoch) = notification {
-                        self.notifier
-                            .notify_before_epoch_change(
-                                BEFORE_EPOCH_CHANGE,
-                                self.notify_before_epoch_tx.clone()
-                            );
-                    } else {
-                        error!("Failed to receive message");
-                    }
+                else => {
+                    error!("Failed to receive message");
+
                 }
             }
         }
-        *self.report_rx.lock().unwrap() = Some(report_rx);
-        *self.notify_before_epoch_rx.lock().unwrap() = Some(notify_before_epoch_rx);
-        *self.notify_new_epoch_rx.lock().unwrap() = Some(notify_new_epoch_rx);
     }
 
     /// Called by the scheduler to notify that it is time to submit the aggregation, to do
@@ -202,6 +109,7 @@ impl<C: Collection> ReputationAggregatorInner<C> {
             .get_measurements()
             .into_iter()
             .collect();
+
         if !measurements.is_empty() {
             if measurements.len() <= MAX_MEASUREMENTS_PER_TX {
                 let submit_tx = self.submit_tx.clone();
@@ -312,6 +220,32 @@ impl<C: Collection> ReputationAggregatorInner<C> {
                     .report_hops(peer, hops);
             },
         }
+    }
+}
+
+impl<C: Collection> BuildGraph for ReputationAggregator<C> {
+    fn build_graph() -> DependencyGraph {
+        DependencyGraph::new().with(Self::new.on("start", Self::start.bounded().spawn()))
+    }
+}
+
+impl<C: Collection> ReputationAggregatorInterface<C> for ReputationAggregator<C> {
+    /// The reputation reporter can be used by our system to report the reputation of other
+    type ReputationReporter = MyReputationReporter;
+
+    /// The query runner can be used to query the local reputation of other nodes.
+    type ReputationQuery = MyReputationQuery;
+
+    /// Returns a reputation reporter that can be used to capture interactions that we have
+    /// with another peer.
+    fn get_reporter(&self) -> Self::ReputationReporter {
+        self.reporter.clone()
+    }
+
+    /// Returns a reputation query that can be used to answer queries about the local
+    /// reputation we have of another peer.
+    fn get_query(&self) -> Self::ReputationQuery {
+        self.query.clone()
     }
 }
 
