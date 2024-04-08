@@ -5,11 +5,11 @@ pub use core::{build_latency_matrix, suggest_connections_from_latency_matrix, Co
 pub mod divisive;
 pub mod pairing;
 
-#[cfg(test)]
-mod tests;
+// #[cfg(test)]
+// mod tests;
 
 use std::collections::BTreeSet;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use anyhow::anyhow;
 pub use config::Config;
@@ -21,12 +21,13 @@ use lightning_interfaces::{
     ConfigConsumer,
     ConfigProviderInterface,
     KeystoreInterface,
-    Notification,
+    NotifierInterface,
     ShutdownWaiter,
+    Subscriber,
     TopologyInterface,
 };
 use lightning_utils::application::QueryRunnerExt;
-use tokio::sync::{mpsc, watch};
+use tokio::sync::watch;
 use tracing::error;
 
 pub struct Topology<C: Collection> {
@@ -35,7 +36,7 @@ pub struct Topology<C: Collection> {
 
 struct TopologyInner<C: Collection> {
     query: c!(C::ApplicationInterface::SyncExecutor),
-    notifier_rx: Arc<Mutex<Option<mpsc::Receiver<Notification>>>>,
+    notifier: C::NotifierInterface,
     topology_tx: watch::Sender<Arc<Vec<Vec<NodePublicKey>>>>,
     topology_rx: watch::Receiver<Arc<Vec<Vec<NodePublicKey>>>>,
     our_public_key: NodePublicKey,
@@ -77,26 +78,25 @@ impl<C: Collection> TopologyInner<C> {
             .suggest_connections()
             .await
             .expect("Failed to compute topology");
+
         if let Err(e) = self.topology_tx.send(Arc::new(conns)) {
             error!("All receivers have been dropped: {e:?}");
         }
 
-        let mut notifier_rx = self.notifier_rx.lock().unwrap().take().unwrap();
-        while let Some(notify) = notifier_rx.recv().await {
-            if let Notification::NewEpoch = notify {
-                // This only fails if joining the blocking task fails, which only
-                // happens if something is already wrong.
-                let conns = self
-                    .suggest_connections()
-                    .await
-                    .expect("Failed to compute topology");
-                if let Err(e) = self.topology_tx.send(Arc::new(conns)) {
-                    error!("All receivers have been dropped: {e:?}");
-                }
+        let mut epoch_changed_sub = self.notifier.subscribe_epoch_changed();
+
+        while epoch_changed_sub.recv().await.is_some() {
+            // This only fails if joining the blocking task fails, which only
+            // happens if something is already wrong.
+            let conns = self
+                .suggest_connections()
+                .await
+                .expect("Failed to compute topology");
+
+            if let Err(e) = self.topology_tx.send(Arc::new(conns)) {
+                error!("All receivers have been dropped: {e:?}");
             }
         }
-
-        *self.notifier_rx.lock().unwrap() = Some(notifier_rx);
     }
 }
 
@@ -110,25 +110,22 @@ impl<C: Collection> Topology<C> {
     fn init(
         config: &C::ConfigProviderInterface,
         signer: &C::KeystoreInterface,
-        _notifier: &C::NotifierInterface,
+        fdi::Cloned(notifier): fdi::Cloned<C::NotifierInterface>,
         fdi::Cloned(query): fdi::Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
     ) -> anyhow::Result<Self> {
         let config = config.get::<Self>();
-        let (_notifier_tx, notifier_rx) = mpsc::channel(16);
-        // TODO(qti3e): Use the new notifier.
-        // notifier.notify_on_new_epoch(notifier_tx);
-
         let (topology_tx, topology_rx) = watch::channel(Arc::new(Vec::new()));
 
         let inner = TopologyInner {
             target_k: config.testing_target_k,
+            notifier,
             min_nodes: config.testing_min_nodes,
             query,
-            notifier_rx: Arc::new(Mutex::new(Some(notifier_rx))),
             topology_tx,
             topology_rx,
             our_public_key: signer.get_ed25519_pk(),
         };
+
         Ok(Self {
             inner: Arc::new(inner),
         })

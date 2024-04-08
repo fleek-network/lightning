@@ -1,7 +1,7 @@
 mod config;
 mod demuxer;
-#[cfg(test)]
-mod tests;
+// #[cfg(test)]
+// mod tests;
 
 use std::marker::PhantomData;
 

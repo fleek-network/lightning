@@ -52,7 +52,6 @@ impl<C: Collection> PoolProvider<C, QuinnMuxer> {
     fn init(
         config: &C::ConfigProviderInterface,
         keystore: &C::KeystoreInterface,
-        notifier: &C::NotifierInterface,
         topology: &C::TopologyInterface,
         sync_query: fdi::Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
     ) -> Result<Self> {
@@ -77,7 +76,6 @@ impl<C: Collection> PoolProvider<C, QuinnMuxer> {
         let (event_tx, event_rx) = mpsc::channel(1024);
         let receiver = EventReceiver::<C>::new(
             sync_query.clone(),
-            notifier.clone(),
             topology.get_receiver(),
             event_rx,
             endpoint_task_tx.clone(),

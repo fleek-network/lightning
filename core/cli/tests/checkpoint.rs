@@ -14,7 +14,6 @@ use lightning_archive::config::Config as ArchiveConfig;
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_blockstore_server::{BlockstoreServer, Config as BlockstoreServerConfig};
-use lightning_broadcast::{Broadcast, Config as BroadcastConfig};
 use lightning_consensus::config::Config as ConsensusConfig;
 use lightning_consensus::consensus::Consensus;
 use lightning_handshake::config::{HandshakeConfig, TransportConfig};
@@ -86,8 +85,6 @@ fn build_config(
     //});
 
     config.inject::<Keystore<FinalTypes>>(keystore_config);
-
-    config.inject::<Broadcast<FinalTypes>>(BroadcastConfig {});
 
     config.inject::<Blockstore<FinalTypes>>(BlockstoreConfig {
         root: path

@@ -14,11 +14,12 @@ use lightning_interfaces::{
     ConfigConsumer,
     ConfigProviderInterface,
     KeystoreInterface,
-    Notification,
+    NotifierInterface,
     PingerInterface,
     RefMut,
     ReputationAggregatorInterface,
     ReputationReporterInterface,
+    Subscriber,
     SyncQueryRunnerInterface,
 };
 use lightning_metrics::histogram;
@@ -45,16 +46,12 @@ impl<C: Collection> Pinger<C> {
         app: &C::ApplicationInterface,
         rep_aggregator: &C::ReputationAggregatorInterface,
         keystore: &C::KeystoreInterface,
-        Cloned(_notifier): Cloned<C::NotifierInterface>,
+        Cloned(notifier): Cloned<C::NotifierInterface>,
         Cloned(shutdown_waiter): Cloned<ShutdownWaiter>,
     ) -> anyhow::Result<Self> {
         let config = config_provider.get::<Self>();
         let query_runner = app.sync_query();
         let rep_reporter = rep_aggregator.get_reporter();
-
-        let (_notifier_tx, notifier_rx) = mpsc::channel(10);
-        // TODO(qti3e): Use the new notifier.
-        // notifier.notify_on_new_epoch(notifier_tx);
 
         let node_pk = keystore.get_ed25519_pk();
         let inner = PingerInner::<C>::new(
@@ -62,7 +59,7 @@ impl<C: Collection> Pinger<C> {
             node_pk,
             query_runner,
             rep_reporter,
-            notifier_rx,
+            notifier,
             shutdown_waiter,
         );
 
@@ -91,7 +88,7 @@ struct PingerInner<C: Collection> {
     node_pk: NodePublicKey,
     query_runner: c!(C::ApplicationInterface::SyncExecutor),
     rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
-    notifier_rx: mpsc::Receiver<Notification>,
+    notifier: C::NotifierInterface,
     shutdown_waiter: ShutdownWaiter,
 }
 
@@ -101,7 +98,7 @@ impl<C: Collection> PingerInner<C> {
         node_pk: NodePublicKey,
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
-        notifier_rx: mpsc::Receiver<Notification>,
+        notifier: C::NotifierInterface,
         shutdown_waiter: ShutdownWaiter,
     ) -> Self {
         Self {
@@ -109,12 +106,12 @@ impl<C: Collection> PingerInner<C> {
             node_pk,
             query_runner,
             rep_reporter,
-            notifier_rx,
+            notifier,
             shutdown_waiter,
         }
     }
 
-    async fn run(mut self) {
+    async fn run(self) {
         // Note(matthias): should a node be able to respond to pings before it knows its node index?
         // In my opinion it should not because it is not fully functioning.
         let mut interval = tokio::time::interval(Duration::from_secs(60));
@@ -154,6 +151,7 @@ impl<C: Collection> PingerInner<C> {
         let mut node_registry = self.get_node_registry(&mut rng);
         let mut cursor = 0;
         let mut pending_req: HashMap<(NodeIndex, u32), Instant> = HashMap::with_capacity(128);
+        let mut epoch_changed_notifier = self.notifier.subscribe_epoch_changed();
 
         loop {
             tokio::select! {
@@ -237,12 +235,13 @@ impl<C: Collection> PingerInner<C> {
                         }
                     }
                 }
-                epoch_notify = self.notifier_rx.recv() => {
-                    if let Some(Notification::NewEpoch) = epoch_notify {
-                        info!("Configuring for new epoch");
-                        node_registry = self.get_node_registry(&mut rng);
-                        cursor = 0;
-                    }
+                Some(_) = epoch_changed_notifier.recv() => {
+                    info!("Configuring for new epoch");
+                    node_registry = self.get_node_registry(&mut rng);
+                    cursor = 0;
+                }
+                else => {
+                    break;
                 }
             }
         }

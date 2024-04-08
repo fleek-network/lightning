@@ -10,13 +10,7 @@ use futures::stream::FuturesUnordered;
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::types::NodeIndex;
-use lightning_interfaces::{
-    ApplicationInterface,
-    Notification,
-    RequestHeader,
-    ServiceScope,
-    ShutdownWaiter,
-};
+use lightning_interfaces::{ApplicationInterface, RequestHeader, ServiceScope, ShutdownWaiter};
 use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot, watch};
@@ -79,8 +73,6 @@ pub struct EventReceiver<C: Collection> {
     event_queue: Receiver<Event>,
     /// Main handler of events.
     pub(crate) handler: LogicalPool<C>,
-    /// Epoch event receiver.
-    notifier: Receiver<Notification>,
     /// Topology update receiver.
     topology_rx: watch::Receiver<Arc<Vec<Vec<NodePublicKey>>>>,
     /// Writer side of queue for actual pool tasks.
@@ -102,23 +94,17 @@ where
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         sync_query: c!(C::ApplicationInterface::SyncExecutor),
-        _notifier: c!(C::NotifierInterface),
         topology_rx: watch::Receiver<Arc<Vec<Vec<NodePublicKey>>>>,
         event_queue: Receiver<Event>,
         pool_queue: Sender<EndpointTask>,
         public_key: NodePublicKey,
         dial_info: Arc<scc::HashMap<NodeIndex, DialInfo>>,
     ) -> Self {
-        let (_notifier_tx, notifier_rx) = mpsc::channel(16);
-        // TODO(qti3e): Use the new notifier.
-        // notifier.notify_on_new_epoch(notifier_tx);
-
         let logical_pool = LogicalPool::<C>::new(sync_query.clone(), public_key);
 
         Self {
             event_queue,
             handler: logical_pool,
-            notifier: notifier_rx,
             topology_rx,
             endpoint_queue: pool_queue,
             broadcast_service_handles: HashMap::new(),
@@ -426,7 +412,6 @@ where
             }
             self.ongoing_async_tasks.clear();
             while !matches!(self.event_queue.try_recv(), Err(TryRecvError::Empty)) {}
-            while !matches!(self.notifier.try_recv(), Err(TryRecvError::Empty)) {}
         });
     }
 

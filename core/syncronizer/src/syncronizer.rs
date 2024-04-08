@@ -21,8 +21,9 @@ use lightning_interfaces::{
     ConfigConsumer,
     ConfigProviderInterface,
     KeystoreInterface,
-    Notification,
+    NotifierInterface,
     ShutdownWaiter,
+    Subscriber,
     SyncQueryRunnerInterface,
     SyncronizerInterface,
 };
@@ -31,7 +32,6 @@ use lightning_utils::application::QueryRunnerExt;
 use rand::seq::SliceRandom;
 use serde::de::DeserializeOwned;
 use tokio::sync::broadcast;
-use tokio::sync::mpsc::Receiver;
 
 use crate::config::Config;
 use crate::rpc::{self, rpc_epoch};
@@ -49,8 +49,8 @@ enum State<C: Collection> {
 struct SyncronizerInner<C: Collection> {
     our_public_key: NodePublicKey,
     query_runner: c![C::ApplicationInterface::SyncExecutor],
+    notifier: C::NotifierInterface,
     blockstore_server_socket: BlockstoreServerSocket,
-    rx_epoch_change: Receiver<Notification>,
     genesis_committee: Vec<(NodeIndex, NodeInfo)>,
     rpc_client: reqwest::Client,
     epoch_change_delta: Duration,
@@ -62,13 +62,10 @@ impl<C: Collection> Syncronizer<C> {
         config: &C::ConfigProviderInterface,
         keystore: &C::KeystoreInterface,
         blockstore_server: &C::BlockstoreServerInterface,
-        _notifier: &C::NotifierInterface,
+        notifier: &C::NotifierInterface,
         query_runner: fdi::Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
     ) -> Result<Self> {
         let config = config.get::<Self>();
-        let (_tx_epoch_change, rx_epoch_change) = tokio::sync::mpsc::channel(10);
-        // TODO(qti3e): Use the new notifier.
-        // notifier.notify_on_new_epoch(tx_epoch_change);
 
         let mut genesis_committee = query_runner.get_genesis_committee();
         // Shuffle this since we often hit this list in order until one responds. This will give our
@@ -91,8 +88,8 @@ impl<C: Collection> Syncronizer<C> {
             our_public_key,
             genesis_committee,
             query_runner.clone(),
+            notifier.clone(),
             blockstore_server,
-            rx_epoch_change,
             config.epoch_change_delta,
             rpc_client,
         )?;
@@ -206,8 +203,8 @@ impl<C: Collection> SyncronizerInner<C> {
         our_public_key: NodePublicKey,
         genesis_committee: Vec<(NodeIndex, NodeInfo)>,
         query_runner: c![C::ApplicationInterface::SyncExecutor],
+        notifier: C::NotifierInterface,
         blockstore_server: &C::BlockstoreServerInterface,
-        rx_epoch_change: Receiver<Notification>,
         epoch_change_delta: Duration,
         rpc_client: reqwest::Client,
     ) -> Result<Self> {
@@ -215,7 +212,7 @@ impl<C: Collection> SyncronizerInner<C> {
             our_public_key,
             query_runner,
             blockstore_server_socket: blockstore_server.get_socket(),
-            rx_epoch_change,
+            notifier,
             genesis_committee,
             rpc_client,
             epoch_change_delta,
@@ -229,6 +226,9 @@ impl<C: Collection> SyncronizerInner<C> {
             let _ = tx_update_ready.send(checkpoint_hash);
             return;
         }
+
+        let mut epoch_changed_sub = self.notifier.subscribe_epoch_changed();
+
         loop {
             let EpochInfo { epoch_end, .. } = self.query_runner.get_epoch_info();
 
@@ -241,8 +241,6 @@ impl<C: Collection> SyncronizerInner<C> {
 
             let time_to_check =
                 tokio::time::sleep(time_until_epoch_change + self.epoch_change_delta);
-
-            let epoch_change_future = self.rx_epoch_change.recv();
 
             tokio::select! {
                 _ = time_to_check => {
@@ -259,11 +257,7 @@ impl<C: Collection> SyncronizerInner<C> {
                     }
                 }
 
-                notification = epoch_change_future => {
-                    if notification.is_none() {
-                        // We must be shutting down
-                        return;
-                    }
+                Some(_notification) = epoch_changed_sub.recv() => {
                     if !cfg!(debug_assertions) {
                         // We only run the prelude in prod mode to avoid interfering with tests.
                         if !self.query_runner.is_valid_node(&self.our_public_key) {
@@ -285,6 +279,11 @@ impl<C: Collection> SyncronizerInner<C> {
                             std::process::exit(1);
                         }
                     }
+                }
+
+                else => {
+                    // We must be shutting down
+                    return;
                 }
             }
         }
