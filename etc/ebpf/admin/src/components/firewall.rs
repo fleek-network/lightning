@@ -22,8 +22,10 @@ use crate::mode::Mode;
 pub struct FireWall {
     command_tx: Option<UnboundedSender<Action>>,
     blocklist: HashSet<Record>,
+    // Table widget.
     longest_item_len: (u16, u16, u16, u16),
     table_state: TableState,
+    // Input widgets.
     show_new_entry_popup: bool,
     text_areas: Vec<InputField>,
     selected_text_area: usize,
@@ -32,36 +34,6 @@ pub struct FireWall {
 
 impl FireWall {
     pub fn new() -> Self {
-        let blocklist: HashSet<Record> = vec![
-            (
-                "192.3.2.1".to_string(),
-                "8080".to_string(),
-                "tcp".to_string(),
-                "2293".to_string(),
-            ),
-            (
-                "128.102.94.5".to_string(),
-                "9888".to_string(),
-                "udp".to_string(),
-                "2293".to_string(),
-            ),
-            (
-                "88.1.94.5".to_string(),
-                "9888".to_string(),
-                "tcp".to_string(),
-                "2293".to_string(),
-            ),
-        ]
-        .into_iter()
-        .map(|(ip, port, proto, author)| Record {
-            ip,
-            port,
-            proto,
-            author,
-        })
-        .collect();
-        let longest_item_len = space_between_columns(&blocklist);
-
         let mut text_areas: Vec<_> =
             vec![("IP", TextArea::default()), ("Port", TextArea::default())]
                 .into_iter()
@@ -71,9 +43,9 @@ impl FireWall {
         inactivate(&mut text_areas[1]);
 
         Self {
-            blocklist,
+            blocklist: HashSet::new(),
             command_tx: None,
-            longest_item_len,
+            longest_item_len: (0, 0, 0, 0),
             table_state: TableState::default().with_selected(0),
             config: Config::default(),
             show_new_entry_popup: false,
@@ -135,6 +107,7 @@ impl Component for FireWall {
             },
             Action::Cancel => {
                 self.show_new_entry_popup = false;
+                let _ = self.process_input();
                 Ok(Some(Action::UpdateMode(Mode::Firewall)))
             },
             Action::Add => {
@@ -142,14 +115,22 @@ impl Component for FireWall {
                 Ok(Some(Action::UpdateMode(Mode::FirewallNewEntry)))
             },
             Action::Up => {
-                if self.selected_text_area > 0 {
-                    self.selected_text_area -= 1;
+                if self.show_new_entry_popup {
+                    if self.selected_text_area > 0 {
+                        self.selected_text_area -= 1;
+                    }
+                } else {
+                    // Scroll up blocklist.
                 }
                 Ok(Some(Action::Render))
             },
             Action::Down => {
-                if self.selected_text_area < self.text_areas.len() - 1 {
-                    self.selected_text_area += 1;
+                if self.show_new_entry_popup {
+                    if self.selected_text_area < self.text_areas.len() - 1 {
+                        self.selected_text_area += 1;
+                    }
+                } else {
+                    // Scroll up blocklist.
                 }
                 Ok(Some(Action::Render))
             },
@@ -158,6 +139,8 @@ impl Component for FireWall {
     }
 
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
+        self.longest_item_len = space_between_columns(&self.blocklist);
+
         let header_style = Style::default().fg(Color::White).bg(Color::Blue);
         let selected_style = Style::default()
             .add_modifier(Modifier::REVERSED)
