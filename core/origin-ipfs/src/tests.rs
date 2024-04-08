@@ -10,46 +10,38 @@ use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_indexer::Indexer;
-use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::infu_collection::{Collection, Node};
 use lightning_interfaces::types::NodePorts;
-use lightning_interfaces::{
-    partial,
-    ApplicationInterface,
-    BlockstoreInterface,
-    ConsensusInterface,
-    ForwarderInterface,
-    IndexerInterface,
-    KeystoreInterface,
-    NotifierInterface,
-    SignerInterface,
-    WithStartAndShutdown,
-};
-use lightning_notifier::Notifier;
+use lightning_interfaces::{fdi, partial, BlockstoreInterface, KeystoreInterface};
 use lightning_signer::Signer;
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus, MockForwarder};
+use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_test_utils::server::spawn_server;
-use tokio::sync::mpsc;
 
 use crate::config::{Config, Gateway, Protocol};
 use crate::IPFSOrigin;
 
 partial!(TestBinding {
+    ConfigProviderInterface = JsonConfigProvider;
     ApplicationInterface = Application<Self>;
-    ConsensusInterface = MockConsensus<Self>;
     BlockstoreInterface = Blockstore<Self>;
-    IndexerInterface = Indexer<Self>;
     KeystoreInterface = EphemeralKeystore<Self>;
     SignerInterface = Signer<Self>;
-    NotifierInterface = Notifier<Self>;
+    ForwarderInterface = MockForwarder<Self>;
+    ConsensusInterface = MockConsensus<Self>;
+    IndexerInterface = Indexer<Self>;
 });
 
 struct AppState {
-    _app: Application<TestBinding>,
-    _signer: Signer<TestBinding>,
-    _consensus: MockConsensus<TestBinding>,
-    blockstore: Blockstore<TestBinding>,
+    node: Node<TestBinding>,
     temp_dir_path: PathBuf,
+}
+
+impl AppState {
+    fn blockstore(&self) -> fdi::Ref<Blockstore<TestBinding>> {
+        self.node.provider.get()
+    }
 }
 
 impl Drop for AppState {
@@ -60,8 +52,10 @@ impl Drop for AppState {
     }
 }
 
+// Todo: This is the same one used in blockstore, indexer and possbily others
+// so it might be useful to create a test factory.
 async fn create_app_state(test_name: String) -> AppState {
-    let keystore = EphemeralKeystore::default();
+    let keystore = EphemeralKeystore::<TestBinding>::default();
     let (consensus_secret_key, node_secret_key) =
         (keystore.get_bls_sk(), keystore.get_ed25519_sk());
     let node_public_key = node_secret_key.to_pk();
@@ -125,80 +119,38 @@ async fn create_app_state(test_name: String) -> AppState {
     genesis.epoch_time = 4000; // millis
 
     let path = std::env::temp_dir().join(test_name);
-    let mut blockstore = Blockstore::<TestBinding>::init(BlockstoreConfig {
-        root: path.clone().try_into().unwrap(),
-    })
-    .unwrap();
 
-    let app = Application::<TestBinding>::init(
-        AppConfig {
-            genesis: Some(genesis),
-            mode: Mode::Test,
-            testnet: false,
-            storage: StorageConfig::InMemory,
-            db_path: None,
-            db_options: None,
-        },
-        blockstore.clone(),
+    let node = Node::<TestBinding>::init_with_provider(
+        fdi::Provider::default()
+            .with(
+                JsonConfigProvider::default()
+                    .with::<Blockstore<TestBinding>>(BlockstoreConfig {
+                        root: path.clone().try_into().unwrap(),
+                    })
+                    .with::<Application<TestBinding>>(AppConfig {
+                        genesis: Some(genesis),
+                        mode: Mode::Test,
+                        testnet: false,
+                        storage: StorageConfig::InMemory,
+                        db_path: None,
+                        db_options: None,
+                    })
+                    .with::<MockConsensus<TestBinding>>(ConsensusConfig {
+                        min_ordering_time: 0,
+                        max_ordering_time: 1,
+                        probability_txn_lost: 0.0,
+                        transactions_to_lose: HashSet::new(),
+                        new_block_interval: Duration::from_secs(5),
+                    }),
+            )
+            .with(keystore),
     )
-    .unwrap();
-    app.start().await;
+    .expect("failed to initialize node");
 
-    let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
-
-    let forwarder = MockForwarder::<TestBinding>::init(
-        Default::default(),
-        consensus_public_key,
-        query_runner.clone(),
-    )
-    .unwrap();
-
-    let mut signer = Signer::<TestBinding>::init(
-        Default::default(),
-        keystore.clone(),
-        query_runner.clone(),
-        forwarder.mempool_socket(),
-    )
-    .unwrap();
-    let notifier = Notifier::<TestBinding>::init(&app);
-
-    let consensus_config = ConsensusConfig {
-        min_ordering_time: 0,
-        max_ordering_time: 1,
-        probability_txn_lost: 0.0,
-        transactions_to_lose: HashSet::new(),
-        new_block_interval: Duration::from_secs(5),
-    };
-
-    let consensus = MockConsensus::<TestBinding>::init(
-        consensus_config,
-        keystore.clone(),
-        &signer,
-        update_socket,
-        query_runner.clone(),
-        infusion::Blank::default(),
-        None,
-        &notifier,
-    )
-    .unwrap();
-
-    let (new_block_tx, new_block_rx) = mpsc::channel(10);
-
-    signer.provide_new_block_notify(new_block_rx);
-    notifier.notify_on_new_block(new_block_tx);
-
-    let indexer =
-        Indexer::<TestBinding>::init(Default::default(), query_runner, keystore, &signer).unwrap();
-    blockstore.provide_indexer(indexer);
-
-    signer.start().await;
-    consensus.start().await;
+    node.start().await;
 
     AppState {
-        _app: app,
-        _signer: signer,
-        _consensus: consensus,
-        blockstore,
+        node,
         temp_dir_path: path,
     }
 }
@@ -213,22 +165,25 @@ async fn test_origin_dag_pb() {
     )
     .unwrap();
 
-    let state = create_app_state("test-origin-dag-pb".to_string()).await;
+    let mut state = create_app_state("test-origin-dag-pb".to_string()).await;
 
     let req_fut = async move {
         config.gateways = vec![Gateway {
             protocol: Protocol::Http,
             authority: "127.0.0.1:30100".to_string(),
         }];
-        let ipfs_origin = IPFSOrigin::<TestBinding>::new(config, state.blockstore.clone()).unwrap();
+        let ipfs_origin =
+            IPFSOrigin::<TestBinding>::new(config, state.blockstore().clone()).unwrap();
 
         let hash = ipfs_origin
             .fetch(req_cid.to_bytes().as_slice())
             .await
             .unwrap();
 
-        let bytes = state.blockstore.read_all_to_vec(&hash).await.unwrap();
+        let bytes = state.blockstore().read_all_to_vec(&hash).await.unwrap();
         assert_eq!(bytes, target_bytes);
+
+        state.node.shutdown().await;
     };
 
     tokio::select! {
@@ -236,10 +191,7 @@ async fn test_origin_dag_pb() {
         Err(e) = spawn_server(30100) => {
             panic!("{e}");
         }
-        _ = req_fut => {
-
-        }
-
+        _ = req_fut => {}
     }
 }
 
@@ -253,22 +205,25 @@ async fn test_origin_bbb_dag_pb() {
     )
     .unwrap();
 
-    let state = create_app_state("test-origin-bbb-dag-pb".to_string()).await;
+    let mut state = create_app_state("test-origin-bbb-dag-pb".to_string()).await;
 
     let req_fut = async move {
         config.gateways = vec![Gateway {
             protocol: Protocol::Http,
             authority: "127.0.0.1:30200".to_string(),
         }];
-        let ipfs_origin = IPFSOrigin::<TestBinding>::new(config, state.blockstore.clone()).unwrap();
+        let ipfs_origin =
+            IPFSOrigin::<TestBinding>::new(config, state.blockstore().clone()).unwrap();
 
         let hash = ipfs_origin
             .fetch(req_cid.to_bytes().as_slice())
             .await
             .unwrap();
 
-        let bytes = state.blockstore.read_all_to_vec(&hash).await.unwrap();
+        let bytes = state.blockstore().read_all_to_vec(&hash).await.unwrap();
         assert_eq!(bytes, target_bytes);
+
+        state.node.shutdown().await;
     };
 
     tokio::select! {
@@ -276,10 +231,7 @@ async fn test_origin_bbb_dag_pb() {
         Err(e) = spawn_server(30200) => {
             panic!("{e}");
         }
-        _ = req_fut => {
-
-        }
-
+        _ = req_fut => {}
     }
 }
 
@@ -293,22 +245,25 @@ async fn test_origin_raw() {
     )
     .unwrap();
 
-    let state = create_app_state("test-origin-raw".to_string()).await;
+    let mut state = create_app_state("test-origin-raw".to_string()).await;
 
     let req_fut = async move {
         config.gateways = vec![Gateway {
             protocol: Protocol::Http,
             authority: "127.0.0.1:30201".to_string(),
         }];
-        let ipfs_origin = IPFSOrigin::<TestBinding>::new(config, state.blockstore.clone()).unwrap();
+        let ipfs_origin =
+            IPFSOrigin::<TestBinding>::new(config, state.blockstore().clone()).unwrap();
 
         let hash = ipfs_origin
             .fetch(req_cid.to_bytes().as_slice())
             .await
             .unwrap();
 
-        let bytes = state.blockstore.read_all_to_vec(&hash).await.unwrap();
+        let bytes = state.blockstore().read_all_to_vec(&hash).await.unwrap();
         assert_eq!(bytes, target_bytes);
+
+        state.node.shutdown().await;
     };
 
     tokio::select! {
@@ -316,10 +271,7 @@ async fn test_origin_raw() {
         Err(e) = spawn_server(30201) => {
             panic!("{e}");
         }
-        _ = req_fut => {
-
-        }
-
+        _ = req_fut => {}
     }
 }
 
