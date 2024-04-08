@@ -4,23 +4,24 @@ use std::time::{Duration, SystemTime};
 
 use derive_more::{From, IsVariant, TryInto};
 use fleek_crypto::{ConsensusPublicKey, NodePublicKey, SecretKey};
-use lightning_interfaces::config::ConfigConsumer;
-use lightning_interfaces::consensus::ConsensusInterface;
 use lightning_interfaces::fdi::{BuildGraph, DependencyGraph, MethodExt};
 use lightning_interfaces::infu_collection::{c, Collection};
-use lightning_interfaces::signer::{SignerInterface, SubmitTxSocket};
 use lightning_interfaces::types::{Epoch, EpochInfo, Event, Topic, UpdateMethod};
 use lightning_interfaces::{
     ApplicationInterface,
     BroadcastInterface,
     Cloned,
+    ConfigConsumer,
     ConfigProviderInterface,
+    ConsensusInterface,
     Emitter,
     KeystoreInterface,
     NotifierInterface,
     PubSub,
     RpcInterface,
     ShutdownWaiter,
+    SignerInterface,
+    SubmitTxSocket,
     SyncQueryRunnerInterface,
 };
 use lightning_schema::AutoImplSerde;

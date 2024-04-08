@@ -10,9 +10,8 @@ use fleek_crypto::{
     TransactionSignature,
 };
 use lightning_application::genesis::Genesis;
-use lightning_interfaces::config::ConfigProviderInterface;
 use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::ToDigest;
+use lightning_interfaces::{ConfigProviderInterface, ToDigest};
 use lightning_node::config::TomlConfigProvider;
 use lightning_types::{
     ChainId,

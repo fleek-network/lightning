@@ -1,5 +1,4 @@
 use affair::Socket;
-use anyhow;
 use fdi::BuildGraph;
 use lightning_types::ImmutablePointer;
 

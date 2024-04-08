@@ -5,7 +5,6 @@ use std::time::{Duration, Instant};
 
 use anyhow::anyhow;
 use fleek_crypto::NodePublicKey;
-use lightning_interfaces::common::ShutdownWaiter;
 use lightning_interfaces::fdi::{BuildGraph, Cloned, DependencyGraph, MethodExt};
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::types::{NodeIndex, NodeInfo};
@@ -19,6 +18,7 @@ use lightning_interfaces::{
     RefMut,
     ReputationAggregatorInterface,
     ReputationReporterInterface,
+    ShutdownWaiter,
     Subscriber,
     SyncQueryRunnerInterface,
 };

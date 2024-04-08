@@ -2,13 +2,13 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use lightning_interfaces::fdi::{BuildGraph, DependencyGraph};
 use lightning_interfaces::infu_collection::{c, Collection};
-use lightning_interfaces::notifier::NotifierInterface;
 use lightning_interfaces::types::{Block, BlockExecutionResponse};
 use lightning_interfaces::{
     ApplicationInterface,
     BlockExecutedNotification,
     Emitter,
     EpochChangedNotification,
+    NotifierInterface,
     Subscriber,
     SyncQueryRunnerInterface,
 };

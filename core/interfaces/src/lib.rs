@@ -1,34 +1,29 @@
-pub mod application;
-pub mod archive;
-pub mod blockstore;
-pub mod blockstore_server;
-pub mod broadcast;
-pub mod common;
-pub mod config;
-pub mod consensus;
-pub mod dack_aggregator;
-pub mod fetcher;
-pub mod forwarder;
-pub mod handshake;
-pub mod indexer;
+mod application;
+mod archive;
+mod blockstore;
+mod blockstore_server;
+mod broadcast;
+mod common;
+mod config;
+mod consensus;
+mod dack_aggregator;
+mod fetcher;
+mod forwarder;
+mod handshake;
+mod indexer;
 pub mod infu_collection;
-pub mod keystore;
-pub mod notifier;
-pub mod origin;
-pub mod pinger;
-pub mod pool;
-pub mod reputation;
-pub mod resolver;
-pub mod rpc;
-pub mod service;
-pub mod signer;
-pub mod syncronizer;
-pub mod topology;
-
-pub mod types {
-    /// Re-export all lightning types
-    pub use lightning_types::*;
-}
+mod keystore;
+mod notifier;
+mod origin;
+mod pinger;
+mod pool;
+mod reputation;
+mod resolver;
+mod rpc;
+mod service;
+mod signer;
+mod syncronizer;
+mod topology;
 
 pub use application::*;
 pub use archive::*;
@@ -59,5 +54,8 @@ pub use topology::*;
 // Re-export schema.
 #[rustfmt::skip]
 pub use lightning_schema as schema;
+// Re-export types.
+#[rustfmt::skip]
+pub use lightning_types as types;
 
 pub use fdi;

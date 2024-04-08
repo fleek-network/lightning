@@ -2,12 +2,8 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use lightning_interfaces::config::ConfigConsumer;
 use lightning_interfaces::fdi::{Bind, BuildGraph, DependencyGraph, MethodExt};
 use lightning_interfaces::infu_collection::{c, Collection};
-use lightning_interfaces::notifier::NotifierInterface;
-use lightning_interfaces::reputation::ReputationAggregatorInterface;
-use lightning_interfaces::signer::SubmitTxSocket;
 use lightning_interfaces::types::{
     NodeIndex,
     ReputationMeasurements,
@@ -16,11 +12,15 @@ use lightning_interfaces::types::{
 };
 use lightning_interfaces::{
     Cloned,
+    ConfigConsumer,
     ConfigProviderInterface,
+    NotifierInterface,
+    ReputationAggregatorInterface,
     ReputationQueryInteface,
     ReputationReporterInterface,
     ShutdownWaiter,
     SignerInterface,
+    SubmitTxSocket,
     Subscriber,
     Weight,
 };

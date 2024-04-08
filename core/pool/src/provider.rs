@@ -9,7 +9,6 @@ use futures::{SinkExt, Stream};
 use infusion::c;
 use lightning_interfaces::fdi::{BuildGraph, MethodExt};
 use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::pool::{PoolInterface, RejectReason, ServiceScope};
 use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::{
     fdi,
@@ -18,11 +17,14 @@ use lightning_interfaces::{
     ConfigProviderInterface,
     EventHandlerInterface,
     KeystoreInterface,
+    PoolInterface,
+    RejectReason,
     RequestHeader,
     RequestInterface,
     RequesterInterface,
     ResponderInterface,
     ResponseInterface,
+    ServiceScope,
     ShutdownWaiter,
     TopologyInterface,
 };

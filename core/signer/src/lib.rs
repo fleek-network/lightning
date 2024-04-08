@@ -8,10 +8,8 @@ use std::time::{Duration, SystemTime};
 
 use affair::{AsyncWorker, Executor, Socket, TokioSpawn};
 use fleek_crypto::{NodePublicKey, NodeSecretKey, SecretKey, TransactionSender};
-use lightning_interfaces::common::ToDigest;
 use lightning_interfaces::fdi::{BuildGraph, DependencyGraph, MethodExt};
 use lightning_interfaces::infu_collection::{c, Collection};
-use lightning_interfaces::signer::{SignerInterface, SubmitTxSocket};
 use lightning_interfaces::types::{
     NodeIndex,
     TransactionResponse,
@@ -28,8 +26,11 @@ use lightning_interfaces::{
     MempoolSocket,
     NotifierInterface,
     Ref,
+    SignerInterface,
+    SubmitTxSocket,
     Subscriber,
     SyncQueryRunnerInterface,
+    ToDigest,
 };
 use lightning_utils::application::QueryRunnerExt;
 use tokio::sync::Mutex;

@@ -12,7 +12,6 @@ use atomo::{
 };
 use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
-use lightning_interfaces::application::SyncQueryRunnerInterface;
 use lightning_interfaces::types::{
     AccountInfo,
     Blake3Hash,
@@ -34,6 +33,7 @@ use lightning_interfaces::types::{
     TxHash,
     Value,
 };
+use lightning_interfaces::SyncQueryRunnerInterface;
 
 use crate::state::State;
 use crate::storage::{AtomoStorage, AtomoStorageBuilder};

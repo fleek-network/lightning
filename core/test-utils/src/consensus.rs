@@ -4,15 +4,15 @@ use std::time::Duration;
 
 use affair::{AsyncWorker, Executor, TokioSpawn};
 use fdi::{BuildGraph, Cloned, DependencyGraph, MethodExt};
-use lightning_interfaces::application::ExecutionEngineSocket;
-use lightning_interfaces::config::ConfigConsumer;
-use lightning_interfaces::consensus::ConsensusInterface;
 use lightning_interfaces::infu_collection::{c, Collection};
 use lightning_interfaces::types::{Block, TransactionRequest};
 use lightning_interfaces::{
     ApplicationInterface,
+    ConfigConsumer,
     ConfigProviderInterface,
+    ConsensusInterface,
     Emitter,
+    ExecutionEngineSocket,
     ForwarderInterface,
     MempoolSocket,
     NotifierInterface,

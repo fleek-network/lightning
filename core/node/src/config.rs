@@ -4,9 +4,8 @@ use std::path::Path;
 use std::sync::Mutex;
 
 use anyhow::{Context, Result};
-use lightning_interfaces::config::ConfigProviderInterface;
 use lightning_interfaces::infu_collection::{Collection, Node};
-use lightning_interfaces::ConfigConsumer;
+use lightning_interfaces::{ConfigConsumer, ConfigProviderInterface};
 use resolved_pathbuf::ResolvedPathBuf;
 use toml::{Table, Value};
 use tracing::debug;
@@ -96,7 +95,7 @@ impl<C: Collection> TomlConfigProvider<C> {
 }
 
 impl<C: Collection> ConfigProviderInterface<C> for TomlConfigProvider<C> {
-    fn get<S: lightning_interfaces::config::ConfigConsumer>(&self) -> S::Config {
+    fn get<S: lightning_interfaces::ConfigConsumer>(&self) -> S::Config {
         debug!("Getting the config for {}", std::any::type_name::<S>());
 
         let mut table = self.table.lock().expect("failed to acquire lock");
