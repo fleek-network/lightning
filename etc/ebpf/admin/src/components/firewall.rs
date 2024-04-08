@@ -25,6 +25,7 @@ pub struct FireWall {
     // Table widget.
     longest_item_len: (u16, u16, u16, u16),
     table_state: TableState,
+    scroll_state: ScrollbarState,
     // Input widgets.
     show_new_entry_popup: bool,
     text_areas: Vec<InputField>,
@@ -47,10 +48,31 @@ impl FireWall {
             command_tx: None,
             longest_item_len: (0, 0, 0, 0),
             table_state: TableState::default().with_selected(0),
+            scroll_state: ScrollbarState::new(0),
             config: Config::default(),
             show_new_entry_popup: false,
             text_areas,
             selected_text_area: 0,
+        }
+    }
+
+    fn scroll_up(&mut self) {
+        if let Some(cur) = self.table_state.selected() {
+            if cur > 0 {
+                let cur = cur - 1;
+                self.table_state.select(Some(cur));
+                self.scroll_state = self.scroll_state.position(cur);
+            }
+        }
+    }
+
+    fn scroll_down(&mut self) {
+        if let Some(cur) = self.table_state.selected() {
+            if cur < self.blocklist.len() - 1 {
+                let cur = cur + 1;
+                self.table_state.select(Some(cur));
+                self.scroll_state = self.scroll_state.position(cur);
+            }
         }
     }
 
@@ -102,6 +124,8 @@ impl Component for FireWall {
                     // Todo: display error.
                 } else {
                     self.show_new_entry_popup = false;
+                    // Update scroll.
+                    self.scroll_state = self.scroll_state.content_length(self.blocklist.len());
                 }
                 Ok(Some(Action::UpdateMode(Mode::Firewall)))
             },
@@ -121,6 +145,7 @@ impl Component for FireWall {
                     }
                 } else {
                     // Scroll up blocklist.
+                    self.scroll_up();
                 }
                 Ok(Some(Action::Render))
             },
@@ -130,7 +155,8 @@ impl Component for FireWall {
                         self.selected_text_area += 1;
                     }
                 } else {
-                    // Scroll up blocklist.
+                    // Scroll down blocklist.
+                    self.scroll_down();
                 }
                 Ok(Some(Action::Render))
             },
