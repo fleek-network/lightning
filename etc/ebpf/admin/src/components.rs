@@ -99,6 +99,7 @@ pub trait Component {
     fn handle_mouse_events(&mut self, mouse: MouseEvent) -> Result<Option<Action>> {
         Ok(None)
     }
+    // Todo: Add a method that takes action as reference.
     /// Update the state of the component based on a received action. (REQUIRED)
     ///
     /// # Arguments

@@ -1,5 +1,6 @@
 use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
+use ratatui::layout::Flex;
 use ratatui::prelude::{Constraint, Direction, Layout, Rect};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
@@ -35,6 +36,7 @@ pub struct App {
 
 impl App {
     pub fn new(tick_rate: f64, frame_rate: f64) -> Result<Self> {
+        let mode = Mode::Home;
         let _home = Home::new();
         let firewall = FireWall::new();
         let _fps = FpsCounter::new();
@@ -42,7 +44,6 @@ impl App {
         let prompt = Prompt::new();
         let navigator = Navigator::new();
         let config = Config::new()?;
-        let mode = Mode::Home;
         Ok(Self {
             tick_rate,
             frame_rate,
@@ -90,11 +91,12 @@ impl App {
         let body_footer_area = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Percentage((100_u16).saturating_sub(3)),
-                Constraint::Percentage(3),
+                Constraint::Percentage((100_u16).saturating_sub(15)),
+                Constraint::Percentage(15),
             ])
             .split(f.size());
 
+        // Before drawing the prompt, update its state.
         self.prompt.draw(f, body_footer_area[1])?;
 
         let content_area = Layout::default()
@@ -150,6 +152,8 @@ impl App {
         self.prompt.register_action_handler(action_tx.clone())?;
         self.prompt.register_config_handler(self.config.clone())?;
         self.prompt.init(tui.size()?)?;
+        // On start up, state has not been set yet so we do that now.
+        self.prompt.update_state(self.mode);
 
         self.navigator.register_action_handler(action_tx.clone())?;
         self.navigator
@@ -221,6 +225,7 @@ impl App {
                     },
                     Action::UpdateMode(mode) => {
                         self.mode = mode;
+                        self.prompt.update_state(self.mode);
                         tui.draw(|f| {
                             if let Err(e) = self.draw_components(f, f.size()) {
                                 action_tx
