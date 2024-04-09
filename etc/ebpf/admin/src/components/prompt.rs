@@ -25,12 +25,17 @@ const MAX_KEYS_PER_ROW: usize = 8;
 pub struct Prompt {
     command_tx: Option<UnboundedSender<Action>>,
     current: Vec<(KeySymbol, Action)>,
+    message: Option<String>,
     config: Config,
 }
 
 impl Prompt {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn new_message(&mut self, message: String) {
+        self.message = Some(message);
     }
 
     pub fn update_state(&mut self, mode: Mode) {
@@ -44,6 +49,9 @@ impl Prompt {
                 })
                 .collect::<Vec<_>>();
             self.current = codes;
+
+            // Remove an old message.
+            self.message.take();
         }
     }
 }
@@ -69,6 +77,15 @@ impl Component for Prompt {
                 Constraint::Percentage(10),
             ])
             .split(area);
+
+        if let Some(e) = self.message.as_ref() {
+            f.render_widget(
+                Paragraph::new(e.as_str())
+                    .alignment(Alignment::Left)
+                    .style(Style::default().fg(Color::Red).reversed()),
+                rows[0],
+            );
+        }
 
         let contraints = if self.current.len() < MAX_KEYS_PER_ROW {
             vec![Constraint::Fill(1); MAX_KEYS_PER_ROW]

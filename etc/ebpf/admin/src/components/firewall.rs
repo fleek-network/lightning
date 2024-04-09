@@ -94,8 +94,18 @@ impl FireWall {
             field.area.cut();
         }
 
-        let ip: Ipv4Addr = self.input_fields[0].area.yank_text().trim().parse()?;
-        let port: u16 = self.input_fields[1].area.yank_text().trim().parse()?;
+        let ip: Ipv4Addr = self.input_fields[0]
+            .area
+            .yank_text()
+            .trim()
+            .parse()
+            .map_err(|_| Report::msg("Invalid IP"))?;
+        let port: u16 = self.input_fields[1]
+            .area
+            .yank_text()
+            .trim()
+            .parse()
+            .map_err(|_| Report::msg("Invalid port"))?;
         let rec = Record {
             ip: ip.to_string(),
             port: port.to_string(),
@@ -130,7 +140,7 @@ impl Component for FireWall {
         match action {
             Action::Save => {
                 if let Err(e) = self.process_input() {
-                    // Todo: display error.
+                    return Ok(Some(Action::Error(e.to_string())));
                 } else {
                     self.show_input_field = false;
                 }

@@ -94,7 +94,6 @@ impl App {
             ])
             .split(f.size());
 
-        // Before drawing the prompt, update its state.
         self.prompt.draw(f, body_footer_area[1])?;
 
         let content_area = Layout::default()
@@ -194,7 +193,7 @@ impl App {
                 if action != Action::Tick && action != Action::Render {
                     log::debug!("{action:?}");
                 }
-                match action {
+                match &action {
                     Action::Tick => {
                         self.last_tick_key_events.drain(..);
                     },
@@ -202,7 +201,7 @@ impl App {
                     Action::Suspend => self.should_suspend = true,
                     Action::Resume => self.should_suspend = false,
                     Action::Resize(w, h) => {
-                        tui.resize(Rect::new(0, 0, w, h))?;
+                        tui.resize(Rect::new(0, 0, *w, *h))?;
                         tui.draw(|f| {
                             if let Err(e) = self.draw_components(f, f.size()) {
                                 action_tx
@@ -221,8 +220,18 @@ impl App {
                         })?;
                     },
                     Action::UpdateMode(mode) => {
-                        self.mode = mode;
+                        self.mode = *mode;
                         self.prompt.update_state(self.mode);
+                        tui.draw(|f| {
+                            if let Err(e) = self.draw_components(f, f.size()) {
+                                action_tx
+                                    .send(Action::Error(format!("Failed to draw: {:?}", e)))
+                                    .unwrap();
+                            }
+                        })?;
+                    },
+                    Action::Error(e) => {
+                        self.prompt.new_message(e.clone());
                         tui.draw(|f| {
                             if let Err(e) = self.draw_components(f, f.size()) {
                                 action_tx
