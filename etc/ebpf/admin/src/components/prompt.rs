@@ -5,7 +5,6 @@ use std::time::Duration;
 use color_eyre::eyre::Result;
 use color_eyre::owo_colors::OwoColorize;
 use color_eyre::Report;
-use colored::Colorize;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::Flex;
 use ratatui::prelude::*;
@@ -139,7 +138,7 @@ impl From<KeyEvent> for KeySymbol {
             KeyCode::F(num) => Self(format!("F-{num}")),
             KeyCode::Char(c) => Self(c.to_string()),
             KeyCode::Null => Self('␀'.to_string()),
-            KeyCode::Esc => Self('␛'.to_string()),
+            KeyCode::Esc => Self("[ESC]".to_string()),
             KeyCode::CapsLock => Self('⇪'.to_string()),
             KeyCode::ScrollLock => Self('⇳'.to_string()),
             KeyCode::NumLock => Self('⇭'.to_string()),
@@ -153,6 +152,8 @@ impl From<KeyEvent> for KeySymbol {
 
         if value.modifiers == KeyModifiers::CONTROL {
             Self(format!("^{}", code))
+        } else if value.modifiers == KeyModifiers::SHIFT {
+            Self(format!("⇧{}", code))
         } else {
             code
         }
