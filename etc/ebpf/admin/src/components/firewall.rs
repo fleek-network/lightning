@@ -1,5 +1,5 @@
 use std::collections::{HashMap, HashSet};
-use std::net::Ipv4Addr;
+use std::net::{Ipv4Addr, SocketAddrV4};
 use std::time::Duration;
 
 use color_eyre::eyre::Result;
@@ -16,6 +16,7 @@ use unicode_width::UnicodeWidthStr;
 use super::{Component, Frame};
 use crate::action::Action;
 use crate::config::{Config, KeyBindings};
+use crate::ebpf::Client;
 use crate::mode::Mode;
 
 const IP_FIELD_NAME: &str = "IP";
@@ -29,6 +30,7 @@ const INPUT_FIELD_COUNT: usize = 2;
 pub struct FireWall {
     command_tx: Option<UnboundedSender<Action>>,
     blocklist: HashSet<Record>,
+    client: Client,
     // Table widget for displaying records.
     longest_item_per_column: [u16; 4],
     table_state: TableState,
@@ -40,7 +42,7 @@ pub struct FireWall {
 }
 
 impl FireWall {
-    pub fn new() -> Self {
+    pub fn new(client: Client) -> Self {
         let mut input_fields: Vec<_> = vec![
             (IP_FIELD_NAME, TextArea::default()),
             (PORT_FIELD_NAME, TextArea::default()),
@@ -55,6 +57,7 @@ impl FireWall {
 
         Self {
             blocklist: HashSet::new(),
+            client,
             command_tx: None,
             longest_item_per_column: [0; COLUMN_COUNT],
             table_state: TableState::default().with_selected(0),
@@ -111,9 +114,23 @@ impl FireWall {
             port: port.to_string(),
             // Todo: update.
             proto: "tcp".to_string(),
-            author: "8889".to_string(),
+            author: "100".to_string(),
         };
         self.blocklist.insert(rec);
+        let command_tx = self
+            .command_tx
+            .clone()
+            .expect("Component always has a sender");
+        let client = self.client.clone();
+        tokio::spawn(async move {
+            let client = client.lock().await;
+            let addr = SocketAddrV4::new(ip, port);
+            if let Err(e) = client.blocklist_add(addr).await {
+                command_tx
+                    .send(Action::Error(e.to_string()))
+                    .expect("Receiver not to drop");
+            }
+        });
         Ok(())
     }
 }
@@ -218,7 +235,7 @@ impl Component for FireWall {
         )
         .header(header)
         .highlight_style(selected_style)
-        .highlight_symbol(Text::from(vec![bar.into()]));
+        .highlight_symbol(Text::from(bar));
         f.render_stateful_widget(table, area, &mut self.table_state);
 
         if self.show_input_field {
