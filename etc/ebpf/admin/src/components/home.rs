@@ -35,22 +35,6 @@ impl Component for Home {
         Ok(())
     }
 
-    fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<Action>> {
-        // if let KeyEventKind::Press = key.kind {
-        //     key.code
-        // }
-        //
-        Ok(None)
-    }
-
-    fn update(&mut self, action: Action) -> Result<Option<Action>> {
-        match action {
-            Action::Tick => {},
-            _ => {},
-        }
-        Ok(None)
-    }
-
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
         f.render_widget(Paragraph::new("hello world"), area);
         Ok(())

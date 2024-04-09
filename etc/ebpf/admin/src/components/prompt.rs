@@ -59,9 +59,6 @@ impl Component for Prompt {
         Ok(())
     }
 
-    fn update(&mut self, _action: Action) -> Result<Option<Action>> {
-        Ok(None)
-    }
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
         let rows = Layout::default()
             .direction(Direction::Vertical)

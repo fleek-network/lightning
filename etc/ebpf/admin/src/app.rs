@@ -7,7 +7,6 @@ use tokio::sync::mpsc;
 
 use crate::action::Action;
 use crate::components::firewall::FireWall;
-use crate::components::fps::FpsCounter;
 use crate::components::home::Home;
 use crate::components::navigator::Navigator;
 use crate::components::prompt::Prompt;
@@ -37,9 +36,8 @@ pub struct App {
 impl App {
     pub fn new(tick_rate: f64, frame_rate: f64) -> Result<Self> {
         let mode = Mode::Home;
-        let _home = Home::new();
+        let home = Home::new();
         let firewall = FireWall::new();
-        let _fps = FpsCounter::new();
         let summary = Summary::new();
         let prompt = Prompt::new();
         let navigator = Navigator::new();
@@ -47,7 +45,7 @@ impl App {
         Ok(Self {
             tick_rate,
             frame_rate,
-            home: _home,
+            home,
             summary,
             prompt,
             navigator,
@@ -138,7 +136,6 @@ impl App {
         let mut tui = tui::Tui::new()?
             .tick_rate(self.tick_rate)
             .frame_rate(self.frame_rate);
-        // tui.mouse(true);
         tui.enter()?;
 
         self.home.register_action_handler(action_tx.clone())?;
@@ -237,7 +234,6 @@ impl App {
                     _ => {},
                 }
 
-                // Todo: Handle events better here for components.
                 if let Some(action) = self.update_components(action)? {
                     action_tx.send(action)?;
                 }
@@ -249,13 +245,13 @@ impl App {
                 tui = tui::Tui::new()?
                     .tick_rate(self.tick_rate)
                     .frame_rate(self.frame_rate);
-                // tui.mouse(true);
                 tui.enter()?;
             } else if self.should_quit {
                 tui.stop()?;
                 break;
             }
         }
+
         tui.exit()?;
         Ok(())
     }

@@ -35,14 +35,6 @@ impl Component for Summary {
         Ok(())
     }
 
-    fn update(&mut self, action: Action) -> Result<Option<Action>> {
-        match action {
-            Action::Tick => {},
-            _ => {},
-        }
-        Ok(None)
-    }
-
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
         let p = Paragraph::new("Overview\n")
             .block(

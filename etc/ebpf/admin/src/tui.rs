@@ -44,15 +44,15 @@ pub enum Event {
 }
 
 pub struct Tui {
-    pub terminal: ratatui::Terminal<Backend<IO>>,
-    pub task: JoinHandle<()>,
-    pub cancellation_token: CancellationToken,
-    pub event_rx: UnboundedReceiver<Event>,
-    pub event_tx: UnboundedSender<Event>,
-    pub frame_rate: f64,
-    pub tick_rate: f64,
-    pub mouse: bool,
-    pub paste: bool,
+    terminal: ratatui::Terminal<Backend<IO>>,
+    task: JoinHandle<()>,
+    cancellation_token: CancellationToken,
+    event_rx: UnboundedReceiver<Event>,
+    event_tx: UnboundedSender<Event>,
+    frame_rate: f64,
+    tick_rate: f64,
+    mouse: bool,
+    paste: bool,
 }
 
 impl Tui {

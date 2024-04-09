@@ -8,7 +8,6 @@ use crate::config::Config;
 use crate::tui::{Event, Frame};
 
 pub mod firewall;
-pub mod fps;
 pub mod home;
 pub mod navigator;
 pub mod prompt;
