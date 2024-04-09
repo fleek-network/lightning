@@ -150,6 +150,9 @@ fn main() {
     let cluster_sizes = [4, 8, 16, 32, 64];
     let propagation_speed_weight = 0.5;
 
+    let num_nodes = [1000, 2000];
+    let cluster_sizes = [16, 64, 128];
+
     let start = Instant::now();
 
     let pb =
@@ -291,7 +294,7 @@ fn main() {
     let output_path =
         PathBuf::from("simulation/plots/propagation/visited_at_depth_time_cluster_size.png");
     plotting::line_plot(
-        &data_prop_time,
+        &data_visited,
         "Maximum visited at depth across all nodes for different cluster sizes",
         "Cluster size",
         "Max visited at depth",
