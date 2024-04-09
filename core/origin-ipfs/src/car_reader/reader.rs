@@ -5,6 +5,7 @@ use libipld::codec::Codec;
 use tokio::io::{AsyncRead, AsyncReadExt};
 
 use super::utils::Buffer;
+use crate::error::Error;
 
 const MAX_ALLOC: usize = 4 * 1024 * 1024;
 
@@ -43,7 +44,7 @@ pub struct CarV2Header {
 }
 
 impl<R: AsyncRead + Unpin> CarReader<R> {
-    pub async fn new(mut reader: R) -> Result<Self> {
+    pub async fn new(mut reader: R) -> Result<Self, Error> {
         match header_v1(&mut reader).await {
             Ok((header, bytes_read)) => {
                 // This is a car v1
@@ -66,7 +67,9 @@ impl<R: AsyncRead + Unpin> CarReader<R> {
                     match pragma_v2(data).await {
                         Ok(_pragma) => {
                             // This is a car v2
-                            let header_v2 = header_v2(&mut reader).await?;
+                            let header_v2 = header_v2(&mut reader)
+                                .await
+                                .map_err(|e| Error::CarReader(format!("{e:?}")))?;
                             bytes_read += 40;
 
                             if header_v2.data_offset > bytes_read as u64 {
@@ -77,13 +80,18 @@ impl<R: AsyncRead + Unpin> CarReader<R> {
                                     // size of the
                                     // optional padding, but for safety reasons, we have to bound
                                     // it.
-                                    return Err(anyhow!("Padding too large"));
+                                    return Err(Error::CarReader("Padding too large".into()));
                                 }
                                 let mut buf = vec![0; padding_size];
-                                reader.read_exact(&mut buf).await?;
+                                reader
+                                    .read_exact(&mut buf)
+                                    .await
+                                    .map_err(|e| Error::CarReader(format!("{e:?}")))?;
                             }
                             // After the optional padding, the wrapped car v1 starts
-                            let (header_v1, bytes_read) = header_v1(&mut reader).await?;
+                            let (header_v1, bytes_read) = header_v1(&mut reader)
+                                .await
+                                .map_err(|e| Error::CarReader(format!("{e:?}")))?;
                             Ok(Self {
                                 reader,
                                 version: 2,
@@ -94,16 +102,16 @@ impl<R: AsyncRead + Unpin> CarReader<R> {
                                 roots: header_v1.roots,
                             })
                         },
-                        Err(e) => Err(e),
+                        Err(e) => Err(Error::CarReader(format!("{e:?}"))),
                     }
                 } else {
-                    Err(e)
+                    Err(Error::CarReader(format!("{e:?}")))
                 }
             },
         }
     }
 
-    pub async fn next_block(&mut self) -> Result<Option<(Cid, Vec<u8>)>> {
+    pub async fn next_block(&mut self) -> Result<Option<(Cid, Vec<u8>)>, Error> {
         if self.version == 2 && self.data_read == self.data_size {
             // For car v2, we have to stop reading content before the index section starts
             return Ok(None);
@@ -118,7 +126,7 @@ impl<R: AsyncRead + Unpin> CarReader<R> {
                 Ok(Some((cid, data)))
             },
             Ok(None) => Ok(None),
-            Err(e) => Err(e),
+            Err(e) => Err(Error::CarReader(format!("{e:?}"))),
         }
     }
 }

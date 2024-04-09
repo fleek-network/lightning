@@ -150,9 +150,6 @@ fn main() {
     let cluster_sizes = [4, 8, 16, 32, 64];
     let propagation_speed_weight = 0.5;
 
-    let num_nodes = [1000, 2000];
-    let cluster_sizes = [16, 64, 128];
-
     let start = Instant::now();
 
     let pb =

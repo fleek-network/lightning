@@ -16,13 +16,14 @@ use lightning_interfaces::types::{Blake3Hash, CompressionAlgorithm};
 use lightning_interfaces::{BlockStoreInterface, IncrementalPutInterface};
 use tokio::time::timeout;
 use tokio_util::io::StreamReader;
-use tracing::info;
+use tracing::{error, info};
 
 use crate::car_reader::{hyper_error, CarReader};
 use crate::config::Gateway;
+use crate::error::Error;
 use crate::{decoder, Config};
 
-const GATEWAY_TIMEOUT: Duration = Duration::from_millis(1000);
+const GATEWAY_TIMEOUT: Duration = Duration::from_millis(3000);
 
 pub struct IPFSOrigin<C: Collection> {
     client: Arc<Client<HttpsConnector<HttpConnector>, Body>>,
@@ -65,12 +66,12 @@ impl<C: Collection> IPFSOrigin<C> {
         })
     }
 
-    pub async fn fetch(&self, uri: &[u8]) -> Result<Blake3Hash> {
+    pub async fn stream_car_into_blockstore(
+        &self,
+        response_body: Body,
+    ) -> Result<Blake3Hash, Error> {
         // Disclaimer(matthias): this method is unpolished and will be improved in due time
-        let requested_cid = Cid::try_from(uri).with_context(|| "Failed to parse uri into cid")?;
-
-        let body = self.fetch_from_gateway(&requested_cid).await?;
-        let reader = StreamReader::new(body.map_err(hyper_error));
+        let reader = StreamReader::new(response_body.map_err(hyper_error));
         let mut car_reader = CarReader::new(reader).await?;
 
         let mut blockstore_putter = self.blockstore.put(None);
@@ -86,11 +87,12 @@ impl<C: Collection> IPFSOrigin<C> {
                         // TODO(matthias): make sure that if the codec of the root block is raw
                         // (0x55), then there will never be any more blocks after that
                         if let Err(e) = blockstore_putter.write(&data, comp) {
-                            return Err(anyhow!("Failed to write to the blockstore: {e}"));
+                            return Err(Error::Blockstore(format!("{e}")));
                         }
                     },
                     0x70 => {
-                        let node = PbNode::from_bytes(data.into())?;
+                        let node = PbNode::from_bytes(data.into())
+                            .map_err(|e| Error::CarReader(format!("{e}")))?;
                         let mut nodes = HashSet::new();
                         for links in &node.links {
                             nodes.insert(links.cid);
@@ -102,7 +104,9 @@ impl<C: Collection> IPFSOrigin<C> {
                                 Err(_) => data,
                             };
                             if let Err(e) = blockstore_putter.write(&data, comp) {
-                                return Err(anyhow!("Failed to write to the blockstore: {e}"));
+                                // TODO: In this case we probably don't want to move in to the next
+                                // gateway
+                                return Err(Error::Blockstore(format!("{e}")));
                             }
                         }
 
@@ -112,13 +116,12 @@ impl<C: Collection> IPFSOrigin<C> {
                                 Ok(Some((cid, data))) => {
                                     if nodes.contains(&cid) {
                                         verify_data(&cid, &data)?;
-                                        let data = decoder::decode_block(cid, data)?;
+                                        let data = decoder::decode_block(cid, data)
+                                            .map_err(|e| Error::CarReader(format!("{e}")))?;
 
                                         if let Some(data) = data {
                                             if let Err(e) = blockstore_putter.write(&data, comp) {
-                                                return Err(anyhow!(
-                                                    "Failed to write to the blockstore: {e}"
-                                                ));
+                                                return Err(Error::Blockstore(format!("{e}")));
                                             }
                                         }
                                     }
@@ -128,23 +131,29 @@ impl<C: Collection> IPFSOrigin<C> {
                             }
                         }
                     },
-                    codec => return Err(anyhow!("Unsupported codec found in CID: {codec}")),
+                    codec => {
+                        return Err(Error::CarReader(format!(
+                            "Unsupported codec found in CID: {codec}"
+                        )));
+                    },
                 }
             },
             Ok(None) => {
                 // TODO(matthias): what if there is no block?
-                return Err(anyhow!("The car file was empty"));
+                return Err(Error::CarReader("The car file was empty".into()));
             },
             Err(e) => return Err(e),
         }
 
+        // TODO: If finalizing the put fails, we probably don't need to move to the next gateway
         blockstore_putter
             .finalize()
             .await
-            .map_err(|e| anyhow!("Failed to finalize blockstore put: {e}"))
+            .map_err(|e| Error::Blockstore(format!("{e}")))
     }
 
-    async fn fetch_from_gateway(&self, requested_cid: &Cid) -> Result<Body> {
+    pub async fn fetch(&self, uri: &[u8]) -> Result<Blake3Hash> {
+        let requested_cid = Cid::try_from(uri).with_context(|| "Failed to parse uri into cid")?;
         for gateway in self.gateways.iter() {
             let url = Uri::builder()
                 .scheme(gateway.protocol.as_str())
@@ -154,39 +163,142 @@ impl<C: Collection> IPFSOrigin<C> {
 
             let req = Request::builder()
                 .uri(url)
-                //.header("Accept", "application/vnd.ipld.raw")
-                //.header("Accept", "application/vnd.ipld.car")
                 .header("Accept", "application/vnd.ipld.car;version=1")
                 .header("Connection", "keep-alive")
                 .body(Body::default())?;
 
+            // TODO: simplify these matches
             match timeout(GATEWAY_TIMEOUT, self.client.request(req)).await {
                 Ok(Ok(res)) => {
-                    if !res.status().is_success() {
-                        info!("Gateway response was not succesful, moving on to the next gateway");
-                        continue;
+                    match res.status().as_u16() {
+                        200..=299 => {
+                            // The gateway responded succesfully
+                            match self.stream_car_into_blockstore(res.into_body()).await {
+                                Ok(hash) => return Ok(hash),
+                                Err(e) => match e {
+                                    Error::Blockstore(e) => return Err(anyhow!("{e}")),
+                                    Error::CarReader(e) => {
+                                        error!(
+                                            "Failed to parse car file from gateway {}: {e}",
+                                            gateway.authority
+                                        );
+                                        continue;
+                                    },
+                                },
+                            }
+                        },
+                        300..=399 => {
+                            info!(
+                                "Gateway {} returned redirect error code trying one redirect",
+                                gateway.authority
+                            );
+                            // This is the redirect code we should try to redirect one time to the
+                            // proper location
+                            let headers = res.headers();
+                            let Some(location_header) = headers.get("Location") else {
+                                info!(
+                                    "Gateway {} redirected but the location header is missing",
+                                    gateway.authority
+                                );
+                                continue;
+                            };
+                            let Ok(new_location) = location_header.to_str() else {
+                                info!(
+                                    "Gateway {} redirected but the location header non-ASCII characters, moving to next gateway",
+                                    gateway.authority
+                                );
+                                continue;
+                            };
+                            let new_uri = format!("{new_location}?format=car");
+                            let Ok(new_req) = Request::builder()
+                                .uri(new_uri)
+                                .header("Accept", "application/vnd.ipld.car;version=1")
+                                .header("Connection", "keep-alive")
+                                .body(Body::default())
+                            else {
+                                info!(
+                                    "Gateway {} redirected but building the new request failed, moving to next gateway",
+                                    gateway.authority
+                                );
+                                continue;
+                            };
+
+                            match timeout(GATEWAY_TIMEOUT, self.client.request(new_req)).await {
+                                Ok(Ok(new_res)) => {
+                                    let status = new_res.status();
+                                    if status.is_success() {
+                                        match self.stream_car_into_blockstore(res.into_body()).await
+                                        {
+                                            Ok(hash) => return Ok(hash),
+                                            Err(e) => match e {
+                                                Error::Blockstore(e) => return Err(anyhow!("{e}")),
+                                                Error::CarReader(e) => {
+                                                    error!(
+                                                        "Failed to parse car file from gateway {}: {e}",
+                                                        gateway.authority
+                                                    );
+                                                    continue;
+                                                },
+                                            },
+                                        }
+                                    } else {
+                                        info!(
+                                            "Gateway {} response was not successful after redirect, moving to next gateway",
+                                            gateway.authority
+                                        );
+                                        continue;
+                                    }
+                                },
+                                Ok(Err(e)) => {
+                                    info!(
+                                        "Failed to fetch from gateway {}, moving onto the next gateway: {e:?}",
+                                        gateway.authority
+                                    );
+                                    continue;
+                                },
+                                Err(_) => {
+                                    info!(
+                                        "Redirect from gateway {} timed out, moving to next gateway",
+                                        gateway.authority
+                                    );
+                                    continue;
+                                },
+                            }
+                        },
+                        _ => {
+                            // This is either informational(100-199), error(300-399, server
+                            // error(400-499) so lets try another gateway
+                            // todo(dalton): We should look into what could cause informational
+                            // 100-199 and see if there is anything we can do here
+                            info!(
+                                "Gateway {} response was not successful, moving on to the next gateway",
+                                gateway.authority
+                            );
+                            continue;
+                        },
                     }
-                    return Ok(res.into_body());
                 },
                 Ok(Err(e)) => {
                     info!(
-                        "Failed to fetch from gateway {gateway:?}, moving onto the next gateway: {e:?}"
+                        "Failed to fetch from gateway {}, moving onto the next gateway: {e:?}",
+                        gateway.authority
                     );
                     continue;
                 },
                 Err(_) => {
                     info!(
-                        "Timeout while fetching from gateway {gateway:?}, moving onto the next gateway"
+                        "Timeout while fetching from gateway {}, moving onto the next gateway",
+                        gateway.authority
                     );
                     continue;
                 },
             }
         }
-        Err(anyhow::anyhow!("No response from gateways."))
+        Err(anyhow!("No response from gateways."))
     }
 }
 
-fn verify_data(cid: &Cid, data: &[u8]) -> Result<()> {
+fn verify_data(cid: &Cid, data: &[u8]) -> Result<(), Error> {
     let valid = match Code::try_from(cid.hash().code()) {
         Ok(hasher) => &hasher.digest(data) == cid.hash(),
         _ => false,
@@ -194,6 +306,8 @@ fn verify_data(cid: &Cid, data: &[u8]) -> Result<()> {
     if valid {
         Ok(())
     } else {
-        Err(anyhow!("Data verification failed for CID: {cid}"))
+        Err(Error::CarReader(format!(
+            "Data verification failed for CID: {cid}"
+        )))
     }
 }
