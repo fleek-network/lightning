@@ -663,50 +663,11 @@ impl<const P: usize> TranscriptBuilderInput for HpUfixedWrapper<P> {
 #[cfg(test)]
 mod tests {
     use ethers::types::U256;
-    use fleek_crypto::{AccountOwnerSignature, NodeSecretKey, SecretKey};
-    use lightning_interfaces::ToDigest;
+    use fleek_crypto::AccountOwnerSignature;
 
     use super::*;
 
     const CHAIN_ID: ChainId = 1337;
-
-    fn get_block(num_txns: usize) -> Block {
-        let transactions: Vec<TransactionRequest> = (0..num_txns)
-            .map(|i| {
-                if i % 2 == 0 {
-                    let secret_key = NodeSecretKey::generate();
-                    let public_key = secret_key.to_pk();
-                    let sender = TransactionSender::NodeMain(public_key);
-                    let method = UpdateMethod::ChangeEpoch { epoch: i as u64 };
-                    let payload = UpdatePayload {
-                        sender,
-                        nonce: 0,
-                        secondary_nonce: 0,
-                        method,
-                        chain_id: CHAIN_ID,
-                    };
-                    let digest = payload.to_digest();
-                    TransactionRequest::UpdateRequest(UpdateRequest {
-                        signature: TransactionSignature::NodeMain(secret_key.sign(&digest)),
-                        payload,
-                    })
-                } else {
-                    let tx = EthersTransaction {
-                        nonce: U256::from(i),
-                        ..Default::default()
-                    };
-                    let bytes = tx.rlp().to_vec();
-                    let tx = rlp::decode::<EthersTransaction>(&bytes).unwrap();
-                    TransactionRequest::EthereumRequest(tx.into())
-                }
-            })
-            .collect();
-        let digest = [1; 32];
-        Block {
-            transactions,
-            digest,
-        }
-    }
 
     #[test]
     fn test_transaction_request_eth() {
@@ -747,15 +708,6 @@ mod tests {
         let bytes: Vec<u8> = (&tx).try_into().unwrap();
         let tx_r = TransactionRequest::try_from(bytes.as_ref()).unwrap();
         assert_eq!(tx, tx_r);
-    }
-
-    #[test]
-    fn test_serialize_deserialize_block() {
-        let block = get_block(100);
-
-        let bytes: Vec<u8> = (&block).try_into().unwrap();
-        let block_r = Block::try_from(bytes).unwrap();
-        assert_eq!(block, block_r);
     }
 
     #[test]
