@@ -91,8 +91,8 @@ impl App {
         let body_footer_area = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Percentage((100_u16).saturating_sub(15)),
-                Constraint::Percentage(15),
+                Constraint::Percentage((100_u16).saturating_sub(10)),
+                Constraint::Percentage(10),
             ])
             .split(f.size());
 

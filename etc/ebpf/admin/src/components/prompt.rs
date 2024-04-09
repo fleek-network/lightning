@@ -3,6 +3,7 @@ use std::fmt;
 use std::time::Duration;
 
 use color_eyre::eyre::Result;
+use color_eyre::owo_colors::OwoColorize;
 use color_eyre::Report;
 use colored::Colorize;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -18,10 +19,13 @@ use crate::action::Action;
 use crate::config::{Config, KeyBindings};
 use crate::mode::Mode;
 
+const MAX_KEYS_IN_PROMPT: usize = 16;
+const MAX_KEYS_PER_ROW: usize = 8;
+
 #[derive(Default)]
 pub struct Prompt {
     command_tx: Option<UnboundedSender<Action>>,
-    current: HashMap<KeySymbol, Action>,
+    current: Vec<(KeySymbol, Action)>,
     config: Config,
 }
 
@@ -39,22 +43,9 @@ impl Prompt {
                     debug_assert!(key.len() == 1);
                     (KeySymbol::from(key[0]), value)
                 })
-                .collect::<HashMap<_, _>>();
+                .collect::<Vec<_>>();
             self.current = codes;
         }
-    }
-
-    fn draw_tree(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
-        f.render_widget(Block::default().style(Style::default()), area);
-
-        let chunks = Layout::default()
-            .vertical_margin(1)
-            .horizontal_margin(1)
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Length(2), Constraint::Min(1)].as_ref())
-            .split(area);
-
-        Ok(())
     }
 }
 
@@ -76,47 +67,49 @@ impl Component for Prompt {
         let rows = Layout::default()
             .direction(Direction::Vertical)
             .constraints(&[
+                Constraint::Percentage(20),
+                Constraint::Percentage(35),
+                Constraint::Percentage(35),
                 Constraint::Percentage(10),
-                Constraint::Percentage(45),
-                Constraint::Percentage(45),
             ])
             .split(area);
 
-        let contraints = vec![
-            Constraint::Fill(1),
-            Constraint::Fill(1),
-            Constraint::Fill(1),
-            Constraint::Fill(1),
-            Constraint::Fill(1),
-            Constraint::Fill(1),
-        ];
+        let contraints = if self.current.len() < MAX_KEYS_PER_ROW {
+            vec![Constraint::Fill(1); MAX_KEYS_PER_ROW]
+        } else {
+            vec![Constraint::Fill(1); MAX_KEYS_IN_PROMPT]
+        };
 
         let first_row = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints::<&Vec<_>>(contraints.as_ref())
+            .constraints(contraints[..MAX_KEYS_PER_ROW].as_ref())
             .split(rows[1]);
-
-        for (i, (key, action)) in self.current.iter().take(6).enumerate() {
-            // Todo: Remove unwrap().
-            let title = format!("{} {action}", key.0.clone().white());
-            let p = Paragraph::new(title)
-                .style(Style::default().fg(Color::White).reversed())
-                .centered();
-            f.render_widget(p, first_row[i]);
-        }
 
         let second_row = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints::<&Vec<_>>(contraints.as_ref())
+            .constraints(contraints[..MAX_KEYS_PER_ROW].as_ref())
             .split(rows[2]);
 
-        for (i, (key, action)) in self.current.iter().take(6).enumerate() {
-            // Todo: Remove unwrap().
-            let title = format!("{key} {action}");
-            let p = Paragraph::new(title)
-                .style(Style::default().fg(Color::White).reversed())
-                .centered();
-            f.render_widget(p, second_row[i]);
+        for i in 0..contraints.len() {
+            let paragraph = if let Some((symbol, action)) = self.current.get(i) {
+                let title = format!("{} {action}", symbol);
+                Paragraph::new(title)
+            } else {
+                Paragraph::default()
+            };
+
+            let chunk = if i / MAX_KEYS_PER_ROW == 0 {
+                first_row[i]
+            } else {
+                second_row[i % MAX_KEYS_PER_ROW]
+            };
+
+            f.render_widget(
+                paragraph
+                    .style(Style::default().fg(Color::White).reversed())
+                    .centered(),
+                chunk,
+            );
         }
 
         Ok(())
@@ -125,17 +118,6 @@ impl Component for Prompt {
 
 #[derive(Debug, Hash, Eq, PartialEq)]
 struct KeySymbol(String);
-
-impl fmt::Display for KeySymbol {
-    // This trait requires `fmt` with this exact signature.
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // Write strictly the first element into the supplied output
-        // stream: `f`. Returns `fmt::Result` which indicates whether the
-        // operation succeeded or failed. Note that `write!` uses syntax which
-        // is very similar to `println!`.
-        write!(f, "{}", self.0)
-    }
-}
 
 impl From<KeyEvent> for KeySymbol {
     fn from(value: KeyEvent) -> Self {
@@ -174,5 +156,11 @@ impl From<KeyEvent> for KeySymbol {
         } else {
             code
         }
+    }
+}
+
+impl fmt::Display for KeySymbol {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
