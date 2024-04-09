@@ -202,19 +202,29 @@ impl Component for FireWall {
         f.render_stateful_widget(t, area, &mut self.table_state);
 
         if self.show_new_entry_popup {
-            let block = Block::default()
-                .title("Block")
-                .borders(Borders::ALL)
-                .border_style(Style::from(Color::Red));
             f.render_widget(Clear, area);
             let area = centered_form(20, 40, area);
-            f.render_widget(block, area);
 
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+                .constraints(
+                    [
+                        Constraint::Percentage(0),
+                        Constraint::Max(3),
+                        Constraint::Max(3),
+                        Constraint::Percentage(0),
+                    ]
+                    .as_ref(),
+                )
                 .split(area);
-            for (i, (textarea, chunk)) in self.text_areas.iter_mut().zip(chunks.iter()).enumerate()
+
+            debug_assert!(self.text_areas.len() == 2);
+
+            for (i, (textarea, chunk)) in self
+                .text_areas
+                .iter_mut()
+                .zip(chunks.iter().take(3).skip(1))
+                .enumerate()
             {
                 if i == self.selected_text_area {
                     activate(textarea);
@@ -255,7 +265,7 @@ fn inactivate(field: &mut InputField) {
     field.area.set_block(
         Block::default()
             .borders(Borders::ALL)
-            .style(Style::default().fg(Color::DarkGray))
+            .style(Style::default().fg(Color::White))
             .title(field.title),
     );
 }
@@ -270,7 +280,7 @@ fn activate(field: &mut InputField) {
     field.area.set_block(
         Block::default()
             .borders(Borders::ALL)
-            .style(Style::default())
+            .style(Style::default().fg(Color::Red))
             .title(field.title),
     );
 }
