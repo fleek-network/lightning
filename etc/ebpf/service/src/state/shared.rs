@@ -9,7 +9,7 @@ use tokio::fs;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::Mutex;
 
-use crate::state::schema::FilterForStorage;
+use crate::state::schema::PacketFilterRule;
 
 const EBPF_STATE_TMP_DIR: &str = "~/.lightning/ebpf/state/tmp";
 const EBPF_STATE_PF_DIR: &str = "~/.lightning/ebpf/state/packet-filter";
@@ -113,7 +113,7 @@ impl SharedState {
         let mut file = fs::File::open(format!("{EBPF_STATE_PF_DIR}/{RULES_FILE}")).await?;
         let mut buf = String::new();
         file.read_to_string(&mut buf).await?;
-        let filters: Vec<FilterForStorage> = serde_json::from_str(&buf)?;
+        let filters: Vec<PacketFilterRule> = serde_json::from_str(&buf)?;
         let new_state = filters
             .into_iter()
             .map(Into::into)
@@ -149,7 +149,7 @@ impl SharedState {
         for key in guard.keys() {
             match key {
                 Ok(key) => {
-                    filters.push(FilterForStorage {
+                    filters.push(PacketFilterRule {
                         ip: key.ip.into(),
                         port: key.port as u16,
                     });
