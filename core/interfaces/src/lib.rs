@@ -53,6 +53,10 @@ pub use signer::*;
 pub use syncronizer::*;
 pub use topology::*;
 
+// The common types.
+#[rustfmt::skip]
+pub mod prelude;
+
 // Re-export schema.
 #[rustfmt::skip]
 pub use lightning_schema as schema;
@@ -69,11 +73,9 @@ pub use ink_quill::{ToDigest, TranscriptBuilder};
 #[rustfmt::skip]
 pub use fdi;
 
-#[rustfmt::skip]
 #[doc(hidden)]
 pub use interfaces_proc as proc;
 
 /// Some types needed in order to play with the type system.
-#[rustfmt::skip]
 #[doc(hidden)]
 pub mod _hacks;

@@ -1,12 +1,13 @@
 use std::marker::PhantomData;
 
 use anyhow::Result;
-use fdi::{DependencyGraph, Provider};
+use fdi::Provider;
 
 use super::*;
-use crate::collection;
 
-// Define the collection of every top-level trait in the system.
+// Define the collection of every top-level trait in the system. The collections is basically
+// a trait with a bunch of associated types called members. Each of them taking the entire
+// collection as input.
 collection!([
     ConfigProviderInterface,
     KeystoreInterface,
