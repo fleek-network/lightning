@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use anyhow::bail;
 use aya::maps::{HashMap, MapData};
-use common::{File, IpPortKey};
+use common::{File, PacketFilter};
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
@@ -16,14 +16,14 @@ const RULES_FILE: &str = "rules.json";
 
 #[derive(Clone)]
 pub struct SharedState {
-    blocklist: Arc<Mutex<HashMap<MapData, IpPortKey, u32>>>,
+    blocklist: Arc<Mutex<HashMap<MapData, PacketFilter, u32>>>,
     proc_to_file: Arc<Mutex<HashMap<MapData, u64, u64>>>,
     binfile_to_file: Arc<Mutex<HashMap<MapData, File, u64>>>,
 }
 
 impl SharedState {
     pub fn new(
-        block_list: HashMap<MapData, IpPortKey, u32>,
+        block_list: HashMap<MapData, PacketFilter, u32>,
         proc_to_file: HashMap<MapData, u64, u64>,
         binfile_to_file: HashMap<MapData, File, u64>,
     ) -> Self {
@@ -37,7 +37,7 @@ impl SharedState {
     pub async fn blocklist_add(&mut self, addr: SocketAddrV4) -> anyhow::Result<()> {
         let mut map = self.blocklist.lock().await;
         map.insert(
-            IpPortKey {
+            PacketFilter {
                 ip: (*addr.ip()).into(),
                 port: addr.port() as u32,
             },
@@ -49,7 +49,7 @@ impl SharedState {
 
     pub async fn blocklist_remove(&mut self, addr: SocketAddrV4) -> anyhow::Result<()> {
         let mut map = self.blocklist.lock().await;
-        map.remove(&IpPortKey {
+        map.remove(&PacketFilter {
             ip: (*addr.ip()).into(),
             port: addr.port() as u32,
         })?;

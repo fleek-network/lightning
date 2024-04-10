@@ -4,13 +4,13 @@ pub const MAX_DEVICES: usize = 4;
 
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct IpPortKey {
+pub struct PacketFilter {
     pub ip: u32,
     pub port: u32,
 }
 
 #[cfg(feature = "userspace")]
-unsafe impl aya::Pod for IpPortKey {}
+unsafe impl aya::Pod for PacketFilter {}
 
 #[derive(Copy, Clone)]
 #[repr(C)]

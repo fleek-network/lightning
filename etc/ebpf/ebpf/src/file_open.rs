@@ -31,7 +31,7 @@ unsafe fn verify_permission(ctx: &LsmContext, file: &File) -> Result<i32, c_long
         ctx,
         "Process running bin {} attempting to open file", binfile.inode_n
     );
-    if let Some(f_inode) = maps::BIN_TO_FILE.get(&binfile) {
+    if let Some(f_inode) = maps::BINFILE_OPEN_FILE_ALLOW.get(&binfile) {
         if f_inode != &file.inode_n {
             return Ok(-1);
         }
@@ -39,7 +39,7 @@ unsafe fn verify_permission(ctx: &LsmContext, file: &File) -> Result<i32, c_long
 
     let pid = aya_bpf::helpers::bpf_get_current_pid_tgid();
     info!(ctx, "Process {} attempting to open file", pid);
-    if let Some(f_inode) = maps::PROCESS_TO_FILE.get(&pid) {
+    if let Some(f_inode) = maps::PID_OPEN_FILE_ALLOW.get(&pid) {
         if f_inode != &file.inode_n {
             return Ok(-1);
         }

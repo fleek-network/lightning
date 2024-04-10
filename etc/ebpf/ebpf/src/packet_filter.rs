@@ -4,7 +4,7 @@ use aya_bpf::bindings::xdp_action;
 use aya_bpf::macros::xdp;
 use aya_bpf::programs::XdpContext;
 use aya_log_ebpf::info;
-use common::IpPortKey;
+use common::PacketFilter;
 use memoffset::offset_of;
 use network_types::eth::{EthHdr, EtherType};
 use network_types::ip::{IpProto, Ipv4Hdr};
@@ -78,8 +78,8 @@ fn ptr_at<T>(ctx: &XdpContext, offset: usize) -> Result<*const T, ()> {
 
 fn not_allowed_for_port(ip: u32, port: u16) -> bool {
     unsafe {
-        maps::BLOCK_LIST
-            .get(&IpPortKey {
+        maps::PACKET_FILTERS
+            .get(&PacketFilter {
                 ip,
                 port: port as u32,
             })
@@ -88,5 +88,9 @@ fn not_allowed_for_port(ip: u32, port: u16) -> bool {
 }
 
 fn not_allowed(ip: u32) -> bool {
-    unsafe { maps::BLOCK_LIST.get(&IpPortKey { ip, port: 0 }).is_some() }
+    unsafe {
+        maps::PACKET_FILTERS
+            .get(&PacketFilter { ip, port: 0 })
+            .is_some()
+    }
 }

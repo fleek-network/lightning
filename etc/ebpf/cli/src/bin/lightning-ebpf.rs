@@ -4,7 +4,7 @@ use aya::programs::{Xdp, XdpFlags};
 use aya::{include_bytes_aligned, Bpf};
 use aya_log::BpfLogger;
 use clap::Parser;
-use common::{File, IpPortKey};
+use common::{File, PacketFilter};
 use ebpf_service::server::Server;
 use ebpf_service::state::SharedState;
 use tokio::net::UnixListener;
@@ -45,14 +45,14 @@ async fn main() -> anyhow::Result<()> {
         .attach(&opt.iface, XdpFlags::default())
         .context("failed to attach the XDP program")?;
 
-    let blocklist: HashMap<_, IpPortKey, u32> =
+    let blocklist: HashMap<_, PacketFilter, u32> =
         HashMap::try_from(handle.take_map("BLOCK_LIST").unwrap())?;
 
     let binfile_to_file: HashMap<_, File, u64> =
-        HashMap::try_from(handle.take_map("BIN_TO_FILE").unwrap())?;
+        HashMap::try_from(handle.take_map("BINFILE_OPEN_FILE_ALLOW").unwrap())?;
 
     let proc_to_file: HashMap<_, u64, u64> =
-        HashMap::try_from(handle.take_map("PROCESS_TO_FILE").unwrap())?;
+        HashMap::try_from(handle.take_map("PID_OPEN_FILE_ALLOW").unwrap())?;
 
     let listener = UnixListener::bind(".lightning/ebpf")?;
     let shared_state = SharedState::new(blocklist, proc_to_file, binfile_to_file);

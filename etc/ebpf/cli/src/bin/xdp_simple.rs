@@ -6,7 +6,7 @@ use aya::programs::{Xdp, XdpFlags};
 use aya::{include_bytes_aligned, Bpf};
 use aya_log::BpfLogger;
 use clap::Parser;
-use common::IpPortKey;
+use common::PacketFilter;
 use tokio::signal;
 
 #[derive(Debug, Parser)]
@@ -47,13 +47,13 @@ async fn main() -> Result<(), anyhow::Error> {
         .attach(&opt.iface, XdpFlags::default())
         .context("failed to attach the XDP program")?;
 
-    let mut blocklist: HashMap<_, IpPortKey, u32> =
+    let mut blocklist: HashMap<_, PacketFilter, u32> =
         HashMap::try_from(handle.map_mut("BLOCK_LIST").unwrap())?;
 
     if let Some(address) = opt.block {
         let ip: u32 = (*address.ip()).into();
         let port = address.port() as u32;
-        blocklist.insert(IpPortKey { ip, port }, 0, 0)?;
+        blocklist.insert(PacketFilter { ip, port }, 0, 0)?;
     }
 
     log::info!("Enter Ctrl-C to shutdown");
