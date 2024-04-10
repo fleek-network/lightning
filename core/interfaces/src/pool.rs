@@ -38,11 +38,8 @@ pub struct RequestHeader {
 /// Defines the connection pool.
 #[interfaces_proc::blank]
 pub trait PoolInterface<C: Collection>: BuildGraph + Send + Sync + Sized {
-    #[blank(crate::_hacks::Blanket)]
     type EventHandler: EventHandlerInterface;
-    #[blank(crate::_hacks::Blanket)]
     type Requester: RequesterInterface;
-    #[blank(crate::_hacks::Blanket)]
     type Responder: ResponderInterface;
 
     fn open_event(&self, scope: ServiceScope) -> Self::EventHandler;
@@ -63,7 +60,6 @@ pub trait EventHandlerInterface: Send + Sync {
 
 #[interfaces_proc::blank]
 pub trait RequesterInterface: Clone + Send + Sync {
-    #[blank(crate::_hacks::Blanket)]
     type Response: ResponseInterface;
     async fn request(&self, destination: NodeIndex, request: Bytes) -> io::Result<Self::Response>;
 }
@@ -79,7 +75,6 @@ pub trait ResponseInterface: Send + Sync {
 
 #[interfaces_proc::blank]
 pub trait ResponderInterface: Send + Sync {
-    #[blank(crate::_hacks::Blanket)]
     type Request: RequestInterface;
     async fn get_next_request(&mut self) -> io::Result<(RequestHeader, Self::Request)>;
 }

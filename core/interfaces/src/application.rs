@@ -63,7 +63,6 @@ pub trait ApplicationInterface<C: Collection>:
     BuildGraph + ConfigConsumer + Sized + Send + Sync
 {
     /// The type for the sync query executor.
-    #[blank(crate::_hacks::Blanket)]
     type SyncExecutor: SyncQueryRunnerInterface;
 
     /// Returns a socket that should be used to submit transactions to be executed

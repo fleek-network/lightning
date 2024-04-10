@@ -8,11 +8,9 @@ use crate::collection::Collection;
 #[interfaces_proc::blank]
 pub trait ReputationAggregatorInterface<C: Collection>: BuildGraph {
     /// The reputation reporter can be used by our system to report the reputation of other
-    #[blank(crate::_hacks::Blanket)]
     type ReputationReporter: ReputationReporterInterface;
 
     /// The query runner can be used to query the local reputation of other nodes.
-    #[blank(crate::_hacks::Blanket)]
     type ReputationQuery: ReputationQueryInteface;
 
     /// Returns a reputation reporter that can be used to capture interactions that we have

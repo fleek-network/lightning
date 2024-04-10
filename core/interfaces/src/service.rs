@@ -12,7 +12,6 @@ use crate::types::ServiceId;
 #[interfaces_proc::blank]
 pub trait ServiceExecutorInterface<C: Collection>: BuildGraph + Sized + Send + Sync {
     /// The provider which can be used to get a handle on a service during runtime.
-    #[blank(crate::_hacks::Blanket)]
     type Provider: ExecutorProviderInterface;
 
     /// Returns the service handle provider which can be used establish connections to the

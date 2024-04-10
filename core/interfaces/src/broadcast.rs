@@ -17,7 +17,6 @@ pub trait BroadcastInterface<C: Collection>: BuildGraph + Sized + Send {
     type Message: LightningMessage;
 
     /// Pubsub topic for sending and receiving messages on a topic
-    #[blank(crate::_hacks::Blanket)]
     type PubSub<T: LightningMessage + Clone>: PubSub<T>;
 
     /// Get a send and receiver for messages in a pub-sub topic.

@@ -8,7 +8,6 @@ use crate::types::{Blake3Hash, ImmutablePointer};
 /// into a Blake3 hash of the content.
 #[interfaces_proc::blank]
 pub trait ResolverInterface<C: Collection>: BuildGraph + Sized + Send + Sync + Clone {
-    #[blank(crate::_hacks::Blanket)]
     type OriginFinder: OriginFinderAsyncIter;
 
     /// Publish new records into the resolver global hash table about us witnessing
