@@ -83,7 +83,7 @@ impl<C: Collection> OriginFetcher<C> {
                                     if let Some(tx) = pending_requests.remove(&uri) {
                                         tx.send(Err(OriginError)).expect("Failed to send response");
                                     }
-                                    error!("Failed to fetch dada from origin");
+                                    error!("Failed to fetch data from origin");
                                 },
                             }
                         },
