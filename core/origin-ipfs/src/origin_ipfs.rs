@@ -247,7 +247,7 @@ impl<C: Collection> IPFSOrigin<C> {
             Ok(Ok(new_res)) => {
                 let status = new_res.status();
                 if status.is_success() {
-                    self.stream_car_into_blockstore(response.into_body()).await
+                    self.stream_car_into_blockstore(new_res.into_body()).await
                 } else {
                     Err(Error::Redirect("Response was not successful".into()))
                 }
