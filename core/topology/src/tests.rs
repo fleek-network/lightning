@@ -10,15 +10,9 @@ use fleek_crypto::{
 use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisLatency, GenesisNode};
-use lightning_interfaces::fdi::Provider;
-use lightning_interfaces::{Collection, Node};
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{NodePorts, Participation};
-use lightning_interfaces::{
-    partial,
-    ApplicationInterface,
-    TopologyInterface,
-    WithStartAndShutdown,
-};
+use lightning_interfaces::{partial, Node};
 use lightning_notifier::Notifier;
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
@@ -155,22 +149,22 @@ async fn test_build_latency_matrix() {
     });
     genesis.latencies = Some(latencies);
 
-    let app = Application::<TestBinding>::init(
-        AppConfig {
+    let mut node = Node::<TestBinding>::init_with_provider(fdi::Provider::default().with(
+        JsonConfigProvider::default().with::<Application<TestBinding>>(AppConfig {
             genesis: Some(genesis),
             mode: Mode::Test,
             testnet: false,
             storage: StorageConfig::InMemory,
             db_path: None,
             db_options: None,
-        },
-        Default::default(),
-    )
-    .unwrap();
+        }),
+    ))
+    .expect("failed to init node");
+    node.start().await;
 
-    let query_runner = app.sync_query();
-    app.start().await;
-
+    let query_runner = node
+        .provider
+        .get::<c!(TestBinding::ApplicationInterface::SyncExecutor)>();
     let latencies = query_runner.get_current_latencies();
     let valid_pubkeys: BTreeSet<NodePublicKey> = query_runner
         .get_node_registry(None)
@@ -200,11 +194,13 @@ async fn test_build_latency_matrix() {
     assert_eq!(matrix[[our_index, index1]], 1000);
     assert_eq!(matrix[[our_index, index2]], 3000);
     assert_eq!(matrix[[index1, index2]], 2000);
+
+    node.shutdown().await;
 }
 
 #[tokio::test]
 async fn test_receive_connections() {
-    let mut node = Node::<TestBinding>::init_with_provider(Provider::default().with(
+    let mut node = Node::<TestBinding>::init_with_provider(fdi::Provider::default().with(
         JsonConfigProvider::default().with::<Application<TestBinding>>(AppConfig {
             genesis: None,
             mode: Mode::Test,

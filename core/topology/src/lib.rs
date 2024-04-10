@@ -5,8 +5,8 @@ pub use core::{build_latency_matrix, suggest_connections_from_latency_matrix, Co
 pub mod divisive;
 pub mod pairing;
 
-// #[cfg(test)]
-// mod tests;
+#[cfg(test)]
+mod tests;
 
 use std::collections::BTreeSet;
 use std::sync::Arc;
@@ -15,17 +15,7 @@ use anyhow::anyhow;
 pub use config::Config;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::fdi::{self, BuildGraph, DependencyGraph, MethodExt};
-use lightning_interfaces::{c, Collection};
-use lightning_interfaces::{
-    ApplicationInterface,
-    ConfigConsumer,
-    ConfigProviderInterface,
-    KeystoreInterface,
-    NotifierInterface,
-    ShutdownWaiter,
-    Subscriber,
-    TopologyInterface,
-};
+use lightning_interfaces::prelude::*;
 use lightning_utils::application::QueryRunnerExt;
 use tokio::sync::watch;
 use tracing::error;
