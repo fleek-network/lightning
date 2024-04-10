@@ -24,19 +24,19 @@ impl Connection {
         match message.src {
             FileOpenSrc::Pid(pid) => {
                 if message.op == FileOpen::ALLOW {
-                    self.shared_state.file_allow_open_for_proc(pid).await
+                    self.shared_state.file_open_allow_pid(pid).await
                 } else {
-                    self.shared_state.file_block_open_for_proc(pid).await
+                    self.shared_state.file_open_deny_pid(pid).await
                 }
             },
             FileOpenSrc::Bin { inode, dev, rdev } => {
                 if message.op == FileOpen::ALLOW {
                     self.shared_state
-                        .file_allow_open_for_binf(inode, dev, rdev)
+                        .file_open_allow_binfile(inode, dev, rdev)
                         .await
                 } else {
                     self.shared_state
-                        .file_block_open_for_binf(inode, dev, rdev)
+                        .file_open_deny_binfile(inode, dev, rdev)
                         .await
                 }
             },
@@ -47,10 +47,10 @@ impl Connection {
     async fn pf_handle(&mut self, message: Pf) -> anyhow::Result<()> {
         match message.op {
             Pf::ADD => {
-                self.shared_state.blocklist_add(message.addr).await?;
+                self.shared_state.packet_filter_add(message.addr).await?;
             },
             Pf::REMOVE => {
-                self.shared_state.blocklist_remove(message.addr).await?;
+                self.shared_state.packet_filter_remove(message.addr).await?;
             },
             op => {
                 bail!("invalid op: {op:?}");

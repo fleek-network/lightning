@@ -45,17 +45,25 @@ async fn main() -> anyhow::Result<()> {
         .attach(&opt.iface, XdpFlags::default())
         .context("failed to attach the XDP program")?;
 
-    let blocklist: HashMap<_, PacketFilter, u32> =
-        HashMap::try_from(handle.take_map("BLOCK_LIST").unwrap())?;
-
-    let binfile_to_file: HashMap<_, File, u64> =
+    let packet_filters: HashMap<_, PacketFilter, u32> =
+        HashMap::try_from(handle.take_map("PACKET_FILTERS").unwrap())?;
+    let binfile_open_file_allow: HashMap<_, File, u64> =
         HashMap::try_from(handle.take_map("BINFILE_OPEN_FILE_ALLOW").unwrap())?;
-
-    let proc_to_file: HashMap<_, u64, u64> =
+    let pid_open_file_allow: HashMap<_, u64, u64> =
         HashMap::try_from(handle.take_map("PID_OPEN_FILE_ALLOW").unwrap())?;
+    let binfile_open_file_deny: HashMap<_, File, u64> =
+        HashMap::try_from(handle.take_map("BINFILE_OPEN_FILE_DENY").unwrap())?;
+    let pid_open_file_deny: HashMap<_, u64, u64> =
+        HashMap::try_from(handle.take_map("PID_OPEN_FILE_DENY").unwrap())?;
 
     let listener = UnixListener::bind(".lightning/ebpf")?;
-    let shared_state = SharedState::new(blocklist, proc_to_file, binfile_to_file);
+    let shared_state = SharedState::new(
+        packet_filters,
+        pid_open_file_allow,
+        binfile_open_file_allow,
+        pid_open_file_deny,
+        binfile_open_file_deny,
+    );
     let server = Server::new(listener, shared_state);
 
     log::info!("Enter Ctrl-C to shutdown");
