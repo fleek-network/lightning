@@ -47,13 +47,13 @@ async fn main() -> Result<(), anyhow::Error> {
         .attach(&opt.iface, XdpFlags::default())
         .context("failed to attach the XDP program")?;
 
-    let mut blocklist: HashMap<_, PacketFilter, u32> =
-        HashMap::try_from(handle.map_mut("BLOCK_LIST").unwrap())?;
+    let mut packet_filters: HashMap<_, PacketFilter, u32> =
+        HashMap::try_from(handle.map_mut("PACKET_FILTERS").unwrap())?;
 
     if let Some(address) = opt.block {
         let ip: u32 = (*address.ip()).into();
         let port = address.port() as u32;
-        blocklist.insert(PacketFilter { ip, port }, 0, 0)?;
+        packet_filters.insert(PacketFilter { ip, port }, 0, 0)?;
     }
 
     log::info!("Enter Ctrl-C to shutdown");

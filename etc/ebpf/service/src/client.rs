@@ -21,7 +21,7 @@ impl EbpfSvcClient {
         self.inner = Some(stream);
     }
 
-    pub async fn blocklist_add(&self, addr: SocketAddrV4) -> io::Result<()> {
+    pub async fn packet_filter_add(&self, addr: SocketAddrV4) -> io::Result<()> {
         if let Some(stream) = &self.inner {
             let frame = EbpfServiceFrame::Pf(Pf { op: Pf::ADD, addr });
             Self::send(stream, frame.serialize_len_delimit()).await?;
@@ -29,7 +29,7 @@ impl EbpfSvcClient {
         Ok(())
     }
 
-    pub async fn blocklist_remove(&self, addr: SocketAddrV4) -> io::Result<()> {
+    pub async fn packet_filter_remove(&self, addr: SocketAddrV4) -> io::Result<()> {
         if let Some(stream) = &self.inner {
             let frame = EbpfServiceFrame::Pf(Pf {
                 op: Pf::REMOVE,
@@ -40,7 +40,7 @@ impl EbpfSvcClient {
         Ok(())
     }
 
-    pub async fn file_open_allow_proc(&self, pid: u64) -> io::Result<()> {
+    pub async fn file_open_allow_pid(&self, pid: u64) -> io::Result<()> {
         if let Some(stream) = &self.inner {
             let frame = EbpfServiceFrame::FileOpen(FileOpen {
                 op: FileOpen::ALLOW,
@@ -51,7 +51,7 @@ impl EbpfSvcClient {
         Ok(())
     }
 
-    pub async fn file_open_block_proc(&self, pid: u64) -> io::Result<()> {
+    pub async fn file_open_deny_pid(&self, pid: u64) -> io::Result<()> {
         if let Some(stream) = &self.inner {
             let frame = EbpfServiceFrame::FileOpen(FileOpen {
                 op: FileOpen::BLOCK,
@@ -62,7 +62,7 @@ impl EbpfSvcClient {
         Ok(())
     }
 
-    pub async fn file_open_allow_bin(&self, inode: u64, dev: u32, rdev: u32) -> io::Result<()> {
+    pub async fn file_open_allow_binfile(&self, inode: u64, dev: u32, rdev: u32) -> io::Result<()> {
         if let Some(stream) = &self.inner {
             let frame = EbpfServiceFrame::FileOpen(FileOpen {
                 op: FileOpen::ALLOW,
@@ -73,7 +73,7 @@ impl EbpfSvcClient {
         Ok(())
     }
 
-    pub async fn file_open_block_bin(&self, inode: u64, dev: u32, rdev: u32) -> io::Result<()> {
+    pub async fn file_open_block_binfile(&self, inode: u64, dev: u32, rdev: u32) -> io::Result<()> {
         if let Some(stream) = &self.inner {
             let frame = EbpfServiceFrame::FileOpen(FileOpen {
                 op: FileOpen::BLOCK,

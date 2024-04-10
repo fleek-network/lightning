@@ -125,7 +125,7 @@ impl FireWall {
         tokio::spawn(async move {
             let client = client.lock().await;
             let addr = SocketAddrV4::new(ip, port);
-            if let Err(e) = client.blocklist_add(addr).await {
+            if let Err(e) = client.packet_filter_add(addr).await {
                 command_tx
                     .send(Action::Error(e.to_string()))
                     .expect("Receiver not to drop");

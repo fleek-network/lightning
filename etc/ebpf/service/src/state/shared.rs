@@ -17,26 +17,26 @@ const RULES_FILE: &str = "rules.json";
 #[derive(Clone)]
 pub struct SharedState {
     packet_filters: Arc<Mutex<HashMap<MapData, PacketFilter, u32>>>,
-    pid_open_file_allow: Arc<Mutex<HashMap<MapData, u64, u64>>>,
-    binfile_open_file_allow: Arc<Mutex<HashMap<MapData, File, u64>>>,
-    pid_open_file_deny: Arc<Mutex<HashMap<MapData, u64, u64>>>,
-    binfile_open_file_deny: Arc<Mutex<HashMap<MapData, File, u64>>>,
+    file_open_allow_pid: Arc<Mutex<HashMap<MapData, u64, u64>>>,
+    file_open_allow_binfile: Arc<Mutex<HashMap<MapData, File, u64>>>,
+    file_open_deny_pid: Arc<Mutex<HashMap<MapData, u64, u64>>>,
+    file_open_deny_binfile: Arc<Mutex<HashMap<MapData, File, u64>>>,
 }
 
 impl SharedState {
     pub fn new(
         packet_filters: HashMap<MapData, PacketFilter, u32>,
-        pid_open_file_allow: HashMap<MapData, u64, u64>,
-        binfile_to_file_allow: HashMap<MapData, File, u64>,
-        pid_open_file_deny: HashMap<MapData, u64, u64>,
-        binfile_to_file_deny: HashMap<MapData, File, u64>,
+        file_open_allow_pid: HashMap<MapData, u64, u64>,
+        file_open_allow_binfile: HashMap<MapData, File, u64>,
+        file_open_deny_pid: HashMap<MapData, u64, u64>,
+        file_open_deny_binfile: HashMap<MapData, File, u64>,
     ) -> Self {
         Self {
             packet_filters: Arc::new(Mutex::new(packet_filters)),
-            pid_open_file_allow: Arc::new(Mutex::new(pid_open_file_allow)),
-            binfile_open_file_allow: Arc::new(Mutex::new(binfile_to_file_allow)),
-            pid_open_file_deny: Arc::new(Mutex::new(pid_open_file_deny)),
-            binfile_open_file_deny: Arc::new(Mutex::new(binfile_to_file_deny)),
+            file_open_allow_pid: Arc::new(Mutex::new(file_open_allow_pid)),
+            file_open_allow_binfile: Arc::new(Mutex::new(file_open_allow_binfile)),
+            file_open_deny_pid: Arc::new(Mutex::new(file_open_deny_pid)),
+            file_open_deny_binfile: Arc::new(Mutex::new(file_open_deny_binfile)),
         }
     }
 
@@ -63,13 +63,13 @@ impl SharedState {
     }
 
     pub async fn file_open_allow_pid(&mut self, pid: u64) -> anyhow::Result<()> {
-        let mut map = self.pid_open_file_allow.lock().await;
+        let mut map = self.file_open_allow_pid.lock().await;
         map.insert(pid, 0, 0)?;
         Ok(())
     }
 
     pub async fn file_open_deny_pid(&mut self, pid: u64) -> anyhow::Result<()> {
-        let mut map = self.pid_open_file_deny.lock().await;
+        let mut map = self.file_open_deny_pid.lock().await;
         map.remove(&pid)?;
         Ok(())
     }
@@ -80,7 +80,7 @@ impl SharedState {
         dev: u32,
         rdev: u32,
     ) -> anyhow::Result<()> {
-        let mut map = self.binfile_open_file_allow.lock().await;
+        let mut map = self.file_open_allow_binfile.lock().await;
         map.insert(
             File {
                 inode_n: inode,
@@ -99,7 +99,7 @@ impl SharedState {
         dev: u32,
         rdev: u32,
     ) -> anyhow::Result<()> {
-        let mut map = self.binfile_open_file_deny.lock().await;
+        let mut map = self.file_open_deny_binfile.lock().await;
         map.remove(&File {
             inode_n: inode,
             dev,
@@ -121,7 +121,7 @@ impl SharedState {
                         port: key.port as u16,
                     });
                 },
-                Err(e) => bail!("failed to sync blocklist: {e:?}"),
+                Err(e) => bail!("failed to sync packet filters: {e:?}"),
             }
         }
 
