@@ -9,7 +9,7 @@ use tokio::fs;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::Mutex;
 
-use crate::state::rules::PacketFilterRule;
+use crate::state::rules::{FileOpenRule, PacketFilterRule, PermissionPolicy};
 
 const EBPF_STATE_TMP_DIR: &str = "~/.lightning/ebpf/state/tmp";
 const EBPF_STATE_PF_DIR: &str = "~/.lightning/ebpf/state/packet-filter";
@@ -18,20 +18,21 @@ const RULES_FILE: &str = "filters.json";
 #[derive(Clone)]
 pub struct SharedState {
     packet_filters: Arc<Mutex<HashMap<MapData, PacketFilter, u32>>>,
-    file_open_allow_binfile: Arc<Mutex<HashMap<MapData, File, u64>>>,
-    file_open_deny_binfile: Arc<Mutex<HashMap<MapData, File, u64>>>,
+    file_open_rules: Arc<Mutex<FileOpenMaps>>,
 }
 
 impl SharedState {
     pub fn new(
         packet_filters: HashMap<MapData, PacketFilter, u32>,
-        file_open_allow_binfile: HashMap<MapData, File, u64>,
-        file_open_deny_binfile: HashMap<MapData, File, u64>,
+        file_open_allow_rules: HashMap<MapData, File, u64>,
+        file_open_deny_rules: HashMap<MapData, File, u64>,
     ) -> Self {
         Self {
             packet_filters: Arc::new(Mutex::new(packet_filters)),
-            file_open_allow_binfile: Arc::new(Mutex::new(file_open_allow_binfile)),
-            file_open_deny_binfile: Arc::new(Mutex::new(file_open_deny_binfile)),
+            file_open_rules: Arc::new(Mutex::new(FileOpenMaps {
+                file_open_allow_rules,
+                file_open_deny_rules,
+            })),
         }
     }
 
@@ -58,8 +59,8 @@ impl SharedState {
     }
 
     pub async fn file_open_allow(&mut self, inode: u64, dev: u32, rdev: u32) -> anyhow::Result<()> {
-        let mut map = self.file_open_allow_binfile.lock().await;
-        map.insert(
+        let mut map = self.file_open_rules.lock().await;
+        map.file_open_allow_rules.insert(
             File {
                 inode_n: inode,
                 dev,
@@ -72,16 +73,20 @@ impl SharedState {
     }
 
     pub async fn file_open_deny(&mut self, inode: u64, dev: u32, rdev: u32) -> anyhow::Result<()> {
-        let mut map = self.file_open_deny_binfile.lock().await;
-        map.remove(&File {
-            inode_n: inode,
-            dev,
-            rdev,
-        })?;
+        let mut map = self.file_open_rules.lock().await;
+        map.file_open_deny_rules.insert(
+            File {
+                inode_n: inode,
+                dev,
+                rdev,
+            },
+            0,
+            0,
+        )?;
         Ok(())
     }
 
-    pub async fn pull_packet_filters_from_config(&self) -> anyhow::Result<()> {
+    pub async fn update_packet_filters(&self) -> anyhow::Result<()> {
         let mut file = fs::File::open(format!("{EBPF_STATE_PF_DIR}/{RULES_FILE}")).await?;
         let mut buf = String::new();
         file.read_to_string(&mut buf).await?;
@@ -113,6 +118,64 @@ impl SharedState {
         Ok(())
     }
 
+    pub async fn update_file_open_rules(&self) -> anyhow::Result<()> {
+        let mut file = fs::File::open(format!("{EBPF_STATE_PF_DIR}/{RULES_FILE}")).await?;
+        let mut buf = String::new();
+        file.read_to_string(&mut buf).await?;
+        let rules: Vec<FileOpenRule> = serde_json::from_str(&buf)?;
+
+        let mut allow = Vec::new();
+        let mut deny = Vec::new();
+
+        for rule in rules {
+            if let PermissionPolicy::Allow = &rule.permission {
+                allow.push(rule);
+            } else {
+                deny.push(rule);
+            }
+        }
+
+        let mut maps = self.file_open_rules.lock().await;
+
+        // Due to a constraint of the aya api, there is no clean method for the maps
+        // so we remove all of them. Todo: Let's open an issue with aya.
+        let mut remove = Vec::new();
+        for rule in maps.file_open_deny_rules.keys() {
+            remove.push(rule);
+        }
+        for rule in remove {
+            let r = rule?;
+            maps.file_open_deny_rules.remove(&File {
+                inode_n: r.inode_n,
+                dev: r.dev,
+                rdev: r.rdev,
+            })?;
+        }
+
+        let mut remove = Vec::new();
+        for rule in maps.file_open_allow_rules.keys() {
+            remove.push(rule);
+        }
+        for rule in remove {
+            let r = rule?;
+            maps.file_open_allow_rules.remove(&File {
+                inode_n: r.inode_n,
+                dev: r.dev,
+                rdev: r.rdev,
+            })?;
+        }
+
+        for rule in deny {
+            maps.file_open_deny_rules.insert(File::from(rule), 0, 0)?;
+        }
+
+        for rule in allow {
+            maps.file_open_allow_rules.insert(File::from(rule), 0, 0)?;
+        }
+
+        Ok(())
+    }
+
     pub async fn sync_packet_filters(&self) -> anyhow::Result<()> {
         let tmp_path = format!("{EBPF_STATE_TMP_DIR}/{RULES_FILE}");
         let mut tmp = fs::File::create(tmp_path.clone()).await?;
@@ -139,4 +202,9 @@ impl SharedState {
 
         Ok(())
     }
+}
+
+pub struct FileOpenMaps {
+    file_open_allow_rules: HashMap<MapData, File, u64>,
+    file_open_deny_rules: HashMap<MapData, File, u64>,
 }

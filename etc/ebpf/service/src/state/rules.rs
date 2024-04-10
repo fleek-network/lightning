@@ -1,6 +1,6 @@
 use std::net::Ipv4Addr;
 
-use common::PacketFilter;
+use common::{File, PacketFilter};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize)]
@@ -30,4 +30,14 @@ pub struct FileOpenRule {
 pub enum PermissionPolicy {
     Allow,
     Deny,
+}
+
+impl From<FileOpenRule> for File {
+    fn from(value: FileOpenRule) -> Self {
+        Self {
+            inode_n: value.inode,
+            dev: value.dev,
+            rdev: value.rdev,
+        }
+    }
 }
