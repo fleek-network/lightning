@@ -10,6 +10,7 @@ aya = { git = "https://github.com/aya-rs/aya", features = ["async_tokio"], optio
 aya-log = { git = "https://github.com/aya-rs/aya", optional = true }
 bytes = { version = "1.4", optional = true }
 common = { path = "../common", features = ["userspace"], optional = true }
+notify = { version = "6.1"}
 libc = { version = "0.2", optional = true }
 log = { version = "0.4", optional = true }
 resolved-pathbuf = { path = "../../../lib/resolved-pathbuf" }

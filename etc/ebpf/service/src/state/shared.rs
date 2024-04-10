@@ -16,12 +16,12 @@ const EBPF_STATE_PF_DIR: &str = "~/.lightning/ebpf/state/packet-filter";
 const RULES_FILE: &str = "filters.json";
 
 #[derive(Clone)]
-pub struct SharedState {
+pub struct SharedStateMap {
     packet_filters: Arc<Mutex<HashMap<MapData, PacketFilter, u32>>>,
     file_open_rules: Arc<Mutex<FileOpenMaps>>,
 }
 
-impl SharedState {
+impl SharedStateMap {
     pub fn new(
         packet_filters: HashMap<MapData, PacketFilter, u32>,
         file_open_allow_rules: HashMap<MapData, File, u64>,

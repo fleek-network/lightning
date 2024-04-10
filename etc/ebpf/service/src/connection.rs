@@ -4,15 +4,15 @@ use tokio::io::Interest;
 use tokio::net::UnixStream;
 
 use crate::frame::{EbpfServiceFrame, Pf};
-use crate::state::SharedState;
+use crate::state::SharedStateMap;
 
 pub struct Connection {
     socket: UnixStream,
-    shared_state: SharedState,
+    shared_state: SharedStateMap,
 }
 
 impl Connection {
-    pub fn new(socket: UnixStream, shared_state: SharedState) -> Self {
+    pub fn new(socket: UnixStream, shared_state: SharedStateMap) -> Self {
         Self {
             socket,
             shared_state,

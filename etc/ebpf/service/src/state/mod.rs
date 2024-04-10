@@ -1,4 +1,4 @@
 mod rules;
 mod shared;
 
-pub use shared::SharedState;
+pub use shared::SharedStateMap;

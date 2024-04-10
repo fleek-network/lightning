@@ -6,7 +6,7 @@ use aya_log::BpfLogger;
 use clap::Parser;
 use common::{File, PacketFilter};
 use ebpf_service::server::Server;
-use ebpf_service::state::SharedState;
+use ebpf_service::state::SharedStateMap;
 use tokio::net::UnixListener;
 use tokio::signal;
 
@@ -53,7 +53,7 @@ async fn main() -> anyhow::Result<()> {
         HashMap::try_from(handle.take_map("FILE_OPEN_DENY").unwrap())?;
 
     let listener = UnixListener::bind(".lightning/ebpf")?;
-    let shared_state = SharedState::new(packet_filters, file_open_allow, file_open_deny);
+    let shared_state = SharedStateMap::new(packet_filters, file_open_allow, file_open_deny);
     let server = Server::new(listener, shared_state);
 
     log::info!("Enter Ctrl-C to shutdown");
