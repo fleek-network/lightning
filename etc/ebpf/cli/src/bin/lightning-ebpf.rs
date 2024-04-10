@@ -4,7 +4,7 @@ use aya::programs::{Xdp, XdpFlags};
 use aya::{include_bytes_aligned, Bpf};
 use aya_log::BpfLogger;
 use clap::Parser;
-use common::IpPortKey;
+use common::{File, IpPortKey};
 use ebpf_service::server::Server;
 use ebpf_service::state::SharedState;
 use tokio::net::UnixListener;
@@ -48,8 +48,14 @@ async fn main() -> anyhow::Result<()> {
     let blocklist: HashMap<_, IpPortKey, u32> =
         HashMap::try_from(handle.take_map("BLOCK_LIST").unwrap())?;
 
+    let binfile_to_file: HashMap<_, File, u64> =
+        HashMap::try_from(handle.take_map("BIN_TO_FILE").unwrap())?;
+
+    let proc_to_file: HashMap<_, u64, u64> =
+        HashMap::try_from(handle.take_map("PROCESS_TO_FILE").unwrap())?;
+
     let listener = UnixListener::bind(".lightning/ebpf")?;
-    let shared_state = SharedState::new(blocklist);
+    let shared_state = SharedState::new(blocklist, proc_to_file, binfile_to_file);
     let server = Server::new(listener, shared_state);
 
     log::info!("Enter Ctrl-C to shutdown");
