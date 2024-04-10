@@ -2,7 +2,7 @@
 
 pub const MAX_DEVICES: usize = 4;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash)]
 #[repr(C)]
 pub struct PacketFilter {
     pub ip: u32,

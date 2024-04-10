@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::net::SocketAddrV4;
 use std::sync::Arc;
 
@@ -5,14 +6,14 @@ use anyhow::bail;
 use aya::maps::{HashMap, MapData};
 use common::{File, PacketFilter};
 use tokio::fs;
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::Mutex;
 
-use crate::state::schema::Filter;
+use crate::state::schema::FilterForStorage;
 
 const EBPF_STATE_TMP_DIR: &str = "~/.lightning/ebpf/state/tmp";
 const EBPF_STATE_PF_DIR: &str = "~/.lightning/ebpf/state/packet-filter";
-const RULES_FILE: &str = "rules.json";
+const RULES_FILE: &str = "filters.json";
 
 #[derive(Clone)]
 pub struct SharedState {
@@ -50,7 +51,7 @@ impl SharedState {
             0,
             0,
         )?;
-        self.sync_packet_filters().await
+        Ok(())
     }
 
     pub async fn packet_filter_remove(&mut self, addr: SocketAddrV4) -> anyhow::Result<()> {
@@ -59,7 +60,7 @@ impl SharedState {
             ip: (*addr.ip()).into(),
             port: addr.port() as u32,
         })?;
-        self.sync_packet_filters().await
+        Ok(())
     }
 
     pub async fn file_open_allow_pid(&mut self, pid: u64) -> anyhow::Result<()> {
@@ -108,15 +109,47 @@ impl SharedState {
         Ok(())
     }
 
-    async fn sync_packet_filters(&self) -> anyhow::Result<()> {
+    pub async fn pull_packet_filters_from_config(&self) -> anyhow::Result<()> {
+        let mut file = fs::File::open(format!("{EBPF_STATE_PF_DIR}/{RULES_FILE}")).await?;
+        let mut buf = String::new();
+        file.read_to_string(&mut buf).await?;
+        let filters: Vec<FilterForStorage> = serde_json::from_str(&buf)?;
+        let new_state = filters
+            .into_iter()
+            .map(Into::into)
+            .collect::<HashSet<PacketFilter>>();
+
+        let mut map = self.packet_filters.lock().await;
+        // Due to a constraint of the aya api, there is no clean method for the maps and
+        // we don't get mutable access as iterator is read only.
+        let mut remove = Vec::new();
+        for filter in map.keys() {
+            let f = filter?;
+            if !new_state.contains(&f) {
+                remove.push(f);
+            }
+        }
+
+        for filter in new_state {
+            map.insert(PacketFilter::from(filter), 0, 0)?;
+        }
+
+        for filter in remove {
+            map.remove(&PacketFilter::from(filter))?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn sync_packet_filters(&self) -> anyhow::Result<()> {
         let tmp_path = format!("{EBPF_STATE_TMP_DIR}/{RULES_FILE}");
         let mut tmp = fs::File::create(tmp_path.clone()).await?;
-        let mut rules = Vec::new();
+        let mut filters = Vec::new();
         let guard = self.packet_filters.lock().await;
         for key in guard.keys() {
             match key {
                 Ok(key) => {
-                    rules.push(Filter {
+                    filters.push(FilterForStorage {
                         ip: key.ip.into(),
                         port: key.port as u16,
                     });
@@ -125,7 +158,7 @@ impl SharedState {
             }
         }
 
-        let bytes = serde_json::to_string(&rules)?;
+        let bytes = serde_json::to_string(&filters)?;
         tmp.write_all(bytes.as_bytes()).await?;
 
         tmp.sync_all().await?;

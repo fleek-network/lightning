@@ -1,5 +1,6 @@
-use std::net::SocketAddrV4;
 use std::io;
+use std::net::SocketAddrV4;
+
 use bytes::Bytes;
 use tokio::io::Interest;
 use tokio::net::UnixStream;
