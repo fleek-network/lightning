@@ -9,7 +9,7 @@ use tokio::fs;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::Mutex;
 
-use crate::state::schema::PacketFilterRule;
+use crate::state::rules::PacketFilterRule;
 
 const EBPF_STATE_TMP_DIR: &str = "~/.lightning/ebpf/state/tmp";
 const EBPF_STATE_PF_DIR: &str = "~/.lightning/ebpf/state/packet-filter";

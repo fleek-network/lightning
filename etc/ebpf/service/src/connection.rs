@@ -3,7 +3,7 @@ use log::error;
 use tokio::io::Interest;
 use tokio::net::UnixStream;
 
-use crate::schema::{EbpfServiceFrame, FileOpen, FileOpenSrc, Pf};
+use crate::frame::{EbpfServiceFrame, Pf};
 use crate::state::SharedState;
 
 pub struct Connection {
@@ -16,22 +16,6 @@ impl Connection {
         Self {
             socket,
             shared_state,
-        }
-    }
-
-    #[inline]
-    async fn file_open_handle(&mut self, message: FileOpen) -> anyhow::Result<()> {
-        match message.src {
-            FileOpenSrc::Pid(pid) => {
-                unimplemented!()
-            },
-            FileOpenSrc::Bin { inode, dev, rdev } => {
-                if message.op == FileOpen::ALLOW {
-                    self.shared_state.file_open_allow(inode, dev, rdev).await
-                } else {
-                    self.shared_state.file_open_deny(inode, dev, rdev).await
-                }
-            },
         }
     }
 
@@ -54,7 +38,6 @@ impl Connection {
     #[inline]
     async fn handle_request(&mut self, frame: EbpfServiceFrame) -> anyhow::Result<()> {
         match frame {
-            EbpfServiceFrame::FileOpen(file_open) => self.file_open_handle(file_open).await,
             EbpfServiceFrame::Pf(pf) => self.pf_handle(pf).await,
         }
     }

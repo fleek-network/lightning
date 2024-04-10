@@ -5,7 +5,7 @@ use bytes::Bytes;
 use tokio::io::Interest;
 use tokio::net::UnixStream;
 
-use crate::schema::{EbpfServiceFrame, FileOpen, FileOpenSrc, Pf};
+use crate::frame::{EbpfServiceFrame, Pf};
 
 #[derive(Default, Debug)]
 pub struct IpcClient {
@@ -34,50 +34,6 @@ impl IpcClient {
             let frame = EbpfServiceFrame::Pf(Pf {
                 op: Pf::REMOVE,
                 addr,
-            });
-            Self::send(stream, frame.serialize_len_delimit()).await?;
-        }
-        Ok(())
-    }
-
-    async fn file_open_allow_pid(&self, pid: u64) -> io::Result<()> {
-        if let Some(stream) = &self.inner {
-            let frame = EbpfServiceFrame::FileOpen(FileOpen {
-                op: FileOpen::ALLOW,
-                src: FileOpenSrc::Pid(pid),
-            });
-            Self::send(stream, frame.serialize_len_delimit()).await?;
-        }
-        Ok(())
-    }
-
-    async fn file_open_deny_pid(&self, pid: u64) -> io::Result<()> {
-        if let Some(stream) = &self.inner {
-            let frame = EbpfServiceFrame::FileOpen(FileOpen {
-                op: FileOpen::BLOCK,
-                src: FileOpenSrc::Pid(pid),
-            });
-            Self::send(stream, frame.serialize_len_delimit()).await?;
-        }
-        Ok(())
-    }
-
-    async fn file_open_allow_binfile(&self, inode: u64, dev: u32, rdev: u32) -> io::Result<()> {
-        if let Some(stream) = &self.inner {
-            let frame = EbpfServiceFrame::FileOpen(FileOpen {
-                op: FileOpen::ALLOW,
-                src: FileOpenSrc::Bin { inode, dev, rdev },
-            });
-            Self::send(stream, frame.serialize_len_delimit()).await?;
-        }
-        Ok(())
-    }
-
-    async fn file_open_block_binfile(&self, inode: u64, dev: u32, rdev: u32) -> io::Result<()> {
-        if let Some(stream) = &self.inner {
-            let frame = EbpfServiceFrame::FileOpen(FileOpen {
-                op: FileOpen::BLOCK,
-                src: FileOpenSrc::Bin { inode, dev, rdev },
             });
             Self::send(stream, frame.serialize_len_delimit()).await?;
         }
