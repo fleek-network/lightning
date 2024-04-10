@@ -5,7 +5,7 @@ use bytes::Bytes;
 use tokio::io::Interest;
 use tokio::net::UnixStream;
 
-use crate::frame::{EbpfServiceFrame, Pf};
+use crate::frame::{IpcServiceFrame, Pf};
 
 #[derive(Default, Debug)]
 pub struct IpcClient {
@@ -23,7 +23,7 @@ impl IpcClient {
 
     pub async fn packet_filter_add(&self, addr: SocketAddrV4) -> io::Result<()> {
         if let Some(stream) = &self.inner {
-            let frame = EbpfServiceFrame::Pf(Pf { op: Pf::ADD, addr });
+            let frame = IpcServiceFrame::Pf(Pf { op: Pf::ADD, addr });
             Self::send(stream, frame.serialize_len_delimit()).await?;
         }
         Ok(())
@@ -31,7 +31,7 @@ impl IpcClient {
 
     pub async fn packet_filter_remove(&self, addr: SocketAddrV4) -> io::Result<()> {
         if let Some(stream) = &self.inner {
-            let frame = EbpfServiceFrame::Pf(Pf {
+            let frame = IpcServiceFrame::Pf(Pf {
                 op: Pf::REMOVE,
                 addr,
             });

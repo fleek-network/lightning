@@ -4,21 +4,21 @@ use std::net::{Ipv4Addr, SocketAddrV4};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 #[non_exhaustive]
-pub enum EbpfServiceFrame {
+pub enum IpcServiceFrame {
     /// Packet filter.
     Pf(Pf),
 }
 
-impl EbpfServiceFrame {
+impl IpcServiceFrame {
     const PF: u8 = 0;
 
     // Serialize the frame prefixed with the length of the frame.
     pub fn serialize_len_delimit(self) -> Bytes {
         match self {
-            EbpfServiceFrame::Pf(pf) => {
+            IpcServiceFrame::Pf(pf) => {
                 let mut result = BytesMut::with_capacity(8 + 8);
                 result.put_u64(8);
-                result.put_u8(EbpfServiceFrame::PF);
+                result.put_u8(IpcServiceFrame::PF);
                 pf.serialize(&mut result)
                     .expect("Buffer capacity is hard-coded");
                 result.freeze()
@@ -27,7 +27,7 @@ impl EbpfServiceFrame {
     }
 }
 
-impl TryFrom<&[u8]> for EbpfServiceFrame {
+impl TryFrom<&[u8]> for IpcServiceFrame {
     type Error = io::Error;
 
     fn try_from(mut value: &[u8]) -> Result<Self, Self::Error> {
@@ -39,9 +39,9 @@ impl TryFrom<&[u8]> for EbpfServiceFrame {
         }
 
         let frame = match value.get_u8() {
-            EbpfServiceFrame::PF => {
+            IpcServiceFrame::PF => {
                 let pf = Pf::try_from(value)?;
-                EbpfServiceFrame::Pf(pf)
+                IpcServiceFrame::Pf(pf)
             },
             _ => {
                 return Err(io::Error::new(

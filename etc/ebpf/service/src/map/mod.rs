@@ -1,6 +1,6 @@
-mod config;
 mod rules;
 mod shared;
 
-pub use config::Config;
+pub mod storage;
+
 pub use shared::SharedStateMap;

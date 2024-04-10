@@ -5,11 +5,13 @@ use tokio::runtime::Handle;
 use tokio::sync::mpsc;
 
 use crate::connection::Connection;
-use crate::state::SharedStateMap;
+use crate::map::storage::Storage;
+use crate::map::SharedStateMap;
 
 pub struct Server {
     listener: UnixListener,
     shared_state: SharedStateMap,
+    storage: Storage,
 }
 
 impl Server {
@@ -17,6 +19,7 @@ impl Server {
         Self {
             listener,
             shared_state,
+            storage: Default::default(),
         }
     }
 
@@ -27,13 +30,13 @@ impl Server {
                 .paths
                 .iter()
                 .map(|path| path.as_path())
-                .any(|p| p == self.shared_state.packet_filers_path())
+                .any(|p| p == self.storage.packet_filers_path())
             {
             } else if event
                 .paths
                 .iter()
                 .map(|path| path.as_path())
-                .any(|p| p == self.shared_state.profiles_path())
+                .any(|p| p == self.storage.profiles_path())
             {
             }
         }
@@ -55,13 +58,10 @@ impl Server {
         )?;
 
         watcher.watch(
-            self.shared_state.packet_filers_path(),
+            self.storage.packet_filers_path(),
             RecursiveMode::NonRecursive,
         )?;
-        watcher.watch(
-            self.shared_state.profiles_path(),
-            RecursiveMode::NonRecursive,
-        )?;
+        watcher.watch(self.storage.profiles_path(), RecursiveMode::NonRecursive)?;
 
         loop {
             tokio::select! {

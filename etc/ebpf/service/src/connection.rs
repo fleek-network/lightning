@@ -3,8 +3,8 @@ use log::error;
 use tokio::io::Interest;
 use tokio::net::UnixStream;
 
-use crate::frame::{EbpfServiceFrame, Pf};
-use crate::state::SharedStateMap;
+use crate::frame::{IpcServiceFrame, Pf};
+use crate::map::SharedStateMap;
 
 pub struct Connection {
     socket: UnixStream,
@@ -36,9 +36,9 @@ impl Connection {
     }
 
     #[inline]
-    async fn handle_request(&mut self, frame: EbpfServiceFrame) -> anyhow::Result<()> {
+    async fn handle_request(&mut self, frame: IpcServiceFrame) -> anyhow::Result<()> {
         match frame {
-            EbpfServiceFrame::Pf(pf) => self.pf_handle(pf).await,
+            IpcServiceFrame::Pf(pf) => self.pf_handle(pf).await,
         }
     }
 
@@ -94,7 +94,7 @@ impl Connection {
                     }
                 }
 
-                match EbpfServiceFrame::try_from(read_buf.as_slice()) {
+                match IpcServiceFrame::try_from(read_buf.as_slice()) {
                     Ok(f) => {
                         if let Err(e) = self.handle_request(f).await {
                             error!("failed to handle request: {e:?}");

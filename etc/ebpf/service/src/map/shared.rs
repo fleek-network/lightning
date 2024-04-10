@@ -1,22 +1,19 @@
 use std::collections::HashSet;
 use std::net::SocketAddrV4;
-use std::path::Path;
 use std::sync::Arc;
 
 use aya::maps::{HashMap, MapData};
 use common::{File, PacketFilter};
-use tokio::fs;
-use tokio::io::AsyncReadExt;
 use tokio::sync::Mutex;
 
-use crate::state::config::Config;
-use crate::state::rules::{FileOpenRule, PacketFilterRule, PermissionPolicy};
+use crate::map::rules::{FileOpenRule, PacketFilterRule, PermissionPolicy};
+use crate::map::storage::Storage;
 
 #[derive(Clone)]
 pub struct SharedStateMap {
     packet_filters: Arc<Mutex<HashMap<MapData, PacketFilter, u32>>>,
     file_open_rules: Arc<Mutex<FileOpenMaps>>,
-    config: Config,
+    storage: Storage,
 }
 
 impl SharedStateMap {
@@ -31,7 +28,7 @@ impl SharedStateMap {
                 file_open_allow_rules,
                 file_open_deny_rules,
             })),
-            config: Default::default(),
+            storage: Default::default(),
         }
     }
 
@@ -61,10 +58,7 @@ impl SharedStateMap {
     ///
     /// Reads from disk so it's a heavy operation.
     pub async fn update_packet_filters(&self) -> anyhow::Result<()> {
-        let mut file = fs::File::open(self.config.packet_filters_path.as_path()).await?;
-        let mut buf = String::new();
-        file.read_to_string(&mut buf).await?;
-        let filters: Vec<PacketFilterRule> = serde_json::from_str(&buf)?;
+        let filters: Vec<PacketFilterRule> = self.storage.read_packet_filters().await?;
         let new_state = filters
             .into_iter()
             .map(Into::into)
@@ -95,22 +89,11 @@ impl SharedStateMap {
         Ok(())
     }
 
-    pub fn packet_filers_path(&self) -> &Path {
-        self.config.packet_filters_path.as_path()
-    }
-
-    pub fn profiles_path(&self) -> &Path {
-        self.config.profiles_path.as_path()
-    }
-
     /// Updates file-open rules.
     ///
     /// Reads from disk so it's a heavy operation.
     pub async fn update_file_open_rules(&self) -> anyhow::Result<()> {
-        let mut file = fs::File::open(self.config.profiles_path.as_path()).await?;
-        let mut buf = String::new();
-        file.read_to_string(&mut buf).await?;
-        let rules: Vec<FileOpenRule> = serde_json::from_str(&buf)?;
+        let rules: Vec<FileOpenRule> = self.storage.read_profiles().await?;
 
         let mut allow = Vec::new();
         let mut deny = Vec::new();
@@ -163,33 +146,6 @@ impl SharedStateMap {
 
         Ok(())
     }
-
-    // pub async fn sync_packet_filters(&self) -> anyhow::Result<()> {
-    //     let tmp_path = format!("{PACKET_FILTERS_JSON}");
-    //     let mut tmp = fs::File::create(tmp_path.clone()).await?;
-    //     let mut filters = Vec::new();
-    //     let guard = self.packet_filters.lock().await;
-    //     for key in guard.keys() {
-    //         match key {
-    //             Ok(key) => {
-    //                 filters.push(PacketFilterRule {
-    //                     ip: key.ip.into(),
-    //                     port: key.port as u16,
-    //                 });
-    //             },
-    //             Err(e) => bail!("failed to sync packet filters: {e:?}"),
-    //         }
-    //     }
-    //
-    //     let bytes = serde_json::to_string(&filters)?;
-    //     tmp.write_all(bytes.as_bytes()).await?;
-    //
-    //     tmp.sync_all().await?;
-    //
-    //     fs::rename(tmp_path, PACKET_FILTERS_JSON).await?;
-    //
-    //     Ok(())
-    // }
 }
 
 pub struct FileOpenMaps {

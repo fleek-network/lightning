@@ -5,6 +5,6 @@ mod connection;
 #[cfg(any(feature = "client", feature = "server"))]
 pub mod frame;
 #[cfg(feature = "server")]
-pub mod server;
+pub mod map;
 #[cfg(feature = "server")]
-pub mod state;
+pub mod server;
