@@ -11,6 +11,7 @@
 //! are not only related to 1 particular component. Such as the `c` macro
 
 // Re-export more traits from our lib dependencies.
+pub use fdi::{Bind, BuildGraph, MethodExt};
 pub use ink_quill::{ToDigest, TranscriptBuilder};
 pub use lightning_schema::LightningMessage;
 
