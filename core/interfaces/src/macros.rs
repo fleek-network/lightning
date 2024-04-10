@@ -16,6 +16,8 @@ macro_rules! collection {
                     .with_module::<<Self as Collection>::$service>()
                     )*
             }
+
+            fn capture_configs(provider: &Self::ConfigProviderInterface);
         }
     }
 }
@@ -43,39 +45,56 @@ macro_rules! c {
 /// types (yet).
 #[macro_export]
 macro_rules! partial {
+    (@gen_missing { $($name:ident),* }) => {
+        $crate::proc::__gen_missing_assignments!({
+            ConfigProviderInterface,
+            KeystoreInterface,
+            ApplicationInterface,
+            BlockstoreInterface,
+            BlockstoreServerInterface,
+            SyncronizerInterface,
+            BroadcastInterface,
+            TopologyInterface,
+            ArchiveInterface,
+            ForwarderInterface,
+            ConsensusInterface,
+            HandshakeInterface,
+            NotifierInterface,
+            OriginProviderInterface,
+            DeliveryAcknowledgmentAggregatorInterface,
+            ReputationAggregatorInterface,
+            ResolverInterface,
+            RpcInterface,
+            ServiceExecutorInterface,
+            SignerInterface,
+            FetcherInterface,
+            PoolInterface,
+            PingerInterface,
+            IndexerInterface,
+        }, { $($name),*});
+    };
+    (@gen_body { $($name:ident),* }) => {
+        #[allow(unused_variables)]
+        fn capture_configs(provider: &Self::ConfigProviderInterface) {
+        }
+    };
     ($struct:ident { $($name:ident = $ty:ty;)* }) => {
         #[derive(Clone)]
         pub struct $struct;
 
         impl $crate::Collection for $struct {
             $(type $name = $ty;)*
+            $crate::partial!(@gen_missing { $($name),* });
+            $crate::partial!(@gen_body { $($name),* });
+        }
+    };
+    ($struct:ident require full { $($name:ident = $ty:ty;)* }) => {
+        #[derive(Clone)]
+        pub struct $struct;
 
-            $crate::proc::__gen_missing_assignments!({
-                ConfigProviderInterface,
-                KeystoreInterface,
-                ApplicationInterface,
-                BlockstoreInterface,
-                BlockstoreServerInterface,
-                SyncronizerInterface,
-                BroadcastInterface,
-                TopologyInterface,
-                ArchiveInterface,
-                ForwarderInterface,
-                ConsensusInterface,
-                HandshakeInterface,
-                NotifierInterface,
-                OriginProviderInterface,
-                DeliveryAcknowledgmentAggregatorInterface,
-                ReputationAggregatorInterface,
-                ResolverInterface,
-                RpcInterface,
-                ServiceExecutorInterface,
-                SignerInterface,
-                FetcherInterface,
-                PoolInterface,
-                PingerInterface,
-                IndexerInterface,
-            }, { $($name),*});
+        impl $crate::Collection for $struct {
+            $(type $name = $ty;)*
+            $crate::partial!(@gen_body { $($name),* });
         }
     };
 }
