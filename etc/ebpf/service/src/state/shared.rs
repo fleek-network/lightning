@@ -43,7 +43,7 @@ impl SharedState {
                 ip: (*addr.ip()).into(),
                 port: addr.port() as u32,
             },
-            0,
+            1,
             0,
         )?;
         Ok(())
@@ -55,34 +55,6 @@ impl SharedState {
             ip: (*addr.ip()).into(),
             port: addr.port() as u32,
         })?;
-        Ok(())
-    }
-
-    pub async fn file_open_allow(&mut self, inode: u64, dev: u32, rdev: u32) -> anyhow::Result<()> {
-        let mut map = self.file_open_rules.lock().await;
-        map.file_open_allow_rules.insert(
-            File {
-                inode_n: inode,
-                dev,
-                rdev,
-            },
-            0,
-            0,
-        )?;
-        Ok(())
-    }
-
-    pub async fn file_open_deny(&mut self, inode: u64, dev: u32, rdev: u32) -> anyhow::Result<()> {
-        let mut map = self.file_open_rules.lock().await;
-        map.file_open_deny_rules.insert(
-            File {
-                inode_n: inode,
-                dev,
-                rdev,
-            },
-            0,
-            0,
-        )?;
         Ok(())
     }
 
@@ -100,9 +72,12 @@ impl SharedState {
         // Due to a constraint of the aya api, there is no clean method for the maps and
         // we don't get mutable access as iterator is read only.
         let mut remove = Vec::new();
-        for filter in map.keys() {
-            let f = filter?;
-            if !new_state.contains(&f) {
+        for result in map.iter() {
+            let (filter, flag) = result?;
+            // Filters with flag=1 do not get removed.
+            // This is to support dynamic ephemiral rules
+            // that may be produced by rate limiting, for example.
+            if !new_state.contains(&filter) && flag != 1 {
                 remove.push(f);
             }
         }
