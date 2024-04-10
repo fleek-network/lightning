@@ -45,9 +45,9 @@ macro_rules! c {
 macro_rules! partial {
     ($struct:ident { $($name:ident = $ty:ty;)* }) => {
         #[derive(Clone)]
-        struct $struct;
+        pub struct $struct;
 
-        impl Collection for $struct {
+        impl $crate::Collection for $struct {
             $(type $name = $ty;)*
 
             $crate::proc::__gen_missing_assignments!({
@@ -78,4 +78,16 @@ macro_rules! partial {
             }, { $($name),*});
         }
     };
+}
+
+#[cfg(test)]
+mod tests {
+    partial!(BlanketCollection {});
+
+    // This test only has to be compiled in order to be considered passing.
+    #[test]
+    fn test_partial_no_missing_member() {
+        fn expect_collection<C: crate::Collection>() {}
+        expect_collection::<BlanketCollection>();
+    }
 }

@@ -20,3 +20,16 @@ pub fn __gen_missing_assignments(input: proc_macro::TokenStream) -> proc_macro::
     let pair = parse_macro_input!(input as partial::IdentSetPair);
     partial::gen_missing_assignments(pair).into()
 }
+
+pub(crate) fn hack_mod() -> syn::Path {
+    let crate_name = std::env::var("CARGO_PKG_NAME").unwrap();
+    if crate_name == "lightning-interfaces" {
+        syn::parse_quote! {
+            crate::_hacks
+        }
+    } else {
+        syn::parse_quote! {
+            lightning_interfaces::_hacks
+        }
+    }
+}

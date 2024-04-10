@@ -8,7 +8,7 @@ pub fn impl_blank(mut trait_: syn::ItemTrait) -> TokenStream {
     let mut report = quote!();
     let mut impl_body = vec![];
     let mut has_async = false;
-    let hack = hack_mod();
+    let hack = crate::hack_mod();
 
     for item in trait_.items.iter_mut() {
         if let syn::TraitItem::Fn(item) = item {
@@ -225,18 +225,5 @@ fn apply<C, T, I, O>(
         Ok(Some(v)) => Ok(Some(t(v))),
         Ok(None) => Ok(None),
         Err(e) => Err(e),
-    }
-}
-
-pub fn hack_mod() -> syn::Path {
-    let crate_name = std::env::var("CARGO_PKG_NAME").unwrap();
-    if crate_name == "lightning-interfaces" {
-        parse_quote! {
-            crate::_hacks
-        }
-    } else {
-        parse_quote! {
-            lightning_interfaces::_hacks
-        }
     }
 }
