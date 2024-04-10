@@ -73,6 +73,7 @@ pub use ink_quill::{ToDigest, TranscriptBuilder};
 #[rustfmt::skip]
 pub use fdi;
 
+/// This is needed to make partial work.
 #[doc(hidden)]
 pub use interfaces_proc as proc;
 

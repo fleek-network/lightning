@@ -53,24 +53,3 @@ pub fn gen_missing_assignments(pair: IdentSetPair) -> TokenStream {
         #(type #missing = lightning_interfaces::_hacks::Blanket;)*
     }
 }
-
-pub fn generate_partial_macros(set: IdentSet) -> TokenStream {
-    let s1 = set.ident.iter();
-
-    quote! {
-        #[macro_export]
-        macro_rules! partial {
-            ($struct:ident { $($name:ident = $ty:ty;)* }) => {
-                #[derive(Clone)]
-                struct $struct;
-
-                impl Collection for $struct {
-                    $(type $name = $ty;)*
-                    lightning_interfaces::proc::__gen_missing_assignments!(
-                        {#(#s1),*}, {$($name),*}
-                    );
-                }
-            };
-        }
-    }
-}

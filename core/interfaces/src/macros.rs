@@ -17,10 +17,6 @@ macro_rules! collection {
                     )*
             }
         }
-
-        $crate::proc::__gen_partial_macro!({
-            $($service),*
-        });
     }
 }
 
@@ -37,5 +33,49 @@ macro_rules! c {
 
     [$collection:tt :: $name:tt :: $sub:ident < $($g:ty),* >] => {
         <<$collection as $crate::Collection>::$name as $name<$collection>>::$sub<$($g),*>
+    };
+}
+
+/// Generate a partial implementation of a collection this uses the provided types to assign the
+/// associated types on the collection while filling every other member with the blanket.
+///
+/// This is a workaround on the fact that trait associated types do not have support for default
+/// types (yet).
+#[macro_export]
+macro_rules! partial {
+    ($struct:ident { $($name:ident = $ty:ty;)* }) => {
+        #[derive(Clone)]
+        struct $struct;
+
+        impl Collection for $struct {
+            $(type $name = $ty;)*
+
+            $crate::proc::__gen_missing_assignments!({
+                ConfigProviderInterface,
+                KeystoreInterface,
+                ApplicationInterface,
+                BlockstoreInterface,
+                BlockstoreServerInterface,
+                SyncronizerInterface,
+                BroadcastInterface,
+                TopologyInterface,
+                ArchiveInterface,
+                ForwarderInterface,
+                ConsensusInterface,
+                HandshakeInterface,
+                NotifierInterface,
+                OriginProviderInterface,
+                DeliveryAcknowledgmentAggregatorInterface,
+                ReputationAggregatorInterface,
+                ResolverInterface,
+                RpcInterface,
+                ServiceExecutorInterface,
+                SignerInterface,
+                FetcherInterface,
+                PoolInterface,
+                PingerInterface,
+                IndexerInterface,
+            }, { $($name),*});
+        }
     };
 }

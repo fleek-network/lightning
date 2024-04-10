@@ -20,9 +20,3 @@ pub fn __gen_missing_assignments(input: proc_macro::TokenStream) -> proc_macro::
     let pair = parse_macro_input!(input as partial::IdentSetPair);
     partial::gen_missing_assignments(pair).into()
 }
-
-#[proc_macro]
-pub fn __gen_partial_macro(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let set = parse_macro_input!(input as partial::IdentSet);
-    partial::generate_partial_macros(set).into()
-}
