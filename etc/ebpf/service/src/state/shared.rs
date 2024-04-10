@@ -1,13 +1,22 @@
 use std::net::SocketAddrV4;
 use std::sync::Arc;
 
+use anyhow::bail;
 use aya::maps::{HashMap, MapData};
 use common::{File, IpPortKey};
+use tokio::fs;
+use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
+
+use crate::state::schema::Filter;
+
+const EBPF_STATE_TMP_DIR: &str = "~/.lightning/ebpf/state/tmp";
+const EBPF_STATE_PF_DIR: &str = "~/.lightning/ebpf/state/packet-filter";
+const RULES_FILE: &str = "rules.json";
 
 #[derive(Clone)]
 pub struct SharedState {
-    block_list: Arc<Mutex<HashMap<MapData, IpPortKey, u32>>>,
+    blocklist: Arc<Mutex<HashMap<MapData, IpPortKey, u32>>>,
     proc_to_file: Arc<Mutex<HashMap<MapData, u64, u64>>>,
     binfile_to_file: Arc<Mutex<HashMap<MapData, File, u64>>>,
 }
@@ -19,14 +28,14 @@ impl SharedState {
         binfile_to_file: HashMap<MapData, File, u64>,
     ) -> Self {
         Self {
-            block_list: Arc::new(Mutex::new(block_list)),
+            blocklist: Arc::new(Mutex::new(block_list)),
             proc_to_file: Arc::new(Mutex::new(proc_to_file)),
             binfile_to_file: Arc::new(Mutex::new(binfile_to_file)),
         }
     }
 
     pub async fn blocklist_add(&mut self, addr: SocketAddrV4) -> anyhow::Result<()> {
-        let mut map = self.block_list.lock().await;
+        let mut map = self.blocklist.lock().await;
         map.insert(
             IpPortKey {
                 ip: (*addr.ip()).into(),
@@ -35,16 +44,16 @@ impl SharedState {
             0,
             0,
         )?;
-        Ok(())
+        self.sync_blocklist().await
     }
 
     pub async fn blocklist_remove(&mut self, addr: SocketAddrV4) -> anyhow::Result<()> {
-        let mut map = self.block_list.lock().await;
+        let mut map = self.blocklist.lock().await;
         map.remove(&IpPortKey {
             ip: (*addr.ip()).into(),
             port: addr.port() as u32,
         })?;
-        Ok(())
+        self.sync_blocklist().await
     }
 
     pub async fn file_allow_open_for_proc(&mut self, pid: u64) -> anyhow::Result<()> {
@@ -90,6 +99,33 @@ impl SharedState {
             dev,
             rdev,
         })?;
+        Ok(())
+    }
+
+    async fn sync_blocklist(&self) -> anyhow::Result<()> {
+        let tmp_path = format!("{EBPF_STATE_TMP_DIR}/{RULES_FILE}");
+        let mut tmp = fs::File::create(tmp_path.clone()).await?;
+        let mut rules = Vec::new();
+        let guard = self.blocklist.lock().await;
+        for key in guard.keys() {
+            match key {
+                Ok(key) => {
+                    rules.push(Filter {
+                        ip: key.ip.into(),
+                        port: key.port as u16,
+                    });
+                },
+                Err(e) => bail!("failed to sync blocklist: {e:?}"),
+            }
+        }
+
+        let bytes = serde_json::to_string(&rules)?;
+        tmp.write_all(bytes.as_bytes()).await?;
+
+        tmp.sync_all().await?;
+
+        fs::rename(tmp_path, format!("{EBPF_STATE_PF_DIR}/{RULES_FILE}")).await?;
+
         Ok(())
     }
 }

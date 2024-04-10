@@ -3001,6 +3001,9 @@ version = "0.0.0"
 dependencies = [
  "bytes",
  "log",
+ "resolved-pathbuf",
+ "serde",
+ "serde_json",
  "tokio",
 ]
 
