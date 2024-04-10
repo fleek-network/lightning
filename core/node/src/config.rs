@@ -5,7 +5,7 @@ use std::sync::Mutex;
 
 use anyhow::{Context, Result};
 use lightning_interfaces::fdi::{self, BuildGraph};
-use lightning_interfaces::{Collection, ConfigConsumer, ConfigProviderInterface, Node};
+use lightning_interfaces::{Collection, ConfigConsumer, ConfigProviderInterface};
 use resolved_pathbuf::ResolvedPathBuf;
 use toml::{Table, Value};
 use tracing::debug;
@@ -78,7 +78,7 @@ impl<C: Collection> TomlConfigProvider<C> {
         config_path: ResolvedPathBuf,
     ) -> Result<TomlConfigProvider<C>> {
         let config = Self::open(&config_path)?;
-        Node::<C>::fill_configuration(&config);
+        <C as Collection>::capture_configs(&config);
 
         if !config_path.exists() {
             std::fs::write(&config_path, config.serialize_config()).with_context(|| {

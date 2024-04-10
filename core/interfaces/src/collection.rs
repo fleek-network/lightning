@@ -87,8 +87,4 @@ impl<C: Collection> Node<C> {
 
         shutdown.shutdown().await;
     }
-
-    /// Fill the configuration provider with the default configuration without performing any
-    /// initialization.
-    pub fn fill_configuration<T: Collection>(_config_provider: &impl ConfigProviderInterface<T>) {}
 }

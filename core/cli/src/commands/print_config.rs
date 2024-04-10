@@ -1,6 +1,5 @@
 use anyhow::Result;
-use lightning_interfaces::{Collection, Node};
-use lightning_interfaces::ConfigProviderInterface;
+use lightning_interfaces::{Collection, ConfigProviderInterface};
 use lightning_node::config::TomlConfigProvider;
 use resolved_pathbuf::ResolvedPathBuf;
 
@@ -13,7 +12,7 @@ pub async fn exec<C: Collection>(default: bool, config_path: ResolvedPathBuf) ->
 
 async fn print_default<C: Collection>() -> Result<()> {
     let config = TomlConfigProvider::<C>::default();
-    Node::<C>::fill_configuration(&config);
+    <C as Collection>::capture_configs(&config);
     println!("{}", config.serialize_config());
     Ok(())
 }

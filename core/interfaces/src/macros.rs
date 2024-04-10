@@ -22,7 +22,7 @@ macro_rules! collection {
             /// implements ConfigConsumer.
             ///
             /// An implementation is provided when using the partial macro.
-            fn capture_configs(provider: &Self::ConfigProviderInterface);
+            fn capture_configs(provider: &impl $crate::ConfigProviderInterface<Self>);
         }
     }
 }
@@ -81,7 +81,7 @@ macro_rules! partial {
     (@gen_body { $($name:ident = $ty:ty;)* }) => {
 
         #[allow(unused)]
-        fn capture_configs(provider: &Self::ConfigProviderInterface) {
+        fn capture_configs(provider: &impl $crate::ConfigProviderInterface<Self>) {
             use $crate::_hacks::ConfigConsumerProxy;
 
             $(
