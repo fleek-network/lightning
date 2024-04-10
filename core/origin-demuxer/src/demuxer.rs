@@ -1,5 +1,5 @@
 use affair::AsyncWorkerUnordered;
-use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::Collection;
 use lightning_interfaces::types::{Blake3Hash, ImmutablePointer, OriginProvider};
 use lightning_origin_http::HttpOrigin;
 use lightning_origin_ipfs::IPFSOrigin;

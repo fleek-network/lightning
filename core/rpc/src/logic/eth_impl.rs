@@ -16,7 +16,7 @@ use ethers::utils::rlp;
 use fleek_crypto::EthAddress;
 use hp_fixed::unsigned::HpUfixed;
 use jsonrpsee::core::RpcResult;
-use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::Collection;
 use lightning_interfaces::{ArchiveInterface, SyncQueryRunnerInterface};
 use lightning_utils::application::QueryRunnerExt;
 use tracing::trace;

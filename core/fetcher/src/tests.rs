@@ -12,7 +12,7 @@ use lightning_blockstore_server::BlockstoreServer;
 use lightning_broadcast::Broadcast;
 use lightning_indexer::Indexer;
 use lightning_interfaces::fdi::Provider;
-use lightning_interfaces::infu_collection::{Collection, Node};
+use lightning_interfaces::{Collection, Node};
 use lightning_interfaces::types::{
     FetcherRequest,
     FetcherResponse,

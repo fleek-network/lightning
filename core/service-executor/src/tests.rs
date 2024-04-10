@@ -13,7 +13,7 @@ use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisAccount};
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
-use lightning_interfaces::infu_collection::{Collection, Node};
+use lightning_interfaces::{Collection, Node};
 use lightning_interfaces::{fdi, partial};
 use lightning_notifier::Notifier;
 use lightning_signer::Signer;

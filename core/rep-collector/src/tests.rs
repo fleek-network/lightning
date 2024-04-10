@@ -8,7 +8,7 @@ use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_interfaces::application::ApplicationInterface;
 use lightning_interfaces::common::WithStartAndShutdown;
 use lightning_interfaces::consensus::ConsensusInterface;
-use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::Collection;
 use lightning_interfaces::notifier::NotifierInterface;
 use lightning_interfaces::reputation::{
     ReputationAggregatorInterface,

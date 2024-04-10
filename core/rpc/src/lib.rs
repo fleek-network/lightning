@@ -6,7 +6,7 @@ use hyper::service::{make_service_fn, service_fn};
 use jsonrpsee::server::{stop_channel, Server as JSONRPCServer};
 use jsonrpsee::{Methods, RpcModule};
 use lightning_interfaces::fdi::MethodExt;
-use lightning_interfaces::infu_collection::{c, Collection};
+use lightning_interfaces::{c, Collection};
 use lightning_interfaces::types::Event;
 use lightning_interfaces::{
     fdi,

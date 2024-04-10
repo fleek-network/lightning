@@ -6,7 +6,7 @@ use lightning_application::app::Application;
 use lightning_application::config::Config as AppConfig;
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
-use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::Collection;
 use lightning_interfaces::{
     partial,
     ApplicationInterface,

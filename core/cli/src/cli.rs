@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use clap::Parser;
-use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::Collection;
 use lightning_node::config::TomlConfigProvider;
 use lightning_node::{FinalTypes, WithMockConsensus};
 use resolved_pathbuf::ResolvedPathBuf;

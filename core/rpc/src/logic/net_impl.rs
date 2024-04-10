@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use jsonrpsee::core::RpcResult;
-use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::Collection;
 use tracing::trace;
 
 use crate::api::NetApiServer;

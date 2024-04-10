@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use affair::{AsyncWorkerUnordered, Executor, TokioSpawn};
 use anyhow::{anyhow, Context, Result};
-use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::Collection;
 use lightning_interfaces::types::{
     Blake3Hash,
     FetcherRequest,

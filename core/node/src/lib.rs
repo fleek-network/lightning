@@ -1,6 +1,5 @@
 pub mod config;
 
-use infusion::Blank;
 use lightning_application::app::Application;
 use lightning_archive::archive::Archive;
 use lightning_blockstore::blockstore::Blockstore;
@@ -11,14 +10,7 @@ use lightning_fetcher::fetcher::Fetcher;
 use lightning_forwarder::Forwarder;
 use lightning_handshake::handshake::Handshake;
 use lightning_indexer::Indexer;
-use lightning_interfaces::infu_collection::{
-    Collection,
-    CollectionBase,
-    ConsensusInterfaceContainer,
-    ConsensusInterfaceModifier,
-    ForwarderInterfaceContainer,
-    ForwarderInterfaceModifier,
-};
+use lightning_interfaces::Collection;
 use lightning_keystore::Keystore;
 use lightning_notifier::Notifier;
 use lightning_origin_demuxer::OriginDemuxer;
@@ -38,45 +30,34 @@ use crate::config::TomlConfigProvider;
 #[derive(Clone)]
 pub struct FinalTypes;
 
-impl CollectionBase for FinalTypes {
-    type ConfigProviderInterface<C: Collection> = TomlConfigProvider<C>;
-    type ApplicationInterface<C: Collection> = Application<C>;
-    type BlockstoreInterface<C: Collection> = Blockstore<C>;
-    type BlockstoreServerInterface<C: Collection> = BlockstoreServer<C>;
-    type SyncronizerInterface<C: Collection> = Syncronizer<C>;
-    type BroadcastInterface<C: Collection> = Broadcast<C>;
-    type TopologyInterface<C: Collection> = Topology<C>;
-    type ArchiveInterface<C: Collection> = Archive<C>;
-    type ForwarderInterface<C: Collection> = Forwarder<C>;
-    type ConsensusInterface<C: Collection> = Consensus<C>;
-    type HandshakeInterface<C: Collection> = Handshake<C>;
-    type NotifierInterface<C: Collection> = Notifier<C>;
-    type OriginProviderInterface<C: Collection> = OriginDemuxer<C>;
-    type DeliveryAcknowledgmentAggregatorInterface<C: Collection> = infusion::Blank<C>;
-    type ReputationAggregatorInterface<C: Collection> = ReputationAggregator<C>;
-    type ResolverInterface<C: Collection> = Resolver<C>;
-    type RpcInterface<C: Collection> = Rpc<C>;
-    type ServiceExecutorInterface<C: Collection> = ServiceExecutor<C>;
-    type KeystoreInterface<C: Collection> = Keystore<C>;
-    type SignerInterface<C: Collection> = Signer<C>;
-    type FetcherInterface<C: Collection> = Fetcher<C>;
-    type PoolInterface<C: Collection> = PoolProvider<C>;
-    type PingerInterface<C: Collection> = Pinger<C>;
-    type IndexerInterface<C: Collection> = Indexer<C>;
+impl Collection for FinalTypes {
+    type ConfigProviderInterface = TomlConfigProvider<Self>;
+    type ApplicationInterface = Application<Self>;
+    type BlockstoreInterface = Blockstore<Self>;
+    type BlockstoreServerInterface = BlockstoreServer<Self>;
+    type SyncronizerInterface = Syncronizer<Self>;
+    type BroadcastInterface = Broadcast<Self>;
+    type TopologyInterface = Topology<Self>;
+    type ArchiveInterface = Archive<Self>;
+    type ForwarderInterface = Forwarder<Self>;
+    type ConsensusInterface = Consensus<Self>;
+    type HandshakeInterface = Handshake<Self>;
+    type NotifierInterface = Notifier<Self>;
+    type OriginProviderInterface = OriginDemuxer<Self>;
+    type ReputationAggregatorInterface = ReputationAggregator<Self>;
+    type ResolverInterface = Resolver<Self>;
+    type RpcInterface = Rpc<Self>;
+    type ServiceExecutorInterface = ServiceExecutor<Self>;
+    type KeystoreInterface = Keystore<Self>;
+    type SignerInterface = Signer<Self>;
+    type FetcherInterface = Fetcher<Self>;
+    type PoolInterface = PoolProvider<Self>;
+    type PingerInterface = Pinger<Self>;
+    type IndexerInterface = Indexer<Self>;
+    type DeliveryAcknowledgmentAggregatorInterface = lightning_interfaces::_hacks::Blanket;
 }
 
 // Create the collection modifier that can inject the mock consensus
 // into the FinalTypes (or other collections.).
 
-pub struct UseMockConsensusMarker;
-impl ForwarderInterfaceContainer for UseMockConsensusMarker {
-    type ForwarderInterface<C: Collection> = Blank<C>;
-}
-impl ConsensusInterfaceContainer for UseMockConsensusMarker {
-    type ConsensusInterface<C: Collection> = Blank<C>;
-}
-
-pub type WithMockConsensus<O = FinalTypes> = ConsensusInterfaceModifier<
-    UseMockConsensusMarker,
-    ForwarderInterfaceModifier<UseMockConsensusMarker, O>,
->;
+pub type WithMockConsensus = FinalTypes;

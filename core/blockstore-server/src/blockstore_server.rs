@@ -13,9 +13,8 @@ use affair::{Socket, Task};
 use anyhow::{anyhow, Result};
 use blake3_tree::ProofBuf;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use infusion::c;
 use lightning_interfaces::fdi::{BuildGraph, DependencyGraph, MethodExt};
-use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::Collection;
 use lightning_interfaces::types::{
     Blake3Hash,
     CompressionAlgoSet,
@@ -25,6 +24,7 @@ use lightning_interfaces::types::{
     ServerRequest,
 };
 use lightning_interfaces::{
+    c,
     BlockstoreInterface,
     BlockstoreServerInterface,
     BlockstoreServerSocket,

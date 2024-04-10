@@ -9,7 +9,7 @@ use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_indexer::Indexer;
-use lightning_interfaces::infu_collection::{Collection, Node};
+use lightning_interfaces::{Collection, Node};
 use lightning_interfaces::types::NodePorts;
 use lightning_interfaces::{fdi, partial, BlockstoreInterface, KeystoreInterface};
 use lightning_signer::Signer;

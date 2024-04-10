@@ -5,7 +5,7 @@
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_cli::cli::Cli;
 use lightning_handshake::handshake::Handshake;
-use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::Collection;
 use lightning_interfaces::partial;
 use lightning_node::config::TomlConfigProvider;
 use lightning_rpc::Rpc;

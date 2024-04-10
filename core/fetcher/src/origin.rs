@@ -1,6 +1,6 @@
 use std::collections::{HashMap, VecDeque};
 
-use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::Collection;
 use lightning_interfaces::types::{Blake3Hash, ImmutablePointer, OriginProvider};
 use lightning_interfaces::{OriginProviderSocket, ResolverInterface};
 use tokio::sync::{broadcast, mpsc, oneshot};

@@ -2,8 +2,8 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use lightning_interfaces::infu_collection::Collection;
-use lightning_interfaces::{ConfigConsumer, ConfigProviderInterface};
+use fdi::BuildGraph;
+use lightning_interfaces::{Collection, ConfigConsumer, ConfigProviderInterface};
 use serde::{Deserialize, Serialize};
 use serde_json::{to_value, Value};
 
@@ -64,5 +64,11 @@ impl<C: Collection> ConfigProviderInterface<C> for JsonConfigProvider {
         let guard = self.value.lock().unwrap();
         let map = serde_json::to_value(&*guard).unwrap();
         format!("{:#}", map)
+    }
+}
+
+impl BuildGraph for JsonConfigProvider {
+    fn build_graph() -> fdi::DependencyGraph {
+        fdi::DependencyGraph::new().with_infallible(Self::default)
     }
 }

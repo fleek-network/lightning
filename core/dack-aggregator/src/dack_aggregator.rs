@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 
 use affair::{Socket, Task};
 use lightning_interfaces::fdi::{self, BuildGraph, MethodExt};
-use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::Collection;
 use lightning_interfaces::types::{
     DeliveryAcknowledgment,
     DeliveryAcknowledgmentProof,

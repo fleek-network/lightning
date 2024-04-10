@@ -20,7 +20,7 @@ use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore_server::BlockstoreServer;
 use lightning_fetcher::fetcher::Fetcher;
 use lightning_indexer::Indexer;
-use lightning_interfaces::infu_collection::{Collection, Node};
+use lightning_interfaces::{Collection, Node};
 use lightning_interfaces::types::{
     Blake3Hash,
     EpochInfo,

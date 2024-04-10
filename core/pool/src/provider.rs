@@ -6,11 +6,11 @@ use std::task::Poll;
 use anyhow::Result;
 use bytes::Bytes;
 use futures::{SinkExt, Stream};
-use infusion::c;
 use lightning_interfaces::fdi::{BuildGraph, MethodExt};
-use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::Collection;
 use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::{
+    c,
     fdi,
     ApplicationInterface,
     ConfigConsumer,

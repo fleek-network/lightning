@@ -15,7 +15,7 @@ use anyhow::anyhow;
 pub use config::Config;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::fdi::{self, BuildGraph, DependencyGraph, MethodExt};
-use lightning_interfaces::infu_collection::{c, Collection};
+use lightning_interfaces::{c, Collection};
 use lightning_interfaces::{
     ApplicationInterface,
     ConfigConsumer,

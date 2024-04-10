@@ -11,7 +11,7 @@ use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisLatency, GenesisNode};
 use lightning_interfaces::fdi::Provider;
-use lightning_interfaces::infu_collection::{Collection, Node};
+use lightning_interfaces::{Collection, Node};
 use lightning_interfaces::types::{NodePorts, Participation};
 use lightning_interfaces::{
     partial,

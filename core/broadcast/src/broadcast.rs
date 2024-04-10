@@ -1,5 +1,5 @@
 use lightning_interfaces::fdi::{BuildGraph, Cloned, DependencyGraph, MethodExt};
-use lightning_interfaces::infu_collection::{c, Collection};
+use lightning_interfaces::{c, Collection};
 use lightning_interfaces::schema::broadcast::Frame;
 use lightning_interfaces::schema::LightningMessage;
 use lightning_interfaces::types::Topic;

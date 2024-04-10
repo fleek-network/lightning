@@ -12,7 +12,7 @@ use std::collections::{HashSet, VecDeque};
 use bytes::Bytes;
 use fleek_crypto::NodeSignature;
 use ink_quill::ToDigest;
-use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::Collection;
 use lightning_interfaces::schema::broadcast::{Advr, Frame, Message, MessageInternedId, Want};
 use lightning_interfaces::schema::LightningMessage;
 use lightning_interfaces::types::{Digest, NodeIndex, Topic};

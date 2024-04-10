@@ -10,9 +10,16 @@ use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_indexer::Indexer;
-use lightning_interfaces::infu_collection::{Collection, Node};
 use lightning_interfaces::types::NodePorts;
-use lightning_interfaces::{fdi, partial, BlockstoreInterface, KeystoreInterface};
+use lightning_interfaces::{
+    fdi,
+    partial,
+    BlockstoreInterface,
+    Collection,
+    Collection,
+    KeystoreInterface,
+    Node,
+};
 use lightning_signer::Signer;
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus, MockForwarder};
 use lightning_test_utils::json_config::JsonConfigProvider;

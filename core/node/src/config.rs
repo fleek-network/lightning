@@ -4,8 +4,8 @@ use std::path::Path;
 use std::sync::Mutex;
 
 use anyhow::{Context, Result};
-use lightning_interfaces::infu_collection::{Collection, Node};
-use lightning_interfaces::{ConfigConsumer, ConfigProviderInterface};
+use lightning_interfaces::fdi::{self, BuildGraph};
+use lightning_interfaces::{Collection, ConfigConsumer, ConfigProviderInterface, Node};
 use resolved_pathbuf::ResolvedPathBuf;
 use toml::{Table, Value};
 use tracing::debug;
@@ -114,5 +114,11 @@ impl<C: Collection> ConfigProviderInterface<C> for TomlConfigProvider<C> {
 
     fn serialize_config(&self) -> String {
         toml::to_string(&self.table).expect("failed to serialize config")
+    }
+}
+
+impl<C: Collection> BuildGraph for TomlConfigProvider<C> {
+    fn build_graph() -> fdi::DependencyGraph {
+        fdi::DependencyGraph::new().with(|| Self::open("./config.toml"))
     }
 }

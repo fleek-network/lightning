@@ -17,7 +17,7 @@ use fleek_crypto::{
 };
 use hp_fixed::signed::HpFixed;
 use hp_fixed::unsigned::HpUfixed;
-use lightning_interfaces::infu_collection::{Collection, Node};
+use lightning_interfaces::{Collection, Node};
 use lightning_interfaces::types::{
     AccountInfo,
     Blake3Hash,

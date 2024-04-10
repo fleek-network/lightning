@@ -7,7 +7,7 @@ use fleek_crypto::{AccountOwnerSecretKey, NodeSecretKey, NodeSignature, SecretKe
 use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisNode};
-use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::Collection;
 use lightning_interfaces::schema::broadcast::{Frame, Message};
 use lightning_interfaces::types::{NodeIndex, NodePorts, Topic};
 use lightning_interfaces::{

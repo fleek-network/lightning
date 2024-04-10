@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use lightning_interfaces::fdi::{Bind, BuildGraph, DependencyGraph, MethodExt};
-use lightning_interfaces::infu_collection::{c, Collection};
+use lightning_interfaces::{c, Collection};
 use lightning_interfaces::types::{
     NodeIndex,
     ReputationMeasurements,

@@ -12,7 +12,7 @@ use lightning_blockstore::blockstore::{Blockstore, BLOCK_SIZE};
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_indexer::Indexer;
 use lightning_interfaces::fdi::Ref;
-use lightning_interfaces::infu_collection::{Collection, Node};
+use lightning_interfaces::{Collection, Node};
 use lightning_interfaces::types::{
     CompressionAlgoSet,
     CompressionAlgorithm,

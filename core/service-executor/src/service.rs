@@ -6,10 +6,10 @@ use std::time::{Duration, Instant};
 use dashmap::DashMap;
 use fleek_crypto::ClientPublicKey;
 use fn_sdk::ipc_types::{self, IpcMessage, IpcRequest, DELIMITER_SIZE};
-use infusion::c;
-use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::{
+    c,
     ApplicationInterface,
+    Collection,
     FetcherSocket,
     ShutdownWaiter,
     SyncQueryRunnerInterface,

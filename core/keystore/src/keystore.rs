@@ -13,7 +13,7 @@ use fleek_crypto::{
     SecretKey,
 };
 use lightning_interfaces::fdi::{BuildGraph, DependencyGraph};
-use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::Collection;
 use lightning_interfaces::{ConfigConsumer, ConfigProviderInterface, KeystoreInterface};
 use tracing::info;
 use triomphe::Arc;

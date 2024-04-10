@@ -3,13 +3,13 @@ use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 
 use fleek_crypto::{AccountOwnerSecretKey, SecretKey};
-use infusion::c;
 use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisNode};
-use lightning_interfaces::infu_collection::{Collection, Node};
+use lightning_interfaces::{Collection, Node};
 use lightning_interfaces::types::{DeliveryAcknowledgment, DeliveryAcknowledgmentProof, NodePorts};
 use lightning_interfaces::{
+    c,
     fdi,
     partial,
     ApplicationInterface,

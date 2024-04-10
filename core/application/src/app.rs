@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use affair::{Executor, TokioSpawn};
 use anyhow::{anyhow, Result};
-use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::Collection;
 use lightning_interfaces::{
     fdi,
     ApplicationInterface,

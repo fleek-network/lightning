@@ -2,11 +2,11 @@ use std::marker::PhantomData;
 use std::path::PathBuf;
 
 use fxhash::FxHashSet;
-use infusion::c;
 use lightning_interfaces::fdi::{BuildGraph, DependencyGraph, MethodExt};
-use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::Collection;
 use lightning_interfaces::types::ServiceId;
 use lightning_interfaces::{
+    c,
     ApplicationInterface,
     BlockstoreInterface,
     Cloned,

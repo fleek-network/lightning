@@ -11,7 +11,7 @@ use blake3_tree::utils::{HashTree, HashVec};
 use blake3_tree::IncrementalVerifier;
 use bytes::{BufMut, BytesMut};
 use lightning_interfaces::fdi::{BuildGraph, Cloned, DependencyGraph, MethodExt};
-use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::Collection;
 use lightning_interfaces::types::{Blake3Hash, CompressionAlgoSet, CompressionAlgorithm};
 use lightning_interfaces::{
     BlockstoreInterface,

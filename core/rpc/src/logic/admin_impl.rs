@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use jsonrpsee::core::RpcResult;
-use lightning_interfaces::infu_collection::Collection;
+use lightning_interfaces::Collection;
 use lightning_interfaces::types::{Blake3Hash, CompressionAlgorithm};
 use lightning_interfaces::{BlockstoreInterface, IncrementalPutInterface};
 

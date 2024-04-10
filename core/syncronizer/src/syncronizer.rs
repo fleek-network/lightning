@@ -3,7 +3,7 @@ use std::time::{Duration, SystemTime};
 use anyhow::{anyhow, bail, Context, Result};
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::fdi::MethodExt;
-use lightning_interfaces::infu_collection::{c, Collection};
+use lightning_interfaces::{c, Collection};
 use lightning_interfaces::types::{
     Blake3Hash,
     Epoch,
