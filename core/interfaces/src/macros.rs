@@ -80,6 +80,9 @@ macro_rules! partial {
     };
     (@gen_body { $($name:ident = $ty:ty;)* }) => {
 
+        // You might wanna read this article to understand what's going on here:
+        // https://github.com/dtolnay/case-studies/blob/master/autoref-specialization/README.md
+        // perm-commit-hash: b2c0e963b7c250587c1bdf80e7e7039b7c99d4c4
         #[allow(unused)]
         fn capture_configs(provider: &impl $crate::ConfigProviderInterface<Self>) {
             use $crate::_hacks::ConfigConsumerProxy;
