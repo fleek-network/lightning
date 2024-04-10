@@ -78,7 +78,7 @@ impl SharedState {
             // This is to support dynamic ephemiral rules
             // that may be produced by rate limiting, for example.
             if !new_state.contains(&filter) && flag != 1 {
-                remove.push(f);
+                remove.push(filter);
             }
         }
 

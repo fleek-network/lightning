@@ -47,23 +47,13 @@ async fn main() -> anyhow::Result<()> {
 
     let packet_filters: HashMap<_, PacketFilter, u32> =
         HashMap::try_from(handle.take_map("PACKET_FILTERS").unwrap())?;
-    let file_open_allow_binfile: HashMap<_, File, u64> =
-        HashMap::try_from(handle.take_map("FILE_OPEN_ALLOW_BINFILE").unwrap())?;
-    let file_open_allow_pid: HashMap<_, u64, u64> =
-        HashMap::try_from(handle.take_map("FILE_OPEN_ALLOW_PID").unwrap())?;
-    let file_open_deny_binfile: HashMap<_, File, u64> =
-        HashMap::try_from(handle.take_map("FILE_OPEN_DENY_BINFILE").unwrap())?;
-    let file_open_deny_pid: HashMap<_, u64, u64> =
-        HashMap::try_from(handle.take_map("FILE_OPEN_DENY_PID").unwrap())?;
+    let file_open_allow: HashMap<_, File, u64> =
+        HashMap::try_from(handle.take_map("FILE_OPEN_ALLOW").unwrap())?;
+    let file_open_deny: HashMap<_, File, u64> =
+        HashMap::try_from(handle.take_map("FILE_OPEN_DENY").unwrap())?;
 
     let listener = UnixListener::bind(".lightning/ebpf")?;
-    let shared_state = SharedState::new(
-        packet_filters,
-        file_open_allow_pid,
-        file_open_allow_binfile,
-        file_open_deny_pid,
-        file_open_deny_binfile,
-    );
+    let shared_state = SharedState::new(packet_filters, file_open_allow, file_open_deny);
     let server = Server::new(listener, shared_state);
 
     log::info!("Enter Ctrl-C to shutdown");
