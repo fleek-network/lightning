@@ -9,9 +9,8 @@ mod tests {
 
     use blake3_tree::blake3::tree::{HashTree, HashTreeBuilder};
     use blake3_tree::ProofBuf;
-    use lightning_interfaces::Collection;
     use lightning_interfaces::types::{Blake3Hash, CompressionAlgorithm};
-    use lightning_interfaces::{partial, BlockstoreInterface, IncrementalPutInterface};
+    use lightning_interfaces::{partial, BlockstoreInterface, Collection, IncrementalPutInterface};
     use tokio::test;
 
     use crate::blockstore::{Blockstore, BLOCK_SIZE};

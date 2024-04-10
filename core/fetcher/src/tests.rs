@@ -12,7 +12,6 @@ use lightning_blockstore_server::BlockstoreServer;
 use lightning_broadcast::Broadcast;
 use lightning_indexer::Indexer;
 use lightning_interfaces::fdi::Provider;
-use lightning_interfaces::{Collection, Node};
 use lightning_interfaces::types::{
     FetcherRequest,
     FetcherResponse,
@@ -20,7 +19,14 @@ use lightning_interfaces::types::{
     NodePorts,
     OriginProvider,
 };
-use lightning_interfaces::{partial, BlockstoreInterface, FetcherInterface, KeystoreInterface};
+use lightning_interfaces::{
+    partial,
+    BlockstoreInterface,
+    Collection,
+    FetcherInterface,
+    KeystoreInterface,
+    Node,
+};
 use lightning_notifier::Notifier;
 use lightning_origin_demuxer::{Config as DemuxerOriginConfig, OriginDemuxer};
 use lightning_origin_ipfs::config::{Gateway, Protocol};

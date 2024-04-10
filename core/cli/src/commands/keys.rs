@@ -1,6 +1,5 @@
 use anyhow::Result;
-use lightning_interfaces::Collection;
-use lightning_interfaces::{ConfigProviderInterface, KeystoreInterface};
+use lightning_interfaces::{Collection, ConfigProviderInterface, KeystoreInterface};
 use lightning_node::config::TomlConfigProvider;
 use resolved_pathbuf::ResolvedPathBuf;
 

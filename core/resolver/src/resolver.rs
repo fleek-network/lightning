@@ -2,13 +2,14 @@ use std::sync::Arc;
 
 use fleek_crypto::{NodeSecretKey, PublicKey, SecretKey};
 use lightning_interfaces::fdi::{self, BuildGraph, MethodExt};
-use lightning_interfaces::{c, Collection};
 use lightning_interfaces::schema::broadcast::ResolvedImmutablePointerRecord;
 use lightning_interfaces::types::{Blake3Hash, ImmutablePointer, NodeIndex, Topic};
 use lightning_interfaces::{
+    c,
     ApplicationInterface,
     BroadcastInterface,
     Cloned,
+    Collection,
     ConfigConsumer,
     ConfigProviderInterface,
     KeystoreInterface,

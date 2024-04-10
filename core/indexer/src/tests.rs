@@ -7,12 +7,13 @@ use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_application::query_runner::QueryRunner;
 use lightning_interfaces::fdi::Provider;
-use lightning_interfaces::{Collection, Node};
 use lightning_interfaces::types::NodePorts;
 use lightning_interfaces::{
     partial,
+    Collection,
     IndexerInterface,
     KeystoreInterface,
+    Node,
     SyncQueryRunnerInterface,
 };
 use lightning_notifier::Notifier;

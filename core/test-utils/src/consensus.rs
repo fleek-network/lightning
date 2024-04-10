@@ -4,10 +4,11 @@ use std::time::Duration;
 
 use affair::{AsyncWorker, Executor, TokioSpawn};
 use fdi::{BuildGraph, Cloned, DependencyGraph, MethodExt};
-use lightning_interfaces::{c, Collection};
 use lightning_interfaces::types::{Block, TransactionRequest};
 use lightning_interfaces::{
+    c,
     ApplicationInterface,
+    Collection,
     ConfigConsumer,
     ConfigProviderInterface,
     ConsensusInterface,

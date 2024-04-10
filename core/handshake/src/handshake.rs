@@ -10,10 +10,10 @@ use fn_sdk::header::{write_header, ConnectionHeader};
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use lightning_interfaces::fdi::{BuildGraph, DependencyGraph, MethodExt};
-use lightning_interfaces::Collection;
 use lightning_interfaces::{
     c,
     Cloned,
+    Collection,
     ConfigConsumer,
     ConfigProviderInterface,
     Consume,

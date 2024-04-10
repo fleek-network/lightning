@@ -5,12 +5,13 @@ use std::time::{Duration, SystemTime};
 use derive_more::{From, IsVariant, TryInto};
 use fleek_crypto::{ConsensusPublicKey, NodePublicKey, SecretKey};
 use lightning_interfaces::fdi::{BuildGraph, DependencyGraph, MethodExt};
-use lightning_interfaces::{c, Collection};
 use lightning_interfaces::types::{Epoch, EpochInfo, Event, Topic, UpdateMethod};
 use lightning_interfaces::{
+    c,
     ApplicationInterface,
     BroadcastInterface,
     Cloned,
+    Collection,
     ConfigConsumer,
     ConfigProviderInterface,
     ConsensusInterface,

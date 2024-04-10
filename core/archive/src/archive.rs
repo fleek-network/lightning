@@ -3,7 +3,6 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use ethers::types::BlockNumber;
 use lightning_interfaces::fdi::{BuildGraph, DependencyGraph, MethodExt};
-use lightning_interfaces::{c, Collection};
 use lightning_interfaces::types::{
     Block,
     BlockExecutionResponse,
@@ -12,10 +11,12 @@ use lightning_interfaces::types::{
     TransactionRequest,
 };
 use lightning_interfaces::{
+    c,
     ApplicationInterface,
     ArchiveInterface,
     BlockstoreInterface,
     Cloned,
+    Collection,
     ConfigConsumer,
     ConfigProviderInterface,
     NotifierInterface,

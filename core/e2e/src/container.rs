@@ -2,9 +2,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::thread::JoinHandle;
 
-use lightning_interfaces::{Collection, Node};
 use lightning_interfaces::types::Blake3Hash;
-use lightning_interfaces::SyncronizerInterface;
+use lightning_interfaces::{Collection, Node, SyncronizerInterface};
 use tokio::sync::{oneshot, Notify};
 
 use crate::containerized_node::RuntimeType;

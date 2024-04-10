@@ -9,11 +9,11 @@ use bytes::Bytes;
 use fleek_crypto::NodePublicKey;
 use futures::stream::FuturesUnordered;
 use hp_fixed::unsigned::HpUfixed;
-use lightning_interfaces::Collection;
 use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::{
     c,
     ApplicationInterface,
+    Collection,
     ServiceScope,
     ShutdownWaiter,
     SyncQueryRunnerInterface,

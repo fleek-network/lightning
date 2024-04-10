@@ -1,8 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
-use lightning_interfaces::{Collection, Node};
-use lightning_interfaces::BlockstoreServerInterface;
+use lightning_interfaces::{BlockstoreServerInterface, Collection, Node};
 use lightning_node::config::TomlConfigProvider;
 use lightning_types::{Blake3Hash, NodePorts};
 use lightning_utils::rpc::rpc_request;

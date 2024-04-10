@@ -9,7 +9,6 @@ use std::time::{Duration, SystemTime};
 use affair::{AsyncWorker, Executor, Socket, TokioSpawn};
 use fleek_crypto::{NodePublicKey, NodeSecretKey, SecretKey, TransactionSender};
 use lightning_interfaces::fdi::{BuildGraph, DependencyGraph, MethodExt};
-use lightning_interfaces::{c, Collection};
 use lightning_interfaces::types::{
     NodeIndex,
     TransactionResponse,
@@ -18,9 +17,11 @@ use lightning_interfaces::types::{
     UpdateRequest,
 };
 use lightning_interfaces::{
+    c,
     ApplicationInterface,
     BlockExecutedNotification,
     Cloned,
+    Collection,
     ForwarderInterface,
     KeystoreInterface,
     MempoolSocket,

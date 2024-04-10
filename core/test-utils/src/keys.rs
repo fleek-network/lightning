@@ -8,8 +8,7 @@ use fleek_crypto::{
     NodeSecretKey,
     SecretKey,
 };
-use lightning_interfaces::Collection;
-use lightning_interfaces::{ConfigConsumer, KeystoreInterface};
+use lightning_interfaces::{Collection, ConfigConsumer, KeystoreInterface};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone)]

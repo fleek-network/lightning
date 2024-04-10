@@ -14,7 +14,6 @@ use anyhow::{anyhow, Result};
 use blake3_tree::ProofBuf;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use lightning_interfaces::fdi::{BuildGraph, DependencyGraph, MethodExt};
-use lightning_interfaces::Collection;
 use lightning_interfaces::types::{
     Blake3Hash,
     CompressionAlgoSet,
@@ -29,6 +28,7 @@ use lightning_interfaces::{
     BlockstoreServerInterface,
     BlockstoreServerSocket,
     Cloned,
+    Collection,
     ConfigConsumer,
     ConfigProviderInterface,
     IncrementalPutInterface,

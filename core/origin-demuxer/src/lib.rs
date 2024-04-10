@@ -8,8 +8,8 @@ use std::marker::PhantomData;
 use affair::{Executor, TokioSpawn};
 use demuxer::Demuxer;
 use lightning_interfaces::fdi::{BuildGraph, DependencyGraph};
-use lightning_interfaces::Collection;
 use lightning_interfaces::{
+    Collection,
     ConfigConsumer,
     ConfigProviderInterface,
     OriginProviderInterface,

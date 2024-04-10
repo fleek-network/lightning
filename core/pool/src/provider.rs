@@ -7,12 +7,12 @@ use anyhow::Result;
 use bytes::Bytes;
 use futures::{SinkExt, Stream};
 use lightning_interfaces::fdi::{BuildGraph, MethodExt};
-use lightning_interfaces::Collection;
 use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::{
     c,
     fdi,
     ApplicationInterface,
+    Collection,
     ConfigConsumer,
     ConfigProviderInterface,
     EventHandlerInterface,

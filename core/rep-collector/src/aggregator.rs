@@ -3,7 +3,6 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use lightning_interfaces::fdi::{Bind, BuildGraph, DependencyGraph, MethodExt};
-use lightning_interfaces::{c, Collection};
 use lightning_interfaces::types::{
     NodeIndex,
     ReputationMeasurements,
@@ -11,7 +10,9 @@ use lightning_interfaces::types::{
     MAX_MEASUREMENTS_PER_TX,
 };
 use lightning_interfaces::{
+    c,
     Cloned,
+    Collection,
     ConfigConsumer,
     ConfigProviderInterface,
     NotifierInterface,

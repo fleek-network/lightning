@@ -1,8 +1,7 @@
 use std::collections::{HashMap, VecDeque};
 
-use lightning_interfaces::Collection;
 use lightning_interfaces::types::{Blake3Hash, ImmutablePointer, OriginProvider};
-use lightning_interfaces::{OriginProviderSocket, ResolverInterface};
+use lightning_interfaces::{Collection, OriginProviderSocket, ResolverInterface};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::task::JoinSet;
 use tracing::error;

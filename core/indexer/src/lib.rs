@@ -6,12 +6,12 @@ use std::sync::{Arc, OnceLock};
 
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::fdi::{BuildGraph, DependencyGraph};
-use lightning_interfaces::Collection;
 use lightning_interfaces::types::{Blake3Hash, ContentUpdate, NodeIndex, UpdateMethod};
 use lightning_interfaces::{
     c,
     ApplicationInterface,
     Cloned,
+    Collection,
     IndexerInterface,
     KeystoreInterface,
     SignerInterface,

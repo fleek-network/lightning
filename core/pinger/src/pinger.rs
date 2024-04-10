@@ -6,10 +6,11 @@ use std::time::{Duration, Instant};
 use anyhow::anyhow;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::fdi::{BuildGraph, Cloned, DependencyGraph, MethodExt};
-use lightning_interfaces::{c, Collection};
 use lightning_interfaces::types::{NodeIndex, NodeInfo};
 use lightning_interfaces::{
+    c,
     ApplicationInterface,
+    Collection,
     ConfigConsumer,
     ConfigProviderInterface,
     KeystoreInterface,

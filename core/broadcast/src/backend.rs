@@ -4,11 +4,11 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use bytes::Bytes;
 use fleek_crypto::{NodePublicKey, NodeSecretKey, NodeSignature, PublicKey, SecretKey};
-use lightning_interfaces::Collection;
 use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::{
     c,
     ApplicationInterface,
+    Collection,
     EventHandlerInterface,
     PoolInterface,
     ReputationAggregatorInterface,
