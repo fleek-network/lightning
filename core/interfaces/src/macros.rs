@@ -9,6 +9,7 @@ macro_rules! collection {
             type $service: $service<Self> + 'static;
          )*
 
+            /// Build the `fdi` dependency graph of this collection.
             fn build_graph() -> fdi::DependencyGraph {
                 fdi::DependencyGraph::new()
                     .with_value($crate::_hacks::Blanket::default())
@@ -17,6 +18,10 @@ macro_rules! collection {
                     )*
             }
 
+            /// The implementation should call `provider.get::<ty>` for every member that
+            /// implements ConfigConsumer.
+            ///
+            /// An implementation is provided when using the partial macro.
             fn capture_configs(provider: &Self::ConfigProviderInterface);
         }
     }
@@ -73,10 +78,17 @@ macro_rules! partial {
             IndexerInterface,
         }, { $($name),*});
     };
-    (@gen_body { $($name:ident),* }) => {
-        #[allow(unused_variables)]
+    (@gen_body { $($name:ident = $ty:ty;)* }) => {
+
+        #[allow(unused)]
         fn capture_configs(provider: &Self::ConfigProviderInterface) {
+            use $crate::_hacks::ConfigConsumerProxy;
+
+            $(
+            (&$crate::_hacks::AsValue::<$ty>::default()).request_config::<Self>(provider);
+            )*
         }
+
     };
     ($struct:ident { $($name:ident = $ty:ty;)* }) => {
         #[derive(Clone)]
@@ -85,16 +97,17 @@ macro_rules! partial {
         impl $crate::Collection for $struct {
             $(type $name = $ty;)*
             $crate::partial!(@gen_missing { $($name),* });
-            $crate::partial!(@gen_body { $($name),* });
+            $crate::partial!(@gen_body { $($name = $ty;)* });
         }
     };
+    // In this case we don't provide the missing types.
     ($struct:ident require full { $($name:ident = $ty:ty;)* }) => {
         #[derive(Clone)]
         pub struct $struct;
 
         impl $crate::Collection for $struct {
             $(type $name = $ty;)*
-            $crate::partial!(@gen_body { $($name),* });
+            $crate::partial!(@gen_body { $($name = $ty;)* });
         }
     };
 }

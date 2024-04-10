@@ -27,17 +27,23 @@ impl tokio_stream::Stream for Blanket {
 
 pub struct AsValue<T>(PhantomData<T>);
 
+impl<T> Default for AsValue<T> {
+    fn default() -> Self {
+        Self(PhantomData)
+    }
+}
+
 pub trait ConfigConsumerProxy {
     /// Request the config of Self if Self: ConfigConsumer.
-    fn request_config<C: Collection>(provider: &C::ConfigProviderInterface);
+    fn request_config<C: Collection>(&self, provider: &C::ConfigProviderInterface);
 }
 
 impl<T> ConfigConsumerProxy for &AsValue<T> {
-    fn request_config<C: Collection>(_: &C::ConfigProviderInterface) {}
+    fn request_config<C: Collection>(&self, _: &C::ConfigProviderInterface) {}
 }
 
 impl<T: ConfigConsumer> ConfigConsumerProxy for AsValue<T> {
-    fn request_config<C: Collection>(provider: &C::ConfigProviderInterface) {
+    fn request_config<C: Collection>(&self, provider: &C::ConfigProviderInterface) {
         provider.get::<T>();
     }
 }
