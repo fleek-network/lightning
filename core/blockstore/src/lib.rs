@@ -61,7 +61,7 @@ mod tests {
             root: path.clone().try_into().unwrap(),
         })
         .unwrap();
-        blockstore.provide_indexer(lightning_interfaces::_hacks::Blanket);
+        blockstore.provide_indexer(Default::default());
 
         BlockStoreCleanOnDrop {
             blockstore,
