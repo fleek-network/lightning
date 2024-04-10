@@ -8,7 +8,7 @@ use cid::Cid;
 use fleek_ipld::unixfs::Data;
 use futures::TryStreamExt;
 use hyper::client::{self, HttpConnector};
-use hyper::{Body, Client, Request, Uri};
+use hyper::{Body, Client, Request, Response, Uri};
 use hyper_rustls::{ConfigBuilderExt, HttpsConnector};
 use libipld::pb::PbNode;
 use lightning_interfaces::infu_collection::Collection;
@@ -104,8 +104,6 @@ impl<C: Collection> IPFSOrigin<C> {
                                 Err(_) => data,
                             };
                             if let Err(e) = blockstore_putter.write(&data, comp) {
-                                // TODO: In this case we probably don't want to move in to the next
-                                // gateway
                                 return Err(Error::Blockstore(format!("{e}")));
                             }
                         }
@@ -145,7 +143,6 @@ impl<C: Collection> IPFSOrigin<C> {
             Err(e) => return Err(e),
         }
 
-        // TODO: If finalizing the put fails, we probably don't need to move to the next gateway
         blockstore_putter
             .finalize()
             .await
@@ -167,134 +164,97 @@ impl<C: Collection> IPFSOrigin<C> {
                 .header("Connection", "keep-alive")
                 .body(Body::default())?;
 
-            // TODO: simplify these matches
-            match timeout(GATEWAY_TIMEOUT, self.client.request(req)).await {
-                Ok(Ok(res)) => {
-                    match res.status().as_u16() {
-                        200..=299 => {
-                            // The gateway responded succesfully
-                            match self.stream_car_into_blockstore(res.into_body()).await {
-                                Ok(hash) => return Ok(hash),
-                                Err(e) => match e {
-                                    Error::Blockstore(e) => return Err(anyhow!("{e}")),
-                                    Error::CarReader(e) => {
-                                        error!(
-                                            "Failed to parse car file from gateway {}: {e}",
-                                            gateway.authority
-                                        );
-                                        continue;
-                                    },
-                                },
-                            }
-                        },
-                        300..=399 => {
-                            info!(
-                                "Gateway {} returned redirect error code trying one redirect",
-                                gateway.authority
-                            );
-                            // This is the redirect code we should try to redirect one time to the
-                            // proper location
-                            let headers = res.headers();
-                            let Some(location_header) = headers.get("Location") else {
-                                info!(
-                                    "Gateway {} redirected but the location header is missing",
-                                    gateway.authority
-                                );
-                                continue;
-                            };
-                            let Ok(new_location) = location_header.to_str() else {
-                                info!(
-                                    "Gateway {} redirected but the location header non-ASCII characters, moving to next gateway",
-                                    gateway.authority
-                                );
-                                continue;
-                            };
-                            let new_uri = format!("{new_location}?format=car");
-                            let Ok(new_req) = Request::builder()
-                                .uri(new_uri)
-                                .header("Accept", "application/vnd.ipld.car;version=1")
-                                .header("Connection", "keep-alive")
-                                .body(Body::default())
-                            else {
-                                info!(
-                                    "Gateway {} redirected but building the new request failed, moving to next gateway",
-                                    gateway.authority
-                                );
-                                continue;
-                            };
-
-                            match timeout(GATEWAY_TIMEOUT, self.client.request(new_req)).await {
-                                Ok(Ok(new_res)) => {
-                                    let status = new_res.status();
-                                    if status.is_success() {
-                                        match self.stream_car_into_blockstore(res.into_body()).await
-                                        {
-                                            Ok(hash) => return Ok(hash),
-                                            Err(e) => match e {
-                                                Error::Blockstore(e) => return Err(anyhow!("{e}")),
-                                                Error::CarReader(e) => {
-                                                    error!(
-                                                        "Failed to parse car file from gateway {}: {e}",
-                                                        gateway.authority
-                                                    );
-                                                    continue;
-                                                },
-                                            },
-                                        }
-                                    } else {
-                                        info!(
-                                            "Gateway {} response was not successful after redirect, moving to next gateway",
-                                            gateway.authority
-                                        );
-                                        continue;
-                                    }
-                                },
-                                Ok(Err(e)) => {
-                                    info!(
-                                        "Failed to fetch from gateway {}, moving onto the next gateway: {e:?}",
-                                        gateway.authority
-                                    );
-                                    continue;
-                                },
-                                Err(_) => {
-                                    info!(
-                                        "Redirect from gateway {} timed out, moving to next gateway",
-                                        gateway.authority
-                                    );
-                                    continue;
-                                },
-                            }
-                        },
-                        _ => {
-                            // This is either informational(100-199), error(300-399, server
-                            // error(400-499) so lets try another gateway
-                            // todo(dalton): We should look into what could cause informational
-                            // 100-199 and see if there is anything we can do here
-                            info!(
-                                "Gateway {} response was not successful, moving on to the next gateway",
-                                gateway.authority
-                            );
-                            continue;
-                        },
-                    }
-                },
-                Ok(Err(e)) => {
-                    info!(
-                        "Failed to fetch from gateway {}, moving onto the next gateway: {e:?}",
-                        gateway.authority
-                    );
-                    continue;
-                },
-                Err(_) => {
-                    info!(
-                        "Timeout while fetching from gateway {}, moving onto the next gateway",
-                        gateway.authority
-                    );
-                    continue;
+            match self.fetch_from_gateway(req, gateway).await {
+                Ok(hash) => return Ok(hash),
+                Err(e) => match e {
+                    Error::Blockstore(info) => {
+                        error!("{info:?}. Stopping request.");
+                        return Err(anyhow!("Request for CID {requested_cid} failed: {info:?}"));
+                    },
+                    Error::Request(info) => {
+                        error!("{info:?}. Moving to next gateway.");
+                    },
+                    Error::Redirect(info) => {
+                        error!("{info:?}. Moving to next gateway.");
+                    },
+                    Error::CarReader(info) => {
+                        error!("{info:?}. Moving to next gateway.");
+                    },
                 },
             }
         }
         Err(anyhow!("No response from gateways."))
+    }
+
+    async fn fetch_from_gateway(
+        &self,
+        request: Request<Body>,
+        gateway: &Gateway,
+    ) -> Result<Blake3Hash, Error> {
+        match timeout(GATEWAY_TIMEOUT, self.client.request(request)).await {
+            Ok(Ok(res)) => {
+                match res.status().as_u16() {
+                    200..=299 => {
+                        // The gateway responded succesfully
+                        self.stream_car_into_blockstore(res.into_body()).await
+                    },
+                    300..=399 => {
+                        info!(
+                            "Gateway {} returned redirect error code, trying one redirect",
+                            gateway.authority
+                        );
+                        // This is the redirect code we should try to redirect one time to the
+                        // proper location
+                        self.handle_redirect(res).await
+                    },
+                    _ => {
+                        // This is either informational(100-199), error(300-399, server
+                        // error(400-499) so lets try another gateway
+                        // todo(dalton): We should look into what could cause informational
+                        // 100-199 and see if there is anything we can do here
+                        info!(
+                            "Gateway {} response was not successful, moving on to the next gateway",
+                            gateway.authority
+                        );
+
+                        Err(Error::Redirect("Response was not successfull".into()))
+                    },
+                }
+            },
+            Ok(Err(e)) => Err(Error::Request(format!("Request failed: {e}"))),
+            Err(_) => Err(Error::Request("Request timed out".into())),
+        }
+    }
+
+    async fn handle_redirect(&self, response: Response<Body>) -> Result<Blake3Hash, Error> {
+        let headers = response.headers();
+        let location_header = headers
+            .get("Location")
+            .context("")
+            .map_err(|_| Error::Redirect("Location header is missing".into()))?;
+        let new_location = location_header
+            .to_str()
+            .map_err(|e| Error::Redirect(format!("Failed to parse header: {e}")))?;
+        let new_uri = format!("{new_location}?format=car");
+        let new_req = Request::builder()
+            .uri(new_uri)
+            .header("Accept", "application/vnd.ipld.car;version=1")
+            .header("Connection", "keep-alive")
+            .body(Body::default())
+            .map_err(|e| Error::Redirect(format!("Failed to build request: {e}")))?;
+
+        match timeout(GATEWAY_TIMEOUT, self.client.request(new_req)).await {
+            Ok(Ok(new_res)) => {
+                let status = new_res.status();
+                if status.is_success() {
+                    self.stream_car_into_blockstore(response.into_body()).await
+                } else {
+                    Err(Error::Redirect("Response was not successful".into()))
+                }
+            },
+            Ok(Err(e)) => Err(Error::Redirect(format!("Request failed: {e}"))),
+            Err(_) => Err(Error::Redirect("Request timed out".into())),
+        }
     }
 }
 
