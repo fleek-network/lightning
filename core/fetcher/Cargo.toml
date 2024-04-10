@@ -10,7 +10,6 @@ lightning-interfaces = { path = "../interfaces" }
 blake3-tree = { path = "../../lib/blake3-tree" }
 lightning-metrics = { path = "../metrics" }
 futures.workspace = true
-infusion.workspace = true
 serde.workspace = true
 anyhow.workspace = true
 tokio.workspace = true

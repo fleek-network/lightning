@@ -3651,7 +3651,6 @@ dependencies = [
  "anyhow",
  "futures",
  "indexmap 2.1.0",
- "infusion",
  "parking_lot",
  "triomphe",
 ]
@@ -4985,28 +4984,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "infusion"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "indexmap 2.1.0",
- "infusion-proc",
- "log",
- "paste",
- "serde",
-]
-
-[[package]]
-name = "infusion-proc"
-version = "0.1.0"
-dependencies = [
- "darling 0.20.3",
- "proc-macro2 1.0.74",
- "quote 1.0.35",
- "syn 2.0.46",
-]
-
-[[package]]
 name = "ink-quill"
 version = "0.1.0"
 dependencies = [
@@ -5580,7 +5557,6 @@ dependencies = [
  "fleek-blake3",
  "fleek-crypto",
  "hp-fixed",
- "infusion",
  "lazy_static",
  "lightning-interfaces",
  "lightning-metrics",
@@ -5607,7 +5583,6 @@ dependencies = [
  "atomo-rocks",
  "bincode",
  "ethers",
- "infusion",
  "lightning-application",
  "lightning-blockstore",
  "lightning-interfaces",
@@ -5629,7 +5604,6 @@ dependencies = [
  "blake3-tree",
  "bytes",
  "derive_more",
- "infusion",
  "lightning-interfaces",
  "parking_lot",
  "rand 0.8.5",
@@ -5651,7 +5625,6 @@ dependencies = [
  "blake3-tree",
  "bytes",
  "fleek-crypto",
- "infusion",
  "lightning-application",
  "lightning-blockstore",
  "lightning-indexer",
@@ -5686,7 +5659,6 @@ dependencies = [
  "fxhash",
  "im",
  "indicatif",
- "infusion",
  "ink-quill",
  "lightning-application",
  "lightning-interfaces",
@@ -5722,7 +5694,6 @@ dependencies = [
  "fleek-blake3",
  "fleek-crypto",
  "futures",
- "infusion",
  "lightning-application",
  "lightning-archive",
  "lightning-blockstore",
@@ -5808,7 +5779,6 @@ dependencies = [
  "anyhow",
  "bincode",
  "fleek-crypto",
- "infusion",
  "lightning-application",
  "lightning-interfaces",
  "lightning-metrics",
@@ -5833,7 +5803,6 @@ dependencies = [
  "fleek-crypto",
  "futures",
  "hp-fixed",
- "infusion",
  "lightning-application",
  "lightning-archive",
  "lightning-blockstore",
@@ -5878,7 +5847,6 @@ dependencies = [
  "cid 0.10.1",
  "fleek-crypto",
  "futures",
- "infusion",
  "lightning-application",
  "lightning-blockstore",
  "lightning-blockstore-server",
@@ -5911,7 +5879,6 @@ dependencies = [
  "fdi",
  "fleek-crypto",
  "futures",
- "infusion",
  "lightning-interfaces",
  "lightning-test-utils",
  "lightning-utils",
@@ -5949,7 +5916,6 @@ dependencies = [
  "fxhash",
  "hex",
  "hyper 0.14.28",
- "infusion",
  "lightning-blockstore",
  "lightning-cli",
  "lightning-interfaces",
@@ -5986,7 +5952,6 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "fleek-crypto",
- "infusion",
  "lightning-application",
  "lightning-interfaces",
  "lightning-notifier",
@@ -6036,7 +6001,6 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "fleek-crypto",
- "infusion",
  "lightning-interfaces",
  "lightning-test-utils",
  "lightning-utils",
@@ -6068,7 +6032,6 @@ name = "lightning-node"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "infusion",
  "lightning-application",
  "lightning-archive",
  "lightning-blockstore",
@@ -6102,7 +6065,6 @@ name = "lightning-notifier"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "infusion",
  "lightning-application",
  "lightning-interfaces",
  "lightning-utils",
@@ -6150,7 +6112,6 @@ dependencies = [
  "cid 0.10.1",
  "derive_more",
  "fleek-crypto",
- "infusion",
  "lightning-application",
  "lightning-blockstore",
  "lightning-indexer",
@@ -6180,7 +6141,6 @@ dependencies = [
  "anyhow",
  "fast-sri",
  "fleek-crypto",
- "infusion",
  "lightning-application",
  "lightning-blockstore",
  "lightning-indexer",
@@ -6206,7 +6166,6 @@ dependencies = [
  "futures",
  "hyper 0.14.28",
  "hyper-rustls",
- "infusion",
  "libipld",
  "lightning-application",
  "lightning-blockstore",
@@ -6231,7 +6190,6 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "fleek-crypto",
- "infusion",
  "lightning-application",
  "lightning-interfaces",
  "lightning-metrics",
@@ -6259,7 +6217,6 @@ dependencies = [
  "fleek-crypto",
  "futures",
  "hp-fixed",
- "infusion",
  "lightning-application",
  "lightning-interfaces",
  "lightning-metrics",
@@ -6293,7 +6250,6 @@ dependencies = [
  "anyhow",
  "fleek-crypto",
  "hp-fixed",
- "infusion",
  "lightning-application",
  "lightning-interfaces",
  "lightning-notifier",
@@ -6328,7 +6284,6 @@ dependencies = [
  "async-trait",
  "bincode",
  "fleek-crypto",
- "infusion",
  "lightning-application",
  "lightning-broadcast",
  "lightning-interfaces",
@@ -6361,7 +6316,6 @@ dependencies = [
  "futures",
  "hp-fixed",
  "hyper 0.14.28",
- "infusion",
  "jsonrpsee",
  "lightning-application",
  "lightning-blockstore",
@@ -6399,7 +6353,6 @@ dependencies = [
  "bytes",
  "fleek-crypto",
  "flexbuffers",
- "infusion",
  "ink-quill",
  "lightning-types",
  "serde",
@@ -6423,7 +6376,6 @@ dependencies = [
  "futures",
  "fxhash",
  "hp-fixed",
- "infusion",
  "lightning-application",
  "lightning-blockstore",
  "lightning-interfaces",
@@ -6450,7 +6402,6 @@ dependencies = [
  "fleek-crypto",
  "futures",
  "hp-fixed",
- "infusion",
  "lightning-application",
  "lightning-interfaces",
  "lightning-notifier",
@@ -6514,7 +6465,6 @@ dependencies = [
  "fleek-crypto",
  "fxhash",
  "indicatif",
- "infusion",
  "lightning-application",
  "lightning-interfaces",
  "lightning-notifier",

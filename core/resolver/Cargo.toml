@@ -21,11 +21,10 @@ rocksdb = "0.21"
 lightning-test-utils = { path = "../test-utils" }
 lightning-signer = { path = "../signer" }
 lightning-broadcast = { path = "../broadcast" }
-lightning-rep-collector = { path="../rep-collector" }
+lightning-rep-collector = { path = "../rep-collector" }
 lightning-application = { path = "../application", features = ["test"] }
 lightning-pool = { path = "../pool" }
 lightning-notifier = { path = "../notifier" }
 lightning-topology = { path = "../topology" }
 fleek-crypto.workspace = true
-infusion.workspace = true
 tracing-test = { version = "0.2", features = ["no-env-filter"] }

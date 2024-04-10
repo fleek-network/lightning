@@ -10,6 +10,3 @@ futures = "0.3"
 
 triomphe = "0.1.11"
 parking_lot = "0.12.1"
-
-# temp
-infusion = { path = "../infusion" }

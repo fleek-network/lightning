@@ -30,7 +30,6 @@ lightning-syncronizer = { path = "../syncronizer" }
 lightning-topology = { path = "../topology" }
 lightning-pinger = { path = "../pinger" }
 toml = "0.7"
-infusion.workspace = true
 anyhow.workspace = true
 resolved-pathbuf.workspace = true
 tracing.workspace = true

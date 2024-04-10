@@ -14,7 +14,6 @@ url = "2.5.0"
 
 [dev-dependencies]
 fleek-crypto.workspace = true
-infusion.workspace = true
 lightning-application = { path = "../application", features = ["test"] }
 lightning-blockstore = { path = "../blockstore" }
 lightning-indexer = { path = "../indexer" }

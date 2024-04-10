@@ -20,7 +20,6 @@ mini-moka = "0.10.2"
 fxhash = "0.2"
 futures = "0.3"
 affair.workspace = true
-infusion.workspace = true
 derive_more = "0.99"
 im = "15.1"
 quick_cache = "0.4.0"
@@ -49,4 +48,3 @@ path = "simulation/perc_nodes_reached.rs"
 [[example]]
 name = "nodes_reached_cluster_size"
 path = "simulation/nodes_reached_cluster_size.rs"
-

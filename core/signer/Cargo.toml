@@ -20,6 +20,5 @@ resolved-pathbuf.workspace = true
 lightning-test-utils = { path = "../test-utils" }
 lightning-application = { path = "../application", features = ["test"] }
 lightning-notifier = { path = "../notifier" }
-infusion.workspace = true
 hp-fixed.workspace = true
 futures.workspace = true

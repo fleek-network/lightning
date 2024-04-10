@@ -6,11 +6,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-lightning-interfaces = { path= "../interfaces" }
+lightning-interfaces = { path = "../interfaces" }
 lightning-utils = { path = "../utils" }
 tokio.workspace = true
 anyhow.workspace = true
 
 [dev-dependencies]
-infusion.workspace = true
-lightning-application = {path="../application", features = ["test"]}
+lightning-application = { path = "../application", features = ["test"] }

@@ -6,8 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-lightning-interfaces = {path="../interfaces"}
-lightning-reputation = {path="../reputation"}
+lightning-interfaces = { path = "../interfaces" }
+lightning-reputation = { path = "../reputation" }
 hp-fixed.workspace = true
 anyhow.workspace = true
 serde.workspace = true
@@ -18,10 +18,9 @@ scc.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
-lightning-test-utils = {path="../test-utils"}
+lightning-test-utils = { path = "../test-utils" }
 lightning-utils = { path = "../utils" }
-lightning-signer = {path="../signer"}
-lightning-application = {path="../application", features = ["test"]}
-lightning-notifier = {path="../notifier"}
-infusion.workspace = true
+lightning-signer = { path = "../signer" }
+lightning-application = { path = "../application", features = ["test"] }
+lightning-notifier = { path = "../notifier" }
 rand.workspace = true

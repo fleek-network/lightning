@@ -16,4 +16,3 @@ triomphe = "0.1"
 
 [dev-dependencies]
 lightning-test-utils = { path = "../test-utils" }
-infusion.workspace = true

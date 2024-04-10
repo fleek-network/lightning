@@ -11,7 +11,6 @@ lightning-metrics = { path = "../metrics" }
 blake3-tree = { path = "../../lib/blake3-tree" }
 affair.workspace = true
 bytes.workspace = true
-infusion.workspace = true
 serde.workspace = true
 tokio.workspace = true
 tokio-stream.workspace = true
@@ -21,12 +20,12 @@ thiserror = "1.0"
 
 [dev-dependencies]
 lightning-test-utils = { path = "../test-utils" }
-lightning-application = { path="../application", features = ["test"] }
+lightning-application = { path = "../application", features = ["test"] }
 lightning-blockstore = { path = "../blockstore" }
 lightning-indexer = { path = "../indexer" }
-lightning-notifier = { path="../notifier" }
-lightning-topology = { path="../topology" }
-lightning-signer = { path="../signer" }
+lightning-notifier = { path = "../notifier" }
+lightning-topology = { path = "../topology" }
+lightning-signer = { path = "../signer" }
 lightning-pool = { path = "../pool" }
 lightning-rep-collector = { path = "../rep-collector" }
 fleek-crypto.workspace = true

@@ -17,7 +17,6 @@ lightning-application = { path = "../application" }
 
 fleek-crypto.workspace = true
 resolved-pathbuf.workspace = true
-infusion.workspace = true
 tokio.workspace = true
 futures.workspace = true
 anyhow.workspace = true

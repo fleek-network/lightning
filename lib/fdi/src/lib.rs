@@ -31,9 +31,3 @@ pub use provider::{Provider, ProviderGuard, Ref, RefMut};
 
 #[cfg(test)]
 mod tests;
-
-impl<C> BuildGraph for infusion::Blank<C> {
-    fn build_graph() -> DependencyGraph {
-        DependencyGraph::new()
-    }
-}

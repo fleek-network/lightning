@@ -19,9 +19,8 @@ resolved-pathbuf.workspace = true
 queue-file = "1.4.10"
 
 [dev-dependencies]
-lightning-test-utils = { path="../test-utils" }
+lightning-test-utils = { path = "../test-utils" }
 lightning-signer = { path = "../signer" }
 lightning-application = { path = "../application", features = ["test"] }
 lightning-notifier = { path = "../notifier" }
-infusion.workspace = true
 fleek-crypto.workspace = true

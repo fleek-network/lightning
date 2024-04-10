@@ -30,7 +30,6 @@ base64 = "0.21.2"
 fxhash = "0.2.1"
 ndarray-rand = "0.14.0"
 tokio.workspace = true
-infusion.workspace = true
 indicatif = "0.17"
 rayon = "1"
 bincode.workspace = true

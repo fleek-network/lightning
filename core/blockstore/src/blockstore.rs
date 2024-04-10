@@ -105,7 +105,7 @@ impl<C: Collection> Blockstore<C> {
 impl<C: Collection> BlockstoreInterface<C> for Blockstore<C> {
     type SharedPointer<T: ?Sized + Send + Sync> = Arc<T>;
     type Put = Putter<Self, C>;
-    type DirPut = infusion::Blank<()>;
+    type DirPut = lightning_interfaces::_hacks::Blanket;
 
     async fn get_tree(&self, cid: &Blake3Hash) -> Option<Self::SharedPointer<HashTree>> {
         let data = self.fetch(INTERNAL_DIR, cid, None).await?;
