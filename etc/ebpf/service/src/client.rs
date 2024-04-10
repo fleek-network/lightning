@@ -1,6 +1,5 @@
-use std::io;
 use std::net::SocketAddrV4;
-
+use std::io;
 use bytes::Bytes;
 use tokio::io::Interest;
 use tokio::net::UnixStream;
@@ -8,13 +7,13 @@ use tokio::net::UnixStream;
 use crate::schema::{EbpfServiceFrame, FileOpen, FileOpenSrc, Pf};
 
 #[derive(Default, Debug)]
-pub struct EbpfSvcClient {
+pub struct IpcClient {
     inner: Option<UnixStream>,
 }
 
-impl EbpfSvcClient {
+impl IpcClient {
     pub fn new() -> Self {
-        EbpfSvcClient::default()
+        IpcClient::default()
     }
 
     pub fn init(&mut self, stream: UnixStream) {
@@ -40,7 +39,7 @@ impl EbpfSvcClient {
         Ok(())
     }
 
-    pub async fn file_open_allow_pid(&self, pid: u64) -> io::Result<()> {
+    async fn file_open_allow_pid(&self, pid: u64) -> io::Result<()> {
         if let Some(stream) = &self.inner {
             let frame = EbpfServiceFrame::FileOpen(FileOpen {
                 op: FileOpen::ALLOW,
@@ -51,7 +50,7 @@ impl EbpfSvcClient {
         Ok(())
     }
 
-    pub async fn file_open_deny_pid(&self, pid: u64) -> io::Result<()> {
+    async fn file_open_deny_pid(&self, pid: u64) -> io::Result<()> {
         if let Some(stream) = &self.inner {
             let frame = EbpfServiceFrame::FileOpen(FileOpen {
                 op: FileOpen::BLOCK,
@@ -62,7 +61,7 @@ impl EbpfSvcClient {
         Ok(())
     }
 
-    pub async fn file_open_allow_binfile(&self, inode: u64, dev: u32, rdev: u32) -> io::Result<()> {
+    async fn file_open_allow_binfile(&self, inode: u64, dev: u32, rdev: u32) -> io::Result<()> {
         if let Some(stream) = &self.inner {
             let frame = EbpfServiceFrame::FileOpen(FileOpen {
                 op: FileOpen::ALLOW,
@@ -73,7 +72,7 @@ impl EbpfSvcClient {
         Ok(())
     }
 
-    pub async fn file_open_block_binfile(&self, inode: u64, dev: u32, rdev: u32) -> io::Result<()> {
+    async fn file_open_block_binfile(&self, inode: u64, dev: u32, rdev: u32) -> io::Result<()> {
         if let Some(stream) = &self.inner {
             let frame = EbpfServiceFrame::FileOpen(FileOpen {
                 op: FileOpen::BLOCK,
