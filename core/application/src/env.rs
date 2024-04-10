@@ -8,6 +8,7 @@ use atomo::{Atomo, AtomoBuilder, DefaultSerdeBackend, QueryPerm, UpdatePerm};
 use atomo_rocks::{Cache as RocksCache, Env as RocksEnv, Options};
 use fleek_crypto::{ClientPublicKey, ConsensusPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
     AccountInfo,
     Blake3Hash,
@@ -32,12 +33,6 @@ use lightning_interfaces::types::{
     TransactionResponse,
     TxHash,
     Value,
-};
-use lightning_interfaces::{
-    BlockstoreInterface,
-    Collection,
-    IncrementalPutInterface,
-    SyncQueryRunnerInterface,
 };
 use lightning_metrics::increment_counter;
 use tracing::warn;

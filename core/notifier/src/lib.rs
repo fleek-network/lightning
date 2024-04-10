@@ -1,18 +1,8 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use lightning_interfaces::fdi::{BuildGraph, DependencyGraph};
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Block, BlockExecutionResponse};
-use lightning_interfaces::{
-    c,
-    ApplicationInterface,
-    BlockExecutedNotification,
-    Collection,
-    Emitter,
-    EpochChangedNotification,
-    NotifierInterface,
-    Subscriber,
-    SyncQueryRunnerInterface,
-};
+use lightning_interfaces::{BlockExecutedNotification, EpochChangedNotification};
 use lightning_utils::application::QueryRunnerExt;
 use tokio::pin;
 use tokio::sync::broadcast;
@@ -48,8 +38,8 @@ impl<C: Collection> Notifier<C> {
 }
 
 impl<C: Collection> BuildGraph for Notifier<C> {
-    fn build_graph() -> DependencyGraph {
-        DependencyGraph::new().with_infallible(Self::new)
+    fn build_graph() -> fdi::DependencyGraph {
+        fdi::DependencyGraph::new().with_infallible(Self::new)
     }
 }
 

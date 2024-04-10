@@ -1,8 +1,8 @@
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Digest as BroadcastDigest, NodeIndex};
-use lightning_interfaces::{BroadcastEventInterface, ToDigest};
 
 use super::transaction_store::Parcel;
 use crate::consensus::PubSubMsg;

@@ -10,20 +10,9 @@ use blake3_tree::blake3::Hash;
 use blake3_tree::utils::{HashTree, HashVec};
 use blake3_tree::IncrementalVerifier;
 use bytes::{BufMut, BytesMut};
-use lightning_interfaces::fdi::{BuildGraph, Cloned, DependencyGraph, MethodExt};
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Blake3Hash, CompressionAlgoSet, CompressionAlgorithm};
-use lightning_interfaces::{
-    BlockstoreInterface,
-    Collection,
-    ConfigConsumer,
-    ConfigProviderInterface,
-    ContentChunk,
-    IncrementalPutInterface,
-    PutFeedProofError,
-    PutFinalizeError,
-    PutWriteError,
-    RefMut,
-};
+use lightning_interfaces::ContentChunk;
 use parking_lot::RwLock;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
@@ -62,10 +51,11 @@ impl<C: Collection> ConfigConsumer for Blockstore<C> {
 }
 
 impl<C: Collection> BuildGraph for Blockstore<C> {
-    fn build_graph() -> DependencyGraph {
-        DependencyGraph::new().with(Self::new.on(
+    fn build_graph() -> fdi::DependencyGraph {
+        fdi::DependencyGraph::new().with(Self::new.on(
             "_post",
-            |mut this: RefMut<Self>, Cloned(indexer): Cloned<C::IndexerInterface>| {
+            |mut this: fdi::RefMut<Self>,
+             fdi::Cloned(indexer): fdi::Cloned<C::IndexerInterface>| {
                 this.provide_indexer(indexer);
             },
         ))

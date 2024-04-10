@@ -3,14 +3,9 @@ use std::sync::{Arc, OnceLock};
 use async_trait::async_trait;
 use fastcrypto::hash::HashFunction;
 use fleek_blake3 as blake3;
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Block, Epoch, Event, Metadata, NodeIndex, TransactionRequest};
-use lightning_interfaces::{
-    Emitter,
-    ExecutionEngineSocket,
-    SyncQueryRunnerInterface,
-    ToDigest,
-    TranscriptBuilder,
-};
+use lightning_interfaces::ExecutionEngineSocket;
 use lightning_utils::application::QueryRunnerExt;
 use narwhal_crypto::DefaultHashFunction;
 use narwhal_executor::ExecutionState;

@@ -3,22 +3,8 @@ use std::marker::PhantomData;
 use std::time::Duration;
 
 use affair::{AsyncWorker, Executor, TokioSpawn};
-use fdi::{BuildGraph, Cloned, DependencyGraph, MethodExt};
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Block, TransactionRequest};
-use lightning_interfaces::{
-    c,
-    ApplicationInterface,
-    Collection,
-    ConfigConsumer,
-    ConfigProviderInterface,
-    ConsensusInterface,
-    Emitter,
-    ExecutionEngineSocket,
-    ForwarderInterface,
-    MempoolSocket,
-    NotifierInterface,
-    ShutdownWaiter,
-};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use tokio::time::{interval, sleep};
@@ -33,8 +19,8 @@ impl<C: Collection> ForwarderInterface<C> for MockForwarder<C> {
 }
 
 impl<C: Collection> BuildGraph for MockForwarder<C> {
-    fn build_graph() -> DependencyGraph {
-        DependencyGraph::new().with_infallible(|consensus: &MockConsensus<C>| {
+    fn build_graph() -> fdi::DependencyGraph {
+        fdi::DependencyGraph::new().with_infallible(|consensus: &MockConsensus<C>| {
             MockForwarder::<C>(consensus.socket.clone(), PhantomData)
         })
     }
@@ -66,8 +52,8 @@ impl<C: Collection> ConfigConsumer for MockConsensus<C> {
 }
 
 impl<C: Collection> BuildGraph for MockConsensus<C> {
-    fn build_graph() -> DependencyGraph {
-        DependencyGraph::new()
+    fn build_graph() -> fdi::DependencyGraph {
+        fdi::DependencyGraph::new()
             .with_infallible(Self::new.on("start", fdi::consume(Self::start).spawn()))
     }
 }
@@ -100,7 +86,7 @@ impl<C: Collection> MockConsensus<C> {
         }
     }
 
-    async fn start(self, Cloned(waiter): Cloned<ShutdownWaiter>) {
+    async fn start(self, fdi::Cloned(waiter): fdi::Cloned<ShutdownWaiter>) {
         let mut interval = interval(self.config.new_block_interval);
         waiter
             .run_until_shutdown(async move {

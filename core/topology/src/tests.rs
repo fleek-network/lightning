@@ -12,7 +12,6 @@ use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisLatency, GenesisNode};
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{NodePorts, Participation};
-use lightning_interfaces::{partial, Node};
 use lightning_notifier::Notifier;
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;

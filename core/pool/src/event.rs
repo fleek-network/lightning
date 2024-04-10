@@ -7,15 +7,9 @@ use std::time::Duration;
 use bytes::{BufMut, Bytes, BytesMut};
 use fleek_crypto::NodePublicKey;
 use futures::stream::FuturesUnordered;
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::NodeIndex;
-use lightning_interfaces::{
-    c,
-    ApplicationInterface,
-    Collection,
-    RequestHeader,
-    ServiceScope,
-    ShutdownWaiter,
-};
+use lightning_interfaces::{RequestHeader, ServiceScope};
 use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot, watch};

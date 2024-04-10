@@ -9,20 +9,7 @@ use fleek_crypto::NodePublicKey;
 use fn_sdk::header::{write_header, ConnectionHeader};
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
-use lightning_interfaces::fdi::{BuildGraph, DependencyGraph, MethodExt};
-use lightning_interfaces::{
-    c,
-    Cloned,
-    Collection,
-    ConfigConsumer,
-    ConfigProviderInterface,
-    Consume,
-    ExecutorProviderInterface,
-    HandshakeInterface,
-    KeystoreInterface,
-    ServiceExecutorInterface,
-    ShutdownWaiter,
-};
+use lightning_interfaces::prelude::*;
 use lightning_schema::handshake::{HandshakeRequestFrame, TerminationReason};
 use rand::RngCore;
 use tracing::warn;
@@ -58,7 +45,7 @@ impl<C: Collection> Handshake<C> {
         config: &C::ConfigProviderInterface,
         keystore: &C::KeystoreInterface,
         service_executor: &C::ServiceExecutorInterface,
-        Cloned(waiter): Cloned<ShutdownWaiter>,
+        fdi::Cloned(waiter): fdi::Cloned<ShutdownWaiter>,
     ) -> Self {
         let config = config.get::<Self>();
         let provider = service_executor.get_provider();
@@ -73,7 +60,10 @@ impl<C: Collection> Handshake<C> {
         }
     }
 
-    async fn start(Consume(mut this): Consume<Self>, Cloned(waiter): Cloned<ShutdownWaiter>) {
+    async fn start(
+        fdi::Consume(mut this): fdi::Consume<Self>,
+        fdi::Cloned(waiter): fdi::Cloned<ShutdownWaiter>,
+    ) {
         let run = this.status.take().expect("restart not implemented.");
 
         // Spawn transports in parallel for accepting incoming handshakes.
@@ -119,8 +109,8 @@ impl<C: Collection> Handshake<C> {
 }
 
 impl<C: Collection> BuildGraph for Handshake<C> {
-    fn build_graph() -> DependencyGraph {
-        DependencyGraph::new().with_infallible(Self::new.on("start", Self::start.spawn()))
+    fn build_graph() -> fdi::DependencyGraph {
+        fdi::DependencyGraph::new().with_infallible(Self::new.on("start", Self::start.spawn()))
     }
 }
 

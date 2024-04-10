@@ -8,7 +8,7 @@ use lightning_blockstore::blockstore::Blockstore;
 use lightning_handshake::handshake::Handshake;
 use lightning_handshake::schema;
 use lightning_handshake::transports::mock::dial_mock;
-use lightning_interfaces::{partial, Collection, Node, ServiceExecutorInterface};
+use lightning_interfaces::prelude::*;
 use lightning_service_executor::shim::ServiceExecutor;
 use lightning_service_executor::test_services::io_stress;
 use lightning_signer::Signer;

@@ -535,8 +535,9 @@ mod tests {
     use fleek_crypto::{ClientPublicKey, ClientSignature};
     use fn_sdk::header::read_header;
     use futures::{SinkExt, StreamExt};
+    use lightning_interfaces::prelude::*;
     use lightning_interfaces::types::ServiceId;
-    use lightning_interfaces::{ExecutorProviderInterface, ShutdownController};
+    use lightning_interfaces::ShutdownController;
     use lightning_schema::handshake::{
         HandshakeRequestFrame,
         RequestFrame,

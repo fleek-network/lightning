@@ -5,8 +5,8 @@ mod tests;
 use std::time::Duration;
 
 use fast_sri::IntegrityMetadata;
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Blake3Hash, CompressionAlgorithm};
-use lightning_interfaces::{BlockstoreInterface, Collection, IncrementalPutInterface};
 use reqwest::{Client, Url};
 
 pub use crate::config::Config;

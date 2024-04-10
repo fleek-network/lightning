@@ -5,9 +5,8 @@ use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_broadcast::Broadcast;
-use lightning_interfaces::fdi::Provider;
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::NodePorts;
-use lightning_interfaces::{partial, Collection, KeystoreInterface, Node};
 use lightning_notifier::Notifier;
 use lightning_pool::PoolProvider;
 use lightning_rep_collector::ReputationAggregator;
@@ -68,7 +67,7 @@ async fn test_start_shutdown() {
     }
 
     let mut node = Node::<TestBinding>::init_with_provider(
-        Provider::default()
+        fdi::Provider::default()
             .with(
                 JsonConfigProvider::default()
                     .with::<Application<TestBinding>>(AppConfig {

@@ -19,7 +19,7 @@ use lightning_consensus::consensus::Consensus;
 use lightning_handshake::config::{HandshakeConfig, TransportConfig};
 use lightning_handshake::handshake::Handshake;
 use lightning_handshake::transports::webrtc::WebRtcConfig;
-use lightning_interfaces::{ApplicationInterface, Collection, ConfigProviderInterface, Node};
+use lightning_interfaces::prelude::*;
 use lightning_keystore::{Keystore, KeystoreConfig};
 use lightning_node::config::TomlConfigProvider;
 use lightning_node::FinalTypes;

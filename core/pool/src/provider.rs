@@ -6,28 +6,9 @@ use std::task::Poll;
 use anyhow::Result;
 use bytes::Bytes;
 use futures::{SinkExt, Stream};
-use lightning_interfaces::fdi::{BuildGraph, MethodExt};
-use lightning_interfaces::types::NodeIndex;
-use lightning_interfaces::{
-    c,
-    fdi,
-    ApplicationInterface,
-    Collection,
-    ConfigConsumer,
-    ConfigProviderInterface,
-    EventHandlerInterface,
-    KeystoreInterface,
-    PoolInterface,
-    RejectReason,
-    RequestHeader,
-    RequestInterface,
-    RequesterInterface,
-    ResponderInterface,
-    ResponseInterface,
-    ServiceScope,
-    ShutdownWaiter,
-    TopologyInterface,
-};
+use lightning_interfaces::prelude::*;
+use lightning_interfaces::types::{NodeIndex, RejectReason};
+use lightning_interfaces::{RequestHeader, ServiceScope};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
 

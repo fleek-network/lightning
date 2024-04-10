@@ -2,7 +2,7 @@ use std::time::{Duration, SystemTime};
 
 use anyhow::{anyhow, bail, Context, Result};
 use fleek_crypto::NodePublicKey;
-use lightning_interfaces::fdi::MethodExt;
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
     Blake3Hash,
     Epoch,
@@ -11,22 +11,6 @@ use lightning_interfaces::types::{
     NodeInfo,
     Participation,
     ServerRequest,
-};
-use lightning_interfaces::{
-    c,
-    fdi,
-    ApplicationInterface,
-    BlockstoreServerInterface,
-    BlockstoreServerSocket,
-    Collection,
-    ConfigConsumer,
-    ConfigProviderInterface,
-    KeystoreInterface,
-    NotifierInterface,
-    ShutdownWaiter,
-    Subscriber,
-    SyncQueryRunnerInterface,
-    SyncronizerInterface,
 };
 use lightning_metrics::increment_counter;
 use lightning_utils::application::QueryRunnerExt;

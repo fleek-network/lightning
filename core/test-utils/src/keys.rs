@@ -1,6 +1,5 @@
 use std::marker::PhantomData;
 
-use fdi::{BuildGraph, DependencyGraph};
 use fleek_crypto::{
     ConsensusPublicKey,
     ConsensusSecretKey,
@@ -8,7 +7,7 @@ use fleek_crypto::{
     NodeSecretKey,
     SecretKey,
 };
-use lightning_interfaces::{Collection, ConfigConsumer, KeystoreInterface};
+use lightning_interfaces::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone)]
@@ -38,7 +37,7 @@ impl<C> Default for EphemeralKeystore<C> {
 
 impl<C: Collection> BuildGraph for EphemeralKeystore<C> {
     fn build_graph() -> fdi::DependencyGraph {
-        DependencyGraph::default().with_infallible(Self::default)
+        fdi::DependencyGraph::default().with_infallible(Self::default)
     }
 }
 

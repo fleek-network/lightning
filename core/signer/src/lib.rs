@@ -8,7 +8,7 @@ use std::time::{Duration, SystemTime};
 
 use affair::{AsyncWorker, Executor, Socket, TokioSpawn};
 use fleek_crypto::{NodePublicKey, NodeSecretKey, SecretKey, TransactionSender};
-use lightning_interfaces::fdi::{BuildGraph, DependencyGraph, MethodExt};
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
     NodeIndex,
     TransactionResponse,
@@ -16,23 +16,7 @@ use lightning_interfaces::types::{
     UpdatePayload,
     UpdateRequest,
 };
-use lightning_interfaces::{
-    c,
-    ApplicationInterface,
-    BlockExecutedNotification,
-    Cloned,
-    Collection,
-    ForwarderInterface,
-    KeystoreInterface,
-    MempoolSocket,
-    NotifierInterface,
-    Ref,
-    SignerInterface,
-    SubmitTxSocket,
-    Subscriber,
-    SyncQueryRunnerInterface,
-    ToDigest,
-};
+use lightning_interfaces::BlockExecutedNotification;
 use lightning_utils::application::QueryRunnerExt;
 use tokio::sync::Mutex;
 use tracing::error;
@@ -105,9 +89,9 @@ impl<C: Collection> Signer<C> {
     }
 
     pub async fn start(
-        this: Ref<Self>,
-        notifier: Ref<C::NotifierInterface>,
-        Cloned(query_runner): Cloned<c![C::ApplicationInterface::SyncExecutor]>,
+        this: fdi::Ref<Self>,
+        notifier: fdi::Ref<C::NotifierInterface>,
+        fdi::Cloned(query_runner): fdi::Cloned<c![C::ApplicationInterface::SyncExecutor]>,
     ) {
         let subscriber = notifier.subscribe_block_executed();
         let worker = this.worker.clone();
@@ -308,8 +292,8 @@ impl AsyncWorker for SignerWorker {
 }
 
 impl<C: Collection> BuildGraph for Signer<C> {
-    fn build_graph() -> DependencyGraph {
-        DependencyGraph::new().with_infallible(Self::init.on("start", Self::start.block_on()))
+    fn build_graph() -> fdi::DependencyGraph {
+        fdi::DependencyGraph::new().with_infallible(Self::init.on("start", Self::start.block_on()))
     }
 }
 

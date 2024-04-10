@@ -11,21 +11,13 @@ use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_blockstore_server::BlockstoreServer;
 use lightning_broadcast::Broadcast;
 use lightning_indexer::Indexer;
-use lightning_interfaces::fdi::Provider;
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
     FetcherRequest,
     FetcherResponse,
     ImmutablePointer,
     NodePorts,
     OriginProvider,
-};
-use lightning_interfaces::{
-    partial,
-    BlockstoreInterface,
-    Collection,
-    FetcherInterface,
-    KeystoreInterface,
-    Node,
 };
 use lightning_notifier::Notifier;
 use lightning_origin_demuxer::{Config as DemuxerOriginConfig, OriginDemuxer};
@@ -116,7 +108,7 @@ async fn get_fetchers(
         .enumerate()
         .map(|(i, keystore)| {
             Node::<TestBinding>::init_with_provider(
-                Provider::default().with(keystore).with(
+                fdi::Provider::default().with(keystore).with(
                     JsonConfigProvider::default()
                         .with::<Application<TestBinding>>(AppConfig {
                             genesis: Some(genesis.clone()),

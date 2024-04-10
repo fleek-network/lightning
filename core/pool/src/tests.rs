@@ -12,24 +12,9 @@ use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_application::query_runner::QueryRunner;
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{NodeIndex, NodePorts};
-use lightning_interfaces::{
-    fdi,
-    partial,
-    ApplicationInterface,
-    Collection,
-    EventHandlerInterface,
-    KeystoreInterface,
-    Node,
-    PoolInterface,
-    RequestInterface,
-    RequesterInterface,
-    ResponderInterface,
-    ResponseInterface,
-    ServiceScope,
-    SyncQueryRunnerInterface,
-    TopologyInterface,
-};
+use lightning_interfaces::ServiceScope;
 use lightning_notifier::Notifier;
 use lightning_rep_collector::ReputationAggregator;
 use lightning_signer::Signer;

@@ -2,23 +2,12 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 
 use affair::{Socket, Task};
-use lightning_interfaces::fdi::{self, BuildGraph, MethodExt};
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
     DeliveryAcknowledgment,
     DeliveryAcknowledgmentProof,
     UpdateMethod,
     MAX_DELIVERY_ACKNOWLEDGMENTS,
-};
-use lightning_interfaces::{
-    Cloned,
-    Collection,
-    ConfigConsumer,
-    ConfigProviderInterface,
-    DeliveryAcknowledgmentAggregatorInterface,
-    DeliveryAcknowledgmentSocket,
-    ShutdownWaiter,
-    SignerInterface,
-    SubmitTxSocket,
 };
 use lightning_metrics::increment_counter_by;
 use queue_file::QueueFile;
@@ -49,7 +38,10 @@ impl<C: Collection> DeliveryAcknowledgmentAggregator<C> {
         })
     }
 
-    async fn start(mut this: fdi::RefMut<Self>, Cloned(shutdown): Cloned<ShutdownWaiter>) {
+    async fn start(
+        mut this: fdi::RefMut<Self>,
+        fdi::Cloned(shutdown): fdi::Cloned<ShutdownWaiter>,
+    ) {
         let inner = this.inner.take().expect("can only call start once");
         drop(this);
 
@@ -60,7 +52,7 @@ impl<C: Collection> DeliveryAcknowledgmentAggregator<C> {
 }
 
 impl<C: Collection> BuildGraph for DeliveryAcknowledgmentAggregator<C> {
-    fn build_graph() -> lightning_interfaces::fdi::DependencyGraph {
+    fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::default().with(Self::init.on("start", Self::start.spawn()))
     }
 }

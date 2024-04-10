@@ -2,8 +2,8 @@ use std::collections::{HashSet, VecDeque};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Digest as BroadcastDigest, NodeIndex};
-use lightning_interfaces::{BroadcastEventInterface, Emitter, SyncQueryRunnerInterface};
 use lightning_utils::application::QueryRunnerExt;
 
 use super::ring_buffer::RingBuffer;

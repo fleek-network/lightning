@@ -4,14 +4,7 @@ use std::time::Duration;
 
 use affair::{Executor, TokioSpawn};
 use anyhow::{anyhow, Result};
-use lightning_interfaces::{
-    fdi,
-    ApplicationInterface,
-    Collection,
-    ConfigConsumer,
-    ConfigProviderInterface,
-    ExecutionEngineSocket,
-};
+use lightning_interfaces::prelude::*;
 use tracing::{error, info};
 
 use crate::config::{Config, StorageConfig};

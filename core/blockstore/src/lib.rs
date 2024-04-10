@@ -9,8 +9,8 @@ mod tests {
 
     use blake3_tree::blake3::tree::{HashTree, HashTreeBuilder};
     use blake3_tree::ProofBuf;
+    use lightning_interfaces::prelude::*;
     use lightning_interfaces::types::{Blake3Hash, CompressionAlgorithm};
-    use lightning_interfaces::{partial, BlockstoreInterface, Collection, IncrementalPutInterface};
     use tokio::test;
 
     use crate::blockstore::{Blockstore, BLOCK_SIZE};
@@ -61,7 +61,7 @@ mod tests {
             root: path.clone().try_into().unwrap(),
         })
         .unwrap();
-        blockstore.provide_indexer(infusion::Blank::default());
+        blockstore.provide_indexer(lightning_interfaces::_hacks::Blanket);
 
         BlockStoreCleanOnDrop {
             blockstore,

@@ -7,16 +7,7 @@ use lightning_application::config::Config as AppConfig;
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_interfaces::Collection;
-use lightning_interfaces::{
-    partial,
-    ApplicationInterface,
-    ArchiveInterface,
-    ArchiveRequest,
-    ArchiveResponse,
-    BlockstoreInterface,
-    IndexRequest,
-    WithStartAndShutdown,
-};
+use lightning_interfaces::prelude::*;
 use lightning_test_utils::transaction::get_index_request;
 
 use crate::archive::{Archive, BlockInfo};

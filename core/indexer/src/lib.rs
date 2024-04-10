@@ -5,20 +5,9 @@ use std::marker::PhantomData;
 use std::sync::{Arc, OnceLock};
 
 use fleek_crypto::NodePublicKey;
-use lightning_interfaces::fdi::{BuildGraph, DependencyGraph};
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Blake3Hash, ContentUpdate, NodeIndex, UpdateMethod};
-use lightning_interfaces::{
-    c,
-    ApplicationInterface,
-    Cloned,
-    Collection,
-    IndexerInterface,
-    KeystoreInterface,
-    SignerInterface,
-    SubmitTxSocket,
-    SyncQueryRunnerInterface,
-};
-
+use lightning_interfaces::SubmitTxSocket;
 pub struct Indexer<C: Collection> {
     pk: NodePublicKey,
     local_index: Arc<OnceLock<NodeIndex>>,
@@ -43,7 +32,7 @@ impl<C: Collection> Indexer<C> {
     fn init(
         keystore: &C::KeystoreInterface,
         signer: &C::SignerInterface,
-        Cloned(query_runner): Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
+        fdi::Cloned(query_runner): fdi::Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
     ) -> anyhow::Result<Self> {
         let pk = keystore.get_ed25519_pk();
         let local_index = OnceLock::new();
@@ -76,8 +65,8 @@ impl<C: Collection> Indexer<C> {
 }
 
 impl<C: Collection> BuildGraph for Indexer<C> {
-    fn build_graph() -> lightning_interfaces::fdi::DependencyGraph {
-        DependencyGraph::default().with(Self::init)
+    fn build_graph() -> fdi::DependencyGraph {
+        fdi::DependencyGraph::default().with(Self::init)
     }
 }
 

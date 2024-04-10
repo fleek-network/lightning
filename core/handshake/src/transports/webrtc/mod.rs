@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use axum::Router;
 use bytes::Bytes;
 use dashmap::DashMap;
-use lightning_interfaces::{ExecutorProviderInterface, ShutdownWaiter};
+use lightning_interfaces::prelude::*;
 use lightning_metrics::increment_counter;
 use serde::{Deserialize, Serialize};
 use stunclient::StunClient;

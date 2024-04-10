@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use axum::Router;
 use bytes::{BufMut, Bytes, BytesMut};
 use fn_sdk::header::TransportDetail;
-use lightning_interfaces::{ExecutorProviderInterface, ShutdownWaiter};
+use lightning_interfaces::prelude::*;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 

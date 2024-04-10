@@ -2,21 +2,8 @@ use std::marker::PhantomData;
 use std::path::PathBuf;
 
 use fxhash::FxHashSet;
-use lightning_interfaces::fdi::{BuildGraph, DependencyGraph, MethodExt};
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::ServiceId;
-use lightning_interfaces::{
-    c,
-    ApplicationInterface,
-    BlockstoreInterface,
-    Cloned,
-    Collection,
-    ConfigConsumer,
-    ConfigProviderInterface,
-    ExecutorProviderInterface,
-    FetcherInterface,
-    ServiceExecutorInterface,
-    ShutdownWaiter,
-};
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
 use tokio::net::UnixStream;
@@ -76,7 +63,7 @@ impl<C: Collection> ServiceExecutor<C> {
         config: &C::ConfigProviderInterface,
         blockstore: &C::BlockstoreInterface,
         fetcher: &C::FetcherInterface,
-        Cloned(query_runner): Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
+        fdi::Cloned(query_runner): fdi::Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
     ) -> anyhow::Result<Self> {
         let config = Arc::new(config.get::<Self>());
 
@@ -95,7 +82,10 @@ impl<C: Collection> ServiceExecutor<C> {
         })
     }
 
-    async fn start(Cloned(this): Cloned<Self>, Cloned(waiter): Cloned<ShutdownWaiter>) {
+    async fn start(
+        fdi::Cloned(this): fdi::Cloned<Self>,
+        fdi::Cloned(waiter): fdi::Cloned<ShutdownWaiter>,
+    ) {
         for &id in this.config.services.iter() {
             let handle = spawn_service(id, this.ctx.clone(), waiter.clone()).await;
             this.collection.insert(id, handle);
@@ -104,8 +94,8 @@ impl<C: Collection> ServiceExecutor<C> {
 }
 
 impl<C: Collection> BuildGraph for ServiceExecutor<C> {
-    fn build_graph() -> lightning_interfaces::fdi::DependencyGraph {
-        DependencyGraph::default().with(Self::init.on("start", Self::start.block_on()))
+    fn build_graph() -> fdi::DependencyGraph {
+        fdi::DependencyGraph::default().with(Self::init.on("start", Self::start.block_on()))
     }
 }
 

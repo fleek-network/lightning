@@ -5,6 +5,7 @@ use fleek_crypto::{EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 use jsonrpsee::core::{RpcResult, SubscriptionResult};
 use jsonrpsee::{PendingSubscriptionSink, SubscriptionMessage};
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
     AccountInfo,
     Blake3Hash,
@@ -26,7 +27,7 @@ use lightning_interfaces::types::{
     TransactionRequest,
     Value,
 };
-use lightning_interfaces::{Collection, PagingParams, SyncQueryRunnerInterface};
+use lightning_interfaces::PagingParams;
 use lightning_types::EventType;
 use lightning_utils::application::QueryRunnerExt;
 

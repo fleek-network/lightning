@@ -2,8 +2,7 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use fdi::BuildGraph;
-use lightning_interfaces::{Collection, ConfigConsumer, ConfigProviderInterface};
+use lightning_interfaces::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::{to_value, Value};
 

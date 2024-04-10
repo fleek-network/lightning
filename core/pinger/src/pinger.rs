@@ -5,24 +5,8 @@ use std::time::{Duration, Instant};
 
 use anyhow::anyhow;
 use fleek_crypto::NodePublicKey;
-use lightning_interfaces::fdi::{BuildGraph, Cloned, DependencyGraph, MethodExt};
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{NodeIndex, NodeInfo};
-use lightning_interfaces::{
-    c,
-    ApplicationInterface,
-    Collection,
-    ConfigConsumer,
-    ConfigProviderInterface,
-    KeystoreInterface,
-    NotifierInterface,
-    PingerInterface,
-    RefMut,
-    ReputationAggregatorInterface,
-    ReputationReporterInterface,
-    ShutdownWaiter,
-    Subscriber,
-    SyncQueryRunnerInterface,
-};
 use lightning_metrics::histogram;
 use lightning_utils::application::QueryRunnerExt;
 use rand::rngs::SmallRng;
@@ -47,8 +31,8 @@ impl<C: Collection> Pinger<C> {
         app: &C::ApplicationInterface,
         rep_aggregator: &C::ReputationAggregatorInterface,
         keystore: &C::KeystoreInterface,
-        Cloned(notifier): Cloned<C::NotifierInterface>,
-        Cloned(shutdown_waiter): Cloned<ShutdownWaiter>,
+        fdi::Cloned(notifier): fdi::Cloned<C::NotifierInterface>,
+        fdi::Cloned(shutdown_waiter): fdi::Cloned<ShutdownWaiter>,
     ) -> anyhow::Result<Self> {
         let config = config_provider.get::<Self>();
         let query_runner = app.sync_query();
@@ -67,7 +51,7 @@ impl<C: Collection> Pinger<C> {
         Ok(Self { inner: Some(inner) })
     }
 
-    pub async fn start(mut this: RefMut<Self>) {
+    pub async fn start(mut this: fdi::RefMut<Self>) {
         this.inner
             .take()
             .expect("Pinger already started")
@@ -79,8 +63,8 @@ impl<C: Collection> Pinger<C> {
 impl<C: Collection> PingerInterface<C> for Pinger<C> {}
 
 impl<C: Collection> BuildGraph for Pinger<C> {
-    fn build_graph() -> DependencyGraph {
-        DependencyGraph::new().with(Self::new.on("start", Self::start.spawn()))
+    fn build_graph() -> fdi::DependencyGraph {
+        fdi::DependencyGraph::new().with(Self::new.on("start", Self::start.spawn()))
     }
 }
 

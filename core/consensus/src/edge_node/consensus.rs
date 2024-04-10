@@ -3,14 +3,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use fleek_crypto::NodePublicKey;
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::Epoch;
-use lightning_interfaces::{
-    BroadcastEventInterface,
-    Emitter,
-    PubSub,
-    SyncQueryRunnerInterface,
-    ToDigest,
-};
 use lightning_metrics::increment_counter;
 use lightning_utils::application::QueryRunnerExt;
 use quick_cache::unsync::Cache;

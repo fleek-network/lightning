@@ -9,15 +9,9 @@ use bytes::Bytes;
 use fleek_crypto::NodePublicKey;
 use futures::stream::FuturesUnordered;
 use hp_fixed::unsigned::HpUfixed;
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::NodeIndex;
-use lightning_interfaces::{
-    c,
-    ApplicationInterface,
-    Collection,
-    ServiceScope,
-    ShutdownWaiter,
-    SyncQueryRunnerInterface,
-};
+use lightning_interfaces::ServiceScope;
 use lightning_metrics::increment_counter;
 use lightning_utils::application::QueryRunnerExt;
 use tokio::sync::mpsc::error::TryRecvError;

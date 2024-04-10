@@ -13,37 +13,17 @@ use affair::{Socket, Task};
 use anyhow::{anyhow, Result};
 use blake3_tree::ProofBuf;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use lightning_interfaces::fdi::{BuildGraph, DependencyGraph, MethodExt};
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
     Blake3Hash,
     CompressionAlgoSet,
     CompressionAlgorithm,
     NodeIndex,
     PeerRequestError,
+    RejectReason,
     ServerRequest,
 };
-use lightning_interfaces::{
-    c,
-    BlockstoreInterface,
-    BlockstoreServerInterface,
-    BlockstoreServerSocket,
-    Cloned,
-    Collection,
-    ConfigConsumer,
-    ConfigProviderInterface,
-    IncrementalPutInterface,
-    PoolInterface,
-    RefMut,
-    RejectReason,
-    ReputationAggregatorInterface,
-    ReputationReporterInterface,
-    RequestInterface,
-    RequesterInterface,
-    ResponderInterface,
-    ResponseInterface,
-    ServiceScope,
-    ShutdownWaiter,
-};
+use lightning_interfaces::ServiceScope;
 use lightning_metrics::increment_counter;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc};
@@ -93,7 +73,7 @@ impl<C: Collection> BlockstoreServer<C> {
     }
 
     /// Start the system, should only be called once
-    async fn start(mut this: RefMut<Self>, waiter: Cloned<ShutdownWaiter>) {
+    async fn start(mut this: fdi::RefMut<Self>, waiter: fdi::Cloned<ShutdownWaiter>) {
         let inner = this
             .inner
             .take()
@@ -104,8 +84,8 @@ impl<C: Collection> BlockstoreServer<C> {
 }
 
 impl<C: Collection> BuildGraph for BlockstoreServer<C> {
-    fn build_graph() -> DependencyGraph {
-        DependencyGraph::default().with(Self::init.on("start", Self::start.spawn()))
+    fn build_graph() -> fdi::DependencyGraph {
+        fdi::DependencyGraph::default().with(Self::init.on("start", Self::start.spawn()))
     }
 }
 

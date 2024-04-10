@@ -7,14 +7,9 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 use fleek_crypto::NodePublicKey;
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::NodeIndex;
-use lightning_interfaces::{
-    c,
-    ApplicationInterface,
-    Collection,
-    ServiceScope,
-    SyncQueryRunnerInterface,
-};
+use lightning_interfaces::ServiceScope;
 use lightning_metrics::histogram;
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;

@@ -1,18 +1,8 @@
-use lightning_interfaces::fdi::{BuildGraph, Cloned, DependencyGraph, MethodExt};
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::schema::broadcast::Frame;
 use lightning_interfaces::schema::LightningMessage;
 use lightning_interfaces::types::Topic;
-use lightning_interfaces::{
-    c,
-    ApplicationInterface,
-    BroadcastInterface,
-    Collection,
-    KeystoreInterface,
-    PoolInterface,
-    ReputationAggregatorInterface,
-    ServiceScope,
-    ShutdownWaiter,
-};
+use lightning_interfaces::ServiceScope;
 use tracing::debug;
 
 use crate::backend::LightningBackend;
@@ -31,7 +21,7 @@ impl<C: Collection> Broadcast<C> {
         keystore: &C::KeystoreInterface,
         rep_aggregator: &C::ReputationAggregatorInterface,
         pool: &c!(C::PoolInterface),
-        Cloned(sqr): Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
+        fdi::Cloned(sqr): fdi::Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
     ) -> Self {
         let sk = keystore.get_ed25519_sk();
         let event_handler = pool.open_event(ServiceScope::Broadcast);
@@ -46,15 +36,15 @@ impl<C: Collection> Broadcast<C> {
         }
     }
 
-    pub fn start(&mut self, Cloned(waiter): Cloned<ShutdownWaiter>) {
+    pub fn start(&mut self, fdi::Cloned(waiter): fdi::Cloned<ShutdownWaiter>) {
         let ctx = self.ctx.take().expect("The context to be present.");
         ctx.spawn(waiter);
     }
 }
 
 impl<C: Collection> BuildGraph for Broadcast<C> {
-    fn build_graph() -> DependencyGraph {
-        DependencyGraph::new().with_infallible(Self::new.on("start", Self::start))
+    fn build_graph() -> fdi::DependencyGraph {
+        fdi::DependencyGraph::new().with_infallible(Self::new.on("start", Self::start))
     }
 }
 

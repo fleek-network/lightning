@@ -10,20 +10,7 @@ use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_interfaces::Collection;
 use lightning_interfaces::schema::broadcast::{Frame, Message};
 use lightning_interfaces::types::{NodeIndex, NodePorts, Topic};
-use lightning_interfaces::{
-    partial,
-    ApplicationInterface,
-    BroadcastInterface,
-    KeystoreInterface,
-    NotifierInterface,
-    PoolInterface,
-    PubSub,
-    ReputationAggregatorInterface,
-    SignerInterface,
-    SyncQueryRunnerInterface,
-    TopologyInterface,
-    WithStartAndShutdown,
-};
+use lightning_interfaces::prelude::*;
 use lightning_notifier::Notifier;
 use lightning_pool::{muxer, Config as PoolConfig, PoolProvider};
 use lightning_rep_collector::ReputationAggregator;

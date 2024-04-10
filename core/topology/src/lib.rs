@@ -14,7 +14,6 @@ use std::sync::Arc;
 use anyhow::anyhow;
 pub use config::Config;
 use fleek_crypto::NodePublicKey;
-use lightning_interfaces::fdi::{self, BuildGraph, DependencyGraph, MethodExt};
 use lightning_interfaces::prelude::*;
 use lightning_utils::application::QueryRunnerExt;
 use tokio::sync::watch;
@@ -130,8 +129,8 @@ impl<C: Collection> Topology<C> {
 }
 
 impl<C: Collection> BuildGraph for Topology<C> {
-    fn build_graph() -> DependencyGraph {
-        DependencyGraph::default().with(Self::init.on("start", Self::start.spawn()))
+    fn build_graph() -> fdi::DependencyGraph {
+        fdi::DependencyGraph::default().with(Self::init.on("start", Self::start.spawn()))
     }
 }
 

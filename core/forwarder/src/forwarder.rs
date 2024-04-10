@@ -1,14 +1,7 @@
 use std::marker::PhantomData;
 
 use affair::{Executor, TokioSpawn};
-use fdi::{BuildGraph, DependencyGraph};
-use lightning_interfaces::{
-    ApplicationInterface,
-    Collection,
-    ConfigConsumer,
-    ForwarderInterface,
-    MempoolSocket,
-};
+use lightning_interfaces::prelude::*;
 
 use crate::config::ForwarderConfig;
 use crate::worker::Worker;
@@ -30,10 +23,8 @@ impl<C> ConfigConsumer for Forwarder<C> {
 }
 
 impl<C: Collection> BuildGraph for Forwarder<C> {
-    fn build_graph() -> DependencyGraph {
-        use lightning_interfaces::KeystoreInterface;
-
-        DependencyGraph::new().with_infallible(
+    fn build_graph() -> fdi::DependencyGraph {
+        fdi::DependencyGraph::new().with_infallible(
             |keystore: &C::KeystoreInterface, app: &C::ApplicationInterface| {
                 let consensus_key = keystore.get_bls_pk();
                 let query_runner = app.sync_query();

@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 
 use affair::{AsyncWorkerUnordered, Executor, TokioSpawn};
 use anyhow::{anyhow, Context, Result};
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
     Blake3Hash,
     FetcherRequest,
@@ -9,19 +10,7 @@ use lightning_interfaces::types::{
     ImmutablePointer,
     ServerRequest,
 };
-use lightning_interfaces::{
-    fdi,
-    BlockstoreInterface,
-    BlockstoreServerInterface,
-    BlockstoreServerSocket,
-    Collection,
-    ConfigConsumer,
-    ConfigProviderInterface,
-    FetcherInterface,
-    FetcherSocket,
-    OriginProviderInterface,
-    ResolverInterface,
-};
+use lightning_interfaces::{BlockstoreServerSocket, FetcherSocket};
 use lightning_metrics::increment_counter;
 use tokio::sync::{mpsc, oneshot};
 

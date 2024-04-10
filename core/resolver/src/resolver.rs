@@ -1,24 +1,9 @@
 use std::sync::Arc;
 
 use fleek_crypto::{NodeSecretKey, PublicKey, SecretKey};
-use lightning_interfaces::fdi::{self, BuildGraph, MethodExt};
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::schema::broadcast::ResolvedImmutablePointerRecord;
 use lightning_interfaces::types::{Blake3Hash, ImmutablePointer, NodeIndex, Topic};
-use lightning_interfaces::{
-    c,
-    ApplicationInterface,
-    BroadcastInterface,
-    Cloned,
-    Collection,
-    ConfigConsumer,
-    ConfigProviderInterface,
-    KeystoreInterface,
-    PubSub,
-    ResolverInterface,
-    ShutdownWaiter,
-    SyncQueryRunnerInterface,
-    ToDigest,
-};
 use rocksdb::{Options, DB};
 use tokio::sync::OnceCell;
 use tracing::warn;
@@ -46,7 +31,7 @@ impl<C: Collection> Resolver<C> {
         config: &C::ConfigProviderInterface,
         broadcast: &C::BroadcastInterface,
         keystore: &C::KeystoreInterface,
-        Cloned(query_runner): Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
+        fdi::Cloned(query_runner): fdi::Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
     ) -> anyhow::Result<Self> {
         let config = config.get::<Self>();
         let node_sk = keystore.get_ed25519_sk();

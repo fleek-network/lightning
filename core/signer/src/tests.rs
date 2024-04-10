@@ -5,17 +5,8 @@ use fleek_crypto::{AccountOwnerSecretKey, SecretKey};
 use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisNode};
-use lightning_interfaces::fdi::Provider;
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{NodePorts, UpdateMethod};
-use lightning_interfaces::{
-    partial,
-    ApplicationInterface,
-    Collection,
-    KeystoreInterface,
-    Node,
-    SignerInterface,
-    SyncQueryRunnerInterface,
-};
 use lightning_notifier::Notifier;
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus, MockForwarder};
 use lightning_test_utils::json_config::JsonConfigProvider;
@@ -65,7 +56,7 @@ fn build_node(transactions_to_lose: &[u32]) -> Node<TestBinding> {
     ));
 
     Node::<TestBinding>::init_with_provider(
-        Provider::default().with(keystore).with(
+        fdi::Provider::default().with(keystore).with(
             JsonConfigProvider::default()
                 .with::<Application<TestBinding>>(AppConfig {
                     genesis: Some(genesis),

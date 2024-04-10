@@ -20,6 +20,7 @@ use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore_server::BlockstoreServer;
 use lightning_fetcher::fetcher::Fetcher;
 use lightning_indexer::Indexer;
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
     Blake3Hash,
     EpochInfo,
@@ -32,16 +33,7 @@ use lightning_interfaces::types::{
     TotalServed,
     Value,
 };
-use lightning_interfaces::{
-    fdi,
-    partial,
-    BlockstoreInterface,
-    Collection,
-    Node,
-    PagingParams,
-    RpcInterface,
-    SyncQueryRunnerInterface,
-};
+use lightning_interfaces::PagingParams;
 use lightning_notifier::Notifier;
 use lightning_origin_demuxer::OriginDemuxer;
 use lightning_pool::PoolProvider;

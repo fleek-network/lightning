@@ -11,23 +11,12 @@ use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_blockstore::blockstore::{Blockstore, BLOCK_SIZE};
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_indexer::Indexer;
-use lightning_interfaces::fdi::Ref;
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
     CompressionAlgoSet,
     CompressionAlgorithm,
     NodePorts,
     ServerRequest,
-};
-use lightning_interfaces::{
-    partial,
-    ApplicationInterface,
-    BlockstoreInterface,
-    BlockstoreServerInterface,
-    Collection,
-    IncrementalPutInterface,
-    KeystoreInterface,
-    Node,
-    SyncQueryRunnerInterface,
 };
 use lightning_notifier::Notifier;
 use lightning_pool::{Config as PoolConfig, PoolProvider};
@@ -68,15 +57,15 @@ struct Peer<C: Collection> {
 }
 
 impl<C: Collection> Peer<C> {
-    fn blockstore(&self) -> Ref<C::BlockstoreInterface> {
+    fn blockstore(&self) -> fdi::Ref<C::BlockstoreInterface> {
         self.inner.provider.get::<C::BlockstoreInterface>()
     }
 
-    fn app(&self) -> Ref<C::ApplicationInterface> {
+    fn app(&self) -> fdi::Ref<C::ApplicationInterface> {
         self.inner.provider.get::<C::ApplicationInterface>()
     }
 
-    fn blockstore_server(&self) -> Ref<C::BlockstoreServerInterface> {
+    fn blockstore_server(&self) -> fdi::Ref<C::BlockstoreServerInterface> {
         self.inner.provider.get::<C::BlockstoreServerInterface>()
     }
 }

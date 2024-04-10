@@ -18,6 +18,17 @@ pub use lightning_schema::LightningMessage;
 // Re-export top level modules and highly used stuff.
 pub use crate::{c, fdi, partial, schema, types, Node, ShutdownWaiter};
 
+#[rustfmt::skip]
+pub use crate::{
+    ExecutionEngineSocket,
+    OriginProviderSocket,
+    SubmitTxSocket,
+    FetcherSocket,
+    DeliveryAcknowledgmentSocket,
+    MempoolSocket,
+    BlockstoreServerSocket
+};
+
 // Re-export all of the pub traits defined in our source code. Except the ones from our hack file.
 //
 // rg 'pub trait (\w+)' --only-matching --replace '$1,' -g '*.rs' -g '!_hacks.rs' \

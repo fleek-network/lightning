@@ -2,29 +2,14 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use lightning_interfaces::fdi::{Bind, BuildGraph, DependencyGraph, MethodExt};
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
     NodeIndex,
     ReputationMeasurements,
     UpdateMethod,
     MAX_MEASUREMENTS_PER_TX,
 };
-use lightning_interfaces::{
-    c,
-    Cloned,
-    Collection,
-    ConfigConsumer,
-    ConfigProviderInterface,
-    NotifierInterface,
-    ReputationAggregatorInterface,
-    ReputationQueryInteface,
-    ReputationReporterInterface,
-    ShutdownWaiter,
-    SignerInterface,
-    SubmitTxSocket,
-    Subscriber,
-    Weight,
-};
+use lightning_interfaces::Weight;
 use tokio::pin;
 use tracing::{error, info};
 
@@ -51,7 +36,7 @@ impl<C: Collection> ReputationAggregator<C> {
     pub fn new(
         config: &C::ConfigProviderInterface,
         signer: &C::SignerInterface,
-        Cloned(notifier): Cloned<C::NotifierInterface>,
+        fdi::Cloned(notifier): fdi::Cloned<C::NotifierInterface>,
     ) -> anyhow::Result<Self> {
         let config = config.get::<Self>();
         let submit_tx = signer.get_socket();
@@ -71,7 +56,7 @@ impl<C: Collection> ReputationAggregator<C> {
         })
     }
 
-    pub async fn start(mut self, Cloned(waiter): Cloned<ShutdownWaiter>) {
+    pub async fn start(mut self, fdi::Cloned(waiter): fdi::Cloned<ShutdownWaiter>) {
         let shutdown_future = waiter.wait_for_shutdown();
         pin!(shutdown_future);
 
@@ -225,8 +210,8 @@ impl<C: Collection> ReputationAggregator<C> {
 }
 
 impl<C: Collection> BuildGraph for ReputationAggregator<C> {
-    fn build_graph() -> DependencyGraph {
-        DependencyGraph::new().with(Self::new.on("start", Self::start.bounded().spawn()))
+    fn build_graph() -> fdi::DependencyGraph {
+        fdi::DependencyGraph::new().with(Self::new.on("start", Self::start.bounded().spawn()))
     }
 }
 

@@ -5,7 +5,7 @@ use arrayref::array_ref;
 use async_trait::async_trait;
 use axum::Router;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use lightning_interfaces::{ExecutorProviderInterface, ShutdownWaiter};
+use lightning_interfaces::prelude::*;
 use lightning_metrics::increment_counter;
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};

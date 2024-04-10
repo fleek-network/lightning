@@ -4,8 +4,7 @@ use std::path::Path;
 use std::sync::Mutex;
 
 use anyhow::{Context, Result};
-use lightning_interfaces::fdi::{self, BuildGraph};
-use lightning_interfaces::{Collection, ConfigConsumer, ConfigProviderInterface};
+use lightning_interfaces::prelude::*;
 use resolved_pathbuf::ResolvedPathBuf;
 use toml::{Table, Value};
 use tracing::debug;

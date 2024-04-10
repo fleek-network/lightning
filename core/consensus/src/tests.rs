@@ -1,5 +1,5 @@
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Digest as BroadcastDigest, NodeIndex};
-use lightning_interfaces::{BroadcastEventInterface, ToDigest};
 use narwhal_types::{Batch, BatchAPI, Transaction};
 use rand::Rng;
 use sui_protocol_config::{Chain, ProtocolConfig, ProtocolVersion};

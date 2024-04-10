@@ -2,15 +2,9 @@ use blake3_tree::blake3::tree::{BlockHasher, HashTreeBuilder};
 use blake3_tree::IncrementalVerifier;
 use bytes::{BufMut, BytesMut};
 use derive_more::IsVariant;
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Blake3Hash, CompressionAlgorithm};
-use lightning_interfaces::{
-    Collection,
-    IncrementalPutInterface,
-    IndexerInterface,
-    PutFeedProofError,
-    PutFinalizeError,
-    PutWriteError,
-};
+use lightning_interfaces::{PutFeedProofError, PutFinalizeError, PutWriteError};
 use tokio::task::JoinSet;
 use tracing::error;
 

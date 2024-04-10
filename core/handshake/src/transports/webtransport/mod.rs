@@ -10,7 +10,7 @@ use bytes::{BufMut as _, Bytes};
 pub use config::WebTransportConfig;
 use fleek_crypto::{NodeSecretKey, SecretKey};
 use futures::StreamExt;
-use lightning_interfaces::{ExecutorProviderInterface, ShutdownWaiter};
+use lightning_interfaces::prelude::*;
 use lightning_metrics::increment_counter;
 use tokio::sync::mpsc::{self, Receiver};
 use tracing::{error, info, warn};

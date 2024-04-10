@@ -5,7 +5,7 @@ use axum::routing::get;
 use axum::Router;
 use bytes::{BufMut, Bytes, BytesMut};
 use dashmap::DashMap;
-use lightning_interfaces::{ExecutorProviderInterface, ShutdownWaiter};
+use lightning_interfaces::prelude::*;
 use lightning_metrics::increment_counter;
 use serde::{Deserialize, Serialize};
 use tokio::sync::OnceCell;

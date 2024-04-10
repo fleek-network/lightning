@@ -4,7 +4,7 @@ use anyhow::Result;
 use clap::Parser;
 use lightning_cli::args::Args;
 use lightning_cli::cli::Cli;
-use lightning_interfaces::{c, ServiceExecutorInterface};
+use lightning_interfaces::prelude::*;
 use lightning_node::FinalTypes;
 
 fn main() -> Result<()> {

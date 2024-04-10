@@ -2,9 +2,9 @@ use std::collections::HashSet;
 use std::marker::PhantomData;
 
 use anyhow::{anyhow, Result};
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::schema::LightningMessage;
 use lightning_interfaces::types::{Digest, NodeIndex, Topic};
-use lightning_interfaces::{BroadcastEventInterface, PubSub};
 use tokio::sync::oneshot;
 use tracing::{debug, info};
 

@@ -2,27 +2,13 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use ethers::types::BlockNumber;
-use lightning_interfaces::fdi::{BuildGraph, DependencyGraph, MethodExt};
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
     Block,
     BlockExecutionResponse,
     BlockReceipt,
     TransactionReceipt,
     TransactionRequest,
-};
-use lightning_interfaces::{
-    c,
-    ApplicationInterface,
-    ArchiveInterface,
-    BlockstoreInterface,
-    Cloned,
-    Collection,
-    ConfigConsumer,
-    ConfigProviderInterface,
-    NotifierInterface,
-    ShutdownWaiter,
-    SyncQueryRunnerInterface,
-    _Subscriber,
 };
 use resolved_pathbuf::ResolvedPathBuf;
 use rocksdb::{Options, DB};
@@ -52,8 +38,9 @@ struct ArchiveInner<C: Collection> {
 }
 
 impl<C: Collection> BuildGraph for Archive<C> {
-    fn build_graph() -> DependencyGraph {
-        DependencyGraph::new().with_infallible(Self::new.on("start", insertion_task::<C>.spawn()))
+    fn build_graph() -> fdi::DependencyGraph {
+        fdi::DependencyGraph::new()
+            .with_infallible(Self::new.on("start", insertion_task::<C>.spawn()))
     }
 }
 
@@ -337,9 +324,9 @@ impl<C: Collection> ArchiveInner<C> {
 
 /// The main loop that listens to notifier events and inserts the data into the db.
 async fn insertion_task<C: Collection>(
-    Cloned(waiter): Cloned<ShutdownWaiter>,
-    Cloned(notifier): Cloned<C::NotifierInterface>,
-    Cloned(archive): Cloned<Archive<C>>,
+    fdi::Cloned(waiter): fdi::Cloned<ShutdownWaiter>,
+    fdi::Cloned(notifier): fdi::Cloned<C::NotifierInterface>,
+    fdi::Cloned(archive): fdi::Cloned<Archive<C>>,
 ) {
     let Some(inner) = archive.inner else {
         return;

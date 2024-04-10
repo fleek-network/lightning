@@ -1,14 +1,7 @@
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use lightning_interfaces::{
-    ApplicationInterface,
-    BlockstoreInterface,
-    Collection,
-    ConfigProviderInterface,
-    Node,
-    SyncronizerInterface,
-};
+use lightning_interfaces::prelude::*;
 use lightning_node::config::TomlConfigProvider;
 use lightning_utils::shutdown::ShutdownController;
 use resolved_pathbuf::ResolvedPathBuf;

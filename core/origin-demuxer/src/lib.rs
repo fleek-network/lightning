@@ -7,14 +7,7 @@ use std::marker::PhantomData;
 
 use affair::{Executor, TokioSpawn};
 use demuxer::Demuxer;
-use lightning_interfaces::fdi::{BuildGraph, DependencyGraph};
-use lightning_interfaces::{
-    Collection,
-    ConfigConsumer,
-    ConfigProviderInterface,
-    OriginProviderInterface,
-    OriginProviderSocket,
-};
+use lightning_interfaces::prelude::*;
 
 pub use crate::config::Config;
 
@@ -50,7 +43,7 @@ impl<C: Collection> OriginProviderInterface<C> for OriginDemuxer<C> {
 }
 
 impl<C: Collection> BuildGraph for OriginDemuxer<C> {
-    fn build_graph() -> DependencyGraph {
-        DependencyGraph::default().with(Self::new)
+    fn build_graph() -> fdi::DependencyGraph {
+        fdi::DependencyGraph::default().with(Self::new)
     }
 }

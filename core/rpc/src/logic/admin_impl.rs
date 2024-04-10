@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use jsonrpsee::core::RpcResult;
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Blake3Hash, CompressionAlgorithm};
-use lightning_interfaces::{BlockstoreInterface, Collection, IncrementalPutInterface};
 
 use crate::api::AdminApiServer;
 use crate::error::RPCError;

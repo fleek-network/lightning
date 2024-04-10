@@ -12,13 +12,7 @@ use fleek_crypto::{
     NodeSecretKey,
     SecretKey,
 };
-use lightning_interfaces::fdi::{BuildGraph, DependencyGraph};
-use lightning_interfaces::{
-    Collection,
-    ConfigConsumer,
-    ConfigProviderInterface,
-    KeystoreInterface,
-};
+use lightning_interfaces::prelude::*;
 use tracing::info;
 use triomphe::Arc;
 
@@ -72,8 +66,8 @@ impl<C: Collection> Keystore<C> {
 }
 
 impl<C: Collection> BuildGraph for Keystore<C> {
-    fn build_graph() -> lightning_interfaces::fdi::DependencyGraph {
-        DependencyGraph::default().with(Self::init)
+    fn build_graph() -> fdi::DependencyGraph {
+        fdi::DependencyGraph::default().with(Self::init)
     }
 }
 

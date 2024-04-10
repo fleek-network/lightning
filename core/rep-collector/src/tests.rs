@@ -16,15 +16,7 @@ use lightning_interfaces::reputation::{
 };
 use lightning_interfaces::signer::SignerInterface;
 use lightning_interfaces::types::{Block, NodePorts, UpdateMethod, UpdatePayload, UpdateRequest};
-use lightning_interfaces::{
-    partial,
-    ForwarderInterface,
-    KeystoreInterface,
-    ReputationQueryInteface,
-    SyncQueryRunnerInterface,
-    ToDigest,
-    Weight,
-};
+use lightning_interfaces::prelude::*;
 use lightning_notifier::Notifier;
 use lightning_signer::Signer;
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus, MockForwarder};

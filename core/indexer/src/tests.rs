@@ -6,16 +6,8 @@ use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_application::query_runner::QueryRunner;
-use lightning_interfaces::fdi::Provider;
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::NodePorts;
-use lightning_interfaces::{
-    partial,
-    Collection,
-    IndexerInterface,
-    KeystoreInterface,
-    Node,
-    SyncQueryRunnerInterface,
-};
 use lightning_notifier::Notifier;
 use lightning_signer::Signer;
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus, MockForwarder};
@@ -102,7 +94,7 @@ async fn test_submission() {
     genesis.epoch_time = 4000; // millis
 
     let mut node = Node::<TestBinding>::init_with_provider(
-        Provider::default()
+        fdi::Provider::default()
             .with(
                 JsonConfigProvider::default()
                     .with::<Application<TestBinding>>(AppConfig {

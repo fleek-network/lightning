@@ -4,27 +4,8 @@ use std::time::{Duration, SystemTime};
 
 use derive_more::{From, IsVariant, TryInto};
 use fleek_crypto::{ConsensusPublicKey, NodePublicKey, SecretKey};
-use lightning_interfaces::fdi::{BuildGraph, DependencyGraph, MethodExt};
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Epoch, EpochInfo, Event, Topic, UpdateMethod};
-use lightning_interfaces::{
-    c,
-    ApplicationInterface,
-    BroadcastInterface,
-    Cloned,
-    Collection,
-    ConfigConsumer,
-    ConfigProviderInterface,
-    ConsensusInterface,
-    Emitter,
-    KeystoreInterface,
-    NotifierInterface,
-    PubSub,
-    RpcInterface,
-    ShutdownWaiter,
-    SignerInterface,
-    SubmitTxSocket,
-    SyncQueryRunnerInterface,
-};
 use lightning_schema::AutoImplSerde;
 use lightning_utils::application::QueryRunnerExt;
 use mysten_metrics::RegistryService;
@@ -315,7 +296,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
 impl<C: Collection> Consensus<C> {
     /// Start the system, should not do anything if the system is already
     /// started.
-    fn start(&mut self, Cloned(waiter): Cloned<ShutdownWaiter>) {
+    fn start(&mut self, fdi::Cloned(waiter): fdi::Cloned<ShutdownWaiter>) {
         let reconfigure_notify = self.reconfigure_notify.clone();
         let shutdown_notify_epoch_state = self.shutdown_notify_epoch_state.clone();
 
@@ -363,8 +344,8 @@ impl<C: Collection> ConfigConsumer for Consensus<C> {
 }
 
 impl<C: Collection> BuildGraph for Consensus<C> {
-    fn build_graph() -> DependencyGraph {
-        DependencyGraph::new().with(
+    fn build_graph() -> fdi::DependencyGraph {
+        fdi::DependencyGraph::new().with(
             Self::init
                 .on("_post", Self::post_init)
                 .on("start", Self::start),
