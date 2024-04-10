@@ -20,18 +20,14 @@ impl From<PacketFilterRule> for PacketFilter {
 
 #[derive(Deserialize, Serialize)]
 pub struct FileOpenRule {
-    pub policy: Policy,
-    pub params: FileOpenParams,
+    pub permission: PermissionPolicy,
+    pub inode: u64,
+    pub dev: u32,
+    pub rdev: u32,
 }
 
 #[derive(Deserialize, Serialize)]
-pub enum Policy {
+pub enum PermissionPolicy {
     Allow,
     Deny,
-}
-
-#[derive(Deserialize, Serialize)]
-pub enum FileOpenParams {
-    Pid(u64),
-    Bin { inode: u64, dev: u32, rdev: u32 },
 }

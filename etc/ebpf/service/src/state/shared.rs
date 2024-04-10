@@ -18,25 +18,19 @@ const RULES_FILE: &str = "filters.json";
 #[derive(Clone)]
 pub struct SharedState {
     packet_filters: Arc<Mutex<HashMap<MapData, PacketFilter, u32>>>,
-    file_open_allow_pid: Arc<Mutex<HashMap<MapData, u64, u64>>>,
     file_open_allow_binfile: Arc<Mutex<HashMap<MapData, File, u64>>>,
-    file_open_deny_pid: Arc<Mutex<HashMap<MapData, u64, u64>>>,
     file_open_deny_binfile: Arc<Mutex<HashMap<MapData, File, u64>>>,
 }
 
 impl SharedState {
     pub fn new(
         packet_filters: HashMap<MapData, PacketFilter, u32>,
-        file_open_allow_pid: HashMap<MapData, u64, u64>,
         file_open_allow_binfile: HashMap<MapData, File, u64>,
-        file_open_deny_pid: HashMap<MapData, u64, u64>,
         file_open_deny_binfile: HashMap<MapData, File, u64>,
     ) -> Self {
         Self {
             packet_filters: Arc::new(Mutex::new(packet_filters)),
-            file_open_allow_pid: Arc::new(Mutex::new(file_open_allow_pid)),
             file_open_allow_binfile: Arc::new(Mutex::new(file_open_allow_binfile)),
-            file_open_deny_pid: Arc::new(Mutex::new(file_open_deny_pid)),
             file_open_deny_binfile: Arc::new(Mutex::new(file_open_deny_binfile)),
         }
     }
@@ -63,24 +57,7 @@ impl SharedState {
         Ok(())
     }
 
-    pub async fn file_open_allow_pid(&mut self, pid: u64) -> anyhow::Result<()> {
-        let mut map = self.file_open_allow_pid.lock().await;
-        map.insert(pid, 0, 0)?;
-        Ok(())
-    }
-
-    pub async fn file_open_deny_pid(&mut self, pid: u64) -> anyhow::Result<()> {
-        let mut map = self.file_open_deny_pid.lock().await;
-        map.remove(&pid)?;
-        Ok(())
-    }
-
-    pub async fn file_open_allow_binfile(
-        &mut self,
-        inode: u64,
-        dev: u32,
-        rdev: u32,
-    ) -> anyhow::Result<()> {
+    pub async fn file_open_allow(&mut self, inode: u64, dev: u32, rdev: u32) -> anyhow::Result<()> {
         let mut map = self.file_open_allow_binfile.lock().await;
         map.insert(
             File {
@@ -94,12 +71,7 @@ impl SharedState {
         Ok(())
     }
 
-    pub async fn file_open_deny_binfile(
-        &mut self,
-        inode: u64,
-        dev: u32,
-        rdev: u32,
-    ) -> anyhow::Result<()> {
+    pub async fn file_open_deny(&mut self, inode: u64, dev: u32, rdev: u32) -> anyhow::Result<()> {
         let mut map = self.file_open_deny_binfile.lock().await;
         map.remove(&File {
             inode_n: inode,

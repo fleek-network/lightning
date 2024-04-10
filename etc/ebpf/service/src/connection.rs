@@ -23,21 +23,13 @@ impl Connection {
     async fn file_open_handle(&mut self, message: FileOpen) -> anyhow::Result<()> {
         match message.src {
             FileOpenSrc::Pid(pid) => {
-                if message.op == FileOpen::ALLOW {
-                    self.shared_state.file_open_allow_pid(pid).await
-                } else {
-                    self.shared_state.file_open_deny_pid(pid).await
-                }
+                unimplemented!()
             },
             FileOpenSrc::Bin { inode, dev, rdev } => {
                 if message.op == FileOpen::ALLOW {
-                    self.shared_state
-                        .file_open_allow_binfile(inode, dev, rdev)
-                        .await
+                    self.shared_state.file_open_allow(inode, dev, rdev).await
                 } else {
-                    self.shared_state
-                        .file_open_deny_binfile(inode, dev, rdev)
-                        .await
+                    self.shared_state.file_open_deny(inode, dev, rdev).await
                 }
             },
         }
