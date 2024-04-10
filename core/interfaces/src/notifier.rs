@@ -1,10 +1,9 @@
 use std::time::Duration;
 
 use fdi::BuildGraph;
-use infusion::Blank;
 use lightning_types::{Block, BlockExecutionResponse};
 
-use crate::infu_collection::Collection;
+use crate::collection::Collection;
 
 #[derive(Clone, Debug)]
 pub struct BlockExecutedNotification {
@@ -19,7 +18,7 @@ pub struct EpochChangedNotification {
 }
 
 /// # Notifier
-#[infusion::service]
+#[interfaces_proc::blank]
 pub trait NotifierInterface<C: Collection>: BuildGraph + Sync + Send + Clone {
     type Emitter: Emitter;
 
@@ -28,17 +27,17 @@ pub trait NotifierInterface<C: Collection>: BuildGraph + Sync + Send + Clone {
     #[blank = Default::default()]
     fn get_emitter(&self) -> Self::Emitter;
 
-    #[blank = Blank::default()]
+    #[blank = crate::_hacks::Blanket]
     fn subscribe_block_executed(&self) -> impl Subscriber<BlockExecutedNotification>;
 
-    #[blank = Blank::default()]
+    #[blank = crate::_hacks::Blanket]
     fn subscribe_epoch_changed(&self) -> impl Subscriber<EpochChangedNotification>;
 
-    #[blank = Blank::default()]
+    #[blank = crate::_hacks::Blanket]
     fn subscribe_before_epoch_change(&self, duration: Duration) -> impl Subscriber<()>;
 }
 
-#[infusion::blank]
+#[interfaces_proc::blank]
 pub trait Emitter: Clone + Send + Sync + 'static {
     /// Notify the waiters about epoch change.
     fn epoch_changed(&self, epoch: u64, hash: [u8; 32]);
@@ -47,7 +46,7 @@ pub trait Emitter: Clone + Send + Sync + 'static {
     fn new_block(&self, block: Block, response: BlockExecutionResponse);
 }
 
-#[infusion::blank]
+#[interfaces_proc::blank]
 pub trait Subscriber<T>: Send + Sync + 'static {
     /// Receive the next notification from this subscriber or returns `None` if we are shutting
     /// down.

@@ -4,13 +4,13 @@ use fdi::BuildGraph;
 use lightning_types::{PeerRequestError, ServerRequest};
 use tokio::sync::broadcast;
 
-use crate::infu_collection::Collection;
+use crate::collection::Collection;
 use crate::ConfigConsumer;
 
 pub type BlockstoreServerSocket =
     Socket<ServerRequest, broadcast::Receiver<Result<(), PeerRequestError>>>;
 
-#[infusion::service]
+#[interfaces_proc::blank]
 pub trait BlockstoreServerInterface<C: Collection>:
     BuildGraph + Sized + Send + Sync + ConfigConsumer
 {

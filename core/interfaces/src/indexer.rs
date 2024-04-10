@@ -1,9 +1,9 @@
 use fdi::BuildGraph;
 use lightning_types::Blake3Hash;
 
-use crate::infu_collection::Collection;
+use crate::collection::Collection;
 
-#[infusion::service]
+#[interfaces_proc::blank]
 pub trait IndexerInterface<C: Collection>: BuildGraph + Clone + Send + Sync + Sized {
     async fn register(&self, cid: Blake3Hash);
 

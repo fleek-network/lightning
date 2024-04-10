@@ -5,27 +5,29 @@ use fdi::BuildGraph;
 use lightning_schema::LightningMessage;
 use lightning_types::{Digest, NodeIndex};
 
-use crate::infu_collection::Collection;
+use crate::collection::Collection;
 use crate::types::Topic;
 
 /// The gossip system in Fleek Network implements the functionality of broadcasting
 /// messages to the rest of the nodes in the network.
-#[infusion::service]
+#[interfaces_proc::blank]
 pub trait BroadcastInterface<C: Collection>: BuildGraph + Sized + Send {
     /// The message type to be encoded/decoded for networking.
+    #[blank(())]
     type Message: LightningMessage;
 
     /// Pubsub topic for sending and receiving messages on a topic
-    type PubSub<T: LightningMessage + Clone>: PubSub<T> = infusion::Blank<T>;
+    #[blank(crate::_hacks::Blanket)]
+    type PubSub<T: LightningMessage + Clone>: PubSub<T>;
 
     /// Get a send and receiver for messages in a pub-sub topic.
     #[blank = Default::default()]
     fn get_pubsub<T: LightningMessage + Clone>(&self, topic: Topic) -> Self::PubSub<T>;
 }
 
-#[infusion::blank]
+#[interfaces_proc::blank]
 pub trait PubSub<T: LightningMessage + Clone>: Clone + Send + Sync {
-    type Event: BroadcastEventInterface<T> = infusion::Blank<T>;
+    type Event: BroadcastEventInterface<T>;
 
     /// Publish a message. If `filter` is `Some(set)`, then the message
     /// will only be sent to nodes in `set`.
@@ -43,7 +45,7 @@ pub trait PubSub<T: LightningMessage + Clone>: Clone + Send + Sync {
     async fn recv_event(&mut self) -> Option<Self::Event>;
 }
 
-#[infusion::blank]
+#[interfaces_proc::blank]
 pub trait BroadcastEventInterface<T: LightningMessage>: Send + Sync {
     /// Should return the originator of the message.
     fn originator(&self) -> NodeIndex;

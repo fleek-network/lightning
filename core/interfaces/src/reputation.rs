@@ -3,14 +3,16 @@ use std::time::Duration;
 use fdi::BuildGraph;
 use lightning_types::NodeIndex;
 
-use crate::infu_collection::Collection;
+use crate::collection::Collection;
 
-#[infusion::service]
+#[interfaces_proc::blank]
 pub trait ReputationAggregatorInterface<C: Collection>: BuildGraph {
     /// The reputation reporter can be used by our system to report the reputation of other
+    #[blank(crate::_hacks::Blanket)]
     type ReputationReporter: ReputationReporterInterface;
 
     /// The query runner can be used to query the local reputation of other nodes.
+    #[blank(crate::_hacks::Blanket)]
     type ReputationQuery: ReputationQueryInteface;
 
     /// Returns a reputation reporter that can be used to capture interactions that we have
@@ -25,7 +27,7 @@ pub trait ReputationAggregatorInterface<C: Collection>: BuildGraph {
 /// Used to answer queries about the (local) reputation of other nodes, this queries should
 /// be as real-time as possible, meaning that the most recent data captured by the reporter
 /// should be taken into account at this layer.
-#[infusion::blank]
+#[interfaces_proc::blank]
 pub trait ReputationQueryInteface: Clone + Send + Sync {
     /// Returns the reputation of the provided node locally.
     fn get_reputation_of(&self, peer: &NodeIndex) -> Option<u8>;
@@ -35,7 +37,7 @@ pub trait ReputationQueryInteface: Clone + Send + Sync {
 /// that we have with another peer, this interface allows a reputation aggregator to spawn many
 /// reporters which can use any method to report the data they capture to their aggregator so
 /// that it can send it to the application layer.
-#[infusion::blank]
+#[interfaces_proc::blank]
 pub trait ReputationReporterInterface: Clone + Send + Sync {
     /// Report a satisfactory (happy) interaction with the given peer. Used for up time.
     fn report_sat(&self, peer: NodeIndex, weight: Weight);

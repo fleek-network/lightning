@@ -1,6 +1,6 @@
 use fdi::BuildGraph;
 
-use crate::infu_collection::Collection;
+use crate::collection::Collection;
 
-#[infusion::service]
+#[interfaces_proc::blank]
 pub trait HandshakeInterface<C: Collection>: BuildGraph + Sized + Send + Sync {}

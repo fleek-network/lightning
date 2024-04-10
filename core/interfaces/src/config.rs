@@ -1,14 +1,15 @@
 use std::collections::HashMap;
 
+use fdi::BuildGraph;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use crate::infu_collection::Collection;
+use crate::collection::Collection;
 
 /// An implementer of this trait should handle providing the configurations from
 /// the loaded configuration file.
-#[infusion::service]
-pub trait ConfigProviderInterface<C: Collection>: Send + Sync {
+#[interfaces_proc::blank]
+pub trait ConfigProviderInterface<C: Collection>: BuildGraph + Send + Sync {
     /// Returns the configuration for the given object. If the key is not present
     /// in the loaded file we should return the default object.
     fn get<S: ConfigConsumer>(&self) -> S::Config;
@@ -20,11 +21,13 @@ pub trait ConfigProviderInterface<C: Collection>: Send + Sync {
 
 /// Any object that in the program that is associated a configuration value
 /// in the global configuration file.
-#[infusion::blank]
+#[interfaces_proc::blank]
 pub trait ConfigConsumer {
+    #[blank("BLANK")]
     /// The top-level key in the config file that should be used for this object.
-    const KEY: &'static str = "BLANK";
+    const KEY: &'static str;
 
     /// The type which is expected for this configuration object.
-    type Config: Send + Sync + Serialize + DeserializeOwned + Default = HashMap<String, String>;
+    #[blank(HashMap<String, String>)]
+    type Config: Send + Sync + Serialize + DeserializeOwned + Default;
 }

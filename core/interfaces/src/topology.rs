@@ -4,14 +4,14 @@ use fdi::BuildGraph;
 use fleek_crypto::NodePublicKey;
 use tokio::sync::watch;
 
-use crate::infu_collection::Collection;
+use crate::collection::Collection;
 use crate::ConfigConsumer;
 
 /// The algorithm used for clustering our network and dynamically creating a network topology.
 /// This clustering is later used in other parts of the codebase when connection to other nodes
 /// is required. The gossip layer is an example of a component that can feed the data this
 /// algorithm generates.
-#[infusion::service]
+#[interfaces_proc::blank]
 pub trait TopologyInterface<C: Collection>:
     BuildGraph + ConfigConsumer + Sized + Send + Sync
 {

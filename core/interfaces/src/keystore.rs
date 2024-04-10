@@ -1,10 +1,10 @@
 use fdi::BuildGraph;
 use fleek_crypto::{ConsensusPublicKey, ConsensusSecretKey, NodePublicKey, NodeSecretKey};
 
-use crate::infu_collection::Collection;
+use crate::collection::Collection;
 use crate::ConfigConsumer;
 
-#[infusion::service]
+#[interfaces_proc::blank]
 pub trait KeystoreInterface<C: Collection>:
     BuildGraph + ConfigConsumer + Clone + Sized + Send + Sync
 {

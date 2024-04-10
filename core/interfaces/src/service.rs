@@ -1,7 +1,7 @@
 use fdi::BuildGraph;
 use tokio::net::UnixStream;
 
-use crate::infu_collection::Collection;
+use crate::collection::Collection;
 use crate::types::ServiceId;
 
 /// The service executor interface is responsible for loading the services and executing
@@ -9,9 +9,10 @@ use crate::types::ServiceId;
 ///
 /// Currently, we are hard coding some services and there is no API on this interface to
 /// load services.
-#[infusion::service]
+#[interfaces_proc::blank]
 pub trait ServiceExecutorInterface<C: Collection>: BuildGraph + Sized + Send + Sync {
     /// The provider which can be used to get a handle on a service during runtime.
+    #[blank(crate::_hacks::Blanket)]
     type Provider: ExecutorProviderInterface;
 
     /// Returns the service handle provider which can be used establish connections to the
@@ -28,7 +29,7 @@ pub trait ServiceExecutorInterface<C: Collection>: BuildGraph + Sized + Send + S
     fn run_service(id: u32);
 }
 
-#[infusion::blank]
+#[interfaces_proc::blank]
 pub trait ExecutorProviderInterface: Clone + Send + Sync + 'static {
     /// Make a connection to the provided service.
     async fn connect(&self, service_id: ServiceId) -> Option<UnixStream>;

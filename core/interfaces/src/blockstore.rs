@@ -8,8 +8,8 @@ use blake3_tree::utils::HashTree;
 use fdi::BuildGraph;
 use thiserror::Error;
 
+use crate::collection::Collection;
 use crate::config::ConfigConsumer;
-use crate::infu_collection::Collection;
 use crate::types::{Blake3Hash, CompressionAlgoSet, CompressionAlgorithm};
 
 /// A chunk of content (usually 256KiB) with a compression tag which determines
@@ -82,14 +82,15 @@ pub struct ContentChunk {
 /// Each chunk is it's own independent *content*, so for example if we use a compression algorithm
 /// we use it at the chunk level, we don't compress the entire file and then perform the chunking,
 /// we chunk first, and compress each chunk later for obvious technical reasons.
-#[infusion::service]
+#[interfaces_proc::blank]
 pub trait BlockstoreInterface<C: Collection>:
     BuildGraph + Clone + Send + Sync + ConfigConsumer
 {
     /// The block store has the ability to use a smart pointer to avoid duplicating
     /// the same content multiple times in memory, this can be used for when multiple
     /// services want access to the same buffer of data.
-    type SharedPointer<T: ?Sized + Send + Sync>: Deref<Target = T> + Clone + Send + Sync = Arc<T>;
+    #[blank(Arc<T>)]
+    type SharedPointer<T: ?Sized + Send + Sync>: Deref<Target = T> + Clone + Send + Sync;
 
     /// The incremental putter which can be used to write a file to block store.
     type Put: IncrementalPutInterface;
@@ -103,7 +104,7 @@ pub trait BlockstoreInterface<C: Collection>:
         &self,
         _cid: &Blake3Hash,
     ) -> impl Future<Output = Option<Self::SharedPointer<HashTree>>> + Send {
-        // TODO: improve infusion so this autoimpl is not needed
+        // TODO: improve interfaces_proc so this autoimpl is not needed
         async { None }
     }
 
@@ -122,7 +123,7 @@ pub trait BlockstoreInterface<C: Collection>:
         _block_hash: &Blake3Hash,
         _compression: CompressionAlgoSet,
     ) -> impl Future<Output = Option<Self::SharedPointer<ContentChunk>>> + Send {
-        // TODO: improve infusion so this autoimpl is not needed
+        // TODO: improve interfaces_proc so this autoimpl is not needed
         async { None }
     }
 
@@ -169,7 +170,7 @@ pub trait BlockstoreInterface<C: Collection>:
 }
 
 /// The interface for the writer to a [`BlockstoreInterface`].
-#[infusion::blank]
+#[interfaces_proc::blank]
 pub trait IncrementalPutInterface: Send {
     /// Write the proof for the buffer.
     fn feed_proof(&mut self, proof: &[u8]) -> Result<(), PutFeedProofError>;
@@ -191,7 +192,7 @@ pub trait IncrementalPutInterface: Send {
 }
 
 /// The interface for the directory writer to a [`BlockstoreInterface`].
-#[infusion::blank]
+#[interfaces_proc::blank]
 pub trait IncrementalDirInterface: Send {
     /// Write the proof for the next entry. Should not be called in the trusted mode.
     fn feed_proof(&mut self, proof: &[u8]) -> Result<(), PutFeedProofError>;

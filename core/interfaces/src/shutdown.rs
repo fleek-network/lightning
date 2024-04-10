@@ -170,9 +170,3 @@ impl Drop for ShutdownWaiter {
         }
     }
 }
-
-/// Any object that implements the cryptographic digest function, this should
-/// use a collision resistant hash function and have a representation agnostic
-/// hashing for our core objects. Re-exported from [`ink_quill`]
-pub use ink_quill::ToDigest;
-pub use ink_quill::TranscriptBuilder;

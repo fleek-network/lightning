@@ -31,7 +31,7 @@ use lightning_types::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::infu_collection::Collection;
+use crate::collection::Collection;
 use crate::types::{
     Block,
     BlockExecutionResponse,
@@ -58,11 +58,12 @@ use crate::ConfigConsumer;
 /// it is created.
 pub type ExecutionEngineSocket = Socket<Block, BlockExecutionResponse>;
 
-#[infusion::service]
+#[interfaces_proc::blank]
 pub trait ApplicationInterface<C: Collection>:
     BuildGraph + ConfigConsumer + Sized + Send + Sync
 {
     /// The type for the sync query executor.
+    #[blank(crate::_hacks::Blanket)]
     type SyncExecutor: SyncQueryRunnerInterface;
 
     /// Returns a socket that should be used to submit transactions to be executed
@@ -78,7 +79,6 @@ pub trait ApplicationInterface<C: Collection>:
     /// putting the entire application state in an `Arc<RwLock<T>>`, but that is not optimal
     /// and is the reason why we have `Atomo` to allow us to have the same kind of behavior
     /// without slowing down the system.
-    #[blank = Default::default()]
     fn sync_query(&self) -> Self::SyncExecutor;
 
     /// Will seed its underlying database with the checkpoint provided
@@ -89,9 +89,10 @@ pub trait ApplicationInterface<C: Collection>:
     ) -> Result<()>;
 }
 
-#[infusion::blank]
+#[interfaces_proc::blank]
 pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
-    type Backend: StorageBackend = InMemoryStorage;
+    #[blank(InMemoryStorage)]
+    type Backend: StorageBackend;
 
     fn new(atomo: Atomo<QueryPerm, Self::Backend>) -> Self;
 

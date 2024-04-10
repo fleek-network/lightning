@@ -3,13 +3,11 @@ name = "lightning-interfaces"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 fdi = { path = "../../lib/fdi" }
+interfaces-proc = { path = "./proc" }
 
 ethers.workspace = true
-infusion.workspace = true
 anyhow.workspace = true
 serde.workspace = true
 serde-big-array.workspace = true

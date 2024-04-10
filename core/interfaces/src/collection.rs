@@ -1,10 +1,10 @@
 use std::marker::PhantomData;
 
+use anyhow::Result;
 use fdi::{DependencyGraph, Provider};
-pub use infusion::c;
-use infusion::{collection, Blank};
 
 use super::*;
+use crate::collection;
 
 // Define the collection of every top-level trait in the system.
 collection!([
@@ -43,15 +43,13 @@ pub struct Node<C: Collection> {
 
 impl<C: Collection> Node<C> {
     #[inline(always)]
-    pub fn init(config: C::ConfigProviderInterface) -> Result<Self, infusion::InitializationError> {
+    pub fn init(config: C::ConfigProviderInterface) -> Result<Self> {
         let provider = Provider::default();
         provider.insert(config);
         Self::init_with_provider(provider)
     }
 
-    pub fn init_with_provider(
-        mut provider: Provider,
-    ) -> Result<Self, infusion::InitializationError> {
+    pub fn init_with_provider(mut provider: Provider) -> Result<Self> {
         let mut exec = provider.get_mut::<fdi::Executor>();
         exec.set_spawn_cb(|fut| {
             tokio::spawn(fut);
@@ -59,33 +57,7 @@ impl<C: Collection> Node<C> {
 
         let shutdown = ShutdownController::new();
         let waiter = shutdown.waiter();
-
-        let graph = DependencyGraph::new()
-            .with_value(waiter)
-            .with_value(Blank::<C>::default())
-            .with_module::<C::ApplicationInterface>()
-            .with_module::<C::BroadcastInterface>()
-            .with_module::<C::HandshakeInterface>()
-            .with_module::<C::ConsensusInterface>()
-            .with_module::<C::SignerInterface>()
-            .with_module::<C::BlockstoreInterface>()
-            .with_module::<C::NotifierInterface>()
-            .with_module::<C::PingerInterface>()
-            .with_module::<C::FetcherInterface>()
-            .with_module::<C::KeystoreInterface>()
-            .with_module::<C::PoolInterface>()
-            .with_module::<C::BlockstoreServerInterface>()
-            .with_module::<C::ForwarderInterface>()
-            .with_module::<C::TopologyInterface>()
-            .with_module::<C::IndexerInterface>()
-            .with_module::<C::ResolverInterface>()
-            .with_module::<C::OriginProviderInterface>()
-            .with_module::<C::ServiceExecutorInterface>()
-            .with_module::<C::DeliveryAcknowledgmentAggregatorInterface>()
-            .with_module::<C::RpcInterface>()
-            .with_module::<C::SyncronizerInterface>()
-            .with_module::<C::ArchiveInterface>()
-            .with_module::<C::ReputationAggregatorInterface>();
+        let graph = C::build_graph().with_value(waiter);
 
         let vis = graph.viz("Lightning Dependency Graph");
         println!("{vis}");

@@ -1,9 +1,10 @@
 use fdi::BuildGraph;
 use lightning_schema::LightningMessage;
 
-use crate::infu_collection::Collection;
+use crate::collection::Collection;
 
-#[infusion::service]
+#[interfaces_proc::blank]
 pub trait ConsensusInterface<C: Collection>: BuildGraph + Sized + Send + Sync {
+    #[blank(())]
     type Certificate: LightningMessage + Clone;
 }

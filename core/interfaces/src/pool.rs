@@ -7,7 +7,7 @@ use lightning_types::NodeIndex;
 pub use lightning_types::RejectReason;
 use tokio_stream::Stream;
 
-use crate::infu_collection::Collection;
+use crate::collection::Collection;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[repr(u8)]
@@ -36,10 +36,13 @@ pub struct RequestHeader {
 }
 
 /// Defines the connection pool.
-#[infusion::service]
+#[interfaces_proc::blank]
 pub trait PoolInterface<C: Collection>: BuildGraph + Send + Sync + Sized {
+    #[blank(crate::_hacks::Blanket)]
     type EventHandler: EventHandlerInterface;
+    #[blank(crate::_hacks::Blanket)]
     type Requester: RequesterInterface;
+    #[blank(crate::_hacks::Blanket)]
     type Responder: ResponderInterface;
 
     fn open_event(&self, scope: ServiceScope) -> Self::EventHandler;
@@ -47,7 +50,7 @@ pub trait PoolInterface<C: Collection>: BuildGraph + Send + Sync + Sized {
     fn open_req_res(&self, scope: ServiceScope) -> (Self::Requester, Self::Responder);
 }
 
-#[infusion::blank]
+#[interfaces_proc::blank]
 pub trait EventHandlerInterface: Send + Sync {
     fn send_to_all<F: Fn(NodeIndex) -> bool + Send + Sync + 'static>(
         &self,
@@ -58,27 +61,30 @@ pub trait EventHandlerInterface: Send + Sync {
     async fn receive(&mut self) -> Option<(NodeIndex, Bytes)>;
 }
 
-#[infusion::blank]
+#[interfaces_proc::blank]
 pub trait RequesterInterface: Clone + Send + Sync {
+    #[blank(crate::_hacks::Blanket)]
     type Response: ResponseInterface;
     async fn request(&self, destination: NodeIndex, request: Bytes) -> io::Result<Self::Response>;
 }
 
-#[infusion::blank]
+#[interfaces_proc::blank]
 pub trait ResponseInterface: Send + Sync {
-    type Body: Stream<Item = io::Result<Bytes>> + Send + Unpin =
-        tokio_stream::Empty<io::Result<Bytes>>;
+    #[blank(tokio_stream::Empty<io::Result<Bytes>>)]
+    type Body: Stream<Item = io::Result<Bytes>> + Send + Unpin;
+
     fn status_code(&self) -> Result<(), RejectReason>;
     fn body(self) -> Self::Body;
 }
 
-#[infusion::blank]
+#[interfaces_proc::blank]
 pub trait ResponderInterface: Send + Sync {
+    #[blank(crate::_hacks::Blanket)]
     type Request: RequestInterface;
     async fn get_next_request(&mut self) -> io::Result<(RequestHeader, Self::Request)>;
 }
 
-#[infusion::blank]
+#[interfaces_proc::blank]
 pub trait RequestInterface: Send + Sync {
     fn reject(self, reason: RejectReason);
     async fn send(&mut self, frame: Bytes) -> io::Result<()>;

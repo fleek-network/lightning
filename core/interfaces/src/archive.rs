@@ -1,12 +1,11 @@
 use ethers::types::BlockNumber;
 use fdi::BuildGraph;
-use infusion::c;
 
-use crate::infu_collection::Collection;
+use crate::collection::Collection;
 use crate::types::{BlockReceipt, TransactionReceipt, TransactionRequest};
-use crate::ApplicationInterface;
+use crate::{c, ApplicationInterface};
 
-#[infusion::service]
+#[interfaces_proc::blank]
 pub trait ArchiveInterface<C: Collection>: BuildGraph + Clone + Send + Sync {
     /// Returns true if the current node is being run as an archive node.
     fn is_active(&self) -> bool;

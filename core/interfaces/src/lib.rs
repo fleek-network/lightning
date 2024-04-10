@@ -3,7 +3,7 @@ mod archive;
 mod blockstore;
 mod blockstore_server;
 mod broadcast;
-mod common;
+mod collection;
 mod config;
 mod consensus;
 mod dack_aggregator;
@@ -11,8 +11,8 @@ mod fetcher;
 mod forwarder;
 mod handshake;
 mod indexer;
-pub mod infu_collection;
 mod keystore;
+mod macros;
 mod notifier;
 mod origin;
 mod pinger;
@@ -21,6 +21,7 @@ mod reputation;
 mod resolver;
 mod rpc;
 mod service;
+mod shutdown;
 mod signer;
 mod syncronizer;
 mod topology;
@@ -30,7 +31,7 @@ pub use archive::*;
 pub use blockstore::*;
 pub use blockstore_server::*;
 pub use broadcast::*;
-pub use common::*;
+pub use collection::*;
 pub use config::*;
 pub use consensus::*;
 pub use dack_aggregator::*;
@@ -47,6 +48,7 @@ pub use reputation::*;
 pub use resolver::*;
 pub use rpc::*;
 pub use service::*;
+pub use shutdown::*;
 pub use signer::*;
 pub use syncronizer::*;
 pub use topology::*;
@@ -54,8 +56,24 @@ pub use topology::*;
 // Re-export schema.
 #[rustfmt::skip]
 pub use lightning_schema as schema;
+
 // Re-export types.
 #[rustfmt::skip]
 pub use lightning_types as types;
 
+/// Any object that implements the cryptographic digest function, this should
+/// use a collision resistant hash function and have a representation agnostic
+/// hashing for our core objects. Re-exported from [`ink_quill`]
+pub use ink_quill::{ToDigest, TranscriptBuilder};
+
+#[rustfmt::skip]
 pub use fdi;
+
+#[rustfmt::skip]
+#[doc(hidden)]
+pub use interfaces_proc as proc;
+
+/// Some types needed in order to play with the type system.
+#[rustfmt::skip]
+#[doc(hidden)]
+pub mod _hacks;

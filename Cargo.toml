@@ -1,6 +1,12 @@
 [workspace]
 resolver = "2"
-members = ["core/*", "lib/*", "services/*", "services/ai/examples/rust/*"]
+members = [
+    "core/*",
+    "core/interfaces/proc",
+    "lib/*",
+    "services/*",
+    "services/ai/examples/rust/*",
+]
 exclude = [
     "etc/global-metrics",
     "lib/cdk",
