@@ -23,7 +23,7 @@ use crate::config::Gateway;
 use crate::error::Error;
 use crate::{decoder, Config};
 
-const GATEWAY_TIMEOUT: Duration = Duration::from_millis(3000);
+const GATEWAY_TIMEOUT: Duration = Duration::from_millis(5000);
 
 pub struct IPFSOrigin<C: Collection> {
     client: Arc<Client<HttpsConnector<HttpConnector>, Body>>,
