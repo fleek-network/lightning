@@ -24,6 +24,7 @@ use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
     Blake3Hash,
     EpochInfo,
+    Event,
     Metadata,
     NodeInfo,
     NodePorts,
@@ -41,7 +42,6 @@ use lightning_rep_collector::ReputationAggregator;
 use lightning_signer::Signer;
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
-use lightning_types::Event;
 use lightning_utils::application::QueryRunnerExt;
 use lightning_utils::rpc as utils;
 use reqwest::Client;

@@ -7,4 +7,4 @@ pub mod config;
 pub mod handshake;
 pub mod transports;
 
-pub use lightning_schema::handshake as schema;
+pub use lightning_interfaces::schema::handshake as schema;

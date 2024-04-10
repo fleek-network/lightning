@@ -9,7 +9,6 @@ default-run = "lightning-node"
 [dependencies]
 lightning-interfaces = { path = "../interfaces" }
 lightning-node = { path = "../node" }
-lightning-types = { path = "../types" }
 lightning-utils = { path = "../utils" }
 
 # TODO: cli ideally shouldn't depend on this directly

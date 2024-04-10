@@ -6,7 +6,6 @@ use derive_more::{From, IsVariant, TryInto};
 use fleek_crypto::{ConsensusPublicKey, NodePublicKey, SecretKey};
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Epoch, EpochInfo, Event, Topic, UpdateMethod};
-use lightning_schema::AutoImplSerde;
 use lightning_utils::application::QueryRunnerExt;
 use mysten_metrics::RegistryService;
 use mysten_network::Multiaddr;

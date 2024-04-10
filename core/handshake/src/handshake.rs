@@ -10,7 +10,7 @@ use fn_sdk::header::{write_header, ConnectionHeader};
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use lightning_interfaces::prelude::*;
-use lightning_schema::handshake::{HandshakeRequestFrame, TerminationReason};
+use lightning_interfaces::schema::handshake::{HandshakeRequestFrame, TerminationReason};
 use rand::RngCore;
 use tracing::warn;
 use triomphe::Arc;

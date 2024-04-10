@@ -10,9 +10,9 @@ use axum::Extension;
 use bytes::Bytes;
 use fleek_crypto::{ClientPublicKey, ClientSignature};
 use fn_sdk::header::{HttpMethod, HttpOverrides, TransportDetail};
+use lightning_interfaces::schema::handshake::{HandshakeRequestFrame, RequestFrame};
 use lightning_interfaces::ExecutorProviderInterface;
 use lightning_metrics::increment_counter;
-use lightning_schema::handshake::{HandshakeRequestFrame, RequestFrame};
 use tokio::sync::oneshot;
 use url::Url;
 

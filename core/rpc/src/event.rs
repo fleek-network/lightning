@@ -1,4 +1,4 @@
-use lightning_types::Event;
+use lightning_interfaces::types::Event;
 use tokio::sync::{broadcast, mpsc, oneshot};
 
 pub struct EventDistributor {

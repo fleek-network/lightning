@@ -11,6 +11,7 @@ use lightning_interfaces::types::{
     Blake3Hash,
     Epoch,
     EpochInfo,
+    EventType,
     FetcherRequest,
     FetcherResponse,
     ImmutablePointer,
@@ -28,7 +29,6 @@ use lightning_interfaces::types::{
     Value,
 };
 use lightning_interfaces::PagingParams;
-use lightning_types::EventType;
 use lightning_utils::application::QueryRunnerExt;
 
 use crate::api::FleekApiServer;

@@ -10,7 +10,7 @@ use bytes::{Bytes, BytesMut};
 pub use config::Config;
 use fn_sdk::header::TransportDetail;
 use lightning_interfaces::prelude::*;
-use lightning_schema::handshake::{
+use lightning_interfaces::schema::handshake::{
     HandshakeRequestFrame,
     HandshakeResponse,
     RequestFrame,

@@ -4,9 +4,17 @@ use std::time::Duration;
 use autometrics::autometrics;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::prelude::*;
-use lightning_interfaces::types::{Epoch, EpochInfo, NodeInfo, ProtocolParams};
+use lightning_interfaces::types::{
+    Epoch,
+    EpochInfo,
+    Metadata,
+    NodeIndex,
+    NodeInfo,
+    NodeInfoWithIndex,
+    ProtocolParams,
+    Value,
+};
 use lightning_interfaces::PagingParams;
-use lightning_types::{Metadata, NodeIndex, NodeInfoWithIndex, Value};
 
 pub trait QueryRunnerExt: SyncQueryRunnerInterface {
     /// Returns the chain id

@@ -1,5 +1,4 @@
 use dashmap::DashMap;
-use lightning_types::DEFAULT_HISTOGRAM_BUCKETS;
 use once_cell::sync::Lazy;
 use prometheus::core::Collector;
 use prometheus::{register_histogram_vec, HistogramVec};
@@ -7,6 +6,7 @@ pub use stdext::function_name;
 use tracing::error;
 
 use crate::labels::Labels;
+use crate::DEFAULT_HISTOGRAM_BUCKETS;
 
 static HISTOGRAM: Lazy<DashMap<String, HistogramVec>> = Lazy::new(DashMap::new);
 

@@ -13,7 +13,7 @@
 // Re-export more traits from our lib dependencies.
 pub use fdi::{Bind, BuildGraph, MethodExt};
 pub use ink_quill::{ToDigest, TranscriptBuilder};
-pub use lightning_schema::LightningMessage;
+pub use lightning_schema::{LightningMessage, AutoImplSerde};
 
 // Re-export top level modules and highly used stuff.
 pub use crate::{c, fdi, partial, schema, types, Node, ShutdownWaiter};

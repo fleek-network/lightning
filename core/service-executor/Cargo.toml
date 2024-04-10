@@ -7,7 +7,6 @@ edition.workspace = true
 
 [dependencies]
 lightning-interfaces = { path = "../interfaces" }
-lightning-schema = { path = "../schema" }
 fn-sdk = { path = "../../lib/sdk" }
 fleek-crypto.workspace = true
 tokio.workspace = true

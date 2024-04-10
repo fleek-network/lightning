@@ -7,7 +7,6 @@ use dashmap::DashMap;
 use fleek_crypto::ClientPublicKey;
 use fn_sdk::ipc_types::{self, IpcMessage, IpcRequest, DELIMITER_SIZE};
 use lightning_interfaces::prelude::*;
-use lightning_schema::LightningMessage;
 use tokio::io::{self, Interest};
 use tokio::net::{UnixListener, UnixStream};
 use tokio::process::Command;

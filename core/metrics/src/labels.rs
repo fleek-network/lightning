@@ -1,4 +1,4 @@
-use lightning_types::METRICS_SERVICE_NAME;
+use crate::METRICS_SERVICE_NAME;
 
 // const and labels from autometrics-rs
 // https://github.com/autometrics-dev/autometrics-rs/blob/main/autometrics/src/labels.rs

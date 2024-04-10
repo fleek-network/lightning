@@ -11,8 +11,7 @@ use fleek_crypto::{
 };
 use lightning_application::genesis::Genesis;
 use lightning_interfaces::prelude::*;
-use lightning_node::config::TomlConfigProvider;
-use lightning_types::{
+use lightning_interfaces::types::{
     ChainId,
     Epoch,
     EpochInfo,
@@ -23,6 +22,7 @@ use lightning_types::{
     UpdatePayload,
     UpdateRequest,
 };
+use lightning_node::config::TomlConfigProvider;
 use lightning_utils::rpc::rpc_request;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::de::DeserializeOwned;

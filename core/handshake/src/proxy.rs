@@ -4,8 +4,8 @@ use std::time::Duration;
 use arrayref::array_ref;
 use async_channel::Receiver;
 use bytes::BytesMut;
+use lightning_interfaces::schema::handshake::{ResponseFrame, TerminationReason};
 use lightning_interfaces::ExecutorProviderInterface;
-use lightning_schema::handshake::{ResponseFrame, TerminationReason};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::UnixStream;
 
@@ -536,14 +536,14 @@ mod tests {
     use fn_sdk::header::read_header;
     use futures::{SinkExt, StreamExt};
     use lightning_interfaces::prelude::*;
-    use lightning_interfaces::types::ServiceId;
-    use lightning_interfaces::ShutdownController;
-    use lightning_schema::handshake::{
+    use lightning_interfaces::schema::handshake::{
         HandshakeRequestFrame,
         RequestFrame,
         ResponseFrame,
         TerminationReason,
     };
+    use lightning_interfaces::types::ServiceId;
+    use lightning_interfaces::ShutdownController;
     use tokio::net::UnixStream;
     use tokio::time::timeout;
     use tokio_util::codec::Framed;
