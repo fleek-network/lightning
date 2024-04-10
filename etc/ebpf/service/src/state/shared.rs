@@ -58,6 +58,9 @@ impl SharedStateMap {
         Ok(())
     }
 
+    /// Updates packet filters.
+    ///
+    /// Reads from disk so it's a heavy operation.
     pub async fn update_packet_filters(&self) -> anyhow::Result<()> {
         let mut file = fs::File::open(format!("{EBPF_STATE_PF_DIR}/{RULES_FILE}")).await?;
         let mut buf = String::new();
@@ -93,6 +96,9 @@ impl SharedStateMap {
         Ok(())
     }
 
+    /// Updates file-open rules.
+    ///
+    /// Reads from disk so it's a heavy operation.
     pub async fn update_file_open_rules(&self) -> anyhow::Result<()> {
         let mut file = fs::File::open(format!("{EBPF_STATE_PF_DIR}/{RULES_FILE}")).await?;
         let mut buf = String::new();
