@@ -1,5 +1,5 @@
 use log::{error, info};
-use notify::{Config, RecommendedWatcher, Watcher};
+use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
 use tokio::net::UnixListener;
 use tokio::runtime::Handle;
 use tokio::sync::mpsc;
@@ -20,17 +20,47 @@ impl Server {
         }
     }
 
-    pub async fn start(self) -> anyhow::Result<()> {
+    pub fn handle_watcher_event(&mut self, event: Event) -> anyhow::Result<()> {
+        info!("received event: {event:?}");
+        if event.kind.is_modify() {
+            if event
+                .paths
+                .iter()
+                .map(|path| path.as_path())
+                .any(|p| p == self.shared_state.packet_filers_path())
+            {
+            } else if event
+                .paths
+                .iter()
+                .map(|path| path.as_path())
+                .any(|p| p == self.shared_state.profiles_path())
+            {
+            }
+        }
+
+        Ok(())
+    }
+
+    pub async fn start(mut self) -> anyhow::Result<()> {
         let (watch_event_tx, mut watch_event_rx) = mpsc::channel(96);
-        let watcher = RecommendedWatcher::new(
+        let mut watcher = RecommendedWatcher::new(
             move |res| {
                 tokio::task::block_in_place(|| {
                     Handle::current().block_on(async {
-                        watch_event_tx.send(res).await.unwrap();
+                        let _ = watch_event_tx.send(res).await;
                     });
                 })
             },
             Config::default(),
+        )?;
+
+        watcher.watch(
+            self.shared_state.packet_filers_path(),
+            RecursiveMode::NonRecursive,
+        )?;
+        watcher.watch(
+            self.shared_state.profiles_path(),
+            RecursiveMode::NonRecursive,
         )?;
 
         loop {
@@ -53,7 +83,11 @@ impl Server {
                 }
                 next = watch_event_rx.recv() => {
                     match next.expect("Watcher not to drop") {
-                        Ok(event) => {}
+                        Ok(event) => {
+                            if let Err(err) = self.handle_watcher_event(event) {
+                                error!("error while handling watcher event: {err:?}")
+                            }
+                        }
                         Err(err) => {
                             error!("watcher returned an error: {err:?}")
                         }
