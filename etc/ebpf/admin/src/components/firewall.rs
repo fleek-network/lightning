@@ -93,6 +93,21 @@ impl FireWall {
         &mut self.input_fields[self.selected_input_field]
     }
 
+    fn remove_filter(&mut self) {
+        if let Some(cur) = self.table_state.selected() {
+            debug_assert!(cur < self.filters.len());
+            self.filters.remove(cur);
+
+            if self.filters.is_empty() {
+                self.table_state.select(None);
+            } else if cur == self.filters.len() {
+                self.table_state.select(Some(cur - 1));
+            } else if cur == 0 {
+                self.table_state.select(Some(1));
+            }
+        }
+    }
+
     fn clear_input(&mut self) {
         for field in self.input_fields.iter_mut() {
             field.area.select_all();
@@ -185,6 +200,10 @@ impl Component for FireWall {
             Action::Add => {
                 self.show_input_field = true;
                 Ok(Some(Action::UpdateMode(Mode::FirewallNewEntry)))
+            },
+            Action::Remove => {
+                self.remove_filter();
+                Ok(Some(Action::Render))
             },
             Action::Up => {
                 if self.show_input_field {
