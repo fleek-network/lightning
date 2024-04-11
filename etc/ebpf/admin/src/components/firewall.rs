@@ -116,7 +116,7 @@ impl FireWall {
         }
     }
 
-    fn process_input(&mut self) -> Result<()> {
+    fn update_filters_from_input(&mut self) -> Result<()> {
         for field in self.input_fields.iter_mut() {
             field.area.select_all();
             field.area.cut();
@@ -143,7 +143,11 @@ impl FireWall {
         };
 
         self.filters.push(filter);
+        self.update_storage();
+        Ok(())
+    }
 
+    fn update_storage(&self) {
         let command_tx = self
             .command_tx
             .clone()
@@ -160,7 +164,6 @@ impl FireWall {
                 let _ = command_tx.send(Action::Error(e.to_string()));
             }
         });
-        Ok(())
     }
 }
 
@@ -185,7 +188,7 @@ impl Component for FireWall {
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         match action {
             Action::Save => {
-                if let Err(e) = self.process_input() {
+                if let Err(e) = self.update_filters_from_input() {
                     return Ok(Some(Action::Error(e.to_string())));
                 } else {
                     self.show_input_field = false;
@@ -203,6 +206,7 @@ impl Component for FireWall {
             },
             Action::Remove => {
                 self.remove_filter();
+                self.update_storage();
                 Ok(Some(Action::Render))
             },
             Action::Up => {
@@ -256,6 +260,7 @@ impl Component for FireWall {
         });
 
         debug_assert!(self.longest_item_per_column.len() == COLUMN_COUNT);
+
         let bar = " > ";
         let table = Table::new(
             rows,
