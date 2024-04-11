@@ -13,6 +13,7 @@ pub trait DeliveryAcknowledgmentAggregatorInterface<C: Collection>:
     BuildGraph + Sized + Send + Sync
 {
     /// Returns the socket that can be used to submit delivery acknowledgments to be aggregated.
+    #[socket]
     fn socket(&self) -> DeliveryAcknowledgmentSocket;
 }
 

@@ -17,6 +17,6 @@ pub type MempoolSocket = Socket<TransactionRequest, ()>;
 #[interfaces_proc::blank]
 pub trait ForwarderInterface<C: Collection>: BuildGraph + Sized + Send + 'static {
     /// Get the socket for forwarding new transaction requests to the mempool.
-    #[blank = Socket::raw_bounded(64).0]
+    #[socket]
     fn mempool_socket(&self) -> MempoolSocket;
 }

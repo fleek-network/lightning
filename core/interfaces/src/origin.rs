@@ -14,6 +14,7 @@ pub type OriginProviderSocket = Socket<ImmutablePointer, anyhow::Result<Blake3Ha
 #[interfaces_proc::blank]
 pub trait OriginProviderInterface<C: Collection>: BuildGraph + Sized + Send + Sync {
     /// Returns a socket for submitting a fetch request to an origin.
+    #[socket]
     fn get_socket(&self) -> OriginProviderSocket;
 }
 

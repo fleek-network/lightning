@@ -14,6 +14,6 @@ pub type BlockstoreServerSocket =
 pub trait BlockstoreServerInterface<C: Collection>:
     BuildGraph + Sized + Send + Sync + ConfigConsumer
 {
-    #[blank = Socket::raw_bounded(32).0]
+    #[socket]
     fn get_socket(&self) -> BlockstoreServerSocket;
 }

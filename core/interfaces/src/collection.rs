@@ -56,9 +56,7 @@ impl<C: Collection> Node<C> {
             tokio::spawn(fut);
         });
 
-        let shutdown = ShutdownController::new();
-        let waiter = shutdown.waiter();
-        let graph = C::build_graph().with_value(waiter);
+        let graph = C::build_graph();
 
         let vis = graph.viz("Lightning Dependency Graph");
         println!("{vis}");
@@ -66,6 +64,8 @@ impl<C: Collection> Node<C> {
         graph
             .init_all(&mut provider)
             .expect("failed to init dependency graph");
+
+        let shutdown = provider.take();
 
         Ok(Self {
             provider,

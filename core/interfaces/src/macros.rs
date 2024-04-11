@@ -11,7 +11,12 @@ macro_rules! collection {
 
             /// Build the `fdi` dependency graph of this collection.
             fn build_graph() -> fdi::DependencyGraph {
+                let shutdown = $crate::ShutdownController::new();
+                let waiter = shutdown.waiter();
+
                 fdi::DependencyGraph::new()
+                    .with_value(shutdown)
+                    .with_value(waiter)
                     .with_value($crate::_hacks::Blanket::default())
                     $(
                     .with_module::<<Self as Collection>::$service>()

@@ -172,6 +172,8 @@ async fn test_simple_origin_fetch() {
 
     let socket = peers[0].provider.get::<Fetcher<TestBinding>>().get_socket();
 
+    peers[0].start().await;
+
     let req_fut = async move {
         let response = socket.run(FetcherRequest::Put { pointer }).await.unwrap();
         let hash = match response {
@@ -211,6 +213,9 @@ async fn test_fetch_from_peer() {
     let blockstore2 = peer2.provider.get::<Blockstore<TestBinding>>().clone();
     let socket1 = peer1.provider.get::<Fetcher<TestBinding>>().get_socket();
     let socket2 = peer2.provider.get::<Fetcher<TestBinding>>().get_socket();
+
+    peer1.start().await;
+    peer2.start().await;
 
     let req_cid =
         Cid::try_from("bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi").unwrap();

@@ -50,11 +50,13 @@ pub trait Emitter: Clone + Send + Sync + 'static {
 pub trait Subscriber<T>: Send + Sync + 'static {
     /// Receive the next notification from this subscriber or returns `None` if we are shutting
     /// down.
+    #[pending]
     async fn recv(&mut self) -> Option<T>;
 
     /// Jump to the last availabe notification skipping over any pending notifications that are
     /// ready.
     ///
     /// Using this method is similar to a `watch` channel.
+    #[pending]
     async fn last(&mut self) -> Option<T>;
 }

@@ -334,7 +334,6 @@ async fn run_unordered_async<'a, H: AsyncWorkerUnordered + 'a>(
         futures.push(Box::pin(fut));
 
         'inner: loop {
-            dbg!(futures.len());
             tokio::select! {
                 maybe_event = rx.recv() => {
                     let Some(event) = maybe_event else {
@@ -344,7 +343,7 @@ async fn run_unordered_async<'a, H: AsyncWorkerUnordered + 'a>(
                     futures.push(Box::pin(fut));
                 },
                 _ = futures.next() => {
-                    if dbg!(futures.is_empty()) {
+                    if futures.is_empty() {
                         continue 'outer;
                     }
                 }

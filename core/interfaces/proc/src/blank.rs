@@ -118,20 +118,44 @@ fn impl_const(
     }))
 }
 
-fn impl_fn(_hack: &syn::Path, item: &mut syn::TraitItemFn) -> Result<Option<syn::ImplItemFn>> {
-    let expr = match (
-        extract_attribute_expr("blank", &mut item.attrs),
-        item.default.is_some(),
-    ) {
-        (None, true) => return Ok(None),
-        (Some(Err(e)), _) => return Err(e),
-        (None, false) => parse_quote! { panic!() },
-        (Some(Ok(expr)), _) => expr,
+fn impl_fn(hack: &syn::Path, item: &mut syn::TraitItemFn) -> Result<Option<syn::ImplItemFn>> {
+    let expr = if let Some(maybe_expr) = extract_attribute_expr("blank", &mut item.attrs) {
+        maybe_expr?
+    } else if extract_attribute_marker("pending", &mut item.attrs) {
+        parse_quote! {
+            {
+                futures::future::pending::<()>().await;
+                panic!("No No")
+            }
+        }
+    } else if extract_attribute_marker("socket", &mut item.attrs) {
+        parse_quote! {
+            #hack::blackhole_socket()
+        }
+    } else if let Some(maybe_msg) = extract_attribute_expr("panic", &mut item.attrs) {
+        match maybe_msg {
+            Ok(e) => parse_quote! {
+                panic!("Blank method called: {}", #e)
+            },
+            Err(_) => {
+                panic!("Blank method called.")
+            },
+        }
+    } else if matches!(item.sig.output, syn::ReturnType::Default) {
+        parse_quote! {
+            Default::default()
+        }
+    } else if item.default.is_none() {
+        parse_quote! {
+            panic!()
+        }
+    } else {
+        return Ok(None);
     };
 
     let block = parse_quote! {
         {
-            eprintln!("Blank Method Called!");
+            eprintln!("Blank Method Called");
             #expr
         }
     };
@@ -213,6 +237,25 @@ fn extract_attribute_type(
     };
 
     Some(syn::parse2(list.tokens))
+}
+
+fn extract_attribute_marker(name: &str, attrs: &mut Vec<syn::Attribute>) -> bool {
+    let maybe_index = attrs.iter().position(|attr| {
+        let ident = match &attr.meta {
+            syn::Meta::Path(e) => e.get_ident(),
+            syn::Meta::List(e) => e.path.get_ident(),
+            syn::Meta::NameValue(e) => e.path.get_ident(),
+        };
+
+        ident.map(|ident| ident == name).unwrap_or(false)
+    });
+
+    if let Some(index) = maybe_index {
+        attrs.remove(index);
+        true
+    } else {
+        false
+    }
 }
 
 fn apply<C, T, I, O>(

@@ -16,5 +16,6 @@ pub trait SignerInterface<C: Collection>: BuildGraph + Sized + Send + Sync {
     /// Returns a socket that can be used to submit transactions to the mempool, these
     /// transactions are signed by the node and a proper nonce is assigned by the
     /// implementation.
+    #[socket]
     fn get_socket(&self) -> SubmitTxSocket;
 }
