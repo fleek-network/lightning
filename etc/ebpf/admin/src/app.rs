@@ -155,6 +155,7 @@ impl App {
         self.firewall.register_action_handler(action_tx.clone())?;
         self.firewall.register_config_handler(self.config.clone())?;
         self.firewall.init(tui.size()?)?;
+        self.firewall.read_state_from_storage().await?;
 
         self.navigator.register_action_handler(action_tx.clone())?;
         self.navigator

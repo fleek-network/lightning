@@ -12,6 +12,7 @@ use log::error;
 use ratatui::prelude::*;
 use ratatui::widgets::*;
 use serde::{Deserialize, Serialize};
+use tokio::runtime::Handle;
 use tokio::sync::mpsc::UnboundedSender;
 use tui_textarea::{Input, TextArea};
 use unicode_width::UnicodeWidthStr;
@@ -68,6 +69,16 @@ impl FireWall {
             input_fields,
             selected_input_field: 0,
         }
+    }
+
+    pub async fn read_state_from_storage(&mut self) -> Result<()> {
+        let filters = self
+            .storage
+            .read_packet_filters()
+            .await
+            .map_err(|e| Report::msg(e.to_string()))?;
+        self.filters = filters.into_iter().map(Into::into).collect();
+        Ok(())
     }
 
     fn scroll_up(&mut self) {
