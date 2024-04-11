@@ -2,12 +2,11 @@ use std::sync::Mutex;
 
 use fleek_crypto::AccountOwnerSecretKey;
 use lightning_blockstore::blockstore::Blockstore;
-use lightning_interfaces::types::{Blake3Hash, Staking};
-use lightning_interfaces::ConfigProviderInterface;
+use lightning_interfaces::prelude::*;
+use lightning_interfaces::types::Staking;
 use lightning_node::config::TomlConfigProvider;
 use lightning_node::FinalTypes;
 use lightning_rpc::Rpc;
-use tokio::sync::oneshot;
 
 use crate::container::Container;
 
@@ -74,12 +73,12 @@ impl ContainerizedNode {
         self.genesis_stake.clone()
     }
 
-    pub fn take_ckpt_rx(&self) -> Option<oneshot::Receiver<Blake3Hash>> {
+    pub fn take_syncronizer(&self) -> Option<fdi::Ref<c!(FinalTypes::SyncronizerInterface)>> {
         let container = self.container.lock().unwrap().take();
         if let Some(mut container) = container {
-            let ckpt_rx = container.take_ckpt_rx();
+            let syncronizer = container.take_ckpt_rx();
             *self.container.lock().unwrap() = Some(container);
-            ckpt_rx
+            syncronizer
         } else {
             *self.container.lock().unwrap() = None;
             None

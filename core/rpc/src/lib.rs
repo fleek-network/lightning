@@ -188,6 +188,8 @@ impl<C: Collection> Rpc<C> {
             let graceful =
                 server.with_graceful_shutdown(async move { shutdown.wait_for_shutdown().await });
             graceful.await.expect("Rpc Server to start");
+            // TODO(qti3e): Figure out why sometimes this fails. But it's not an error to halt
+            // the execution for. (It's a AlreadyStopped error.)
             server_handle.stop().unwrap();
         });
     }

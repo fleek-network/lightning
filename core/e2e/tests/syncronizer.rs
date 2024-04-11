@@ -4,8 +4,8 @@ use std::time::{Duration, SystemTime};
 use anyhow::Result;
 use fleek_blake3 as blake3;
 use lightning_e2e::swarm::Swarm;
-use lightning_e2e::utils::{logging, rpc};
-use lightning_interfaces::BlockStoreInterface;
+use lightning_e2e::utils::rpc;
+use lightning_interfaces::prelude::*;
 use lightning_test_utils::logging;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde_json::json;
@@ -32,15 +32,15 @@ async fn e2e_syncronize_state() -> Result<()> {
         .with_max_port(10600)
         .with_num_nodes(5)
         .with_committee_size(4)
-        .with_epoch_time(15000)
+        .with_epoch_time(5000)
         .with_epoch_start(epoch_start)
-        .with_syncronizer_delta(Duration::from_secs(5))
+        .with_syncronizer_delta(Duration::from_secs(2))
         .persistence(true)
         .build();
     swarm.launch_genesis_committee().await.unwrap();
 
     // Wait for the epoch to change.
-    tokio::time::sleep(Duration::from_secs(20)).await;
+    tokio::time::sleep(Duration::from_secs(8)).await;
 
     // Make sure that all genesis nodes changed epoch.
     let request = json!({
@@ -65,11 +65,11 @@ async fn e2e_syncronize_state() -> Result<()> {
 
     // Get the checkpoint receivers from the syncronizer for the node that is not on the genesis
     // committee.
-    let (pubkey, ckpt_rx) = swarm.get_non_genesis_committee_ckpt_rx().pop().unwrap();
-    let ckpt_rx = ckpt_rx.unwrap();
+    let (pubkey, syncro) = swarm.get_non_genesis_committee_syncronizer().pop().unwrap();
+    let syncronizer = syncro.unwrap();
 
     // Wait for the syncronizer to detect that we are behind and send the checkpoint hash.
-    let ckpt_hash = ckpt_rx.await.expect("Failed to receive checkpoint hash");
+    let ckpt_hash = syncronizer.next_checkpoint_hash().await;
 
     // Get the hash for this checkpoint from our blockstore. The syncronizer should have downloaded
     // it.

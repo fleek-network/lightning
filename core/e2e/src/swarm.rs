@@ -26,7 +26,7 @@ use lightning_handshake::config::{HandshakeConfig, TransportConfig};
 use lightning_handshake::handshake::Handshake;
 use lightning_handshake::transports::webrtc::WebRtcConfig;
 use lightning_interfaces::prelude::*;
-use lightning_interfaces::types::{Blake3Hash, NodePorts, Staking};
+use lightning_interfaces::types::{NodePorts, Staking};
 use lightning_keystore::{Keystore, KeystoreConfig};
 use lightning_node::config::TomlConfigProvider;
 use lightning_node::FinalTypes;
@@ -42,7 +42,6 @@ use lightning_service_executor::shim::{ServiceExecutor, ServiceExecutorConfig};
 use lightning_syncronizer::config::Config as SyncronizerConfig;
 use lightning_syncronizer::syncronizer::Syncronizer;
 use resolved_pathbuf::ResolvedPathBuf;
-use tokio::sync::oneshot;
 
 use crate::containerized_node::ContainerizedNode;
 use crate::utils::networking::{PortAssigner, Transport};
@@ -124,13 +123,16 @@ impl Swarm {
             .collect()
     }
 
-    pub fn get_non_genesis_committee_ckpt_rx(
+    pub fn get_non_genesis_committee_syncronizer(
         &self,
-    ) -> Vec<(NodePublicKey, Option<oneshot::Receiver<Blake3Hash>>)> {
+    ) -> Vec<(
+        NodePublicKey,
+        Option<fdi::Ref<c!(FinalTypes::SyncronizerInterface)>>,
+    )> {
         self.nodes
             .iter()
             .filter(|(_pubkey, node)| !node.is_genesis_committee())
-            .map(|(pubkey, node)| (*pubkey, node.take_ckpt_rx()))
+            .map(|(pubkey, node)| (*pubkey, node.take_syncronizer()))
             .collect()
     }
 

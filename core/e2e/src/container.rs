@@ -1,17 +1,17 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::thread::JoinHandle;
+use std::time::Duration;
 
 use lightning_interfaces::prelude::*;
-use lightning_interfaces::types::Blake3Hash;
-use tokio::sync::{oneshot, Notify};
+use tokio::sync::Notify;
 
 use crate::containerized_node::RuntimeType;
 
 pub struct Container<C: Collection> {
     join_handle: Option<JoinHandle<()>>,
     shutdown_notify: Option<Arc<Notify>>,
-    ckpt_rx: Option<oneshot::Receiver<Blake3Hash>>,
+    syncronizer: Option<fdi::Ref<C::SyncronizerInterface>>,
     blockstore: Option<C::BlockstoreInterface>,
 }
 
@@ -29,9 +29,8 @@ impl<C: Collection> Container<C> {
     ) -> Self {
         let shutdown_notify = Arc::new(Notify::new());
         let shutdown_notify_rx = shutdown_notify.clone();
-        let (started_tx, started_rx) = tokio::sync::oneshot::channel::<()>();
 
-        let (tx, rx) = std::sync::mpsc::channel();
+        let (tx, rx) = tokio::sync::oneshot::channel();
         let handle = std::thread::Builder::new()
             .name(format!("NODE-{index}#MAIN"))
             .spawn(move || {
@@ -53,18 +52,18 @@ impl<C: Collection> Container<C> {
                 runtime.block_on(async move {
                     let mut node = Node::<C>::init(config).unwrap();
                     node.start().await;
-                    let ckpt_rx = node
+
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+
+                    let syncronizer = node
                         .provider
-                        .get::<<C as Collection>::SyncronizerInterface>()
-                        .checkpoint_socket();
+                        .get::<<C as Collection>::SyncronizerInterface>();
                     let blockstore = node
                         .provider
                         .get::<<C as Collection>::BlockstoreInterface>()
                         .clone();
 
-                    tx.send((ckpt_rx, blockstore)).expect("Failed to send");
-
-                    let _ = started_tx.send(());
+                    tx.send((syncronizer, blockstore)).ok();
 
                     shutdown_notify_rx.notified().await;
                     node.shutdown().await;
@@ -72,13 +71,12 @@ impl<C: Collection> Container<C> {
             })
             .expect("Failed to spawn E2E thread");
 
-        let (ckpt_rx, blockstore) = rx.recv().expect("Failed to receive");
-        started_rx.await.expect("Failed to start the node.");
+        let (syncronizer, blockstore) = rx.await.expect("Failed to receive");
 
         Self {
             join_handle: Some(handle),
             shutdown_notify: Some(shutdown_notify),
-            ckpt_rx: Some(ckpt_rx),
+            syncronizer: Some(syncronizer),
             blockstore: Some(blockstore),
         }
     }
@@ -91,8 +89,8 @@ impl<C: Collection> Container<C> {
         }
     }
 
-    pub fn take_ckpt_rx(&mut self) -> Option<oneshot::Receiver<Blake3Hash>> {
-        self.ckpt_rx.take()
+    pub fn take_ckpt_rx(&mut self) -> Option<fdi::Ref<C::SyncronizerInterface>> {
+        self.syncronizer.take()
     }
 
     pub fn take_blockstore(&mut self) -> Option<C::BlockstoreInterface> {
