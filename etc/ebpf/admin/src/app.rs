@@ -1,5 +1,6 @@
 use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
+use ebpf_service::map::storage::Storage;
 use ratatui::layout::Flex;
 use ratatui::prelude::{Constraint, Direction, Layout, Rect};
 use serde::{Deserialize, Serialize};
@@ -13,7 +14,6 @@ use crate::components::prompt::Prompt;
 use crate::components::summary::Summary;
 use crate::components::Component;
 use crate::config::Config;
-use crate::ebpf::Client;
 use crate::mode::Mode;
 use crate::tui;
 use crate::tui::Frame;
@@ -35,11 +35,10 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(tick_rate: f64, frame_rate: f64) -> Result<Self> {
-        let client = Client::default();
+    pub fn new(tick_rate: f64, frame_rate: f64, storage: Storage) -> Result<Self> {
         let mode = Mode::Home;
         let home = Home::new();
-        let firewall = FireWall::new(client.clone());
+        let firewall = FireWall::new(storage);
         let summary = Summary::new();
         let prompt = Prompt::new();
         let navigator = Navigator::new();

@@ -6,6 +6,9 @@ use color_eyre::eyre::Result;
 use color_eyre::owo_colors::OwoColorize;
 use color_eyre::Report;
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
+use ebpf_service::map::storage::Storage;
+use ebpf_service::map::PacketFilterRule;
+use log::error;
 use ratatui::prelude::*;
 use ratatui::widgets::*;
 use serde::{Deserialize, Serialize};
@@ -16,7 +19,6 @@ use unicode_width::UnicodeWidthStr;
 use super::{Component, Frame};
 use crate::action::Action;
 use crate::config::{Config, KeyBindings};
-use crate::ebpf::Client;
 use crate::mode::Mode;
 
 const IP_FIELD_NAME: &str = "IP";
@@ -29,8 +31,8 @@ const INPUT_FIELD_COUNT: usize = 2;
 #[derive(Default)]
 pub struct FireWall {
     command_tx: Option<UnboundedSender<Action>>,
-    blocklist: HashSet<Record>,
-    client: Client,
+    filters: Vec<Filter>,
+    storage: Storage,
     // Table widget for displaying records.
     longest_item_per_column: [u16; 4],
     table_state: TableState,
@@ -42,7 +44,7 @@ pub struct FireWall {
 }
 
 impl FireWall {
-    pub fn new(client: Client) -> Self {
+    pub fn new(storage: Storage) -> Self {
         let mut input_fields: Vec<_> = vec![
             (IP_FIELD_NAME, TextArea::default()),
             (PORT_FIELD_NAME, TextArea::default()),
@@ -56,8 +58,8 @@ impl FireWall {
         inactivate(&mut input_fields[1]);
 
         Self {
-            blocklist: HashSet::new(),
-            client,
+            filters: Vec::new(),
+            storage,
             command_tx: None,
             longest_item_per_column: [0; COLUMN_COUNT],
             table_state: TableState::default().with_selected(0),
@@ -79,7 +81,7 @@ impl FireWall {
 
     fn scroll_down(&mut self) {
         if let Some(cur) = self.table_state.selected() {
-            let len = self.blocklist.len();
+            let len = self.filters.len();
             if len > 0 && cur < len - 1 {
                 let cur = cur + 1;
                 self.table_state.select(Some(cur));
@@ -109,26 +111,30 @@ impl FireWall {
             .trim()
             .parse()
             .map_err(|_| Report::msg("Invalid port"))?;
-        let rec = Record {
+        let filter = Filter {
             ip: ip.to_string(),
             port: port.to_string(),
             // Todo: update.
             proto: "tcp".to_string(),
             author: "100".to_string(),
         };
-        self.blocklist.insert(rec);
+
+        self.filters.push(filter);
+
         let command_tx = self
             .command_tx
             .clone()
             .expect("Component always has a sender");
-        let client = self.client.clone();
+        let storage = self.storage.clone();
+        let new = self
+            .filters
+            .clone()
+            .into_iter()
+            .map(Into::into)
+            .collect::<Vec<_>>();
         tokio::spawn(async move {
-            let client = client.lock().await;
-            let addr = SocketAddrV4::new(ip, port);
-            if let Err(e) = client.packet_filter_add(addr).await {
-                command_tx
-                    .send(Action::Error(e.to_string()))
-                    .expect("Receiver not to drop");
+            if let Err(e) = storage.write_packet_filters(new).await {
+                let _ = command_tx.send(Action::Error(e.to_string()));
             }
         });
         Ok(())
@@ -199,7 +205,7 @@ impl Component for FireWall {
     }
 
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
-        self.longest_item_per_column = space_between_columns(&self.blocklist);
+        self.longest_item_per_column = space_between_columns(&self.filters);
 
         let header_style = Style::default().fg(Color::White).bg(Color::Blue);
         let selected_style = Style::default()
@@ -211,7 +217,7 @@ impl Component for FireWall {
             .collect::<Row>()
             .style(header_style);
 
-        let rows = self.blocklist.iter().enumerate().map(|(i, data)| {
+        let rows = self.filters.iter().enumerate().map(|(i, data)| {
             let item = data.flatten();
             item.into_iter()
                 .map(|content| {
@@ -283,15 +289,15 @@ struct InputField {
     area: TextArea<'static>,
 }
 
-#[derive(Eq, PartialEq, Hash)]
-struct Record {
+#[derive(Clone, Eq, PartialEq, Hash)]
+struct Filter {
     ip: String,
     port: String,
     proto: String,
     author: String,
 }
 
-impl Record {
+impl Filter {
     fn flatten(&self) -> [&str; 4] {
         [
             self.ip.as_str(),
@@ -299,6 +305,26 @@ impl Record {
             self.proto.as_str(),
             self.author.as_str(),
         ]
+    }
+}
+
+impl From<PacketFilterRule> for Filter {
+    fn from(value: PacketFilterRule) -> Self {
+        Filter {
+            ip: value.ip.to_string(),
+            port: value.port.to_string(),
+            proto: "tcp".to_string(),
+            author: "888".to_string(),
+        }
+    }
+}
+
+impl From<Filter> for PacketFilterRule {
+    fn from(value: Filter) -> Self {
+        PacketFilterRule {
+            ip: value.ip.parse().unwrap(),
+            port: value.port.parse().unwrap(),
+        }
     }
 }
 
@@ -344,7 +370,7 @@ fn center_form(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
     .split(popup_layout[1])[1]
 }
 
-fn space_between_columns(items: &HashSet<Record>) -> [u16; 4] {
+fn space_between_columns(items: &Vec<Filter>) -> [u16; 4] {
     let ip_len = items
         .iter()
         .map(|r| r.ip.as_str())

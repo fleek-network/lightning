@@ -2999,6 +2999,7 @@ checksum = "545b22097d44f8a9581187cdf93de7a71e4722bf51200cfaba810865b49a495d"
 name = "ebpf-service"
 version = "0.0.0"
 dependencies = [
+ "anyhow",
  "bytes",
  "log",
  "notify",
