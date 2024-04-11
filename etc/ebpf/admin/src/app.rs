@@ -152,6 +152,10 @@ impl App {
         // On start up, state has not been set yet so we do that now.
         self.prompt.update_state(self.mode);
 
+        self.firewall.register_action_handler(action_tx.clone())?;
+        self.firewall.register_config_handler(self.config.clone())?;
+        self.firewall.init(tui.size()?)?;
+
         self.navigator.register_action_handler(action_tx.clone())?;
         self.navigator
             .register_config_handler(self.config.clone())?;

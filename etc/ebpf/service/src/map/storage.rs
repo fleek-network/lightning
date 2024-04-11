@@ -40,6 +40,19 @@ pub struct Storage {
 }
 
 impl Storage {
+    pub fn new() -> anyhow::Result<Self> {
+        let result = Self::default();
+
+        std::fs::create_dir_all(&result.config.root_path)?;
+
+        let mut tmp = PathBuf::new();
+        tmp.push("tmp");
+        tmp.push(&result.config.root_path.as_path());
+        std::fs::create_dir_all(tmp)?;
+
+        Ok(result)
+    }
+
     pub fn packet_filers_path(&self) -> &Path {
         self.config.packet_filters_path.as_path()
     }
