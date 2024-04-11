@@ -16,7 +16,6 @@ use lightning_metrics::increment_counter;
 use lightning_utils::application::QueryRunnerExt;
 use rand::seq::SliceRandom;
 use serde::de::DeserializeOwned;
-use tokio::sync::broadcast;
 
 use crate::config::Config;
 use crate::rpc::{self, rpc_epoch};
@@ -28,7 +27,7 @@ pub struct Syncronizer<C: Collection> {
 
 enum State<C: Collection> {
     Initialized(SyncronizerInner<C>),
-    Running(broadcast::Sender<Blake3Hash>),
+    Running(async_channel::Receiver<Blake3Hash>),
 }
 
 struct SyncronizerInner<C: Collection> {
@@ -87,18 +86,15 @@ impl<C: Collection> Syncronizer<C> {
     /// Start the system, should not do anything if the system is already
     /// started.
     async fn start(mut this: fdi::RefMut<Self>, shutdown: fdi::Cloned<ShutdownWaiter>) {
-        let (tx_checkpoint_ready, _) = broadcast::channel(1);
-
-        let state = std::mem::replace(&mut this.state, State::Running(tx_checkpoint_ready.clone()));
+        let (tx, rx) = async_channel::bounded(1);
+        let state = std::mem::replace(&mut this.state, State::Running(rx));
         let State::Initialized(mut inner) = state else {
             panic!("Syncronizer can only be started once");
         };
 
         drop(this);
 
-        shutdown
-            .run_until_shutdown(inner.run(tx_checkpoint_ready))
-            .await;
+        shutdown.run_until_shutdown(inner.run(tx)).await;
     }
 
     fn prelude(
@@ -179,7 +175,7 @@ impl<C: Collection> SyncronizerInterface<C> for Syncronizer<C> {
         let State::Running(rx) = &self.state else {
             panic!("syncronizer must be started");
         };
-        rx.subscribe().recv().await.unwrap()
+        rx.recv().await.unwrap()
     }
 }
 
@@ -204,11 +200,11 @@ impl<C: Collection> SyncronizerInner<C> {
         })
     }
 
-    async fn run(&mut self, tx_update_ready: broadcast::Sender<Blake3Hash>) {
+    async fn run(&mut self, tx_update_ready: async_channel::Sender<Blake3Hash>) {
         // When we first start we want to check if we should checkpoint
         if let Ok(checkpoint_hash) = self.try_sync().await {
             // Our blockstore succesfully downloaded the checkpoint lets send up the hash and return
-            let _ = tx_update_ready.send(checkpoint_hash);
+            let _ = tx_update_ready.send(checkpoint_hash).await;
             return;
         }
 
