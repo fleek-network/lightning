@@ -93,6 +93,14 @@ impl FireWall {
         &mut self.input_fields[self.selected_input_field]
     }
 
+    fn clear_input(&mut self) {
+        for field in self.input_fields.iter_mut() {
+            field.area.select_all();
+            field.area.cut();
+            field.area.yank_text();
+        }
+    }
+
     fn process_input(&mut self) -> Result<()> {
         for field in self.input_fields.iter_mut() {
             field.area.select_all();
@@ -171,7 +179,7 @@ impl Component for FireWall {
             },
             Action::Cancel => {
                 self.show_input_field = false;
-                let _ = self.process_input();
+                self.clear_input();
                 Ok(Some(Action::UpdateMode(Mode::Firewall)))
             },
             Action::Add => {
