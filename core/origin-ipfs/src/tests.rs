@@ -322,3 +322,43 @@ async fn test_origin_raw() {
 
     }
 }
+
+#[tokio::test]
+async fn test_origin_bbb_dag_pb_and_raw() {
+    let req_cid =
+        Cid::try_from("bafybeieb3754ppknuruchkb5pxdizi5rzz42kldrps4qvjmouomyt3xkte").unwrap();
+    let mut config = Config::default();
+    let target_bytes = std::fs::read(
+        "../test-utils/files/bafybeieb3754ppknuruchkb5pxdizi5rzz42kldrps4qvjmouomyt3xkte.js",
+    )
+    .unwrap();
+
+    let state = create_app_state("test-origin-bbb-dag-pb-and-raw".to_string()).await;
+
+    let req_fut = async move {
+        config.gateways = vec![Gateway {
+            protocol: Protocol::Http,
+            authority: "127.0.0.1:30202".to_string(),
+        }];
+        let ipfs_origin = IPFSOrigin::<TestBinding>::new(config, state.blockstore.clone()).unwrap();
+
+        let hash = ipfs_origin
+            .fetch(req_cid.to_bytes().as_slice())
+            .await
+            .unwrap();
+
+        let bytes = state.blockstore.read_all_to_vec(&hash).await.unwrap();
+        assert_eq!(bytes, target_bytes);
+    };
+
+    tokio::select! {
+        biased;
+        Err(e) = spawn_server(30202) => {
+            panic!("{e}");
+        }
+        _ = req_fut => {
+
+        }
+
+    }
+}

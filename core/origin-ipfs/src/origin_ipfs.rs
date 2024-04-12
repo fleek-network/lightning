@@ -114,8 +114,12 @@ impl<C: Collection> IPFSOrigin<C> {
                                 Ok(Some((cid, data))) => {
                                     if nodes.contains(&cid) {
                                         verify_data(&cid, &data)?;
-                                        let data = decoder::decode_block(cid, data)
-                                            .map_err(|e| Error::CarReader(format!("{e}")))?;
+                                        let data = if cid.codec() == 0x55 {
+                                            Some(data.into())
+                                        } else {
+                                            decoder::decode_block(cid, data)
+                                                .map_err(|e| Error::CarReader(format!("{e}")))?
+                                        };
 
                                         if let Some(data) = data {
                                             if let Err(e) = blockstore_putter.write(&data, comp) {
@@ -183,7 +187,7 @@ impl<C: Collection> IPFSOrigin<C> {
                 },
             }
         }
-        Err(anyhow!("No response from gateways."))
+        Err(anyhow!("Failed to fetch data from gateways."))
     }
 
     async fn fetch_from_gateway(
