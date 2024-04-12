@@ -5,12 +5,23 @@ pub const MAX_DEVICES: usize = 4;
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
 #[repr(C)]
 pub struct PacketFilter {
+    /// Source IPv4 address.
+    pub ip: u32,
     /// Source port.
     pub port: u16,
     /// Transport protocol.
     ///
     /// Uses values from Ipv4 header.
+    /// Use `u16::MAX` to indicate `any`.
     pub proto: u16,
+}
+
+#[cfg(feature = "userspace")]
+unsafe impl aya::Pod for PacketFilter {}
+
+#[derive(Copy, Clone, Eq, PartialEq, Hash)]
+#[repr(C)]
+pub struct PacketFilterParams {
     /// Flag set to true=1 when we should trigger
     /// an event from kernel space.
     pub trigger_event: u16,
@@ -29,7 +40,7 @@ pub struct PacketFilter {
 }
 
 #[cfg(feature = "userspace")]
-unsafe impl aya::Pod for FilterParams {}
+unsafe impl aya::Pod for PacketFilterParams {}
 
 #[derive(Copy, Clone)]
 #[repr(C)]

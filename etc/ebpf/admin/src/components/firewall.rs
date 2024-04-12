@@ -6,8 +6,8 @@ use color_eyre::eyre::Result;
 use color_eyre::owo_colors::OwoColorize;
 use color_eyre::Report;
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
-use ebpf_service::map::storage::Storage;
 use ebpf_service::map::PacketFilterRule;
+use ebpf_service::ConfigSource;
 use log::error;
 use ratatui::prelude::*;
 use ratatui::widgets::*;
@@ -33,7 +33,7 @@ const INPUT_FIELD_COUNT: usize = 2;
 pub struct FireWall {
     command_tx: Option<UnboundedSender<Action>>,
     filters: Vec<PacketFilterRule>,
-    storage: Storage,
+    src: ConfigSource,
     // Table widget for displaying records.
     longest_item_per_column: [u16; COLUMN_COUNT],
     table_state: TableState,
@@ -45,7 +45,7 @@ pub struct FireWall {
 }
 
 impl FireWall {
-    pub fn new(storage: Storage) -> Self {
+    pub fn new(src: ConfigSource) -> Self {
         let mut input_fields: Vec<_> = vec![
             (IP_FIELD_NAME, TextArea::default()),
             (PORT_FIELD_NAME, TextArea::default()),
@@ -60,7 +60,7 @@ impl FireWall {
 
         Self {
             filters: Vec::new(),
-            storage,
+            src,
             command_tx: None,
             longest_item_per_column: [0; COLUMN_COUNT],
             table_state: TableState::default().with_selected(0),
@@ -74,7 +74,7 @@ impl FireWall {
     pub async fn read_state_from_storage(&mut self) -> Result<()> {
         // If it's an error, there is no file and thus there is nothing to do.
         if let Ok(filters) = self
-            .storage
+            .src
             .read_packet_filters()
             .await
             .map_err(|e| Report::msg(e.to_string()))
@@ -170,7 +170,7 @@ impl FireWall {
             .command_tx
             .clone()
             .expect("Component always has a sender");
-        let storage = self.storage.clone();
+        let storage = self.src.clone();
         let new = self.filters.clone().into_iter().collect::<Vec<_>>();
         tokio::spawn(async move {
             if let Err(e) = storage.write_packet_filters(new).await {

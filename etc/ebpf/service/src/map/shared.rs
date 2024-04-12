@@ -1,24 +1,23 @@
-use std::collections::HashSet;
 use std::net::SocketAddrV4;
 use std::sync::Arc;
 
 use aya::maps::{HashMap, MapData};
-use common::{File, PacketFilter};
+use common::{File, PacketFilter, PacketFilterParams};
 use tokio::sync::Mutex;
 
-use crate::map::rules::{FileOpenRule, PacketFilterRule, PermissionPolicy};
-use crate::map::storage::Storage;
+use crate::config::ConfigSource;
+use crate::map::{FileOpenRule, PacketFilterRule, PermissionPolicy};
 
 #[derive(Clone)]
-pub struct SharedStateMap {
-    packet_filters: Arc<Mutex<HashMap<MapData, PacketFilter, u32>>>,
+pub struct SharedMap {
+    packet_filters: Arc<Mutex<HashMap<MapData, PacketFilter, PacketFilterParams>>>,
     file_open_rules: Arc<Mutex<FileOpenMaps>>,
-    storage: Storage,
+    storage: ConfigSource,
 }
 
-impl SharedStateMap {
+impl SharedMap {
     pub fn new(
-        packet_filters: HashMap<MapData, PacketFilter, u32>,
+        packet_filters: HashMap<MapData, PacketFilter, PacketFilterParams>,
         file_open_allow_rules: HashMap<MapData, File, u64>,
         file_open_deny_rules: HashMap<MapData, File, u64>,
     ) -> Self {
@@ -36,10 +35,15 @@ impl SharedStateMap {
         let mut map = self.packet_filters.lock().await;
         map.insert(
             PacketFilter {
-                ip: (*addr.ip()).into(),
-                port: addr.port() as u32,
+                ip: u32::from_be_bytes(addr.ip().octets()),
+                port: addr.port(),
+                proto: PacketFilterRule::TCP,
             },
-            1,
+            PacketFilterParams {
+                trigger_event: 1,
+                shortlived: 1,
+                action: PacketFilterRule::DROP,
+            },
             0,
         )?;
         Ok(())
@@ -48,8 +52,9 @@ impl SharedStateMap {
     pub async fn packet_filter_remove(&mut self, addr: SocketAddrV4) -> anyhow::Result<()> {
         let mut map = self.packet_filters.lock().await;
         map.remove(&PacketFilter {
-            ip: (*addr.ip()).into(),
-            port: addr.port() as u32,
+            ip: u32::from_be_bytes(addr.ip().octets()),
+            port: addr.port(),
+            proto: PacketFilterRule::TCP,
         })?;
         Ok(())
     }
@@ -61,29 +66,29 @@ impl SharedStateMap {
         let filters: Vec<PacketFilterRule> = self.storage.read_packet_filters().await?;
         let new_state = filters
             .into_iter()
-            .map(Into::into)
-            .collect::<HashSet<PacketFilter>>();
+            .map(|filter| (PacketFilter::from(filter), PacketFilterParams::from(filter)))
+            .collect::<std::collections::HashMap<_, _>>();
 
         let mut map = self.packet_filters.lock().await;
         // Due to a constraint of the aya api, there is no clean method for the maps and
         // we don't get mutable access as iterator is read only.
         let mut remove = Vec::new();
         for result in map.iter() {
-            let (filter, flag) = result?;
-            // Filters with flag=1 do not get removed.
+            let (filter, params) = result?;
+            // Filters with shortlived=1 do not get removed.
             // This is to support dynamic ephemiral rules
             // that may be produced by rate limiting, for example.
-            if !new_state.contains(&filter) && flag != 1 {
+            if !new_state.contains_key(&filter) && params.shortlived != 1 {
                 remove.push(filter);
             }
         }
 
-        for filter in new_state {
-            map.insert(PacketFilter::from(filter), 0, 0)?;
+        for (filter, params) in new_state {
+            map.insert(filter, params, 0)?;
         }
 
         for filter in remove {
-            map.remove(&PacketFilter::from(filter))?;
+            map.remove(&filter)?;
         }
 
         Ok(())

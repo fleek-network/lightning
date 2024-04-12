@@ -1,7 +1,7 @@
 use std::net::SocketAddrV4;
 
 use clap::Subcommand;
-use ebpf_service::client::IpcClient;
+use ebpf_service::client::IpcSender;
 use tokio::net::UnixStream;
 
 #[derive(Debug, Subcommand)]
@@ -12,7 +12,7 @@ pub enum PfSubCmd {
 
 pub async fn block(address: SocketAddrV4) -> Result<(), anyhow::Error> {
     let stream = UnixStream::connect(".lightning/ebpf").await?;
-    let mut client = IpcClient::new();
+    let mut client = IpcSender::new();
     client.init(stream);
     client.packet_filter_add(address).await?;
     Ok(())
@@ -20,7 +20,7 @@ pub async fn block(address: SocketAddrV4) -> Result<(), anyhow::Error> {
 
 pub async fn allow(address: SocketAddrV4) -> Result<(), anyhow::Error> {
     let stream = UnixStream::connect(".lightning/ebpf").await?;
-    let mut client = IpcClient::new();
+    let mut client = IpcSender::new();
     client.init(stream);
     client.packet_filter_remove(address).await?;
     Ok(())

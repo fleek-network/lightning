@@ -1,6 +1,6 @@
 use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
-use ebpf_service::map::storage::Storage;
+use ebpf_service::ConfigSource;
 use ratatui::layout::Flex;
 use ratatui::prelude::{Constraint, Direction, Layout, Rect};
 use serde::{Deserialize, Serialize};
@@ -35,10 +35,10 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(tick_rate: f64, frame_rate: f64, storage: Storage) -> Result<Self> {
+    pub fn new(tick_rate: f64, frame_rate: f64, src: ConfigSource) -> Result<Self> {
         let mode = Mode::Home;
         let home = Home::new();
-        let firewall = FireWall::new(storage);
+        let firewall = FireWall::new(src);
         let summary = Summary::new();
         let prompt = Prompt::new();
         let navigator = Navigator::new();

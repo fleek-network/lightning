@@ -3,6 +3,15 @@ use std::net::{Ipv4Addr, SocketAddrV4};
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
+pub const PACKET_FILTER_SERVICE: u32 = 0;
+pub const SUB_SECURITY_TOPIC: u32 = 1;
+pub const SUB_STATS_TOPIC: u32 = 2;
+
+pub enum Message {
+    SecurityEvent,
+    Stats,
+}
+
 #[non_exhaustive]
 pub enum IpcServiceFrame {
     /// Packet filter.

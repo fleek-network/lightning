@@ -4,7 +4,7 @@ use aya_bpf::bindings::xdp_action;
 use aya_bpf::macros::xdp;
 use aya_bpf::programs::XdpContext;
 use aya_log_ebpf::info;
-use common::PacketFilter;
+use common::{PacketFilter, PacketFilterParams};
 use memoffset::offset_of;
 use network_types::eth::{EthHdr, EtherType};
 use network_types::ip::{IpProto, Ipv4Hdr};
@@ -37,14 +37,8 @@ fn process_ipv4(ctx: &XdpContext) -> Result<XdpAction, ()> {
 
     info!(ctx, "received a packet from {:i}", ip);
 
-    let filter = match get_filter(ip) {
-        Some(f) => f,
-        None => return Ok(xdp_action::XDP_PASS),
-    };
-
-    // Handle wild cards.
-    if filter.port == 0u16 && filter.proto == 0u16 {
-        return Ok(filter.action);
+    if let Some(params) = try_match_only_ip(ip) {
+        return Ok(params.action);
     }
 
     let proto = unsafe { *ptr_at::<IpProto>(&ctx, EthHdr::LEN + offset_of!(Ipv4Hdr, proto))? };
@@ -60,12 +54,12 @@ fn process_ipv4(ctx: &XdpContext) -> Result<XdpAction, ()> {
         },
     };
 
-    let proto = proto as u16;
-    if (port == filter.port && proto == filter.proto)
-        || (port == 0u16 && proto == filter.proto)
-        || (proto == 0u16 && port == filter.port)
-    {
-        return Ok(filter.action);
+    if let Some(params) = try_match(PacketFilter {
+        ip,
+        port,
+        proto: proto as u16,
+    }) {
+        return Ok(params.action);
     }
 
     Ok(xdp_action::XDP_PASS)
@@ -84,6 +78,45 @@ fn ptr_at<T>(ctx: &XdpContext, offset: usize) -> Result<*const T, ()> {
     Ok((start + offset) as *const T)
 }
 
-fn get_filter(ip: u32) -> Option<PacketFilter> {
-    unsafe { maps::PACKET_FILTERS.get(&ip).copied() }
+fn try_match(filter: PacketFilter) -> Option<PacketFilterParams> {
+    unsafe {
+        // Try a specific match.
+        let mut result = maps::PACKET_FILTERS.get(&filter).copied();
+
+        // Try for any port.
+        if result.is_none() {
+            result = maps::PACKET_FILTERS
+                .get(&PacketFilter {
+                    ip: filter.ip,
+                    port: 0,
+                    proto: filter.proto,
+                })
+                .copied();
+        }
+
+        // Try for any protocol.
+        if result.is_none() {
+            result = maps::PACKET_FILTERS
+                .get(&PacketFilter {
+                    ip: filter.ip,
+                    port: filter.port,
+                    proto: u16::MAX,
+                })
+                .copied()
+        }
+
+        result
+    }
+}
+
+fn try_match_only_ip(ip: u32) -> Option<PacketFilterParams> {
+    unsafe {
+        maps::PACKET_FILTERS
+            .get(&PacketFilter {
+                ip,
+                port: 0,
+                proto: u16::MAX,
+            })
+            .copied()
+    }
 }

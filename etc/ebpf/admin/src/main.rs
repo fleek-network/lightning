@@ -15,7 +15,7 @@ use clap::Parser;
 use cli::Cli;
 use color_eyre::eyre::Result;
 use color_eyre::Report;
-use ebpf_service::map::storage::Storage;
+use ebpf_service::ConfigSource;
 
 use crate::app::App;
 use crate::utils::{initialize_logging, initialize_panic_handler, version};
@@ -29,7 +29,7 @@ async fn tokio_main() -> Result<()> {
     let mut app = App::new(
         args.tick_rate,
         args.frame_rate,
-        Storage::new().map_err(|e| Report::msg(e.to_string()))?,
+        ConfigSource::new().map_err(|e| Report::msg(e.to_string()))?,
     )?;
     app.run().await?;
 

@@ -1,7 +1,7 @@
 use std::net::Ipv4Addr;
 
 #[cfg(feature = "server")]
-use common::{File, PacketFilter};
+use common::{File, PacketFilter, PacketFilterParams};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Deserialize, Serialize)]
@@ -16,12 +16,13 @@ pub struct PacketFilterRule {
     ///
     /// Uses values from Ipv4 header.
     pub proto: u16,
-    /// Flag set to true=1 when we should trigger
+    /// Flag set to true when we should trigger
     /// an event from kernel space.
     pub trigger_event: bool,
-    /// Flag set to true=1 if this is a short-lived filter.
+    /// Flag set to true if this is a short-lived filter.
     ///
     /// Short-lived filters do not get saved in storage.
+    #[serde(skip)]
     pub shortlived: bool,
     /// Action to take e.g. DROP or PASS.
     pub action: u32,
@@ -81,9 +82,21 @@ impl From<FileOpenRule> for File {
 #[cfg(feature = "server")]
 impl From<PacketFilterRule> for PacketFilter {
     fn from(value: PacketFilterRule) -> Self {
-        Self {
+        PacketFilter {
             ip: u32::from_be_bytes(value.ip.octets()),
-            port: value.filter as u32,
+            port: value.port,
+            proto: value.proto,
+        }
+    }
+}
+
+#[cfg(feature = "server")]
+impl From<PacketFilterRule> for PacketFilterParams {
+    fn from(value: PacketFilterRule) -> Self {
+        PacketFilterParams {
+            trigger_event: value.trigger_event as u16,
+            shortlived: value.shortlived as u16,
+            action: value.action,
         }
     }
 }

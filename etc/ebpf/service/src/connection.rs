@@ -1,18 +1,18 @@
 use anyhow::bail;
 use log::error;
-use tokio::io::Interest;
 use tokio::net::UnixStream;
 
 use crate::frame::{IpcServiceFrame, Pf};
-use crate::map::SharedStateMap;
+use crate::map::SharedMap;
+use crate::utils;
 
 pub struct Connection {
     socket: UnixStream,
-    shared_state: SharedStateMap,
+    shared_state: SharedMap,
 }
 
 impl Connection {
-    pub fn new(socket: UnixStream, shared_state: SharedStateMap) -> Self {
+    pub fn new(socket: UnixStream, shared_state: SharedMap) -> Self {
         Self {
             socket,
             shared_state,
@@ -42,75 +42,21 @@ impl Connection {
         }
     }
 
+    /// Safety: This is not cancel safe.
     pub async fn handle(mut self) -> anyhow::Result<()> {
-        let mut read_buf = vec![0u8; 8];
-        let mut bytes_read = 0;
-        let mut frame_len = 0;
-        loop {
-            self.socket.ready(Interest::READABLE).await?;
-            'read: loop {
-                while frame_len == 0 && bytes_read < 8 {
-                    match self.socket.try_read(&mut read_buf[bytes_read..]) {
-                        Ok(0) => {
-                            return Ok(());
-                        },
-                        Ok(n) => {
-                            bytes_read += n;
-                        },
-                        Err(e) if e.kind() == tokio::io::ErrorKind::WouldBlock => {
-                            // We received a false positive.
-                            break 'read;
-                        },
-                        Err(e) => {
-                            return Err(e.into());
-                        },
+        while let Some(bytes) = utils::read(&self.socket).await? {
+            match IpcServiceFrame::try_from(bytes.as_ref()) {
+                Ok(f) => {
+                    if let Err(e) = self.handle_request(f).await {
+                        error!("failed to handle request: {e:?}");
                     }
-                }
-
-                if frame_len == 0 {
-                    let bytes: [u8; 8] = read_buf.as_slice().try_into()?;
-                    frame_len = usize::from_be_bytes(bytes);
-                    // We subtract here to pass entire buffer
-                    // to EbpfServiceFrame deserializer further below.
-                    read_buf.resize(frame_len - 8, 0);
-                    bytes_read = 0;
-                }
-
-                while bytes_read < frame_len {
-                    match self.socket.try_read(&mut read_buf[bytes_read..]) {
-                        Ok(0) => {
-                            return Ok(());
-                        },
-                        Ok(n) => {
-                            bytes_read += n;
-                        },
-                        Err(e) if e.kind() == tokio::io::ErrorKind::WouldBlock => {
-                            // We received a false positive.
-                            break 'read;
-                        },
-                        Err(e) => {
-                            return Err(e.into());
-                        },
-                    }
-                }
-
-                match IpcServiceFrame::try_from(read_buf.as_slice()) {
-                    Ok(f) => {
-                        if let Err(e) = self.handle_request(f).await {
-                            error!("failed to handle request: {e:?}");
-                        }
-                    },
-                    Err(e) => {
-                        error!("failed to deserialize frame: {e:?}");
-                    },
-                }
-
-                read_buf.resize(8, 0);
-                bytes_read = 0;
-                frame_len = 0;
-
-                break 'read;
+                },
+                Err(e) => {
+                    error!("failed to deserialize frame: {e:?}");
+                },
             }
         }
+
+        Ok(())
     }
 }

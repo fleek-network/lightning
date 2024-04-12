@@ -1,21 +1,24 @@
+use anyhow::{anyhow, bail};
 use log::{error, info};
 use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
-use tokio::net::UnixListener;
+use tokio::net::{UnixListener, UnixStream};
 use tokio::runtime::Handle;
 use tokio::sync::mpsc;
 
+use crate::config::ConfigSource;
 use crate::connection::Connection;
-use crate::map::storage::Storage;
-use crate::map::SharedStateMap;
+use crate::frame::{PACKET_FILTER_SERVICE, SUB_SECURITY_TOPIC, SUB_STATS_TOPIC};
+use crate::map::SharedMap;
+use crate::utils;
 
 pub struct Server {
     listener: UnixListener,
-    shared_state: SharedStateMap,
-    storage: Storage,
+    shared_state: SharedMap,
+    storage: ConfigSource,
 }
 
 impl Server {
-    pub fn new(listener: UnixListener, shared_state: SharedStateMap) -> Self {
+    pub fn new(listener: UnixListener, shared_state: SharedMap) -> Self {
         Self {
             listener,
             shared_state,
@@ -39,6 +42,28 @@ impl Server {
                 .any(|p| p == self.storage.profiles_path())
             {
             }
+        }
+
+        Ok(())
+    }
+
+    pub async fn handle_new_stream(&mut self, stream: UnixStream) -> anyhow::Result<()> {
+        let shared_state = self.shared_state.clone();
+        let service = utils::read_service_header(&stream)
+            .await?
+            .ok_or(anyhow!("socket was closed unexpectedly"))?;
+        match service {
+            PACKET_FILTER_SERVICE => {
+                tokio::spawn(async move {
+                    if let Err(e) = Connection::new(stream, shared_state).handle().await {
+                        info!("connection handler failed: {e:?}");
+                    }
+                });
+            },
+            SUB_SECURITY_TOPIC | SUB_STATS_TOPIC => {
+                // Todo: add new subscriber.
+            },
+            _ => bail!("invalid service header"),
         }
 
         Ok(())
@@ -68,13 +93,9 @@ impl Server {
                 next = self.listener.accept() => {
                     match next {
                         Ok((stream, _addr)) => {
-                            let shared_state = self.shared_state.clone();
-                            tokio::spawn(async move {
-                                if let Err(e) =
-                                    Connection::new(stream, shared_state).handle().await {
-                                    info!("connection handler failed: {e:?}");
-                                }
-                            });
+                            if let Err(e) = self.handle_new_stream(stream).await {
+                                error!("failed to handle the new stream: {e:?}");
+                            }
                         },
                         Err(e) => {
                             error!("accept failed: {e:?}")
