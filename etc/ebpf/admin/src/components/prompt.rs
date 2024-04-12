@@ -105,7 +105,7 @@ impl Component for Prompt {
 
         for i in 0..contraints.len() {
             let paragraph = if let Some((symbol, action)) = self.current.get(i) {
-                let title = format!("{} {action}", symbol);
+                let title = format!("[{symbol}] {action}");
                 Paragraph::new(title)
             } else {
                 Paragraph::default()

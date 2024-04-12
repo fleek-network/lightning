@@ -4,10 +4,53 @@ use std::net::Ipv4Addr;
 use common::{File, PacketFilter};
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Copy, Deserialize, Serialize)]
 pub struct PacketFilterRule {
+    /// Subnet prefix.
+    pub prefix: u32,
+    /// Source IP address.
     pub ip: Ipv4Addr,
+    /// Source port.
     pub port: u16,
+    /// Transport protocol.
+    ///
+    /// Uses values from Ipv4 header.
+    pub proto: u16,
+    /// Flag set to true=1 when we should trigger
+    /// an event from kernel space.
+    pub trigger_event: bool,
+    /// Flag set to true=1 if this is a short-lived filter.
+    ///
+    /// Short-lived filters do not get saved in storage.
+    pub shortlived: bool,
+    /// Action to take e.g. DROP or PASS.
+    pub action: u32,
+}
+
+impl PacketFilterRule {
+    pub const DROP: u32 = 1;
+    pub const PASS: u32 = 2;
+    pub const TCP: u16 = 6;
+    pub const UDP: u16 = 17;
+    pub const DEFAULT_PREFIX: u32 = 32;
+}
+
+impl PacketFilterRule {
+    pub fn action_str(&self) -> String {
+        match self.action {
+            Self::DROP => "drop".to_string(),
+            Self::PASS => "pass".to_string(),
+            _ => "N/A".to_string(),
+        }
+    }
+
+    pub fn proto_str(&self) -> String {
+        match self.proto {
+            Self::TCP => "tcp".to_string(),
+            Self::UDP => "udp".to_string(),
+            _ => "N/A".to_string(),
+        }
+    }
 }
 
 #[derive(Deserialize, Serialize)]
@@ -40,7 +83,7 @@ impl From<PacketFilterRule> for PacketFilter {
     fn from(value: PacketFilterRule) -> Self {
         Self {
             ip: u32::from_be_bytes(value.ip.octets()),
-            port: value.port as u32,
+            port: value.filter as u32,
         }
     }
 }

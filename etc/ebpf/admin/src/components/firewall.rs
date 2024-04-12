@@ -24,7 +24,7 @@ use crate::mode::Mode;
 
 const IP_FIELD_NAME: &str = "IP";
 const PORT_FIELD_NAME: &str = "Port";
-const COLUMN_COUNT: usize = 4;
+const COLUMN_COUNT: usize = 6;
 const INPUT_FORM_X: u16 = 20;
 const INPUT_FORM_Y: u16 = 40;
 const INPUT_FIELD_COUNT: usize = 2;
@@ -32,10 +32,10 @@ const INPUT_FIELD_COUNT: usize = 2;
 #[derive(Default)]
 pub struct FireWall {
     command_tx: Option<UnboundedSender<Action>>,
-    filters: Vec<Filter>,
+    filters: Vec<PacketFilterRule>,
     storage: Storage,
     // Table widget for displaying records.
-    longest_item_per_column: [u16; 4],
+    longest_item_per_column: [u16; COLUMN_COUNT],
     table_state: TableState,
     // Input widgets for adding a new record.
     show_input_field: bool,
@@ -72,12 +72,16 @@ impl FireWall {
     }
 
     pub async fn read_state_from_storage(&mut self) -> Result<()> {
-        let filters = self
+        // If it's an error, there is no file and thus there is nothing to do.
+        if let Ok(filters) = self
             .storage
             .read_packet_filters()
             .await
-            .map_err(|e| Report::msg(e.to_string()))?;
-        self.filters = filters.into_iter().map(Into::into).collect();
+            .map_err(|e| Report::msg(e.to_string()))
+        {
+            self.filters = filters.into_iter().map(Into::into).collect();
+        }
+
         Ok(())
     }
 
@@ -145,12 +149,15 @@ impl FireWall {
             .trim()
             .parse()
             .map_err(|_| Report::msg("Invalid port"))?;
-        let filter = Filter {
-            ip: ip.to_string(),
-            port: port.to_string(),
-            // Todo: update.
-            proto: "tcp".to_string(),
-            author: "100".to_string(),
+        let filter = PacketFilterRule {
+            prefix: PacketFilterRule::DEFAULT_PREFIX,
+            ip,
+            port,
+            shortlived: false,
+            // Todo: get these from input.
+            proto: PacketFilterRule::TCP,
+            trigger_event: true,
+            action: PacketFilterRule::DROP,
         };
 
         self.filters.push(filter);
@@ -164,12 +171,7 @@ impl FireWall {
             .clone()
             .expect("Component always has a sender");
         let storage = self.storage.clone();
-        let new = self
-            .filters
-            .clone()
-            .into_iter()
-            .map(Into::into)
-            .collect::<Vec<_>>();
+        let new = self.filters.clone().into_iter().collect::<Vec<_>>();
         tokio::spawn(async move {
             if let Err(e) = storage.write_packet_filters(new).await {
                 let _ = command_tx.send(Action::Error(e.to_string()));
@@ -248,43 +250,55 @@ impl Component for FireWall {
 
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
         self.longest_item_per_column = space_between_columns(&self.filters);
+        debug_assert!(self.longest_item_per_column.len() == COLUMN_COUNT);
+
+        let column_names = [
+            "IP",
+            "Subnet",
+            "Port",
+            "Protocol",
+            "Trigger Event",
+            "Action",
+        ];
+        debug_assert!(column_names.len() == COLUMN_COUNT);
 
         let header_style = Style::default().fg(Color::White).bg(Color::Blue);
         let selected_style = Style::default()
             .add_modifier(Modifier::REVERSED)
             .fg(Color::DarkGray);
-        let header = ["IP", "Port", "Protocol", "Pid"]
+        let header = column_names
             .into_iter()
             .map(Cell::from)
             .collect::<Row>()
             .style(header_style);
 
         let rows = self.filters.iter().enumerate().map(|(i, data)| {
-            let item = data.flatten();
+            let item = flatten_filter(data);
             item.into_iter()
                 .map(|content| {
-                    let text = Text::from(format!("{content}"));
+                    let text = Text::from(content);
                     Cell::from(text)
                 })
                 .collect::<Row>()
                 .style(Style::new().fg(Color::White).bg(Color::Black))
         });
 
-        debug_assert!(self.longest_item_per_column.len() == COLUMN_COUNT);
+        let contraints = [
+            Constraint::Min(self.longest_item_per_column[0] + 1),
+            Constraint::Min(self.longest_item_per_column[1] + 1),
+            Constraint::Min(self.longest_item_per_column[2] + 1),
+            Constraint::Min(self.longest_item_per_column[3] + 1),
+            Constraint::Min(self.longest_item_per_column[4] + 1),
+            Constraint::Min(self.longest_item_per_column[5]),
+        ];
+        debug_assert!(contraints.len() == COLUMN_COUNT);
 
         let bar = " > ";
-        let table = Table::new(
-            rows,
-            [
-                Constraint::Min(self.longest_item_per_column[0] + 1),
-                Constraint::Min(self.longest_item_per_column[1] + 1),
-                Constraint::Min(self.longest_item_per_column[2] + 1),
-                Constraint::Min(self.longest_item_per_column[3]),
-            ],
-        )
-        .header(header)
-        .highlight_style(selected_style)
-        .highlight_symbol(Text::from(bar));
+        let table = Table::new(rows, contraints)
+            .header(header)
+            .highlight_style(selected_style)
+            .highlight_symbol(Text::from(bar));
+
         f.render_stateful_widget(table, area, &mut self.table_state);
 
         if self.show_input_field {
@@ -332,45 +346,6 @@ struct InputField {
     area: TextArea<'static>,
 }
 
-#[derive(Clone, Eq, PartialEq, Hash)]
-struct Filter {
-    ip: String,
-    port: String,
-    proto: String,
-    author: String,
-}
-
-impl Filter {
-    fn flatten(&self) -> [&str; 4] {
-        [
-            self.ip.as_str(),
-            self.port.as_str(),
-            self.proto.as_str(),
-            self.author.as_str(),
-        ]
-    }
-}
-
-impl From<PacketFilterRule> for Filter {
-    fn from(value: PacketFilterRule) -> Self {
-        Filter {
-            ip: value.ip.to_string(),
-            port: value.port.to_string(),
-            proto: "tcp".to_string(),
-            author: "888".to_string(),
-        }
-    }
-}
-
-impl From<Filter> for PacketFilterRule {
-    fn from(value: Filter) -> Self {
-        PacketFilterRule {
-            ip: value.ip.parse().unwrap(),
-            port: value.port.parse().unwrap(),
-        }
-    }
-}
-
 fn inactivate(field: &mut InputField) {
     field.area.set_cursor_line_style(Style::default());
     field.area.set_cursor_style(Style::default());
@@ -413,37 +388,55 @@ fn center_form(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
     .split(popup_layout[1])[1]
 }
 
-fn space_between_columns(items: &Vec<Filter>) -> [u16; 4] {
+fn space_between_columns(items: &Vec<PacketFilterRule>) -> [u16; COLUMN_COUNT] {
+    let prefix = items
+        .iter()
+        .map(|r| r.prefix.to_string().as_str().width())
+        .max()
+        .unwrap_or(0);
     let ip_len = items
         .iter()
-        .map(|r| r.ip.as_str())
-        .map(UnicodeWidthStr::width)
+        .map(|r| r.ip.to_string().as_str().width())
         .max()
         .unwrap_or(0);
     let port_len = items
         .iter()
-        .map(|r| r.port.as_str())
-        .flat_map(str::lines)
-        .map(UnicodeWidthStr::width)
+        .map(|r| r.port.to_string().as_str().width())
         .max()
         .unwrap_or(0);
     let proto_len = items
         .iter()
-        .map(|r| r.proto.as_str())
-        .map(UnicodeWidthStr::width)
+        .map(|r| r.proto_str().as_str().width())
         .max()
         .unwrap_or(0);
-    let author_len = items
+    let trigger_event_len = items
         .iter()
-        .map(|r| r.proto.as_str())
-        .map(UnicodeWidthStr::width)
+        .map(|r| r.trigger_event.to_string().as_str().width())
+        .max()
+        .unwrap_or(0);
+    let action_len = items
+        .iter()
+        .map(|r| r.action_str().as_str().width())
         .max()
         .unwrap_or(0);
 
     [
         ip_len as u16,
+        prefix as u16,
         port_len as u16,
         proto_len as u16,
-        author_len as u16,
+        trigger_event_len as u16,
+        action_len as u16,
+    ]
+}
+
+fn flatten_filter(filter: &PacketFilterRule) -> [String; COLUMN_COUNT] {
+    [
+        filter.ip.to_string(),
+        filter.prefix.to_string(),
+        filter.port.to_string(),
+        filter.proto_str(),
+        filter.trigger_event.to_string(),
+        filter.action_str(),
     ]
 }
