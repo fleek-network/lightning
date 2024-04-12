@@ -249,59 +249,61 @@ impl Component for FireWall {
     }
 
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
-        self.longest_item_per_column = space_between_columns(&self.filters);
-        debug_assert!(self.longest_item_per_column.len() == COLUMN_COUNT);
+        if !self.show_input_field {
+            // Display list of filter rules.
+            self.longest_item_per_column = space_between_columns(&self.filters);
+            debug_assert!(self.longest_item_per_column.len() == COLUMN_COUNT);
 
-        let column_names = [
-            "IP",
-            "Subnet",
-            "Port",
-            "Protocol",
-            "Trigger Event",
-            "Action",
-        ];
-        debug_assert!(column_names.len() == COLUMN_COUNT);
+            let column_names = [
+                "IP",
+                "Subnet",
+                "Port",
+                "Protocol",
+                "Trigger Event",
+                "Action",
+            ];
+            debug_assert!(column_names.len() == COLUMN_COUNT);
 
-        let header_style = Style::default().fg(Color::White).bg(Color::Blue);
-        let selected_style = Style::default()
-            .add_modifier(Modifier::REVERSED)
-            .fg(Color::DarkGray);
-        let header = column_names
-            .into_iter()
-            .map(Cell::from)
-            .collect::<Row>()
-            .style(header_style);
-
-        let rows = self.filters.iter().enumerate().map(|(i, data)| {
-            let item = flatten_filter(data);
-            item.into_iter()
-                .map(|content| {
-                    let text = Text::from(content);
-                    Cell::from(text)
-                })
+            let header_style = Style::default().fg(Color::White).bg(Color::Blue);
+            let selected_style = Style::default()
+                .add_modifier(Modifier::REVERSED)
+                .fg(Color::DarkGray);
+            let header = column_names
+                .into_iter()
+                .map(Cell::from)
                 .collect::<Row>()
-                .style(Style::new().fg(Color::White).bg(Color::Black))
-        });
+                .style(header_style);
 
-        let contraints = [
-            Constraint::Min(self.longest_item_per_column[0] + 1),
-            Constraint::Min(self.longest_item_per_column[1] + 1),
-            Constraint::Min(self.longest_item_per_column[2] + 1),
-            Constraint::Min(self.longest_item_per_column[3] + 1),
-            Constraint::Min(self.longest_item_per_column[4] + 1),
-            Constraint::Min(self.longest_item_per_column[5]),
-        ];
-        debug_assert!(contraints.len() == COLUMN_COUNT);
+            let rows = self.filters.iter().enumerate().map(|(i, data)| {
+                let item = flatten_filter(data);
+                item.into_iter()
+                    .map(|content| {
+                        let text = Text::from(content);
+                        Cell::from(text)
+                    })
+                    .collect::<Row>()
+                    .style(Style::new().fg(Color::White).bg(Color::Black))
+            });
 
-        let bar = " > ";
-        let table = Table::new(rows, contraints)
-            .header(header)
-            .highlight_style(selected_style)
-            .highlight_symbol(Text::from(bar));
+            let contraints = [
+                Constraint::Min(self.longest_item_per_column[0] + 1),
+                Constraint::Min(self.longest_item_per_column[1] + 1),
+                Constraint::Min(self.longest_item_per_column[2] + 1),
+                Constraint::Min(self.longest_item_per_column[3] + 1),
+                Constraint::Min(self.longest_item_per_column[4] + 1),
+                Constraint::Min(self.longest_item_per_column[5]),
+            ];
+            debug_assert!(contraints.len() == COLUMN_COUNT);
 
-        f.render_stateful_widget(table, area, &mut self.table_state);
+            let bar = " > ";
+            let table = Table::new(rows, contraints)
+                .header(header)
+                .highlight_style(selected_style)
+                .highlight_symbol(Text::from(bar));
 
-        if self.show_input_field {
+            f.render_stateful_widget(table, area, &mut self.table_state);
+        } else {
+            // Display form to enter new rule.
             debug_assert!(self.input_fields.len() == INPUT_FIELD_COUNT);
 
             f.render_widget(Clear, area);
