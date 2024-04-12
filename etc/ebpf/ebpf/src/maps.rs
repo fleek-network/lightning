@@ -3,8 +3,8 @@ use aya_bpf::maps::HashMap;
 use common::{File, FileMetadata, PacketFilter};
 
 #[map]
-pub static PACKET_FILTERS: HashMap<PacketFilter, u32> =
-    HashMap::<PacketFilter, u32>::with_max_entries(1024, 0);
+pub static PACKET_FILTERS: HashMap<u32, PacketFilter> =
+    HashMap::<u32, PacketFilter>::with_max_entries(1024, 0);
 #[map]
 pub static FILE_OPEN_ALLOW: HashMap<File, u64> = HashMap::<File, u64>::with_max_entries(1024, 0);
 #[map]

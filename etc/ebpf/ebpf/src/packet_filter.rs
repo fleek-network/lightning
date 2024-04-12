@@ -37,9 +37,14 @@ fn process_ipv4(ctx: &XdpContext) -> Result<XdpAction, ()> {
 
     info!(ctx, "received a packet from {:i}", ip);
 
-    // First check if it's blocked from all ports.
-    if not_allowed(ip) {
-        return Ok(xdp_action::XDP_DROP);
+    let filter = match get_filter(ip) {
+        Some(f) => f,
+        None => return Ok(xdp_action::XDP_PASS),
+    };
+
+    // Handle wild cards.
+    if filter.port == 0u16 && filter.proto == 0u16 {
+        return Ok(filter.action);
     }
 
     let proto = unsafe { *ptr_at::<IpProto>(&ctx, EthHdr::LEN + offset_of!(Ipv4Hdr, proto))? };
@@ -55,12 +60,15 @@ fn process_ipv4(ctx: &XdpContext) -> Result<XdpAction, ()> {
         },
     };
 
-    // Check if it's block for a particular port.
-    if not_allowed_for_port(ip, port) {
-        Ok(xdp_action::XDP_DROP)
-    } else {
-        Ok(xdp_action::XDP_PASS)
+    let proto = proto as u16;
+    if (port == filter.port && proto == filter.proto)
+        || (port == 0u16 && proto == filter.proto)
+        || (proto == 0u16 && port == filter.port)
+    {
+        return Ok(filter.action);
     }
+
+    Ok(xdp_action::XDP_PASS)
 }
 
 // Before any data access, the verifier requires us to do a bound check.
@@ -76,21 +84,6 @@ fn ptr_at<T>(ctx: &XdpContext, offset: usize) -> Result<*const T, ()> {
     Ok((start + offset) as *const T)
 }
 
-fn not_allowed_for_port(ip: u32, port: u16) -> bool {
-    unsafe {
-        maps::PACKET_FILTERS
-            .get(&PacketFilter {
-                ip,
-                port: port as u32,
-            })
-            .is_some()
-    }
-}
-
-fn not_allowed(ip: u32) -> bool {
-    unsafe {
-        maps::PACKET_FILTERS
-            .get(&PacketFilter { ip, port: 0 })
-            .is_some()
-    }
+fn get_filter(ip: u32) -> Option<PacketFilter> {
+    unsafe { maps::PACKET_FILTERS.get(&ip).copied() }
 }
