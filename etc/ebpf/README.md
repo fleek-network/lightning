@@ -31,7 +31,7 @@ Note: since eBPF is a Linux feature, you can only build.
 2. Install the `bpf-linker`. 
 
 ```
-cargo install --git https://github.com/aya-rs/bpf-linker --rev 2ae2397701272bface78abc36b0b32d99a2a6998 --no-default-features
+LLVM_SYS_170_PREFIX=$(brew --prefix llvm) cargo install --git https://github.com/aya-rs/bpf-linker --rev 2ae2397701272bface78abc36b0b32d99a2a6998 --no-default-features
 ```
 
 Note: Recently, nightly started using LLVM 18 which forced `bpf-linker` to upgrade to LLVM 18.
