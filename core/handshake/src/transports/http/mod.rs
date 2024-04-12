@@ -52,8 +52,7 @@ pub struct HttpSender {
     service: Service,
     frame_tx: Sender<Option<RequestFrame>>,
     body_tx: Sender<anyhow::Result<Bytes>>,
-    expected_block_count: Option<usize>,
-    current_block_len: usize,
+    current_write: usize,
     termination_tx: Option<oneshot::Sender<TerminationReason>>,
 }
 
@@ -68,8 +67,7 @@ impl HttpSender {
             service,
             frame_tx,
             body_tx,
-            expected_block_count: None,
-            current_block_len: 0,
+            current_write: 0,
             termination_tx: Some(termination_tx),
         }
     }
@@ -86,45 +84,6 @@ impl HttpSender {
         if self.frame_tx.try_send(None).is_err() {
             warn!("failed to send close signal to receiver");
         }
-    }
-
-    fn fetcher_service_write(&mut self, buf: Bytes) -> anyhow::Result<usize> {
-        let len = buf.len();
-        self.current_block_len -= len;
-
-        if self.expected_block_count.is_none() && len == 4 {
-            let expected_block_count = u32::from_be_bytes(buf.as_ref().try_into()?);
-            assert!(
-                self.expected_block_count
-                    .replace(expected_block_count as usize)
-                    .is_none()
-            );
-            return Ok(4);
-        }
-
-        self.inner_send(buf);
-
-        let expected_block_count = self
-            .expected_block_count
-            .as_ref()
-            .expect("To be initialized");
-        if *expected_block_count == 0 && self.current_block_len == 0 {
-            self.close();
-        }
-
-        Ok(len)
-    }
-
-    fn js_service_write(&mut self, buf: Bytes) -> anyhow::Result<usize> {
-        let len = buf.len();
-        self.inner_send(buf);
-        self.current_block_len -= len;
-
-        if self.current_block_len == 0 {
-            self.close();
-        }
-
-        Ok(len)
     }
 }
 
@@ -147,27 +106,23 @@ impl TransportSender for HttpSender {
         self.termination_tx.take();
 
         debug_assert!(
-            self.current_block_len == 0,
+            self.current_write == 0,
             "data should be written completely before calling start_write again"
         );
 
-        self.current_block_len = len;
-
-        if let Service::Fetcher = self.service {
-            if let Some(expected_block_count) = self.expected_block_count.as_mut() {
-                *expected_block_count -= 1;
-            }
-        }
+        self.current_write = len;
     }
 
     fn write(&mut self, buf: Bytes) -> anyhow::Result<usize> {
-        debug_assert!(self.current_block_len != 0);
-        debug_assert!(self.current_block_len >= buf.len());
+        let len = buf.len();
 
-        match self.service {
-            Service::Fetcher => self.fetcher_service_write(buf),
-            Service::Js => self.js_service_write(buf),
-        }
+        debug_assert!(self.current_write != 0);
+        debug_assert!(self.current_write >= len);
+
+        self.current_write -= len;
+        self.inner_send(buf);
+
+        Ok(len)
     }
 }
 
