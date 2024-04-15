@@ -67,13 +67,18 @@
 
           librusty_v8 = (
             let
-              v8_version = "0.83.1";
+              v8_version = "0.89.0";
               arch = pkgs.rust.toRustTarget pkgs.stdenv.hostPlatform;
             in
             pkgs.fetchurl {
               name = "librusty_v8-${v8_version}";
-              url = "https://github.com/denoland/rusty_v8/releases/download/v${v8_version}/librusty_v8_release_${arch}.a";
-              sha256 = { x86_64-linux = "0cCpFMPpFWTvoU3+HThYDDTQO7DdpdVDDer5k+3HQFY="; }."${system}";
+              url = "https://github.com/denoland/rusty_v8/releases/download/v${v8_version}/librusty_v8_release_${arch}.a.gz";
+              sha256 = { x86_64-linux = "XxX3x3LBiJK768gvzIsV7aKm6Yn5dLS3LINdDOUjDGU="; }."${system}";
+              postFetch = ''
+                mv $out src.gz
+                ${pkgs.gzip} -d src.gz
+                mv src $out
+              '';
               meta.version = v8_version;
             }
           );

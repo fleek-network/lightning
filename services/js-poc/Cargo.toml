@@ -20,29 +20,31 @@ cid = "0.11"
 tracing-subscriber = { version = "0.3", features = [ "env-filter" ] }
 
 # Deno core + webapi extensions
-deno_core = "0.256"
-deno_webidl = "0.136"
-deno_console = "0.136"
-deno_url = "0.136"
-deno_web = "0.167"
-deno_fetch = "0.160"
-deno_crypto = "0.150"
-deno_canvas = "0.5.0"
-deno_webgpu = "0.103"
+deno_core = "0.272"
+deno_webidl = "0.146"
+deno_console = "0.146"
+deno_url = "0.146"
+deno_net = "0.138"
+deno_web = "0.177"
+deno_fetch = "0.170"
+deno_crypto = "0.160"
+deno_canvas = "0.15.0"
+deno_webgpu = "0.113"
 
 [dev-dependencies]
 lightning-schema = { path = "../../core/schema" }
 
 [build-dependencies]
-deno_core = "0.256"
-deno_webidl = "0.136"
-deno_console = "0.136"
-deno_url = "0.136"
-deno_web = "0.167"
-deno_fetch = "0.160"
-deno_crypto = "0.150"
-deno_canvas = "0.5.0"
-deno_webgpu = "0.103"
+deno_core = "0.272"
+deno_webidl = "0.146"
+deno_console = "0.146"
+deno_url = "0.146"
+deno_web = "0.177"
+deno_net = "0.138"
+deno_fetch = "0.170"
+deno_crypto = "0.160"
+deno_canvas = "0.15.0"
+deno_webgpu = "0.113"
 
 [[bin]]
 name = "fn-service-1"

@@ -4,6 +4,13 @@ const {
   ObjectPrototypeIsPrototypeOf,
   SymbolFor
 } = primordials;
+const {
+  propGetterOnly,
+  propNonEnumerable,
+  propNonEnumerableLazyLoaded,
+  propReadOnly,
+  propWritable,
+} = core;
 
 import * as webidl from "ext:deno_webidl/00_webidl.js";
 
@@ -26,6 +33,7 @@ import * as location from "ext:deno_web/12_location.js";
 import { MessageChannel, MessagePort } from "ext:deno_web/13_message_port.js";
 import * as compression from "ext:deno_web/14_compression.js";
 import * as performance from "ext:deno_web/15_performance.js";
+import * as imageData from "ext:deno_web/16_image_data.js";
 
 import * as headers from "ext:deno_fetch/20_headers.js";
 import * as formData from "ext:deno_fetch/21_formdata.js";
@@ -36,74 +44,17 @@ import * as eventSource from "ext:deno_fetch/27_eventsource.js";
 
 import * as crypto from "ext:deno_crypto/00_crypto.js";
 
-import { webgpu, webGPUNonEnumerable } from "ext:deno_webgpu/00_init.js";
+import { loadWebGPU } from "ext:deno_webgpu/00_init.js";
 import * as webgpuSurface from "ext:deno_webgpu/02_surface.js";
 
-import { readOnly, writable, getterOnly, nonEnumerable } from 'ext:fleek/util.js';
 import { Fleek } from "ext:fleek/fleek.js";
 
 // TODO:
-// Events
 // structuredClone
-// Navigator
 
 const { ops } = core;
 
-let image;
-
-function ImageNonEnumerable(getter) {
-  let valueIsSet = false;
-  let value;
-
-  return {
-    get() {
-      loadImage();
-
-      if (valueIsSet) {
-        return value;
-      } else {
-        return getter();
-      }
-    },
-    set(v) {
-      loadImage();
-
-      valueIsSet = true;
-      value = v;
-    },
-    enumerable: false,
-    configurable: true,
-  };
-}
-function ImageWritable(getter) {
-  let valueIsSet = false;
-  let value;
-
-  return {
-    get() {
-      loadImage();
-
-      if (valueIsSet) {
-        return value;
-      } else {
-        return getter();
-      }
-    },
-    set(v) {
-      loadImage();
-
-      valueIsSet = true;
-      value = v;
-    },
-    enumerable: true,
-    configurable: true,
-  };
-}
-function loadImage() {
-  if (!image) {
-    image = ops.op_lazy_load_esm("ext:deno_canvas/01_image.js");
-  }
-}
+const loadImage = core.createLazyLoader("ext:deno_canvas/01_image.js");
 
 class Navigator {
   constructor() {
@@ -128,16 +79,6 @@ class Navigator {
 }
 
 const navigator = webidl.createBranded(Navigator);
-
-function memoizeLazy(f) {
-  let v_ = null;
-  return () => {
-    if (v_ === null) {
-      v_ = f();
-    }
-    return v_;
-  };
-}
 
 ObjectDefineProperties(Navigator.prototype, {
   gpu: {
@@ -186,125 +127,127 @@ const NavigatorPrototype = Navigator.prototype;
 
 const globalContext = {
   // Fleek api
-  Fleek: nonEnumerable(Fleek),
+  Fleek: propNonEnumerable(Fleek),
 
   // Window apis
-  console: nonEnumerable(
+  console: propNonEnumerable(
     new Console((msg, level) => ops.log(msg, level > 0))
   ),
   Location: location.locationConstructorDescriptor,
   location: location.locationDescriptor,
-  Navigator: nonEnumerable(Navigator),
-  navigator: getterOnly(() => navigator),
+  Navigator: propNonEnumerable(Navigator),
+  navigator: propGetterOnly(() => navigator),
   Window: globalInterfaces.windowConstructorDescriptor,
-  window: getterOnly(() => globalThis),
-  global: getterOnly(() => globalThis),
-  self: getterOnly(() => globalThis),
+  window: propGetterOnly(() => globalThis),
+  global: propGetterOnly(() => globalThis),
+  self: propGetterOnly(() => globalThis),
 
   // Web apis
-  DOMException: nonEnumerable(DOMException),
-  CloseEvent: nonEnumerable(event.CloseEvent),
-  CustomEvent: nonEnumerable(event.CustomEvent),
-  ErrorEvent: nonEnumerable(event.ErrorEvent),
-  Event: nonEnumerable(event.Event),
-  EventTarget: nonEnumerable(event.EventTarget),
-  MessageEvent: nonEnumerable(event.MessageEvent),
-  PromiseRejectionEvent: nonEnumerable(event.PromiseRejectionEvent),
-  ProgressEvent: nonEnumerable(event.ProgressEvent),
-  reportError: writable(event.reportError),
-  clearInterval: writable(timers.clearInterval),
-  clearTimeout: writable(timers.clearTimeout),
-  setInterval: writable(timers.setInterval),
-  setTimeout: writable(timers.setTimeout),
-  AbortSignal: nonEnumerable(abortSignal.AbortSignal),
-  AbortController: nonEnumerable(abortSignal.AbortController),
-  WritableStream: nonEnumerable(streams.WritableStream),
-  WritableStreamDefaultWriter: nonEnumerable(streams.WritableStreamDefaultWriter),
-  WritableStreamDefaultController: nonEnumerable(streams.WritableStreamDefaultController),
-  ReadableByteStreamController: nonEnumerable(streams.ReadableByteStreamController),
-  ReadableStream: nonEnumerable(streams.ReadableStream),
-  ReadableStreamBYOBReader: nonEnumerable(streams.ReadableStreamBYOBReader),
-  ReadableStreamBYOBRequest: nonEnumerable(streams.ReadableStreamBYOBRequest),
-  ReadableStreamDefaultController: nonEnumerable(streams.ReadableStreamDefaultController),
-  TransportStream: nonEnumerable(streams.TransformStream),
-  TransformStreamDefaultController: nonEnumerable(streams.TransformStreamDefaultController),
-  Blob: nonEnumerable(file.Blob),
-  File: nonEnumerable(file.File),
-  FileReader: nonEnumerable(FileReader),
-  CompressionStream: nonEnumerable(compression.CompressionStream),
-  DecompressionStream: nonEnumerable(compression.DecompressionStream),
-  TextDecoder: nonEnumerable(encoding.TextDecoder),
-  TextDecoderStream: nonEnumerable(encoding.TextDecoderStream),
-  TextEncoder: nonEnumerable(encoding.TextEncoder),
-  TextEncoderStream: nonEnumerable(encoding.TextEncoderStream),
-  atob: writable(base64.atob),
-  btoa: writable(base64.btoa),
-  URL: nonEnumerable(URL),
-  URLPattern: nonEnumerable(URLPattern),
-  URLSearchParams: nonEnumerable(URLSearchParams),
-  MessageChannel: nonEnumerable(MessageChannel),
-  MessagePort: nonEnumerable(MessagePort),
+  DOMException: propNonEnumerable(DOMException),
+  CloseEvent: propNonEnumerable(event.CloseEvent),
+  CustomEvent: propNonEnumerable(event.CustomEvent),
+  ErrorEvent: propNonEnumerable(event.ErrorEvent),
+  Event: propNonEnumerable(event.Event),
+  EventTarget: propNonEnumerable(event.EventTarget),
+  MessageEvent: propNonEnumerable(event.MessageEvent),
+  PromiseRejectionEvent: propNonEnumerable(event.PromiseRejectionEvent),
+  ProgressEvent: propNonEnumerable(event.ProgressEvent),
+  reportError: propWritable(event.reportError),
+  clearInterval: propWritable(timers.clearInterval),
+  clearTimeout: propWritable(timers.clearTimeout),
+  setInterval: propWritable(timers.setInterval),
+  setTimeout: propWritable(timers.setTimeout),
+  AbortSignal: propNonEnumerable(abortSignal.AbortSignal),
+  AbortController: propNonEnumerable(abortSignal.AbortController),
+  WritableStream: propNonEnumerable(streams.WritableStream),
+  WritableStreamDefaultWriter: propNonEnumerable(streams.WritableStreamDefaultWriter),
+  WritableStreamDefaultController: propNonEnumerable(streams.WritableStreamDefaultController),
+  ReadableByteStreamController: propNonEnumerable(streams.ReadableByteStreamController),
+  ReadableStream: propNonEnumerable(streams.ReadableStream),
+  ReadableStreamBYOBReader: propNonEnumerable(streams.ReadableStreamBYOBReader),
+  ReadableStreamBYOBRequest: propNonEnumerable(streams.ReadableStreamBYOBRequest),
+  ReadableStreamDefaultController: propNonEnumerable(streams.ReadableStreamDefaultController),
+  TransportStream: propNonEnumerable(streams.TransformStream),
+  TransformStreamDefaultController: propNonEnumerable(streams.TransformStreamDefaultController),
+  Blob: propNonEnumerable(file.Blob),
+  File: propNonEnumerable(file.File),
+  FileReader: propNonEnumerable(FileReader),
+  CompressionStream: propNonEnumerable(compression.CompressionStream),
+  DecompressionStream: propNonEnumerable(compression.DecompressionStream),
+  TextDecoder: propNonEnumerable(encoding.TextDecoder),
+  TextDecoderStream: propNonEnumerable(encoding.TextDecoderStream),
+  TextEncoder: propNonEnumerable(encoding.TextEncoder),
+  TextEncoderStream: propNonEnumerable(encoding.TextEncoderStream),
+  atob: propWritable(base64.atob),
+  btoa: propWritable(base64.btoa),
+  URL: propNonEnumerable(URL),
+  URLPattern: propNonEnumerable(URLPattern),
+  URLSearchParams: propNonEnumerable(URLSearchParams),
+  MessageChannel: propNonEnumerable(MessageChannel),
+  MessagePort: propNonEnumerable(MessagePort),
 
   // Fetch apis
-  Headers: nonEnumerable(headers.Headers),
-  FormData: nonEnumerable(formData.FormData),
-  Request: nonEnumerable(request.Request),
-  Response: nonEnumerable(response.Response),
-  fetch: writable(fetch.fetch),
-  EventSource: writable(eventSource.EventSource),
+  Headers: propNonEnumerable(headers.Headers),
+  FormData: propNonEnumerable(formData.FormData),
+  Request: propNonEnumerable(request.Request),
+  Response: propNonEnumerable(response.Response),
+  fetch: propWritable(fetch.fetch),
+  EventSource: propWritable(eventSource.EventSource),
 
   // Crypto apis
-  crypto: readOnly(crypto.crypto),
-  Crypto: nonEnumerable(crypto.Crypto),
-  CryptoKey: nonEnumerable(crypto.CryptoKey),
-  SubtleCrypto: nonEnumerable(crypto.SubtleCrypto),
+  crypto: propReadOnly(crypto.crypto),
+  Crypto: propNonEnumerable(crypto.Crypto),
+  CryptoKey: propNonEnumerable(crypto.CryptoKey),
+  SubtleCrypto: propNonEnumerable(crypto.SubtleCrypto),
 
   // canvas
-  createImageBitmap: ImageWritable(() => image.createImageBitmap),
-  ImageData: ImageNonEnumerable(() => image.ImageData),
-  ImageBitmap: ImageNonEnumerable(() => image.ImageBitmap),
+  createImageBitmap: core.propWritableLazyLoaded(
+    (image) => image.createImageBitmap,
+    loadImage,
+  ),
+  ImageData: propNonEnumerable(imageData.ImageData),
+  ImageBitmap: propNonEnumerableLazyLoaded(
+    (image) => image.ImageBitmap,
+    loadImage,
+  ),
 
   // webgpu
-  GPU: webGPUNonEnumerable(() => webgpu.GPU),
-  GPUAdapter: webGPUNonEnumerable(() => webgpu.GPUAdapter),
-  GPUAdapterInfo: webGPUNonEnumerable(() => webgpu.GPUAdapterInfo),
-  GPUSupportedLimits: webGPUNonEnumerable(() => webgpu.GPUSupportedLimits),
-  GPUSupportedFeatures: webGPUNonEnumerable(() => webgpu.GPUSupportedFeatures),
-  GPUDeviceLostInfo: webGPUNonEnumerable(() => webgpu.GPUDeviceLostInfo),
-  GPUDevice: webGPUNonEnumerable(() => webgpu.GPUDevice),
-  GPUQueue: webGPUNonEnumerable(() => webgpu.GPUQueue),
-  GPUBuffer: webGPUNonEnumerable(() => webgpu.GPUBuffer),
-  GPUBufferUsage: webGPUNonEnumerable(() => webgpu.GPUBufferUsage),
-  GPUMapMode: webGPUNonEnumerable(() => webgpu.GPUMapMode),
-  GPUTextureUsage: webGPUNonEnumerable(() => webgpu.GPUTextureUsage),
-  GPUTexture: webGPUNonEnumerable(() => webgpu.GPUTexture),
-  GPUTextureView: webGPUNonEnumerable(() => webgpu.GPUTextureView),
-  GPUSampler: webGPUNonEnumerable(() => webgpu.GPUSampler),
-  GPUBindGroupLayout: webGPUNonEnumerable(() => webgpu.GPUBindGroupLayout),
-  GPUPipelineLayout: webGPUNonEnumerable(() => webgpu.GPUPipelineLayout),
-  GPUBindGroup: webGPUNonEnumerable(() => webgpu.GPUBindGroup),
-  GPUShaderModule: webGPUNonEnumerable(() => webgpu.GPUShaderModule),
-  GPUShaderStage: webGPUNonEnumerable(() => webgpu.GPUShaderStage),
-  GPUComputePipeline: webGPUNonEnumerable(() => webgpu.GPUComputePipeline),
-  GPURenderPipeline: webGPUNonEnumerable(() => webgpu.GPURenderPipeline),
-  GPUColorWrite: webGPUNonEnumerable(() => webgpu.GPUColorWrite),
-  GPUCommandEncoder: webGPUNonEnumerable(() => webgpu.GPUCommandEncoder),
-  GPURenderPassEncoder: webGPUNonEnumerable(() => webgpu.GPURenderPassEncoder),
-  GPUComputePassEncoder: webGPUNonEnumerable(() =>
-    webgpu.GPUComputePassEncoder
-  ),
-  GPUCommandBuffer: webGPUNonEnumerable(() => webgpu.GPUCommandBuffer),
-  GPURenderBundleEncoder: webGPUNonEnumerable(() =>
-    webgpu.GPURenderBundleEncoder
-  ),
-  GPURenderBundle: webGPUNonEnumerable(() => webgpu.GPURenderBundle),
-  GPUQuerySet: webGPUNonEnumerable(() => webgpu.GPUQuerySet),
-  GPUError: webGPUNonEnumerable(() => webgpu.GPUError),
-  GPUValidationError: webGPUNonEnumerable(() => webgpu.GPUValidationError),
-  GPUOutOfMemoryError: webGPUNonEnumerable(() => webgpu.GPUOutOfMemoryError),
-  GPUCanvasContext: webGPUNonEnumerable(() => webgpuSurface.GPUCanvasContext),
+  GPU: propNonEnumerableLazyLoaded((webgpu) => webgpu.GPU, loadWebGPU),
+  GPUAdapter: propNonEnumerableLazyLoaded((webgpu) => webgpu.GPUAdapter, loadWebGPU),
+  GPUAdapterInfo: propNonEnumerableLazyLoaded((webgpu) => webgpu.GPUAdapterInfo, loadWebGPU),
+  GPUSupportedLimits: propNonEnumerableLazyLoaded((webgpu) => webgpu.GPUSupportedLimits, loadWebGPU),
+  GPUSupportedFeatures: propNonEnumerableLazyLoaded((webgpu) => webgpu.GPUSupportedFeatures, loadWebGPU),
+  GPUDeviceLostInfo: propNonEnumerableLazyLoaded((webgpu) => webgpu.GPUDeviceLostInfo, loadWebGPU),
+  GPUDevice: propNonEnumerableLazyLoaded((webgpu) => webgpu.GPUDevice, loadWebGPU),
+  GPUQueue: propNonEnumerableLazyLoaded((webgpu) => webgpu.GPUQueue, loadWebGPU),
+  GPUBuffer: propNonEnumerableLazyLoaded((webgpu) => webgpu.GPUBuffer, loadWebGPU),
+  GPUBufferUsage: propNonEnumerableLazyLoaded((webgpu) => webgpu.GPUBufferUsage, loadWebGPU),
+  GPUMapMode: propNonEnumerableLazyLoaded((webgpu) => webgpu.GPUMapMode, loadWebGPU),
+  GPUTextureUsage: propNonEnumerableLazyLoaded((webgpu) => webgpu.GPUTextureUsage, loadWebGPU),
+  GPUTexture: propNonEnumerableLazyLoaded((webgpu) => webgpu.GPUTexture, loadWebGPU),
+  GPUTextureView: propNonEnumerableLazyLoaded((webgpu) => webgpu.GPUTextureView, loadWebGPU),
+  GPUSampler: propNonEnumerableLazyLoaded((webgpu) => webgpu.GPUSampler, loadWebGPU),
+  GPUBindGroupLayout: propNonEnumerableLazyLoaded((webgpu) => webgpu.GPUBindGroupLayout, loadWebGPU),
+  GPUPipelineLayout: propNonEnumerableLazyLoaded((webgpu) => webgpu.GPUPipelineLayout, loadWebGPU),
+  GPUBindGroup: propNonEnumerableLazyLoaded((webgpu) => webgpu.GPUBindGroup, loadWebGPU),
+  GPUShaderModule: propNonEnumerableLazyLoaded((webgpu) => webgpu.GPUShaderModule, loadWebGPU),
+  GPUShaderStage: propNonEnumerableLazyLoaded((webgpu) => webgpu.GPUShaderStage, loadWebGPU),
+  GPUComputePipeline: propNonEnumerableLazyLoaded((webgpu) => webgpu.GPUComputePipeline, loadWebGPU),
+  GPURenderPipeline: propNonEnumerableLazyLoaded((webgpu) => webgpu.GPURenderPipeline, loadWebGPU),
+  GPUColorWrite: propNonEnumerableLazyLoaded((webgpu) => webgpu.GPUColorWrite, loadWebGPU),
+  GPUCommandEncoder: propNonEnumerableLazyLoaded((webgpu) => webgpu.GPUCommandEncoder, loadWebGPU),
+  GPURenderPassEncoder: propNonEnumerableLazyLoaded((webgpu) => webgpu.GPURenderPassEncoder, loadWebGPU),
+  GPUComputePassEncoder: propNonEnumerableLazyLoaded((webgpu) => webgpu.GPUComputePassEncoder, loadWebGPU),
+  GPUCommandBuffer: propNonEnumerableLazyLoaded((webgpu) => webgpu.GPUCommandBuffer, loadWebGPU),
+  GPURenderBundleEncoder: propNonEnumerableLazyLoaded((webgpu) => webgpu.GPURenderBundleEncoder, loadWebGPU),
+  GPURenderBundle: propNonEnumerableLazyLoaded((webgpu) => webgpu.GPURenderBundle, loadWebGPU),
+  GPUQuerySet: propNonEnumerableLazyLoaded((webgpu) => webgpu.GPUQuerySet, loadWebGPU),
+  GPUError: propNonEnumerableLazyLoaded((webgpu) => webgpu.GPUError, loadWebGPU),
+  GPUValidationError: propNonEnumerableLazyLoaded((webgpu) => webgpu.GPUValidationError, loadWebGPU),
+  GPUOutOfMemoryError: propNonEnumerableLazyLoaded((webgpu) => webgpu.GPUOutOfMemoryError, loadWebGPU),
+  GPUCanvasContext: propNonEnumerable(webgpuSurface.GPUCanvasContext),
 
-  [webidl.brand]: nonEnumerable(webidl.brand)
+  [webidl.brand]: propNonEnumerable(webidl.brand)
 };
 
 export { globalContext };

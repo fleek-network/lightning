@@ -1,7 +1,7 @@
 // Example simple ssr script for testing ideas for a browser request
-// cargo run --example js-poc-client $(lgtn-old dev store services/js-poc/examples/example_ssr.js | awk '{print $1}') blake3 '{"path":"/index.html"}'
+// curl localhost:4220/services/1/blake3/$(lightning-node dev store services/js-poc/examples/example_ssr.js | awk '{print $1}')
 
-const main = () => {
+export const main = () => {
   const path = window.location.pathname;
 
   switch (path) {

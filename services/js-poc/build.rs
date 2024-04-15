@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use ::deno_fetch::{deno_fetch, FetchPermissions};
+use ::deno_net::{deno_net, NetPermissions};
 use ::deno_web::{deno_web, TimersPermission};
 use deno_canvas::deno_canvas;
 use deno_console::deno_console;
@@ -25,7 +26,6 @@ extension!(
     esm_entry_point = "ext:fleek/bootstrap.js",
     esm = [
         dir "src/runtime/js",
-        "util.js",
         "fleek.js",
         "global.js",
         "bootstrap.js"
@@ -54,6 +54,31 @@ impl FetchPermissions for Permissions {
         unreachable!()
     }
 }
+impl NetPermissions for Permissions {
+    fn check_net<T: AsRef<str>>(
+        &mut self,
+        _host: &(T, Option<u16>),
+        _api_name: &str,
+    ) -> Result<(), deno_core::error::AnyError> {
+        unreachable!()
+    }
+
+    fn check_read(
+        &mut self,
+        _p: &std::path::Path,
+        _api_name: &str,
+    ) -> Result<(), deno_core::error::AnyError> {
+        unreachable!()
+    }
+
+    fn check_write(
+        &mut self,
+        _p: &std::path::Path,
+        _api_name: &str,
+    ) -> Result<(), deno_core::error::AnyError> {
+        unreachable!()
+    }
+}
 
 fn main() {
     let extensions = vec![
@@ -61,6 +86,7 @@ fn main() {
         deno_console::init_ops_and_esm(),
         deno_url::init_ops_and_esm(),
         deno_web::init_ops_and_esm::<Permissions>(Arc::new(Default::default()), None),
+        deno_net::init_ops_and_esm::<Permissions>(None, None),
         deno_fetch::init_ops_and_esm::<Permissions>(Default::default()),
         deno_crypto::init_ops_and_esm(None),
         deno_webgpu::init_ops_and_esm(),
@@ -68,15 +94,28 @@ fn main() {
         fleek::init_ops_and_esm(),
     ];
 
-    let _snapshot = deno_core::snapshot_util::create_snapshot(
-        deno_core::snapshot_util::CreateSnapshotOptions {
+    let snapshot = deno_core::snapshot::create_snapshot(
+        deno_core::snapshot::CreateSnapshotOptions {
             cargo_manifest_dir: env!("CARGO_MANIFEST_DIR"),
-            snapshot_path: format!("{}/snapshot.bin", std::env::var("OUT_DIR").unwrap()).into(),
+            extension_transpiler: None,
             startup_snapshot: None,
             skip_op_registration: false,
-            compression_cb: None,
             with_runtime_cb: None,
             extensions,
         },
-    );
+        None,
+    )
+    .expect("failed to build snapshot");
+
+    // Rebuild snapshot when any files pulled from fs are modified
+    for file in snapshot.files_loaded_during_snapshot {
+        println!("cargo::rerun-if-changed={}", file.display())
+    }
+
+    // Write snapshot to output dir
+    std::fs::write(
+        format!("{}/snapshot.bin", std::env::var("OUT_DIR").unwrap()),
+        snapshot.output,
+    )
+    .expect("failed to write snapshot");
 }

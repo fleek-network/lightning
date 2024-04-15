@@ -1,5 +1,5 @@
 import * as loc from "ext:deno_web/12_location.js";
-import { globalContext } from 'ext:fleek/global.js';
+import { globalContext } from "ext:fleek/global.js";
 
 /** Bootstrap function called at runtime before execution.
  *  Can only be called once.
@@ -9,7 +9,7 @@ globalThis.bootstrap = (time, url) => {
   // Define webapis in the global scope
   Object.defineProperties(globalThis, globalContext);
 
-  // Hardcode timestamp 
+  // Hardcode timestamp
   globalThis.Date.now = () => time;
 
   // Set runtime location

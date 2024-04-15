@@ -1,5 +1,5 @@
 // Example script for fetching some content with the sdk
-// cargo run --example js-poc-client $(lgtn-old dev store services/js-poc/examples/example_fetch.js | awk '{print $1}') blake3
+// curl localhost:4220/services/1/blake3/$(lightning-node dev store services/js-poc/examples/example_fetch.js | awk '{print $1}')
 
 const bbb_hash = new Uint8Array([
   16,
@@ -36,7 +36,7 @@ const bbb_hash = new Uint8Array([
   209,
 ]);
 
-const main = async () => {
+export const main = async () => {
   console.log("Hello world from javascript!");
 
   if (await Fleek.fetch_blake3(bbb_hash)) {

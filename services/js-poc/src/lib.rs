@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context};
+use anyhow::{anyhow, bail, Context};
 use arrayref::array_ref;
 use cid::Cid;
 use deno_core::url::Url;
@@ -167,16 +167,10 @@ async fn handle_request(
         .read_to_end()
         .await
         .context("failed to read source from blockstore")?;
-
-    let mut source = String::from_utf8(source_bytes).context("failed to parse source as utf8")?;
-    // Append entry point function with parameters
-    match param {
-        Some(param) => source.push_str(&format!("\nmain({param})")),
-        None => source.push_str("\nmain()"),
-    }
+    let source = String::from_utf8(source_bytes).context("failed to parse source as utf8")?;
 
     // Create runtime and execute the source
-    let mut runtime = match Runtime::new(location) {
+    let mut runtime = match Runtime::new(location.clone()) {
         Ok(runtime) => runtime,
         Err(e) => {
             connection
@@ -190,8 +184,15 @@ async fn handle_request(
     tx.send(runtime.deno.v8_isolate().thread_safe_handle())
         .context("Failed to send the IsolateHandle to main thread.")?;
 
-    let res = match runtime.exec(source) {
-        Ok(res) => res,
+    let res = match runtime.exec(location, source, param).await {
+        Ok(Some(res)) => res,
+        Ok(None) => {
+            connection
+                .write_payload(b"no response available")
+                .await
+                .context("failed to send error message")?;
+            bail!("no response available");
+        },
         Err(e) => {
             connection
                 .write_payload(e.to_string().as_bytes())

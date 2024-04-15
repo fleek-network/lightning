@@ -17,6 +17,7 @@ extension!(
         deno_console,
         deno_url,
         deno_web,
+        deno_net,
         deno_fetch,
         deno_crypto,
         deno_webgpu,

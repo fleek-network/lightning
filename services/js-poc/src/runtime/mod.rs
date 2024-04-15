@@ -2,14 +2,15 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use ::deno_fetch::{deno_fetch, FetchPermissions, Options};
+use ::deno_net::{deno_net, NetPermissions};
 use ::deno_web::{deno_web, TimersPermission};
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use deno_canvas::deno_canvas;
 use deno_console::deno_console;
-use deno_core::serde_v8::Serializable;
+use deno_core::serde_v8::{self, Serializable};
 use deno_core::url::Url;
 use deno_core::v8::{self, CreateParams, Global, Value};
-use deno_core::{JsRuntime, RuntimeOptions, Snapshot};
+use deno_core::{JsRuntime, PollEventLoopOptions, RuntimeOptions};
 use deno_crypto::deno_crypto;
 use deno_url::deno_url;
 use deno_webgpu::deno_webgpu;
@@ -58,6 +59,35 @@ impl FetchPermissions for Permissions {
         Err(anyhow!("paths are disabled :("))
     }
 }
+impl NetPermissions for Permissions {
+    fn check_net<T: AsRef<str>>(
+        &mut self,
+        host: &(T, Option<u16>),
+        _api_name: &str,
+    ) -> std::prelude::v1::Result<(), deno_core::error::AnyError> {
+        if FETCH_BLACKLIST.contains(&host.0.as_ref()) {
+            Err(anyhow!("{} is blacklisted", host.0.as_ref()))
+        } else {
+            Ok(())
+        }
+    }
+    fn check_read(
+        &mut self,
+        _p: &std::path::Path,
+        _api_name: &str,
+    ) -> std::prelude::v1::Result<(), deno_core::error::AnyError> {
+        // Disable reading file descriptors
+        Err(anyhow!("paths are disabled :("))
+    }
+    fn check_write(
+        &mut self,
+        _p: &std::path::Path,
+        _api_name: &str,
+    ) -> std::prelude::v1::Result<(), deno_core::error::AnyError> {
+        // Disable writing file descriptors
+        Err(anyhow!("paths are disabled :("))
+    }
+}
 
 impl Runtime {
     /// Create a new runtime
@@ -70,6 +100,7 @@ impl Runtime {
                 deno_console::init_ops(),
                 deno_url::init_ops(),
                 deno_web::init_ops::<Permissions>(Arc::new(Default::default()), None),
+                deno_net::init_ops::<Permissions>(None, None),
                 deno_fetch::init_ops::<Permissions>(Options::default()),
                 deno_crypto::init_ops(None),
                 deno_webgpu::init_ops(),
@@ -77,7 +108,7 @@ impl Runtime {
                 // Fleek runtime
                 fleek::init_ops(),
             ],
-            startup_snapshot: Some(Snapshot::Static(SNAPSHOT)),
+            startup_snapshot: Some(SNAPSHOT),
             op_metrics_factory_fn: Some(tape.op_metrics_factory_fn()),
             // Heap initializes with 1KiB, maxes out at 10MiB
             create_params: Some(CreateParams::default().heap_limits(HEAP_INIT, HEAP_LIMIT)),
@@ -116,8 +147,51 @@ impl Runtime {
     }
 
     /// Execute javascript source on the runtime
-    pub fn exec(&mut self, source: String) -> anyhow::Result<Global<Value>> {
-        self.deno.execute_script("<anon>", source.into())
+    pub async fn exec(
+        &mut self,
+        url: Url,
+        source: String,
+        param: Option<serde_json::Value>,
+    ) -> anyhow::Result<Option<Global<Value>>> {
+        let id = self
+            .deno
+            .load_main_es_module_from_code(&url, source)
+            .await?;
+
+        self.deno
+            .run_event_loop(PollEventLoopOptions::default())
+            .await?;
+
+        self.deno.mod_evaluate(id).await?;
+
+        {
+            let main = self.deno.get_module_namespace(id)?;
+            let scope = &mut self.deno.handle_scope();
+            let main_local = v8::Local::new(scope, main);
+
+            // Get bootstrap function pointer
+            let main_str = v8::String::new_external_onebyte_static(scope, b"main").unwrap();
+            let main_fn = main_local.get(scope, main_str.into()).unwrap();
+
+            if !main_fn.is_function() {
+                bail!("expected function main, found {}", main_fn.type_repr());
+            }
+            let main_fn = v8::Local::<v8::Function>::try_from(main_fn)?;
+
+            // construct parameters
+            let param = if let Some(param) = param {
+                serde_v8::to_v8(scope, param)?
+            } else {
+                v8::undefined(scope).into()
+            };
+            let undefined = v8::undefined(scope);
+
+            // call function and move response into a global ref
+            let Some(res) = main_fn.call(scope, undefined.into(), &[param]) else {
+                return Ok(None);
+            };
+            Ok(Some(Global::new(scope, res)))
+        }
     }
 
     /// End and collect the punch tape
