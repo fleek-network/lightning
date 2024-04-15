@@ -14,7 +14,7 @@ use crate::utils;
 pub struct Server {
     listener: UnixListener,
     shared_state: SharedMap,
-    storage: ConfigSource,
+    config_src: ConfigSource,
 }
 
 impl Server {
@@ -22,25 +22,27 @@ impl Server {
         Self {
             listener,
             shared_state,
-            storage: Default::default(),
+            config_src: Default::default(),
         }
     }
 
-    pub fn handle_watcher_event(&mut self, event: Event) -> anyhow::Result<()> {
+    pub async fn handle_watcher_event(&mut self, event: Event) -> anyhow::Result<()> {
         info!("received event: {event:?}");
         if event.kind.is_modify() {
             if event
                 .paths
                 .iter()
                 .map(|path| path.as_path())
-                .any(|p| p == self.storage.packet_filers_path())
+                .any(|p| p == self.config_src.packet_filers_path())
             {
+                self.shared_state.update_packet_filters().await?;
             } else if event
                 .paths
                 .iter()
                 .map(|path| path.as_path())
-                .any(|p| p == self.storage.profiles_path())
+                .any(|p| p == self.config_src.profiles_path())
             {
+                todo!()
             }
         }
 
@@ -83,10 +85,10 @@ impl Server {
         )?;
 
         watcher.watch(
-            self.storage.packet_filers_path(),
+            self.config_src.packet_filers_path(),
             RecursiveMode::NonRecursive,
         )?;
-        watcher.watch(self.storage.profiles_path(), RecursiveMode::NonRecursive)?;
+        watcher.watch(self.config_src.profiles_path(), RecursiveMode::NonRecursive)?;
 
         loop {
             tokio::select! {
@@ -105,7 +107,7 @@ impl Server {
                 next = watch_event_rx.recv() => {
                     match next.expect("Watcher not to drop") {
                         Ok(event) => {
-                            if let Err(err) = self.handle_watcher_event(event) {
+                            if let Err(err) = self.handle_watcher_event(event).await {
                                 error!("error while handling watcher event: {err:?}")
                             }
                         }
