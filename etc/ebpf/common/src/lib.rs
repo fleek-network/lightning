@@ -42,6 +42,23 @@ pub struct PacketFilterParams {
 #[cfg(feature = "userspace")]
 unsafe impl aya::Pod for PacketFilterParams {}
 
+#[derive(Copy, Clone, Eq, PartialEq, Hash)]
+#[repr(C)]
+pub struct SubnetFilterParams {
+    /// Source port.
+    pub port: u16,
+    /// Transport protocol.
+    ///
+    /// Uses values from Ipv4 header.
+    /// Use `u16::MAX` to indicate `any`.
+    pub proto: u16,
+    /// Extra parameters.
+    pub extra: PacketFilterParams,
+}
+
+#[cfg(feature = "userspace")]
+unsafe impl aya::Pod for SubnetFilterParams {}
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct File {

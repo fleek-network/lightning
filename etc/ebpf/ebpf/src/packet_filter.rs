@@ -2,9 +2,10 @@ use core::mem;
 
 use aya_bpf::bindings::xdp_action;
 use aya_bpf::macros::xdp;
+use aya_bpf::maps::lpm_trie::Key;
 use aya_bpf::programs::XdpContext;
 use aya_log_ebpf::info;
-use common::{PacketFilter, PacketFilterParams};
+use common::{PacketFilter, PacketFilterParams, SubnetFilterParams};
 use memoffset::offset_of;
 use network_types::eth::{EthHdr, EtherType};
 use network_types::ip::{IpProto, Ipv4Hdr};
@@ -19,7 +20,7 @@ type XdpAction = xdp_action::Type;
 pub fn xdp_packet_filter(ctx: XdpContext) -> u32 {
     match unsafe { filter(ctx) } {
         Ok(ret) => ret,
-        Err(_) => xdp_action::XDP_ABORTED,
+        Err(_) => xdp_action::XDP_PASS,
     }
 }
 
@@ -60,6 +61,10 @@ fn process_ipv4(ctx: &XdpContext) -> Result<XdpAction, ()> {
         proto: proto as u16,
     }) {
         return Ok(params.action);
+    }
+
+    if let Some(params) = try_match_subnet(ip, port, proto as u16) {
+        return Ok(params.extra.action);
     }
 
     Ok(xdp_action::XDP_PASS)
@@ -118,5 +123,23 @@ fn try_match_only_ip(ip: u32) -> Option<PacketFilterParams> {
                 proto: u16::MAX,
             })
             .copied()
+    }
+}
+
+fn try_match_subnet(ip: u32, port: u16, proto: u16) -> Option<SubnetFilterParams> {
+    let subnet_filter = maps::SUBNET_FILTER
+        .get(&Key {
+            prefix_len: 32,
+            data: ip,
+        })
+        .copied()?;
+
+    if (subnet_filter.port == port && subnet_filter.proto == proto)
+        || (subnet_filter.port == port && subnet_filter.proto == u16::MAX)
+        || (subnet_filter.proto == proto && subnet_filter.port == 0)
+    {
+        Some(subnet_filter)
+    } else {
+        None
     }
 }
