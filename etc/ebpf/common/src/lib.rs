@@ -65,8 +65,6 @@ unsafe impl aya::Pod for SubnetFilterParams {}
 pub struct FileRuleList {
     /// The files that are being protected.
     pub rules: [FileRule; MAX_FILE_RULES],
-    /// The device the files are located on.
-    pub dev: u32,
 }
 
 #[cfg(feature = "userspace")]

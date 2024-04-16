@@ -33,7 +33,7 @@ unsafe fn verify_permission(ctx: &LsmContext, file: &File) -> Result<i32, c_long
     );
 
     if let Some(rule_list) = maps::FILE_RULES.get(&binfile) {
-        if rule_list.dev == file.dev {
+        if binfile.dev == file.dev {
             if let Some(rule) = rule_list.rules.iter().find(|rule| rule.inode == file.inode) {
                 return Ok(rule.allow);
             }

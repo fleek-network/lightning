@@ -125,7 +125,6 @@ impl SharedMap {
             new.insert(
                 exec,
                 FileRuleList {
-                    dev: exec.dev,
                     rules,
                 },
             );
