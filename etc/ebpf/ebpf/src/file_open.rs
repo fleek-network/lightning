@@ -15,11 +15,10 @@ unsafe fn try_file_open(ctx: LsmContext) -> Result<i32, c_long> {
     let kfile: *const vmlinux::file = ctx.arg(0);
     let inode = aya_bpf::helpers::bpf_probe_read_kernel(&(*kfile).f_inode)?;
     let inode_n = aya_bpf::helpers::bpf_probe_read_kernel(&(*inode).i_ino)?;
-    // Todo: Get device for regular and special files.
+    // Todo: Get device ID.
     let file = File {
-        inode_n,
+        inode: inode_n,
         dev: 0,
-        rdev: 0,
     };
 
     verify_permission(&ctx, &file)
@@ -30,14 +29,18 @@ unsafe fn verify_permission(ctx: &LsmContext, file: &File) -> Result<i32, c_long
     let pid = aya_bpf::helpers::bpf_get_current_pid_tgid();
     info!(
         ctx,
-        "Process {} running bin {} attempting to open file", pid, binfile.inode_n
+        "Process {} running bin {} attempting to open file", pid, binfile.inode
     );
-    if let Some(f_inode) = maps::FILE_OPEN_ALLOW.get(&binfile) {
-        if f_inode != &file.inode_n {
-            return Ok(-1);
+
+    if let Some(rule_list) = maps::FILE_RULES.get(&binfile) {
+        if rule_list.dev == file.dev {
+            if let Some(rule) = rule_list.rules.iter().find(|rule| rule.inode == file.inode) {
+                return Ok(rule.allow);
+            }
         }
     }
 
+    // Todo: Send event about access that was not accounted for.
     Ok(0)
 }
 
@@ -49,10 +52,11 @@ unsafe fn get_current_process_binfile() -> Result<File, c_long> {
     let f_inode = aya_bpf::helpers::bpf_probe_read_kernel(&(*file).f_inode)?;
     // Get the inode number.
     let inode_n = aya_bpf::helpers::bpf_probe_read_kernel(&(*f_inode).i_ino)?;
-    // Get the device ID for special files.
-    let rdev = aya_bpf::helpers::bpf_probe_read_kernel(&(*f_inode).i_rdev)?;
     // Get the device ID from the SuperBlock obj.
     let super_block = aya_bpf::helpers::bpf_probe_read_kernel(&(*f_inode).i_sb)?;
     let dev = aya_bpf::helpers::bpf_probe_read_kernel(&(*super_block).s_dev)?;
-    Ok(File { inode_n, dev, rdev })
+    Ok(File {
+        inode: inode_n,
+        dev,
+    })
 }
