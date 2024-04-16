@@ -156,7 +156,7 @@ impl FireWall {
             shortlived: false,
             // Todo: get these from input.
             proto: PacketFilterRule::TCP,
-            trigger_event: true,
+            audit: true,
             action: PacketFilterRule::DROP,
         };
 
@@ -413,7 +413,7 @@ fn space_between_columns(items: &Vec<PacketFilterRule>) -> [u16; COLUMN_COUNT] {
         .unwrap_or(0);
     let trigger_event_len = items
         .iter()
-        .map(|r| r.trigger_event.to_string().as_str().width())
+        .map(|r| r.audit.to_string().as_str().width())
         .max()
         .unwrap_or(0);
     let action_len = items
@@ -438,7 +438,7 @@ fn flatten_filter(filter: &PacketFilterRule) -> [String; COLUMN_COUNT] {
         filter.prefix.to_string(),
         filter.port.to_string(),
         filter.proto_str(),
-        filter.trigger_event.to_string(),
+        filter.audit.to_string(),
         filter.action_str(),
     ]
 }

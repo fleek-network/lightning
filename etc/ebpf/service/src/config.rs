@@ -5,7 +5,7 @@ use resolved_pathbuf::ResolvedPathBuf;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 
-use crate::map::{FileOpenRule, PacketFilterRule};
+use crate::map::{PacketFilterRule, Profile};
 
 const ROOT_CONFIG_DIR: &str = "~/.lightning/ebpf/config";
 const PACKET_FILTER_PATH: &str = "filters.json";
@@ -69,20 +69,20 @@ impl ConfigSource {
     }
 
     /// Read packet-filters from storage.
-    pub async fn read_profiles(&self) -> anyhow::Result<Vec<FileOpenRule>> {
+    pub async fn read_profiles(&self) -> anyhow::Result<Vec<Profile>> {
         let content = fs::read_to_string(&self.paths.profiles_path).await?;
         serde_json::from_str(&content).map_err(Into::into)
     }
 
     /// Writes packet-filters to storage.
-    pub async fn write_profiles(&self, filters: Vec<FileOpenRule>) -> anyhow::Result<()> {
+    pub async fn write_profiles(&self, profiles: Vec<Profile>) -> anyhow::Result<()> {
         let mut tmp_path = PathBuf::new();
         tmp_path.push(self.paths.root_path.as_path());
         tmp_path.push("tmp");
         tmp_path.push(self.paths.profiles_path.as_path());
 
         let mut tmp = fs::File::create(tmp_path.as_path()).await?;
-        let bytes = serde_json::to_string(&filters)?;
+        let bytes = serde_json::to_string(&profiles)?;
         tmp.write_all(bytes.as_bytes()).await?;
         tmp.sync_all().await?;
 

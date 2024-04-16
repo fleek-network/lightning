@@ -53,7 +53,15 @@ async fn main() -> Result<(), anyhow::Error> {
     if let Some(address) = opt.block {
         let ip: u32 = (*address.ip()).into();
         let port = address.port() as u32;
-        packet_filters.insert(PacketFilter { ip, port }, 0, 0)?;
+        packet_filters.insert(
+            PacketFilter {
+                ip,
+                port: port as u16,
+                proto: u16::MAX,
+            },
+            0,
+            0,
+        )?;
     }
 
     log::info!("Enter Ctrl-C to shutdown");

@@ -1,9 +1,16 @@
 use std::net::Ipv4Addr;
 
 #[cfg(feature = "server")]
-use common::{File, PacketFilter, PacketFilterParams};
+use common::{PacketFilter, PacketFilterParams};
+use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
 
+/// Lightning Packet Filter rule.
+///
+/// The filter rule specifies the action to perform
+/// on incoming IP network packets when they match
+/// the IP address, port, subnet and protocol specified
+/// in this filter.
 #[derive(Clone, Copy, Deserialize, Serialize)]
 pub struct PacketFilterRule {
     /// Subnet prefix.
@@ -11,20 +18,25 @@ pub struct PacketFilterRule {
     /// Source IP address.
     pub ip: Ipv4Addr,
     /// Source port.
+    ///
+    /// Wildcard value is `0`.
     pub port: u16,
     /// Transport protocol.
     ///
     /// Uses values from Ipv4 header.
+    /// Wildcard value is [`u16::MAX`].
     pub proto: u16,
-    /// Flag set to true when we should trigger
-    /// an event from kernel space.
-    pub trigger_event: bool,
+    /// Audit mode.
+    ///
+    /// If set to true, logs on match.
+    /// Defaults to false.
+    pub audit: bool,
     /// Flag set to true if this is a short-lived filter.
     ///
     /// Short-lived filters do not get saved in storage.
     #[serde(skip)]
     pub shortlived: bool,
-    /// Action to take e.g. DROP or PASS.
+    /// Action to perform e.g. DROP or PASS.
     pub action: u32,
 }
 
@@ -54,31 +66,6 @@ impl PacketFilterRule {
     }
 }
 
-#[derive(Deserialize, Serialize)]
-pub struct FileOpenRule {
-    pub permission: PermissionPolicy,
-    pub inode: u64,
-    pub dev: u32,
-    pub rdev: u32,
-}
-
-#[derive(Deserialize, Serialize)]
-pub enum PermissionPolicy {
-    Allow,
-    Deny,
-}
-
-#[cfg(feature = "server")]
-impl From<FileOpenRule> for File {
-    fn from(value: FileOpenRule) -> Self {
-        Self {
-            inode_n: value.inode,
-            dev: value.dev,
-            rdev: value.rdev,
-        }
-    }
-}
-
 #[cfg(feature = "server")]
 impl From<PacketFilterRule> for PacketFilter {
     fn from(value: PacketFilterRule) -> Self {
@@ -94,9 +81,52 @@ impl From<PacketFilterRule> for PacketFilter {
 impl From<PacketFilterRule> for PacketFilterParams {
     fn from(value: PacketFilterRule) -> Self {
         PacketFilterParams {
-            trigger_event: value.trigger_event as u16,
+            trigger_event: value.audit as u16,
             shortlived: value.shortlived as u16,
             action: value.action,
         }
     }
+}
+
+/// Lightning Security Profile.
+///
+/// A profile specifies a list of files that a program
+/// can access and the operations the program may perform.
+#[derive(Deserialize, Serialize)]
+pub struct Profile {
+    /// Path to the executable file.
+    ///
+    /// If `None`, the profile will apply to all processes.
+    pub name: Option<ResolvedPathBuf>,
+    /// File rules.
+    ///
+    /// These control how files are accessed by the
+    /// executable (or process if a name was not provided).
+    /// Please see [`FileRule`].
+    pub file_rules: Vec<FileRule>,
+    /// Audit mode.
+    ///
+    /// If set to true, logs every access decision.
+    /// Normally, only access decisions made without
+    /// a cooresponding rule will be logged.
+    pub audit: bool,
+}
+
+/// Rule that defines how a file is accessed.
+#[derive(Deserialize, Serialize)]
+pub struct FileRule {
+    /// Path of the file.
+    pub file: ResolvedPathBuf,
+    /// Operations.
+    pub operations: u8,
+    /// If set to true, allows the operation(s).
+    /// Otherwise, it denies the operation(s).
+    pub allow: bool,
+}
+
+impl FileRule {
+    pub const OPEN_MASK: u8 = 0x01 << 0;
+    pub const READ_MASK: u8 = 0x01 << 1;
+    pub const WRITE_MASK: u8 = 0x01 << 2;
+    pub const EXEC_MASK: u8 = 0x01 << 3;
 }

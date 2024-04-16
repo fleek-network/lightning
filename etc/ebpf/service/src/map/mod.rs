@@ -3,6 +3,6 @@ mod schema;
 #[cfg(feature = "server")]
 mod shared;
 
-pub use schema::{FileOpenRule, PacketFilterRule, PermissionPolicy};
+pub use schema::{FileRule, PacketFilterRule, Profile};
 #[cfg(feature = "server")]
 pub use shared::SharedMap;

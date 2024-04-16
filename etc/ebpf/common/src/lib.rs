@@ -1,8 +1,9 @@
 #![no_std]
 
 pub const MAX_DEVICES: usize = 2;
+pub const MAX_FILE_RULES: usize = 10;
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash)]
 #[repr(C)]
 pub struct PacketFilter {
     /// Source IPv4 address.
@@ -19,7 +20,7 @@ pub struct PacketFilter {
 #[cfg(feature = "userspace")]
 unsafe impl aya::Pod for PacketFilter {}
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash)]
 #[repr(C)]
 pub struct PacketFilterParams {
     /// Flag set to true=1 when we should trigger
@@ -42,7 +43,7 @@ pub struct PacketFilterParams {
 #[cfg(feature = "userspace")]
 unsafe impl aya::Pod for PacketFilterParams {}
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash)]
 #[repr(C)]
 pub struct SubnetFilterParams {
     /// Source port.
@@ -59,10 +60,11 @@ pub struct SubnetFilterParams {
 #[cfg(feature = "userspace")]
 unsafe impl aya::Pod for SubnetFilterParams {}
 
+#[derive(Clone, Copy)]
 #[repr(C)]
 pub struct FileRuleList {
     /// The files that are being protected.
-    pub rules: [FileRule; 10],
+    pub rules: [FileRule; MAX_FILE_RULES],
     /// The device the files are located on.
     pub dev: u32,
 }
@@ -70,7 +72,7 @@ pub struct FileRuleList {
 #[cfg(feature = "userspace")]
 unsafe impl aya::Pod for FileRuleList {}
 
-#[derive(Copy, Clone)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash)]
 #[repr(C)]
 pub struct File {
     /// Inode ID of the file.
@@ -82,6 +84,7 @@ pub struct File {
 #[cfg(feature = "userspace")]
 unsafe impl aya::Pod for File {}
 
+#[derive(Clone, Copy)]
 pub struct FileRule {
     /// The file in question.
     pub inode: u64,
@@ -89,4 +92,16 @@ pub struct FileRule {
     /// in question is not allowed for these files,
     /// otherwise set to true=0.
     pub allow: i32,
+}
+
+#[cfg(feature = "userspace")]
+unsafe impl aya::Pod for FileRule {}
+
+impl Default for FileRule {
+    fn default() -> Self {
+        Self {
+            inode: 0,
+            allow: -1,
+        }
+    }
 }

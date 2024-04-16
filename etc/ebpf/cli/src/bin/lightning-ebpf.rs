@@ -4,9 +4,9 @@ use aya::programs::{Xdp, XdpFlags};
 use aya::{include_bytes_aligned, Bpf};
 use aya_log::BpfLogger;
 use clap::Parser;
-use common::{File, PacketFilter};
+use common::{File, FileRuleList, PacketFilter, PacketFilterParams};
+use ebpf_service::map::SharedMap;
 use ebpf_service::server::Server;
-use ebpf_service::state::SharedStateMap;
 use tokio::net::UnixListener;
 use tokio::signal;
 
@@ -45,15 +45,13 @@ async fn main() -> anyhow::Result<()> {
         .attach(&opt.iface, XdpFlags::default())
         .context("failed to attach the XDP program")?;
 
-    let packet_filters: HashMap<_, PacketFilter, u32> =
+    let packet_filters: HashMap<_, PacketFilter, PacketFilterParams> =
         HashMap::try_from(handle.take_map("PACKET_FILTERS").unwrap())?;
-    let file_open_allow: HashMap<_, File, u64> =
+    let file_open_allow: HashMap<_, File, FileRuleList> =
         HashMap::try_from(handle.take_map("FILE_OPEN_ALLOW").unwrap())?;
-    let file_open_deny: HashMap<_, File, u64> =
-        HashMap::try_from(handle.take_map("FILE_OPEN_DENY").unwrap())?;
 
     let listener = UnixListener::bind(".lightning/ebpf")?;
-    let shared_state = SharedStateMap::new(packet_filters, file_open_allow, file_open_deny);
+    let shared_state = SharedMap::new(packet_filters, file_open_allow);
     let server = Server::new(listener, shared_state);
 
     log::info!("Enter Ctrl-C to shutdown");

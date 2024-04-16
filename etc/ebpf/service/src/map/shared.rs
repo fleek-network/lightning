@@ -1,32 +1,32 @@
 use std::net::SocketAddrV4;
+use std::os::unix::fs::MetadataExt;
 use std::sync::Arc;
 
+use anyhow::{anyhow, bail};
 use aya::maps::{HashMap, MapData};
-use common::{File, PacketFilter, PacketFilterParams};
+use common::{File, FileRuleList, PacketFilter, PacketFilterParams, MAX_FILE_RULES};
+use resolved_pathbuf::ResolvedPathBuf;
+use tokio::fs;
 use tokio::sync::Mutex;
 
 use crate::config::ConfigSource;
-use crate::map::{FileOpenRule, PacketFilterRule, PermissionPolicy};
+use crate::map::{FileRule, PacketFilterRule};
 
 #[derive(Clone)]
 pub struct SharedMap {
     packet_filters: Arc<Mutex<HashMap<MapData, PacketFilter, PacketFilterParams>>>,
-    file_open_rules: Arc<Mutex<FileOpenMaps>>,
+    file_open_rules: Arc<Mutex<HashMap<MapData, File, FileRuleList>>>,
     storage: ConfigSource,
 }
 
 impl SharedMap {
     pub fn new(
         packet_filters: HashMap<MapData, PacketFilter, PacketFilterParams>,
-        file_open_allow_rules: HashMap<MapData, File, u64>,
-        file_open_deny_rules: HashMap<MapData, File, u64>,
+        file_open_rules: HashMap<MapData, File, FileRuleList>,
     ) -> Self {
         Self {
             packet_filters: Arc::new(Mutex::new(packet_filters)),
-            file_open_rules: Arc::new(Mutex::new(FileOpenMaps {
-                file_open_allow_rules,
-                file_open_deny_rules,
-            })),
+            file_open_rules: Arc::new(Mutex::new(file_open_rules)),
             storage: Default::default(),
         }
     }
@@ -97,18 +97,38 @@ impl SharedMap {
     /// Updates file-open rules.
     ///
     /// Reads from disk so it's a heavy operation.
-    pub async fn update_file_open_rules(&self) -> anyhow::Result<()> {
-        let rules: Vec<FileOpenRule> = self.storage.read_profiles().await?;
+    pub async fn update_file_rules(&self) -> anyhow::Result<()> {
+        let profiles = self.storage.read_profiles().await?;
 
-        let mut allow = Vec::new();
-        let mut deny = Vec::new();
-
-        for rule in rules {
-            if let PermissionPolicy::Allow = &rule.permission {
-                allow.push(rule);
-            } else {
-                deny.push(rule);
+        let mut new = std::collections::HashMap::new();
+        for profile in profiles {
+            let exec = file_from_path(profile.name.as_ref().unwrap()).await?;
+            let mut file_open_rules = vec![common::FileRule::default(); MAX_FILE_RULES];
+            for (i, rule) in profile.file_rules.iter().enumerate() {
+                // Todo: check for other types of accesses.
+                if rule.operations == FileRule::OPEN_MASK {
+                    let file = file_from_path(&rule.file).await?;
+                    if exec.dev != file.dev {
+                        // Protecting files in more than one device is not supported yet.
+                        bail!("executable file device and file device do not match");
+                    }
+                    if i >= MAX_FILE_RULES {
+                        bail!("path maximum {MAX_FILE_RULES} execeeded");
+                    }
+                    file_open_rules[i].inode = file.inode;
+                    file_open_rules[i].allow = if rule.allow { 0 } else { -1 };
+                }
             }
+
+            let rules: [common::FileRule; MAX_FILE_RULES] =
+                file_open_rules.try_into().map_err(|_| anyhow!("eerror"))?;
+            new.insert(
+                exec,
+                FileRuleList {
+                    dev: exec.dev,
+                    rules,
+                },
+            );
         }
 
         let mut maps = self.file_open_rules.lock().await;
@@ -116,44 +136,29 @@ impl SharedMap {
         // Due to a constraint of the aya api, there is no clean method for the maps
         // so we remove all of them. Todo: Let's open an issue with aya.
         let mut remove = Vec::new();
-        for rule in maps.file_open_deny_rules.keys() {
-            remove.push(rule);
+        for file in maps.keys() {
+            remove.push(file);
         }
         for rule in remove {
             let r = rule?;
-            maps.file_open_deny_rules.remove(&File {
-                inode_n: r.inode_n,
-                dev: r.dev,
-                rdev: r.rdev,
-            })?;
+            maps.remove(&r)?;
         }
 
-        let mut remove = Vec::new();
-        for rule in maps.file_open_allow_rules.keys() {
-            remove.push(rule);
-        }
-        for rule in remove {
-            let r = rule?;
-            maps.file_open_allow_rules.remove(&File {
-                inode_n: r.inode_n,
-                dev: r.dev,
-                rdev: r.rdev,
-            })?;
-        }
-
-        for rule in deny {
-            maps.file_open_deny_rules.insert(File::from(rule), 0, 0)?;
-        }
-
-        for rule in allow {
-            maps.file_open_allow_rules.insert(File::from(rule), 0, 0)?;
+        for (exec, rules) in new {
+            maps.insert(exec, rules, 0)?;
         }
 
         Ok(())
     }
 }
 
-pub struct FileOpenMaps {
-    file_open_allow_rules: HashMap<MapData, File, u64>,
-    file_open_deny_rules: HashMap<MapData, File, u64>,
+async fn file_from_path(path: &ResolvedPathBuf) -> anyhow::Result<File> {
+    let file = fs::File::open(path.as_path()).await?;
+    let metadata = file.metadata().await?;
+    let inode = metadata.ino();
+    let dev = metadata.dev();
+    Ok(File {
+        inode,
+        dev: dev.try_into()?,
+    })
 }
