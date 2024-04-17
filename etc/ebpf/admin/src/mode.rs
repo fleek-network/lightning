@@ -9,7 +9,7 @@ pub enum Mode {
     Home,
     Firewall,
     FirewallNewEntry,
-    Access,
+    Profiles,
 }
 
 impl FromStr for Mode {
@@ -19,7 +19,7 @@ impl FromStr for Mode {
         let mode = match value {
             "Firewall" => Mode::Firewall,
             "Home" => Mode::Home,
-            "Access" => Mode::Access,
+            "Profiles" => Mode::Profiles,
             _ => return Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid mode")),
         };
 

@@ -10,6 +10,7 @@ use crate::action::Action;
 use crate::components::firewall::FireWall;
 use crate::components::home::Home;
 use crate::components::navigator::Navigator;
+use crate::components::profile::ProfileTable;
 use crate::components::prompt::Prompt;
 use crate::components::summary::Summary;
 use crate::components::Component;
@@ -32,16 +33,18 @@ pub struct App {
     pub prompt: Prompt,
     pub navigator: Navigator,
     pub firewall: FireWall,
+    pub profiles: ProfileTable,
 }
 
 impl App {
     pub fn new(tick_rate: f64, frame_rate: f64, src: ConfigSource) -> Result<Self> {
         let mode = Mode::Home;
         let home = Home::new();
-        let firewall = FireWall::new(src);
+        let firewall = FireWall::new(src.clone());
         let summary = Summary::new();
         let prompt = Prompt::new();
         let navigator = Navigator::new();
+        let profiles = ProfileTable::new(src);
         let config = Config::new()?;
         Ok(Self {
             tick_rate,
@@ -51,6 +54,7 @@ impl App {
             prompt,
             navigator,
             firewall,
+            profiles,
             should_quit: false,
             should_suspend: false,
             config,
@@ -64,7 +68,7 @@ impl App {
             Mode::Home => self.home.update(action.clone())?,
             Mode::Firewall => self.firewall.update(action.clone())?,
             Mode::FirewallNewEntry => self.firewall.update(action.clone())?,
-            _ => None,
+            Mode::Profiles => self.profiles.update(action.clone())?,
         };
 
         if maybe_action.is_none() {
@@ -79,10 +83,7 @@ impl App {
             Mode::Home => self.home.handle_events(Some(event)),
             Mode::Firewall => self.firewall.handle_events(Some(event)),
             Mode::FirewallNewEntry => self.firewall.handle_events(Some(event)),
-            _ => {
-                // We ignore navigation here.
-                Ok(None)
-            },
+            Mode::Profiles => self.profiles.handle_events(Some(event)),
         }
     }
 
@@ -124,6 +125,9 @@ impl App {
             Mode::Firewall | Mode::FirewallNewEntry => {
                 self.firewall.draw(f, content[0])?;
             },
+            Mode::Profiles => {
+                self.profiles.draw(f, content[0])?;
+            },
             _ => {},
         }
 
@@ -152,15 +156,19 @@ impl App {
         // On start up, state has not been set yet so we do that now.
         self.prompt.update_state(self.mode);
 
+        self.navigator.register_action_handler(action_tx.clone())?;
+        self.navigator
+            .register_config_handler(self.config.clone())?;
+        self.navigator.init(tui.size()?)?;
+
         self.firewall.register_action_handler(action_tx.clone())?;
         self.firewall.register_config_handler(self.config.clone())?;
         self.firewall.init(tui.size()?)?;
         self.firewall.read_state_from_storage().await?;
 
-        self.navigator.register_action_handler(action_tx.clone())?;
-        self.navigator
-            .register_config_handler(self.config.clone())?;
-        self.navigator.init(tui.size()?)?;
+        self.profiles.register_action_handler(action_tx.clone())?;
+        self.profiles.register_config_handler(self.config.clone())?;
+        self.profiles.init(tui.size()?)?;
 
         loop {
             if let Some(e) = tui.next().await {

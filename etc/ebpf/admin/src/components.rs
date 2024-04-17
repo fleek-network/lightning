@@ -10,6 +10,7 @@ use crate::tui::{Event, Frame};
 pub mod firewall;
 pub mod home;
 pub mod navigator;
+pub mod profile;
 pub mod prompt;
 pub mod summary;
 

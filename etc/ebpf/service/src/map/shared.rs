@@ -122,12 +122,7 @@ impl SharedMap {
 
             let rules: [common::FileRule; MAX_FILE_RULES] =
                 file_open_rules.try_into().map_err(|_| anyhow!("eerror"))?;
-            new.insert(
-                exec,
-                FileRuleList {
-                    rules,
-                },
-            );
+            new.insert(exec, FileRuleList { rules });
         }
 
         let mut maps = self.file_open_rules.lock().await;
