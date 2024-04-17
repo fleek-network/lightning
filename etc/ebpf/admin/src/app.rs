@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
 use crate::action::Action;
+use crate::components::firewall::form::FirewallForm;
 use crate::components::firewall::FireWall;
 use crate::components::home::Home;
 use crate::components::navigator::Navigator;
@@ -33,6 +34,7 @@ pub struct App {
     pub prompt: Prompt,
     pub navigator: Navigator,
     pub firewall: FireWall,
+    pub firewall_form: FirewallForm,
     pub profiles: ProfileTable,
 }
 
@@ -41,6 +43,7 @@ impl App {
         let mode = Mode::Home;
         let home = Home::new();
         let firewall = FireWall::new(src.clone());
+        let firewall_form = FirewallForm::new();
         let summary = Summary::new();
         let prompt = Prompt::new();
         let navigator = Navigator::new();
@@ -54,6 +57,7 @@ impl App {
             prompt,
             navigator,
             firewall,
+            firewall_form,
             profiles,
             should_quit: false,
             should_suspend: false,
@@ -67,7 +71,8 @@ impl App {
         let maybe_action = match self.mode {
             Mode::Home => self.home.update(action.clone())?,
             Mode::Firewall => self.firewall.update(action.clone())?,
-            Mode::FirewallNewEntry => self.firewall.update(action.clone())?,
+            Mode::FirewallEdit => self.firewall.update(action.clone())?,
+            Mode::FirewallForm => self.firewall.form().update(action.clone())?,
             Mode::Profiles => self.profiles.update(action.clone())?,
         };
 
@@ -82,7 +87,8 @@ impl App {
         match self.mode {
             Mode::Home => self.home.handle_events(Some(event)),
             Mode::Firewall => self.firewall.handle_events(Some(event)),
-            Mode::FirewallNewEntry => self.firewall.handle_events(Some(event)),
+            Mode::FirewallEdit => self.firewall.handle_events(Some(event)),
+            Mode::FirewallForm => self.firewall.form().handle_events(Some(event)),
             Mode::Profiles => self.profiles.handle_events(Some(event)),
         }
     }
@@ -122,8 +128,11 @@ impl App {
             .split(navigation_area[0]);
 
         match self.mode {
-            Mode::Firewall | Mode::FirewallNewEntry => {
+            Mode::Firewall | Mode::FirewallEdit => {
                 self.firewall.draw(f, content[0])?;
+            },
+            Mode::FirewallForm => {
+                self.firewall.form().draw(f, content[0])?;
             },
             Mode::Profiles => {
                 self.profiles.draw(f, content[0])?;
@@ -165,6 +174,12 @@ impl App {
         self.firewall.register_config_handler(self.config.clone())?;
         self.firewall.init(tui.size()?)?;
         self.firewall.read_state_from_storage().await?;
+
+        self.firewall_form
+            .register_action_handler(action_tx.clone())?;
+        self.firewall_form
+            .register_config_handler(self.config.clone())?;
+        self.firewall_form.init(tui.size()?)?;
 
         self.profiles.register_action_handler(action_tx.clone())?;
         self.profiles.register_config_handler(self.config.clone())?;

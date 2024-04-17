@@ -10,20 +10,28 @@
     },
     "Firewall": {
       "<q>": "Quit", // Quit the application.
-      "<a>": "Add", // Add an entry in the block list.
-      "<r>": "Remove", // Remove an entry in the block list.
+      "<i>": "Edit", // Remove an entry in the block list.
       "<up>": "Up", // Move up to the next component.
       "<down>": "Down", // Move down to the next component.
       "<shift-left>": "NavLeft", // Move left to the next component.
       "<shift-right>": "NavRight", // Move right to the next component.
-      "<Ctrl-d>": "Quit", // Another way to quit.
       "<Ctrl-c>": "Quit", // Yet another way to quit.
       "<Ctrl-z>": "Suspend", // Suspend the application.
     },
-    "FirewallNewEntry": {
+    "FirewallEdit": {
       "<q>": "Quit", // Quit the application.
       "<esc>": "Cancel", // Scape mode.
       "<Ctrl-s>": "Save", // Add an entry in the block list.
+      "<Ctrl-a>": "Add", // Open form to enter a new rule.
+      "<Ctrl-r>": "Remove", // Remove an entry in the block list.
+      "<up>": "Up", // Move up to the next component.
+      "<down>": "Down", // Move down to the next component.
+      "<Ctrl-z>": "Suspend", // Suspend the application.
+    },
+    "FirewallForm": {
+      "<q>": "Quit", // Quit the application.
+      "<esc>": "Cancel", // Scape mode.
+      "<Ctrl-a>": "Add", // Add rule to the list.
       "<up>": "Up", // Move up to the next component.
       "<down>": "Down", // Move down to the next component.
       "<Ctrl-d>": "Quit", // Another way to quit.

@@ -1,3 +1,5 @@
+pub mod form;
+
 use std::collections::{HashMap, HashSet};
 use std::net::{Ipv4Addr, SocketAddrV4};
 use std::time::Duration;
@@ -19,6 +21,7 @@ use unicode_width::UnicodeWidthStr;
 
 use super::{Component, Frame};
 use crate::action::Action;
+use crate::components::firewall::form::FirewallForm;
 use crate::config::{Config, KeyBindings};
 use crate::mode::Mode;
 
@@ -32,15 +35,13 @@ const INPUT_FIELD_COUNT: usize = 2;
 #[derive(Default)]
 pub struct FireWall {
     command_tx: Option<UnboundedSender<Action>>,
-    filters: Vec<PacketFilterRule>,
+    filters: Vec<(bool, PacketFilterRule)>,
+    removing: Vec<PacketFilterRule>,
     src: ConfigSource,
     // Table widget for displaying records.
     longest_item_per_column: [u16; COLUMN_COUNT],
     table_state: TableState,
-    // Input widgets for adding a new record.
-    show_input_field: bool,
-    input_fields: Vec<InputField>,
-    selected_input_field: usize,
+    form: FirewallForm,
     config: Config,
 }
 
@@ -60,14 +61,13 @@ impl FireWall {
 
         Self {
             filters: Vec::new(),
+            removing: Vec::new(),
             src,
             command_tx: None,
             longest_item_per_column: [0; COLUMN_COUNT],
             table_state: TableState::default().with_selected(0),
+            form: FirewallForm::new(),
             config: Config::default(),
-            show_input_field: false,
-            input_fields,
-            selected_input_field: 0,
         }
     }
 
@@ -79,7 +79,7 @@ impl FireWall {
             .await
             .map_err(|e| Report::msg(e.to_string()))
         {
-            self.filters = filters.into_iter().map(Into::into).collect();
+            self.filters = filters.into_iter().map(|f| (false, f)).collect();
         }
 
         Ok(())
@@ -104,14 +104,11 @@ impl FireWall {
         }
     }
 
-    fn selected_field(&mut self) -> &mut InputField {
-        &mut self.input_fields[self.selected_input_field]
-    }
-
     fn remove_filter(&mut self) {
+        let mut elem = None;
         if let Some(cur) = self.table_state.selected() {
             debug_assert!(cur < self.filters.len());
-            self.filters.remove(cur);
+            elem = Some(self.filters.remove(cur));
 
             if self.filters.is_empty() {
                 self.table_state.select(None);
@@ -121,48 +118,9 @@ impl FireWall {
                 self.table_state.select(Some(1));
             }
         }
-    }
-
-    fn clear_input(&mut self) {
-        for field in self.input_fields.iter_mut() {
-            field.area.select_all();
-            field.area.cut();
-            field.area.yank_text();
+        if let Some((_, rule)) = elem {
+            self.removing.push(rule);
         }
-    }
-
-    fn update_filters_from_input(&mut self) -> Result<()> {
-        for field in self.input_fields.iter_mut() {
-            field.area.select_all();
-            field.area.cut();
-        }
-
-        let ip: Ipv4Addr = self.input_fields[0]
-            .area
-            .yank_text()
-            .trim()
-            .parse()
-            .map_err(|_| Report::msg("Invalid IP"))?;
-        let port: u16 = self.input_fields[1]
-            .area
-            .yank_text()
-            .trim()
-            .parse()
-            .map_err(|_| Report::msg("Invalid port"))?;
-        let filter = PacketFilterRule {
-            prefix: PacketFilterRule::DEFAULT_PREFIX,
-            ip,
-            port,
-            shortlived: false,
-            // Todo: get these from input.
-            proto: PacketFilterRule::TCP,
-            audit: true,
-            action: PacketFilterRule::DROP,
-        };
-
-        self.filters.push(filter);
-        self.update_storage();
-        Ok(())
     }
 
     fn update_storage(&self) {
@@ -171,12 +129,37 @@ impl FireWall {
             .clone()
             .expect("Component always has a sender");
         let storage = self.src.clone();
-        let new = self.filters.clone().into_iter().collect::<Vec<_>>();
+        let new = self
+            .filters
+            .clone()
+            .into_iter()
+            .map(|(uncommitted, filter)| {
+                debug_assert!(!uncommitted);
+                filter
+            })
+            .collect::<Vec<_>>();
         tokio::spawn(async move {
             if let Err(e) = storage.write_packet_filters(new).await {
                 let _ = command_tx.send(Action::Error(e.to_string()));
             }
         });
+    }
+
+    pub fn restore_state(&mut self) {
+        self.filters.retain(|(new, _)| !new);
+        self.filters
+            .extend(self.removing.iter().map(|r| (false, *r)));
+    }
+
+    fn commit_changes(&mut self) {
+        self.filters.iter_mut().for_each(|(new, r)| {
+            *new = false;
+        });
+        self.removing.clear();
+    }
+
+    pub fn form(&mut self) -> &mut FirewallForm {
+        &mut self.form
     }
 }
 
@@ -191,153 +174,94 @@ impl Component for FireWall {
         Ok(())
     }
 
-    fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<Action>> {
-        if self.show_input_field {
-            self.selected_field().area.input(Input::from(key));
-        }
-        Ok(None)
-    }
-
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         match action {
+            Action::Edit => Ok(Some(Action::UpdateMode(Mode::FirewallEdit))),
+            Action::Add => Ok(Some(Action::UpdateMode(Mode::FirewallForm))),
             Action::Save => {
-                if let Err(e) = self.update_filters_from_input() {
-                    return Ok(Some(Action::Error(e.to_string())));
-                } else {
-                    self.show_input_field = false;
-                }
+                self.commit_changes();
+                self.update_storage();
                 Ok(Some(Action::UpdateMode(Mode::Firewall)))
             },
             Action::Cancel => {
-                self.show_input_field = false;
-                self.clear_input();
+                self.restore_state();
                 Ok(Some(Action::UpdateMode(Mode::Firewall)))
-            },
-            Action::Add => {
-                self.show_input_field = true;
-                Ok(Some(Action::UpdateMode(Mode::FirewallNewEntry)))
             },
             Action::Remove => {
                 self.remove_filter();
-                self.update_storage();
                 Ok(Some(Action::Render))
             },
             Action::Up => {
-                if self.show_input_field {
-                    if self.selected_input_field > 0 {
-                        self.selected_input_field -= 1;
-                    }
-                } else {
-                    // Scroll up blocklist.
-                    self.scroll_up();
-                }
+                self.scroll_up();
                 Ok(Some(Action::Render))
             },
             Action::Down => {
-                if self.show_input_field {
-                    if self.selected_input_field < self.input_fields.len() - 1 {
-                        self.selected_input_field += 1;
-                    }
-                } else {
-                    // Scroll down blocklist.
-                    self.scroll_down();
-                }
+                self.scroll_down();
                 Ok(Some(Action::Render))
+            },
+            Action::UpdateMode(Mode::FirewallEdit) => {
+                // It's possible that the form sent this so we try to yank a new input value.
+                if let Some(rule) = self.form.yank_input() {
+                    self.filters.push((true, rule));
+                }
+                Ok(None)
             },
             _ => Ok(None),
         }
     }
 
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
-        if !self.show_input_field {
-            // Display list of filter rules.
-            self.longest_item_per_column = space_between_columns(&self.filters);
-            debug_assert!(self.longest_item_per_column.len() == COLUMN_COUNT);
+        self.longest_item_per_column = space_between_columns(&self.filters);
+        debug_assert!(self.longest_item_per_column.len() == COLUMN_COUNT);
 
-            let column_names = [
-                "IP",
-                "Subnet",
-                "Port",
-                "Protocol",
-                "Trigger Event",
-                "Action",
-            ];
-            debug_assert!(column_names.len() == COLUMN_COUNT);
+        let column_names = [
+            "IP",
+            "Subnet",
+            "Port",
+            "Protocol",
+            "Trigger Event",
+            "Action",
+        ];
+        debug_assert!(column_names.len() == COLUMN_COUNT);
 
-            let header_style = Style::default().fg(Color::White).bg(Color::Blue);
-            let selected_style = Style::default()
-                .add_modifier(Modifier::REVERSED)
-                .fg(Color::DarkGray);
-            let header = column_names
-                .into_iter()
-                .map(Cell::from)
+        let header_style = Style::default().fg(Color::White).bg(Color::Blue);
+        let selected_style = Style::default()
+            .add_modifier(Modifier::REVERSED)
+            .fg(Color::DarkGray);
+        let header = column_names
+            .into_iter()
+            .map(Cell::from)
+            .collect::<Row>()
+            .style(header_style);
+
+        let rows = self.filters.iter().enumerate().map(|(i, (_, data))| {
+            let item = flatten_filter(data);
+            item.into_iter()
+                .map(|content| {
+                    let text = Text::from(content);
+                    Cell::from(text)
+                })
                 .collect::<Row>()
-                .style(header_style);
+                .style(Style::new().fg(Color::White).bg(Color::Black))
+        });
 
-            let rows = self.filters.iter().enumerate().map(|(i, data)| {
-                let item = flatten_filter(data);
-                item.into_iter()
-                    .map(|content| {
-                        let text = Text::from(content);
-                        Cell::from(text)
-                    })
-                    .collect::<Row>()
-                    .style(Style::new().fg(Color::White).bg(Color::Black))
-            });
+        let contraints = [
+            Constraint::Min(self.longest_item_per_column[0] + 1),
+            Constraint::Min(self.longest_item_per_column[1] + 1),
+            Constraint::Min(self.longest_item_per_column[2] + 1),
+            Constraint::Min(self.longest_item_per_column[3] + 1),
+            Constraint::Min(self.longest_item_per_column[4] + 1),
+            Constraint::Min(self.longest_item_per_column[5]),
+        ];
+        debug_assert!(contraints.len() == COLUMN_COUNT);
 
-            let contraints = [
-                Constraint::Min(self.longest_item_per_column[0] + 1),
-                Constraint::Min(self.longest_item_per_column[1] + 1),
-                Constraint::Min(self.longest_item_per_column[2] + 1),
-                Constraint::Min(self.longest_item_per_column[3] + 1),
-                Constraint::Min(self.longest_item_per_column[4] + 1),
-                Constraint::Min(self.longest_item_per_column[5]),
-            ];
-            debug_assert!(contraints.len() == COLUMN_COUNT);
+        let bar = " > ";
+        let table = Table::new(rows, contraints)
+            .header(header)
+            .highlight_style(selected_style)
+            .highlight_symbol(Text::from(bar));
 
-            let bar = " > ";
-            let table = Table::new(rows, contraints)
-                .header(header)
-                .highlight_style(selected_style)
-                .highlight_symbol(Text::from(bar));
-
-            f.render_stateful_widget(table, area, &mut self.table_state);
-        } else {
-            // Display form to enter new rule.
-            debug_assert!(self.input_fields.len() == INPUT_FIELD_COUNT);
-
-            f.render_widget(Clear, area);
-            let area = center_form(INPUT_FORM_X, INPUT_FORM_Y, area);
-
-            let chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints(
-                    [
-                        Constraint::Percentage(0),
-                        Constraint::Max(3),
-                        Constraint::Max(3),
-                        Constraint::Percentage(0),
-                    ]
-                    .as_ref(),
-                )
-                .split(area);
-
-            for (i, (textarea, chunk)) in self
-                .input_fields
-                .iter_mut()
-                // We don't want the first or last because they're for padding.
-                .zip(chunks.iter().take(3).skip(1))
-                .enumerate()
-            {
-                if i == self.selected_input_field {
-                    activate(textarea);
-                } else {
-                    inactivate(textarea)
-                }
-                let widget = textarea.area.widget();
-                f.render_widget(widget, *chunk);
-            }
-        }
+        f.render_stateful_widget(table, area, &mut self.table_state);
 
         Ok(())
     }
@@ -390,35 +314,35 @@ fn center_form(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
     .split(popup_layout[1])[1]
 }
 
-fn space_between_columns(items: &Vec<PacketFilterRule>) -> [u16; COLUMN_COUNT] {
+fn space_between_columns(items: &Vec<(bool, PacketFilterRule)>) -> [u16; COLUMN_COUNT] {
     let prefix = items
         .iter()
-        .map(|r| r.prefix.to_string().as_str().width())
+        .map(|(_, r)| r.prefix.to_string().as_str().width())
         .max()
         .unwrap_or(0);
     let ip_len = items
         .iter()
-        .map(|r| r.ip.to_string().as_str().width())
+        .map(|(_, r)| r.ip.to_string().as_str().width())
         .max()
         .unwrap_or(0);
     let port_len = items
         .iter()
-        .map(|r| r.port.to_string().as_str().width())
+        .map(|(_, r)| r.port.to_string().as_str().width())
         .max()
         .unwrap_or(0);
     let proto_len = items
         .iter()
-        .map(|r| r.proto_str().as_str().width())
+        .map(|(_, r)| r.proto_str().as_str().width())
         .max()
         .unwrap_or(0);
     let trigger_event_len = items
         .iter()
-        .map(|r| r.audit.to_string().as_str().width())
+        .map(|(_, r)| r.audit.to_string().as_str().width())
         .max()
         .unwrap_or(0);
     let action_len = items
         .iter()
-        .map(|r| r.action_str().as_str().width())
+        .map(|(_, r)| r.action_str().as_str().width())
         .max()
         .unwrap_or(0);
 

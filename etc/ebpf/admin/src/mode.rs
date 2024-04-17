@@ -3,12 +3,13 @@ use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Default, Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Mode {
     #[default]
     Home,
     Firewall,
-    FirewallNewEntry,
+    FirewallEdit,
+    FirewallForm,
     Profiles,
 }
 
