@@ -177,7 +177,7 @@ const globalContext = {
   ReadableStreamDefaultController: propNonEnumerable(
     streams.ReadableStreamDefaultController,
   ),
-  TransportStream: propNonEnumerable(streams.TransformStream),
+  TransformStream: propNonEnumerable(streams.TransformStream),
   TransformStreamDefaultController: propNonEnumerable(
     streams.TransformStreamDefaultController,
   ),
