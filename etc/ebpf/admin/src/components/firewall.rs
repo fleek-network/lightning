@@ -36,7 +36,7 @@ const INPUT_FIELD_COUNT: usize = 2;
 pub struct FireWall {
     command_tx: Option<UnboundedSender<Action>>,
     filters: Vec<(bool, PacketFilterRule)>,
-    removing: Vec<PacketFilterRule>,
+    removing: Vec<(bool, PacketFilterRule)>,
     src: ConfigSource,
     // Table widget for displaying records.
     longest_item_per_column: [u16; COLUMN_COUNT],
@@ -114,12 +114,12 @@ impl FireWall {
                 self.table_state.select(None);
             } else if cur == self.filters.len() {
                 self.table_state.select(Some(cur - 1));
-            } else if cur == 0 {
-                self.table_state.select(Some(1));
+            } else {
+                self.table_state.select(Some(cur));
             }
         }
-        if let Some((_, rule)) = elem {
-            self.removing.push(rule);
+        if let Some((new, rule)) = elem {
+            self.removing.push((new, rule));
         }
     }
 
@@ -133,8 +133,8 @@ impl FireWall {
             .filters
             .clone()
             .into_iter()
-            .map(|(uncommitted, filter)| {
-                debug_assert!(!uncommitted);
+            .map(|(new, filter)| {
+                debug_assert!(!new);
                 filter
             })
             .collect::<Vec<_>>();
@@ -147,8 +147,12 @@ impl FireWall {
 
     pub fn restore_state(&mut self) {
         self.filters.retain(|(new, _)| !new);
-        self.filters
-            .extend(self.removing.iter().map(|r| (false, *r)));
+        self.removing.retain(|(new, _)| !new);
+        self.filters.extend(self.removing.iter());
+        self.removing.clear();
+        if !self.filters.is_empty() {
+            self.table_state.select(Some(0));
+        }
     }
 
     fn commit_changes(&mut self) {
@@ -156,6 +160,13 @@ impl FireWall {
             *new = false;
         });
         self.removing.clear();
+    }
+    fn new_rule(&mut self, rule: PacketFilterRule) {
+        self.filters.push((true, rule));
+        if self.table_state.selected().is_none() {
+            debug_assert!(self.filters.len() == 1);
+            self.table_state.select(Some(0));
+        }
     }
 
     pub fn form(&mut self) -> &mut FirewallForm {
@@ -202,7 +213,7 @@ impl Component for FireWall {
             Action::UpdateMode(Mode::FirewallEdit) => {
                 // It's possible that the form sent this so we try to yank a new input value.
                 if let Some(rule) = self.form.yank_input() {
-                    self.filters.push((true, rule));
+                    self.new_rule(rule);
                 }
                 Ok(None)
             },
