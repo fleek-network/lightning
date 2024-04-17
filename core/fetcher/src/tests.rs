@@ -270,6 +270,7 @@ async fn get_fetchers(
                 protocol: Protocol::Http,
                 authority: format!("127.0.0.1:{}", gateway_port_offset + i as u16),
             }],
+            gateway_timeout: Duration::from_millis(5000),
         };
 
         let ipfs_origin = OriginDemuxer::<TestBinding>::init(

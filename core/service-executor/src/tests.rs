@@ -194,6 +194,7 @@ async fn init_service_executor(
                 protocol: Protocol::Http,
                 authority: format!("127.0.0.1:{}", gateway_port),
             }],
+            gateway_timeout: Duration::from_millis(5000),
         },
         ..Default::default()
     };

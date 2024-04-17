@@ -1,8 +1,11 @@
+use std::time::Duration;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct Config {
     pub gateways: Vec<Gateway>,
+    pub gateway_timeout: Duration,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -34,6 +37,7 @@ impl Default for Config {
                     authority: "ipfs.runfission.com".to_string(),
                 },
             ],
+            gateway_timeout: Duration::from_millis(5000),
         }
     }
 }

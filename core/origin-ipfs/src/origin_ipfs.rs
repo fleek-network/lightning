@@ -23,12 +23,11 @@ use crate::config::Gateway;
 use crate::error::Error;
 use crate::{decoder, Config};
 
-const GATEWAY_TIMEOUT: Duration = Duration::from_millis(5000);
-
 pub struct IPFSOrigin<C: Collection> {
     client: Arc<Client<HttpsConnector<HttpConnector>, Body>>,
     gateways: Arc<Vec<Gateway>>,
     blockstore: C::BlockStoreInterface,
+    gateway_timeout: Duration,
 }
 
 impl<C: Collection> Clone for IPFSOrigin<C> {
@@ -37,6 +36,7 @@ impl<C: Collection> Clone for IPFSOrigin<C> {
             client: self.client.clone(),
             gateways: self.gateways.clone(),
             blockstore: self.blockstore.clone(),
+            gateway_timeout: self.gateway_timeout,
         }
     }
 }
@@ -63,6 +63,7 @@ impl<C: Collection> IPFSOrigin<C> {
             client: Arc::new(client),
             gateways: Arc::new(config.gateways),
             blockstore,
+            gateway_timeout: config.gateway_timeout,
         })
     }
 
@@ -195,7 +196,7 @@ impl<C: Collection> IPFSOrigin<C> {
         request: Request<Body>,
         gateway: &Gateway,
     ) -> Result<Blake3Hash, Error> {
-        match timeout(GATEWAY_TIMEOUT, self.client.request(request)).await {
+        match timeout(self.gateway_timeout, self.client.request(request)).await {
             Ok(Ok(res)) => {
                 match res.status().as_u16() {
                     200..=299 => {
@@ -247,7 +248,7 @@ impl<C: Collection> IPFSOrigin<C> {
             .body(Body::default())
             .map_err(|e| Error::Redirect(format!("Failed to build request: {e}")))?;
 
-        match timeout(GATEWAY_TIMEOUT, self.client.request(new_req)).await {
+        match timeout(self.gateway_timeout, self.client.request(new_req)).await {
             Ok(Ok(new_res)) => {
                 let status = new_res.status();
                 if status.is_success() {
