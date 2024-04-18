@@ -353,7 +353,7 @@ pub async fn query_genesis_committee<T: DeserializeOwned>(
         .collect();
 
     if results.is_empty() {
-        Err(anyhow!("Unable to get a responce from nodes"))
+        Err(anyhow!("Unable to get a response from nodes"))
     } else {
         Ok(results)
     }
