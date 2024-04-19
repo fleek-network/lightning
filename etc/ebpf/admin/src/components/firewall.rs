@@ -150,6 +150,8 @@ impl FireWall {
         self.removing.retain(|(new, _)| !new);
         self.filters.extend(self.removing.iter());
         self.removing.clear();
+
+        // Refresh the table state.
         if !self.filters.is_empty() {
             self.table_state.select(Some(0));
         }
@@ -163,6 +165,8 @@ impl FireWall {
     }
     fn new_rule(&mut self, rule: PacketFilterRule) {
         self.filters.push((true, rule));
+
+        // In case, the list was emptied.
         if self.table_state.selected().is_none() {
             debug_assert!(self.filters.len() == 1);
             self.table_state.select(Some(0));

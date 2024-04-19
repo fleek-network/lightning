@@ -125,8 +125,37 @@ pub struct FileRule {
 }
 
 impl FileRule {
+    pub const NO_OPERATION: u8 = 0x00;
     pub const OPEN_MASK: u8 = 0x01 << 0;
     pub const READ_MASK: u8 = 0x01 << 1;
     pub const WRITE_MASK: u8 = 0x01 << 2;
     pub const EXEC_MASK: u8 = 0x01 << 3;
+
+    pub fn allowed_permissions(&self) -> String {
+        let mut result = String::new();
+
+        if self.allow {
+            if self.operations & Self::OPEN_MASK == Self::OPEN_MASK {
+                result.push_str("o");
+            }
+
+            if self.operations & Self::READ_MASK == Self::READ_MASK {
+                result.push_str("r");
+            }
+
+            if self.operations & Self::WRITE_MASK == Self::WRITE_MASK {
+                result.push_str("w");
+            }
+
+            if self.operations & Self::EXEC_MASK == Self::EXEC_MASK {
+                result.push_str("x");
+            }
+        }
+
+        if result.is_empty() {
+            result.push_str("-");
+        }
+
+        result
+    }
 }

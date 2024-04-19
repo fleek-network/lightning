@@ -74,6 +74,7 @@ impl App {
             Mode::FirewallEdit => self.firewall.update(action.clone())?,
             Mode::FirewallForm => self.firewall.form().update(action.clone())?,
             Mode::Profiles => self.profiles.update(action.clone())?,
+            Mode::ProfileView => self.profiles.view().update(action.clone())?,
         };
 
         if maybe_action.is_none() {
@@ -90,6 +91,7 @@ impl App {
             Mode::FirewallEdit => self.firewall.handle_events(Some(event)),
             Mode::FirewallForm => self.firewall.form().handle_events(Some(event)),
             Mode::Profiles => self.profiles.handle_events(Some(event)),
+            Mode::ProfileView => self.profiles.view().handle_events(Some(event)),
         }
     }
 
@@ -136,6 +138,9 @@ impl App {
             },
             Mode::Profiles => {
                 self.profiles.draw(f, content[0])?;
+            },
+            Mode::ProfileView => {
+                self.profiles.view().draw(f, content[0])?;
             },
             _ => {},
         }

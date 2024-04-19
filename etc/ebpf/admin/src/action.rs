@@ -28,4 +28,5 @@ pub enum Action {
     Save,
     Cancel,
     Edit,
+    Select,
 }

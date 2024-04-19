@@ -40,6 +40,15 @@
     },
     "Profiles": {
       "<q>": "Quit", // Quit the application.
+      "<Enter>": "Select", // Select profile to view.
+      "<up>": "Up", // Move up to the next component.
+      "<down>": "Down", // Move down to the next component.
+      "<shift-left>": "NavLeft", // Move left to the next component.
+      "<shift-right>": "NavRight", // Move right to the next component.
+      "<Ctrl-z>": "Suspend", // Suspend the application.
+    },
+    "ProfileView": {
+      "<q>": "Quit", // Quit the application.
       "<up>": "Up", // Move up to the next component.
       "<down>": "Down", // Move down to the next component.
       "<shift-left>": "NavLeft", // Move left to the next component.

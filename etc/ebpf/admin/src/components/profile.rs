@@ -1,3 +1,5 @@
+mod view;
+
 use std::collections::{HashMap, HashSet};
 use std::net::{Ipv4Addr, SocketAddrV4};
 use std::time::Duration;
@@ -19,6 +21,7 @@ use unicode_width::UnicodeWidthStr;
 
 use super::{Component, Frame};
 use crate::action::Action;
+use crate::components::profile::view::ProfileView;
 use crate::config::{Config, KeyBindings};
 use crate::mode::Mode;
 
@@ -29,9 +32,9 @@ pub struct ProfileTable {
     command_tx: Option<UnboundedSender<Action>>,
     profiles: Vec<Profile>,
     src: ConfigSource,
-    // Table widget for displaying records.
     longest_item_per_column: [u16; COLUMN_COUNT],
-    table_state: ListState,
+    list_state: ListState,
+    profile_view: ProfileView,
     config: Config,
 }
 
@@ -39,12 +42,12 @@ impl ProfileTable {
     pub fn new(src: ConfigSource) -> Self {
         let profiles = vec![
             Profile {
-                name: Some("~/.lightning/keystore/consensus.pem".try_into().unwrap()),
+                name: Some("~/path/to/bin1".try_into().unwrap()),
                 file_rules: Vec::new(),
                 audit: false,
             },
             Profile {
-                name: Some("~/.lightning/keystore/node.pem".try_into().unwrap()),
+                name: Some("~/path/to/bin2".try_into().unwrap()),
                 file_rules: Vec::new(),
                 audit: false,
             },
@@ -54,7 +57,8 @@ impl ProfileTable {
             src,
             command_tx: None,
             longest_item_per_column: [0; COLUMN_COUNT],
-            table_state: ListState::default().with_selected(Some(0)),
+            list_state: ListState::default().with_selected(Some(0)),
+            profile_view: ProfileView::new(),
             config: Config::default(),
         }
     }
@@ -74,35 +78,35 @@ impl ProfileTable {
     }
 
     fn scroll_up(&mut self) {
-        if let Some(cur) = self.table_state.selected() {
+        if let Some(cur) = self.list_state.selected() {
             if cur > 0 {
                 let cur = cur - 1;
-                self.table_state.select(Some(cur));
+                self.list_state.select(Some(cur));
             }
         }
     }
 
     fn scroll_down(&mut self) {
-        if let Some(cur) = self.table_state.selected() {
+        if let Some(cur) = self.list_state.selected() {
             let len = self.profiles.len();
             if len > 0 && cur < len - 1 {
                 let cur = cur + 1;
-                self.table_state.select(Some(cur));
+                self.list_state.select(Some(cur));
             }
         }
     }
 
     fn remove_profile(&mut self) {
-        if let Some(cur) = self.table_state.selected() {
+        if let Some(cur) = self.list_state.selected() {
             debug_assert!(cur < self.profiles.len());
             self.profiles.remove(cur);
 
             if self.profiles.is_empty() {
-                self.table_state.select(None);
+                self.list_state.select(None);
             } else if cur == self.profiles.len() {
-                self.table_state.select(Some(cur - 1));
+                self.list_state.select(Some(cur - 1));
             } else if cur == 0 {
-                self.table_state.select(Some(1));
+                self.list_state.select(Some(1));
             }
         }
     }
@@ -120,17 +124,21 @@ impl ProfileTable {
             }
         });
     }
+
+    pub fn view(&mut self) -> &mut ProfileView {
+        &mut self.profile_view
+    }
 }
 
 impl Component for ProfileTable {
     fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
-        self.command_tx = Some(tx);
-        Ok(())
+        self.command_tx = Some(tx.clone());
+        self.profile_view.register_action_handler(tx)
     }
 
     fn register_config_handler(&mut self, config: Config) -> Result<()> {
-        self.config = config;
-        Ok(())
+        self.config = config.clone();
+        self.profile_view.register_config_handler(config)
     }
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
@@ -147,6 +155,7 @@ impl Component for ProfileTable {
                 self.scroll_down();
                 Ok(Some(Action::Render))
             },
+            Action::Select => Ok(Some(Action::UpdateMode(Mode::ProfileView))),
             _ => Ok(None),
         }
     }
@@ -164,7 +173,7 @@ impl Component for ProfileTable {
             .highlight_style(Style::default().add_modifier(Modifier::BOLD))
             .highlight_symbol("> ");
 
-        f.render_stateful_widget(profiles, chunks[0], &mut self.table_state);
+        f.render_stateful_widget(profiles, chunks[0], &mut self.list_state);
 
         Ok(())
     }
