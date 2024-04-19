@@ -48,8 +48,6 @@ url = { version = "2.5.0", features = ["serde"] }
 [dev-dependencies]
 criterion = { version = "0.5.0", features = ["html_reports", "async_tokio"] }
 affair.workspace = true
-lightning-node = { path = "../node" } # for TomlConfigProvider
-lightning-cli = { path = "../cli" }
 lightning-signer = { path = "../signer" }
 lightning-rpc = { path = "../rpc" }
 lightning-service-executor = { path = "../service-executor" }

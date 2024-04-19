@@ -291,14 +291,15 @@ async fn test_origin_bbb_dag_pb_and_raw() {
             protocol: Protocol::Http,
             authority: "127.0.0.1:30202".to_string(),
         }];
-        let ipfs_origin = IPFSOrigin::<TestBinding>::new(config, state.blockstore.clone()).unwrap();
+        let ipfs_origin =
+            IPFSOrigin::<TestBinding>::new(config, state.blockstore().clone()).unwrap();
 
         let hash = ipfs_origin
             .fetch(req_cid.to_bytes().as_slice())
             .await
             .unwrap();
 
-        let bytes = state.blockstore.read_all_to_vec(&hash).await.unwrap();
+        let bytes = state.blockstore().read_all_to_vec(&hash).await.unwrap();
         assert_eq!(bytes, target_bytes);
     };
 
