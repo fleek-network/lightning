@@ -15,12 +15,23 @@ use crate::config::{Config, KeyBindings};
 
 pub struct Home {
     command_tx: Option<UnboundedSender<Action>>,
+    title: String,
     logo: String,
     config: Config,
 }
 
 impl Home {
     pub fn new() -> Self {
+        let logo = indoc! {"
+                  ▄
+               ▄█▀
+           ▄▄██▀
+        ▄██████████▀
+             ▄██▀
+           ▄█▀
+          ▀
+       "};
+
         let d = indoc! {"
             ▄▄▄
             █  █
@@ -48,7 +59,7 @@ impl Home {
             █
         "};
 
-        let mut logo = a
+        let mut title = a
             .lines()
             .zip(d.lines())
             .zip(m.lines())
@@ -57,12 +68,18 @@ impl Home {
             .map(|((((a, d), m), n), i)| format!("{a:5}{d:5}{m:8}{i:2}{n:4}"))
             .collect::<Vec<_>>()
             .join("\n");
+        title.push_str("\n\nUnder Construction");
 
-        logo.push_str("\n\nUnder Construction");
+        let logo = logo
+            .lines()
+            .map(|a| format!("{a:12}"))
+            .collect::<Vec<_>>()
+            .join("\n");
 
         Self {
             command_tx: None,
             logo,
+            title,
             config: Config::default(),
         }
     }
@@ -94,7 +111,14 @@ impl Component for Home {
         ])
         .split(vchunks[1]);
 
-        f.render_widget(Paragraph::new(self.logo.as_str()).centered(), hchunks[1]);
+        let logo =
+            Layout::horizontal([Constraint::Length(12), Constraint::Fill(1)]).split(hchunks[1]);
+
+        f.render_widget(Paragraph::new(self.logo.as_str()).right_aligned(), logo[0]);
+
+        let title = Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]).split(logo[1]);
+        f.render_widget(Paragraph::new(self.title.as_str()).centered(), title[1]);
+
         Ok(())
     }
 }
