@@ -70,12 +70,7 @@ impl Component for Prompt {
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
         let rows = Layout::default()
             .direction(Direction::Vertical)
-            .constraints(&[
-                Constraint::Percentage(20),
-                Constraint::Percentage(35),
-                Constraint::Percentage(35),
-                Constraint::Percentage(10),
-            ])
+            .constraints(&[Constraint::Length(1), Constraint::Length(1)])
             .split(area);
 
         if let Some(e) = self.message.as_ref() {
@@ -87,21 +82,12 @@ impl Component for Prompt {
             );
         }
 
-        let contraints = if self.current.len() < MAX_KEYS_PER_ROW {
-            vec![Constraint::Fill(1); MAX_KEYS_PER_ROW]
-        } else {
-            vec![Constraint::Fill(1); MAX_KEYS_IN_PROMPT]
-        };
+        let contraints = vec![Constraint::Percentage(100); MAX_KEYS_PER_ROW];
 
         let first_row = Layout::default()
             .direction(Direction::Horizontal)
             .constraints(contraints[..MAX_KEYS_PER_ROW].as_ref())
             .split(rows[1]);
-
-        let second_row = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints(contraints[..MAX_KEYS_PER_ROW].as_ref())
-            .split(rows[2]);
 
         for i in 0..contraints.len() {
             let paragraph = if let Some((symbol, action)) = self.current.get(i) {
@@ -111,11 +97,7 @@ impl Component for Prompt {
                 Paragraph::default()
             };
 
-            let chunk = if i / MAX_KEYS_PER_ROW == 0 {
-                first_row[i]
-            } else {
-                second_row[i % MAX_KEYS_PER_ROW]
-            };
+            let chunk = first_row[i];
 
             f.render_widget(
                 paragraph
@@ -152,7 +134,7 @@ impl From<KeyEvent> for KeySymbol {
             KeyCode::F(num) => Self(format!("F-{num}")),
             KeyCode::Char(c) => Self(c.to_string()),
             KeyCode::Null => Self('␀'.to_string()),
-            KeyCode::Esc => Self("[ESC]".to_string()),
+            KeyCode::Esc => Self("ESC".to_string()),
             KeyCode::CapsLock => Self('⇪'.to_string()),
             KeyCode::ScrollLock => Self('⇳'.to_string()),
             KeyCode::NumLock => Self('⇭'.to_string()),

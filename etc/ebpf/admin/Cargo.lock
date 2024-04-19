@@ -32,6 +32,7 @@ dependencies = [
  "futures",
  "human-panic",
  "indexmap",
+ "indoc",
  "json5",
  "lazy_static",
  "libc",

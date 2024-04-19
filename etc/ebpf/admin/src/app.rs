@@ -98,10 +98,7 @@ impl App {
     fn draw_components(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
         let body_footer_area = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Percentage((100_u16).saturating_sub(10)),
-                Constraint::Percentage(10),
-            ])
+            .constraints([Constraint::Fill(1), Constraint::Length(3)])
             .split(f.size());
 
         self.prompt.draw(f, body_footer_area[1])?;
@@ -130,6 +127,9 @@ impl App {
             .split(navigation_area[0]);
 
         match self.mode {
+            Mode::Home => {
+                self.home.draw(f, content[0])?;
+            },
             Mode::Firewall | Mode::FirewallEdit => {
                 self.firewall.draw(f, content[0])?;
             },
@@ -142,7 +142,6 @@ impl App {
             Mode::ProfileView => {
                 self.profiles.view().draw(f, content[0])?;
             },
-            _ => {},
         }
 
         Ok(())
