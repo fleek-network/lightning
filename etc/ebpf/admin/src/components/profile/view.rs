@@ -9,8 +9,8 @@ use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ebpf_service::map::FileRule;
 use ebpf_service::ConfigSource;
 use log::error;
-use ratatui::prelude::*;
-use ratatui::widgets::*;
+use ratatui::prelude::{Color, Constraint, Modifier, Rect, Style, Text};
+use ratatui::widgets::{Cell, Row};
 use serde::{Deserialize, Serialize};
 use tokio::runtime::Handle;
 use tokio::sync::mpsc::UnboundedSender;
@@ -21,120 +21,67 @@ use super::{Component, Frame};
 use crate::action::Action;
 use crate::config::{Config, KeyBindings};
 use crate::mode::Mode;
+use crate::widgets::table::Table;
 
 const COLUMN_COUNT: usize = 2;
 
-#[derive(Default)]
 pub struct ProfileView {
     command_tx: Option<UnboundedSender<Action>>,
-    filters: Vec<(bool, FileRule)>,
-    removing: Vec<(bool, FileRule)>,
     longest_item_per_column: [u16; COLUMN_COUNT],
-    table_state: TableState,
+    table: Table<FileRule>,
     config: Config,
+}
+
+impl Default for ProfileView {
+    fn default() -> Self {
+        Self {
+            command_tx: None,
+            longest_item_per_column: [0; COLUMN_COUNT],
+            table: Table::new(),
+            config: Config::default(),
+        }
+    }
 }
 
 impl ProfileView {
     pub fn new() -> Self {
-        let filters = vec![
-            (
-                false,
-                FileRule {
-                    file: "~/.lightning/keystore/consensus.pem".try_into().unwrap(),
-                    operations: FileRule::READ_MASK | FileRule::WRITE_MASK,
-                },
-            ),
-            (
-                false,
-                FileRule {
-                    file: "~/.lightning/keystore/node.pem".try_into().unwrap(),
-                    operations: FileRule::READ_MASK,
-                },
-            ),
-            (
-                false,
-                FileRule {
-                    file: "~/.lightning/keystore/node.pem".try_into().unwrap(),
-                    operations: FileRule::NO_OPERATION,
-                },
-            ),
+        let mock_filters = vec![
+            FileRule {
+                file: "~/.lightning/keystore/consensus.pem".try_into().unwrap(),
+                operations: FileRule::READ_MASK | FileRule::WRITE_MASK,
+            },
+            FileRule {
+                file: "~/.lightning/keystore/node.pem".try_into().unwrap(),
+                operations: FileRule::READ_MASK,
+            },
+            FileRule {
+                file: "~/.lightning/keystore/node.pem".try_into().unwrap(),
+                operations: FileRule::NO_OPERATION,
+            },
         ];
         Self {
-            filters,
-            removing: Vec::new(),
             command_tx: None,
             longest_item_per_column: [0; COLUMN_COUNT],
-            table_state: TableState::default().with_selected(0),
+            table: Table::with_records(mock_filters),
             config: Config::default(),
         }
     }
 
-    fn scroll_up(&mut self) {
-        if let Some(cur) = self.table_state.selected() {
-            if cur > 0 {
-                let cur = cur - 1;
-                self.table_state.select(Some(cur));
-            }
-        }
-    }
+    fn space_between_columns(&self) -> [u16; COLUMN_COUNT] {
+        let name = self
+            .table
+            .records()
+            .map(|r| r.file.display().to_string().as_str().width())
+            .max()
+            .unwrap_or(0);
+        let permissions = self
+            .table
+            .records()
+            .map(|r| r.permissions().as_str().width())
+            .max()
+            .unwrap_or(0);
 
-    fn scroll_down(&mut self) {
-        if let Some(cur) = self.table_state.selected() {
-            let len = self.filters.len();
-            if len > 0 && cur < len - 1 {
-                let cur = cur + 1;
-                self.table_state.select(Some(cur));
-            }
-        }
-    }
-
-    fn remove_rule(&mut self) {
-        let mut elem = None;
-        if let Some(cur) = self.table_state.selected() {
-            debug_assert!(cur < self.filters.len());
-            elem = Some(self.filters.remove(cur));
-
-            if self.filters.is_empty() {
-                self.table_state.select(None);
-            } else if cur == self.filters.len() {
-                self.table_state.select(Some(cur - 1));
-            } else {
-                self.table_state.select(Some(cur));
-            }
-        }
-        if let Some((new, rule)) = elem {
-            self.removing.push((new, rule));
-        }
-    }
-
-    pub fn restore_state(&mut self) {
-        self.filters.retain(|(new, _)| !new);
-        self.removing.retain(|(new, _)| !new);
-        // Todo: avoid copying here.
-        self.filters.extend(self.removing.clone().into_iter());
-        self.removing.clear();
-
-        // Refresh the table state.
-        if !self.filters.is_empty() {
-            self.table_state.select(Some(0));
-        }
-    }
-
-    fn commit_changes(&mut self) {
-        self.filters.iter_mut().for_each(|(new, r)| {
-            *new = false;
-        });
-        self.removing.clear();
-    }
-
-    fn new_rule(&mut self, rule: FileRule) {
-        self.filters.push((true, rule));
-
-        // In case, the list was emptied.
-        if self.table_state.selected().is_none() {
-            debug_assert!(self.filters.len() == 1);
-            self.table_state.select(Some(0));
-        }
+        [name as u16, permissions as u16]
     }
 }
 
@@ -154,24 +101,24 @@ impl Component for ProfileView {
             Action::Edit => Ok(None),
             Action::Add => Ok(None),
             Action::Save => {
-                self.commit_changes();
+                self.table.commit_changes();
                 // self.update_storage();
                 Ok(Some(Action::UpdateMode(Mode::Firewall)))
             },
             Action::Cancel => {
-                self.restore_state();
+                self.table.restore_state();
                 Ok(Some(Action::UpdateMode(Mode::Firewall)))
             },
             Action::Remove => {
-                self.remove_rule();
+                self.table.remove_cur();
                 Ok(Some(Action::Render))
             },
             Action::Up => {
-                self.scroll_up();
+                self.table.scroll_up();
                 Ok(Some(Action::Render))
             },
             Action::Down => {
-                self.scroll_down();
+                self.table.scroll_down();
                 Ok(Some(Action::Render))
             },
             _ => Ok(None),
@@ -179,7 +126,7 @@ impl Component for ProfileView {
     }
 
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
-        self.longest_item_per_column = space_between_columns(&self.filters);
+        self.longest_item_per_column = self.space_between_columns();
         debug_assert!(self.longest_item_per_column.len() == COLUMN_COUNT);
 
         let column_names = ["Target", "Permissions"];
@@ -195,7 +142,7 @@ impl Component for ProfileView {
             .collect::<Row>()
             .style(header_style);
 
-        let rows = self.filters.iter().enumerate().map(|(i, (_, data))| {
+        let rows = self.table.records().enumerate().map(|(i, data)| {
             let item = flatten_filter(data);
             item.into_iter()
                 .map(|content| {
@@ -213,30 +160,15 @@ impl Component for ProfileView {
         debug_assert!(contraints.len() == COLUMN_COUNT);
 
         let bar = " > ";
-        let table = Table::new(rows, contraints)
+        let table = ratatui::widgets::Table::new(rows, contraints)
             .header(header)
             .highlight_style(selected_style)
             .highlight_symbol(Text::from(bar));
 
-        f.render_stateful_widget(table, area, &mut self.table_state);
+        f.render_stateful_widget(table, area, self.table.state());
 
         Ok(())
     }
-}
-
-fn space_between_columns(items: &Vec<(bool, FileRule)>) -> [u16; COLUMN_COUNT] {
-    let name = items
-        .iter()
-        .map(|(_, r)| r.file.display().to_string().as_str().width())
-        .max()
-        .unwrap_or(0);
-    let permissions = items
-        .iter()
-        .map(|(_, r)| r.permissions().as_str().width())
-        .max()
-        .unwrap_or(0);
-
-    [name as u16, permissions as u16]
 }
 
 fn flatten_filter(filter: &FileRule) -> [String; COLUMN_COUNT] {
