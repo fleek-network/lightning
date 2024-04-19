@@ -41,6 +41,12 @@ where
         }
     }
 
+    pub fn get(&self) -> Option<&T> {
+        self.records
+            .get(self.list_state.selected()?)
+            .map(|(_, r)| r)
+    }
+
     pub fn update_state(&mut self, records: Vec<T>) {
         self.records = records.into_iter().map(|r| (false, r)).collect();
     }

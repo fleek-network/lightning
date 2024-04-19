@@ -81,6 +81,14 @@ impl ConfigSource {
         Ok(result)
     }
 
+    pub fn blocking_read_profile(&self, name: Option<impl AsRef<Path>>) -> anyhow::Result<Profile> {
+        let content = match name {
+            Some(name) => std::fs::read_to_string(name)?,
+            None => std::fs::read_to_string("global.json")?,
+        };
+        serde_json::from_str(&content).map_err(Into::into)
+    }
+
     /// Read profile.
     pub async fn read_profile(&self, name: Option<impl AsRef<Path>>) -> anyhow::Result<Profile> {
         let content = match name {

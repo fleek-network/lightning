@@ -73,7 +73,7 @@ impl Profile {
                 .name
                 .as_ref()
                 .map(|path| path.display().to_string())
-                .unwrap_or("global".to_string()),
+                .unwrap_or("global.json".to_string()),
         );
 
         if self.profiles_to_update.is_none() {
@@ -102,6 +102,17 @@ impl Profile {
         }
     }
 
+    fn prepare_view(&mut self) -> Result<()> {
+        if let Some(selected) = self.list.get() {
+            let profile = self
+                .src
+                .blocking_read_profile(Some(selected))
+                .map_err(|e| Report::msg(e.to_string()))?;
+            self.profile_view.update_state(profile);
+        }
+        Ok(())
+    }
+
     pub fn view(&mut self) -> &mut ProfileView {
         &mut self.profile_view
     }
@@ -120,6 +131,7 @@ impl Component for Profile {
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         match action {
+            Action::Edit => Ok(None),
             Action::Save => Ok(None),
             Action::Cancel => Ok(None),
             Action::Add => Ok(None),
@@ -132,7 +144,12 @@ impl Component for Profile {
                 self.list.scroll_down();
                 Ok(Some(Action::Render))
             },
-            Action::Select => Ok(Some(Action::UpdateMode(Mode::ProfileView))),
+            Action::Select => {
+                if let Err(e) = self.prepare_view() {
+                    return Ok(Some(Action::Error(e.to_string())))
+                }
+                Ok(Some(Action::UpdateMode(Mode::ProfileView)))
+            },
             _ => Ok(None),
         }
     }

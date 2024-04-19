@@ -6,7 +6,7 @@ use color_eyre::eyre::Result;
 use color_eyre::owo_colors::OwoColorize;
 use color_eyre::Report;
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
-use ebpf_service::map::FileRule;
+use ebpf_service::map::{FileRule, Profile};
 use ebpf_service::ConfigSource;
 use log::error;
 use ratatui::prelude::{Color, Constraint, Modifier, Rect, Style, Text};
@@ -65,6 +65,10 @@ impl ProfileView {
             table: Table::with_records(mock_filters),
             config: Config::default(),
         }
+    }
+
+    pub fn update_state(&mut self, profile: Profile) {
+        self.table.update_state(profile.file_rules)
     }
 
     fn space_between_columns(&self) -> [u16; COLUMN_COUNT] {
