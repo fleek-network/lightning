@@ -8,11 +8,11 @@ use color_eyre::eyre::Result;
 use color_eyre::owo_colors::OwoColorize;
 use color_eyre::Report;
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
-use ebpf_service::map::{PacketFilterRule, Profile};
+use ebpf_service::map::{self, PacketFilterRule};
 use ebpf_service::ConfigSource;
 use log::error;
-use ratatui::prelude::*;
-use ratatui::widgets::*;
+use ratatui::prelude::{Constraint, Layout, Modifier, Rect, Style};
+use ratatui::widgets::{Block, Borders};
 use serde::{Deserialize, Serialize};
 use tokio::runtime::Handle;
 use tokio::sync::mpsc::UnboundedSender;
@@ -24,105 +24,82 @@ use crate::action::Action;
 use crate::components::profile::view::ProfileView;
 use crate::config::{Config, KeyBindings};
 use crate::mode::Mode;
+use crate::widgets::list::List;
 
 const COLUMN_COUNT: usize = 6;
 
 #[derive(Default)]
-pub struct ProfileTable {
+pub struct Profile {
     command_tx: Option<UnboundedSender<Action>>,
-    profiles: Vec<Profile>,
+    profiles_to_update: Option<Vec<map::Profile>>,
     src: ConfigSource,
     longest_item_per_column: [u16; COLUMN_COUNT],
-    list_state: ListState,
+    list: List<String>,
     profile_view: ProfileView,
     config: Config,
 }
 
-impl ProfileTable {
+impl Profile {
     pub fn new(src: ConfigSource) -> Self {
-        let profiles = vec![
-            Profile {
-                name: Some("~/path/to/bin1".try_into().unwrap()),
-                file_rules: Vec::new(),
-                audit: false,
-            },
-            Profile {
-                name: Some("~/path/to/bin2".try_into().unwrap()),
-                file_rules: Vec::new(),
-                audit: false,
-            },
-        ];
+        let mock_profiles = vec!["~/path/to/bin1".to_string(), "~/path/to/bin1".to_string()];
+
         Self {
-            profiles,
             src,
+            profiles_to_update: None,
             command_tx: None,
             longest_item_per_column: [0; COLUMN_COUNT],
-            list_state: ListState::default().with_selected(Some(0)),
+            list: List::with_records(mock_profiles, "Profiles"),
             profile_view: ProfileView::new(),
             config: Config::default(),
         }
     }
 
-    pub async fn read_state_from_storage(&mut self) -> Result<()> {
-        // If it's an error, there is no file and thus there is nothing to do.
+    pub async fn get_profile_list_from_storage(&mut self) -> Result<()> {
+        // If it's an error, there are no files and thus there is nothing to do.
         if let Ok(profiles) = self
             .src
-            .read_profiles()
+            .get_profiles()
             .await
             .map_err(|e| Report::msg(e.to_string()))
         {
-            self.profiles = profiles;
+            self.list.update_state(profiles);
         }
-
         Ok(())
     }
 
-    fn scroll_up(&mut self) {
-        if let Some(cur) = self.list_state.selected() {
-            if cur > 0 {
-                let cur = cur - 1;
-                self.list_state.select(Some(cur));
-            }
+    fn add_profile(&mut self, profile: map::Profile) {
+        self.list.add_record(
+            profile
+                .name
+                .as_ref()
+                .map(|path| path.display().to_string())
+                .unwrap_or("global".to_string()),
+        );
+
+        if self.profiles_to_update.is_none() {
+            self.profiles_to_update = Some(Vec::new());
         }
+
+        let profiles_to_update = self
+            .profiles_to_update
+            .as_mut()
+            .expect("Already initialized");
+        profiles_to_update.push(profile);
     }
 
-    fn scroll_down(&mut self) {
-        if let Some(cur) = self.list_state.selected() {
-            let len = self.profiles.len();
-            if len > 0 && cur < len - 1 {
-                let cur = cur + 1;
-                self.list_state.select(Some(cur));
-            }
+    fn update_storage(&mut self) {
+        if let Some(new) = self.profiles_to_update.take() {
+            let command_tx = self
+                .command_tx
+                .clone()
+                .expect("Component always has a sender");
+            let storage = self.src.clone();
+            tokio::spawn(async move {
+                if let Err(e) = storage.write_profiles(new).await {
+                    let _ = command_tx.send(Action::Error(e.to_string()));
+                }
+            });
         }
-    }
-
-    fn remove_profile(&mut self) {
-        if let Some(cur) = self.list_state.selected() {
-            debug_assert!(cur < self.profiles.len());
-            self.profiles.remove(cur);
-
-            if self.profiles.is_empty() {
-                self.list_state.select(None);
-            } else if cur == self.profiles.len() {
-                self.list_state.select(Some(cur - 1));
-            } else if cur == 0 {
-                self.list_state.select(Some(1));
-            }
-        }
-    }
-
-    fn update_storage(&self) {
-        let command_tx = self
-            .command_tx
-            .clone()
-            .expect("Component always has a sender");
-        let storage = self.src.clone();
-        let new = self.profiles.clone().into_iter().collect::<Vec<_>>();
-        tokio::spawn(async move {
-            if let Err(e) = storage.write_profiles(new).await {
-                let _ = command_tx.send(Action::Error(e.to_string()));
-            }
-        });
     }
 
     pub fn view(&mut self) -> &mut ProfileView {
@@ -130,7 +107,7 @@ impl ProfileTable {
     }
 }
 
-impl Component for ProfileTable {
+impl Component for Profile {
     fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
         self.command_tx = Some(tx.clone());
         self.profile_view.register_action_handler(tx)
@@ -148,11 +125,11 @@ impl Component for ProfileTable {
             Action::Add => Ok(None),
             Action::Remove => Ok(None),
             Action::Up => {
-                self.scroll_up();
+                self.list.scroll_up();
                 Ok(Some(Action::Render))
             },
             Action::Down => {
-                self.scroll_down();
+                self.list.scroll_down();
                 Ok(Some(Action::Render))
             },
             Action::Select => Ok(Some(Action::UpdateMode(Mode::ProfileView))),
@@ -161,20 +138,6 @@ impl Component for ProfileTable {
     }
 
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
-        // Display profiles.
-        let chunks = Layout::horizontal([Constraint::Percentage(100)]).split(area);
-        let profiles = self
-            .profiles
-            .iter()
-            .map(|p| p.name.as_ref().unwrap().display().to_string())
-            .collect::<Vec<_>>();
-        let profiles = List::new(profiles)
-            .block(Block::default().borders(Borders::ALL).title("Profiles"))
-            .highlight_style(Style::default().add_modifier(Modifier::BOLD))
-            .highlight_symbol("> ");
-
-        f.render_stateful_widget(profiles, chunks[0], &mut self.list_state);
-
-        Ok(())
+        self.list.render(f, area)
     }
 }

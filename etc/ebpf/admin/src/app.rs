@@ -11,7 +11,7 @@ use crate::components::firewall::form::FirewallForm;
 use crate::components::firewall::FireWall;
 use crate::components::home::Home;
 use crate::components::navigator::Navigator;
-use crate::components::profile::ProfileTable;
+use crate::components::profile::Profile;
 use crate::components::prompt::Prompt;
 use crate::components::summary::Summary;
 use crate::components::Component;
@@ -35,7 +35,7 @@ pub struct App {
     pub navigator: Navigator,
     pub firewall: FireWall,
     pub firewall_form: FirewallForm,
-    pub profiles: ProfileTable,
+    pub profiles: Profile,
 }
 
 impl App {
@@ -47,7 +47,7 @@ impl App {
         let summary = Summary::new();
         let prompt = Prompt::new();
         let navigator = Navigator::new();
-        let profiles = ProfileTable::new(src);
+        let profiles = Profile::new(src);
         let config = Config::new()?;
         Ok(Self {
             tick_rate,

@@ -105,10 +105,10 @@ impl FireWall {
     }
 
     fn remove_filter(&mut self) {
-        let mut elem = None;
         if let Some(cur) = self.table_state.selected() {
             debug_assert!(cur < self.filters.len());
-            elem = Some(self.filters.remove(cur));
+            let elem = self.filters.remove(cur);
+            self.removing.push(elem);
 
             if self.filters.is_empty() {
                 self.table_state.select(None);
@@ -117,9 +117,6 @@ impl FireWall {
             } else {
                 self.table_state.select(Some(cur));
             }
-        }
-        if let Some((new, rule)) = elem {
-            self.removing.push((new, rule));
         }
     }
 

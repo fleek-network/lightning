@@ -9,7 +9,7 @@ use crate::map::{PacketFilterRule, Profile};
 
 const ROOT_CONFIG_DIR: &str = "~/.lightning/ebpf/config";
 const PACKET_FILTER_PATH: &str = "filters.json";
-const PROFILES_PATH: &str = "profiles.json";
+const PROFILES_PATH: &str = "profiles";
 
 /// Configuration source.
 ///
@@ -68,9 +68,25 @@ impl ConfigSource {
         Ok(())
     }
 
-    /// Read packet-filters from storage.
-    pub async fn read_profiles(&self) -> anyhow::Result<Vec<Profile>> {
-        let content = fs::read_to_string(&self.paths.profiles_path).await?;
+    /// Get names of profiles.
+    pub async fn get_profiles(&self) -> anyhow::Result<Vec<String>> {
+        let mut result = Vec::new();
+        let mut files = fs::read_dir(&self.paths.profiles_path).await?;
+        while let Some(entry) = files.next_entry().await? {
+            let ty = entry.file_type().await?;
+            if ty.is_file() {
+                result.push(entry.path().display().to_string());
+            }
+        }
+        Ok(result)
+    }
+
+    /// Read profile.
+    pub async fn read_profile(&self, name: Option<impl AsRef<Path>>) -> anyhow::Result<Profile> {
+        let content = match name {
+            Some(name) => fs::read_to_string(name).await?,
+            None => fs::read_to_string("global.json").await?,
+        };
         serde_json::from_str(&content).map_err(Into::into)
     }
 

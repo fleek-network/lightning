@@ -105,7 +105,7 @@ impl SharedMap {
     ///
     /// Reads from disk so it's a heavy operation.
     pub async fn update_file_rules(&self) -> anyhow::Result<()> {
-        let profiles = self.storage.read_profiles().await?;
+        let profiles = self.storage.get_profiles().await?;
 
         let mut new = std::collections::HashMap::new();
         for profile in profiles {
