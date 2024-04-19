@@ -4,7 +4,14 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, bail};
 use aya::maps::{HashMap, MapData};
-use common::{File, FileRuleList, PacketFilter, PacketFilterParams, MAX_FILE_RULES};
+use common::{
+    File,
+    FileRuleList,
+    PacketFilter,
+    PacketFilterParams,
+    ALLOW_FILE_RULE,
+    MAX_FILE_RULES,
+};
 use resolved_pathbuf::ResolvedPathBuf;
 use tokio::fs;
 use tokio::sync::Mutex;
@@ -116,7 +123,7 @@ impl SharedMap {
                         bail!("path maximum {MAX_FILE_RULES} execeeded");
                     }
                     file_open_rules[i].inode = file.inode;
-                    file_open_rules[i].allow = if rule.allow { 0 } else { -1 };
+                    file_open_rules[i].allow = ALLOW_FILE_RULE;
                 }
             }
 

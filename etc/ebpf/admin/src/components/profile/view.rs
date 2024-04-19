@@ -42,7 +42,6 @@ impl ProfileView {
                 FileRule {
                     file: "~/.lightning/keystore/consensus.pem".try_into().unwrap(),
                     operations: FileRule::READ_MASK | FileRule::WRITE_MASK,
-                    allow: true,
                 },
             ),
             (
@@ -50,7 +49,6 @@ impl ProfileView {
                 FileRule {
                     file: "~/.lightning/keystore/node.pem".try_into().unwrap(),
                     operations: FileRule::READ_MASK,
-                    allow: true,
                 },
             ),
             (
@@ -58,7 +56,6 @@ impl ProfileView {
                 FileRule {
                     file: "~/.lightning/keystore/node.pem".try_into().unwrap(),
                     operations: FileRule::NO_OPERATION,
-                    allow: false,
                 },
             ),
         ];
@@ -235,7 +232,7 @@ fn space_between_columns(items: &Vec<(bool, FileRule)>) -> [u16; COLUMN_COUNT] {
         .unwrap_or(0);
     let permissions = items
         .iter()
-        .map(|(_, r)| r.allowed_permissions().as_str().width())
+        .map(|(_, r)| r.permissions().as_str().width())
         .max()
         .unwrap_or(0);
 
@@ -243,8 +240,5 @@ fn space_between_columns(items: &Vec<(bool, FileRule)>) -> [u16; COLUMN_COUNT] {
 }
 
 fn flatten_filter(filter: &FileRule) -> [String; COLUMN_COUNT] {
-    [
-        filter.file.display().to_string(),
-        filter.allowed_permissions(),
-    ]
+    [filter.file.display().to_string(), filter.permissions()]
 }

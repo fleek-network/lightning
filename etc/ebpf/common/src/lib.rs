@@ -2,6 +2,7 @@
 
 pub const MAX_DEVICES: usize = 2;
 pub const MAX_FILE_RULES: usize = 10;
+pub const ALLOW_FILE_RULE: i32 = 0;
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
 #[repr(C)]

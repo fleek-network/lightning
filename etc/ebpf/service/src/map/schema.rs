@@ -117,11 +117,8 @@ pub struct Profile {
 pub struct FileRule {
     /// Path of the file.
     pub file: ResolvedPathBuf,
-    /// Operations.
+    /// Allowed operations.
     pub operations: u8,
-    /// If set to true, allows the operation(s).
-    /// Otherwise, it denies the operation(s).
-    pub allow: bool,
 }
 
 impl FileRule {
@@ -131,25 +128,23 @@ impl FileRule {
     pub const WRITE_MASK: u8 = 0x01 << 2;
     pub const EXEC_MASK: u8 = 0x01 << 3;
 
-    pub fn allowed_permissions(&self) -> String {
+    pub fn permissions(&self) -> String {
         let mut result = String::new();
 
-        if self.allow {
-            if self.operations & Self::OPEN_MASK == Self::OPEN_MASK {
-                result.push_str("o");
-            }
+        if self.operations & Self::OPEN_MASK == Self::OPEN_MASK {
+            result.push_str("o");
+        }
 
-            if self.operations & Self::READ_MASK == Self::READ_MASK {
-                result.push_str("r");
-            }
+        if self.operations & Self::READ_MASK == Self::READ_MASK {
+            result.push_str("r");
+        }
 
-            if self.operations & Self::WRITE_MASK == Self::WRITE_MASK {
-                result.push_str("w");
-            }
+        if self.operations & Self::WRITE_MASK == Self::WRITE_MASK {
+            result.push_str("w");
+        }
 
-            if self.operations & Self::EXEC_MASK == Self::EXEC_MASK {
-                result.push_str("x");
-            }
+        if self.operations & Self::EXEC_MASK == Self::EXEC_MASK {
+            result.push_str("x");
         }
 
         if result.is_empty() {
