@@ -185,12 +185,14 @@ impl<C: Collection> Rpc<C> {
         let server = hyper::Server::bind(&addr).serve(make_service);
 
         tokio::spawn(async move {
-            let graceful =
-                server.with_graceful_shutdown(async move { shutdown.wait_for_shutdown().await });
+            let graceful = server.with_graceful_shutdown(async move { stop.shutdown().await });
             graceful.await.expect("Rpc Server to start");
-            // TODO(qti3e): Figure out why sometimes this fails. But it's not an error to halt
-            // the execution for. (It's a AlreadyStopped error.)
+        });
+
+        tokio::spawn(async move {
+            shutdown.wait_for_shutdown().await;
             server_handle.stop().unwrap();
+            server_handle.stopped().await;
         });
     }
 
