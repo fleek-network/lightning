@@ -233,7 +233,7 @@ impl<C: Collection> SyncronizerInner<C> {
                             Some("Counter for the number of times the node restarted from a new checkpoint instead of changing epochs naturally")
                         );
 
-                        let _ = tx_update_ready.send(checkpoint_hash);
+                        let _ = tx_update_ready.send(checkpoint_hash).await;
                         return;
                     }
                 }
