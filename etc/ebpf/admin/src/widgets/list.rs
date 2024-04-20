@@ -21,23 +21,14 @@ pub struct List<T> {
 
 impl<'a, T> List<T>
 where
-    T: Into<ListItem<'a>> + AsRef<str>,
+    T: Display,
 {
     pub fn new(name: &'static str) -> Self {
         Self {
             records: Vec::new(),
             removing: Vec::new(),
             name,
-            list_state: ListState::default().with_selected(Some(0)),
-        }
-    }
-
-    pub fn with_records(records: Vec<T>, name: &'static str) -> Self {
-        Self {
-            records: records.into_iter().map(|r| (false, r)).collect(),
-            removing: Default::default(),
-            name,
-            list_state: ListState::default().with_selected(Some(0)),
+            list_state: ListState::default().with_selected(None),
         }
     }
 
@@ -48,7 +39,9 @@ where
     }
 
     pub fn update_state(&mut self, records: Vec<T>) {
-        self.records = records.into_iter().map(|r| (false, r)).collect();
+        for r in records {
+            self.push_record(false, r);
+        }
     }
 
     pub fn scroll_up(&mut self) {
@@ -70,7 +63,7 @@ where
         }
     }
 
-    pub fn remove_profile(&mut self) {
+    pub fn remove_cur(&mut self) {
         if let Some(cur) = self.list_state.selected() {
             debug_assert!(cur < self.records.len());
             let removing = self.records.remove(cur);
@@ -106,7 +99,11 @@ where
     }
 
     pub fn add_record(&mut self, record: T) {
-        self.records.push((true, record));
+        self.push_record(true, record);
+    }
+
+    pub fn push_record(&mut self, new: bool, record: T) {
+        self.records.push((new, record));
 
         // In case, the list was emptied.
         if self.list_state.selected().is_none() {
@@ -125,7 +122,7 @@ where
         let profiles = self
             .records
             .iter()
-            .map(|(_, name)| name.as_ref())
+            .map(|(_, name)| format!("{}", name))
             .collect::<Vec<_>>();
         let profiles = ratatui::widgets::List::new(profiles)
             .block(Block::default().borders(Borders::ALL).title("Profiles"))

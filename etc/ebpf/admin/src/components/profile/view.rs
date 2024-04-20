@@ -7,7 +7,7 @@ use color_eyre::owo_colors::OwoColorize;
 use color_eyre::Report;
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ebpf_service::map::{FileRule, Profile};
-use ebpf_service::{ConfigSource, map};
+use ebpf_service::{map, ConfigSource};
 use log::error;
 use ratatui::prelude::{Color, Constraint, Modifier, Rect, Style, Text};
 use ratatui::widgets::{Cell, Row};
@@ -44,7 +44,7 @@ impl Default for ProfileView {
             table: Table::new(),
             profile_form: ProfileForm::new(),
             rule_form: RuleForm::new(),
-            profile: Some(Profile::default()),
+            profile: None,
             config: Config::default(),
         }
     }
@@ -52,29 +52,7 @@ impl Default for ProfileView {
 
 impl ProfileView {
     pub fn new() -> Self {
-        let mock_filters = vec![
-            FileRule {
-                file: "~/.lightning/keystore/consensus.pem".try_into().unwrap(),
-                operations: FileRule::READ_MASK | FileRule::WRITE_MASK,
-            },
-            FileRule {
-                file: "~/.lightning/keystore/node.pem".try_into().unwrap(),
-                operations: FileRule::READ_MASK,
-            },
-            FileRule {
-                file: "~/.lightning/keystore/node.pem".try_into().unwrap(),
-                operations: FileRule::NO_OPERATION,
-            },
-        ];
-        Self {
-            command_tx: None,
-            longest_item_per_column: [0; COLUMN_COUNT],
-            table: Table::with_records(mock_filters),
-            profile_form: ProfileForm::new(),
-            rule_form: RuleForm::new(),
-            profile: None,
-            config: Config::default(),
-        }
+        Self::default()
     }
 
     pub fn update_state(&mut self, profile: Profile) {
@@ -150,8 +128,7 @@ impl Component for ProfileView {
                 self.table.restore_state();
                 Ok(Some(Action::UpdateMode(Mode::Profiles)))
             },
-            Action::UpdateProfile => Ok(Some(Action::UpdateMode(Mode::ProfileViewEditNameForm))),
-            Action::Add => Ok(Some(Action::UpdateMode(Mode::ProfileViewEditRuleForm))),
+            Action::AddRule => Ok(Some(Action::UpdateMode(Mode::ProfileViewEditRuleForm))),
             Action::Remove => {
                 self.table.remove_cur();
                 Ok(Some(Action::Render))
@@ -167,7 +144,12 @@ impl Component for ProfileView {
             Action::UpdateMode(Mode::ProfileViewEdit) => {
                 self.update_profile_from_input();
                 Ok(None)
-            }
+            },
+            Action::NavLeft | Action::NavRight => {
+                self.profile.take();
+                self.table.clear();
+                Ok(None)
+            },
             _ => Ok(None),
         }
     }

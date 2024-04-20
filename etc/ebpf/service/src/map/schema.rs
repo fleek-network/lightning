@@ -1,4 +1,6 @@
+use std::fmt::Display;
 use std::net::Ipv4Addr;
+use std::path::PathBuf;
 
 #[cfg(feature = "server")]
 use common::{PacketFilter, PacketFilterParams};
@@ -97,7 +99,7 @@ pub struct Profile {
     /// Path to the executable file.
     ///
     /// If `None`, the profile will apply to all processes.
-    pub name: Option<ResolvedPathBuf>,
+    pub name: Option<PathBuf>,
     /// File rules.
     ///
     /// These control how files are accessed by the
@@ -110,6 +112,19 @@ pub struct Profile {
     /// Normally, only access decisions made without
     /// a cooresponding rule will be logged.
     pub audit: bool,
+}
+
+impl Display for Profile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.name
+                .as_ref()
+                .map(|name| name.to_string_lossy())
+                .unwrap_or("*".into())
+        )
+    }
 }
 
 /// Rule that defines how a file is accessed.

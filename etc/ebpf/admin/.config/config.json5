@@ -67,8 +67,7 @@
       "<Ctrl-z>": "Suspend", // Suspend the application.
     },
     "ProfileViewEdit": {
-      "<Ctrl-p>": "UpdateProfile", // Open form to update profile.
-      "<Ctrl-a>": "Add", // Open form to enter a new rule.
+      "<Ctrl-a>": "AddRule", // Open form to enter a new rule.
       "<Ctrl-r>": "Remove", // Remove a rule.
       "<esc>": "Cancel", // Scape mode.
       "<Ctrl-s>": "Save", // Add an entry in the block list.

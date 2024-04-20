@@ -1,3 +1,4 @@
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -9,7 +10,7 @@ use crate::map::{PacketFilterRule, Profile};
 
 const ROOT_CONFIG_DIR: &str = "~/.lightning/ebpf/config";
 const PACKET_FILTER_PATH: &str = "filters.json";
-const PROFILES_PATH: &str = "profiles";
+const PROFILES_PATH: &str = "~/.lightning/ebpf/profiles";
 
 /// Configuration source.
 ///
@@ -26,9 +27,11 @@ impl ConfigSource {
         std::fs::create_dir_all(&result.paths.root_path)?;
 
         let mut tmp = PathBuf::new();
-        tmp.push("tmp");
         tmp.push(&result.paths.root_path.as_path());
+        tmp.push("tmp");
         std::fs::create_dir_all(tmp)?;
+
+        std::fs::create_dir_all(result.paths.profiles_path.as_path())?;
 
         Ok(result)
     }
@@ -69,53 +72,82 @@ impl ConfigSource {
     }
 
     /// Get names of profiles.
-    pub async fn get_profiles(&self) -> anyhow::Result<Vec<String>> {
+    pub async fn get_profiles(&self) -> anyhow::Result<Vec<Profile>> {
         let mut result = Vec::new();
         let mut files = fs::read_dir(&self.paths.profiles_path).await?;
         while let Some(entry) = files.next_entry().await? {
             let ty = entry.file_type().await?;
             if ty.is_file() {
-                result.push(entry.path().display().to_string());
+                let profile = self.read_profile(Some(&entry.file_name())).await?;
+                result.push(profile);
             }
         }
         Ok(result)
     }
 
-    pub fn blocking_read_profile(&self, name: Option<impl AsRef<Path>>) -> anyhow::Result<Profile> {
+    pub fn blocking_read_profile(&self, name: Option<&OsStr>) -> anyhow::Result<Profile> {
         let content = match name {
-            Some(name) => std::fs::read_to_string(name)?,
-            None => std::fs::read_to_string("global.json")?,
+            Some(name) => {
+                let mut path = PathBuf::new();
+                path.push(self.paths.profiles_path.as_path());
+                path.push(name);
+                std::fs::read_to_string(path.as_path())?
+            },
+            None => {
+                let mut path = PathBuf::new();
+                path.push(self.paths.profiles_path.as_path());
+                path.push("global.json");
+                std::fs::read_to_string(path)?
+            },
         };
         serde_json::from_str(&content).map_err(Into::into)
     }
 
     /// Read profile.
-    pub async fn read_profile(&self, name: Option<impl AsRef<Path>>) -> anyhow::Result<Profile> {
+    pub async fn read_profile(&self, name: Option<&OsStr>) -> anyhow::Result<Profile> {
         let content = match name {
-            Some(name) => fs::read_to_string(name).await?,
-            None => fs::read_to_string("global.json").await?,
+            Some(name) => {
+                let mut path = PathBuf::new();
+                path.push(self.paths.profiles_path.as_path());
+                path.push(name);
+                fs::read_to_string(path.as_path()).await?
+            },
+            None => {
+                let mut path = PathBuf::new();
+                path.push(self.paths.profiles_path.as_path());
+                path.push("global.json");
+                fs::read_to_string(path).await?
+            },
         };
         serde_json::from_str(&content).map_err(Into::into)
     }
 
     /// Writes packet-filters to storage.
     pub async fn write_profiles(&self, profiles: Vec<Profile>) -> anyhow::Result<()> {
-        let mut tmp_path = PathBuf::new();
-        tmp_path.push(self.paths.root_path.as_path());
-        tmp_path.push("tmp");
-        tmp_path.push(self.paths.profiles_path.as_path());
+        for profile in profiles {
+            let name = profile
+                .name
+                .as_ref()
+                .map(|path| path.file_stem().unwrap().to_os_string())
+                .unwrap_or("global".into());
+            let mut tmp_path = PathBuf::new();
+            tmp_path.push(self.paths.root_path.as_path());
+            tmp_path.push("tmp");
+            tmp_path.push(self.paths.profiles_path.as_path());
+            tmp_path.push(name.clone());
 
-        let mut tmp = fs::File::create(tmp_path.as_path()).await?;
-        let bytes = serde_json::to_string(&profiles)?;
-        tmp.write_all(bytes.as_bytes()).await?;
-        tmp.sync_all().await?;
+            let mut tmp = fs::File::create(tmp_path.as_path()).await?;
+            let bytes = serde_json::to_string(&profile)?;
+            tmp.write_all(bytes.as_bytes()).await?;
+            tmp.sync_all().await?;
 
-        let mut dst = PathBuf::new();
-        dst.push(self.paths.root_path.as_path());
-        dst.push(self.paths.profiles_path.as_path());
+            let mut dst = PathBuf::new();
+            dst.push(self.paths.root_path.as_path());
+            dst.push(self.paths.profiles_path.as_path());
+            dst.push(name);
 
-        fs::rename(tmp_path, dst).await?;
-
+            fs::rename(tmp_path, dst).await?;
+        }
         Ok(())
     }
 }
@@ -135,10 +167,7 @@ impl Default for PathConfig {
                 format!("{ROOT_CONFIG_DIR}/{PACKET_FILTER_PATH}").as_str(),
             )
             .expect("Hardcoded path"),
-            profiles_path: ResolvedPathBuf::try_from(
-                format!("{ROOT_CONFIG_DIR}/{PROFILES_PATH}").as_str(),
-            )
-            .expect("Hardcoded path"),
+            profiles_path: ResolvedPathBuf::try_from(PROFILES_PATH).expect("Hardcoded path"),
         }
     }
 }

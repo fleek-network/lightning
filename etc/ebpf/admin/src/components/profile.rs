@@ -35,21 +35,19 @@ pub struct Profile {
     profiles_to_update: Option<Vec<map::Profile>>,
     src: ConfigSource,
     longest_item_per_column: [u16; COLUMN_COUNT],
-    list: List<String>,
+    list: List<map::Profile>,
     profile_view: ProfileView,
     config: Config,
 }
 
 impl Profile {
     pub fn new(src: ConfigSource) -> Self {
-        let mock_profiles = vec!["~/path/to/bin1".to_string(), "~/path/to/bin1".to_string()];
-
         Self {
             src,
             profiles_to_update: None,
             command_tx: None,
             longest_item_per_column: [0; COLUMN_COUNT],
-            list: List::with_records(mock_profiles, "Profiles"),
+            list: List::new("Profiles"),
             profile_view: ProfileView::new(),
             config: Config::default(),
         }
@@ -69,13 +67,7 @@ impl Profile {
     }
 
     fn add_profile(&mut self, profile: map::Profile) {
-        self.list.add_record(
-            profile
-                .name
-                .as_ref()
-                .map(|path| path.display().to_string())
-                .unwrap_or("global.json".to_string()),
-        );
+        self.list.add_record(profile.clone());
 
         if self.profiles_to_update.is_none() {
             self.profiles_to_update = Some(Vec::new());
@@ -107,7 +99,13 @@ impl Profile {
         if let Some(selected) = self.list.get() {
             let profile = self
                 .src
-                .blocking_read_profile(Some(selected))
+                .blocking_read_profile(
+                    selected
+                        .name
+                        .as_ref()
+                        .map(|name| name.file_stem())
+                        .flatten(),
+                )
                 .map_err(|e| Report::msg(e.to_string()))?;
             self.profile_view.update_state(profile);
         }
@@ -137,13 +135,24 @@ impl Component for Profile {
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         match action {
             Action::Edit => Ok(Some(Action::UpdateMode(Mode::ProfilesEdit))),
-            Action::Save => Ok(Some(Action::UpdateMode(Mode::Profiles))),
-            Action::Cancel => Ok(None),
+            Action::Save => {
+                self.update_storage();
+                self.list.commit_changes();
+                Ok(Some(Action::UpdateMode(Mode::Profiles)))
+            },
+            Action::Cancel => {
+                self.list.restore_state();
+                self.profiles_to_update.take();
+                Ok(Some(Action::UpdateMode(Mode::Profiles)))
+            },
             Action::Add => {
                 self.empty_view();
-                Ok(Some(Action::UpdateMode(Mode::ProfileViewEdit)))
+                Ok(Some(Action::UpdateMode(Mode::ProfileViewEditNameForm)))
             },
-            Action::Remove => Ok(None),
+            Action::Remove => {
+                self.list.remove_cur();
+                Ok(Some(Action::Render))
+            },
             Action::Up => {
                 self.list.scroll_up();
                 Ok(Some(Action::Render))

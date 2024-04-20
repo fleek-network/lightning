@@ -212,6 +212,7 @@ impl App {
         self.profiles.register_action_handler(action_tx.clone())?;
         self.profiles.register_config_handler(self.config.clone())?;
         self.profiles.init(tui.size()?)?;
+        self.profiles.get_profile_list_from_storage().await?;
 
         loop {
             if let Some(e) = tui.next().await {

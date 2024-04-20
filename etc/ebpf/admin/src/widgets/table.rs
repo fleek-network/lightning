@@ -23,20 +23,14 @@ impl<T> Table<T> {
         Self {
             records: Vec::new(),
             removing: Vec::new(),
-            state: TableState::default().with_selected(Some(0)),
-        }
-    }
-
-    pub fn with_records(records: Vec<T>) -> Self {
-        Self {
-            records: records.into_iter().map(|r| (false, r)).collect(),
-            removing: Default::default(),
-            state: TableState::default().with_selected(Some(0)),
+            state: TableState::default().with_selected(None),
         }
     }
 
     pub fn update_state(&mut self, records: Vec<T>) {
-        self.records = records.into_iter().map(|r| (false, r)).collect();
+        for r in records {
+            self.push_record(false, r);
+        }
     }
 
     pub fn scroll_up(&mut self) {
@@ -86,6 +80,12 @@ impl<T> Table<T> {
         }
     }
 
+    pub fn clear(&mut self) {
+        self.records.clear();
+        self.removing.clear();
+        self.state.select(None);
+    }
+
     pub fn commit_changes(&mut self) {
         self.records.iter_mut().for_each(|(new, r)| {
             *new = false;
@@ -94,7 +94,11 @@ impl<T> Table<T> {
     }
 
     pub fn add_record(&mut self, record: T) {
-        self.records.push((true, record));
+        self.push_record(true, record);
+    }
+
+    pub fn push_record(&mut self, new: bool, record: T) {
+        self.records.push((new, record));
 
         // In case, the list was emptied.
         if self.state.selected().is_none() {

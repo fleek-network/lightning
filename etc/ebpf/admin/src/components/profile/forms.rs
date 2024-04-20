@@ -7,7 +7,7 @@ use color_eyre::owo_colors::OwoColorize;
 use color_eyre::Report;
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ebpf_service::map::{FileRule, PacketFilterRule};
-use ebpf_service::{ConfigSource, map};
+use ebpf_service::{map, ConfigSource};
 use log::error;
 use ratatui::prelude::*;
 use ratatui::widgets::*;
