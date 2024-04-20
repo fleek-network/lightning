@@ -92,7 +92,7 @@ impl From<PacketFilterRule> for PacketFilterParams {
 ///
 /// A profile specifies a list of files that a program
 /// can access and the operations the program may perform.
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Default, Deserialize, Serialize)]
 pub struct Profile {
     /// Path to the executable file.
     ///

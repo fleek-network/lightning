@@ -11,7 +11,11 @@ pub enum Mode {
     FirewallEdit,
     FirewallForm,
     Profiles,
+    ProfilesEdit,
     ProfileView,
+    ProfileViewEdit,
+    ProfileViewEditNameForm,
+    ProfileViewEditRuleForm,
 }
 
 impl FromStr for Mode {

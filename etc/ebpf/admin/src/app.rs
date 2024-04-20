@@ -74,7 +74,15 @@ impl App {
             Mode::FirewallEdit => self.firewall.update(action.clone())?,
             Mode::FirewallForm => self.firewall.form().update(action.clone())?,
             Mode::Profiles => self.profiles.update(action.clone())?,
+            Mode::ProfilesEdit => self.profiles.update(action.clone())?,
             Mode::ProfileView => self.profiles.view().update(action.clone())?,
+            Mode::ProfileViewEdit => self.profiles.view().update(action.clone())?,
+            Mode::ProfileViewEditNameForm => {
+                self.profiles.view().profile_form().update(action.clone())?
+            },
+            Mode::ProfileViewEditRuleForm => {
+                self.profiles.view().rule_form().update(action.clone())?
+            },
         };
 
         if maybe_action.is_none() {
@@ -91,7 +99,17 @@ impl App {
             Mode::FirewallEdit => self.firewall.handle_events(Some(event)),
             Mode::FirewallForm => self.firewall.form().handle_events(Some(event)),
             Mode::Profiles => self.profiles.handle_events(Some(event)),
+            Mode::ProfilesEdit => self.profiles.handle_events(Some(event)),
             Mode::ProfileView => self.profiles.view().handle_events(Some(event)),
+            Mode::ProfileViewEdit => self.profiles.view().handle_events(Some(event)),
+            Mode::ProfileViewEditNameForm => self
+                .profiles
+                .view()
+                .profile_form()
+                .handle_events(Some(event)),
+            Mode::ProfileViewEditRuleForm => {
+                self.profiles.view().rule_form().handle_events(Some(event))
+            },
         }
     }
 
@@ -136,11 +154,17 @@ impl App {
             Mode::FirewallForm => {
                 self.firewall.form().draw(f, content[0])?;
             },
-            Mode::Profiles => {
+            Mode::Profiles | Mode::ProfilesEdit => {
                 self.profiles.draw(f, content[0])?;
             },
-            Mode::ProfileView => {
+            Mode::ProfileView | Mode::ProfileViewEdit => {
                 self.profiles.view().draw(f, content[0])?;
+            },
+            Mode::ProfileViewEditNameForm => {
+                self.profiles.view().profile_form().draw(f, content[0])?;
+            },
+            Mode::ProfileViewEditRuleForm => {
+                self.profiles.view().rule_form().draw(f, content[0])?;
             },
         }
 

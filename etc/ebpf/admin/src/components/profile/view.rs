@@ -7,7 +7,7 @@ use color_eyre::owo_colors::OwoColorize;
 use color_eyre::Report;
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ebpf_service::map::{FileRule, Profile};
-use ebpf_service::ConfigSource;
+use ebpf_service::{ConfigSource, map};
 use log::error;
 use ratatui::prelude::{Color, Constraint, Modifier, Rect, Style, Text};
 use ratatui::widgets::{Cell, Row};
@@ -19,6 +19,7 @@ use unicode_width::UnicodeWidthStr;
 
 use super::{Component, Frame};
 use crate::action::Action;
+use crate::components::profile::forms::{ProfileForm, RuleForm};
 use crate::config::{Config, KeyBindings};
 use crate::mode::Mode;
 use crate::widgets::table::Table;
@@ -29,6 +30,9 @@ pub struct ProfileView {
     command_tx: Option<UnboundedSender<Action>>,
     longest_item_per_column: [u16; COLUMN_COUNT],
     table: Table<FileRule>,
+    profile_form: ProfileForm,
+    rule_form: RuleForm,
+    profile: Option<Profile>,
     config: Config,
 }
 
@@ -38,6 +42,9 @@ impl Default for ProfileView {
             command_tx: None,
             longest_item_per_column: [0; COLUMN_COUNT],
             table: Table::new(),
+            profile_form: ProfileForm::new(),
+            rule_form: RuleForm::new(),
+            profile: Some(Profile::default()),
             config: Config::default(),
         }
     }
@@ -63,12 +70,24 @@ impl ProfileView {
             command_tx: None,
             longest_item_per_column: [0; COLUMN_COUNT],
             table: Table::with_records(mock_filters),
+            profile_form: ProfileForm::new(),
+            rule_form: RuleForm::new(),
+            profile: None,
             config: Config::default(),
         }
     }
 
     pub fn update_state(&mut self, profile: Profile) {
-        self.table.update_state(profile.file_rules)
+        self.table.update_state(profile.file_rules.clone());
+        self.profile = Some(profile);
+    }
+
+    pub fn profile_form(&mut self) -> &mut ProfileForm {
+        &mut self.profile_form
+    }
+
+    pub fn rule_form(&mut self) -> &mut RuleForm {
+        &mut self.rule_form
     }
 
     fn space_between_columns(&self) -> [u16; COLUMN_COUNT] {
@@ -87,6 +106,25 @@ impl ProfileView {
 
         [name as u16, permissions as u16]
     }
+
+    fn update_profile_from_input(&mut self) {
+        debug_assert!(self.profile.is_some());
+
+        if let Some(name) = self.profile_form.yank_input() {
+            let profile = self.profile.as_mut().expect("Profile to be initialized");
+            profile.name = name.name
+        }
+
+        if let Some(rule) = self.rule_form.yank_input() {
+            let profile = self.profile.as_mut().expect("Profile to be initialized");
+            profile.file_rules.push(rule.clone());
+            self.table.add_record(rule);
+        }
+    }
+
+    pub fn yank_profile(&mut self) -> Option<Profile> {
+        self.profile.take()
+    }
 }
 
 impl Component for ProfileView {
@@ -102,17 +140,18 @@ impl Component for ProfileView {
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         match action {
-            Action::Edit => Ok(None),
-            Action::Add => Ok(None),
+            Action::Edit => Ok(Some(Action::UpdateMode(Mode::ProfileViewEdit))),
             Action::Save => {
                 self.table.commit_changes();
                 // self.update_storage();
-                Ok(Some(Action::UpdateMode(Mode::Firewall)))
+                Ok(Some(Action::UpdateMode(Mode::ProfilesEdit)))
             },
             Action::Cancel => {
                 self.table.restore_state();
-                Ok(Some(Action::UpdateMode(Mode::Firewall)))
+                Ok(Some(Action::UpdateMode(Mode::Profiles)))
             },
+            Action::UpdateProfile => Ok(Some(Action::UpdateMode(Mode::ProfileViewEditNameForm))),
+            Action::Add => Ok(Some(Action::UpdateMode(Mode::ProfileViewEditRuleForm))),
             Action::Remove => {
                 self.table.remove_cur();
                 Ok(Some(Action::Render))
@@ -125,6 +164,10 @@ impl Component for ProfileView {
                 self.table.scroll_down();
                 Ok(Some(Action::Render))
             },
+            Action::UpdateMode(Mode::ProfileViewEdit) => {
+                self.update_profile_from_input();
+                Ok(None)
+            }
             _ => Ok(None),
         }
     }

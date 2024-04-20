@@ -1,3 +1,4 @@
+mod forms;
 mod view;
 
 use std::collections::{HashMap, HashSet};
@@ -102,7 +103,7 @@ impl Profile {
         }
     }
 
-    fn prepare_view(&mut self) -> Result<()> {
+    fn prefill_view(&mut self) -> Result<()> {
         if let Some(selected) = self.list.get() {
             let profile = self
                 .src
@@ -111,6 +112,10 @@ impl Profile {
             self.profile_view.update_state(profile);
         }
         Ok(())
+    }
+
+    fn empty_view(&mut self) {
+        self.profile_view.update_state(map::Profile::default());
     }
 
     pub fn view(&mut self) -> &mut ProfileView {
@@ -131,10 +136,13 @@ impl Component for Profile {
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         match action {
-            Action::Edit => Ok(None),
-            Action::Save => Ok(None),
+            Action::Edit => Ok(Some(Action::UpdateMode(Mode::ProfilesEdit))),
+            Action::Save => Ok(Some(Action::UpdateMode(Mode::Profiles))),
             Action::Cancel => Ok(None),
-            Action::Add => Ok(None),
+            Action::Add => {
+                self.empty_view();
+                Ok(Some(Action::UpdateMode(Mode::ProfileViewEdit)))
+            },
             Action::Remove => Ok(None),
             Action::Up => {
                 self.list.scroll_up();
@@ -145,10 +153,16 @@ impl Component for Profile {
                 Ok(Some(Action::Render))
             },
             Action::Select => {
-                if let Err(e) = self.prepare_view() {
-                    return Ok(Some(Action::Error(e.to_string())))
+                if let Err(e) = self.prefill_view() {
+                    return Ok(Some(Action::Error(e.to_string())));
                 }
                 Ok(Some(Action::UpdateMode(Mode::ProfileView)))
+            },
+            Action::UpdateMode(Mode::ProfilesEdit) => {
+                if let Some(new) = self.profile_view.yank_profile() {
+                    self.add_profile(new);
+                }
+                Ok(None)
             },
             _ => Ok(None),
         }
