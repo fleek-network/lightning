@@ -67,7 +67,7 @@ impl ProfileForm {
         }
     }
 
-    fn update_filters_from_input(&mut self) -> Result<()> {
+    fn update_profile_from_input(&mut self) -> Result<()> {
         for field in self.input_fields.iter_mut() {
             field.area.select_all();
             field.area.cut();
@@ -109,7 +109,7 @@ impl Component for ProfileForm {
                 Ok(Some(Action::UpdateMode(Mode::ProfilesEdit)))
             },
             Action::Add => {
-                if let Err(e) = self.update_filters_from_input() {
+                if let Err(e) = self.update_profile_from_input() {
                     Ok(Some(Action::Error(e.to_string())))
                 } else {
                     // Todo: Here send new entry.
@@ -169,53 +169,6 @@ impl Component for ProfileForm {
 
         Ok(())
     }
-}
-
-struct InputField {
-    title: &'static str,
-    area: TextArea<'static>,
-}
-
-fn inactivate(field: &mut InputField) {
-    field.area.set_cursor_line_style(Style::default());
-    field.area.set_cursor_style(Style::default());
-    field.area.set_block(
-        Block::default()
-            .borders(Borders::ALL)
-            .style(Style::default().fg(Color::White))
-            .title(field.title),
-    );
-}
-
-fn activate(field: &mut InputField) {
-    field
-        .area
-        .set_cursor_line_style(Style::default().add_modifier(Modifier::UNDERLINED));
-    field
-        .area
-        .set_cursor_style(Style::default().add_modifier(Modifier::REVERSED));
-    field.area.set_block(
-        Block::default()
-            .borders(Borders::ALL)
-            .style(Style::default().fg(Color::Red))
-            .title(field.title),
-    );
-}
-
-fn center_form(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
-    let popup_layout = Layout::vertical([
-        Constraint::Percentage((100 - percent_y) / 2),
-        Constraint::Percentage(percent_y),
-        Constraint::Percentage((100 - percent_y) / 2),
-    ])
-    .split(r);
-
-    Layout::horizontal([
-        Constraint::Percentage((100 - percent_x) / 2),
-        Constraint::Percentage(percent_x),
-        Constraint::Percentage((100 - percent_x) / 2),
-    ])
-    .split(popup_layout[1])[1]
 }
 
 pub struct RuleForm {
@@ -308,7 +261,6 @@ impl Component for RuleForm {
                 if let Err(e) = self.update_filters_from_input() {
                     Ok(Some(Action::Error(e.to_string())))
                 } else {
-                    // Todo: Here send new entry.
                     Ok(Some(Action::UpdateMode(Mode::ProfileViewEdit)))
                 }
             },
@@ -366,4 +318,51 @@ impl Component for RuleForm {
 
         Ok(())
     }
+}
+
+struct InputField {
+    title: &'static str,
+    area: TextArea<'static>,
+}
+
+fn inactivate(field: &mut InputField) {
+    field.area.set_cursor_line_style(Style::default());
+    field.area.set_cursor_style(Style::default());
+    field.area.set_block(
+        Block::default()
+            .borders(Borders::ALL)
+            .style(Style::default().fg(Color::White))
+            .title(field.title),
+    );
+}
+
+fn activate(field: &mut InputField) {
+    field
+        .area
+        .set_cursor_line_style(Style::default().add_modifier(Modifier::UNDERLINED));
+    field
+        .area
+        .set_cursor_style(Style::default().add_modifier(Modifier::REVERSED));
+    field.area.set_block(
+        Block::default()
+            .borders(Borders::ALL)
+            .style(Style::default().fg(Color::Red))
+            .title(field.title),
+    );
+}
+
+fn center_form(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
+    let popup_layout = Layout::vertical([
+        Constraint::Percentage((100 - percent_y) / 2),
+        Constraint::Percentage(percent_y),
+        Constraint::Percentage((100 - percent_y) / 2),
+    ])
+    .split(r);
+
+    Layout::horizontal([
+        Constraint::Percentage((100 - percent_x) / 2),
+        Constraint::Percentage(percent_x),
+        Constraint::Percentage((100 - percent_x) / 2),
+    ])
+    .split(popup_layout[1])[1]
 }

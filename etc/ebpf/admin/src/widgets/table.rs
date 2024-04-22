@@ -27,9 +27,9 @@ impl<T> Table<T> {
         }
     }
 
-    pub fn update_state(&mut self, records: Vec<T>) {
+    pub fn load_records(&mut self, records: Vec<T>) {
         for r in records {
-            self.push_record(false, r);
+            self.push(false, r);
         }
     }
 
@@ -52,7 +52,7 @@ impl<T> Table<T> {
         }
     }
 
-    pub fn remove_cur(&mut self) {
+    pub fn remove_selected_record(&mut self) {
         if let Some(cur) = self.state.selected() {
             debug_assert!(cur < self.records.len());
             let removing = self.records.remove(cur);
@@ -94,17 +94,7 @@ impl<T> Table<T> {
     }
 
     pub fn add_record(&mut self, record: T) {
-        self.push_record(true, record);
-    }
-
-    pub fn push_record(&mut self, new: bool, record: T) {
-        self.records.push((new, record));
-
-        // In case, the list was emptied.
-        if self.state.selected().is_none() {
-            debug_assert!(self.records.len() == 1);
-            self.state.select(Some(0));
-        }
+        self.push(true, record);
     }
 
     pub fn state(&mut self) -> &mut TableState {
@@ -113,5 +103,19 @@ impl<T> Table<T> {
 
     pub fn records(&self) -> impl Iterator<Item = &T> {
         self.records.iter().map(|(_, r)| r)
+    }
+
+    pub fn records_to_remove(&self) -> impl Iterator<Item = &T> {
+        self.removing.iter().map(|(_, r)| r)
+    }
+
+    fn push(&mut self, new: bool, record: T) {
+        self.records.push((new, record));
+
+        // In case, the list was emptied.
+        if self.state.selected().is_none() {
+            debug_assert!(self.records.len() == 1);
+            self.state.select(Some(0));
+        }
     }
 }

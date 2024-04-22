@@ -138,7 +138,6 @@ impl Component for FirewallForm {
                 if let Err(e) = self.update_filters_from_input() {
                     Ok(Some(Action::Error(e.to_string())))
                 } else {
-                    // Todo: Here send new entry.
                     Ok(Some(Action::UpdateMode(Mode::FirewallEdit)))
                 }
             },

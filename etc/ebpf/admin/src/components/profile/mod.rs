@@ -36,7 +36,7 @@ pub struct Profile {
     src: ConfigSource,
     longest_item_per_column: [u16; COLUMN_COUNT],
     list: List<map::Profile>,
-    profile_view: ProfileView,
+    view: ProfileView,
     form: ProfileForm,
     config: Config,
 }
@@ -49,7 +49,7 @@ impl Profile {
             command_tx: None,
             longest_item_per_column: [0; COLUMN_COUNT],
             list: List::new("Profiles"),
-            profile_view: ProfileView::new(src),
+            view: ProfileView::new(src),
             form: ProfileForm::new(),
             config: Config::default(),
         }
@@ -63,7 +63,7 @@ impl Profile {
             .await
             .map_err(|e| Report::msg(e.to_string()))
         {
-            self.list.update_state(profiles);
+            self.list.load_records(profiles);
         }
         Ok(())
     }
@@ -82,22 +82,33 @@ impl Profile {
         profiles_to_update.push(profile);
     }
 
-    fn update_storage(&mut self) {
-        if let Some(new) = self.profiles_to_update.take() {
-            let command_tx = self
-                .command_tx
-                .clone()
-                .expect("Component always has a sender");
-            let storage = self.src.clone();
-            tokio::spawn(async move {
-                if let Err(e) = storage.write_profiles(new).await {
+    fn save(&mut self) {
+        // Remove names of profiles that need to be deleted before they're gone forever.
+        let remove = self
+            .list
+            .records_to_remove_mut()
+            .map(|profile| profile.name.take())
+            .collect::<HashSet<_>>();
+        self.list.commit_changes();
+        let update = self.profiles_to_update.take();
+        let command_tx = self
+            .command_tx
+            .clone()
+            .expect("Component always has a sender");
+        let storage = self.src.clone();
+        tokio::spawn(async move {
+            if let Err(e) = storage.delete_profiles(remove).await {
+                let _ = command_tx.send(Action::Error(e.to_string()));
+            }
+            if let Some(profiles) = update {
+                if let Err(e) = storage.write_profiles(profiles).await {
                     let _ = command_tx.send(Action::Error(e.to_string()));
                 }
-            });
-        }
+            }
+        });
     }
 
-    fn prefill_view(&mut self) -> Result<()> {
+    fn load_profile_for_view(&mut self) -> Result<()> {
         if let Some(selected) = self.list.get() {
             let profile = self
                 .src
@@ -109,17 +120,17 @@ impl Profile {
                         .flatten(),
                 )
                 .map_err(|e| Report::msg(e.to_string()))?;
-            self.profile_view.update_state(profile);
+            self.view.load_profile(profile);
         }
         Ok(())
     }
 
     fn empty_view(&mut self) {
-        self.profile_view.update_state(map::Profile::default());
+        self.view.load_profile(map::Profile::default());
     }
 
     pub fn view(&mut self) -> &mut ProfileView {
-        &mut self.profile_view
+        &mut self.view
     }
 
     pub fn form(&mut self) -> &mut ProfileForm {
@@ -130,12 +141,12 @@ impl Profile {
 impl Component for Profile {
     fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
         self.command_tx = Some(tx.clone());
-        self.profile_view.register_action_handler(tx)
+        self.view.register_action_handler(tx)
     }
 
     fn register_config_handler(&mut self, config: Config) -> Result<()> {
         self.config = config.clone();
-        self.profile_view.register_config_handler(config)
+        self.view.register_config_handler(config)
     }
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
@@ -143,8 +154,7 @@ impl Component for Profile {
             Action::Edit => Ok(Some(Action::UpdateMode(Mode::ProfilesEdit))),
             Action::Save => {
                 // Save deleted items.
-                self.update_storage();
-                self.list.commit_changes();
+                self.save();
                 Ok(Some(Action::UpdateMode(Mode::Profiles)))
             },
             Action::Cancel => {
@@ -154,7 +164,7 @@ impl Component for Profile {
             },
             Action::Add => Ok(Some(Action::UpdateMode(Mode::ProfileForm))),
             Action::Remove => {
-                self.list.remove_cur();
+                self.list.remove_selected_record();
                 Ok(Some(Action::Render))
             },
             Action::Up => {
@@ -166,7 +176,7 @@ impl Component for Profile {
                 Ok(Some(Action::Render))
             },
             Action::Select => {
-                if let Err(e) = self.prefill_view() {
+                if let Err(e) = self.load_profile_for_view() {
                     return Ok(Some(Action::Error(e.to_string())));
                 }
                 Ok(Some(Action::UpdateMode(Mode::ProfileView)))

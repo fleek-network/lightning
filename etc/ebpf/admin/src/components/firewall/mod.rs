@@ -47,18 +47,6 @@ pub struct FireWall {
 
 impl FireWall {
     pub fn new(src: ConfigSource) -> Self {
-        let mut input_fields: Vec<_> = vec![
-            (IP_FIELD_NAME, TextArea::default()),
-            (PORT_FIELD_NAME, TextArea::default()),
-        ]
-        .into_iter()
-        .map(|(title, area)| InputField { title, area })
-        .collect();
-
-        debug_assert!(input_fields.len() == INPUT_FIELD_COUNT);
-        activate(&mut input_fields[0]);
-        inactivate(&mut input_fields[1]);
-
         Self {
             filters: Vec::new(),
             removing: Vec::new(),
@@ -282,48 +270,6 @@ impl Component for FireWall {
 struct InputField {
     title: &'static str,
     area: TextArea<'static>,
-}
-
-fn inactivate(field: &mut InputField) {
-    field.area.set_cursor_line_style(Style::default());
-    field.area.set_cursor_style(Style::default());
-    field.area.set_block(
-        Block::default()
-            .borders(Borders::ALL)
-            .style(Style::default().fg(Color::White))
-            .title(field.title),
-    );
-}
-
-fn activate(field: &mut InputField) {
-    field
-        .area
-        .set_cursor_line_style(Style::default().add_modifier(Modifier::UNDERLINED));
-    field
-        .area
-        .set_cursor_style(Style::default().add_modifier(Modifier::REVERSED));
-    field.area.set_block(
-        Block::default()
-            .borders(Borders::ALL)
-            .style(Style::default().fg(Color::Red))
-            .title(field.title),
-    );
-}
-
-fn center_form(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
-    let popup_layout = Layout::vertical([
-        Constraint::Percentage((100 - percent_y) / 2),
-        Constraint::Percentage(percent_y),
-        Constraint::Percentage((100 - percent_y) / 2),
-    ])
-    .split(r);
-
-    Layout::horizontal([
-        Constraint::Percentage((100 - percent_x) / 2),
-        Constraint::Percentage(percent_x),
-        Constraint::Percentage((100 - percent_x) / 2),
-    ])
-    .split(popup_layout[1])[1]
 }
 
 fn space_between_columns(items: &Vec<(bool, PacketFilterRule)>) -> [u16; COLUMN_COUNT] {

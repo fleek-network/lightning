@@ -29,7 +29,5 @@ pub enum Action {
     Cancel,
     Edit,
     Select,
-    UpdateProfile,
-    AddRule,
     Back,
 }

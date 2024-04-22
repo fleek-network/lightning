@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -115,17 +116,30 @@ impl ConfigSource {
             None => {
                 let mut path = PathBuf::new();
                 path.push(self.paths.profiles_path.as_path());
-                path.push("global.json");
+                path.push("global");
                 fs::read_to_string(path).await?
             },
         };
         serde_json::from_str(&content).map_err(Into::into)
     }
 
+    pub async fn delete_profiles(&self, profiles: HashSet<Option<PathBuf>>) -> anyhow::Result<()> {
+        for profile in profiles {
+            let fname = profile.unwrap_or("global".into());
+            let mut dst = PathBuf::new();
+            dst.push(self.paths.root_path.as_path());
+            dst.push(self.paths.profiles_path.as_path());
+            dst.push(fname);
+
+            fs::remove_file(dst).await.unwrap();
+        }
+        Ok(())
+    }
+
     /// Writes packet-filters to storage.
     pub async fn write_profiles(&self, profiles: Vec<Profile>) -> anyhow::Result<()> {
         for profile in profiles {
-            let name = profile
+            let fname = profile
                 .name
                 .as_ref()
                 .map(|path| path.file_stem().unwrap().to_os_string())
@@ -134,7 +148,7 @@ impl ConfigSource {
             tmp_path.push(self.paths.root_path.as_path());
             tmp_path.push("tmp");
             tmp_path.push(self.paths.profiles_path.as_path());
-            tmp_path.push(name.clone());
+            tmp_path.push(fname.clone());
 
             let mut tmp = fs::File::create(tmp_path.as_path()).await?;
             let bytes = serde_json::to_string(&profile)?;
@@ -144,7 +158,7 @@ impl ConfigSource {
             let mut dst = PathBuf::new();
             dst.push(self.paths.root_path.as_path());
             dst.push(self.paths.profiles_path.as_path());
-            dst.push(name);
+            dst.push(fname);
 
             fs::rename(tmp_path, dst).await?;
         }

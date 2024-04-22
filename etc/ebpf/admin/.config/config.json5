@@ -1,15 +1,12 @@
 {
   "keybindings": {
     "Home": {
-      "<q>": "Quit", // Quit the application.
       "<shift-left>": "NavLeft", // Move left to the next component.
       "<shift-right>": "NavRight", // Move right to the next component.
-      "<Ctrl-d>": "Quit", // Another way to quit.
       "<Ctrl-c>": "Quit", // Yet another way to quit.
       "<Ctrl-z>": "Suspend", // Suspend the application.
     },
     "Firewall": {
-      "<q>": "Quit", // Quit the application.
       "<i>": "Edit", // Remove an entry in the block list.
       "<up>": "Up", // Move up to the next component.
       "<down>": "Down", // Move down to the next component.
@@ -19,79 +16,73 @@
       "<Ctrl-z>": "Suspend", // Suspend the application.
     },
     "FirewallEdit": {
-      "<q>": "Quit", // Quit the application.
       "<esc>": "Cancel", // Scape mode.
       "<Ctrl-s>": "Save", // Add an entry in the block list.
       "<Ctrl-a>": "Add", // Open form to enter a new rule.
       "<Ctrl-r>": "Remove", // Remove an entry in the block list.
       "<up>": "Up", // Move up to the next component.
       "<down>": "Down", // Move down to the next component.
+      "<Ctrl-c>": "Quit", // Yet another way to quit.
       "<Ctrl-z>": "Suspend", // Suspend the application.
     },
     "FirewallForm": {
-      "<q>": "Quit", // Quit the application.
       "<esc>": "Cancel", // Scape mode.
       "<Ctrl-a>": "Add", // Add rule to the list.
       "<up>": "Up", // Move up to the next component.
       "<down>": "Down", // Move down to the next component.
-      "<Ctrl-d>": "Quit", // Another way to quit.
       "<Ctrl-c>": "Quit", // Yet another way to quit.
       "<Ctrl-z>": "Suspend", // Suspend the application.
     },
     "Profiles": {
-      "<q>": "Quit", // Quit the application.
       "<i>": "Edit",
       "<Enter>": "Select", // Select profile to view.
       "<up>": "Up", // Move up to the next component.
       "<down>": "Down", // Move down to the next component.
       "<shift-left>": "NavLeft", // Move left to the next component.
       "<shift-right>": "NavRight", // Move right to the next component.
+      "<Ctrl-c>": "Quit", // Yet another way to quit.
       "<Ctrl-z>": "Suspend", // Suspend the application.
     },
     "ProfilesEdit": {
-      "<q>": "Quit", // Quit the application.
       "<esc>": "Cancel", // Scape mode.
       "<Ctrl-s>": "Save", // Add an entry in the block list.
       "<Ctrl-a>": "Add", // Open form to enter a new rule.
       "<Ctrl-r>": "Remove", // Remove an entry in the block list.
       "<up>": "Up", // Move up to the next component.
       "<down>": "Down", // Move down to the next component.
+      "<Ctrl-c>": "Quit", // Yet another way to quit.
       "<Ctrl-z>": "Suspend", // Suspend the application.
     },
     "ProfileView": {
-      "<q>": "Quit", // Quit the application.
       "<i>": "Edit",
+      "<b>": "Back", // Suspend the application.
       "<up>": "Up", // Move up to the next component.
       "<down>": "Down", // Move down to the next component.
-      "<b>": "Back", // Suspend the application.
       "<shift-left>": "NavLeft", // Move left to the next component.
       "<shift-right>": "NavRight", // Move right to the next component.
+      "<Ctrl-c>": "Quit", // Yet another way to quit.
       "<Ctrl-z>": "Suspend", // Suspend the application.
     },
     "ProfileViewEdit": {
-      "<Ctrl-a>": "AddRule", // Open form to enter a new rule.
+      "<Ctrl-a>": "Add", // Open form to enter a new rule.
       "<Ctrl-r>": "Remove", // Remove a rule.
       "<esc>": "Cancel", // Scape mode.
       "<Ctrl-s>": "Save", // Add an entry in the block list.
       "<up>": "Up", // Move up to the next component.
       "<down>": "Down", // Move down to the next component.
-      "<q>": "Quit", // Quit the application.
+      "<Ctrl-c>": "Quit", // Yet another way to quit.
     },
     "ProfileForm": {
-      "<q>": "Quit", // Quit the application.
       "<esc>": "Cancel", // Scape mode.
       "<Ctrl-a>": "Add", // Add rule to the list.
-      "<Ctrl-d>": "Quit", // Another way to quit.
       "<Ctrl-c>": "Quit", // Yet another way to quit.
       "<Ctrl-z>": "Suspend", // Suspend the application.
     },
     "ProfileRuleForm": {
-      "<q>": "Quit", // Quit the application.
       "<esc>": "Cancel", // Scape mode.
       "<Ctrl-a>": "Add", // Add rule to the list.
       "<up>": "Up", // Move up to the next component.
       "<down>": "Down", // Move down to the next component.
-      "<Ctrl-d>": "Quit", // Another way to quit.
       "<Ctrl-c>": "Quit", // Yet another way to quit.
       "<Ctrl-z>": "Suspend", // Suspend the application.
     }

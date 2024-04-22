@@ -30,7 +30,7 @@ pub struct ProfileView {
     command_tx: Option<UnboundedSender<Action>>,
     longest_item_per_column: [u16; COLUMN_COUNT],
     table: Table<FileRule>,
-    rule_form: RuleForm,
+    form: RuleForm,
     profile: Option<Profile>,
     src: ConfigSource,
     config: Config,
@@ -42,20 +42,20 @@ impl ProfileView {
             command_tx: None,
             longest_item_per_column: [0; COLUMN_COUNT],
             table: Table::new(),
-            rule_form: RuleForm::new(),
+            form: RuleForm::new(),
             profile: None,
             src,
             config: Config::default(),
         }
     }
 
-    pub fn update_state(&mut self, profile: Profile) {
-        self.table.update_state(profile.file_rules.clone());
+    pub fn load_profile(&mut self, profile: Profile) {
+        self.table.load_records(profile.file_rules.clone());
         self.profile = Some(profile);
     }
 
     pub fn rule_form(&mut self) -> &mut RuleForm {
-        &mut self.rule_form
+        &mut self.form
     }
 
     fn space_between_columns(&self) -> [u16; COLUMN_COUNT] {
@@ -75,20 +75,29 @@ impl ProfileView {
         [name as u16, permissions as u16]
     }
 
-    fn update_profile_from_input(&mut self) {
-        if let Some(rule) = self.rule_form.yank_input() {
+    fn update_rules_from_input(&mut self) {
+        if let Some(rule) = self.form.yank_input() {
+            // Update the profile in view.
             let profile = self.profile.as_mut().expect("Profile to be initialized");
             profile.file_rules.push(rule.clone());
+            // Update the rule table.
             self.table.add_record(rule);
         }
     }
 
+    fn restore(&mut self) {
+        self.table.restore_state();
+    }
+
     fn save(&mut self) {
+        self.table.commit_changes();
         let records = self.table.records().cloned().collect::<Vec<_>>();
-        let profile = self
+        let mut profile = self
             .profile
             .take()
             .expect("The view should laways have a profile to view");
+        // Update profile with the new rules.
+        profile.file_rules = records;
         let src = self.src.clone();
         tokio::spawn(async move {
             if let Err(e) = src.write_profiles(vec![profile]).await {
@@ -97,11 +106,7 @@ impl ProfileView {
         });
     }
 
-    pub fn yank_profile(&mut self) -> Option<Profile> {
-        self.profile.take()
-    }
-
-    pub fn reset_state(&mut self) {
+    fn clear(&mut self) {
         self.profile.take();
         self.table.clear();
     }
@@ -121,26 +126,25 @@ impl Component for ProfileView {
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         match action {
             Action::Edit => Ok(Some(Action::UpdateMode(Mode::ProfileViewEdit))),
-            Action::AddRule => Ok(Some(Action::UpdateMode(Mode::ProfileRuleForm))),
+            Action::Add => Ok(Some(Action::UpdateMode(Mode::ProfileRuleForm))),
             Action::Remove => {
-                self.table.remove_cur();
+                self.table.remove_selected_record();
                 Ok(Some(Action::Render))
             },
             Action::Save => {
-                self.table.commit_changes();
                 self.save();
                 Ok(Some(Action::UpdateMode(Mode::ProfileView)))
             },
             Action::Cancel => {
-                self.table.restore_state();
+                self.restore();
                 Ok(Some(Action::UpdateMode(Mode::ProfileView)))
             },
             Action::UpdateMode(Mode::ProfileViewEdit) => {
-                self.update_profile_from_input();
+                self.update_rules_from_input();
                 Ok(None)
             },
             Action::Back => {
-                self.reset_state();
+                self.clear();
                 Ok(Some(Action::UpdateMode(Mode::Profiles)))
             },
             Action::Up => {
@@ -152,7 +156,7 @@ impl Component for ProfileView {
                 Ok(Some(Action::Render))
             },
             Action::NavLeft | Action::NavRight => {
-                self.reset_state();
+                self.clear();
                 Ok(None)
             },
             _ => Ok(None),

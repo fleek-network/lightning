@@ -38,9 +38,13 @@ where
             .map(|(_, r)| r)
     }
 
-    pub fn update_state(&mut self, records: Vec<T>) {
+    pub fn records_to_remove_mut(&mut self) -> impl Iterator<Item = &mut T> {
+        self.removing.iter_mut().map(|(_, r)| r)
+    }
+
+    pub fn load_records(&mut self, records: Vec<T>) {
         for r in records {
-            self.push_record(false, r);
+            self.push(false, r);
         }
     }
 
@@ -63,7 +67,7 @@ where
         }
     }
 
-    pub fn remove_cur(&mut self) {
+    pub fn remove_selected_record(&mut self) {
         if let Some(cur) = self.list_state.selected() {
             debug_assert!(cur < self.records.len());
             let removing = self.records.remove(cur);
@@ -99,17 +103,7 @@ where
     }
 
     pub fn add_record(&mut self, record: T) {
-        self.push_record(true, record);
-    }
-
-    pub fn push_record(&mut self, new: bool, record: T) {
-        self.records.push((new, record));
-
-        // In case, the list was emptied.
-        if self.list_state.selected().is_none() {
-            debug_assert!(self.records.len() == 1);
-            self.list_state.select(Some(0));
-        }
+        self.push(true, record);
     }
 
     pub fn state(&mut self) -> &mut ListState {
@@ -133,5 +127,15 @@ where
         f.render_stateful_widget(profiles, chunks[0], &mut self.list_state);
 
         Ok(())
+    }
+
+    fn push(&mut self, new: bool, record: T) {
+        self.records.push((new, record));
+
+        // In case, the list was emptied.
+        if self.list_state.selected().is_none() {
+            debug_assert!(self.records.len() == 1);
+            self.list_state.select(Some(0));
+        }
     }
 }
