@@ -3,6 +3,7 @@ mod handler;
 
 use async_channel::{Receiver, Sender};
 use async_trait::async_trait;
+use axum::http::StatusCode;
 use axum::routing::any;
 use axum::Router;
 use bytes::{Bytes, BytesMut};
@@ -43,9 +44,29 @@ impl Transport for HttpTransport {
     }
 }
 
+#[derive(Clone, Copy)]
+#[repr(u32)]
 pub enum Service {
-    Fetcher,
-    Js,
+    Fetcher = 0,
+    Js = 1,
+}
+
+impl TryFrom<u32> for Service {
+    type Error = (StatusCode, String);
+
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Service::Fetcher),
+            1 => Ok(Service::Js),
+            _ => Err((StatusCode::NOT_FOUND, "route not found".to_string())),
+        }
+    }
+}
+
+impl Service {
+    pub fn supports_http_overrides(&self) -> bool {
+        matches!(self, Service::Js)
+    }
 }
 
 pub struct HttpSender {
@@ -76,6 +97,12 @@ impl HttpSender {
 
     #[inline(always)]
     fn inner_send(&mut self, bytes: Bytes) {
+        if let Err(e) = self.body_tx.try_send(Ok(bytes)) {
+            warn!("payload dropped, failed to send to write loop: {e}");
+        }
+    }
+
+    fn send_with_http_override(&mut self, bytes: Bytes) {
         if let Some(header_buffer) = self.header_buffer.as_mut() {
             header_buffer.extend(bytes);
             if self.current_write == 0 {
@@ -87,7 +114,7 @@ impl HttpSender {
                 }
             }
         } else if let Err(e) = self.body_tx.try_send(Ok(bytes)) {
-                warn!("payload dropped, failed to send to write loop: {e}");
+            warn!("payload dropped, failed to send to write loop: {e}");
         }
     }
 
@@ -117,7 +144,7 @@ impl TransportSender for HttpSender {
     fn start_write(&mut self, len: usize) {
         // if the header buffer is gone it means we sent the headers already and are ready to stream
         // the body
-        if self.header_buffer.is_none() {
+        if self.header_buffer.is_none() || !self.service.supports_http_overrides() {
             self.termination_tx.take();
         }
 
@@ -136,7 +163,12 @@ impl TransportSender for HttpSender {
         debug_assert!(self.current_write >= len);
 
         self.current_write -= len;
-        self.inner_send(buf);
+
+        if self.service.supports_http_overrides() {
+            self.send_with_http_override(buf);
+        } else {
+            self.inner_send(buf);
+        }
 
         Ok(len)
     }

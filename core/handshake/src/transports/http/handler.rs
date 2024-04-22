@@ -28,8 +28,9 @@ pub async fn handler<P: ExecutorProviderInterface>(
     Extension(provider): Extension<Context<P>>,
     payload: Bytes,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
-    let id = u32::from_str(&service_id)
-        .map_err(|_| (StatusCode::NOT_FOUND, "route not found".to_string()))?;
+    let service_id = u32::from_str(&service_id)
+        .map_err(|_| (StatusCode::NOT_FOUND, "route not found".to_string()))
+        .and_then(Service::try_from)?;
 
     let method = match method {
         Method::GET => HttpMethod::Get,
@@ -42,7 +43,7 @@ pub async fn handler<P: ExecutorProviderInterface>(
     let body_frame = RequestFrame::ServicePayload { bytes: payload };
 
     let handshake_frame = HandshakeRequestFrame::Handshake {
-        service: id,
+        service: service_id as u32,
         pk: ClientPublicKey([0; 96]),
         pop: ClientSignature([0; 48]),
         retry: None,
@@ -56,7 +57,7 @@ pub async fn handler<P: ExecutorProviderInterface>(
     let (body_tx, body_rx) = async_channel::bounded(2_000_000);
     let (termination_tx, termination_rx) = oneshot::channel();
 
-    let sender = HttpSender::new(Service::Js, frame_tx, body_tx, termination_tx);
+    let sender = HttpSender::new(service_id, frame_tx, body_tx, termination_tx);
     let receiver = HttpReceiver::new(
         frame_rx,
         TransportDetail::HttpRequest {
@@ -94,28 +95,34 @@ pub async fn handler<P: ExecutorProviderInterface>(
     provider
         .handle_new_connection(handshake_frame, sender, receiver)
         .await;
-    let header_bytes = body_rx
-        .recv()
-        .await
-        .map_err(|_| bad_request("Connection closed before headers were sent"))
-        .and_then(|res| {
-            res.map_err(|e| bad_request(format!("Unable to get headers from service: {e}")))
-        })?;
-    let header_overrides =
-        serde_json::from_slice::<HttpOverrides>(&header_bytes).unwrap_or_default();
 
     let mut response_builder = Response::builder();
 
     if let Some(content_type) = params.get("mime") {
         response_builder = response_builder.header("Content-Type", content_type);
     }
-    if let Some(headers) = header_overrides.headers {
-        for header in headers {
-            response_builder = response_builder.header(header.0, header.1);
+
+    // If the service is the javascript service. Await the first response as the possible header
+    // overrides and over ride the response headers
+    if let Service::Js = service_id {
+        let header_bytes = body_rx
+            .recv()
+            .await
+            .map_err(|_| bad_request("Connection closed before headers were sent"))
+            .and_then(|res| {
+                res.map_err(|e| bad_request(format!("Unable to get headers from service: {e}")))
+            })?;
+        let header_overrides =
+            serde_json::from_slice::<HttpOverrides>(&header_bytes).unwrap_or_default();
+
+        if let Some(headers) = header_overrides.headers {
+            for header in headers {
+                response_builder = response_builder.header(header.0, header.1);
+            }
         }
-    }
-    if let Some(status) = header_overrides.status {
-        response_builder = response_builder.status(status);
+        if let Some(status) = header_overrides.status {
+            response_builder = response_builder.status(status);
+        }
     }
 
     let body = Body::from_stream(body_rx);
