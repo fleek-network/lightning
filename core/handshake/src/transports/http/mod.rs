@@ -5,7 +5,7 @@ use async_channel::{Receiver, Sender};
 use async_trait::async_trait;
 use axum::routing::any;
 use axum::Router;
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 pub use config::Config;
 use fn_sdk::header::TransportDetail;
 use lightning_interfaces::ExecutorProviderInterface;
@@ -54,6 +54,7 @@ pub struct HttpSender {
     body_tx: Sender<anyhow::Result<Bytes>>,
     current_write: usize,
     termination_tx: Option<oneshot::Sender<TerminationReason>>,
+    header_buffer: Option<BytesMut>,
 }
 
 impl HttpSender {
@@ -69,13 +70,24 @@ impl HttpSender {
             body_tx,
             current_write: 0,
             termination_tx: Some(termination_tx),
+            header_buffer: Some(BytesMut::new()),
         }
     }
 
     #[inline(always)]
     fn inner_send(&mut self, bytes: Bytes) {
-        if let Err(e) = self.body_tx.try_send(Ok(bytes)) {
-            warn!("payload dropped, failed to send to write loop: {e}");
+        if let Some(header_buffer) = self.header_buffer.as_mut() {
+            header_buffer.extend(bytes);
+            if self.current_write == 0 {
+                // always Some due to previous check
+                let payload = self.header_buffer.take().unwrap_or_default();
+
+                if let Err(e) = self.body_tx.try_send(Ok(payload.into())) {
+                    warn!("payload dropped, failed to send to write loop: {e}");
+                }
+            }
+        } else if let Err(e) = self.body_tx.try_send(Ok(bytes)) {
+                warn!("payload dropped, failed to send to write loop: {e}");
         }
     }
 
@@ -103,7 +115,11 @@ impl TransportSender for HttpSender {
     }
 
     fn start_write(&mut self, len: usize) {
-        self.termination_tx.take();
+        // if the header buffer is gone it means we sent the headers already and are ready to stream
+        // the body
+        if self.header_buffer.is_none() {
+            self.termination_tx.take();
+        }
 
         debug_assert!(
             self.current_write == 0,

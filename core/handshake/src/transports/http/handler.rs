@@ -9,7 +9,7 @@ use axum::response::{IntoResponse, Response};
 use axum::Extension;
 use bytes::Bytes;
 use fleek_crypto::{ClientPublicKey, ClientSignature};
-use fn_sdk::header::{HttpMethod, TransportDetail};
+use fn_sdk::header::{HttpMethod, HttpOverrides, TransportDetail};
 use lightning_interfaces::ExecutorProviderInterface;
 use lightning_metrics::increment_counter;
 use lightning_schema::handshake::{HandshakeRequestFrame, RequestFrame};
@@ -78,7 +78,6 @@ pub async fn handler<P: ExecutorProviderInterface>(
                 .collect(),
         },
     );
-    let body = Body::from_stream(body_rx);
 
     sender.frame_tx.try_send(Some(body_frame)).map_err(|_| {
         (
@@ -95,20 +94,39 @@ pub async fn handler<P: ExecutorProviderInterface>(
     provider
         .handle_new_connection(handshake_frame, sender, receiver)
         .await;
+    let header_bytes = body_rx
+        .recv()
+        .await
+        .map_err(|_| bad_request("Connection closed before headers were sent"))
+        .and_then(|res| {
+            res.map_err(|e| bad_request(format!("Unable to get headers from service: {e}")))
+        })?;
+    let header_overrides =
+        serde_json::from_slice::<HttpOverrides>(&header_bytes).unwrap_or_default();
+
+    let mut response_builder = Response::builder();
+
+    if let Some(content_type) = params.get("mime") {
+        response_builder = response_builder.header("Content-Type", content_type);
+    }
+    if let Some(headers) = header_overrides.headers {
+        for header in headers {
+            response_builder = response_builder.header(header.0, header.1);
+        }
+    }
+    if let Some(status) = header_overrides.status {
+        response_builder = response_builder.status(status);
+    }
+
+    let body = Body::from_stream(body_rx);
 
     // If there is an error while streaming, the status header has already been sent,
     // this is a hacky way of returning an error status before beginning streaming the body.
     match termination_rx.await {
         Ok(reason) => Err(bad_request(format!("handshake failed: {reason:?}"))),
-        Err(_) => {
-            let mut builder = Response::builder();
-            if let Some(content_type) = params.get("mime") {
-                builder = builder.header("Content-Type", content_type);
-            }
-            builder
-                .body(body)
-                .map_err(|_| bad_request("invalid type value"))
-        },
+        Err(_) => response_builder
+            .body(body)
+            .map_err(|_| bad_request("invalid type value")),
     }
 }
 

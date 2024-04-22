@@ -5,7 +5,7 @@ use deno_core::url::Url;
 use deno_core::v8::IsolateHandle;
 use deno_core::{serde_v8, v8, JsRuntime};
 use fn_sdk::connection::Connection;
-use fn_sdk::header::TransportDetail;
+use fn_sdk::header::{HttpOverrides, HttpResponse, TransportDetail};
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::{debug, error, info};
 
@@ -112,10 +112,7 @@ async fn handle_request(
             let hash = hex::decode(uri).context("failed to decode blake3 hash")?;
 
             if hash.len() != 32 {
-                connection
-                    .write_payload(b"Invalid blake3 hash length")
-                    .await
-                    .context("failed to send error message")?;
+                respond_with_error(connection, b"Invalid blake3 hash length").await?;
                 return Err(anyhow!("invalid blake3 hash length"));
             }
 
@@ -124,10 +121,7 @@ async fn handle_request(
             if fn_sdk::api::fetch_blake3(hash).await {
                 hash
             } else {
-                connection
-                    .write_payload(b"Failed to fetch blake3 content")
-                    .await
-                    .context("failed to send error message")?;
+                respond_with_error(connection, b"Failed to fetch blake3 content").await?;
                 return Err(anyhow!("failed to fetch file"));
             }
         },
@@ -140,20 +134,14 @@ async fn handle_request(
             {
                 Some(hash) => hash,
                 None => {
-                    connection
-                        .write_payload(b"Failed to fetch from origin")
-                        .await
-                        .context("failed to send error message")?;
+                    respond_with_error(connection, b"Failed to fetch from origin").await?;
                     return Err(anyhow!("failed to fetch from origin"));
                 },
             }
         },
         o => {
             let err = anyhow!("unknown origin: {o:?}");
-            connection
-                .write_payload(err.to_string().as_bytes())
-                .await
-                .context("failed to send error message")?;
+            respond_with_error(connection, err.to_string().as_bytes()).await?;
             return Err(err);
         },
     };
@@ -177,10 +165,7 @@ async fn handle_request(
     let mut runtime = match Runtime::new(location.clone()) {
         Ok(runtime) => runtime,
         Err(e) => {
-            connection
-                .write_payload(e.to_string().as_bytes())
-                .await
-                .context("failed to send error message")?;
+            respond_with_error(connection, e.to_string().as_bytes()).await?;
             return Err(e).context("failed to initialize runtime");
         },
     };
@@ -194,17 +179,11 @@ async fn handle_request(
     {
         Ok(Some(res)) => res,
         Ok(None) => {
-            connection
-                .write_payload(b"no response available")
-                .await
-                .context("failed to send error message")?;
+            respond_with_error(connection, b"no response available").await?;
             bail!("no response available");
         },
         Err(e) => {
-            connection
-                .write_payload(e.to_string().as_bytes())
-                .await
-                .context("failed to send error message")?;
+            respond_with_error(connection, e.to_string().as_bytes()).await?;
             return Err(e).context("failed to run javascript");
         },
     };
@@ -216,17 +195,11 @@ async fn handle_request(
     {
         Ok(Ok(res)) => res,
         Ok(Err(e)) => {
-            connection
-                .write_payload(e.to_string().as_bytes())
-                .await
-                .context("failed to send error message")?;
+            respond_with_error(connection, e.to_string().as_bytes()).await?;
             return Err(e).context("failed to resolve output");
         },
         Err(e) => {
-            connection
-                .write_payload(b"Request timeout")
-                .await
-                .context("failed to send error message")?;
+            respond_with_error(connection, b"Request timeout").await?;
             return Err(e).context("execution timeout");
         },
     };
@@ -242,28 +215,32 @@ async fn handle_request(
                 Ok(slice) => slice.to_vec(),
                 Err(e) => return Err(anyhow!("failed to parse bytes: {e}")),
             };
-            connection
-                .write_payload(&bytes)
-                .await
-                .context("failed to send byte response")?;
+            respond_to_client(connection, &bytes).await?;
         } else if local.is_string() {
             // Likewise for string types
             let string = serde_v8::from_v8::<String>(scope, local)
                 .context("failed to deserialize response string")?;
-            connection
-                .write_payload(string.as_bytes())
-                .await
-                .context("failed to send string response")?;
+
+            // Check and make sure isnt JSON of HttpResponse
+            if let Ok(http_response) = serde_json::from_str::<HttpResponse>(&string) {
+                respond_to_client_with_http_response(connection, http_response).await?;
+            } else {
+                respond_to_client(connection, string.as_bytes()).await?;
+            }
         } else {
-            // Otherwise, send the data as json
-            let value = serde_v8::from_v8::<serde_json::Value>(scope, local)
-                .context("failed to deserialize response")?
-                .clone();
-            let res = serde_json::to_string(&value).context("failed to encode json response")?;
-            connection
-                .write_payload(res.as_bytes())
-                .await
-                .context("failed to send json response")?;
+            // Try to deserialize into the HTTP response object incase that is what they returned
+            if let Ok(http_response) = serde_v8::from_v8::<HttpResponse>(scope, local) {
+                // Its an http response so lets send over the headers provided
+                respond_to_client_with_http_response(connection, http_response).await?;
+            } else {
+                // Otherwise, send the data as json
+                let value = serde_v8::from_v8::<serde_json::Value>(scope, local)
+                    .context("failed to deserialize response")?
+                    .clone();
+                let res =
+                    serde_json::to_string(&value).context("failed to encode json response")?;
+                respond_to_client(connection, res.as_bytes()).await?;
+            }
         }
     }
 
@@ -325,6 +302,72 @@ fn extract_request(url: &Url, body: &[u8], detail: &TransportDetail) -> Option<R
         headers,
         param,
     })
+}
+
+async fn respond_with_error(connection: &mut Connection, error: &[u8]) -> anyhow::Result<()> {
+    let headers = HttpOverrides {
+        status: Some(400_u16),
+        headers: None,
+    };
+    let header_bytes = serde_json::to_vec(&headers).context("Failed to serialize headers")?;
+
+    // respond with the headers first
+    connection
+        .write_payload(&header_bytes)
+        .await
+        .context("failed to send error headers")?;
+
+    // Send the error message back now as body
+    connection
+        .write_payload(error)
+        .await
+        .context("failed to send error message")?;
+
+    Ok(())
+}
+
+async fn respond_to_client_with_http_response(
+    connection: &mut Connection,
+    response: HttpResponse,
+) -> anyhow::Result<()> {
+    let headers = HttpOverrides {
+        status: response.status,
+        headers: response.headers,
+    };
+    let header_bytes = serde_json::to_vec(&headers).context("Failed to serialize headers")?;
+
+    // respond with headers first
+    connection
+        .write_payload(&header_bytes)
+        .await
+        .context("failed to send error headers")?;
+
+    // send body back
+    connection
+        .write_payload(&response.body)
+        .await
+        .context("failed to send body")?;
+
+    Ok(())
+}
+
+async fn respond_to_client(connection: &mut Connection, response: &[u8]) -> anyhow::Result<()> {
+    let header_bytes =
+        serde_json::to_vec(&HttpOverrides::default()).context("Failed to serializez headers")?;
+
+    // response with the headers first
+    connection
+        .write_payload(&header_bytes)
+        .await
+        .context("failed to send error headers")?;
+
+    // Send the body back now
+    connection
+        .write_payload(response)
+        .await
+        .context("failed to send error message")?;
+
+    Ok(())
 }
 
 #[cfg(test)]
