@@ -30,38 +30,28 @@ pub struct ProfileView {
     command_tx: Option<UnboundedSender<Action>>,
     longest_item_per_column: [u16; COLUMN_COUNT],
     table: Table<FileRule>,
-    profile_form: ProfileForm,
     rule_form: RuleForm,
     profile: Option<Profile>,
+    src: ConfigSource,
     config: Config,
 }
 
-impl Default for ProfileView {
-    fn default() -> Self {
+impl ProfileView {
+    pub fn new(src: ConfigSource) -> Self {
         Self {
             command_tx: None,
             longest_item_per_column: [0; COLUMN_COUNT],
             table: Table::new(),
-            profile_form: ProfileForm::new(),
             rule_form: RuleForm::new(),
             profile: None,
+            src,
             config: Config::default(),
         }
-    }
-}
-
-impl ProfileView {
-    pub fn new() -> Self {
-        Self::default()
     }
 
     pub fn update_state(&mut self, profile: Profile) {
         self.table.update_state(profile.file_rules.clone());
         self.profile = Some(profile);
-    }
-
-    pub fn profile_form(&mut self) -> &mut ProfileForm {
-        &mut self.profile_form
     }
 
     pub fn rule_form(&mut self) -> &mut RuleForm {
@@ -86,13 +76,6 @@ impl ProfileView {
     }
 
     fn update_profile_from_input(&mut self) {
-        debug_assert!(self.profile.is_some());
-
-        if let Some(name) = self.profile_form.yank_input() {
-            let profile = self.profile.as_mut().expect("Profile to be initialized");
-            profile.name = name.name
-        }
-
         if let Some(rule) = self.rule_form.yank_input() {
             let profile = self.profile.as_mut().expect("Profile to be initialized");
             profile.file_rules.push(rule.clone());
@@ -100,8 +83,27 @@ impl ProfileView {
         }
     }
 
+    fn save(&mut self) {
+        let records = self.table.records().cloned().collect::<Vec<_>>();
+        let profile = self
+            .profile
+            .take()
+            .expect("The view should laways have a profile to view");
+        let src = self.src.clone();
+        tokio::spawn(async move {
+            if let Err(e) = src.write_profiles(vec![profile]).await {
+                error!("failed to write to list");
+            }
+        });
+    }
+
     pub fn yank_profile(&mut self) -> Option<Profile> {
         self.profile.take()
+    }
+
+    pub fn reset_state(&mut self) {
+        self.profile.take();
+        self.table.clear();
     }
 }
 
@@ -119,19 +121,27 @@ impl Component for ProfileView {
     fn update(&mut self, action: Action) -> Result<Option<Action>> {
         match action {
             Action::Edit => Ok(Some(Action::UpdateMode(Mode::ProfileViewEdit))),
-            Action::Save => {
-                self.table.commit_changes();
-                // self.update_storage();
-                Ok(Some(Action::UpdateMode(Mode::ProfilesEdit)))
-            },
-            Action::Cancel => {
-                self.table.restore_state();
-                Ok(Some(Action::UpdateMode(Mode::Profiles)))
-            },
-            Action::AddRule => Ok(Some(Action::UpdateMode(Mode::ProfileViewEditRuleForm))),
+            Action::AddRule => Ok(Some(Action::UpdateMode(Mode::ProfileRuleForm))),
             Action::Remove => {
                 self.table.remove_cur();
                 Ok(Some(Action::Render))
+            },
+            Action::Save => {
+                self.table.commit_changes();
+                self.save();
+                Ok(Some(Action::UpdateMode(Mode::ProfileView)))
+            },
+            Action::Cancel => {
+                self.table.restore_state();
+                Ok(Some(Action::UpdateMode(Mode::ProfileView)))
+            },
+            Action::UpdateMode(Mode::ProfileViewEdit) => {
+                self.update_profile_from_input();
+                Ok(None)
+            },
+            Action::Back => {
+                self.reset_state();
+                Ok(Some(Action::UpdateMode(Mode::Profiles)))
             },
             Action::Up => {
                 self.table.scroll_up();
@@ -141,13 +151,8 @@ impl Component for ProfileView {
                 self.table.scroll_down();
                 Ok(Some(Action::Render))
             },
-            Action::UpdateMode(Mode::ProfileViewEdit) => {
-                self.update_profile_from_input();
-                Ok(None)
-            },
             Action::NavLeft | Action::NavRight => {
-                self.profile.take();
-                self.table.clear();
+                self.reset_state();
                 Ok(None)
             },
             _ => Ok(None),

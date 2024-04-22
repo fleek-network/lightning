@@ -22,6 +22,7 @@ use unicode_width::UnicodeWidthStr;
 
 use super::{Component, Frame};
 use crate::action::Action;
+use crate::components::profile::forms::ProfileForm;
 use crate::components::profile::view::ProfileView;
 use crate::config::{Config, KeyBindings};
 use crate::mode::Mode;
@@ -29,7 +30,6 @@ use crate::widgets::list::List;
 
 const COLUMN_COUNT: usize = 6;
 
-#[derive(Default)]
 pub struct Profile {
     command_tx: Option<UnboundedSender<Action>>,
     profiles_to_update: Option<Vec<map::Profile>>,
@@ -37,18 +37,20 @@ pub struct Profile {
     longest_item_per_column: [u16; COLUMN_COUNT],
     list: List<map::Profile>,
     profile_view: ProfileView,
+    form: ProfileForm,
     config: Config,
 }
 
 impl Profile {
     pub fn new(src: ConfigSource) -> Self {
         Self {
-            src,
+            src: src.clone(),
             profiles_to_update: None,
             command_tx: None,
             longest_item_per_column: [0; COLUMN_COUNT],
             list: List::new("Profiles"),
-            profile_view: ProfileView::new(),
+            profile_view: ProfileView::new(src),
+            form: ProfileForm::new(),
             config: Config::default(),
         }
     }
@@ -119,6 +121,10 @@ impl Profile {
     pub fn view(&mut self) -> &mut ProfileView {
         &mut self.profile_view
     }
+
+    pub fn form(&mut self) -> &mut ProfileForm {
+        &mut self.form
+    }
 }
 
 impl Component for Profile {
@@ -136,6 +142,7 @@ impl Component for Profile {
         match action {
             Action::Edit => Ok(Some(Action::UpdateMode(Mode::ProfilesEdit))),
             Action::Save => {
+                // Save deleted items.
                 self.update_storage();
                 self.list.commit_changes();
                 Ok(Some(Action::UpdateMode(Mode::Profiles)))
@@ -145,10 +152,7 @@ impl Component for Profile {
                 self.profiles_to_update.take();
                 Ok(Some(Action::UpdateMode(Mode::Profiles)))
             },
-            Action::Add => {
-                self.empty_view();
-                Ok(Some(Action::UpdateMode(Mode::ProfileViewEditNameForm)))
-            },
+            Action::Add => Ok(Some(Action::UpdateMode(Mode::ProfileForm))),
             Action::Remove => {
                 self.list.remove_cur();
                 Ok(Some(Action::Render))
@@ -168,7 +172,7 @@ impl Component for Profile {
                 Ok(Some(Action::UpdateMode(Mode::ProfileView)))
             },
             Action::UpdateMode(Mode::ProfilesEdit) => {
-                if let Some(new) = self.profile_view.yank_profile() {
+                if let Some(new) = self.form.yank_input() {
                     self.add_profile(new);
                 }
                 Ok(None)

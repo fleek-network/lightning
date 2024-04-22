@@ -60,8 +60,10 @@
     },
     "ProfileView": {
       "<q>": "Quit", // Quit the application.
+      "<i>": "Edit",
       "<up>": "Up", // Move up to the next component.
       "<down>": "Down", // Move down to the next component.
+      "<b>": "Back", // Suspend the application.
       "<shift-left>": "NavLeft", // Move left to the next component.
       "<shift-right>": "NavRight", // Move right to the next component.
       "<Ctrl-z>": "Suspend", // Suspend the application.
@@ -75,7 +77,7 @@
       "<down>": "Down", // Move down to the next component.
       "<q>": "Quit", // Quit the application.
     },
-    "ProfileViewEditNameForm": {
+    "ProfileForm": {
       "<q>": "Quit", // Quit the application.
       "<esc>": "Cancel", // Scape mode.
       "<Ctrl-a>": "Add", // Add rule to the list.
@@ -83,7 +85,7 @@
       "<Ctrl-c>": "Quit", // Yet another way to quit.
       "<Ctrl-z>": "Suspend", // Suspend the application.
     },
-    "ProfileViewEditRuleForm": {
+    "ProfileRuleForm": {
       "<q>": "Quit", // Quit the application.
       "<esc>": "Cancel", // Scape mode.
       "<Ctrl-a>": "Add", // Add rule to the list.

@@ -106,14 +106,14 @@ impl Component for ProfileForm {
         match action {
             Action::Cancel => {
                 self.clear_input();
-                Ok(Some(Action::UpdateMode(Mode::ProfileViewEdit)))
+                Ok(Some(Action::UpdateMode(Mode::ProfilesEdit)))
             },
             Action::Add => {
                 if let Err(e) = self.update_filters_from_input() {
                     Ok(Some(Action::Error(e.to_string())))
                 } else {
                     // Todo: Here send new entry.
-                    Ok(Some(Action::UpdateMode(Mode::ProfileViewEdit)))
+                    Ok(Some(Action::UpdateMode(Mode::ProfilesEdit)))
                 }
             },
             Action::Up => {
@@ -218,7 +218,6 @@ fn center_form(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
     .split(popup_layout[1])[1]
 }
 
-#[derive(Default)]
 pub struct RuleForm {
     command_tx: Option<UnboundedSender<Action>>,
     input_fields: Vec<InputField>,

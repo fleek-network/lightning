@@ -31,4 +31,5 @@ pub enum Action {
     Select,
     UpdateProfile,
     AddRule,
+    Back,
 }

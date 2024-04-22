@@ -77,12 +77,8 @@ impl App {
             Mode::ProfilesEdit => self.profiles.update(action.clone())?,
             Mode::ProfileView => self.profiles.view().update(action.clone())?,
             Mode::ProfileViewEdit => self.profiles.view().update(action.clone())?,
-            Mode::ProfileViewEditNameForm => {
-                self.profiles.view().profile_form().update(action.clone())?
-            },
-            Mode::ProfileViewEditRuleForm => {
-                self.profiles.view().rule_form().update(action.clone())?
-            },
+            Mode::ProfileForm => self.profiles.form().update(action.clone())?,
+            Mode::ProfileRuleForm => self.profiles.view().rule_form().update(action.clone())?,
         };
 
         if maybe_action.is_none() {
@@ -102,14 +98,8 @@ impl App {
             Mode::ProfilesEdit => self.profiles.handle_events(Some(event)),
             Mode::ProfileView => self.profiles.view().handle_events(Some(event)),
             Mode::ProfileViewEdit => self.profiles.view().handle_events(Some(event)),
-            Mode::ProfileViewEditNameForm => self
-                .profiles
-                .view()
-                .profile_form()
-                .handle_events(Some(event)),
-            Mode::ProfileViewEditRuleForm => {
-                self.profiles.view().rule_form().handle_events(Some(event))
-            },
+            Mode::ProfileForm => self.profiles.form().handle_events(Some(event)),
+            Mode::ProfileRuleForm => self.profiles.view().rule_form().handle_events(Some(event)),
         }
     }
 
@@ -160,10 +150,10 @@ impl App {
             Mode::ProfileView | Mode::ProfileViewEdit => {
                 self.profiles.view().draw(f, content[0])?;
             },
-            Mode::ProfileViewEditNameForm => {
-                self.profiles.view().profile_form().draw(f, content[0])?;
+            Mode::ProfileForm => {
+                self.profiles.form().draw(f, content[0])?;
             },
-            Mode::ProfileViewEditRuleForm => {
+            Mode::ProfileRuleForm => {
                 self.profiles.view().rule_form().draw(f, content[0])?;
             },
         }
