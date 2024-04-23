@@ -13,6 +13,7 @@ use crate::action::Action;
 use crate::config::{Config, KeyBindings};
 use crate::mode::Mode;
 
+/// Component for switching between tabs.
 #[derive(Default)]
 pub struct Navigator {
     command_tx: Option<UnboundedSender<Action>>,
@@ -72,7 +73,7 @@ impl Component for Navigator {
 
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
         let t = Tabs::new(self.tabs.clone())
-            .select(self.selected_tab as usize)
+            .select(self.selected_tab)
             .block(Block::default().borders(Borders::ALL))
             .style(Style::default().white())
             .highlight_style(Style::default().yellow())

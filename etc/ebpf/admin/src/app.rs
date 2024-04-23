@@ -1,9 +1,7 @@
 use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
 use ebpf_service::ConfigSource;
-use ratatui::layout::Flex;
 use ratatui::prelude::{Constraint, Direction, Layout, Rect};
-use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
 use crate::action::Action;

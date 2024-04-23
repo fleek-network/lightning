@@ -1,22 +1,12 @@
 pub mod form;
 
-use std::collections::{HashMap, HashSet};
-use std::net::{Ipv4Addr, SocketAddrV4};
-use std::time::Duration;
-
 use color_eyre::eyre::Result;
-use color_eyre::owo_colors::OwoColorize;
 use color_eyre::Report;
-use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use ebpf_service::map::PacketFilterRule;
 use ebpf_service::ConfigSource;
-use log::error;
-use ratatui::prelude::*;
-use ratatui::widgets::*;
-use serde::{Deserialize, Serialize};
-use tokio::runtime::Handle;
+use ratatui::prelude::{Color, Constraint, Modifier, Rect, Style, Text};
+use ratatui::widgets::{Cell, Row, TableState};
 use tokio::sync::mpsc::UnboundedSender;
-use tui_textarea::{Input, TextArea};
 use unicode_width::UnicodeWidthStr;
 
 use super::{Component, Frame};
@@ -24,36 +14,27 @@ use crate::action::Action;
 use crate::components::firewall::form::FirewallForm;
 use crate::config::{Config, KeyBindings};
 use crate::mode::Mode;
+use crate::widgets::table::Table;
 
-const IP_FIELD_NAME: &str = "IP";
-const PORT_FIELD_NAME: &str = "Port";
 const COLUMN_COUNT: usize = 6;
-const INPUT_FORM_X: u16 = 20;
-const INPUT_FORM_Y: u16 = 40;
-const INPUT_FIELD_COUNT: usize = 2;
 
-#[derive(Default)]
+/// Component that displaying and managing packet-filter rules.
 pub struct FireWall {
     command_tx: Option<UnboundedSender<Action>>,
-    filters: Vec<(bool, PacketFilterRule)>,
-    removing: Vec<(bool, PacketFilterRule)>,
-    src: ConfigSource,
-    // Table widget for displaying records.
+    table: Table<PacketFilterRule>,
     longest_item_per_column: [u16; COLUMN_COUNT],
-    table_state: TableState,
     form: FirewallForm,
+    src: ConfigSource,
     config: Config,
 }
 
 impl FireWall {
     pub fn new(src: ConfigSource) -> Self {
         Self {
-            filters: Vec::new(),
-            removing: Vec::new(),
             src,
+            table: Table::new(),
             command_tx: None,
             longest_item_per_column: [0; COLUMN_COUNT],
-            table_state: TableState::default().with_selected(0),
             form: FirewallForm::new(),
             config: Config::default(),
         }
@@ -67,62 +48,24 @@ impl FireWall {
             .await
             .map_err(|e| Report::msg(e.to_string()))
         {
-            self.filters = filters.into_iter().map(|f| (false, f)).collect();
+            self.table.load_records(filters);
         }
 
         Ok(())
     }
 
-    fn scroll_up(&mut self) {
-        if let Some(cur) = self.table_state.selected() {
-            if cur > 0 {
-                let cur = cur - 1;
-                self.table_state.select(Some(cur));
-            }
-        }
+    pub fn form(&mut self) -> &mut FirewallForm {
+        &mut self.form
     }
 
-    fn scroll_down(&mut self) {
-        if let Some(cur) = self.table_state.selected() {
-            let len = self.filters.len();
-            if len > 0 && cur < len - 1 {
-                let cur = cur + 1;
-                self.table_state.select(Some(cur));
-            }
-        }
-    }
-
-    fn remove_filter(&mut self) {
-        if let Some(cur) = self.table_state.selected() {
-            debug_assert!(cur < self.filters.len());
-            let elem = self.filters.remove(cur);
-            self.removing.push(elem);
-
-            if self.filters.is_empty() {
-                self.table_state.select(None);
-            } else if cur == self.filters.len() {
-                self.table_state.select(Some(cur - 1));
-            } else {
-                self.table_state.select(Some(cur));
-            }
-        }
-    }
-
-    fn update_storage(&self) {
+    fn save(&mut self) {
+        self.table.commit_changes();
         let command_tx = self
             .command_tx
             .clone()
             .expect("Component always has a sender");
         let storage = self.src.clone();
-        let new = self
-            .filters
-            .clone()
-            .into_iter()
-            .map(|(new, filter)| {
-                debug_assert!(!new);
-                filter
-            })
-            .collect::<Vec<_>>();
+        let new = self.table.records().cloned().collect::<Vec<_>>();
         tokio::spawn(async move {
             if let Err(e) = storage.write_packet_filters(new).await {
                 let _ = command_tx.send(Action::Error(e.to_string()));
@@ -130,36 +73,52 @@ impl FireWall {
         });
     }
 
-    pub fn restore_state(&mut self) {
-        self.filters.retain(|(new, _)| !new);
-        self.removing.retain(|(new, _)| !new);
-        self.filters.extend(self.removing.iter());
-        self.removing.clear();
+    fn space_between_columns(&self) -> [u16; COLUMN_COUNT] {
+        let prefix = self
+            .table
+            .records()
+            .map(|r| r.prefix.to_string().as_str().width())
+            .max()
+            .unwrap_or(0);
+        let ip_len = self
+            .table
+            .records()
+            .map(|r| r.ip.to_string().as_str().width())
+            .max()
+            .unwrap_or(0);
+        let port_len = self
+            .table
+            .records()
+            .map(|r| r.port.to_string().as_str().width())
+            .max()
+            .unwrap_or(0);
+        let proto_len = self
+            .table
+            .records()
+            .map(|r| r.proto_str().as_str().width())
+            .max()
+            .unwrap_or(0);
+        let trigger_event_len = self
+            .table
+            .records()
+            .map(|r| r.audit.to_string().as_str().width())
+            .max()
+            .unwrap_or(0);
+        let action_len = self
+            .table
+            .records()
+            .map(|r| r.action_str().as_str().width())
+            .max()
+            .unwrap_or(0);
 
-        // Refresh the table state.
-        if !self.filters.is_empty() {
-            self.table_state.select(Some(0));
-        }
-    }
-
-    fn commit_changes(&mut self) {
-        self.filters.iter_mut().for_each(|(new, r)| {
-            *new = false;
-        });
-        self.removing.clear();
-    }
-    fn new_rule(&mut self, rule: PacketFilterRule) {
-        self.filters.push((true, rule));
-
-        // In case, the list was emptied.
-        if self.table_state.selected().is_none() {
-            debug_assert!(self.filters.len() == 1);
-            self.table_state.select(Some(0));
-        }
-    }
-
-    pub fn form(&mut self) -> &mut FirewallForm {
-        &mut self.form
+        [
+            ip_len as u16,
+            prefix as u16,
+            port_len as u16,
+            proto_len as u16,
+            trigger_event_len as u16,
+            action_len as u16,
+        ]
     }
 }
 
@@ -179,30 +138,29 @@ impl Component for FireWall {
             Action::Edit => Ok(Some(Action::UpdateMode(Mode::FirewallEdit))),
             Action::Add => Ok(Some(Action::UpdateMode(Mode::FirewallForm))),
             Action::Save => {
-                self.commit_changes();
-                self.update_storage();
+                self.save();
                 Ok(Some(Action::UpdateMode(Mode::Firewall)))
             },
             Action::Cancel => {
-                self.restore_state();
+                self.table.restore_state();
                 Ok(Some(Action::UpdateMode(Mode::Firewall)))
             },
             Action::Remove => {
-                self.remove_filter();
+                self.table.remove_selected_record();
                 Ok(Some(Action::Render))
             },
             Action::Up => {
-                self.scroll_up();
+                self.table.scroll_up();
                 Ok(Some(Action::Render))
             },
             Action::Down => {
-                self.scroll_down();
+                self.table.scroll_down();
                 Ok(Some(Action::Render))
             },
             Action::UpdateMode(Mode::FirewallEdit) => {
                 // It's possible that the form sent this so we try to yank a new input value.
                 if let Some(rule) = self.form.yank_input() {
-                    self.new_rule(rule);
+                    self.table.add_record(rule);
                 }
                 Ok(None)
             },
@@ -211,7 +169,7 @@ impl Component for FireWall {
     }
 
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
-        self.longest_item_per_column = space_between_columns(&self.filters);
+        self.longest_item_per_column = self.space_between_columns();
         debug_assert!(self.longest_item_per_column.len() == COLUMN_COUNT);
 
         let column_names = [
@@ -234,7 +192,7 @@ impl Component for FireWall {
             .collect::<Row>()
             .style(header_style);
 
-        let rows = self.filters.iter().enumerate().map(|(i, (_, data))| {
+        let rows = self.table.records().enumerate().map(|(i, data)| {
             let item = flatten_filter(data);
             item.into_iter()
                 .map(|content| {
@@ -256,62 +214,15 @@ impl Component for FireWall {
         debug_assert!(contraints.len() == COLUMN_COUNT);
 
         let bar = " > ";
-        let table = Table::new(rows, contraints)
+        let table = ratatui::widgets::Table::new(rows, contraints)
             .header(header)
             .highlight_style(selected_style)
             .highlight_symbol(Text::from(bar));
 
-        f.render_stateful_widget(table, area, &mut self.table_state);
+        f.render_stateful_widget(table, area, self.table.state());
 
         Ok(())
     }
-}
-
-struct InputField {
-    title: &'static str,
-    area: TextArea<'static>,
-}
-
-fn space_between_columns(items: &Vec<(bool, PacketFilterRule)>) -> [u16; COLUMN_COUNT] {
-    let prefix = items
-        .iter()
-        .map(|(_, r)| r.prefix.to_string().as_str().width())
-        .max()
-        .unwrap_or(0);
-    let ip_len = items
-        .iter()
-        .map(|(_, r)| r.ip.to_string().as_str().width())
-        .max()
-        .unwrap_or(0);
-    let port_len = items
-        .iter()
-        .map(|(_, r)| r.port.to_string().as_str().width())
-        .max()
-        .unwrap_or(0);
-    let proto_len = items
-        .iter()
-        .map(|(_, r)| r.proto_str().as_str().width())
-        .max()
-        .unwrap_or(0);
-    let trigger_event_len = items
-        .iter()
-        .map(|(_, r)| r.audit.to_string().as_str().width())
-        .max()
-        .unwrap_or(0);
-    let action_len = items
-        .iter()
-        .map(|(_, r)| r.action_str().as_str().width())
-        .max()
-        .unwrap_or(0);
-
-    [
-        ip_len as u16,
-        prefix as u16,
-        port_len as u16,
-        proto_len as u16,
-        trigger_event_len as u16,
-        action_len as u16,
-    ]
 }
 
 fn flatten_filter(filter: &PacketFilterRule) -> [String; COLUMN_COUNT] {

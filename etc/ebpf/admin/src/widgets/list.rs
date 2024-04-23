@@ -1,14 +1,10 @@
 use std::fmt::Display;
 
 use color_eyre::Report;
-use ebpf_service::{map, ConfigSource};
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::prelude::{Modifier, Style};
-use ratatui::widgets::{Block, Borders, ListItem, ListState};
+use ratatui::widgets::{Block, Borders, ListState};
 
-use crate::action::Action;
-use crate::components::profile::Profile;
-use crate::config::Config;
 use crate::tui::Frame;
 
 #[derive(Default)]
@@ -19,7 +15,7 @@ pub struct List<T> {
     list_state: ListState,
 }
 
-impl<'a, T> List<T>
+impl<T> List<T>
 where
     T: Display,
 {

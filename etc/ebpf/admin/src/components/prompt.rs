@@ -21,6 +21,7 @@ use crate::mode::Mode;
 const MAX_KEYS_IN_PROMPT: usize = 16;
 const MAX_KEYS_PER_ROW: usize = 8;
 
+/// Component for displaying key bindings and error messages.
 #[derive(Default)]
 pub struct Prompt {
     command_tx: Option<UnboundedSender<Action>>,
@@ -70,7 +71,7 @@ impl Component for Prompt {
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
         let rows = Layout::default()
             .direction(Direction::Vertical)
-            .constraints(&[Constraint::Length(1), Constraint::Length(1)])
+            .constraints([Constraint::Length(1), Constraint::Length(1)])
             .split(area);
 
         if let Some(e) = self.message.as_ref() {
@@ -82,7 +83,7 @@ impl Component for Prompt {
             );
         }
 
-        let contraints = vec![Constraint::Percentage(100); MAX_KEYS_PER_ROW];
+        let contraints = [Constraint::Percentage(100); MAX_KEYS_PER_ROW];
 
         let first_row = Layout::default()
             .direction(Direction::Horizontal)

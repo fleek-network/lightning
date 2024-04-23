@@ -1,26 +1,20 @@
-use std::collections::{HashMap, HashSet};
-use std::net::{Ipv4Addr, SocketAddrV4};
-use std::time::Duration;
+use std::net::Ipv4Addr;
 
 use color_eyre::eyre::Result;
-use color_eyre::owo_colors::OwoColorize;
 use color_eyre::Report;
-use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
+use crossterm::event::KeyEvent;
 use ebpf_service::map::PacketFilterRule;
-use ebpf_service::ConfigSource;
-use log::error;
-use ratatui::prelude::*;
-use ratatui::widgets::*;
-use serde::{Deserialize, Serialize};
-use tokio::runtime::Handle;
+use ratatui::prelude::{Constraint, Direction, Layout, Rect};
+use ratatui::widgets::Clear;
 use tokio::sync::mpsc::UnboundedSender;
 use tui_textarea::{Input, TextArea};
-use unicode_width::UnicodeWidthStr;
 
 use super::{Component, Frame};
 use crate::action::Action;
-use crate::config::{Config, KeyBindings};
+use crate::config::Config;
 use crate::mode::Mode;
+use crate::widgets::utils;
+use crate::widgets::utils::InputField;
 
 const IP_FIELD_NAME: &str = "IP";
 const PORT_FIELD_NAME: &str = "Port";
@@ -49,8 +43,8 @@ impl FirewallForm {
         .collect();
 
         debug_assert!(input_fields.len() == INPUT_FIELD_COUNT);
-        activate(&mut input_fields[0]);
-        inactivate(&mut input_fields[1]);
+        utils::activate(&mut input_fields[0]);
+        utils::inactivate(&mut input_fields[1]);
 
         Self {
             command_tx: None,
@@ -162,7 +156,7 @@ impl Component for FirewallForm {
         debug_assert!(self.input_fields.len() == INPUT_FIELD_COUNT);
 
         f.render_widget(Clear, area);
-        let area = center_form(INPUT_FORM_X, INPUT_FORM_Y, area);
+        let area = utils::center_form(INPUT_FORM_X, INPUT_FORM_Y, area);
 
         let chunks = Layout::default()
             .direction(Direction::Vertical)
@@ -185,9 +179,9 @@ impl Component for FirewallForm {
             .enumerate()
         {
             if i == self.selected_input_field {
-                activate(textarea);
+                utils::activate(textarea);
             } else {
-                inactivate(textarea)
+                utils::inactivate(textarea)
             }
             let widget = textarea.area.widget();
             f.render_widget(widget, *chunk);
@@ -195,51 +189,4 @@ impl Component for FirewallForm {
 
         Ok(())
     }
-}
-
-struct InputField {
-    title: &'static str,
-    area: TextArea<'static>,
-}
-
-fn inactivate(field: &mut InputField) {
-    field.area.set_cursor_line_style(Style::default());
-    field.area.set_cursor_style(Style::default());
-    field.area.set_block(
-        Block::default()
-            .borders(Borders::ALL)
-            .style(Style::default().fg(Color::White))
-            .title(field.title),
-    );
-}
-
-fn activate(field: &mut InputField) {
-    field
-        .area
-        .set_cursor_line_style(Style::default().add_modifier(Modifier::UNDERLINED));
-    field
-        .area
-        .set_cursor_style(Style::default().add_modifier(Modifier::REVERSED));
-    field.area.set_block(
-        Block::default()
-            .borders(Borders::ALL)
-            .style(Style::default().fg(Color::Red))
-            .title(field.title),
-    );
-}
-
-fn center_form(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
-    let popup_layout = Layout::vertical([
-        Constraint::Percentage((100 - percent_y) / 2),
-        Constraint::Percentage(percent_y),
-        Constraint::Percentage((100 - percent_y) / 2),
-    ])
-    .split(r);
-
-    Layout::horizontal([
-        Constraint::Percentage((100 - percent_x) / 2),
-        Constraint::Percentage(percent_x),
-        Constraint::Percentage((100 - percent_x) / 2),
-    ])
-    .split(popup_layout[1])[1]
 }

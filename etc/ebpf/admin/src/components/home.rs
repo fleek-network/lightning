@@ -2,17 +2,18 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use color_eyre::eyre::Result;
-use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 use indoc::indoc;
-use ratatui::prelude::*;
-use ratatui::widgets::*;
+use ratatui::prelude::{Constraint, Layout, Rect};
+use ratatui::widgets::Paragraph;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::UnboundedSender;
 
 use super::{Component, Frame};
 use crate::action::Action;
-use crate::config::{Config, KeyBindings};
+use crate::config::Config;
 
+/// Component that displaying the home page.
+#[derive(Default)]
 pub struct Home {
     command_tx: Option<UnboundedSender<Action>>,
     title: String,

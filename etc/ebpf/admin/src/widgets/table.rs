@@ -1,15 +1,8 @@
 use std::fmt::Display;
 
 use color_eyre::Report;
-use ebpf_service::{map, ConfigSource};
-use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::prelude::{Color, Modifier, Style, Text};
-use ratatui::widgets::{Block, Borders, Cell, Row, TableState};
-
-use crate::action::Action;
-use crate::components::profile::Profile;
-use crate::config::Config;
-use crate::tui::Frame;
+use ebpf_service::map;
+use ratatui::widgets::TableState;
 
 #[derive(Default)]
 pub struct Table<T> {

@@ -12,6 +12,7 @@ use super::{Component, Frame};
 use crate::action::Action;
 use crate::config::{Config, KeyBindings};
 
+/// Component for displaying summary statistics and event notification.
 #[derive(Default)]
 pub struct Summary {
     command_tx: Option<UnboundedSender<Action>>,

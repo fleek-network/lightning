@@ -21,6 +21,8 @@ use super::{Component, Frame};
 use crate::action::Action;
 use crate::config::{Config, KeyBindings};
 use crate::mode::Mode;
+use crate::widgets::utils;
+use crate::widgets::utils::InputField;
 
 const PROFILE_NAME: &str = "Profile Name";
 const TARGET_NAME: &str = "Target";
@@ -74,8 +76,10 @@ impl ProfileForm {
         }
 
         let name = self.input_fields[0].area.yank_text().trim().to_string();
-        let mut profile = map::Profile::default();
-        profile.name = Some(name.as_str().try_into()?);
+        let profile = map::Profile {
+            name: Some(name.as_str().into()),
+            ..Default::default()
+        };
         self.buf.replace(profile);
 
         Ok(())
@@ -137,7 +141,7 @@ impl Component for ProfileForm {
         debug_assert!(self.input_fields.len() == PROFILE_NAME_INPUT_FIELD_COUNT);
 
         f.render_widget(Clear, area);
-        let area = center_form(INPUT_FORM_X, INPUT_FORM_Y, area);
+        let area = utils::center_form(INPUT_FORM_X, INPUT_FORM_Y, area);
 
         let chunks = Layout::default()
             .direction(Direction::Vertical)
@@ -159,9 +163,9 @@ impl Component for ProfileForm {
             .enumerate()
         {
             if i == self.selected_input_field {
-                activate(textarea);
+                utils::activate(textarea);
             } else {
-                inactivate(textarea)
+                utils::inactivate(textarea)
             }
             let widget = textarea.area.widget();
             f.render_widget(widget, *chunk);
@@ -171,6 +175,7 @@ impl Component for ProfileForm {
     }
 }
 
+#[derive(Default)]
 pub struct RuleForm {
     command_tx: Option<UnboundedSender<Action>>,
     input_fields: Vec<InputField>,
@@ -190,8 +195,8 @@ impl RuleForm {
         .collect();
 
         debug_assert!(input_fields.len() == RULE_INPUT_FIELD_COUNT);
-        activate(&mut input_fields[0]);
-        inactivate(&mut input_fields[1]);
+        utils::activate(&mut input_fields[0]);
+        utils::inactivate(&mut input_fields[1]);
 
         Self {
             command_tx: None,
@@ -285,7 +290,7 @@ impl Component for RuleForm {
         debug_assert!(self.input_fields.len() == RULE_INPUT_FIELD_COUNT);
 
         f.render_widget(Clear, area);
-        let area = center_form(INPUT_FORM_X, INPUT_FORM_Y, area);
+        let area = utils::center_form(INPUT_FORM_X, INPUT_FORM_Y, area);
 
         let chunks = Layout::default()
             .direction(Direction::Vertical)
@@ -308,9 +313,9 @@ impl Component for RuleForm {
             .enumerate()
         {
             if i == self.selected_input_field {
-                activate(textarea);
+                utils::activate(textarea);
             } else {
-                inactivate(textarea)
+                utils::inactivate(textarea)
             }
             let widget = textarea.area.widget();
             f.render_widget(widget, *chunk);
@@ -318,51 +323,4 @@ impl Component for RuleForm {
 
         Ok(())
     }
-}
-
-struct InputField {
-    title: &'static str,
-    area: TextArea<'static>,
-}
-
-fn inactivate(field: &mut InputField) {
-    field.area.set_cursor_line_style(Style::default());
-    field.area.set_cursor_style(Style::default());
-    field.area.set_block(
-        Block::default()
-            .borders(Borders::ALL)
-            .style(Style::default().fg(Color::White))
-            .title(field.title),
-    );
-}
-
-fn activate(field: &mut InputField) {
-    field
-        .area
-        .set_cursor_line_style(Style::default().add_modifier(Modifier::UNDERLINED));
-    field
-        .area
-        .set_cursor_style(Style::default().add_modifier(Modifier::REVERSED));
-    field.area.set_block(
-        Block::default()
-            .borders(Borders::ALL)
-            .style(Style::default().fg(Color::Red))
-            .title(field.title),
-    );
-}
-
-fn center_form(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
-    let popup_layout = Layout::vertical([
-        Constraint::Percentage((100 - percent_y) / 2),
-        Constraint::Percentage(percent_y),
-        Constraint::Percentage((100 - percent_y) / 2),
-    ])
-    .split(r);
-
-    Layout::horizontal([
-        Constraint::Percentage((100 - percent_x) / 2),
-        Constraint::Percentage(percent_x),
-        Constraint::Percentage((100 - percent_x) / 2),
-    ])
-    .split(popup_layout[1])[1]
 }

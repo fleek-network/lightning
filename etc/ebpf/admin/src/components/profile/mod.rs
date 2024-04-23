@@ -30,11 +30,11 @@ use crate::widgets::list::List;
 
 const COLUMN_COUNT: usize = 6;
 
+/// Component that displaying and managing security profiles.
 pub struct Profile {
     command_tx: Option<UnboundedSender<Action>>,
     profiles_to_update: Option<Vec<map::Profile>>,
     src: ConfigSource,
-    longest_item_per_column: [u16; COLUMN_COUNT],
     list: List<map::Profile>,
     view: ProfileView,
     form: ProfileForm,
@@ -47,7 +47,6 @@ impl Profile {
             src: src.clone(),
             profiles_to_update: None,
             command_tx: None,
-            longest_item_per_column: [0; COLUMN_COUNT],
             list: List::new("Profiles"),
             view: ProfileView::new(src),
             form: ProfileForm::new(),
@@ -66,6 +65,14 @@ impl Profile {
             self.list.load_records(profiles);
         }
         Ok(())
+    }
+
+    pub fn view(&mut self) -> &mut ProfileView {
+        &mut self.view
+    }
+
+    pub fn form(&mut self) -> &mut ProfileForm {
+        &mut self.form
     }
 
     fn add_profile(&mut self, profile: map::Profile) {
@@ -108,17 +115,11 @@ impl Profile {
         });
     }
 
-    fn load_profile_for_view(&mut self) -> Result<()> {
+    fn load_profile_into_view(&mut self) -> Result<()> {
         if let Some(selected) = self.list.get() {
             let profile = self
                 .src
-                .blocking_read_profile(
-                    selected
-                        .name
-                        .as_ref()
-                        .map(|name| name.file_stem())
-                        .flatten(),
-                )
+                .blocking_read_profile(selected.name.as_ref().and_then(|name| name.file_stem()))
                 .map_err(|e| Report::msg(e.to_string()))?;
             self.view.load_profile(profile);
         }
@@ -129,12 +130,9 @@ impl Profile {
         self.view.load_profile(map::Profile::default());
     }
 
-    pub fn view(&mut self) -> &mut ProfileView {
-        &mut self.view
-    }
-
-    pub fn form(&mut self) -> &mut ProfileForm {
-        &mut self.form
+    fn restore_state(&mut self) {
+        self.list.restore_state();
+        self.profiles_to_update.take();
     }
 }
 
@@ -153,13 +151,11 @@ impl Component for Profile {
         match action {
             Action::Edit => Ok(Some(Action::UpdateMode(Mode::ProfilesEdit))),
             Action::Save => {
-                // Save deleted items.
                 self.save();
                 Ok(Some(Action::UpdateMode(Mode::Profiles)))
             },
             Action::Cancel => {
-                self.list.restore_state();
-                self.profiles_to_update.take();
+                self.restore_state();
                 Ok(Some(Action::UpdateMode(Mode::Profiles)))
             },
             Action::Add => Ok(Some(Action::UpdateMode(Mode::ProfileForm))),
@@ -176,7 +172,7 @@ impl Component for Profile {
                 Ok(Some(Action::Render))
             },
             Action::Select => {
-                if let Err(e) = self.load_profile_for_view() {
+                if let Err(e) = self.load_profile_into_view() {
                     return Ok(Some(Action::Error(e.to_string())));
                 }
                 Ok(Some(Action::UpdateMode(Mode::ProfileView)))
