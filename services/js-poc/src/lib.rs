@@ -223,8 +223,7 @@ async fn handle_request(
             let string = serde_v8::from_v8::<String>(scope, local)
                 .context("failed to deserialize response string")?;
 
-                respond_to_client(connection, string.as_bytes(), is_http).await?;
-            
+            respond_to_client(connection, string.as_bytes(), is_http).await?;
         } else {
             // todo() unest this
             if is_http {
