@@ -30,7 +30,7 @@ pub enum HttpMethod {
 pub struct HttpResponse {
     pub headers: Option<Vec<(String, String)>>,
     pub status: Option<u16>,
-    pub body: Vec<u8>,
+    pub body: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
