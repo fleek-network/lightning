@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use axum::body::Body;
 use axum::extract::{OriginalUri, Path, Query};
-use axum::http::{Method, StatusCode, Uri};
+use axum::http::{HeaderMap, Method, StatusCode, Uri};
 use axum::response::{IntoResponse, Response};
 use axum::Extension;
 use bytes::Bytes;
@@ -21,6 +21,7 @@ use crate::transports::http::{HttpReceiver, HttpSender, Service};
 
 pub async fn handler<P: ExecutorProviderInterface>(
     method: Method,
+    headers: HeaderMap,
     OriginalUri(uri): OriginalUri,
     Path((service_id, path)): Path<(String, String)>,
     Query(params): Query<HashMap<String, String>>,
@@ -62,7 +63,20 @@ pub async fn handler<P: ExecutorProviderInterface>(
             method,
             uri: extract_url(&path, uri),
             // TODO
-            header: Default::default(),
+            header: headers
+                .into_iter()
+                .filter_map(|(name, val)| {
+                    if let Some(name) = name {
+                        if let Ok(val) = val.to_str() {
+                            Some((name.to_string(), val.to_string()))
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                })
+                .collect(),
         },
     );
     let body = Body::from_stream(body_rx);
