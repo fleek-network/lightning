@@ -62,7 +62,6 @@ pub async fn handler<P: ExecutorProviderInterface>(
         TransportDetail::HttpRequest {
             method,
             uri: extract_url(&path, uri),
-            // TODO
             header: headers
                 .into_iter()
                 .filter_map(|(name, val)| {

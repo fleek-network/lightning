@@ -79,7 +79,8 @@ async fn handle_connection(
         let TransportDetail::HttpRequest { uri, .. } = &connection.header.transport_detail else {
             unreachable!()
         };
-        let request = extract_request(uri, &body).context("Could not parse request")?;
+        let request = extract_request(uri, &body, &connection.header.transport_detail)
+            .context("Could not parse request")?;
         handle_request(&mut connection, &tx, request).await?;
     } else {
         while let Some(payload) = connection.read_payload().await {
@@ -95,10 +96,13 @@ async fn handle_request(
     tx: &UnboundedSender<IsolateHandle>,
     request: Request,
 ) -> anyhow::Result<()> {
+    let req_params = serde_json::to_value(&request)?;
+
     let Request {
         origin,
         uri,
         path,
+        headers: _,
         param,
     } = request;
 
@@ -184,7 +188,10 @@ async fn handle_request(
     tx.send(runtime.deno.v8_isolate().thread_safe_handle())
         .context("Failed to send the IsolateHandle to main thread.")?;
 
-    let res = match runtime.exec(location, source, param).await {
+    let res = match runtime
+        .exec(location, source, param, Some(req_params))
+        .await
+    {
         Ok(Some(res)) => res,
         Ok(None) => {
             connection
@@ -266,7 +273,7 @@ async fn handle_request(
     Ok(())
 }
 
-fn extract_request(url: &Url, body: &[u8]) -> Option<Request> {
+fn extract_request(url: &Url, body: &[u8], detail: &TransportDetail) -> Option<Request> {
     let mut segments = url.path_segments()?;
     let seg1 = segments.next()?;
     let seg2 = segments.next()?;
@@ -305,10 +312,17 @@ fn extract_request(url: &Url, body: &[u8]) -> Option<Request> {
         Some(serde_json::from_slice::<serde_json::Value>(body).ok()?)
     };
 
+    let headers = if let TransportDetail::HttpRequest { header, .. } = &detail {
+        Some(header.clone())
+    } else {
+        None
+    };
+
     Some(Request {
         origin,
         uri: seg2.to_string(),
         path: Some(path),
+        headers,
         param,
     })
 }
@@ -323,17 +337,19 @@ mod tests {
         serde_json::to_vec(&value).unwrap()
     }
 
-    #[test]
-    fn test_extract_request() {
+    #[tokio::test]
+    async fn test_extract_request() {
         assert_eq!(
             extract_request(
                 &Url::parse("http://fleek/blake3/content-hash/").unwrap(),
-                &[]
+                &[],
+                &TransportDetail::Other,
             ),
             Some(Request {
                 origin: Origin::Blake3,
                 uri: "content-hash".to_string(),
                 path: Some("/".to_string()),
+                headers: None,
                 param: None,
             })
         );
@@ -341,12 +357,14 @@ mod tests {
         assert_eq!(
             extract_request(
                 &Url::parse("http://fleek/blake3/content-hash/a").unwrap(),
-                &[]
+                &[],
+                &TransportDetail::Other,
             ),
             Some(Request {
                 origin: Origin::Blake3,
                 uri: "content-hash".to_string(),
                 path: Some("/a".to_string()),
+                headers: None,
                 param: None,
             })
         );
@@ -354,12 +372,14 @@ mod tests {
         assert_eq!(
             extract_request(
                 &Url::parse("http://fleek/blake3/content-hash/a/b").unwrap(),
-                &[]
+                &[],
+                &TransportDetail::Other,
             ),
             Some(Request {
                 origin: Origin::Blake3,
                 uri: "content-hash".to_string(),
                 path: Some("/a/b".to_string()),
+                headers: None,
                 param: None,
             })
         );
@@ -367,12 +387,14 @@ mod tests {
         assert_eq!(
             extract_request(
                 &Url::parse("http://fleek/blake3/content-hash/a/b?a=4").unwrap(),
-                &[]
+                &[],
+                &TransportDetail::Other,
             ),
             Some(Request {
                 origin: Origin::Blake3,
                 uri: "content-hash".to_string(),
                 path: Some("/a/b?a=4".to_string()),
+                headers: None,
                 param: None,
             })
         );
@@ -380,12 +402,14 @@ mod tests {
         assert_eq!(
             extract_request(
                 &Url::parse("http://fleek/blake3/content-hash/a/b?a=4#hello").unwrap(),
-                &[]
+                &[],
+                &TransportDetail::Other,
             ),
             Some(Request {
                 origin: Origin::Blake3,
                 uri: "content-hash".to_string(),
                 path: Some("/a/b?a=4#hello".to_string()),
+                headers: None,
                 param: None,
             })
         );
@@ -396,12 +420,14 @@ mod tests {
                     "http://fleek/blake3/content-hash/a/b?a=4&param=%7B%22a%22%3A%204%7D#hello"
                 )
                 .unwrap(),
-                &[]
+                &[],
+                &TransportDetail::Other,
             ),
             Some(Request {
                 origin: Origin::Blake3,
                 uri: "content-hash".to_string(),
                 path: Some("/a/b?a=4&param=%7B%22a%22%3A%204%7D#hello".to_string()),
+                headers: None,
                 param: Some(json!({"a": 4})),
             })
         );
@@ -412,12 +438,14 @@ mod tests {
                     "http://fleek/blake3/content-hash/a/b?a=4&param=%7B%22a%22%3A%204%7D#hello"
                 )
                 .unwrap(),
-                &body(json!({"hello": 5}))
+                &body(json!({"hello": 5})),
+                &TransportDetail::Other,
             ),
             Some(Request {
                 origin: Origin::Blake3,
                 uri: "content-hash".to_string(),
                 path: Some("/a/b?a=4&param=%7B%22a%22%3A%204%7D#hello".to_string()),
+                headers: None,
                 param: Some(json!({"hello": 5})),
             })
         );

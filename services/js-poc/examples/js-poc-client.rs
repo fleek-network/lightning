@@ -33,6 +33,7 @@ async fn main() -> anyhow::Result<()> {
                 origin,
                 uri,
                 path: None,
+                headers: None,
                 param,
             })
             .expect("failed to encode request")

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use fn_sdk::api::Origin as ApiOrigin;
 use serde::{Deserialize, Serialize};
 
@@ -12,6 +14,8 @@ pub struct Request {
     pub uri: String,
     /// Optional path to provide as the window location
     pub path: Option<String>,
+    /// Headers from the http request
+    pub headers: Option<HashMap<String, String>>,
     /// Parameter to pass to the script's main function
     #[serde(skip_serializing_if = "Option::is_none")]
     pub param: Option<serde_json::Value>,
