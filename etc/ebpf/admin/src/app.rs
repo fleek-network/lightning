@@ -112,8 +112,8 @@ impl App {
         let content_area = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
-                Constraint::Percentage(35),
-                Constraint::Percentage((100_u16).saturating_sub(35)),
+                Constraint::Percentage(25),
+                Constraint::Percentage((100_u16).saturating_sub(25)),
             ])
             .split(body_footer_area[0]);
 

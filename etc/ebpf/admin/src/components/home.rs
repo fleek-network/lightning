@@ -106,9 +106,9 @@ impl Component for Home {
         .split(area);
 
         let hchunks = Layout::horizontal([
-            Constraint::Percentage(30),
-            Constraint::Percentage(40),
-            Constraint::Percentage(30),
+            Constraint::Fill(1),
+            Constraint::Max(42),
+            Constraint::Fill(1),
         ])
         .split(vchunks[1]);
 
