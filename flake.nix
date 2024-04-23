@@ -91,18 +91,26 @@
             strictDeps = true;
             pname = "lightning";
             version = "0.1.0";
-            nativeBuildInputs =
+            nativeBuildInputs = with pkgs; [
+              pkg-config
+              gcc
+              perl
+              cmake
+              clang
+              protobuf
+              mold-wrapped
+              (pkgs.writeShellScriptBin "git" ''
+                # hack to fix `git rev-parse HEAD` when building in sandbox
+                [[ $NIX_ENFORCE_PURITY -eq 1 ]] && echo ${gitRev} && exit
+                "${git}/bin/git" "$@"
+              '')
+            ];
+            buildInputs =
               with pkgs;
               [
-                pkg-config
-                gcc
-                perl
-                cmake
-                clang
                 libclang
                 fontconfig
                 freetype
-                protobuf
                 protobufc
                 openssl_3
                 (rocksdb.override { enableShared = true; })
@@ -112,13 +120,6 @@
                 bzip2
                 lz4
                 onnxruntime
-                mold-wrapped
-
-                (pkgs.writeShellScriptBin "git" ''
-                  # hack to fix `git rev-parse HEAD` when building in sandbox
-                  [[ $NIX_ENFORCE_PURITY -eq 1 ]] && echo ${gitRev} && exit
-                  "${git}/bin/git" "$@"
-                '')
               ]
               ++ lib.optionals pkgs.stdenv.isDarwin [
                 # MacOS specific packages
