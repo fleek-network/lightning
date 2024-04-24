@@ -493,7 +493,7 @@ fn generate_and_store_node_secret(
 ) -> (NodePublicKey, ConsensusPublicKey) {
     Keystore::<FinalTypes>::generate_keys(config.get::<Keystore<FinalTypes>>(), true)
         .expect("failed to ensure keys are generated");
-    let keystore = Keystore::<FinalTypes>::init(&config).expect("failed to load keystore");
+    let keystore = Keystore::<FinalTypes>::init(config).expect("failed to load keystore");
     (keystore.get_ed25519_pk(), keystore.get_bls_pk())
 }
 
