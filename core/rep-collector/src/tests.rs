@@ -15,7 +15,6 @@ use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus, 
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_utils::application::QueryRunnerExt;
-use tokio::sync::mpsc;
 
 use crate::aggregator::ReputationAggregator;
 use crate::config::Config;
@@ -71,7 +70,7 @@ fn get_genesis_committee(
 
 #[tokio::test]
 async fn test_query() {
-    let keystore = EphemeralKeystore::default();
+    let keystore = EphemeralKeystore::<TestBinding>::default();
     let (consensus_secret_key, node_secret_key) =
         (keystore.get_bls_sk(), keystore.get_ed25519_sk());
     let (consensus_public_key, node_public_key) =
@@ -129,7 +128,6 @@ async fn test_query() {
     .expect("failed to initialize node");
     node.start().await;
 
-    let query_runner: fdi::Ref<QueryRunner> = node.provider.get();
     let rep_agg: fdi::Ref<ReputationAggregator<TestBinding>> = node.provider.get();
     let rep_reporter = rep_agg.get_reporter();
     let rep_query = rep_agg.get_query();
@@ -266,7 +264,6 @@ async fn test_submit_measurements() {
     let query_runner: fdi::Ref<QueryRunner> = node.provider.get();
     let rep_agg: fdi::Ref<ReputationAggregator<TestBinding>> = node.provider.get();
     let rep_reporter = rep_agg.get_reporter();
-    let rep_query = rep_agg.get_query();
 
     // Report some measurements to the reputation aggregator.
     let peer_index = query_runner.pubkey_to_index(&peer_public_key).unwrap();
@@ -318,8 +315,8 @@ async fn test_reputation_calculation_and_query() {
     // have reported measurements. Therefore, we need to create two reputation aggregators, two
     // signers, and two consensus services that will receive a socket for the same application
     // service.
-    let keystore1 = EphemeralKeystore::default();
-    let keystore2 = EphemeralKeystore::default();
+    let keystore1 = EphemeralKeystore::<TestBinding>::default();
+    let keystore2 = EphemeralKeystore::<TestBinding>::default();
     let (consensus_secret_key1, node_secret_key1) =
         (keystore1.get_bls_sk(), keystore1.get_ed25519_sk());
     let (consensus_secret_key2, node_secret_key2) =
@@ -395,7 +392,7 @@ async fn test_reputation_calculation_and_query() {
             .with(
                 JsonConfigProvider::default()
                     .with::<Application<TestBinding>>(AppConfig {
-                        genesis: Some(genesis),
+                        genesis: Some(genesis.clone()),
                         mode: Mode::Test,
                         testnet: false,
                         storage: StorageConfig::InMemory,
@@ -420,10 +417,8 @@ async fn test_reputation_calculation_and_query() {
 
     let rep_agg1: fdi::Ref<ReputationAggregator<TestBinding>> = node1.provider.get();
     let rep_reporter1 = rep_agg1.get_reporter();
-    let rep_query1 = rep_agg1.get_query();
 
     let app: fdi::Ref<Application<TestBinding>> = node1.provider.get();
-    let query_runner = app.sync_query();
     let update_socket = app.transaction_executor();
 
     let mut node2 = Node::<TestBinding>::init_with_provider(
@@ -456,7 +451,6 @@ async fn test_reputation_calculation_and_query() {
     let query_runner: fdi::Ref<QueryRunner> = node2.provider.get();
     let rep_agg2: fdi::Ref<ReputationAggregator<TestBinding>> = node2.provider.get();
     let rep_reporter2 = rep_agg2.get_reporter();
-    let rep_query2 = rep_agg2.get_query();
 
     // Both nodes report measurements for two peers (alice and bob).
     // note(dalton): Refactored to not include measurements for non white listed nodes so have to
