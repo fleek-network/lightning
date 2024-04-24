@@ -2,26 +2,26 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use affair::Socket;
 use fleek_crypto::{AccountOwnerSecretKey, NodeSecretKey, NodeSignature, SecretKey};
 use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisNode};
-use lightning_interfaces::Collection;
-use lightning_interfaces::schema::broadcast::{Frame, Message};
-use lightning_interfaces::types::{NodeIndex, NodePorts, Topic};
 use lightning_interfaces::prelude::*;
+use lightning_interfaces::schema::broadcast::{Frame, Message};
+use lightning_interfaces::types::{NodePorts, Topic};
 use lightning_notifier::Notifier;
-use lightning_pool::{muxer, Config as PoolConfig, PoolProvider};
+use lightning_pool::{Config as PoolConfig, PoolProvider};
 use lightning_rep_collector::ReputationAggregator;
 use lightning_signer::Signer;
+use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
-use lightning_topology::{Config as TopologyConfig, Topology};
+use lightning_topology::Topology;
 use tokio::sync::oneshot;
 
-use crate::{Broadcast, Config};
+use crate::Broadcast;
 
 partial!(TestBinding {
+    ConfigProviderInterface = JsonConfigProvider;
     ApplicationInterface = Application<Self>;
     PoolInterface = PoolProvider<Self>;
     KeystoreInterface = EphemeralKeystore<Self>;
@@ -32,22 +32,25 @@ partial!(TestBinding {
     BroadcastInterface = Broadcast<Self>;
 });
 
-pub struct Peer<C: Collection> {
-    _rep_aggregator: C::ReputationAggregatorInterface,
-    _notifier: C::NotifierInterface,
-    topology: C::TopologyInterface,
-    pool: C::PoolInterface,
-    broadcast: C::BroadcastInterface,
-    pub node_secret_key: NodeSecretKey,
-    pub node_index: NodeIndex,
+pub struct Peer {
+    inner: Node<TestBinding>,
+    node_secret_key: NodeSecretKey,
+}
+
+impl Peer {
+    fn sync_query(&self) -> fdi::Ref<c!(TestBinding::ApplicationInterface::SyncExecutor)> {
+        self.inner.provider.get()
+    }
+    fn broadcast(&self) -> fdi::Ref<c!(TestBinding::BroadcastInterface)> {
+        self.inner.provider.get()
+    }
 }
 
 async fn get_broadcasts(
     test_name: &str,
     port_offset: u16,
     num_peers: usize,
-) -> (Vec<Peer<TestBinding>>, Application<TestBinding>, PathBuf) {
-    let mut keystores = Vec::new();
+) -> (Vec<Peer>, PathBuf) {
     let mut genesis = Genesis::load().unwrap();
     let path = std::env::temp_dir()
         .join("lightning-broadcast-test")
@@ -59,10 +62,10 @@ async fn get_broadcasts(
     let owner_public_key = owner_secret_key.to_pk();
 
     genesis.node_info = vec![];
-
+    let mut keystores = vec![];
     // Create signer configs and add nodes to state.
     for i in 0..num_peers {
-        let keystore = EphemeralKeystore::default();
+        let keystore = EphemeralKeystore::<TestBinding>::default();
         let (consensus_secret_key, node_secret_key) =
             (keystore.get_bls_sk(), keystore.get_ed25519_sk());
         keystores.push(keystore);
@@ -89,19 +92,14 @@ async fn get_broadcasts(
         ));
     }
 
-    let app = Application::<TestBinding>::init(
-        AppConfig {
-            genesis: Some(genesis),
-            mode: Mode::Test,
-            testnet: false,
-            storage: StorageConfig::InMemory,
-            db_path: None,
-            db_options: None,
-        },
-        Default::default(),
-    )
-    .unwrap();
-    app.start().await;
+    let app_config = AppConfig {
+        genesis: Some(genesis),
+        mode: Mode::Test,
+        testnet: false,
+        storage: StorageConfig::InMemory,
+        db_path: None,
+        db_options: None,
+    };
 
     // Create peers.
     let mut peers = Vec::new();
@@ -109,104 +107,54 @@ async fn get_broadcasts(
         let address: SocketAddr = format!("0.0.0.0:{}", port_offset + i as u16)
             .parse()
             .unwrap();
-        let peer = create_peer(&app, keystore, address, true).await;
+        let peer = create_peer(app_config.clone(), keystore, address).await;
         peers.push(peer);
     }
 
-    (peers, app, path)
+    (peers, path)
 }
 
 async fn create_peer(
-    app: &Application<TestBinding>,
+    app_config: AppConfig,
     keystore: EphemeralKeystore<TestBinding>,
     address: SocketAddr,
-    in_state: bool,
-) -> Peer<TestBinding> {
-    let query_runner = app.sync_query();
+) -> Peer {
     let node_secret_key = keystore.get_ed25519_sk();
-    let node_public_key = node_secret_key.to_pk();
-    let signer = Signer::<TestBinding>::init(
-        Default::default(),
-        keystore.clone(),
-        query_runner.clone(),
-        Socket::raw_bounded(128).0,
-    )
-    .unwrap();
-    let notifier = Notifier::<TestBinding>::init(app);
-    let topology = Topology::<TestBinding>::init(
-        TopologyConfig::default(),
-        node_public_key,
-        notifier.clone(),
-        query_runner.clone(),
-    )
-    .unwrap();
-    let rep_aggregator = ReputationAggregator::<TestBinding>::init(
-        Default::default(),
-        signer.get_socket(),
-        notifier.clone(),
-        query_runner.clone(),
-    )
-    .unwrap();
-    rep_aggregator.start().await;
 
-    let config = PoolConfig {
-        max_idle_timeout: Duration::from_secs(5),
-        address,
-        ..Default::default()
-    };
-    let pool = PoolProvider::<TestBinding, muxer::quinn::QuinnMuxer>::init(
-        config,
-        keystore.clone(),
-        query_runner.clone(),
-        notifier.clone(),
-        topology.get_receiver(),
-        rep_aggregator.get_reporter(),
+    let inner = Node::<TestBinding>::init_with_provider(
+        fdi::Provider::default()
+            .with(
+                JsonConfigProvider::default()
+                    .with::<Application<TestBinding>>(app_config)
+                    .with::<PoolProvider<TestBinding>>(PoolConfig {
+                        max_idle_timeout: Duration::from_secs(5),
+                        address,
+                        ..Default::default()
+                    }),
+            )
+            .with(keystore),
     )
-    .unwrap();
+    .expect("failed to initialize node");
 
-    let node_index = if in_state {
-        query_runner.pubkey_to_index(&node_public_key).unwrap()
-    } else {
-        u32::MAX
-    };
-
-    let config = Config {};
-
-    let broadcast = Broadcast::<TestBinding>::init(
-        config,
-        query_runner,
-        keystore,
-        rep_aggregator.get_reporter(),
-        &pool,
-    )
-    .unwrap();
-
-    Peer::<TestBinding> {
-        _rep_aggregator: rep_aggregator,
-        _notifier: notifier,
-        topology,
-        pool,
-        broadcast,
+    Peer {
+        inner,
         node_secret_key,
-        node_index,
     }
 }
 
 #[tokio::test]
 async fn test_send() {
     // Initialize three broadcasts
-    let (peers, app, path) = get_broadcasts("send", 28000, 3).await;
-    let query_runner = app.sync_query();
+    let (peers, path) = get_broadcasts("send", 28000, 3).await;
+    let query_runner = peers[0].sync_query();
 
     for peer in &peers {
-        peer.topology.start().await;
-        peer.broadcast.start().await;
-        peer.pool.start().await;
+        peer.inner.start().await;
     }
 
-    let pub_sub1 = peers[0].broadcast.get_pubsub::<Frame>(Topic::Debug);
-    let mut pub_sub2 = peers[1].broadcast.get_pubsub::<Frame>(Topic::Debug);
-    let mut pub_sub3 = peers[2].broadcast.get_pubsub::<Frame>(Topic::Debug);
+    let pub_sub1 = peers[0].broadcast().get_pubsub::<Frame>(Topic::Debug);
+    let mut pub_sub2 = peers[1].broadcast().get_pubsub::<Frame>(Topic::Debug);
+    let mut pub_sub3 = peers[2].broadcast().get_pubsub::<Frame>(Topic::Debug);
 
     // Create a message from node1
     let index = query_runner
@@ -259,9 +207,8 @@ async fn test_send() {
     rx3.await.unwrap();
 
     // Clean up
-    for peer in &peers {
-        peer.broadcast.shutdown().await;
-        peer.pool.shutdown().await;
+    for mut peer in peers {
+        peer.inner.shutdown().await;
     }
     if path.exists() {
         std::fs::remove_dir_all(&path).unwrap();

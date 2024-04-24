@@ -11,8 +11,9 @@ mod pubsub;
 mod recv_buffer;
 mod ring;
 mod stats;
-// #[cfg(test)]
-// mod tests;
+
+#[cfg(test)]
+mod tests;
 
 pub use backend::{BroadcastBackend, SimulonBackend};
 pub use broadcast::Broadcast;
