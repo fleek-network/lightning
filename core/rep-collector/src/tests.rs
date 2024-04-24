@@ -5,21 +5,14 @@ use fleek_crypto::{AccountOwnerSecretKey, ConsensusSecretKey, NodeSecretKey, Sec
 use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisNode};
-use lightning_interfaces::application::ApplicationInterface;
-use lightning_interfaces::common::WithStartAndShutdown;
-use lightning_interfaces::consensus::ConsensusInterface;
-use lightning_interfaces::Collection;
-use lightning_interfaces::notifier::NotifierInterface;
-use lightning_interfaces::reputation::{
-    ReputationAggregatorInterface,
-    ReputationReporterInterface,
-};
-use lightning_interfaces::signer::SignerInterface;
-use lightning_interfaces::types::{Block, NodePorts, UpdateMethod, UpdatePayload, UpdateRequest};
+use lightning_application::query_runner::QueryRunner;
 use lightning_interfaces::prelude::*;
+use lightning_interfaces::types::{Block, NodePorts, UpdateMethod, UpdatePayload, UpdateRequest};
+use lightning_interfaces::Weight;
 use lightning_notifier::Notifier;
 use lightning_signer::Signer;
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus, MockForwarder};
+use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_utils::application::QueryRunnerExt;
 use tokio::sync::mpsc;
@@ -108,82 +101,39 @@ async fn test_query() {
         true,
     ));
 
-    let app = Application::<TestBinding>::init(
-        AppConfig {
-            genesis: Some(genesis),
-            mode: Mode::Test,
-            testnet: false,
-            storage: StorageConfig::InMemory,
-            db_path: None,
-            db_options: None,
-        },
-        Default::default(),
+    let mut node = Node::<TestBinding>::init_with_provider(
+        fdi::Provider::default()
+            .with(
+                JsonConfigProvider::default()
+                    .with::<Application<TestBinding>>(AppConfig {
+                        genesis: Some(genesis),
+                        mode: Mode::Test,
+                        testnet: false,
+                        storage: StorageConfig::InMemory,
+                        db_path: None,
+                        db_options: None,
+                    })
+                    .with::<MockConsensus<TestBinding>>(ConsensusConfig {
+                        min_ordering_time: 0,
+                        max_ordering_time: 1,
+                        probability_txn_lost: 0.0,
+                        transactions_to_lose: HashSet::new(),
+                        new_block_interval: Duration::from_secs(5),
+                    })
+                    .with::<ReputationAggregator<TestBinding>>(Config {
+                        reporter_buffer_size: 1,
+                    }),
+            )
+            .with(keystore),
     )
-    .unwrap();
-    app.start().await;
+    .expect("failed to initialize node");
+    node.start().await;
 
-    let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
+    let query_runner: fdi::Ref<QueryRunner> = node.provider.get();
+    let rep_agg: fdi::Ref<ReputationAggregator<TestBinding>> = node.provider.get();
+    let rep_reporter = rep_agg.get_reporter();
+    let rep_query = rep_agg.get_query();
 
-    let forwarder = MockForwarder::<TestBinding>::init(
-        Default::default(),
-        consensus_public_key,
-        query_runner.clone(),
-    )
-    .unwrap();
-
-    let mut signer = Signer::<TestBinding>::init(
-        Default::default(),
-        keystore.clone(),
-        query_runner.clone(),
-        forwarder.mempool_socket(),
-    )
-    .unwrap();
-
-    let notifier = Notifier::<TestBinding>::init(&app);
-
-    let consensus_config = ConsensusConfig {
-        min_ordering_time: 0,
-        max_ordering_time: 1,
-        probability_txn_lost: 0.0,
-        transactions_to_lose: HashSet::new(),
-        new_block_interval: Duration::from_secs(5),
-    };
-
-    let consensus = MockConsensus::<TestBinding>::init(
-        consensus_config,
-        keystore,
-        &signer,
-        update_socket,
-        query_runner.clone(),
-        infusion::Blank::default(),
-        None,
-        &notifier,
-    )
-    .unwrap();
-
-    let (new_block_tx, new_block_rx) = mpsc::channel(10);
-
-    signer.provide_new_block_notify(new_block_rx);
-    notifier.notify_on_new_block(new_block_tx);
-
-    signer.start().await;
-    consensus.start().await;
-
-    let notifier = Notifier::<TestBinding>::init(&app);
-    let config = Config {
-        reporter_buffer_size: 1,
-    };
-    let rep_aggregator = ReputationAggregator::<TestBinding>::init(
-        config,
-        signer.get_socket(),
-        notifier,
-        query_runner,
-    )
-    .unwrap();
-
-    let rep_reporter = rep_aggregator.get_reporter();
-    let rep_query = rep_aggregator.get_query();
-    rep_aggregator.start().await;
     // Report some measurements for alice and bob.
     let alice = 1;
     let bob = 2;
@@ -216,11 +166,13 @@ async fn test_query() {
             }
         }
     }
+
+    node.shutdown().await;
 }
 
 #[tokio::test]
 async fn test_submit_measurements() {
-    let keystore = EphemeralKeystore::default();
+    let keystore = EphemeralKeystore::<TestBinding>::default();
     let (consensus_secret_key, node_secret_key) =
         (keystore.get_bls_sk(), keystore.get_ed25519_sk());
     let (consensus_public_key, node_public_key) =
@@ -283,80 +235,38 @@ async fn test_submit_measurements() {
     genesis.epoch_start = epoch_start;
     genesis.epoch_time = 4000; // millis
 
-    let app = Application::<TestBinding>::init(
-        AppConfig {
-            genesis: Some(genesis),
-            mode: Mode::Test,
-            testnet: false,
-            storage: StorageConfig::InMemory,
-            db_path: None,
-            db_options: None,
-        },
-        Default::default(),
+    let mut node = Node::<TestBinding>::init_with_provider(
+        fdi::Provider::default()
+            .with(
+                JsonConfigProvider::default()
+                    .with::<Application<TestBinding>>(AppConfig {
+                        genesis: Some(genesis),
+                        mode: Mode::Test,
+                        testnet: false,
+                        storage: StorageConfig::InMemory,
+                        db_path: None,
+                        db_options: None,
+                    })
+                    .with::<MockConsensus<TestBinding>>(ConsensusConfig {
+                        min_ordering_time: 0,
+                        max_ordering_time: 1,
+                        probability_txn_lost: 0.0,
+                        transactions_to_lose: HashSet::new(),
+                        new_block_interval: Duration::from_secs(5),
+                    })
+                    .with::<ReputationAggregator<TestBinding>>(Config {
+                        reporter_buffer_size: 1,
+                    }),
+            )
+            .with(keystore),
     )
-    .unwrap();
-    app.start().await;
+    .expect("failed to initialize node");
+    node.start().await;
 
-    let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
-
-    let forwarder = MockForwarder::<TestBinding>::init(
-        Default::default(),
-        consensus_public_key,
-        query_runner.clone(),
-    )
-    .unwrap();
-
-    let mut signer = Signer::<TestBinding>::init(
-        Default::default(),
-        keystore.clone(),
-        query_runner.clone(),
-        forwarder.mempool_socket(),
-    )
-    .unwrap();
-
-    let notifier = Notifier::<TestBinding>::init(&app);
-
-    let consensus_config = ConsensusConfig {
-        min_ordering_time: 0,
-        max_ordering_time: 1,
-        probability_txn_lost: 0.0,
-        transactions_to_lose: HashSet::new(),
-        new_block_interval: Duration::from_secs(5),
-    };
-    let consensus = MockConsensus::<TestBinding>::init(
-        consensus_config,
-        keystore,
-        &signer,
-        update_socket,
-        query_runner.clone(),
-        infusion::Blank::default(),
-        None,
-        &notifier,
-    )
-    .unwrap();
-
-    let (new_block_tx, new_block_rx) = mpsc::channel(10);
-
-    signer.provide_new_block_notify(new_block_rx);
-    notifier.notify_on_new_block(new_block_tx);
-
-    signer.start().await;
-    consensus.start().await;
-
-    let notifier = Notifier::<TestBinding>::init(&app);
-    let config = Config {
-        reporter_buffer_size: 1,
-    };
-    let rep_aggregator = ReputationAggregator::<TestBinding>::init(
-        config,
-        signer.get_socket(),
-        notifier,
-        query_runner.clone(),
-    )
-    .unwrap();
-
-    let rep_reporter = rep_aggregator.get_reporter();
-    rep_aggregator.start().await;
+    let query_runner: fdi::Ref<QueryRunner> = node.provider.get();
+    let rep_agg: fdi::Ref<ReputationAggregator<TestBinding>> = node.provider.get();
+    let rep_reporter = rep_agg.get_reporter();
+    let rep_query = rep_agg.get_query();
 
     // Report some measurements to the reputation aggregator.
     let peer_index = query_runner.pubkey_to_index(&peer_public_key).unwrap();
@@ -398,6 +308,8 @@ async fn test_submit_measurements() {
             }
         }
     }
+
+    node.shutdown().await;
 }
 
 #[tokio::test]
@@ -478,121 +390,73 @@ async fn test_reputation_calculation_and_query() {
     genesis.epoch_start = epoch_start;
     genesis.epoch_time = 4000; // millis
 
-    let app = Application::<TestBinding>::init(
-        AppConfig {
-            genesis: Some(genesis),
-            mode: Mode::Test,
-            testnet: false,
-            storage: StorageConfig::InMemory,
-            db_path: None,
-            db_options: None,
-        },
-        Default::default(),
+    let mut node1 = Node::<TestBinding>::init_with_provider(
+        fdi::Provider::default()
+            .with(
+                JsonConfigProvider::default()
+                    .with::<Application<TestBinding>>(AppConfig {
+                        genesis: Some(genesis),
+                        mode: Mode::Test,
+                        testnet: false,
+                        storage: StorageConfig::InMemory,
+                        db_path: None,
+                        db_options: None,
+                    })
+                    .with::<MockConsensus<TestBinding>>(ConsensusConfig {
+                        min_ordering_time: 0,
+                        max_ordering_time: 1,
+                        probability_txn_lost: 0.0,
+                        transactions_to_lose: HashSet::new(),
+                        new_block_interval: Duration::from_secs(5),
+                    })
+                    .with::<ReputationAggregator<TestBinding>>(Config {
+                        reporter_buffer_size: 1,
+                    }),
+            )
+            .with(keystore1),
     )
-    .unwrap();
-    app.start().await;
+    .expect("failed to initialize node");
+    node1.start().await;
 
-    let (update_socket, query_runner) = (app.transaction_executor(), app.sync_query());
+    let rep_agg1: fdi::Ref<ReputationAggregator<TestBinding>> = node1.provider.get();
+    let rep_reporter1 = rep_agg1.get_reporter();
+    let rep_query1 = rep_agg1.get_query();
 
-    // mock forwarder will send to all consensus instances
-    let forwarder = MockForwarder::<TestBinding>::init(
-        Default::default(),
-        consensus_public_key1,
-        query_runner.clone(),
+    let app: fdi::Ref<Application<TestBinding>> = node1.provider.get();
+    let query_runner = app.sync_query();
+    let update_socket = app.transaction_executor();
+
+    let mut node2 = Node::<TestBinding>::init_with_provider(
+        fdi::Provider::default()
+            .with(
+                JsonConfigProvider::default()
+                    .with::<Application<TestBinding>>(AppConfig {
+                        genesis: Some(genesis),
+                        mode: Mode::Test,
+                        testnet: false,
+                        storage: StorageConfig::InMemory,
+                        db_path: None,
+                        db_options: None,
+                    })
+                    .with::<MockConsensus<TestBinding>>(ConsensusConfig {
+                        min_ordering_time: 0,
+                        max_ordering_time: 1,
+                        probability_txn_lost: 0.0,
+                        transactions_to_lose: HashSet::new(),
+                        new_block_interval: Duration::from_secs(5),
+                    })
+                    .with::<ReputationAggregator<TestBinding>>(Config {
+                        reporter_buffer_size: 1,
+                    }),
+            )
+            .with(keystore2),
     )
-    .unwrap();
-
-    let mut signer1 = Signer::<TestBinding>::init(
-        Default::default(),
-        keystore1.clone(),
-        query_runner.clone(),
-        forwarder.mempool_socket(),
-    )
-    .unwrap();
-    let mut signer2 = Signer::<TestBinding>::init(
-        Default::default(),
-        keystore2.clone(),
-        query_runner.clone(),
-        forwarder.mempool_socket(),
-    )
-    .unwrap();
-
-    let notifier1 = Notifier::<TestBinding>::init(&app);
-    let notifier2 = Notifier::<TestBinding>::init(&app);
-
-    let consensus_config = ConsensusConfig {
-        min_ordering_time: 0,
-        max_ordering_time: 1,
-        probability_txn_lost: 0.0,
-        transactions_to_lose: HashSet::new(),
-        new_block_interval: Duration::from_secs(5),
-    };
-    // Need to Clone later while we have 2 different MockConsensus
-    let update_socket = update_socket;
-    let consensus1 = MockConsensus::<TestBinding>::init(
-        consensus_config.clone(),
-        keystore1.clone(),
-        &signer1,
-        update_socket.clone(),
-        query_runner.clone(),
-        infusion::Blank::default(),
-        None,
-        &notifier1,
-    )
-    .unwrap();
-
-    let consensus2 = MockConsensus::<TestBinding>::init(
-        consensus_config,
-        keystore2.clone(),
-        &signer2,
-        update_socket.clone(),
-        query_runner.clone(),
-        infusion::Blank::default(),
-        None,
-        &notifier2,
-    )
-    .unwrap();
-
-    let (new_block_tx_1, new_block_rx_1) = mpsc::channel(10);
-    signer1.provide_new_block_notify(new_block_rx_1);
-    notifier1.notify_on_new_block(new_block_tx_1);
-
-    let (new_block_tx_2, new_block_rx_2) = mpsc::channel(10);
-    signer2.provide_new_block_notify(new_block_rx_2);
-    notifier2.notify_on_new_block(new_block_tx_2);
-
-    signer1.start().await;
-
-    signer2.start().await;
-    consensus1.start().await;
-
-    consensus2.start().await;
-
-    let notifier1 = Notifier::<TestBinding>::init(&app);
-
-    let notifier2 = Notifier::<TestBinding>::init(&app);
-    let config = Config {
-        reporter_buffer_size: 1,
-    };
-    let rep_aggregator1 = ReputationAggregator::<TestBinding>::init(
-        config.clone(),
-        signer1.get_socket(),
-        notifier1,
-        query_runner.clone(),
-    )
-    .unwrap();
-    let rep_aggregator2 = ReputationAggregator::<TestBinding>::init(
-        config,
-        signer2.get_socket(),
-        notifier2,
-        query_runner.clone(),
-    )
-    .unwrap();
-
-    let rep_reporter1 = rep_aggregator1.get_reporter();
-    let rep_reporter2 = rep_aggregator2.get_reporter();
-    rep_aggregator1.start().await;
-    rep_aggregator2.start().await;
+    .expect("failed to initialize node");
+    node2.start().await;
+    let query_runner: fdi::Ref<QueryRunner> = node2.provider.get();
+    let rep_agg2: fdi::Ref<ReputationAggregator<TestBinding>> = node2.provider.get();
+    let rep_reporter2 = rep_agg2.get_reporter();
+    let rep_query2 = rep_agg2.get_query();
 
     // Both nodes report measurements for two peers (alice and bob).
     // note(dalton): Refactored to not include measurements for non white listed nodes so have to
@@ -687,4 +551,7 @@ async fn test_reputation_calculation_and_query() {
         .get_reputation_score(&bob)
         .expect("Reputation score for bob is missing");
     assert!(alice_rep > bob_rep);
+
+    node1.shutdown().await;
+    node2.shutdown().await;
 }
