@@ -5,7 +5,12 @@ use deno_core::url::Url;
 use deno_core::v8::IsolateHandle;
 use deno_core::{serde_v8, v8, JsRuntime};
 use fn_sdk::connection::Connection;
-use fn_sdk::header::{HttpOverrides, HttpResponse, TransportDetail};
+use fn_sdk::header::{HttpResponse, TransportDetail};
+use fn_sdk::http_util::{
+    respond_to_client,
+    respond_to_client_with_http_response,
+    respond_with_error,
+};
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::{debug, error, info};
 
@@ -311,82 +316,6 @@ fn extract_request(url: &Url, body: &[u8], detail: &TransportDetail) -> Option<R
         headers,
         param,
     })
-}
-
-async fn respond_with_error(
-    connection: &mut Connection,
-    error: &[u8],
-    is_http: bool,
-) -> anyhow::Result<()> {
-    if is_http {
-        let headers = HttpOverrides {
-            status: Some(400_u16),
-            headers: None,
-        };
-        let header_bytes = serde_json::to_vec(&headers).context("Failed to serialize headers")?;
-
-        // respond with the headers first
-        connection
-            .write_payload(&header_bytes)
-            .await
-            .context("failed to send error headers")?;
-    }
-    // Send the error message back now as body
-    connection
-        .write_payload(error)
-        .await
-        .context("failed to send error message")?;
-
-    Ok(())
-}
-
-async fn respond_to_client_with_http_response(
-    connection: &mut Connection,
-    response: HttpResponse,
-) -> anyhow::Result<()> {
-    let headers = HttpOverrides {
-        status: response.status,
-        headers: response.headers,
-    };
-    let header_bytes = serde_json::to_vec(&headers).context("Failed to serialize headers")?;
-
-    // respond with headers first
-    connection
-        .write_payload(&header_bytes)
-        .await
-        .context("failed to send error headers")?;
-
-    // send body back
-    connection
-        .write_payload(response.body.as_bytes())
-        .await
-        .context("failed to send body")?;
-
-    Ok(())
-}
-
-async fn respond_to_client(
-    connection: &mut Connection,
-    response: &[u8],
-    is_http: bool,
-) -> anyhow::Result<()> {
-    if is_http {
-        let header_bytes = serde_json::to_vec(&HttpOverrides::default())
-            .context("Failed to serializez headers")?;
-
-        // response with the headers first
-        connection
-            .write_payload(&header_bytes)
-            .await
-            .context("failed to send error headers")?;
-    }
-    // Send the body back now
-    connection
-        .write_payload(response)
-        .await
-        .context("failed to send error message")?;
-
-    Ok(())
 }
 
 #[cfg(test)]

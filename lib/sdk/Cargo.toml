@@ -27,3 +27,4 @@ lightning-schema = { path = "../../core/schema" }
 tracing.workspace = true
 rkyv.workspace = true
 anyhow.workspace = true
+serde_json.workspace = true
