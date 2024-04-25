@@ -119,7 +119,7 @@ async fn handle_request(
             let hash = hex::decode(uri).context("failed to decode blake3 hash")?;
 
             if hash.len() != 32 {
-                respond_with_error(connection, b"Invalid blake3 hash length", is_http).await?;
+                respond_with_error(connection, b"Invalid blake3 hash length", 400, is_http).await?;
                 return Err(anyhow!("invalid blake3 hash length"));
             }
 
@@ -128,7 +128,8 @@ async fn handle_request(
             if fn_sdk::api::fetch_blake3(hash).await {
                 hash
             } else {
-                respond_with_error(connection, b"Failed to fetch blake3 content", is_http).await?;
+                respond_with_error(connection, b"Failed to fetch blake3 content", 400, is_http)
+                    .await?;
                 return Err(anyhow!("failed to fetch file"));
             }
         },
@@ -141,14 +142,15 @@ async fn handle_request(
             {
                 Some(hash) => hash,
                 None => {
-                    respond_with_error(connection, b"Failed to fetch from origin", is_http).await?;
+                    respond_with_error(connection, b"Failed to fetch from origin", 400, is_http)
+                        .await?;
                     return Err(anyhow!("failed to fetch from origin"));
                 },
             }
         },
         o => {
             let err = anyhow!("unknown origin: {o:?}");
-            respond_with_error(connection, err.to_string().as_bytes(), is_http).await?;
+            respond_with_error(connection, err.to_string().as_bytes(), 400, is_http).await?;
             return Err(err);
         },
     };
@@ -172,7 +174,7 @@ async fn handle_request(
     let mut runtime = match Runtime::new(location.clone()) {
         Ok(runtime) => runtime,
         Err(e) => {
-            respond_with_error(connection, e.to_string().as_bytes(), is_http).await?;
+            respond_with_error(connection, e.to_string().as_bytes(), 400, is_http).await?;
             return Err(e).context("failed to initialize runtime");
         },
     };
@@ -186,11 +188,11 @@ async fn handle_request(
     {
         Ok(Some(res)) => res,
         Ok(None) => {
-            respond_with_error(connection, b"no response available", is_http).await?;
+            respond_with_error(connection, b"no response available", 400, is_http).await?;
             bail!("no response available");
         },
         Err(e) => {
-            respond_with_error(connection, e.to_string().as_bytes(), is_http).await?;
+            respond_with_error(connection, e.to_string().as_bytes(), 400, is_http).await?;
             return Err(e).context("failed to run javascript");
         },
     };
@@ -202,11 +204,11 @@ async fn handle_request(
     {
         Ok(Ok(res)) => res,
         Ok(Err(e)) => {
-            respond_with_error(connection, e.to_string().as_bytes(), is_http).await?;
+            respond_with_error(connection, e.to_string().as_bytes(), 400, is_http).await?;
             return Err(e).context("failed to resolve output");
         },
         Err(e) => {
-            respond_with_error(connection, b"Request timeout", is_http).await?;
+            respond_with_error(connection, b"Request timeout", 400, is_http).await?;
             return Err(e).context("execution timeout");
         },
     };

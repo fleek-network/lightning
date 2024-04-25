@@ -110,19 +110,19 @@ async fn handle_request(conn: &mut Connection, origin: Origin, uri: Bytes) -> an
     // Fetch the content from the origin
     let hash = match origin {
         Origin::Unknown => {
-            respond_with_error(conn, b"Unknown origin", is_http).await?;
+            respond_with_error(conn, b"Unknown origin", 400, is_http).await?;
             bail!("unknown origin");
         },
         Origin::Blake3 => {
             if uri.len() != 32 {
-                respond_with_error(conn, b"Invalid blake3 hash", is_http).await?;
+                respond_with_error(conn, b"Invalid blake3 hash", 400, is_http).await?;
                 bail!("expected a 32 byte hash");
             }
 
             // Fetch the content from the network
             let hash = *array_ref!(uri, 0, 32);
             if !fn_sdk::api::fetch_blake3(hash).await {
-                respond_with_error(conn, b"Failed to fetch blake3 content", is_http).await?;
+                respond_with_error(conn, b"Failed to fetch blake3 content", 400, is_http).await?;
                 bail!("failed to fetch content");
             }
 
@@ -131,7 +131,7 @@ async fn handle_request(conn: &mut Connection, origin: Origin, uri: Bytes) -> an
         origin => {
             // Fetch the content from the origin
             let Some(hash) = fn_sdk::api::fetch_from_origin(origin.into(), uri).await else {
-                respond_with_error(conn, b"Failed to fetch from origin", is_http).await?;
+                respond_with_error(conn, b"Failed to fetch from origin", 400, is_http).await?;
                 bail!("failed to fetch from origin");
             };
             hash
@@ -142,7 +142,7 @@ async fn handle_request(conn: &mut Connection, origin: Origin, uri: Bytes) -> an
 
     // Get the content from the blockstore
     let Ok(content_handle) = fn_sdk::blockstore::ContentHandle::load(&hash).await else {
-        // TODO(matthias): why aren't we sending an error to the handshake here?
+        respond_with_error(conn, b"Internal error", 500, is_http).await?;
         bail!("failed to load content handle from the blockstore");
     };
 

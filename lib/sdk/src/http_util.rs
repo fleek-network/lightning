@@ -6,11 +6,12 @@ use crate::header::{HttpOverrides, HttpResponse};
 pub async fn respond_with_error(
     connection: &mut Connection,
     error: &[u8],
+    status_code: u16,
     is_http: bool,
 ) -> anyhow::Result<()> {
     if is_http {
         let headers = HttpOverrides {
-            status: Some(400_u16),
+            status: Some(status_code),
             headers: None,
         };
         let header_bytes = serde_json::to_vec(&headers).context("Failed to serialize headers")?;
