@@ -80,7 +80,7 @@ impl<C: Collection> Node<C> {
 
     /// Shutdown the node
     pub async fn shutdown(&mut self) {
-        let mut shutdown = self
+        let shutdown = self
             .shutdown
             .take()
             .expect("cannot call shutdown more than once");
