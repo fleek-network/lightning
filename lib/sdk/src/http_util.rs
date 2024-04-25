@@ -78,3 +78,20 @@ pub async fn respond_to_client(
 
     Ok(())
 }
+
+pub async fn respond_to_client_with_http_headers(
+    connection: &mut Connection,
+    is_http: bool,
+) -> anyhow::Result<()> {
+    if is_http {
+        let header_bytes = serde_json::to_vec(&HttpOverrides::default())
+            .context("Failed to serializez headers")?;
+
+        // response with the headers first
+        connection
+            .write_payload(&header_bytes)
+            .await
+            .context("failed to send error headers")?;
+    }
+    Ok(())
+}

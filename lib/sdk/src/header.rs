@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use fleek_crypto::ClientPublicKey;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -73,45 +73,4 @@ pub async fn write_header(
 pub enum WriteHeaderError {
     Serialization(#[from] serde_cbor::Error),
     Write(#[from] std::io::Error),
-}
-
-impl HttpResponse {
-    pub fn try_from_json(value: &serde_json::Value) -> Result<Self> {
-        if value["status"].is_null() {
-            return Err(anyhow!("Failed to parse status"));
-        }
-        let Some(status) = value["status"].as_str() else {
-            return Err(anyhow!("Failed to parse status"));
-        };
-        let status = status.parse::<u16>()?;
-        println!("status: {:?}", status);
-
-        if value["body"].is_null() {
-            return Err(anyhow!("Failed to parse body"));
-        }
-        let body = value["body"].to_string();
-        println!("body: {}", body);
-
-        if value["headers"].is_null() {
-            return Err(anyhow!("Failed to parse body"));
-        }
-        println!("array: {}", value["headers"].is_object());
-
-        todo!()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::header::HttpResponse;
-
-    #[test]
-    fn test_json() {
-        let json_str = std::fs::read_to_string("/home/matthias/Desktop/ssr.txt").unwrap();
-        let value: serde_json::Value = serde_json::from_str(&json_str).unwrap();
-
-        let res = HttpResponse::try_from_json(&value).unwrap();
-
-        println!("{value}");
-    }
 }

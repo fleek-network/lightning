@@ -18,6 +18,7 @@ use cid::Cid;
 use fn_sdk::api::Origin as ApiOrigin;
 use fn_sdk::connection::Connection;
 use fn_sdk::header::TransportDetail;
+use fn_sdk::http_util::{respond_to_client_with_http_headers, respond_with_error};
 use tracing::{debug, error, info};
 use url::Url;
 
@@ -105,22 +106,23 @@ fn parse_http_url(url: &Url) -> Option<(Origin, Bytes)> {
 async fn handle_request(conn: &mut Connection, origin: Origin, uri: Bytes) -> anyhow::Result<()> {
     debug!("got request for cid");
 
+    let is_http = conn.is_http_request();
     // Fetch the content from the origin
     let hash = match origin {
         Origin::Unknown => {
-            let _ = conn.write_payload(b"Unknown origin").await;
+            respond_with_error(conn, b"Unknown origin", is_http).await?;
             bail!("unknown origin");
         },
         Origin::Blake3 => {
             if uri.len() != 32 {
-                let _ = conn.write_payload(b"Invalid blake3 hash").await;
+                respond_with_error(conn, b"Invalid blake3 hash", is_http).await?;
                 bail!("expected a 32 byte hash");
             }
 
             // Fetch the content from the network
             let hash = *array_ref!(uri, 0, 32);
             if !fn_sdk::api::fetch_blake3(hash).await {
-                let _ = conn.write_payload(b"Failed to fetch blake3 content").await;
+                respond_with_error(conn, b"Failed to fetch blake3 content", is_http).await?;
                 bail!("failed to fetch content");
             }
 
@@ -129,7 +131,7 @@ async fn handle_request(conn: &mut Connection, origin: Origin, uri: Bytes) -> an
         origin => {
             // Fetch the content from the origin
             let Some(hash) = fn_sdk::api::fetch_from_origin(origin.into(), uri).await else {
-                let _ = conn.write_payload(b"Failed to fetch from origin").await;
+                respond_with_error(conn, b"Failed to fetch from origin", is_http).await?;
                 bail!("failed to fetch from origin");
             };
             hash
@@ -140,19 +142,23 @@ async fn handle_request(conn: &mut Connection, origin: Origin, uri: Bytes) -> an
 
     // Get the content from the blockstore
     let Ok(content_handle) = fn_sdk::blockstore::ContentHandle::load(&hash).await else {
+        // TODO(matthias): why aren't we sending an error to the handshake here?
         bail!("failed to load content handle from the blockstore");
     };
 
     debug!("got content handle");
 
     // Only write block count for non-HTTP transports.
-    if !conn.is_http_request() {
+    if !is_http {
         let bytes = (content_handle.len() as u32).to_be_bytes();
         if let Err(e) = conn.write_payload(bytes.as_slice()).await {
             bail!("failed to send number of blocks: {e}");
         }
         debug!("sent block count {}", content_handle.len());
     }
+
+    // Respond with header before streaming the body
+    respond_to_client_with_http_headers(conn, is_http).await?;
 
     for block in 0..content_handle.len() {
         let Ok(bytes) = content_handle.read(block).await else {

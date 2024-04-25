@@ -104,7 +104,7 @@ pub async fn handler<P: ExecutorProviderInterface>(
 
     // If the service is the javascript service. Await the first response as the possible header
     // overrides and over ride the response headers
-    if let Service::Js = service_id {
+    if matches!(service_id, Service::Js | Service::Fetcher) {
         let header_bytes = body_rx
             .recv()
             .await
