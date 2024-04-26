@@ -4,6 +4,7 @@ use color_eyre::eyre::Result;
 use color_eyre::Report;
 use crossterm::event::KeyEvent;
 use ebpf_service::map::PacketFilterRule;
+use ipnet::{AddrParseError, Ipv4Net};
 use ratatui::prelude::{Constraint, Direction, Layout, Rect};
 use ratatui::widgets::Clear;
 use tokio::sync::mpsc::UnboundedSender;
@@ -73,12 +74,19 @@ impl FirewallForm {
             field.area.cut();
         }
 
-        let ip: Ipv4Addr = self.input_fields[0]
-            .area
-            .yank_text()
-            .trim()
-            .parse()
-            .map_err(|_| Report::msg("Invalid IP"))?;
+        let (ip, prefix): (Ipv4Addr, Option<u32>) = {
+            let input = self.input_fields[0].area.yank_text().trim().to_string();
+
+            match input.parse::<Ipv4Addr>() {
+                Ok(ip) => (ip, None),
+                Err(_) => {
+                    let ip_net = input
+                        .parse::<Ipv4Net>()
+                        .map_err(|_| Report::msg("Invalid IP"))?;
+                    (ip_net.network(), Some(ip_net.prefix_len() as u32))
+                },
+            }
+        };
         let port: u16 = self.input_fields[1]
             .area
             .yank_text()
@@ -87,7 +95,7 @@ impl FirewallForm {
             .map_err(|_| Report::msg("Invalid port"))?;
 
         let rule = PacketFilterRule {
-            prefix: PacketFilterRule::DEFAULT_PREFIX,
+            prefix: prefix.unwrap_or(PacketFilterRule::DEFAULT_PREFIX),
             ip,
             port,
             shortlived: false,
