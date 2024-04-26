@@ -117,7 +117,9 @@ pub async fn handler<P: ExecutorProviderInterface>(
 
         if let Some(headers) = header_overrides.headers {
             for header in headers {
-                response_builder = response_builder.header(header.0, header.1);
+                for header_value in header.1 {
+                    response_builder = response_builder.header(header.0.clone(), header_value);
+                }
             }
         }
         if let Some(status) = header_overrides.status {

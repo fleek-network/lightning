@@ -29,14 +29,14 @@ pub enum HttpMethod {
 /// transport is HTTP
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct HttpResponse {
-    pub headers: Option<Vec<(String, String)>>,
+    pub headers: Option<Vec<(String, Vec<String>)>>,
     pub status: Option<u16>,
     pub body: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct HttpOverrides {
-    pub headers: Option<Vec<(String, String)>>,
+    pub headers: Option<Vec<(String, Vec<String>)>>,
     pub status: Option<u16>,
 }
 
