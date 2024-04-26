@@ -27,7 +27,7 @@ pub enum HttpMethod {
 
 ///  Response type used by a service to override the handshake http response fields when the
 /// transport is HTTP
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct HttpResponse {
     pub headers: Option<Vec<(String, Vec<String>)>>,
     pub status: Option<u16>,

@@ -5,7 +5,7 @@ use deno_core::url::Url;
 use deno_core::v8::IsolateHandle;
 use deno_core::{serde_v8, v8, JsRuntime};
 use fn_sdk::connection::Connection;
-use fn_sdk::header::{HttpResponse, TransportDetail};
+use fn_sdk::header::TransportDetail;
 use fn_sdk::http_util::{
     respond_to_client,
     respond_to_client_with_http_response,
@@ -234,26 +234,24 @@ async fn handle_request(
             respond_to_client(connection, string.as_bytes(), is_http).await?;
         } else {
             // todo() unest this
+            let value = serde_v8::from_v8::<serde_json::Value>(scope, local)
+                .context("failed to deserialize response")?
+                .clone();
             if is_http {
                 // Try to deserialize into the HTTP response object incase that is what they
                 // returned
-                if let Ok(http_response) = serde_v8::from_v8::<HttpResponse>(scope, local) {
+
+                if let Ok(http_response) = response_parser::parse(&value) {
                     // Its an http response so lets send over the headers provided
                     respond_to_client_with_http_response(connection, http_response).await?;
                 } else {
                     // Otherwise, send the data as json
-                    let value = serde_v8::from_v8::<serde_json::Value>(scope, local)
-                        .context("failed to deserialize response")?
-                        .clone();
                     let res =
                         serde_json::to_string(&value).context("failed to encode json response")?;
                     respond_to_client(connection, res.as_bytes(), is_http).await?;
                 }
             } else {
                 // Otherwise, send the data as json
-                let value = serde_v8::from_v8::<serde_json::Value>(scope, local)
-                    .context("failed to deserialize response")?
-                    .clone();
                 let res =
                     serde_json::to_string(&value).context("failed to encode json response")?;
                 respond_to_client(connection, res.as_bytes(), is_http).await?;
