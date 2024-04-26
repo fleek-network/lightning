@@ -2948,6 +2948,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dcbb2bf8e87535c23f7a8a321e364ce21462d0ff10cb6407820e8e96dfff6653"
 
 [[package]]
+name = "dummy-waker"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8ea6672d73216c05740850c789368d371ca226dc8104d5f2e30c74252d5d6e5e"
+
+[[package]]
 name = "dunce"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6002,6 +6008,8 @@ dependencies = [
  "atomo-rocks",
  "blake3-tree",
  "bytes",
+ "criterion",
+ "dummy-waker",
  "ethers",
  "fdi",
  "fleek-crypto",
