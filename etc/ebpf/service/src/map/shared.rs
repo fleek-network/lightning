@@ -1,5 +1,6 @@
 use std::net::SocketAddrV4;
 use std::os::unix::fs::MetadataExt;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::{anyhow, bail};
@@ -12,7 +13,6 @@ use common::{
     ALLOW_FILE_RULE,
     MAX_FILE_RULES,
 };
-use resolved_pathbuf::ResolvedPathBuf;
 use tokio::fs;
 use tokio::sync::Mutex;
 
@@ -153,7 +153,7 @@ impl SharedMap {
     }
 }
 
-async fn file_from_path(path: &ResolvedPathBuf) -> anyhow::Result<File> {
+async fn file_from_path(path: &PathBuf) -> anyhow::Result<File> {
     let file = fs::File::open(path.as_path()).await?;
     let metadata = file.metadata().await?;
     let inode = metadata.ino();
