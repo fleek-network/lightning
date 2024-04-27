@@ -1,0 +1,23 @@
+[package]
+name = "better-shutdown"
+version.workspace = true
+edition.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+triomphe.workspace = true
+futures.workspace = true
+tracing.workspace = true
+rand.workspace = true
+parking_lot.workspace = true
+arrayvec = "0.7"
+
+[dev-dependencies]
+criterion = { version = "0.5.0", features = ["html_reports"] }
+tokio.workspace = true
+dummy-waker = "1.1.0"
+
+[[bench]]
+name = "shutdown"
+harness = false
