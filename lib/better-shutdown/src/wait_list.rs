@@ -106,6 +106,7 @@ impl WaitList {
         }
 
         let vec_len = self.arena.len();
+        self.len += 1;
 
         // If we have enough capacity in the vec, don't bother consulting the free_slots list.
         if self.arena.capacity() == vec_len {

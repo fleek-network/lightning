@@ -9,19 +9,19 @@ use criterion::*;
 use futures::FutureExt;
 use triomphe::Arc;
 
-fn bench_over_many_threads<M: Measurement<Value = Duration>, S, R, O>(
+fn bench_over_many_threads<M: Measurement<Value = Duration>, S, R, O, F>(
     b: &mut Bencher<'_, M>,
     num_threads: u8,
-    state: S,
+    state: F,
     routine: R,
 ) where
     R: 'static + Clone + Copy + Send + Fn(&S, u8) -> O,
     S: 'static + Send + Sync,
+    F: Fn() -> S,
 {
-    let state_arc = Arc::new(state);
     b.iter_custom(|iters| {
         let thread_handles = repeat(routine)
-            .map(|r| (state_arc.clone(), r))
+            .map(|r| (state(), r))
             .take(num_threads as usize)
             .enumerate()
             .map(move |(n, (state, routine))| {
@@ -56,15 +56,20 @@ fn bench(c: &mut Criterion) {
             BenchmarkId::new("wait_for_shutdown+drop", n),
             &n,
             |b, num_threads| {
-                let ctrl = ShutdownController::new(shard_count);
+                let ctrl = Arc::new(ShutdownController::new(shard_count));
 
-                bench_over_many_threads(b, *num_threads, ctrl, |ctrl, i| {
-                    let waiter = ctrl.waiter();
-                    let future = waiter.wait_for_shutdown(i);
-                    let future = black_box(future);
-                    drop(future);
-                    drop(black_box(waiter));
-                });
+                bench_over_many_threads(
+                    b,
+                    *num_threads,
+                    || ctrl.clone(),
+                    |ctrl, i| {
+                        let waiter = ctrl.waiter();
+                        let future = waiter.wait_for_shutdown(i);
+                        let future = black_box(future);
+                        drop(future);
+                        drop(black_box(waiter));
+                    },
+                );
             },
         );
 
@@ -72,18 +77,23 @@ fn bench(c: &mut Criterion) {
             BenchmarkId::new("wait_for_shutdown+poll+drop", n),
             &n,
             |b, num_threads| {
-                let ctrl = ShutdownController::new(shard_count);
+                let ctrl = Arc::new(ShutdownController::new(shard_count));
 
-                bench_over_many_threads(b, *num_threads, ctrl, |ctrl, i| {
-                    let waiter = ctrl.waiter();
-                    let future = waiter.wait_for_shutdown(i);
-                    let mut future = Box::pin(black_box(future));
-                    let poll =
-                        future.poll_unpin(&mut Context::from_waker(&dummy_waker::dummy_waker()));
-                    let _ = black_box(poll);
-                    drop(future);
-                    drop(black_box(waiter));
-                });
+                bench_over_many_threads(
+                    b,
+                    *num_threads,
+                    || ctrl.clone(),
+                    |ctrl, i| {
+                        let waiter = ctrl.waiter();
+                        let future = waiter.wait_for_shutdown(i);
+                        let mut future = Box::pin(black_box(future));
+                        let poll = future
+                            .poll_unpin(&mut Context::from_waker(&dummy_waker::dummy_waker()));
+                        let _ = black_box(poll);
+                        drop(future);
+                        drop(black_box(waiter));
+                    },
+                );
             },
         );
 
@@ -91,21 +101,26 @@ fn bench(c: &mut Criterion) {
             BenchmarkId::new("wait_for_shutdown+poll2x+drop", n),
             &n,
             |b, num_threads| {
-                let ctrl = ShutdownController::new(shard_count);
+                let ctrl = Arc::new(ShutdownController::new(shard_count));
 
-                bench_over_many_threads(b, *num_threads, ctrl, |ctrl, i| {
-                    let waiter = ctrl.waiter();
-                    let future = waiter.wait_for_shutdown(i);
-                    let mut future = Box::pin(black_box(future));
-                    let poll =
-                        future.poll_unpin(&mut Context::from_waker(&dummy_waker::dummy_waker()));
-                    let _ = black_box(poll);
-                    let poll =
-                        future.poll_unpin(&mut Context::from_waker(&dummy_waker::dummy_waker()));
-                    let _ = black_box(poll);
-                    drop(future);
-                    drop(black_box(waiter));
-                });
+                bench_over_many_threads(
+                    b,
+                    *num_threads,
+                    || ctrl.clone(),
+                    |ctrl, i| {
+                        let waiter = ctrl.waiter();
+                        let future = waiter.wait_for_shutdown(i);
+                        let mut future = Box::pin(black_box(future));
+                        let poll = future
+                            .poll_unpin(&mut Context::from_waker(&dummy_waker::dummy_waker()));
+                        let _ = black_box(poll);
+                        let poll = future
+                            .poll_unpin(&mut Context::from_waker(&dummy_waker::dummy_waker()));
+                        let _ = black_box(poll);
+                        drop(future);
+                        drop(black_box(waiter));
+                    },
+                );
             },
         );
 
@@ -115,14 +130,45 @@ fn bench(c: &mut Criterion) {
             |b, num_threads| {
                 let ctrl = ShutdownController::new(shard_count);
 
-                bench_over_many_threads(b, *num_threads, ctrl.waiter(), |waiter, i| {
-                    let future = waiter.wait_for_shutdown(i);
-                    let mut future = Box::pin(black_box(future));
-                    let poll =
-                        future.poll_unpin(&mut Context::from_waker(&dummy_waker::dummy_waker()));
-                    let _ = black_box(poll);
-                    drop(future);
-                });
+                bench_over_many_threads(
+                    b,
+                    *num_threads,
+                    || ctrl.waiter(),
+                    |waiter, i| {
+                        let future = waiter.wait_for_shutdown(i);
+                        let mut future = Box::pin(black_box(future));
+                        let poll = future
+                            .poll_unpin(&mut Context::from_waker(&dummy_waker::dummy_waker()));
+                        let _ = black_box(poll);
+                        drop(future);
+                    },
+                );
+            },
+        );
+
+        g.bench_with_input(
+            BenchmarkId::new("wait_for_shutdown+poll+drop[busy_waiter]", n),
+            &n,
+            |b, num_threads| {
+                let ctrl = ShutdownController::new(shard_count);
+
+                bench_over_many_threads(
+                    b,
+                    *num_threads,
+                    || {
+                        let mut waiter = ctrl.waiter();
+                        waiter.mark_busy();
+                        waiter
+                    },
+                    |waiter, i| {
+                        let future = waiter.wait_for_shutdown(i);
+                        let mut future = Box::pin(black_box(future));
+                        let poll = future
+                            .poll_unpin(&mut Context::from_waker(&dummy_waker::dummy_waker()));
+                        let _ = black_box(poll);
+                        drop(future);
+                    },
+                );
             },
         );
 
@@ -130,19 +176,24 @@ fn bench(c: &mut Criterion) {
             BenchmarkId::new("wait_for_shutdown+poll+drop[post-shutdown]", n),
             &n,
             |b, num_threads| {
-                let ctrl = ShutdownController::new(shard_count);
+                let ctrl = Arc::new(ShutdownController::new(shard_count));
                 ctrl.trigger_shutdown();
 
-                bench_over_many_threads(b, *num_threads, ctrl, |ctrl, i| {
-                    let waiter = ctrl.waiter();
-                    let future = waiter.wait_for_shutdown(i);
-                    let mut future = Box::pin(black_box(future));
-                    let poll =
-                        future.poll_unpin(&mut Context::from_waker(&dummy_waker::dummy_waker()));
-                    let _ = black_box(poll);
-                    drop(future);
-                    drop(black_box(waiter));
-                });
+                bench_over_many_threads(
+                    b,
+                    *num_threads,
+                    || ctrl.clone(),
+                    |ctrl, i| {
+                        let waiter = ctrl.waiter();
+                        let future = waiter.wait_for_shutdown(i);
+                        let mut future = Box::pin(black_box(future));
+                        let poll = future
+                            .poll_unpin(&mut Context::from_waker(&dummy_waker::dummy_waker()));
+                        let _ = black_box(poll);
+                        drop(future);
+                        drop(black_box(waiter));
+                    },
+                );
             },
         );
     }
