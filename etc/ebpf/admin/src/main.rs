@@ -1,42 +1,25 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
+mod cli;
+mod commands;
 
-pub mod action;
-pub mod app;
-pub mod cli;
-pub mod components;
-pub mod config;
-pub mod mode;
-pub mod tui;
-pub mod utils;
-pub mod widgets;
-
+use anyhow::Context;
 use clap::Parser;
-use color_eyre::eyre::Result;
-use color_eyre::Report;
+use cli::Cli;
+use color_eyre::{Report, Result};
 use ebpf_service::ConfigSource;
 
-use crate::app::App;
-use crate::cli::Cli;
-use crate::utils::{initialize_logging, initialize_panic_handler, version};
+fn main() -> Result<()> {
+    lightning_tui::utils::initialize_logging()?;
 
-async fn tokio_main() -> Result<()> {
-    initialize_logging()?;
+    lightning_tui::utils::initialize_panic_handler()?;
 
-    initialize_panic_handler()?;
+    ConfigSource::create_config().unwrap();
 
     let cmd = Cli::parse();
-    cmd.exec().await?;
-    Ok(())
-}
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    if let Err(e) = tokio_main().await {
-        eprintln!("{} error: Something went wrong", env!("CARGO_PKG_NAME"));
-        return Err(e);
-    }
-
-    Ok(())
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .context("failed to build runtime")
+        .map_err(Report::msg)?
+        .block_on(cmd.exec())
 }

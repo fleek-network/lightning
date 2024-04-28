@@ -13,6 +13,12 @@ exclude = [
     "lib/cdk",
     "lib/blake3-js",
     "lib/cdk-x-platform-test",
+    "etc/ebpf/tui",
+    "etc/ebpf/admin",
+    "etc/ebpf/ebpf",
+    "etc/ebpf/common",
+    "etc/ebpf/service",
+    "etc/global-metrics",
 ]
 
 

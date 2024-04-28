@@ -6086,6 +6086,7 @@ dependencies = [
  "criterion",
  "dashmap",
  "derive_more",
+ "ebpf-service",
  "enum_dispatch",
  "fleek-crypto",
  "fn-sdk",

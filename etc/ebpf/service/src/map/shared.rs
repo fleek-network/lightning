@@ -30,12 +30,12 @@ impl SharedMap {
     pub fn new(
         packet_filters: HashMap<MapData, PacketFilter, PacketFilterParams>,
         file_open_rules: HashMap<MapData, File, FileRuleList>,
-    ) -> Self {
-        Self {
+    ) -> anyhow::Result<Self> {
+        Ok(Self {
             packet_filters: Arc::new(Mutex::new(packet_filters)),
             file_open_rules: Arc::new(Mutex::new(file_open_rules)),
-            storage: Default::default(),
-        }
+            storage: ConfigSource::create_config()?,
+        })
     }
 
     pub async fn packet_filter_add(&mut self, addr: SocketAddrV4) -> anyhow::Result<()> {

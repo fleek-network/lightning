@@ -1618,26 +1618,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lightning-admin"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "aya",
- "aya-log",
- "clap",
- "color-eyre",
- "common",
- "ebpf-service",
- "env_logger",
- "libc",
- "lightning-tui",
- "log",
- "resolved-pathbuf",
- "tokio",
- "vergen",
-]
-
-[[package]]
 name = "lightning-tui"
 version = "0.0.0"
 dependencies = [

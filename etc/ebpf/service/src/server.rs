@@ -2,7 +2,6 @@ use anyhow::{anyhow, bail};
 use log::{error, info};
 use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
 use tokio::net::{UnixListener, UnixStream};
-use tokio::runtime::Handle;
 use tokio::sync::mpsc;
 
 use crate::config::ConfigSource;
@@ -18,12 +17,12 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new(listener: UnixListener, shared_state: SharedMap) -> Self {
-        Self {
+    pub fn new(listener: UnixListener, shared_state: SharedMap) -> anyhow::Result<Self> {
+        Ok(Self {
             listener,
             shared_state,
-            config_src: Default::default(),
-        }
+            config_src: ConfigSource::create_config()?,
+        })
     }
 
     pub async fn handle_watcher_event(&mut self, event: Event) -> anyhow::Result<()> {
@@ -56,6 +55,7 @@ impl Server {
             .ok_or(anyhow!("socket was closed unexpectedly"))?;
         match service {
             PACKET_FILTER_SERVICE => {
+                println!("Event happened!!!!!");
                 tokio::spawn(async move {
                     if let Err(e) = Connection::new(stream, shared_state).handle().await {
                         info!("connection handler failed: {e:?}");
@@ -75,11 +75,7 @@ impl Server {
         let (watch_event_tx, mut watch_event_rx) = mpsc::channel(96);
         let mut watcher = RecommendedWatcher::new(
             move |res| {
-                tokio::task::block_in_place(|| {
-                    Handle::current().block_on(async {
-                        let _ = watch_event_tx.send(res).await;
-                    });
-                })
+                let _ = watch_event_tx.blocking_send(res);
             },
             Config::default(),
         )?;

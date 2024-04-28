@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::ffi::OsStr;
+use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -16,25 +17,36 @@ const PROFILES_PATH: &str = "~/.lightning/ebpf/profiles";
 /// Configuration source.
 ///
 /// Utility object for reading/writting to configuration files.
-#[derive(Clone, Default)]
+#[derive(Clone, Debug)]
 pub struct ConfigSource {
     paths: Arc<PathConfig>,
 }
 
 impl ConfigSource {
-    pub fn new() -> anyhow::Result<Self> {
-        let result = Self::default();
+    pub fn create_config() -> anyhow::Result<Self> {
+        let config = PathConfig::default();
 
-        std::fs::create_dir_all(&result.paths.root_path)?;
+        std::fs::create_dir_all(&config.root_path)?;
 
         let mut tmp = PathBuf::new();
-        tmp.push(&result.paths.root_path.as_path());
+        tmp.push(&config.root_path.as_path());
         tmp.push("tmp");
         std::fs::create_dir_all(tmp)?;
 
-        std::fs::create_dir_all(result.paths.profiles_path.as_path())?;
+        std::fs::create_dir_all(config.profiles_path.as_path())?;
 
-        Ok(result)
+        // Create file for packet filters.
+        File::create(config.packet_filters_path.as_path())?;
+
+        Ok(Self {
+            paths: Arc::new(config)
+        })
+    }
+
+    pub fn new() -> Self  {
+        Self {
+            paths: Arc::new(PathConfig::default())
+        }
     }
 
     pub fn packet_filers_path(&self) -> &Path {
@@ -56,7 +68,7 @@ impl ConfigSource {
         let mut tmp_path = PathBuf::new();
         tmp_path.push(self.paths.root_path.as_path());
         tmp_path.push("tmp");
-        tmp_path.push(self.paths.packet_filters_path.as_path());
+        tmp_path.push(PACKET_FILTER_PATH);
 
         let mut tmp = fs::File::create(tmp_path.as_path()).await?;
         let bytes = serde_json::to_string(&filters)?;
@@ -64,9 +76,7 @@ impl ConfigSource {
         tmp.sync_all().await?;
 
         let mut dst = PathBuf::new();
-        dst.push(self.paths.root_path.as_path());
         dst.push(self.paths.packet_filters_path.as_path());
-
         fs::rename(tmp_path, dst).await?;
 
         Ok(())
