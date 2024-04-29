@@ -4,13 +4,16 @@ use std::sync::Mutex;
 
 use triomphe::Arc;
 
-use crate::wait_list::WaitList;
+use crate::wait_list::{WaitList, WAIT_LIST_DEFAULT_CAPACITY};
 
 pub(crate) const NUM_SHARED_SHARDS: usize = 16;
 pub(crate) const SHARED_SHARDS_TOTAL_DEFAULT_CAPACITY: usize = 2048;
 
 /// The data shared between shutdown controller and the waiters.
 pub(crate) struct SharedState {
+    /// Is set to true if we have to force capture backtraces.
+    pub capture_backtrace: bool,
+
     /// Useless before `trigger_shutdown` is called. But at that stage it is used to keep track
     /// of the number of 'frozen' wait lists that were not empty.
     pub pending_waiting_lists: AtomicUsize,
@@ -33,21 +36,23 @@ struct DedicatedWaitListState {
 }
 
 impl SharedState {
-    pub fn new(_: usize) -> Self {
+    pub fn new(capture_backtrace: bool) -> Self {
         let wait_list_shards = std::array::from_fn(|_| {
-            Mutex::new(WaitList::with_capacity(
+            Mutex::new(WaitList::new(
                 SHARED_SHARDS_TOTAL_DEFAULT_CAPACITY / NUM_SHARED_SHARDS,
+                capture_backtrace,
             ))
         });
 
         Self {
+            capture_backtrace,
             pending_waiting_lists: AtomicUsize::new(0),
             wait_list_shards,
             dedicated_wait_lists: Mutex::new(DedicatedWaitListState {
                 did_shutdown: false,
                 lists: Vec::with_capacity(16),
             }),
-            waiting_for_drop: Mutex::new(WaitList::with_capacity(8)),
+            waiting_for_drop: Mutex::new(WaitList::new(2, capture_backtrace)),
         }
     }
 
@@ -68,7 +73,10 @@ impl SharedState {
         if guard.did_shutdown {
             None
         } else {
-            let wait_list = Arc::new(Mutex::new(WaitList::default()));
+            let wait_list = Arc::new(Mutex::new(WaitList::new(
+                WAIT_LIST_DEFAULT_CAPACITY,
+                self.capture_backtrace,
+            )));
             guard.lists.push(wait_list.clone());
             Some(wait_list)
         }
@@ -120,5 +128,23 @@ impl SharedState {
             let mut wait_list = wait_list_mutex.lock().unwrap();
             wait_list.wake_all();
         }
+    }
+
+    /// Collect and return the backtrace of all of the pending tasks. This functions consumes the
+    /// backtraces and even if the task is still pending a second call to this function will not
+    /// include that task.
+    // TODO(qti3e): Fix above limitation.
+    pub fn collect_pending_backtrace(&self) -> Vec<std::backtrace::Backtrace> {
+        let mut result = Vec::new();
+        let dedicated_list_guard = self.dedicated_wait_lists.lock().unwrap();
+        for wait_list_mutex in self
+            .wait_list_shards
+            .iter()
+            .chain(dedicated_list_guard.lists.iter().map(Arc::deref))
+        {
+            let mut wait_list = wait_list_mutex.lock().unwrap();
+            wait_list.take_all_backtraces(&mut result);
+        }
+        result
     }
 }

@@ -49,14 +49,12 @@ fn bench(c: &mut Criterion) {
     let mut g = c.benchmark_group("Shutdown");
     g.sample_size(1000);
 
-    let shard_count = 32;
-
     for n in [1, 2, 4, 8, 16, 24, 32] {
         g.bench_with_input(
             BenchmarkId::new("wait_for_shutdown+drop", n),
             &n,
             |b, num_threads| {
-                let ctrl = Arc::new(ShutdownController::new(shard_count));
+                let ctrl = Arc::new(ShutdownController::new(false));
 
                 bench_over_many_threads(
                     b,
@@ -77,7 +75,7 @@ fn bench(c: &mut Criterion) {
             BenchmarkId::new("wait_for_shutdown+poll+drop", n),
             &n,
             |b, num_threads| {
-                let ctrl = Arc::new(ShutdownController::new(shard_count));
+                let ctrl = Arc::new(ShutdownController::new(false));
 
                 bench_over_many_threads(
                     b,
@@ -101,7 +99,7 @@ fn bench(c: &mut Criterion) {
             BenchmarkId::new("wait_for_shutdown+poll2x+drop", n),
             &n,
             |b, num_threads| {
-                let ctrl = Arc::new(ShutdownController::new(shard_count));
+                let ctrl = Arc::new(ShutdownController::new(false));
 
                 bench_over_many_threads(
                     b,
@@ -128,7 +126,7 @@ fn bench(c: &mut Criterion) {
             BenchmarkId::new("wait_for_shutdown+poll+drop[same_waiter]", n),
             &n,
             |b, num_threads| {
-                let ctrl = ShutdownController::new(shard_count);
+                let ctrl = ShutdownController::new(false);
 
                 bench_over_many_threads(
                     b,
@@ -150,7 +148,7 @@ fn bench(c: &mut Criterion) {
             BenchmarkId::new("wait_for_shutdown+poll+drop[busy_waiter]", n),
             &n,
             |b, num_threads| {
-                let ctrl = ShutdownController::new(shard_count);
+                let ctrl = ShutdownController::new(false);
 
                 bench_over_many_threads(
                     b,
@@ -176,7 +174,7 @@ fn bench(c: &mut Criterion) {
             BenchmarkId::new("wait_for_shutdown+poll+drop[post-shutdown]", n),
             &n,
             |b, num_threads| {
-                let ctrl = Arc::new(ShutdownController::new(shard_count));
+                let ctrl = Arc::new(ShutdownController::new(false));
                 ctrl.trigger_shutdown();
 
                 bench_over_many_threads(

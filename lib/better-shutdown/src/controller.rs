@@ -12,11 +12,17 @@ pub struct ShutdownController {
     inner: Arc<SharedState>,
 }
 
+impl Default for ShutdownController {
+    fn default() -> Self {
+        Self::new(false)
+    }
+}
+
 impl ShutdownController {
     /// Create a new shutdown controller with the given number of wait list shards.
-    pub fn new(shards: usize) -> Self {
+    pub fn new(capture_backtrace: bool) -> Self {
         ShutdownController {
-            inner: Arc::new(SharedState::new(shards)),
+            inner: Arc::new(SharedState::new(capture_backtrace)),
         }
     }
 
@@ -40,5 +46,13 @@ impl ShutdownController {
     /// have dropped.
     pub fn wait_for_completion(&self) -> CompletionFuture {
         CompletionFuture::new(&self.inner)
+    }
+
+    pub fn collect_pending_backtrace(&self) -> Option<Vec<std::backtrace::Backtrace>> {
+        if !self.inner.capture_backtrace {
+            return None;
+        }
+
+        Some(self.inner.collect_pending_backtrace())
     }
 }

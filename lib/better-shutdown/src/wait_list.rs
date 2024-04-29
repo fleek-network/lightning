@@ -1,6 +1,6 @@
 use std::task::{Context, Poll, Waker};
 
-const WAIT_LIST_DEFAULT_CAPACITY: usize = 256;
+pub const WAIT_LIST_DEFAULT_CAPACITY: usize = 256;
 
 /// The wait list contains a list of wakers (and some potential attached attributes) and can wake
 /// all of these wakers up at any time.
@@ -18,6 +18,9 @@ const WAIT_LIST_DEFAULT_CAPACITY: usize = 256;
 /// a link to the previously freed item. If the free list was empty we use [ArenaEntry::Empty]
 /// instead.
 pub struct WaitList {
+    /// Set to true if we have to capture the backtrace of the poll functions.
+    capture_backtrace: bool,
+
     /// The current state of wait list which begins at [State::Open] initially.
     state: State,
 
@@ -61,14 +64,15 @@ pub struct WaitListSlotPos {
 
 impl Default for WaitList {
     fn default() -> Self {
-        Self::with_capacity(WAIT_LIST_DEFAULT_CAPACITY)
+        Self::new(WAIT_LIST_DEFAULT_CAPACITY, false)
     }
 }
 
 impl WaitList {
     /// Create a new wait list with the provided capacity.
-    pub fn with_capacity(capacity: usize) -> Self {
+    pub fn new(capacity: usize, capture_backtrace: bool) -> Self {
         Self {
+            capture_backtrace,
             state: State::Open,
             len: 0,
             last_freed: None,
@@ -126,17 +130,6 @@ impl WaitList {
         Ok(WaitListSlotPos { index: vec_len })
     }
 
-    /// Update the waker for a task.
-    #[inline]
-    pub fn update_waker(&mut self, idx: &WaitListSlotPos, waker: Waker) {
-        // As long as the index does exists the value at that position is not null and is valid
-        // entry.
-        match &mut self.arena[idx.index] {
-            ArenaEntry::Item(entry) => entry.waker = waker,
-            _ => panic!("wrong index!"),
-        }
-    }
-
     /// Remove a previously registered waker from the list.
     #[inline]
     pub fn deregister(&mut self, ptr: WaitListSlotPos) {
@@ -164,6 +157,32 @@ impl WaitList {
         }
     }
 
+    /// Returns all of the captured backtraces.
+    pub fn take_all_backtraces(&mut self, result: &mut Vec<std::backtrace::Backtrace>) {
+        if !self.capture_backtrace {
+            return;
+        }
+
+        result.reserve(self.len);
+        let mut visited_entries = 0;
+        for entry in &mut self.arena {
+            if visited_entries == self.len {
+                break;
+            }
+
+            match entry {
+                ArenaEntry::Empty => {},
+                ArenaEntry::Link(_) => {},
+                ArenaEntry::Item(WaitListEntry { backtrace, .. }) => {
+                    if let Some(b) = backtrace.take() {
+                        result.push(*b);
+                    }
+                    visited_entries += 1;
+                },
+            }
+        }
+    }
+
     /// The common implementation of poll shared by some of the futures. This is to be called
     /// by any future that wants to be part of a [WaitList]. The future has to maintain an
     /// state field [Option<WaitListSlotPos>] to keep track of its position in the wait list.
@@ -174,17 +193,23 @@ impl WaitList {
         }
 
         let waker = cx.waker().clone();
+        let backtrace = self
+            .capture_backtrace
+            .then(std::backtrace::Backtrace::force_capture)
+            .map(Box::new);
 
         if let Some(idx) = &*prev_index {
-            self.update_waker(idx, waker);
+            // As long as the index does exists the value at that position is not null and is valid
+            // entry.
+            match &mut self.arena[idx.index] {
+                ArenaEntry::Item(entry) => {
+                    entry.waker = waker;
+                    entry.backtrace = backtrace;
+                },
+                _ => panic!("wrong index!"),
+            }
         } else {
-            let idx = self
-                .register(WaitListEntry {
-                    waker,
-                    backtrace: None,
-                })
-                .unwrap();
-
+            let idx = self.register(WaitListEntry { waker, backtrace }).unwrap();
             *prev_index = Some(idx);
         }
 
