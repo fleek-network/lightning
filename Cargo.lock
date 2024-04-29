@@ -1040,6 +1040,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "better-shutdown"
+version = "0.1.0"
+dependencies = [
+ "arrayvec",
+ "criterion",
+ "dummy-waker",
+ "futures",
+ "fxhash",
+ "rand 0.8.5",
+ "tokio",
+ "tracing",
+ "triomphe",
+]
+
+[[package]]
 name = "bincode"
 version = "1.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
