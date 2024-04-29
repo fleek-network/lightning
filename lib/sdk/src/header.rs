@@ -17,7 +17,7 @@ pub struct ConnectionHeader {
     pub transport_detail: TransportDetail,
 }
 
-#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, PartialOrd)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, PartialOrd, Eq)]
 pub enum HttpMethod {
     Get,
     Post,

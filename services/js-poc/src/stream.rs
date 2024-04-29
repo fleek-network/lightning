@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use fn_sdk::api::Origin as ApiOrigin;
+use fn_sdk::header::HttpMethod;
 use serde::{Deserialize, Serialize};
 
 /// Request to execute some javascript from an origin
@@ -14,6 +15,8 @@ pub struct Request {
     pub uri: String,
     /// Optional path to provide as the window location
     pub path: Option<String>,
+    /// Http method
+    pub method: Option<HttpMethod>,
     /// Headers from the http request
     pub headers: Option<HashMap<String, String>>,
     /// Parameter to pass to the script's main function

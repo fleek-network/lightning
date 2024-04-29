@@ -110,6 +110,7 @@ async fn handle_request(
         origin,
         uri,
         path,
+        method: _,
         headers: _,
         param,
     } = request;
@@ -304,16 +305,17 @@ fn extract_request(url: &Url, body: &[u8], detail: &TransportDetail) -> Option<R
         Some(serde_json::from_slice::<serde_json::Value>(body).ok()?)
     };
 
-    let headers = if let TransportDetail::HttpRequest { header, .. } = &detail {
-        Some(header.clone())
+    let (headers, method) = if let TransportDetail::HttpRequest { header, method, .. } = &detail {
+        (Some(header.clone()), Some(*method))
     } else {
-        None
+        (None, None)
     };
 
     Some(Request {
         origin,
         uri: seg2.to_string(),
         path: Some(path),
+        method,
         headers,
         param,
     })
@@ -341,6 +343,7 @@ mod tests {
                 origin: Origin::Blake3,
                 uri: "content-hash".to_string(),
                 path: Some("/".to_string()),
+                method: None,
                 headers: None,
                 param: None,
             })
@@ -356,6 +359,7 @@ mod tests {
                 origin: Origin::Blake3,
                 uri: "content-hash".to_string(),
                 path: Some("/a".to_string()),
+                method: None,
                 headers: None,
                 param: None,
             })
@@ -371,6 +375,7 @@ mod tests {
                 origin: Origin::Blake3,
                 uri: "content-hash".to_string(),
                 path: Some("/a/b".to_string()),
+                method: None,
                 headers: None,
                 param: None,
             })
@@ -386,6 +391,7 @@ mod tests {
                 origin: Origin::Blake3,
                 uri: "content-hash".to_string(),
                 path: Some("/a/b?a=4".to_string()),
+                method: None,
                 headers: None,
                 param: None,
             })
@@ -401,6 +407,7 @@ mod tests {
                 origin: Origin::Blake3,
                 uri: "content-hash".to_string(),
                 path: Some("/a/b?a=4#hello".to_string()),
+                method: None,
                 headers: None,
                 param: None,
             })
@@ -419,6 +426,7 @@ mod tests {
                 origin: Origin::Blake3,
                 uri: "content-hash".to_string(),
                 path: Some("/a/b?a=4&param=%7B%22a%22%3A%204%7D#hello".to_string()),
+                method: None,
                 headers: None,
                 param: Some(json!({"a": 4})),
             })
@@ -437,6 +445,7 @@ mod tests {
                 origin: Origin::Blake3,
                 uri: "content-hash".to_string(),
                 path: Some("/a/b?a=4&param=%7B%22a%22%3A%204%7D#hello".to_string()),
+                method: None,
                 headers: None,
                 param: Some(json!({"hello": 5})),
             })

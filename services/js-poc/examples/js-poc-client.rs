@@ -33,6 +33,7 @@ async fn main() -> anyhow::Result<()> {
                 origin,
                 uri,
                 path: None,
+                method: None,
                 headers: None,
                 param,
             })
