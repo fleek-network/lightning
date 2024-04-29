@@ -33,6 +33,8 @@ async fn main() -> anyhow::Result<()> {
                 origin,
                 uri,
                 path: None,
+                query_params: None,
+                url_fragment: None,
                 method: None,
                 headers: None,
                 param,

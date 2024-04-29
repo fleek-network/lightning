@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use anyhow::{anyhow, bail, Context};
 use arrayref::array_ref;
 use cid::Cid;
@@ -110,6 +112,8 @@ async fn handle_request(
         origin,
         uri,
         path,
+        query_params: _,
+        url_fragment: _,
         method: _,
         headers: _,
         param,
@@ -284,14 +288,16 @@ fn extract_request(url: &Url, body: &[u8], detail: &TransportDetail) -> Option<R
     if path.is_empty() {
         path.push('/');
     }
-    if let Some(q) = url.query() {
-        path.push('?');
-        path.push_str(q);
-    }
-    if let Some(f) = url.fragment() {
-        path.push('#');
-        path.push_str(f);
-    }
+
+    let query_params: HashMap<String, String> = url
+        .query_pairs()
+        .map(|(key, val)| (key.to_string(), val.to_string()))
+        .collect();
+    let query_params = if query_params.is_empty() {
+        None
+    } else {
+        Some(query_params)
+    };
 
     let param = if body.is_empty() {
         url.query_pairs()
@@ -315,6 +321,8 @@ fn extract_request(url: &Url, body: &[u8], detail: &TransportDetail) -> Option<R
         origin,
         uri: seg2.to_string(),
         path: Some(path),
+        query_params,
+        url_fragment: url.fragment().map(|frag| frag.to_string()),
         method,
         headers,
         param,
@@ -343,6 +351,8 @@ mod tests {
                 origin: Origin::Blake3,
                 uri: "content-hash".to_string(),
                 path: Some("/".to_string()),
+                query_params: None,
+                url_fragment: None,
                 method: None,
                 headers: None,
                 param: None,
@@ -359,6 +369,8 @@ mod tests {
                 origin: Origin::Blake3,
                 uri: "content-hash".to_string(),
                 path: Some("/a".to_string()),
+                query_params: None,
+                url_fragment: None,
                 method: None,
                 headers: None,
                 param: None,
@@ -375,12 +387,16 @@ mod tests {
                 origin: Origin::Blake3,
                 uri: "content-hash".to_string(),
                 path: Some("/a/b".to_string()),
+                query_params: None,
+                url_fragment: None,
                 method: None,
                 headers: None,
                 param: None,
             })
         );
 
+        let mut query_params = HashMap::new();
+        query_params.insert("a".to_string(), "4".to_string());
         assert_eq!(
             extract_request(
                 &Url::parse("http://fleek/blake3/content-hash/a/b?a=4").unwrap(),
@@ -390,13 +406,17 @@ mod tests {
             Some(Request {
                 origin: Origin::Blake3,
                 uri: "content-hash".to_string(),
-                path: Some("/a/b?a=4".to_string()),
+                path: Some("/a/b".to_string()),
+                query_params: Some(query_params),
+                url_fragment: None,
                 method: None,
                 headers: None,
                 param: None,
             })
         );
 
+        let mut query_params = HashMap::new();
+        query_params.insert("a".to_string(), "4".to_string());
         assert_eq!(
             extract_request(
                 &Url::parse("http://fleek/blake3/content-hash/a/b?a=4#hello").unwrap(),
@@ -406,13 +426,18 @@ mod tests {
             Some(Request {
                 origin: Origin::Blake3,
                 uri: "content-hash".to_string(),
-                path: Some("/a/b?a=4#hello".to_string()),
+                path: Some("/a/b".to_string()),
+                query_params: Some(query_params),
+                url_fragment: Some("hello".to_string()),
                 method: None,
                 headers: None,
                 param: None,
             })
         );
 
+        let mut query_params = HashMap::new();
+        query_params.insert("a".to_string(), "4".to_string());
+        query_params.insert("param".to_string(), "{\"a\": 4}".to_string());
         assert_eq!(
             extract_request(
                 &Url::parse(
@@ -425,13 +450,18 @@ mod tests {
             Some(Request {
                 origin: Origin::Blake3,
                 uri: "content-hash".to_string(),
-                path: Some("/a/b?a=4&param=%7B%22a%22%3A%204%7D#hello".to_string()),
+                path: Some("/a/b".to_string()),
+                query_params: Some(query_params),
+                url_fragment: Some("hello".to_string()),
                 method: None,
                 headers: None,
                 param: Some(json!({"a": 4})),
             })
         );
 
+        let mut query_params = HashMap::new();
+        query_params.insert("a".to_string(), "4".to_string());
+        query_params.insert("param".to_string(), "{\"a\": 4}".to_string());
         assert_eq!(
             extract_request(
                 &Url::parse(
@@ -444,7 +474,9 @@ mod tests {
             Some(Request {
                 origin: Origin::Blake3,
                 uri: "content-hash".to_string(),
-                path: Some("/a/b?a=4&param=%7B%22a%22%3A%204%7D#hello".to_string()),
+                path: Some("/a/b".to_string()),
+                query_params: Some(query_params),
+                url_fragment: Some("hello".to_string()),
                 method: None,
                 headers: None,
                 param: Some(json!({"hello": 5})),

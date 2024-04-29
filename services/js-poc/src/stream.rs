@@ -15,6 +15,10 @@ pub struct Request {
     pub uri: String,
     /// Optional path to provide as the window location
     pub path: Option<String>,
+    /// The query params from the url, if they exist
+    pub query_params: Option<HashMap<String, String>>,
+    /// The url fragment identifier, if it exists
+    pub url_fragment: Option<String>,
     /// Http method
     pub method: Option<HttpMethod>,
     /// Headers from the http request
