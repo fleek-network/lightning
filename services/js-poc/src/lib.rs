@@ -7,12 +7,9 @@ use deno_core::url::Url;
 use deno_core::v8::IsolateHandle;
 use deno_core::{serde_v8, v8, JsRuntime};
 use fn_sdk::connection::Connection;
-use fn_sdk::header::TransportDetail;
-use fn_sdk::http_util::{
-    respond_to_client,
-    respond_to_client_with_http_response,
-    respond_with_error,
-};
+use fn_sdk::header::{HttpMethod, TransportDetail};
+use fn_sdk::http_util::{respond, respond_with_error, respond_with_http_response};
+use serde_json::json;
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::{debug, error, info};
 
@@ -94,7 +91,7 @@ async fn handle_connection(
     } else {
         while let Some(payload) = connection.read_payload().await {
             let request: Request = serde_json::from_slice(&payload)?;
-            handle_request(&mut connection, &tx, request, is_http).await?;
+            handle_request(&mut connection, &tx, request).await?;
         }
     }
     Ok(())
@@ -125,7 +122,7 @@ async fn handle_request(
             let hash = hex::decode(uri).context("failed to decode blake3 hash")?;
 
             if hash.len() != 32 {
-                respond_with_error(connection, b"Invalid blake3 hash length", 400, is_http).await?;
+                respond_with_error(connection, b"Invalid blake3 hash length", 400).await?;
                 return Err(anyhow!("invalid blake3 hash length"));
             }
 
@@ -134,8 +131,7 @@ async fn handle_request(
             if fn_sdk::api::fetch_blake3(hash).await {
                 hash
             } else {
-                respond_with_error(connection, b"Failed to fetch blake3 content", 400, is_http)
-                    .await?;
+                respond_with_error(connection, b"Failed to fetch blake3 content", 400).await?;
                 return Err(anyhow!("failed to fetch file"));
             }
         },
@@ -148,15 +144,14 @@ async fn handle_request(
             {
                 Some(hash) => hash,
                 None => {
-                    respond_with_error(connection, b"Failed to fetch from origin", 400, is_http)
-                        .await?;
+                    respond_with_error(connection, b"Failed to fetch from origin", 400).await?;
                     return Err(anyhow!("failed to fetch from origin"));
                 },
             }
         },
         o => {
             let err = anyhow!("unknown origin: {o:?}");
-            respond_with_error(connection, err.to_string().as_bytes(), 400, is_http).await?;
+            respond_with_error(connection, err.to_string().as_bytes(), 400).await?;
             return Err(err);
         },
     };
@@ -180,7 +175,7 @@ async fn handle_request(
     let mut runtime = match Runtime::new(location.clone()) {
         Ok(runtime) => runtime,
         Err(e) => {
-            respond_with_error(connection, e.to_string().as_bytes(), 400, is_http).await?;
+            respond_with_error(connection, e.to_string().as_bytes(), 400).await?;
             return Err(e).context("failed to initialize runtime");
         },
     };
@@ -194,11 +189,11 @@ async fn handle_request(
     {
         Ok(Some(res)) => res,
         Ok(None) => {
-            respond_with_error(connection, b"no response available", 400, is_http).await?;
+            respond_with_error(connection, b"no response available", 400).await?;
             bail!("no response available");
         },
         Err(e) => {
-            respond_with_error(connection, e.to_string().as_bytes(), 400, is_http).await?;
+            respond_with_error(connection, e.to_string().as_bytes(), 400).await?;
             return Err(e).context("failed to run javascript");
         },
     };

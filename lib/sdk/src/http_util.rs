@@ -3,13 +3,14 @@ use anyhow::Context;
 use crate::connection::Connection;
 use crate::header::{HttpOverrides, HttpResponse};
 
+/// Respond with an error, utilizing the error code if the connection is http
+#[inline(always)]
 pub async fn respond_with_error(
     connection: &mut Connection,
     error: &[u8],
     status_code: u16,
-    is_http: bool,
 ) -> anyhow::Result<()> {
-    if is_http {
+    if connection.is_http_request() {
         let headers = HttpOverrides {
             status: Some(status_code),
             headers: None,
@@ -31,10 +32,15 @@ pub async fn respond_with_error(
     Ok(())
 }
 
-pub async fn respond_to_client_with_http_response(
+/// Respond with a custom [`HttpResponse`] directly.
+/// Panics in debug mode if the connection is not http.
+#[inline(always)]
+pub async fn respond_with_http_response(
     connection: &mut Connection,
     response: HttpResponse,
 ) -> anyhow::Result<()> {
+    debug_assert!(connection.is_http_request());
+
     let headers = HttpOverrides {
         status: response.status,
         headers: response.headers,
@@ -56,21 +62,11 @@ pub async fn respond_to_client_with_http_response(
     Ok(())
 }
 
-pub async fn respond_to_client(
-    connection: &mut Connection,
-    response: &[u8],
-    is_http: bool,
-) -> anyhow::Result<()> {
-    if is_http {
-        let header_bytes = serde_json::to_vec(&HttpOverrides::default())
-            .context("Failed to serializez headers")?;
+/// Respond with some bytes, setting default headers if the connection is http.
+#[inline(always)]
+pub async fn respond(connection: &mut Connection, response: &[u8]) -> anyhow::Result<()> {
+    respond_only_default_headers(connection).await?;
 
-        // response with the headers first
-        connection
-            .write_payload(&header_bytes)
-            .await
-            .context("failed to send error headers")?;
-    }
     // Send the body back now
     connection
         .write_payload(response)
@@ -80,19 +76,19 @@ pub async fn respond_to_client(
     Ok(())
 }
 
-pub async fn respond_to_client_with_http_headers(
-    connection: &mut Connection,
-    is_http: bool,
-) -> anyhow::Result<()> {
-    if is_http {
-        let header_bytes = serde_json::to_vec(&HttpOverrides::default())
-            .context("Failed to serializez headers")?;
+/// Send only the default headers, allowing for data to be streamed or sent directly afterwards.
+#[inline(always)]
+pub async fn respond_only_default_headers(connection: &mut Connection) -> anyhow::Result<()> {
+    debug_assert!(connection.is_http_request());
 
-        // response with the headers first
-        connection
-            .write_payload(&header_bytes)
-            .await
-            .context("failed to send error headers")?;
-    }
+    let header_bytes =
+        serde_json::to_vec(&HttpOverrides::default()).context("Failed to serializez headers")?;
+
+    // response with the headers first
+    connection
+        .write_payload(&header_bytes)
+        .await
+        .context("failed to send error headers")?;
+
     Ok(())
 }
