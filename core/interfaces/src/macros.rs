@@ -11,7 +11,8 @@ macro_rules! collection {
 
             /// Build the `fdi` dependency graph of this collection.
             fn build_graph() -> fdi::DependencyGraph {
-                let shutdown = $crate::ShutdownController::new();
+                let trace_shutdown = std::env::var("TRACE_SHUTDOWN").is_ok();
+                let shutdown = $crate::ShutdownController::new(trace_shutdown);
                 let waiter = shutdown.waiter();
 
                 fdi::DependencyGraph::new()

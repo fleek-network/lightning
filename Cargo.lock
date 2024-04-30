@@ -6021,6 +6021,7 @@ dependencies = [
  "anyhow",
  "atomo",
  "atomo-rocks",
+ "better-shutdown",
  "blake3-tree",
  "bytes",
  "criterion",

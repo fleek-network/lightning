@@ -32,6 +32,7 @@ fleek-crypto.workspace = true
 hp-fixed.workspace = true
 ink-quill.workspace = true
 blake3-tree = { path = "../../lib/blake3-tree" }
+better-shutdown.workspace = true
 
 # Currently we need the SDK because of the FFI types.
 fn-sdk = { path = "../../lib/sdk" }
@@ -39,7 +40,3 @@ fn-sdk = { path = "../../lib/sdk" }
 [dev-dependencies]
 criterion = { version = "0.5.0", features = ["html_reports"] }
 dummy-waker = "1.1.0"
-
-[[bench]]
-name = "shutdown"
-harness = false

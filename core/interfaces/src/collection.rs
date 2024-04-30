@@ -1,7 +1,9 @@
 use std::marker::PhantomData;
+use std::time::Duration;
 
 use anyhow::Result;
 use fdi::Provider;
+use tokio::time::sleep;
 
 use super::*;
 
@@ -80,11 +82,44 @@ impl<C: Collection> Node<C> {
 
     /// Shutdown the node
     pub async fn shutdown(&mut self) {
-        let shutdown = self
+        let mut shutdown = self
             .shutdown
             .take()
             .expect("cannot call shutdown more than once");
 
-        shutdown.shutdown().await;
+        tracing::trace!("Shutting node down.");
+        shutdown.trigger_shutdown();
+
+        for i in 0.. {
+            tokio::select! {
+                biased;
+                _ = shutdown.wait_for_completion() => {
+                    return;
+                },
+                _ = sleep(Duration::from_secs(5)) => {
+                    match i {
+                        0 => {
+                            tracing::trace!("Still shutting down...");
+                            continue;
+                        },
+                        1 => {
+                            tracing::warn!("Still shutting down...");
+                            continue;
+                        },
+                        _ => {
+                            tracing::error!("Shutdown taking too long")
+                        }
+                    }
+                }
+            }
+
+            let Some(iter) = shutdown.pending_backtraces() else {
+                continue;
+            };
+
+            for (i, trace) in iter.enumerate() {
+                eprintln!("Pending task backtrace #{i}:\n{trace:#?}");
+            }
+        }
     }
 }

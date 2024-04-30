@@ -1,8 +1,11 @@
+use std::ops::ControlFlow;
 use std::sync::Mutex;
 
+use futures::future::{select, Either};
+use futures::Future;
 use triomphe::Arc;
 
-use crate::shared::SharedState;
+use crate::shared::{SharedState, NUM_SHARED_SHARDS};
 use crate::wait_list::WaitList;
 use crate::ShutdownSignal;
 
@@ -51,8 +54,76 @@ impl ShutdownWaiter {
         self.dedicated = self.inner.new_dedicated_wait_list();
     }
 
-    /// Create a future that will be resolved when shutdown arrives.
-    pub fn wait_for_shutdown(&self, _: u8) -> ShutdownSignal {
+    /// Returns true if we have already shutdown.
+    pub fn is_shutdown(&self) -> bool {
+        let ptr = self as *const _ as *const () as usize as u64;
+        let shard = self.dedicated.as_deref().unwrap_or_else(|| {
+            let out = fxhash::hash32(&ptr) % (NUM_SHARED_SHARDS as u32);
+            &self.inner.wait_list_shards[out as usize]
+        });
+
+        let wait_list = shard.lock().unwrap();
+        wait_list.is_closed()
+    }
+
+    /// Standalone function to wait until the shutdown signal is received.
+    /// This function is 100% cancel safe and will always return immediately
+    /// if shutdown has already happened.
+    #[inline(always)]
+    pub fn wait_for_shutdown(&self) -> ShutdownSignal {
         ShutdownSignal::new(&self.inner, self.dedicated.as_deref())
+    }
+
+    /// Run a function until a shutdown signal is received.
+    ///
+    /// This method is recommended to use for run loops that are spawned, since the notify permit
+    /// will persist then entire time until the run loop future resolves, and will be polled any
+    /// time the run loop yields back to the async executor allowing very fast immediate exits.
+    ///
+    /// This should be considered on a case by case basis, as sometimes it's desirable to fully
+    /// handle a branch before checking and exiting on shutdown. For example, maybe a piece of
+    /// code than handles a write ahead log on disk might need to be ensured to always complete
+    /// if it's doing work, so that no items are lost during a shutdown.
+    pub async fn run_until_shutdown<T>(&self, fut: impl Future<Output = T>) -> Option<T> {
+        let future1 = self.wait_for_shutdown();
+        let future2 = std::pin::pin!(fut);
+        match select(future1, future2).await {
+            Either::Left(_) => None,
+            Either::Right((r, _)) => Some(r),
+        }
+    }
+
+    #[inline]
+    pub async fn fold_until_shutdown<F, O, T, R>(&self, init: T, mut task: F) -> Option<R>
+    where
+        F: FnMut(T) -> O,
+        O: Future<Output = ControlFlow<R, T>>,
+    {
+        let mut notified = self.wait_for_shutdown();
+        let mut current = init;
+
+        loop {
+            let output = std::pin::pin!(task(current));
+
+            match select(notified, output).await {
+                Either::Left(_) => return None,
+                Either::Right((ControlFlow::Break(ret), _)) => {
+                    return Some(ret);
+                },
+                Either::Right((ControlFlow::Continue(new), tmp)) => {
+                    current = new;
+                    notified = tmp;
+                },
+            }
+        }
+    }
+
+    #[inline]
+    pub async fn run_task_until_shutdown<F, O, R>(&self, mut task: F) -> Option<R>
+    where
+        F: FnMut() -> O,
+        O: Future<Output = ControlFlow<R>>,
+    {
+        self.fold_until_shutdown((), |_| task()).await
     }
 }

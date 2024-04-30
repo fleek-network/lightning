@@ -60,9 +60,9 @@ fn bench(c: &mut Criterion) {
                     b,
                     *num_threads,
                     || ctrl.clone(),
-                    |ctrl, i| {
+                    |ctrl, _| {
                         let waiter = ctrl.waiter();
-                        let future = waiter.wait_for_shutdown(i);
+                        let future = waiter.wait_for_shutdown();
                         let future = black_box(future);
                         drop(future);
                         drop(black_box(waiter));
@@ -81,9 +81,9 @@ fn bench(c: &mut Criterion) {
                     b,
                     *num_threads,
                     || ctrl.clone(),
-                    |ctrl, i| {
+                    |ctrl, _| {
                         let waiter = ctrl.waiter();
-                        let future = waiter.wait_for_shutdown(i);
+                        let future = waiter.wait_for_shutdown();
                         let mut future = Box::pin(black_box(future));
                         let poll = future
                             .poll_unpin(&mut Context::from_waker(&dummy_waker::dummy_waker()));
@@ -105,9 +105,9 @@ fn bench(c: &mut Criterion) {
                     b,
                     *num_threads,
                     || ctrl.clone(),
-                    |ctrl, i| {
+                    |ctrl, _| {
                         let waiter = ctrl.waiter();
-                        let future = waiter.wait_for_shutdown(i);
+                        let future = waiter.wait_for_shutdown();
                         let mut future = Box::pin(black_box(future));
                         let poll = future
                             .poll_unpin(&mut Context::from_waker(&dummy_waker::dummy_waker()));
@@ -132,8 +132,8 @@ fn bench(c: &mut Criterion) {
                     b,
                     *num_threads,
                     || ctrl.waiter(),
-                    |waiter, i| {
-                        let future = waiter.wait_for_shutdown(i);
+                    |waiter, _| {
+                        let future = waiter.wait_for_shutdown();
                         let mut future = Box::pin(black_box(future));
                         let poll = future
                             .poll_unpin(&mut Context::from_waker(&dummy_waker::dummy_waker()));
@@ -158,8 +158,8 @@ fn bench(c: &mut Criterion) {
                         waiter.mark_busy();
                         waiter
                     },
-                    |waiter, i| {
-                        let future = waiter.wait_for_shutdown(i);
+                    |waiter, _| {
+                        let future = waiter.wait_for_shutdown();
                         let mut future = Box::pin(black_box(future));
                         let poll = future
                             .poll_unpin(&mut Context::from_waker(&dummy_waker::dummy_waker()));
@@ -181,9 +181,9 @@ fn bench(c: &mut Criterion) {
                     b,
                     *num_threads,
                     || ctrl.clone(),
-                    |ctrl, i| {
+                    |ctrl, _| {
                         let waiter = ctrl.waiter();
-                        let future = waiter.wait_for_shutdown(i);
+                        let future = waiter.wait_for_shutdown();
                         let mut future = Box::pin(black_box(future));
                         let poll = future
                             .poll_unpin(&mut Context::from_waker(&dummy_waker::dummy_waker()));

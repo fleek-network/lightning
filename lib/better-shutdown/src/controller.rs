@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use triomphe::Arc;
 
 use crate::backtrace_list::BacktraceList;
@@ -63,5 +65,49 @@ impl ShutdownController {
             .collect_pending_backtrace(&mut self.backtrace_list);
 
         Some(self.backtrace_list.iter())
+    }
+
+    /// Trigger the shutdown and wait for it to complete. This is an opionated function with some
+    /// custom logic and will print the backtrace of the pending futures after 15second.
+    ///
+    /// This is also the only runtime dependent function of this crate and expects to be called
+    /// in a tokio runtime.
+    ///
+    /// Expect this method to be removed in future.
+    pub async fn shutdown(&mut self) {
+        tracing::trace!("Shutting node down.");
+        self.trigger_shutdown();
+
+        for i in 0.. {
+            tokio::select! {
+                biased;
+                _ = self.wait_for_completion() => {
+                    return;
+                },
+                _ = tokio::time::sleep(Duration::from_secs(5)) => {
+                    match i {
+                        0 => {
+                            tracing::trace!("Still shutting down...");
+                            continue;
+                        },
+                        1 => {
+                            tracing::warn!("Still shutting down...");
+                            continue;
+                        },
+                        _ => {
+                            tracing::error!("Shutdown taking too long")
+                        }
+                    }
+                }
+            }
+
+            let Some(iter) = self.pending_backtraces() else {
+                continue;
+            };
+
+            for (i, trace) in iter.enumerate() {
+                eprintln!("Pending task backtrace #{i}:\n{trace:#?}");
+            }
+        }
     }
 }
