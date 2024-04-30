@@ -12,6 +12,6 @@ pub mod frame;
 pub mod map;
 mod utils;
 
-pub use config::ConfigSource;
+pub use config::{ConfigSource, PathConfig};
 #[cfg(feature = "client")]
 pub use pubsub::Subscriber;

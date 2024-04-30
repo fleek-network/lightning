@@ -3,8 +3,19 @@ use color_eyre::eyre::Result;
 use ebpf_service::ConfigSource;
 use lightning_tui::app::App;
 
+use crate::PATH_CONFIG;
+
 pub async fn exec(cmd: TuiCommand) -> Result<()> {
-    let mut app = App::new(cmd.tick_rate, cmd.frame_rate, ConfigSource::new())?;
+    let mut app = App::new(
+        cmd.tick_rate,
+        cmd.frame_rate,
+        ConfigSource::new(
+            PATH_CONFIG
+                .get()
+                .cloned()
+                .expect("Config to be initialized on start-up"),
+        ),
+    )?;
     app.run().await
 }
 

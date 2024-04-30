@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use anyhow::Context;
 use aya::maps::HashMap;
 use aya::programs::{Xdp, XdpFlags};
@@ -7,15 +9,27 @@ use clap::Parser;
 use common::{File, FileRuleList, PacketFilter, PacketFilterParams};
 use ebpf_service::map::SharedMap;
 use ebpf_service::server::Server;
-use resolved_pathbuf::ResolvedPathBuf;
+use ebpf_service::{ConfigSource, PathConfig};
 use tokio::net::UnixListener;
 use tokio::signal;
 
 #[derive(Debug, Parser)]
 struct Opts {
     /// Interface to attach packet filter program.
-    #[clap(short, long, default_value = "eth0")]
+    #[clap(short, long)]
     iface: String,
+    /// Path to packet filter config.
+    #[clap(short, long)]
+    pf: PathBuf,
+    /// Path to temporary directory.
+    #[clap(short, long)]
+    tmp: PathBuf,
+    /// Path to profile directory.
+    #[clap(short, long)]
+    profile: PathBuf,
+    /// Bind path.
+    #[clap(short, long)]
+    bind: PathBuf,
 }
 
 #[tokio::main]
@@ -51,11 +65,18 @@ async fn main() -> anyhow::Result<()> {
     let file_open_allow: HashMap<_, File, FileRuleList> =
         HashMap::try_from(handle.take_map("FILE_RULES").unwrap()).unwrap();
 
-    let bind_path: ResolvedPathBuf = "~/.lightning/ebpf/ctrl".try_into()?;
-    let _ = tokio::fs::remove_file(&bind_path).await;
-    let listener = UnixListener::bind(bind_path)?;
-    let shared_state = SharedMap::new(packet_filters, file_open_allow).unwrap();
-    let server = Server::new(listener, shared_state)?;
+    let path_config = PathConfig {
+        tmp_dir: opt.tmp,
+        packet_filter: opt.pf,
+        profiles_dir: opt.profile,
+    };
+    let config_src = ConfigSource::new(path_config);
+
+    let _ = tokio::fs::remove_file(opt.bind.as_path()).await;
+    let listener = UnixListener::bind(opt.bind.as_path())?;
+
+    let shared_state = SharedMap::new(packet_filters, file_open_allow, config_src.clone());
+    let server = Server::new(listener, shared_state, config_src);
 
     log::info!("Enter Ctrl-C to shutdown");
 

@@ -17,12 +17,12 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new(listener: UnixListener, shared_state: SharedMap) -> anyhow::Result<Self> {
-        Ok(Self {
+    pub fn new(listener: UnixListener, shared_state: SharedMap, config_src: ConfigSource) -> Self {
+        Self {
             listener,
             shared_state,
-            config_src: ConfigSource::create_config()?,
-        })
+            config_src,
+        }
     }
 
     pub async fn handle_watcher_event(&mut self, event: Event) -> anyhow::Result<()> {

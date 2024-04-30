@@ -1632,6 +1632,7 @@ dependencies = [
  "libc",
  "lightning-tui",
  "log",
+ "once_cell",
  "resolved-pathbuf",
  "tokio",
  "vergen",

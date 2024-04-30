@@ -23,19 +23,20 @@ use crate::map::{FileRule, PacketFilterRule};
 pub struct SharedMap {
     packet_filters: Arc<Mutex<HashMap<MapData, PacketFilter, PacketFilterParams>>>,
     file_open_rules: Arc<Mutex<HashMap<MapData, File, FileRuleList>>>,
-    storage: ConfigSource,
+    config_src: ConfigSource,
 }
 
 impl SharedMap {
     pub fn new(
         packet_filters: HashMap<MapData, PacketFilter, PacketFilterParams>,
         file_open_rules: HashMap<MapData, File, FileRuleList>,
-    ) -> anyhow::Result<Self> {
-        Ok(Self {
+        config_src: ConfigSource
+    ) -> Self {
+        Self {
             packet_filters: Arc::new(Mutex::new(packet_filters)),
             file_open_rules: Arc::new(Mutex::new(file_open_rules)),
-            storage: ConfigSource::create_config()?,
-        })
+            config_src,
+        }
     }
 
     pub async fn packet_filter_add(&mut self, addr: SocketAddrV4) -> anyhow::Result<()> {
@@ -70,7 +71,7 @@ impl SharedMap {
     ///
     /// Reads from disk so it's a heavy operation.
     pub async fn update_packet_filters(&self) -> anyhow::Result<()> {
-        let filters: Vec<PacketFilterRule> = self.storage.read_packet_filters().await?;
+        let filters: Vec<PacketFilterRule> = self.config_src.read_packet_filters().await?;
         let new_state = filters
             .into_iter()
             .map(|filter| (PacketFilter::from(filter), PacketFilterParams::from(filter)))
@@ -105,7 +106,7 @@ impl SharedMap {
     ///
     /// Reads from disk so it's a heavy operation.
     pub async fn update_file_rules(&self) -> anyhow::Result<()> {
-        let profiles = self.storage.get_profiles().await?;
+        let profiles = self.config_src.get_profiles().await?;
 
         let mut new = std::collections::HashMap::new();
         for profile in profiles {
