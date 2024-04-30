@@ -13,6 +13,9 @@ common = { path = "../common" }
 memoffset = "0.9"
 network-types = "0.0.5"
 
+[build-dependencies]
+aya-tool = { git = "https://github.com/deepfence/aya-rs", branch = "btf-fixes" }
+
 [profile.dev]
 opt-level = 3
 debug = false

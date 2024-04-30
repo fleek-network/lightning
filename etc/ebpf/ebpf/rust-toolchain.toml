@@ -1,7 +1,7 @@
 [toolchain]
-#channel = "nightly"
+channel = "nightly"
 # Getting some weird errors related to LLVM.
-channel = "nightly-2023-07-01"
+#channel = "nightly-2023-07-01"
 # The source code of rustc, provided by the rust-src component, is needed for
 # building eBPF programs.
 components = [
