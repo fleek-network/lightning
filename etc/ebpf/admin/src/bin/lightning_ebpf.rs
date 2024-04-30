@@ -25,7 +25,7 @@ struct Opts {
     #[clap(short, long)]
     tmp: PathBuf,
     /// Path to profile directory.
-    #[clap(short, long)]
+    #[clap(short = 's', long)]
     profile: PathBuf,
     /// Bind path.
     #[clap(short, long)]

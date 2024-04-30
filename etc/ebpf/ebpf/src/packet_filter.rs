@@ -4,7 +4,6 @@ use aya_bpf::bindings::xdp_action;
 use aya_bpf::macros::xdp;
 use aya_bpf::maps::lpm_trie::Key;
 use aya_bpf::programs::XdpContext;
-use aya_log_ebpf::info;
 use common::{PacketFilter, PacketFilterParams, SubnetFilterParams};
 use memoffset::offset_of;
 use network_types::eth::{EthHdr, EtherType};
@@ -35,8 +34,6 @@ unsafe fn filter(ctx: XdpContext) -> Result<u32, ()> {
 fn process_ipv4(ctx: &XdpContext) -> Result<XdpAction, ()> {
     let ip =
         u32::from_be_bytes(unsafe { *ptr_at(&ctx, EthHdr::LEN + offset_of!(Ipv4Hdr, src_addr))? });
-
-    info!(ctx, "received a packet from {:i}", ip);
 
     if let Some(params) = try_match_only_ip(ip) {
         return Ok(params.action);

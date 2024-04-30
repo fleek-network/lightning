@@ -55,7 +55,6 @@ impl Server {
             .ok_or(anyhow!("socket was closed unexpectedly"))?;
         match service {
             PACKET_FILTER_SERVICE => {
-                println!("Event happened!!!!!");
                 tokio::spawn(async move {
                     if let Err(e) = Connection::new(stream, shared_state).handle().await {
                         info!("connection handler failed: {e:?}");
@@ -81,10 +80,12 @@ impl Server {
         )?;
 
         watcher.watch(
-            self.config_src.packet_filers_path(),
+            self.config_src.packet_filers_path().parent().unwrap(),
             RecursiveMode::NonRecursive,
         )?;
         watcher.watch(self.config_src.profiles_path(), RecursiveMode::NonRecursive)?;
+
+        self.shared_state.update_packet_filters().await?;
 
         loop {
             tokio::select! {

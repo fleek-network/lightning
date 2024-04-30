@@ -64,10 +64,10 @@ impl FireWall {
             .command_tx
             .clone()
             .expect("Component always has a sender");
-        let storage = self.src.clone();
+        let config_src = self.src.clone();
         let new = self.table.records().cloned().collect::<Vec<_>>();
         tokio::spawn(async move {
-            if let Err(e) = storage.write_packet_filters(new).await {
+            if let Err(e) = config_src.write_packet_filters(new).await {
                 let _ = command_tx.send(Action::Error(e.to_string()));
             }
         });

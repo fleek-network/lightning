@@ -4,6 +4,8 @@ use std::process::Command;
 use clap::Subcommand;
 use color_eyre::{Report, Result};
 
+use crate::{BIND_PATH, PATH_CONFIG};
+
 pub fn exec(cmd: EbpfCommand) -> Result<()> {
     match cmd {
         EbpfCommand::Build { target, release } => build_bpf_program(target, release),
@@ -113,11 +115,22 @@ pub fn run(target: Target, release: bool, iface: String) -> Result<()> {
     let mode = if release { "release" } else { "debug" };
     let bin_path = format!("target/{mode}/lightning_ebpf");
 
-    let mut xdp_args = format!("--iface={iface}");
-
+    let path_config = PATH_CONFIG.get().expect("Static to be initialized");
+    let xdp_args = format!("--iface={iface}");
+    let pf = format!("--pf={}", path_config.packet_filter.display());
+    let tmp = format!("--tmp={}", path_config.tmp_dir.display());
+    let profile = format!("--profile={}", path_config.profiles_dir.display());
+    let bind = format!(
+        "--bind={}",
+        BIND_PATH.get().expect("Static to be initialized").display()
+    );
     let mut args: Vec<_> = vec!["sudo", "-E"];
     args.push(bin_path.as_str());
-    args.push(&mut xdp_args);
+    args.push(&xdp_args);
+    args.push(&pf);
+    args.push(&tmp);
+    args.push(&profile);
+    args.push(&bind);
 
     let status = Command::new(args.first().expect("args are hardcoded"))
         .args(args.iter().skip(1))

@@ -3,6 +3,7 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use resolved_pathbuf::ResolvedPathBuf;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 
@@ -11,7 +12,6 @@ use crate::map::{PacketFilterRule, Profile};
 const TMP_DIR: &str = "~/.lightning/ebpf/tmp";
 const PROFILES_DIR: &str = "~/.lightning/ebpf/profiles";
 const PACKET_FILTER_CONFIG: &str = "~/.lightning/ebpf/filters.json";
-
 
 /// Configuration source.
 ///
@@ -22,9 +22,9 @@ pub struct ConfigSource {
 }
 
 impl ConfigSource {
-    pub fn new(config: PathConfig) -> Self  {
+    pub fn new(config: PathConfig) -> Self {
         Self {
-            paths: Arc::new(config)
+            paths: Arc::new(config),
         }
     }
 
@@ -46,7 +46,7 @@ impl ConfigSource {
     pub async fn write_packet_filters(&self, filters: Vec<PacketFilterRule>) -> anyhow::Result<()> {
         let mut tmp_path = PathBuf::new();
         tmp_path.push(self.paths.tmp_dir.as_path());
-        tmp_path.push(PACKET_FILTER_CONFIG);
+        tmp_path.push("filters.json");
 
         let mut tmp = fs::File::create(tmp_path.as_path()).await?;
         let bytes = serde_json::to_string(&filters)?;
@@ -160,10 +160,15 @@ pub struct PathConfig {
 impl Default for PathConfig {
     fn default() -> Self {
         Self {
-            tmp_dir: PathBuf::try_from(TMP_DIR).expect("Hardcoded path"),
-            packet_filter: PathBuf::try_from(PACKET_FILTER_CONFIG)
-            .expect("Hardcoded path"),
-            profiles_dir: PathBuf::try_from(PROFILES_DIR).expect("Hardcoded path"),
+            tmp_dir: ResolvedPathBuf::try_from(TMP_DIR)
+                .expect("Hardcoded path")
+                .to_path_buf(),
+            packet_filter: ResolvedPathBuf::try_from(PACKET_FILTER_CONFIG)
+                .expect("Hardcoded path")
+                .to_path_buf(),
+            profiles_dir: ResolvedPathBuf::try_from(PROFILES_DIR)
+                .expect("Hardcoded path")
+                .to_path_buf(),
         }
     }
 }

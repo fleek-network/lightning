@@ -10,8 +10,10 @@ use cli::Cli;
 use color_eyre::{Report, Result};
 use ebpf_service::PathConfig;
 use once_cell::sync::OnceCell;
+use resolved_pathbuf::ResolvedPathBuf;
 
 pub static PATH_CONFIG: OnceCell<PathConfig> = OnceCell::new();
+pub static BIND_PATH: OnceCell<ResolvedPathBuf> = OnceCell::new();
 
 fn main() -> Result<()> {
     lightning_tui::utils::initialize_logging()?;
@@ -35,6 +37,12 @@ fn main() -> Result<()> {
     }
 
     PATH_CONFIG.set(config).expect("Not to be initialized yet");
+    BIND_PATH
+        .set(
+            ResolvedPathBuf::try_from("~/.lightning/ebpf/ctrl")
+                .expect("Path resolution not to fail"),
+        )
+        .expect("Not to be initialized yet");
 
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()

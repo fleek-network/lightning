@@ -30,7 +30,7 @@ impl SharedMap {
     pub fn new(
         packet_filters: HashMap<MapData, PacketFilter, PacketFilterParams>,
         file_open_rules: HashMap<MapData, File, FileRuleList>,
-        config_src: ConfigSource
+        config_src: ConfigSource,
     ) -> Self {
         Self {
             packet_filters: Arc::new(Mutex::new(packet_filters)),
