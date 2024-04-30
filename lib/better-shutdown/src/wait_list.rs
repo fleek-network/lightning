@@ -1,5 +1,7 @@
 use std::task::{Context, Poll, Waker};
 
+use crate::backtrace_list::BacktraceList;
+
 pub const WAIT_LIST_DEFAULT_CAPACITY: usize = 256;
 
 /// The wait list contains a list of wakers (and some potential attached attributes) and can wake
@@ -158,26 +160,26 @@ impl WaitList {
     }
 
     /// Returns all of the captured backtraces.
-    pub fn take_all_backtraces(&mut self, result: &mut Vec<std::backtrace::Backtrace>) {
+    pub fn take_all_backtraces(&mut self, wait_list_index: usize, list: &mut BacktraceList) {
         if !self.capture_backtrace {
             return;
         }
 
-        result.reserve(self.len);
-        let mut visited_entries = 0;
-        for entry in &mut self.arena {
-            if visited_entries == self.len {
-                break;
-            }
+        list.ensure_index_is_inserted(wait_list_index);
+        list.reserve(wait_list_index, self.len);
 
+        for (index, entry) in self.arena.iter_mut().enumerate() {
             match entry {
-                ArenaEntry::Empty => {},
-                ArenaEntry::Link(_) => {},
+                ArenaEntry::Empty => {
+                    list.remove(wait_list_index, index);
+                },
+                ArenaEntry::Link(_) => {
+                    list.remove(wait_list_index, index);
+                },
                 ArenaEntry::Item(WaitListEntry { backtrace, .. }) => {
-                    if let Some(b) = backtrace.take() {
-                        result.push(*b);
+                    if let Some(trace) = backtrace.take() {
+                        list.insert(wait_list_index, index, trace);
                     }
-                    visited_entries += 1;
                 },
             }
         }

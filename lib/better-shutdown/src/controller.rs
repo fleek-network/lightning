@@ -1,8 +1,10 @@
 use triomphe::Arc;
 
+use crate::backtrace_list::BacktraceList;
 use crate::completion_fut::CompletionFuture;
 use crate::shared::SharedState;
 use crate::waiter::ShutdownWaiter;
+use crate::BacktraceListIter;
 
 /// The main struct of this crate which can be used to produce many [ShutdownWaiter]s.
 ///
@@ -10,6 +12,7 @@ use crate::waiter::ShutdownWaiter;
 /// of the shutdown futures linked to the same controller.
 pub struct ShutdownController {
     inner: Arc<SharedState>,
+    backtrace_list: BacktraceList,
 }
 
 impl Default for ShutdownController {
@@ -23,6 +26,7 @@ impl ShutdownController {
     pub fn new(capture_backtrace: bool) -> Self {
         ShutdownController {
             inner: Arc::new(SharedState::new(capture_backtrace)),
+            backtrace_list: BacktraceList::default(),
         }
     }
 
@@ -48,11 +52,16 @@ impl ShutdownController {
         CompletionFuture::new(&self.inner)
     }
 
-    pub fn collect_pending_backtrace(&self) -> Option<Vec<std::backtrace::Backtrace>> {
+    /// Returns an iterator over all of the currently pending backtraces. This is a very expensive
+    /// operation.
+    pub fn pending_backtraces(&mut self) -> Option<BacktraceListIter> {
         if !self.inner.capture_backtrace {
             return None;
         }
 
-        Some(self.inner.collect_pending_backtrace())
+        self.inner
+            .collect_pending_backtrace(&mut self.backtrace_list);
+
+        Some(self.backtrace_list.iter())
     }
 }

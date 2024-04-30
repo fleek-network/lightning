@@ -4,6 +4,7 @@ use std::sync::Mutex;
 
 use triomphe::Arc;
 
+use crate::backtrace_list::BacktraceList;
 use crate::wait_list::{WaitList, WAIT_LIST_DEFAULT_CAPACITY};
 
 pub(crate) const NUM_SHARED_SHARDS: usize = 16;
@@ -130,21 +131,17 @@ impl SharedState {
         }
     }
 
-    /// Collect and return the backtrace of all of the pending tasks. This functions consumes the
-    /// backtraces and even if the task is still pending a second call to this function will not
-    /// include that task.
-    // TODO(qti3e): Fix above limitation.
-    pub fn collect_pending_backtrace(&self) -> Vec<std::backtrace::Backtrace> {
-        let mut result = Vec::new();
+    /// Collect and update the given backtrace list.
+    pub fn collect_pending_backtrace(&self, list: &mut BacktraceList) {
         let dedicated_list_guard = self.dedicated_wait_lists.lock().unwrap();
-        for wait_list_mutex in self
+        for (wait_list_index, wait_list_mutex) in self
             .wait_list_shards
             .iter()
             .chain(dedicated_list_guard.lists.iter().map(Arc::deref))
+            .enumerate()
         {
             let mut wait_list = wait_list_mutex.lock().unwrap();
-            wait_list.take_all_backtraces(&mut result);
+            wait_list.take_all_backtraces(wait_list_index, list);
         }
-        result
     }
 }
