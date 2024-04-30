@@ -65,10 +65,10 @@ pub async fn main() {
 pub async fn handle_connection(mut conn: Connection) {
     debug!("new connection");
     if conn.is_http_request() {
-        let TransportDetail::HttpRequest { uri, .. } = &conn.header.transport_detail else {
+        let TransportDetail::HttpRequest { url, .. } = &conn.header.transport_detail else {
             unreachable!()
         };
-        let Some((origin, uri)) = parse_http_url(uri) else {
+        let Some((origin, uri)) = parse_http_url(url) else {
             let _ = conn.write_payload(b"invalid request url").await;
             return;
         };

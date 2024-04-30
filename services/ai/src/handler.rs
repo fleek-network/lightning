@@ -13,13 +13,13 @@ use crate::{Origin, StartSession};
 
 pub async fn handle(mut connection: Connection) -> anyhow::Result<()> {
     if connection.is_http_request() {
-        let TransportDetail::HttpRequest { uri, .. } = &connection.header.transport_detail else {
+        let TransportDetail::HttpRequest { url, .. } = &connection.header.transport_detail else {
             unreachable!()
         };
 
-        let (content_format, model_io_encoding) = parse_query_params(uri)?;
+        let (content_format, model_io_encoding) = parse_query_params(url)?;
 
-        let Some((service, origin, uri)) = parse_http_url(uri) else {
+        let Some((service, origin, uri)) = parse_http_url(url) else {
             let _ = connection.write_payload(b"invalid request url").await;
             bail!("Invalid url");
         };

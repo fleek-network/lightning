@@ -62,7 +62,7 @@ pub async fn handler<P: ExecutorProviderInterface>(
         frame_rx,
         TransportDetail::HttpRequest {
             method,
-            uri: extract_url(&path, uri),
+            url: extract_url(&path, uri),
             header: headers
                 .into_iter()
                 .filter_map(|(name, val)| {
@@ -145,9 +145,9 @@ fn bad_request<T: AsRef<str> + Display>(msg: T) -> (StatusCode, String) {
 }
 
 #[inline(always)]
-fn extract_url(path: &str, url: Uri) -> Url {
+fn extract_url(path: &str, uri: Uri) -> Url {
     let mut result = Url::parse("http://fleek/").unwrap();
     result.set_path(path);
-    result.set_query(url.query());
+    result.set_query(uri.query());
     result
 }

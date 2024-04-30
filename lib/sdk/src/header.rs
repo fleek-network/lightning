@@ -44,7 +44,7 @@ pub struct HttpOverrides {
 pub enum TransportDetail {
     HttpRequest {
         method: HttpMethod,
-        uri: Url,
+        url: Url,
         header: HashMap<String, String>,
     },
     Other,
