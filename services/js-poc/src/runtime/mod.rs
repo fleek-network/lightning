@@ -152,7 +152,6 @@ impl Runtime {
         url: Url,
         source: String,
         param: Option<serde_json::Value>,
-        req_params: Option<serde_json::Value>,
     ) -> anyhow::Result<Option<Global<Value>>> {
         let id = self
             .deno
@@ -185,15 +184,10 @@ impl Runtime {
             } else {
                 v8::undefined(scope).into()
             };
-            let req_params = if let Some(req_params) = req_params {
-                serde_v8::to_v8(scope, req_params)?
-            } else {
-                v8::undefined(scope).into()
-            };
             let undefined = v8::undefined(scope);
 
             // call function and move response into a global ref
-            let Some(res) = main_fn.call(scope, undefined.into(), &[param, req_params]) else {
+            let Some(res) = main_fn.call(scope, undefined.into(), &[param]) else {
                 return Ok(None);
             };
             Ok(Some(Global::new(scope, res)))
