@@ -1,3 +1,4 @@
+use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -21,6 +22,7 @@ use self::tape::{Punch, Tape};
 use crate::params::{FETCH_BLACKLIST, HEAP_INIT, HEAP_LIMIT};
 
 mod extensions;
+mod module_loader;
 mod tape;
 
 /// Snapshot of the runtime after javascript modules have been initialized
@@ -112,6 +114,7 @@ impl Runtime {
             op_metrics_factory_fn: Some(tape.op_metrics_factory_fn()),
             // Heap initializes with 1KiB, maxes out at 10MiB
             create_params: Some(CreateParams::default().heap_limits(HEAP_INIT, HEAP_LIMIT)),
+            module_loader: Some(Rc::new(module_loader::get())),
             ..Default::default()
         });
 
