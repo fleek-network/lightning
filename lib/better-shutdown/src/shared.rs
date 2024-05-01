@@ -7,7 +7,7 @@ use triomphe::Arc;
 use crate::backtrace_list::BacktraceList;
 use crate::wait_list::{WaitList, WAIT_LIST_DEFAULT_CAPACITY};
 
-pub(crate) const NUM_SHARED_SHARDS: usize = 1;
+pub(crate) const NUM_SHARED_SHARDS: usize = 16;
 pub(crate) const SHARED_SHARDS_TOTAL_DEFAULT_CAPACITY: usize = 2048;
 
 /// The data shared between shutdown controller and the waiters.
@@ -95,7 +95,6 @@ impl SharedState {
     /// If if happens that the number of non-empty wait lists are zero initially, we wake up
     /// that future in this same function.
     pub fn trigger_shutdown(&self) {
-        println!("X");
         let mut dedicated_list_guard = self.dedicated_wait_lists.lock().unwrap();
         let mut guards = Vec::with_capacity(NUM_SHARED_SHARDS + dedicated_list_guard.lists.len());
 
@@ -126,16 +125,12 @@ impl SharedState {
         }
 
         // Give up the lock on everything.
-        println!("Y");
         drop(guards);
-        println!("Z");
 
         // If there are no alive wait lists no `Drop` is gonna notice this so it's up to us
         // here to wake up this tasks.
         if alive_wait_lists_counter == 0 {
-            println!("T");
             self.waiting_for_drop.lock().unwrap().wake_all();
-            println!("U");
         }
     }
 
