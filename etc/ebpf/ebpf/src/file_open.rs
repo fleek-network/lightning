@@ -4,7 +4,7 @@ use aya_bpf::programs::LsmContext;
 use aya_log_ebpf::info;
 use common::File;
 
-use crate::{maps, vmlinux};
+use crate::{access, maps, vmlinux};
 
 #[lsm(hook = "file_open")]
 pub fn file_open(ctx: LsmContext) -> i32 {
@@ -12,9 +12,12 @@ pub fn file_open(ctx: LsmContext) -> i32 {
 }
 
 unsafe fn try_file_open(ctx: LsmContext) -> Result<i32, c_long> {
-    let kfile: *const vmlinux::file = ctx.arg(0);
-    let inode = aya_bpf::helpers::bpf_probe_read_kernel(&(*kfile).f_inode)?;
-    let inode_n = aya_bpf::helpers::bpf_probe_read_kernel(&(*inode).i_ino)?;
+    let ctx_file: *const vmlinux::file = ctx.arg(0);
+    let inode = aya_bpf::helpers::bpf_probe_read_kernel(access::file_inode(ctx_file))?;
+    let inode_n = aya_bpf::helpers::bpf_probe_read_kernel(access::inode_i_ino(inode))?;
+
+    info!(&ctx, "file_open attempt on {}", inode_n);
+
     // Todo: Get device ID.
     let file = File {
         inode: inode_n,
@@ -44,19 +47,15 @@ unsafe fn verify_permission(ctx: &LsmContext, file: &File) -> Result<i32, c_long
     Ok(0)
 }
 
-// Todo: these accesses are not CO-RE compatible.
 unsafe fn get_current_process_binfile() -> Result<File, c_long> {
     let task = aya_bpf::helpers::bpf_get_current_task() as *mut vmlinux::task_struct;
-    let mm = aya_bpf::helpers::bpf_probe_read_kernel(&(*task).mm)?;
-    let file = aya_bpf::helpers::bpf_probe_read_kernel(&(*mm).__bindgen_anon_1.exe_file)?;
-    let f_inode = aya_bpf::helpers::bpf_probe_read_kernel(&(*file).f_inode)?;
+    let mm = aya_bpf::helpers::bpf_probe_read_kernel(access::task_struct_mm(task))?;
+    let file = aya_bpf::helpers::bpf_probe_read_kernel(access::mm_exe_file(mm))?;
+    let f_inode = aya_bpf::helpers::bpf_probe_read_kernel(access::file_inode(file))?;
     // Get the inode number.
-    let inode_n = aya_bpf::helpers::bpf_probe_read_kernel(&(*f_inode).i_ino)?;
+    let i_ino = aya_bpf::helpers::bpf_probe_read_kernel(access::inode_i_ino(f_inode))?;
     // Get the device ID from the SuperBlock obj.
-    let super_block = aya_bpf::helpers::bpf_probe_read_kernel(&(*f_inode).i_sb)?;
-    let dev = aya_bpf::helpers::bpf_probe_read_kernel(&(*super_block).s_dev)?;
-    Ok(File {
-        inode: inode_n,
-        dev,
-    })
+    let super_block = aya_bpf::helpers::bpf_probe_read_kernel(access::inode_i_sb(f_inode))?;
+    let dev = aya_bpf::helpers::bpf_probe_read_kernel(access::super_block_s_dev(super_block))?;
+    Ok(File { inode: i_ino, dev })
 }

@@ -4,9 +4,6 @@ version = "0.0.0"
 edition = "2021"
 description = "tui for admin"
 authors = ["Miguel <miguel@fleek.xyz>"]
-# Todo: Move this build script to admin.
-build = "build.rs"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -51,7 +48,3 @@ unicode-width = "0.1"
 # Todo: Move this build script to admin.
 [build-dependencies]
 vergen = { version = "8.2.6", features = [ "build", "git", "gitoxide", "cargo" ]}
-
-#[[bin]]
-#name = "lightning_bpf"
-#path = "src/bin/lightning_bpf.rs"

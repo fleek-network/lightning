@@ -16,11 +16,11 @@ struct file ** mm_exe_file(struct mm_struct *target) {
 	return __builtin_preserve_access_index(&target->exe_file);
 }
 
-struct inode ** exe_file_inode(struct file *target) {
+struct inode ** file_inode(struct file *target) {
 	return __builtin_preserve_access_index(&target->f_inode);
 }
 
-uint64_t file_inode(struct file *target) {
+uint64_t file_f_path_dentry_inode(struct file *target) {
 	return __builtin_preserve_access_index(target->f_path.dentry->d_inode->i_ino);
 }
 
@@ -32,8 +32,12 @@ uint64_t dentry_i_ino(struct dentry *target) {
 	return __builtin_preserve_access_index(target->d_inode->i_ino);
 }
 
-uint64_t * inode_i_ino(struct inode *inode) {
-	return __builtin_preserve_access_index(&inode->i_ino);
+uint64_t * inode_i_ino(struct inode *target) {
+	return __builtin_preserve_access_index(&target->i_ino);
+}
+
+struct super_block * inode_i_sb(struct inode *target) {
+	return __builtin_preserve_access_index(&target->i_sb);
 }
 
 int32_t linux_binprm_argc(struct linux_binprm *target) {
@@ -58,4 +62,8 @@ uid_t cred_uid_val(struct cred *target) {
 
 uid_t cred_gid_val(struct cred *target) {
 	return __builtin_preserve_access_index(target->gid.val);
+}
+
+uint32_t * super_block_s_dev(struct super_block *target) {
+    return __builtin_preserve_access_index(&target->s_dev);
 }

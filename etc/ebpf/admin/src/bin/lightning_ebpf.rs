@@ -2,8 +2,8 @@ use std::path::PathBuf;
 
 use anyhow::Context;
 use aya::maps::HashMap;
-use aya::programs::{Xdp, XdpFlags};
-use aya::{include_bytes_aligned, Ebpf};
+use aya::programs::{Lsm, Xdp, XdpFlags};
+use aya::{include_bytes_aligned, Btf, Ebpf};
 use aya_log::EbpfLogger;
 use clap::Parser;
 use common::{File, FileRuleList, PacketFilter, PacketFilterParams};
@@ -30,6 +30,8 @@ struct Opts {
     /// Bind path.
     #[clap(short, long)]
     bind: PathBuf,
+    #[clap(short, long, default_value_t = false)]
+    enable_file_open: bool,
 }
 
 #[tokio::main]
@@ -59,6 +61,15 @@ async fn main() -> anyhow::Result<()> {
     program
         .attach(&opt.iface, XdpFlags::default())
         .context("failed to attach the XDP program")?;
+
+    let mut _file_open_prog: Option<&mut Lsm> = None;
+    if opt.enable_file_open {
+        let prog: &mut Lsm = handle.program_mut("file_open").unwrap().try_into()?;
+        let btf = Btf::from_sys_fs()?;
+        prog.load("file_open", &btf)?;
+        prog.attach()?;
+        _file_open_prog = Some(prog);
+    }
 
     let packet_filters: HashMap<_, PacketFilter, PacketFilterParams> =
         HashMap::try_from(handle.take_map("PACKET_FILTERS").unwrap())?;
