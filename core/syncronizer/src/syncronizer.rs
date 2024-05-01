@@ -85,16 +85,13 @@ impl<C: Collection> Syncronizer<C> {
 
     /// Start the system, should not do anything if the system is already
     /// started.
-    async fn start(mut this: fdi::RefMut<Self>, shutdown: fdi::Cloned<ShutdownWaiter>) {
+    fn start(this: &mut Self, fdi::Cloned(shutdown): fdi::Cloned<ShutdownWaiter>) {
         let (tx, rx) = async_channel::bounded(1);
         let state = std::mem::replace(&mut this.state, State::Running(rx));
         let State::Initialized(mut inner) = state else {
             panic!("Syncronizer can only be started once");
         };
-
-        drop(this);
-
-        shutdown.run_until_shutdown(inner.run(tx)).await;
+        tokio::spawn(async move { shutdown.run_until_shutdown(inner.run(tx)).await });
     }
 
     fn prelude(
@@ -164,7 +161,7 @@ impl<C: Collection> Syncronizer<C> {
 
 impl<C: Collection> fdi::BuildGraph for Syncronizer<C> {
     fn build_graph() -> fdi::DependencyGraph {
-        fdi::DependencyGraph::new().with(Self::init.on("start", Self::start.spawn()))
+        fdi::DependencyGraph::new().with(Self::init.on("start", Self::start))
     }
 }
 
