@@ -41,9 +41,9 @@ where
             checkpoint_hash = checkpoint_fut => {
                 // get the checkpoint from the blockstore
                 let checkpoint = node
-                .provider
-                .get::<<C as Collection>::BlockstoreInterface>()
-                .read_all_to_vec(&checkpoint_hash).await.expect("Failed to read checkpoint from blockstore");
+                    .provider
+                    .get::<<C as Collection>::BlockstoreInterface>()
+                    .read_all_to_vec(&checkpoint_hash).await.expect("Failed to read checkpoint from blockstore");
 
                 // shutdown the node
                 node.shutdown().await;
@@ -55,7 +55,10 @@ where
 
                 // start local env in checkpoint mode to seed database with the new checkpoint
                 C::ApplicationInterface::load_from_checkpoint(
-                    &app_config, checkpoint, checkpoint_hash).await?;
+                    &app_config,
+                    checkpoint,
+                    checkpoint_hash
+                ).await?;
 
                 //restart the node
                 node = Node::<C>::init(config.clone())
