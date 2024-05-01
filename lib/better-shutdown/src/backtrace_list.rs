@@ -20,7 +20,7 @@ impl BacktraceList {
 
     #[inline(always)]
     pub fn ensure_index_is_inserted(&mut self, wait_list_index: usize) {
-        while wait_list_index <= self.backtraces.len() {
+        while wait_list_index >= self.backtraces.len() {
             self.backtraces.push(FxHashMap::default());
         }
     }

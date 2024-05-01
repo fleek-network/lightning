@@ -151,9 +151,13 @@ impl WaitList {
 
     /// Close the wait list and call the wake up on all of the registered waiters.
     pub fn wake_all(&mut self) {
+        if self.has_woke_up() {
+            return;
+        }
         self.state = State::WokeUp;
         for item in &self.arena {
             if let ArenaEntry::Item(e) = item {
+                println!("wakeup");
                 e.waker.wake_by_ref();
             }
         }
