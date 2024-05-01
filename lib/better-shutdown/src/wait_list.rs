@@ -157,7 +157,6 @@ impl WaitList {
         self.state = State::WokeUp;
         for item in &self.arena {
             if let ArenaEntry::Item(e) = item {
-                println!("wakeup");
                 e.waker.wake_by_ref();
             }
         }
