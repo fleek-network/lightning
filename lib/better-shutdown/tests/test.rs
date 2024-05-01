@@ -1,6 +1,8 @@
+use std::iter::repeat;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::task::{Context, Poll, Waker};
+use std::time::Duration;
 
 use better_shutdown::ShutdownController;
 use futures::task::ArcWake;
@@ -16,7 +18,7 @@ impl WakeCounter {
 
 impl ArcWake for WakeCounter {
     fn wake_by_ref(arc_self: &std::sync::Arc<Self>) {
-        arc_self.0.fetch_add(1, Ordering::Relaxed);
+        arc_self.0.fetch_add(1, Ordering::SeqCst);
     }
 }
 
@@ -286,4 +288,62 @@ fn test_14() {
     assert_eq!(ctrl.pending_backtraces().unwrap().count(), 1);
     drop(future);
     assert_eq!(ctrl.pending_backtraces().unwrap().count(), 0);
+}
+
+#[test]
+fn test_15() {
+    loop {
+        let ctrl = ShutdownController::new(false);
+        let (counter, waker) = new_waker();
+
+        let waiter = ctrl.waiter();
+        let handles = repeat((waiter, waker))
+            .take(4)
+            .map(|(waiter, waker)| {
+                std::thread::spawn(move || {
+                    let mut futures = Vec::new();
+
+                    for _ in 0..100 {
+                        let mut future = waiter.wait_for_shutdown();
+                        let _ = future.poll_unpin(&mut Context::from_waker(&waker));
+                        futures.push(future);
+                    }
+
+                    drop(waker);
+
+                    futures::executor::block_on(waiter.wait_for_shutdown());
+
+                    while futures.pop().is_some() {
+                        std::thread::sleep(Duration::from_millis(1));
+                    }
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let (_, com_waker) = new_waker();
+        let mut com_future = ctrl.wait_for_completion();
+        let result = com_future.poll_unpin(&mut Context::from_waker(&com_waker));
+        assert_eq!(result, Poll::Pending);
+
+        std::thread::sleep(Duration::from_millis(500)); // wait until everything is inserted.
+        let num_wakers = Arc::strong_count(&counter);
+
+        ctrl.trigger_shutdown();
+
+        handles
+            .into_iter()
+            .for_each(|handle| handle.join().unwrap());
+
+        futures::executor::block_on(ctrl.wait_for_completion());
+
+        let result = com_future.poll_unpin(&mut Context::from_waker(&com_waker));
+        assert_eq!(result, Poll::Ready(()));
+        assert_eq!(counter.get(), num_wakers - 1);
+
+        // new futures.
+        let (_, com_waker) = new_waker();
+        let mut com_future = ctrl.wait_for_completion();
+        let result = com_future.poll_unpin(&mut Context::from_waker(&com_waker));
+        assert_eq!(result, Poll::Ready(()));
+    }
 }

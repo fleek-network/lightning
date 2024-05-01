@@ -7,7 +7,7 @@ use triomphe::Arc;
 use crate::backtrace_list::BacktraceList;
 use crate::wait_list::{WaitList, WAIT_LIST_DEFAULT_CAPACITY};
 
-pub(crate) const NUM_SHARED_SHARDS: usize = 16;
+pub(crate) const NUM_SHARED_SHARDS: usize = 1;
 pub(crate) const SHARED_SHARDS_TOTAL_DEFAULT_CAPACITY: usize = 2048;
 
 /// The data shared between shutdown controller and the waiters.
@@ -95,10 +95,12 @@ impl SharedState {
     /// If if happens that the number of non-empty wait lists are zero initially, we wake up
     /// that future in this same function.
     pub fn trigger_shutdown(&self) {
-        // Shard index of the non-empty wait lists.
+        println!("X");
         let mut dedicated_list_guard = self.dedicated_wait_lists.lock().unwrap();
-        let mut alive_wait_lists =
-            Vec::with_capacity(NUM_SHARED_SHARDS + dedicated_list_guard.lists.len());
+        let mut guards = Vec::with_capacity(NUM_SHARED_SHARDS + dedicated_list_guard.lists.len());
+
+        // The number of waitlists that have at least one waiter.
+        let mut alive_wait_lists_counter = 0;
 
         // Tell the `new_dedicated_wait_list` to return `None` at this point.
         dedicated_list_guard.did_shutdown = true;
@@ -108,26 +110,32 @@ impl SharedState {
             .iter()
             .chain(dedicated_list_guard.lists.iter().map(Arc::deref))
         {
-            let mut wait_list = wait_list_mutex.lock().unwrap();
-            wait_list.close();
-
-            if !wait_list.is_empty() {
-                alive_wait_lists.push(wait_list_mutex);
+            let guard = wait_list_mutex.lock().unwrap();
+            if !guard.is_empty() {
+                alive_wait_lists_counter += 1;
             }
+            guards.push(guard);
         }
 
         self.pending_waiting_lists
-            .store(alive_wait_lists.len(), Ordering::SeqCst);
+            .store(alive_wait_lists_counter, Ordering::SeqCst);
+
+        for wait_list in &mut guards {
+            wait_list.close();
+            wait_list.wake_all();
+        }
+
+        // Give up the lock on everything.
+        println!("Y");
+        drop(guards);
+        println!("Z");
 
         // If there are no alive wait lists no `Drop` is gonna notice this so it's up to us
         // here to wake up this tasks.
-        if alive_wait_lists.is_empty() {
+        if alive_wait_lists_counter == 0 {
+            println!("T");
             self.waiting_for_drop.lock().unwrap().wake_all();
-        }
-
-        for wait_list_mutex in alive_wait_lists.into_iter() {
-            let mut wait_list = wait_list_mutex.lock().unwrap();
-            wait_list.wake_all();
+            println!("U");
         }
     }
 
