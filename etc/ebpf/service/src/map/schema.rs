@@ -128,7 +128,7 @@ impl Display for Profile {
 }
 
 /// Rule that defines how a file is accessed.
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct FileRule {
     /// Path of the file.
     pub file: ResolvedPathBuf,

@@ -30,7 +30,8 @@ struct Opts {
     /// Bind path.
     #[clap(short, long)]
     bind: PathBuf,
-    #[clap(short, long, default_value_t = false)]
+    /// Load FILE_OPEN program in the corresponding LSM hook.
+    #[clap(short, long, default_value_t = true)]
     enable_file_open: bool,
 }
 

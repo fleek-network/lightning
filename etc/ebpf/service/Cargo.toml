@@ -13,6 +13,7 @@ common = { path = "../common", features = ["userspace"], optional = true }
 notify = { version = "6.1"}
 libc = { version = "0.2", optional = true }
 log = { version = "0.4", optional = true }
+once_cell = "1.19"
 resolved-pathbuf = { path = "../../../lib/resolved-pathbuf" }
 tokio = { version = "1.32", features = ["macros", "rt", "rt-multi-thread", "net", "sync", "fs", "io-util"], optional = true }
 serde = { version = "1.0", features = ["derive"] }

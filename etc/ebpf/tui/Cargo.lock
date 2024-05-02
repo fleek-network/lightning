@@ -690,6 +690,7 @@ dependencies = [
  "libc",
  "log",
  "notify",
+ "once_cell",
  "resolved-pathbuf",
  "serde",
  "serde_json",

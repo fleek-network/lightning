@@ -39,9 +39,11 @@ impl Server {
                 .paths
                 .iter()
                 .map(|path| path.as_path())
-                .any(|p| p == self.config_src.profiles_path())
+                .any(|p| p.parent() == Some(self.config_src.profiles_path()))
             {
-                todo!()
+                for path in event.paths {
+                    self.shared_state.update_file_rules(path).await?;
+                }
             }
         }
 

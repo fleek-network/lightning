@@ -3,6 +3,8 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use anyhow::anyhow;
+use once_cell::sync::Lazy;
 use resolved_pathbuf::ResolvedPathBuf;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
@@ -11,7 +13,9 @@ use crate::map::{PacketFilterRule, Profile};
 
 const TMP_DIR: &str = "~/.lightning/ebpf/tmp";
 const PROFILES_DIR: &str = "~/.lightning/ebpf/profiles";
-const PACKET_FILTER_CONFIG: &str = "~/.lightning/ebpf/filters.json";
+const PACKET_FILTER_CONFIG: &str = "filters.json";
+const PACKET_FILTER_CONFIG_PATH: &str = "~/.lightning/ebpf/filters.json";
+pub static GLOBAL_PROFILE: Lazy<PathBuf> = Lazy::new(|| PathBuf::from("global".to_string()));
 
 /// Configuration source.
 ///
@@ -46,7 +50,7 @@ impl ConfigSource {
     pub async fn write_packet_filters(&self, filters: Vec<PacketFilterRule>) -> anyhow::Result<()> {
         let mut tmp_path = PathBuf::new();
         tmp_path.push(self.paths.tmp_dir.as_path());
-        tmp_path.push("filters.json");
+        tmp_path.push(PACKET_FILTER_CONFIG);
 
         let mut tmp = fs::File::create(tmp_path.as_path()).await?;
         let bytes = serde_json::to_string(&filters)?;
@@ -85,7 +89,7 @@ impl ConfigSource {
             None => {
                 let mut path = PathBuf::new();
                 path.push(self.paths.profiles_dir.as_path());
-                path.push("global.json");
+                path.push(GLOBAL_PROFILE.as_path());
                 std::fs::read_to_string(path)?
             },
         };
@@ -104,7 +108,7 @@ impl ConfigSource {
             None => {
                 let mut path = PathBuf::new();
                 path.push(self.paths.profiles_dir.as_path());
-                path.push("global");
+                path.push(GLOBAL_PROFILE.as_path());
                 fs::read_to_string(path).await?
             },
         };
@@ -113,10 +117,10 @@ impl ConfigSource {
 
     pub async fn delete_profiles(&self, profiles: HashSet<Option<PathBuf>>) -> anyhow::Result<()> {
         for profile in profiles {
-            let fname = profile.unwrap_or("global".into());
+            let fname = profile.as_ref().unwrap_or(&GLOBAL_PROFILE);
             let mut dst = PathBuf::new();
             dst.push(self.paths.profiles_dir.as_path());
-            dst.push(fname);
+            dst.push(fname.as_path());
 
             fs::remove_file(dst).await.unwrap();
         }
@@ -126,14 +130,16 @@ impl ConfigSource {
     /// Writes packet-filters to storage.
     pub async fn write_profiles(&self, profiles: Vec<Profile>) -> anyhow::Result<()> {
         for profile in profiles {
-            let fname = profile
-                .name
-                .as_ref()
-                .map(|path| path.file_stem().unwrap().to_os_string())
-                .unwrap_or("global".into());
+            let fname = match profile.name.as_ref() {
+                Some(path) => path
+                    .file_stem()
+                    .ok_or(anyhow!("invalid name for profile"))?,
+                None => GLOBAL_PROFILE.as_os_str(),
+            };
+
             let mut tmp_path = PathBuf::new();
             tmp_path.push(self.paths.tmp_dir.as_path());
-            tmp_path.push(fname.clone());
+            tmp_path.push(&fname);
 
             let mut tmp = fs::File::create(tmp_path.as_path()).await?;
             let bytes = serde_json::to_string(&profile)?;
@@ -142,7 +148,7 @@ impl ConfigSource {
 
             let mut dst = PathBuf::new();
             dst.push(self.paths.profiles_dir.as_path());
-            dst.push(fname);
+            dst.push(&fname);
 
             fs::rename(tmp_path, dst).await?;
         }
@@ -163,7 +169,7 @@ impl Default for PathConfig {
             tmp_dir: ResolvedPathBuf::try_from(TMP_DIR)
                 .expect("Hardcoded path")
                 .to_path_buf(),
-            packet_filter: ResolvedPathBuf::try_from(PACKET_FILTER_CONFIG)
+            packet_filter: ResolvedPathBuf::try_from(PACKET_FILTER_CONFIG_PATH)
                 .expect("Hardcoded path")
                 .to_path_buf(),
             profiles_dir: ResolvedPathBuf::try_from(PROFILES_DIR)

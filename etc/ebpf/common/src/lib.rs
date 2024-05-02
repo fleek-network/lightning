@@ -83,7 +83,7 @@ pub struct File {
 #[cfg(feature = "userspace")]
 unsafe impl aya::Pod for File {}
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct FileRule {
     /// The file in question.
     pub inode: u64,
