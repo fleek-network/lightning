@@ -7,7 +7,7 @@ use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_application::query_runner::QueryRunner;
 use lightning_interfaces::prelude::*;
-use lightning_interfaces::types::{Block, NodePorts, UpdateMethod, UpdatePayload, UpdateRequest};
+use lightning_interfaces::types::{NodePorts, UpdateMethod, UpdatePayload, UpdateRequest};
 use lightning_interfaces::Weight;
 use lightning_notifier::Notifier;
 use lightning_signer::Signer;
@@ -19,8 +19,10 @@ use lightning_utils::application::QueryRunnerExt;
 use crate::aggregator::ReputationAggregator;
 use crate::config::Config;
 use crate::measurement_manager::Interactions;
+use crate::{MyReputationQuery, MyReputationReporter};
 
 partial!(TestBinding {
+    ConfigProviderInterface = JsonConfigProvider;
     ReputationAggregatorInterface = ReputationAggregator<Self>;
     ApplicationInterface = Application<Self>;
     NotifierInterface = Notifier<Self>;
@@ -128,9 +130,8 @@ async fn test_query() {
     .expect("failed to initialize node");
     node.start().await;
 
-    let rep_agg: fdi::Ref<ReputationAggregator<TestBinding>> = node.provider.get();
-    let rep_reporter = rep_agg.get_reporter();
-    let rep_query = rep_agg.get_query();
+    let rep_reporter = node.provider.get::<MyReputationReporter>();
+    let rep_query = node.provider.get::<MyReputationQuery>();
 
     // Report some measurements for alice and bob.
     let alice = 1;
@@ -262,8 +263,7 @@ async fn test_submit_measurements() {
     node.start().await;
 
     let query_runner: fdi::Ref<QueryRunner> = node.provider.get();
-    let rep_agg: fdi::Ref<ReputationAggregator<TestBinding>> = node.provider.get();
-    let rep_reporter = rep_agg.get_reporter();
+    let rep_reporter = node.provider.get::<MyReputationReporter>();
 
     // Report some measurements to the reputation aggregator.
     let peer_index = query_runner.pubkey_to_index(&peer_public_key).unwrap();
@@ -415,11 +415,11 @@ async fn test_reputation_calculation_and_query() {
     .expect("failed to initialize node");
     node1.start().await;
 
-    let rep_agg1: fdi::Ref<ReputationAggregator<TestBinding>> = node1.provider.get();
-    let rep_reporter1 = rep_agg1.get_reporter();
-
-    let app: fdi::Ref<Application<TestBinding>> = node1.provider.get();
-    let update_socket = app.transaction_executor();
+    let rep_reporter1 = node1.provider.get::<MyReputationReporter>();
+    let forwarder_socket = node1
+        .provider
+        .get::<MockForwarder<TestBinding>>()
+        .mempool_socket();
 
     let mut node2 = Node::<TestBinding>::init_with_provider(
         fdi::Provider::default()
@@ -449,8 +449,7 @@ async fn test_reputation_calculation_and_query() {
     .expect("failed to initialize node");
     node2.start().await;
     let query_runner: fdi::Ref<QueryRunner> = node2.provider.get();
-    let rep_agg2: fdi::Ref<ReputationAggregator<TestBinding>> = node2.provider.get();
-    let rep_reporter2 = rep_agg2.get_reporter();
+    let rep_reporter2 = node2.provider.get::<MyReputationReporter>();
 
     // Both nodes report measurements for two peers (alice and bob).
     // note(dalton): Refactored to not include measurements for non white listed nodes so have to
@@ -461,6 +460,7 @@ async fn test_reputation_calculation_and_query() {
     let bob = query_runner
         .pubkey_to_index(&keystores[1].get_ed25519_pk())
         .unwrap();
+
     rep_reporter1.report_sat(alice, Weight::Strong);
     rep_reporter1.report_ping(alice, Some(Duration::from_millis(100)));
     rep_reporter1.report_bytes_sent(alice, 10_000, Some(Duration::from_millis(100)));
@@ -483,17 +483,16 @@ async fn test_reputation_calculation_and_query() {
 
     let mut interval = tokio::time::interval(Duration::from_millis(100));
     loop {
-        tokio::select! {
-            _ = interval.tick() => {
-                let measure_alice =
-                    query_runner.get_reputation_measurements(&alice).unwrap_or(Vec::new());
-                let measure_bob =
-                    query_runner.get_reputation_measurements(&bob).unwrap_or(Vec::new());
-                if measure_alice.len() == 2 && measure_bob.len() == 2 {
-                    // Wait until all measurements were submitted to the application.
-                    break;
-                }
-            }
+        interval.tick().await;
+        let measure_alice = query_runner
+            .get_reputation_measurements(&alice)
+            .unwrap_or(Vec::new());
+        let measure_bob = query_runner
+            .get_reputation_measurements(&bob)
+            .unwrap_or(Vec::new());
+        if measure_alice.len() == 2 && measure_bob.len() == 2 {
+            // Wait until all measurements were submitted to the application.
+            break;
         }
     }
 
@@ -522,14 +521,8 @@ async fn test_reputation_calculation_and_query() {
             signature: signature.into(),
             payload,
         };
-        let _res = update_socket
-            .run(Block {
-                transactions: vec![req.into()],
-                digest: [0; 32],
-            })
-            .await
-            .map_err(|r| anyhow::anyhow!(format!("{r:?}")))
-            .unwrap();
+
+        forwarder_socket.run(req.into()).await.unwrap();
     }
     // Make sure that the epoch change happened.
     assert_eq!(query_runner.get_epoch_info().epoch, 1);

@@ -11,6 +11,8 @@ macro_rules! collection {
 
             /// Build the `fdi` dependency graph of this collection.
             fn build_graph() -> fdi::DependencyGraph {
+                use $crate::prelude::*;
+
                 let trace_shutdown = std::env::var("TRACE_SHUTDOWN").is_ok();
                 let shutdown = $crate::ShutdownController::new(trace_shutdown);
                 let waiter = shutdown.waiter();
@@ -19,6 +21,15 @@ macro_rules! collection {
                     .with_value(shutdown)
                     .with_value(waiter)
                     .with_value($crate::_hacks::Blanket::default())
+                    .with_infallible(|this: &<Self as Collection>::ApplicationInterface|
+                        ApplicationInterface::sync_query(this)
+                    )
+                    .with_infallible(|this: &<Self as Collection>::ReputationAggregatorInterface|
+                        ReputationAggregatorInterface::get_reporter(this)
+                    )
+                    .with_infallible(|this: &<Self as Collection>::ReputationAggregatorInterface|
+                        ReputationAggregatorInterface::get_query(this)
+                    )
                     $(
                     .with_module::<<Self as Collection>::$service>()
                     )*

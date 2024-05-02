@@ -55,9 +55,7 @@ impl<C: Collection> ConfigConsumer for Application<C> {
 
 impl<C: Collection> fdi::BuildGraph for Application<C> {
     fn build_graph() -> fdi::DependencyGraph {
-        fdi::DependencyGraph::new()
-            .with(Self::init)
-            .with_infallible(|this: &Self| this.query_runner.clone())
+        fdi::DependencyGraph::new().with(Self::init)
     }
 }
 
