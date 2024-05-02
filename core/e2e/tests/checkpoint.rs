@@ -27,8 +27,7 @@ async fn e2e_checkpoint() -> Result<()> {
     }
     let swarm = Swarm::builder()
         .with_directory(path)
-        .with_min_port(10401)
-        .with_max_port(10500)
+        .with_min_port(10000)
         .with_num_nodes(4)
         .with_epoch_time(30000)
         .with_epoch_start(epoch_start)

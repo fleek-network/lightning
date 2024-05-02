@@ -6,7 +6,6 @@ use clap::Parser;
 use fleek_crypto::PublicKey;
 use lightning_application::app::Application;
 use lightning_e2e::swarm::Swarm;
-use lightning_e2e::utils::networking::PortAssigner;
 use lightning_e2e::utils::shutdown;
 use lightning_interfaces::prelude::*;
 use lightning_test_utils::logging;
@@ -48,8 +47,6 @@ async fn main() -> Result<()> {
         panic!("Committee size can not be larger than number of nodes.")
     }
 
-    let port_assigner = PortAssigner::default();
-
     let epoch_start = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .unwrap()
@@ -61,14 +58,12 @@ async fn main() -> Result<()> {
     }
     let swarm = Swarm::builder()
         .with_directory(path)
-        .with_min_port(12001)
-        .with_max_port(13000)
+        .with_min_port(12000)
         .with_num_nodes(args.num_nodes)
         .with_committee_size(args.committee_size as u64)
         .with_epoch_time(args.epoch_time)
         .with_epoch_start(epoch_start)
         .with_archiver()
-        .with_port_assigner(port_assigner)
         .persistence(args.persistence)
         .build();
     swarm.launch().await.unwrap();

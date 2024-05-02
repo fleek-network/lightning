@@ -783,12 +783,11 @@ where
             }
             self.ongoing_async_tasks.clear();
 
-            // We drop the muxer to unbind the address.
-            self.muxer
-                .take()
-                .expect("start method to have been called")
-                .close()
-                .await;
+            // We drop the muxer to unbind the address. If the spawn is called after shutdown
+            // has already happened the muxer might not be set yet.
+            if let Some(muxer) = self.muxer.take() {
+                muxer.close().await;
+            }
         });
     }
 }

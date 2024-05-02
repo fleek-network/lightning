@@ -27,8 +27,7 @@ async fn e2e_detect_offline_node() -> Result<()> {
     }
     let swarm = Swarm::builder()
         .with_directory(path)
-        .with_min_port(10601)
-        .with_max_port(10700)
+        .with_min_port(10500)
         .with_num_nodes(5)
         .with_committee_size(4)
         .with_epoch_time(25000)

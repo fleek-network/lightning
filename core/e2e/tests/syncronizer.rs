@@ -28,8 +28,7 @@ async fn e2e_syncronize_state() -> Result<()> {
     }
     let swarm = Swarm::builder()
         .with_directory(path)
-        .with_min_port(10501)
-        .with_max_port(10600)
+        .with_min_port(10600)
         .with_num_nodes(5)
         .with_committee_size(4)
         .with_epoch_time(5000)

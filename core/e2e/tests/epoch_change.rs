@@ -30,8 +30,7 @@ async fn e2e_epoch_change_all_nodes_on_committee() -> Result<()> {
     }
     let swarm = Swarm::builder()
         .with_directory(path)
-        .with_min_port(10000)
-        .with_max_port(10100)
+        .with_min_port(10100)
         .with_num_nodes(4)
         .with_epoch_time(30000)
         .with_epoch_start(epoch_start)
@@ -100,8 +99,7 @@ async fn e2e_epoch_change_with_edge_node() -> Result<()> {
     }
     let swarm = Swarm::builder()
         .with_directory(path)
-        .with_min_port(10101)
-        .with_max_port(10200)
+        .with_min_port(10200)
         .with_num_nodes(5)
         .with_committee_size(4)
         .with_epoch_time(30000)
@@ -171,8 +169,7 @@ async fn e2e_committee_change() -> Result<()> {
     let committee_size = 4;
     let swarm = Swarm::builder()
         .with_directory(path)
-        .with_min_port(10201)
-        .with_max_port(10300)
+        .with_min_port(10300)
         .with_num_nodes(5)
         .with_committee_size(committee_size)
         .with_epoch_time(20000)
@@ -235,8 +232,7 @@ async fn test_staking_auction() -> Result<()> {
     // to be kicked off on epoch change
     let swarm = Swarm::builder()
         .with_directory(path)
-        .with_min_port(10201)
-        .with_max_port(10300)
+        .with_min_port(10400)
         .with_num_nodes(5)
         .with_node_count_param(4)
         .with_epoch_time(20000)

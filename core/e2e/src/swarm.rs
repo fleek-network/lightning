@@ -243,9 +243,11 @@ impl SwarmBuilder {
         let num_nodes = self.num_nodes.expect("Number of nodes must be provided.");
         let directory = self.directory.expect("Directory must be provided.");
         let min_port = self.min_port.expect("Minimum port must be provided.");
-        let max_port = self.max_port.expect("Maximum port must be provided.");
+        let max_port = self.max_port.unwrap_or(min_port + 100);
 
-        let mut port_assigner = self.port_assigner.unwrap_or_default();
+        let mut port_assigner = self
+            .port_assigner
+            .unwrap_or_else(|| PortAssigner::new(min_port, max_port));
 
         // Load the default genesis. Clear the committee and node info and overwrite
         // the provided values from config.
@@ -298,7 +300,7 @@ impl SwarmBuilder {
             let root = directory.join(format!("node-{index}"));
             fs::create_dir_all(&root).expect("Failed to create node directory");
 
-            let ports = assign_ports(&mut port_assigner, min_port, max_port);
+            let ports = assign_ports(&mut port_assigner);
             let config = build_config(
                 &root,
                 ports.clone(),
@@ -364,35 +366,35 @@ impl SwarmBuilder {
     }
 }
 
-fn assign_ports(port_assigner: &mut PortAssigner, min_port: u16, max_port: u16) -> NodePorts {
+fn assign_ports(port_assigner: &mut PortAssigner) -> NodePorts {
     NodePorts {
         primary: port_assigner
-            .get_port(min_port, max_port, Transport::Udp)
+            .next_port(Transport::Udp)
             .expect("Could not get port"),
         worker: port_assigner
-            .get_port(min_port, max_port, Transport::Udp)
+            .next_port(Transport::Udp)
             .expect("Could not get port"),
         mempool: port_assigner
-            .get_port(min_port, max_port, Transport::Tcp)
+            .next_port(Transport::Tcp)
             .expect("Could not get port"),
         rpc: port_assigner
-            .get_port(min_port, max_port, Transport::Tcp)
+            .next_port(Transport::Tcp)
             .expect("Could not get port"),
         pool: port_assigner
-            .get_port(min_port, max_port, Transport::Udp)
+            .next_port(Transport::Udp)
             .expect("Could not get port"),
         pinger: port_assigner
-            .get_port(min_port, max_port, Transport::Udp)
+            .next_port(Transport::Udp)
             .expect("Could not get port"),
         handshake: lightning_interfaces::types::HandshakePorts {
             http: port_assigner
-                .get_port(min_port, max_port, Transport::Tcp)
+                .next_port(Transport::Tcp)
                 .expect("Could not get port"),
             webrtc: port_assigner
-                .get_port(min_port, max_port, Transport::Udp)
+                .next_port(Transport::Udp)
                 .expect("Could not get port"),
             webtransport: port_assigner
-                .get_port(min_port, max_port, Transport::Udp)
+                .next_port(Transport::Udp)
                 .expect("Could not get port"),
         },
     }
