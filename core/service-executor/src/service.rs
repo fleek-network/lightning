@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 
 use dashmap::DashMap;
 use fleek_crypto::ClientPublicKey;
-use fn_sdk::ipc_types::{self, IpcMessage, IpcRequest};
+use fn_sdk::ipc_types::{self, IpcMessage, IpcRequest, DELIMITER_SIZE};
 use infusion::c;
 use lightning_interfaces::infu_collection::Collection;
 use lightning_interfaces::{ApplicationInterface, FetcherSocket, SyncQueryRunnerInterface};
@@ -213,9 +213,9 @@ async fn handle_stream<C: Collection>(
     ctx: Arc<Context<C>>,
 ) -> Result<(), Box<dyn Error>> {
     // incoming IpcRequests
-    let mut read_buffer = vec![0; 8];
+    // start with a buffer of 8 bytes to read the length delimiter
+    let mut read_buffer = vec![0; DELIMITER_SIZE];
     let mut read_buffer_pos = 0;
-    let mut read_len = 0;
 
     // outgoing IpcMessages
     let mut write_buffer = Vec::<u8>::new();
@@ -290,9 +290,11 @@ async fn handle_stream<C: Collection>(
         // these might take awhile so we want to get them kicked off asap, if theres multiple
         // messages in the stream then this will handle them all before moving on
         if ready.is_readable() {
+            let mut reading_len = true;
+
             'read: loop {
                 // try to read the length delimiter first
-                while read_buffer_pos < 8 && read_len == 0 {
+                while read_buffer_pos < read_buffer.len() {
                     match stream.try_read(&mut read_buffer[read_buffer_pos..]) {
                         Ok(0) => {
                             tracing::warn!("Connection reset control loop");
@@ -310,46 +312,32 @@ async fn handle_stream<C: Collection>(
                     }
                 }
 
-                // if we have no message len already then we have the new length delimiter
-                if read_len == 0 {
-                    read_len = usize::from_le_bytes(
+                // Check if were only reading the length delimiter
+                if reading_len {
+                    let read_len = usize::from_le_bytes(
                         read_buffer[..8]
                             .try_into()
                             .expect("Can create len 4 array from read buffer slice"),
                     );
 
+                    // here we just resize expected size buffer to the correct size and reset the
+                    // position
                     read_buffer_pos = 0;
                     read_buffer.resize(read_len, 0);
-                }
 
-                // try to read the request
-                // downcast here should be safe on >= 32 bit machines
-                while read_buffer_pos < read_len {
-                    match stream.try_read(&mut read_buffer[read_buffer_pos..]) {
-                        Ok(0) => {
-                            // connection reset
-                            tracing::warn!("Connection reset control loop");
-                            break 'outer;
-                        },
-                        Ok(n) => {
-                            read_buffer_pos += n;
-                        },
-                        Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
-                            break 'read;
-                        },
-                        Err(e) => {
-                            return Err(e.into());
-                        },
-                    }
+                    // make sure we dont hit this block again
+                    reading_len = false;
+
+                    // get more bytes
+                    continue 'read;
                 }
 
                 let request = IpcRequest::decode(&read_buffer)?;
 
-                // we need to resize to 4 bytes or else the first part of the read loop may bring in
-                // too many bytes
-                read_buffer.resize(8, 0);
-                read_len = 0;
+                // reset the buffer back to 8 bytes for the next delimiter
+                read_buffer.resize(DELIMITER_SIZE, 0);
                 read_buffer_pos = 0;
+                reading_len = true;
 
                 if let Some(request_ctx) = request.request_ctx {
                     let ctx = ctx.clone();

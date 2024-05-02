@@ -76,10 +76,13 @@ pub enum IpcMessage {
         response: Response,
     },
 }
+/// The size of the length delimiter in bytes.
+///
+/// todo!(n) this should probably be reflected on the trait
+pub const DELIMITER_SIZE: usize = 8;
 
 /// Deduping this as is seems to be impossible because it would require IpcMessage (`T`)
 /// To implemenet both Serialize<AllocSeralizer<_>> and Serialize<WriteSerializer<_>>
-///
 ///
 /// todo!(n)
 impl LightningMessage for IpcMessage {
@@ -106,7 +109,10 @@ impl LightningMessage for IpcMessage {
         let encoded = rkyv::to_bytes::<_, 256>(self)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
-        let len = encoded.len().to_le_bytes();
+        // we need to cast to an 8 byte uint incase a systems usize is not 8 bytes
+        // will probably never happen
+        let len = encoded.len() as u64;
+        let len = len.to_le_bytes();
 
         writer.write_all(&len)?;
         writer.write_all(&encoded)
@@ -137,7 +143,9 @@ impl LightningMessage for IpcRequest {
         let encoded = rkyv::to_bytes::<_, 256>(self)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
-        let len = encoded.len().to_le_bytes();
+        // we need to cast to an 8 byte uint incase a systems usize is not 8 bytes
+        let len = encoded.len() as u64;
+        let len = len.to_le_bytes();
 
         writer.write_all(&len)?;
         writer.write_all(&encoded)
@@ -145,7 +153,7 @@ impl LightningMessage for IpcRequest {
 }
 
 ReqRes! {
-    // we need an extra `meta` attribute to specify the derive macros otherwise it could be a multiple parse
+    // we need an extra `endmeta` derive macros otherwise it could be a multiple parse
     // todo!(n) find out how to remove this,
     // for some reasons adding these directly into the macro invocation doesn't work
     meta: #[derive(IsVariant, Archive, Serialize, Deserialize, PartialEq, Eq, Debug, Clone, Copy)],

@@ -18,7 +18,7 @@ use tokio::sync::mpsc;
 
 use crate::connection::ConnectionListener;
 use crate::futures::future_callback;
-use crate::ipc_types::{IpcMessage, IpcRequest, Request, Response};
+use crate::ipc_types::{IpcMessage, IpcRequest, Request, Response, DELIMITER_SIZE};
 
 static mut SENDER: Option<tokio::sync::mpsc::Sender<IpcRequest>> = None;
 pub(crate) static mut IPC_PATH: Option<PathBuf> = None;
@@ -80,9 +80,8 @@ pub(crate) async fn spawn_service_loop_inner(
     let mut write_buffer = Vec::<u8>::new();
     let mut write_buffer_pos = 0_usize;
     // IpcMessage
-    let mut read_buffer = vec![0; 8];
+    let mut read_buffer = vec![0; DELIMITER_SIZE];
     let mut read_buffer_pos = 0;
-    let mut read_len = 0;
 
     'outer: loop {
         let ready = if write_buffer.is_empty() {
@@ -133,10 +132,12 @@ pub(crate) async fn spawn_service_loop_inner(
         }
 
         if ready.is_readable() {
+            let mut reading_len = true;
+
             'read: loop {
                 // try to read the length from the buffer,
                 // if were not already trying to read a message
-                while read_buffer_pos < 8 && read_len == 0 {
+                while read_buffer_pos < read_buffer.len() {
                     match ipc_stream.try_read(&mut read_buffer[read_buffer_pos..]) {
                         // socket reset
                         Ok(0) => {
@@ -159,9 +160,9 @@ pub(crate) async fn spawn_service_loop_inner(
 
                 // if the len is 0 then we dont have any messages yet, therefore we jsut finished
                 // reading the len or else we would have broken out
-                if read_len == 0 {
+                if reading_len {
                     // assume were running on a 64bit machine
-                    read_len = usize::from_le_bytes(
+                    let read_len = usize::from_le_bytes(
                         read_buffer[..8]
                             .try_into()
                             .expect("can create len 8 buffer from read buffer"),
@@ -169,36 +170,20 @@ pub(crate) async fn spawn_service_loop_inner(
 
                     // were now using this as the postion in the message buffer
                     read_buffer_pos = 0;
+
                     // resize will not deallocate
                     read_buffer.resize(read_len, 0);
-                }
+                    reading_len = false;
 
-                // this downcasting should be safe because its from a u32
-                // and no one should be running this on a < 32 bit machine
-                while read_buffer_pos < read_len {
-                    match ipc_stream.try_read(&mut read_buffer[read_buffer_pos..]) {
-                        Ok(0) => {
-                            tracing::warn!("service control loop connection reset");
-                            break 'outer;
-                        },
-                        Ok(n) => {
-                            read_buffer_pos += n;
-                        },
-                        Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                            break 'read;
-                        },
-                        Err(e) => {
-                            return Err(e.into());
-                        },
-                    }
+                    continue 'read;
                 }
 
                 let message = IpcMessage::decode(&read_buffer)?;
 
                 // cleanup now that weve read the message
                 read_buffer_pos = 0;
-                read_len = 0;
-                read_buffer.resize(8, 0);
+                read_buffer.resize(DELIMITER_SIZE, 0);
+                reading_len = true;
 
                 handle_message(message);
             }
