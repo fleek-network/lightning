@@ -272,7 +272,8 @@ impl MyReputationReporter {
     fn send_message(&self, message: ReportMessage) {
         let tx = self.tx.clone();
         tokio::spawn(async move {
-            tx.send(message).await.unwrap();
+            // failure here means we're shutting down.
+            let _ = tx.send(message).await;
         });
     }
 }

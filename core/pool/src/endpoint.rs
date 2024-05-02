@@ -14,7 +14,6 @@ use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::ServiceScope;
 use lightning_metrics::increment_counter;
 use lightning_utils::application::QueryRunnerExt;
-use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
@@ -765,9 +764,6 @@ where
             }
             self.pending_task.clear();
             self.connection_buffer.clear();
-
-            // Clean out the queue.
-            while !matches!(self.task_queue.try_recv(), Err(TryRecvError::Empty)) {}
 
             // Cancel pending connection dials before shutting down
             let nodes: Vec<NodeIndex> = self.pending_dial.keys().copied().collect();
