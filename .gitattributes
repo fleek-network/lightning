@@ -7,4 +7,5 @@
 *.fixed linguist-language=Rust
 *.mir linguist-language=Rust
 Cargo.lock linguist-generated=false
+services/js-poc/src/runtime/js/node*.js linguist-vendored
 
