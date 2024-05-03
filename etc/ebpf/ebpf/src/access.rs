@@ -1,5 +1,5 @@
 #![allow(unused)]
-use aya_bpf::cty::{c_int, c_uint, c_ulong, c_ushort};
+use aya_ebpf::cty::{c_int, c_uint, c_ulong, c_ushort};
 
 use crate::vmlinux::{
     cred,

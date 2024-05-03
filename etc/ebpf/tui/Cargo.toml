@@ -8,8 +8,6 @@ authors = ["Miguel <miguel@fleek.xyz>"]
 
 [dependencies]
 anyhow = "1.0"
-aya = { git = "https://github.com/aya-rs/aya", features = ["async_tokio"] }
-aya-log = { git = "https://github.com/aya-rs/aya" }
 better-panic = "0.3.0"
 clap = { version = "4.4.5", features = ["derive", "cargo", "wrap_help", "unicode", "string", "unstable-styles"] }
 color-eyre = "0.6.2"

@@ -1,5 +1,5 @@
-use aya_bpf::macros::lsm;
-use aya_bpf::programs::LsmContext;
+use aya_ebpf::macros::lsm;
+use aya_ebpf::programs::LsmContext;
 use aya_log_ebpf::info;
 
 use crate::vmlinux::cred;

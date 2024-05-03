@@ -7,14 +7,14 @@ authors = ["M. Meier <miguel@fleek.xyz>"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-aya-bpf = { git = "https://github.com/aya-rs/aya" }
-aya-log-ebpf = { git = "https://github.com/aya-rs/aya" }
+aya-ebpf = { git = "https://github.com/aya-rs/aya", rev = "e5d107d" }
+aya-log-ebpf = { git = "https://github.com/aya-rs/aya", rev = "e5d107d" }
 common = { path = "../common" }
 memoffset = "0.9"
 network-types = "0.0.5"
 
 [build-dependencies]
-aya-tool = { git = "https://github.com/deepfence/aya-rs", branch = "btf-fixes" }
+aya-tool = { git = "https://github.com/deepfence/aya-rs", rev = "e5d107d" }
 
 [profile.dev]
 opt-level = 3

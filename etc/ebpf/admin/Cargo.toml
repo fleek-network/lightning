@@ -7,8 +7,8 @@ build = "build.rs"
 
 [dependencies]
 anyhow = "1.0"
-aya = { git = "https://github.com/aya-rs/aya", features = ["async_tokio"] }
-aya-log = { git = "https://github.com/aya-rs/aya" }
+aya = { git = "https://github.com/aya-rs/aya", rev = "e5d107d", features = ["async_tokio"] }
+aya-log = { git = "https://github.com/aya-rs/aya", rev = "e5d107d" }
 clap = { version = "4.4", features = ["derive"] }
 color-eyre = "0.6.2"
 common = { path = "../common", features = ["userspace"] }

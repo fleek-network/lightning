@@ -130,7 +130,7 @@ checksum = "f1fdabc7756949593fe60f30ec81974b613357de856987752631dea1e3394c80"
 [[package]]
 name = "aya"
 version = "0.12.0"
-source = "git+https://github.com/aya-rs/aya#e5d107dd50b13ccf9783b9af4e79b57b02c1f0f3"
+source = "git+https://github.com/aya-rs/aya?rev=e5d107d#e5d107dd50b13ccf9783b9af4e79b57b02c1f0f3"
 dependencies = [
  "assert_matches",
  "aya-obj",
@@ -147,7 +147,7 @@ dependencies = [
 [[package]]
 name = "aya-log"
 version = "0.2.0"
-source = "git+https://github.com/aya-rs/aya#e5d107dd50b13ccf9783b9af4e79b57b02c1f0f3"
+source = "git+https://github.com/aya-rs/aya?rev=e5d107d#e5d107dd50b13ccf9783b9af4e79b57b02c1f0f3"
 dependencies = [
  "aya",
  "aya-log-common",
@@ -160,7 +160,7 @@ dependencies = [
 [[package]]
 name = "aya-log-common"
 version = "0.1.14"
-source = "git+https://github.com/aya-rs/aya#e5d107dd50b13ccf9783b9af4e79b57b02c1f0f3"
+source = "git+https://github.com/aya-rs/aya?rev=e5d107d#e5d107dd50b13ccf9783b9af4e79b57b02c1f0f3"
 dependencies = [
  "num_enum",
 ]
@@ -168,7 +168,7 @@ dependencies = [
 [[package]]
 name = "aya-obj"
 version = "0.1.0"
-source = "git+https://github.com/aya-rs/aya#e5d107dd50b13ccf9783b9af4e79b57b02c1f0f3"
+source = "git+https://github.com/aya-rs/aya?rev=e5d107d#e5d107dd50b13ccf9783b9af4e79b57b02c1f0f3"
 dependencies = [
  "bytes",
  "core-error",
@@ -1623,8 +1623,6 @@ name = "lightning-tui"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "aya",
- "aya-log",
  "better-panic",
  "clap",
  "color-eyre",

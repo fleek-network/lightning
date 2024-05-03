@@ -72,33 +72,33 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
-name = "aya-bpf"
+name = "aya-ebpf"
 version = "0.1.0"
-source = "git+https://github.com/aya-rs/aya#0f6a7343926b23190483bed49855fdc9bb10988d"
+source = "git+https://github.com/aya-rs/aya?rev=e5d107d#e5d107dd50b13ccf9783b9af4e79b57b02c1f0f3"
 dependencies = [
- "aya-bpf-bindings",
- "aya-bpf-cty",
- "aya-bpf-macros",
+ "aya-ebpf-bindings",
+ "aya-ebpf-cty",
+ "aya-ebpf-macros",
  "rustversion",
 ]
 
 [[package]]
-name = "aya-bpf-bindings"
+name = "aya-ebpf-bindings"
 version = "0.1.0"
-source = "git+https://github.com/aya-rs/aya#0f6a7343926b23190483bed49855fdc9bb10988d"
+source = "git+https://github.com/aya-rs/aya?rev=e5d107d#e5d107dd50b13ccf9783b9af4e79b57b02c1f0f3"
 dependencies = [
- "aya-bpf-cty",
+ "aya-ebpf-cty",
 ]
 
 [[package]]
-name = "aya-bpf-cty"
+name = "aya-ebpf-cty"
 version = "0.2.1"
-source = "git+https://github.com/aya-rs/aya#0f6a7343926b23190483bed49855fdc9bb10988d"
+source = "git+https://github.com/aya-rs/aya?rev=e5d107d#e5d107dd50b13ccf9783b9af4e79b57b02c1f0f3"
 
 [[package]]
-name = "aya-bpf-macros"
+name = "aya-ebpf-macros"
 version = "0.1.0"
-source = "git+https://github.com/aya-rs/aya#0f6a7343926b23190483bed49855fdc9bb10988d"
+source = "git+https://github.com/aya-rs/aya?rev=e5d107d#e5d107dd50b13ccf9783b9af4e79b57b02c1f0f3"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",
@@ -108,8 +108,8 @@ dependencies = [
 
 [[package]]
 name = "aya-log-common"
-version = "0.1.13"
-source = "git+https://github.com/aya-rs/aya#0f6a7343926b23190483bed49855fdc9bb10988d"
+version = "0.1.14"
+source = "git+https://github.com/aya-rs/aya?rev=e5d107d#e5d107dd50b13ccf9783b9af4e79b57b02c1f0f3"
 dependencies = [
  "num_enum",
 ]
@@ -117,9 +117,9 @@ dependencies = [
 [[package]]
 name = "aya-log-ebpf"
 version = "0.1.0"
-source = "git+https://github.com/aya-rs/aya#0f6a7343926b23190483bed49855fdc9bb10988d"
+source = "git+https://github.com/aya-rs/aya?rev=e5d107d#e5d107dd50b13ccf9783b9af4e79b57b02c1f0f3"
 dependencies = [
- "aya-bpf",
+ "aya-ebpf",
  "aya-log-common",
  "aya-log-ebpf-macros",
 ]
@@ -127,7 +127,7 @@ dependencies = [
 [[package]]
 name = "aya-log-ebpf-macros"
 version = "0.1.0"
-source = "git+https://github.com/aya-rs/aya#0f6a7343926b23190483bed49855fdc9bb10988d"
+source = "git+https://github.com/aya-rs/aya?rev=e5d107d#e5d107dd50b13ccf9783b9af4e79b57b02c1f0f3"
 dependencies = [
  "aya-log-common",
  "aya-log-parser",
@@ -138,8 +138,8 @@ dependencies = [
 
 [[package]]
 name = "aya-log-parser"
-version = "0.1.11-dev.0"
-source = "git+https://github.com/aya-rs/aya#0f6a7343926b23190483bed49855fdc9bb10988d"
+version = "0.1.13"
+source = "git+https://github.com/aya-rs/aya?rev=e5d107d#e5d107dd50b13ccf9783b9af4e79b57b02c1f0f3"
 dependencies = [
  "aya-log-common",
 ]
@@ -147,7 +147,7 @@ dependencies = [
 [[package]]
 name = "aya-tool"
 version = "0.1.0"
-source = "git+https://github.com/deepfence/aya-rs?branch=btf-fixes#611950e7d7def4c68b4f8bb914dad1ed27abe130"
+source = "git+https://github.com/deepfence/aya-rs?rev=e5d107d#e5d107dd50b13ccf9783b9af4e79b57b02c1f0f3"
 dependencies = [
  "anyhow",
  "bindgen",
@@ -158,17 +158,17 @@ dependencies = [
 
 [[package]]
 name = "bindgen"
-version = "0.65.1"
+version = "0.69.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cfdf7b466f9a4903edc73f95d6d2bcd5baf8ae620638762244d3f60143643cc5"
+checksum = "a00dc851838a2120612785d195287475a3ac45514741da670b735818822129a0"
 dependencies = [
- "bitflags 1.3.2",
+ "bitflags",
  "cexpr",
  "clang-sys",
+ "itertools",
  "lazy_static",
  "lazycell",
  "log",
- "peeking_take_while",
  "prettyplease",
  "proc-macro2",
  "quote",
@@ -178,12 +178,6 @@ dependencies = [
  "syn",
  "which",
 ]
-
-[[package]]
-name = "bitflags"
-version = "1.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
 name = "bitflags"
@@ -271,7 +265,7 @@ version = "0.0.0"
 name = "ebpf"
 version = "0.0.0"
 dependencies = [
- "aya-bpf",
+ "aya-ebpf",
  "aya-log-ebpf",
  "aya-tool",
  "common",
@@ -320,6 +314,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3d1354bf6b7235cb4a0576c2619fd4ed18183f689b12b006a0ee7329eeff9a5"
 dependencies = [
  "windows-sys",
+]
+
+[[package]]
+name = "itertools"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba291022dbbd398a455acf126c1e341954079855bc60dfdda641363bd6922569"
+dependencies = [
+ "either",
 ]
 
 [[package]]
@@ -426,12 +429,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3fdb12b2476b595f9358c5161aa467c2438859caa136dec86c26fdd2efe17b92"
 
 [[package]]
-name = "peeking_take_while"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19b17cddbe7ec3f8bc800887bab5e717348c95ea2ca0b1bf0837fb964dc67099"
-
-[[package]]
 name = "prettyplease"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -523,7 +520,7 @@ version = "0.38.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "70dc5ec042f7a43c4a73241207cecc9873a06d45debb38b329f8541d85c2730f"
 dependencies = [
- "bitflags 2.5.0",
+ "bitflags",
  "errno",
  "libc",
  "linux-raw-sys",

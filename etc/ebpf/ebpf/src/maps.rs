@@ -1,5 +1,5 @@
-use aya_bpf::macros::map;
-use aya_bpf::maps::{HashMap, LpmTrie};
+use aya_ebpf::macros::map;
+use aya_ebpf::maps::{HashMap, LpmTrie};
 use common::{File, FileRuleList, PacketFilter, PacketFilterParams, SubnetFilterParams};
 
 #[map]

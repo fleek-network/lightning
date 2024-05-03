@@ -1,9 +1,9 @@
 use core::mem;
 
-use aya_bpf::bindings::xdp_action;
-use aya_bpf::macros::xdp;
-use aya_bpf::maps::lpm_trie::Key;
-use aya_bpf::programs::XdpContext;
+use aya_ebpf::bindings::xdp_action;
+use aya_ebpf::macros::xdp;
+use aya_ebpf::maps::lpm_trie::Key;
+use aya_ebpf::programs::XdpContext;
 use common::{PacketFilter, PacketFilterParams, SubnetFilterParams};
 use memoffset::offset_of;
 use network_types::eth::{EthHdr, EtherType};
