@@ -44,10 +44,24 @@ pub fn extract(
         })
         .flatten();
 
-    let query: HashMap<String, String> = url
-        .query_pairs()
-        .map(|(k, v)| (k.to_string(), v.to_string()))
-        .collect();
+    let query = url.query_pairs().fold(
+        HashMap::<String, serde_json::Value>::new(),
+        |mut map, (k, v)| {
+            map.entry(k.to_string())
+                .and_modify(|current| {
+                    if let serde_json::Value::Array(arr) = current {
+                        // Append to existing array parameter
+                        arr.push(v.to_string().into());
+                    } else {
+                        // Upgrade parameter to an array containing previous and new values
+                        let prev = std::mem::take(current);
+                        *current = serde_json::Value::Array(vec![prev, v.to_string().into()]);
+                    }
+                })
+                .or_insert(v.to_string().into());
+            map
+        },
+    );
     let query = (!query.is_empty()).then_some(query);
     let headers = (!headers.is_empty()).then_some(headers);
 
