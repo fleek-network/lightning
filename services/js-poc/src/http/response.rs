@@ -9,7 +9,7 @@ enum HeaderFormat {
 }
 
 pub fn parse(value: &serde_json::Value) -> Result<HttpResponse> {
-    let body = parse_body(value)?;
+    let body = value_to_string(value.get("body").context("Body is missing")?);
     let status = parse_status(value)?;
     let headers = parse_headers(value)?;
 
@@ -21,18 +21,20 @@ pub fn parse(value: &serde_json::Value) -> Result<HttpResponse> {
 }
 
 fn parse_headers(value: &serde_json::Value) -> Result<Vec<(String, Vec<String>)>> {
-    if value["headers"].is_null() {
-        return Err(anyhow!("Headers are missing"));
+    let headers = value.get("headers").context("Missing headers")?;
+    if headers.is_null() {
+        return Err(anyhow!("Headers cannot be null"));
     }
-    if let Some(headers_j) = value["headers"].as_array() {
+
+    if let Some(headers_j) = headers.as_array() {
         // the headers are wrapped into an array
         let mut headers = Vec::new();
         for header_j in headers_j {
-            let (name, value) = parse_header(header_j)?;
-            headers.push((name, vec![value]));
+            let (name, values) = parse_header(header_j)?;
+            headers.push((name, values));
         }
         return Ok(headers);
-    } else if let Some(headers_j) = value["headers"].as_object() {
+    } else if let Some(headers_j) = headers.as_object() {
         let mut headers = Vec::new();
 
         let mut header_fmt = HeaderFormat::Undetermined;
@@ -50,10 +52,15 @@ fn parse_headers(value: &serde_json::Value) -> Result<Vec<(String, Vec<String>)>
                     },
                 }
 
-                let value = value
-                    .as_str()
-                    .context("Failed to convert value to string")?;
-                headers.push((key.to_owned(), vec![value.to_string()]));
+                headers.push((
+                    key.to_owned(),
+                    vec![
+                        value
+                            .as_str()
+                            .context("Failed to convert value to string")?
+                            .to_string(),
+                    ],
+                ));
             } else if let Some(array) = value.as_array() {
                 // At this point the array either consists of header values corresponding to
                 // the header name stored in `key` or key value objects, where key and value
@@ -73,8 +80,11 @@ fn parse_headers(value: &serde_json::Value) -> Result<Vec<(String, Vec<String>)>
                                 ));
                             },
                         }
-                        let elem = elem.as_str().context("Failed to convert value to string")?;
-                        header_values.push(elem.to_string());
+                        header_values.push(
+                            elem.as_str()
+                                .context("Failed to convert value to string")?
+                                .to_string(),
+                        );
                     } else {
                         // TODO(matthias): make sure all of the objects share the same key
                         match header_fmt {
@@ -88,17 +98,17 @@ fn parse_headers(value: &serde_json::Value) -> Result<Vec<(String, Vec<String>)>
                                 ));
                             },
                         }
-                        let (header_name, header_val) = parse_header(elem)?;
+                        let (header_name, ref mut values) = parse_header(elem)?;
                         if *key != header_name.to_lowercase() {
                             return Err(anyhow!("Inconsistent header names"));
                         }
-                        header_values.push(header_val);
+                        header_values.append(values);
                     }
                 }
                 headers.push((key.to_owned(), header_values));
             } else {
-                let (name, value) = parse_header(value)?;
-                headers.push((name, vec![value]));
+                let (name, values) = parse_header(value)?;
+                headers.push((name, values));
             }
         }
         return Ok(headers);
@@ -107,53 +117,57 @@ fn parse_headers(value: &serde_json::Value) -> Result<Vec<(String, Vec<String>)>
     Err(anyhow!("Unsupported header format"))
 }
 
-fn parse_header(value: &serde_json::Value) -> Result<(String, String)> {
+fn parse_header(value: &serde_json::Value) -> Result<(String, Vec<String>)> {
     if value.is_object() && !value["key"].is_null() && !value["value"].is_null() {
-        if let Ok((name, value)) = parse_header_key_value(value) {
-            return Ok((name, value));
+        Ok((
+            value["key"]
+                .as_str()
+                .context("Header key must be a string")?
+                .to_string(),
+            vec![value_to_string(&value["value"])],
+        ))
+    } else if let Some(arr) = value.as_array() {
+        match arr.as_slice() {
+            // TODO: verify correctness of allowing empty headers
+            [serde_json::Value::String(key)] => Ok((key.clone(), vec![])),
+            [
+                serde_json::Value::String(key),
+                serde_json::Value::Array(arr),
+            ] => Ok((key.clone(), arr.iter().map(value_to_string).collect())),
+            [serde_json::Value::String(key), _, ..] => {
+                Ok((key.clone(), arr[1..].iter().map(value_to_string).collect()))
+            },
+            [_, ..] => Err(anyhow!("Header key must be a string")),
+            [] => Err(anyhow!("Empty header key value array pair")),
         }
+    } else {
+        Err(anyhow!("Unsupported header format"))
     }
-    Err(anyhow!("Unsupported header format"))
-}
-
-fn parse_header_key_value(value: &serde_json::Value) -> Result<(String, String)> {
-    if value["key"].is_null() || value["value"].is_null() {
-        return Err(anyhow!("Key or value is missing"));
-    }
-    let key = value["key"]
-        .as_str()
-        .context("Failed to convert key to string")?;
-    let value = value["value"]
-        .as_str()
-        .context("Failed to convert value to string")?;
-    Ok((key.to_string(), value.to_string()))
-}
-
-fn parse_body(value: &serde_json::Value) -> Result<String> {
-    if value["body"].is_null() {
-        return Err(anyhow!("Body is missing"));
-    }
-    // TODO(matthias): support other types than string?
-    let body = value["body"]
-        .as_str()
-        .context("Failed to convert body to string")?;
-    Ok(body.to_string())
 }
 
 fn parse_status(value: &serde_json::Value) -> Result<u16> {
-    if value["status"].is_null() {
-        return Err(anyhow!("Status is missing"));
+    let status = value.get("status").context("Status is missing")?;
+    if status.is_null() {
+        return Err(anyhow!("Status cannot be null"));
     }
 
-    let status = if let Some(status) = value["status"].as_u64() {
-        status as u16
+    if let Some(status) = status.as_u64() {
+        u16::try_from(status).context("Invalid status code")
     } else {
         let status = value["status"]
             .as_str()
-            .context("Failed to convert status to string")?;
-        status.parse::<u16>()?
-    };
-    Ok(status)
+            .context("Invalid status code, expected string or integer")?;
+        status.parse::<u16>().context("Invalid status code")
+    }
+}
+
+/// Turn any value into a string, ignoring quotes if the value is a string already
+fn value_to_string(value: &serde_json::Value) -> String {
+    if let Some(s) = value.as_str() {
+        s.into()
+    } else {
+        value.to_string()
+    }
 }
 
 #[cfg(test)]
@@ -235,6 +249,46 @@ mod tests {
                         "Next-Router-State-Tree".to_string(),
                         "Next-Router-Prefetch".to_string(),
                     ],
+                ),
+            ]),
+            body: "hello".to_string(),
+        };
+
+        let value = serde_json::from_str::<serde_json::Value>(res).unwrap();
+        let http_res = parse(&value).unwrap();
+
+        assert_eq!(http_res, target);
+    }
+
+    #[test]
+    fn test_header_array_variants() {
+        let res = r###"
+{
+  "status":"201",
+  "headers": [
+      ["empty-header"],
+      ["simple-header", "foo"],
+      ["multi-header", [ "foo", "bar" ]],
+      ["encoded-number-header", 1],
+      ["encoded-object-header", { "foo": "bar" }]
+  ],
+  "body": "hello"
+}
+        "###;
+
+        let target = HttpResponse {
+            status: Some(201),
+            headers: Some(vec![
+                ("empty-header".to_string(), vec![]),
+                ("simple-header".to_string(), vec!["foo".to_string()]),
+                (
+                    "multi-header".to_string(),
+                    vec!["foo".to_string(), "bar".to_string()],
+                ),
+                ("encoded-number-header".to_string(), vec!["1".to_string()]),
+                (
+                    "encoded-object-header".to_string(),
+                    vec![r#"{"foo":"bar"}"#.to_string()],
                 ),
             ]),
             body: "hello".to_string(),

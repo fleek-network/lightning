@@ -1,7 +1,7 @@
 // Example simple ssr script for testing ideas for a browser request
 // curl localhost:4220/services/1/blake3/$(lightning-node dev store services/js-poc/examples/example_ssr.js | awk '{print $1}')
 
-export const main = ({ path, method, headers, body }) => {
+export function main({ path, method, headers, body }) {
   switch (path) {
     case '/index.html':
       return {
@@ -13,7 +13,10 @@ export const main = ({ path, method, headers, body }) => {
       return {
         status: 404,
         body: '<html><body><p>404 not found</p></body></html>',
-        headers: { "x-custom": "foobar" },
+        headers: [
+          ["x-custom", "foobar"],
+          ["x-original", arguments[0]]
+        ],
       }
   }
 }
