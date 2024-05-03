@@ -47,6 +47,7 @@ impl PacketFilterRule {
     pub const PASS: u32 = 2;
     pub const TCP: u16 = 6;
     pub const UDP: u16 = 17;
+    pub const ANY_PROTO: u16 = u16::MAX;
     pub const DEFAULT_PREFIX: u32 = 32;
 }
 

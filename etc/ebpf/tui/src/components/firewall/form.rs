@@ -19,9 +19,11 @@ use crate::widgets::utils::InputField;
 
 const IP_FIELD_NAME: &str = "IP";
 const PORT_FIELD_NAME: &str = "Port";
-const INPUT_FORM_X: u16 = 20;
-const INPUT_FORM_Y: u16 = 40;
-const INPUT_FIELD_COUNT: usize = 2;
+const PROTO_FIELD_NAME: &str = "Protocol";
+const ACTION_FIELD_NAME: &str = "Action";
+const INPUT_FORM_X: u16 = 28;
+const INPUT_FORM_Y: u16 = 14;
+const INPUT_FIELD_COUNT: usize = 4;
 
 #[derive(Default)]
 pub struct FirewallForm {
@@ -37,6 +39,8 @@ impl FirewallForm {
         let mut input_fields: Vec<_> = vec![
             (IP_FIELD_NAME, TextArea::default()),
             (PORT_FIELD_NAME, TextArea::default()),
+            (PROTO_FIELD_NAME, TextArea::default()),
+            (ACTION_FIELD_NAME, TextArea::default()),
         ]
         .into_iter()
         .map(|(title, area)| InputField { title, area })
@@ -45,6 +49,8 @@ impl FirewallForm {
         debug_assert!(input_fields.len() == INPUT_FIELD_COUNT);
         utils::activate(&mut input_fields[0]);
         utils::inactivate(&mut input_fields[1]);
+        utils::inactivate(&mut input_fields[2]);
+        utils::inactivate(&mut input_fields[3]);
 
         Self {
             command_tx: None,
@@ -92,17 +98,39 @@ impl FirewallForm {
             .trim()
             .parse()
             .map_err(|_| Report::msg("Invalid port"))?;
-
+        let proto = match self.input_fields[2]
+            .area
+            .yank_text()
+            .trim()
+            .to_lowercase()
+            .as_str()
+        {
+            "tcp" => PacketFilterRule::TCP,
+            "udp" => PacketFilterRule::UDP,
+            "any" => PacketFilterRule::ANY_PROTO,
+            _ => return Err(Report::msg("Invalid protocol")),
+        };
+        let action = match self.input_fields[3]
+            .area
+            .yank_text()
+            .trim()
+            .to_lowercase()
+            .as_str()
+        {
+            "pass" => PacketFilterRule::PASS,
+            "drop" => PacketFilterRule::DROP,
+            _ => return Err(Report::msg("Invalid action")),
+        };
         let rule = PacketFilterRule {
             prefix: prefix.unwrap_or(PacketFilterRule::DEFAULT_PREFIX),
             ip,
             port,
             shortlived: false,
-            // Todo: get these from input.
-            proto: PacketFilterRule::TCP,
+            proto,
             audit: true,
-            action: PacketFilterRule::DROP,
+            action,
         };
+
         self.buf.replace(rule);
 
         Ok(())
@@ -163,16 +191,18 @@ impl Component for FirewallForm {
         debug_assert!(self.input_fields.len() == INPUT_FIELD_COUNT);
 
         f.render_widget(Clear, area);
-        let area = utils::center_form(INPUT_FORM_X, INPUT_FORM_Y, area);
+        let area = center_form(INPUT_FORM_X, INPUT_FORM_Y, area);
 
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints(
                 [
-                    Constraint::Percentage(0),
-                    Constraint::Max(3),
-                    Constraint::Max(3),
-                    Constraint::Percentage(0),
+                    Constraint::Fill(1),
+                    Constraint::Min(3),
+                    Constraint::Min(3),
+                    Constraint::Min(3),
+                    Constraint::Min(3),
+                    Constraint::Fill(1),
                 ]
                 .as_ref(),
             )
@@ -182,7 +212,7 @@ impl Component for FirewallForm {
             .input_fields
             .iter_mut()
             // We don't want the first or last because they're for padding.
-            .zip(chunks.iter().take(3).skip(1))
+            .zip(chunks.iter().take(5).skip(1))
             .enumerate()
         {
             if i == self.selected_input_field {
@@ -196,4 +226,12 @@ impl Component for FirewallForm {
 
         Ok(())
     }
+}
+
+pub fn center_form(x: u16, y: u16, r: Rect) -> Rect {
+    let popup_layout =
+        Layout::vertical([Constraint::Fill(1), Constraint::Min(y), Constraint::Fill(1)]).split(r);
+
+    Layout::horizontal([Constraint::Fill(1), Constraint::Min(x), Constraint::Fill(1)])
+        .split(popup_layout[1])[1]
 }

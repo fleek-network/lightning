@@ -172,14 +172,7 @@ impl Component for FireWall {
         self.longest_item_per_column = self.space_between_columns();
         debug_assert!(self.longest_item_per_column.len() == COLUMN_COUNT);
 
-        let column_names = [
-            "IP",
-            "Subnet",
-            "Port",
-            "Protocol",
-            "Trigger Event",
-            "Action",
-        ];
+        let column_names = ["IP", "Subnet", "Port", "Protocol", "Audit", "Action"];
         debug_assert!(column_names.len() == COLUMN_COUNT);
 
         let header_style = Style::default().fg(Color::White).bg(Color::Blue);
