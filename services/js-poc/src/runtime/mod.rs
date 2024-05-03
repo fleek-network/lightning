@@ -114,7 +114,7 @@ impl Runtime {
             op_metrics_factory_fn: Some(tape.op_metrics_factory_fn()),
             // Heap initializes with 1KiB, maxes out at 10MiB
             create_params: Some(CreateParams::default().heap_limits(HEAP_INIT, HEAP_LIMIT)),
-            module_loader: Some(Rc::new(module_loader::get())),
+            module_loader: Some(Rc::new(module_loader::node_crypto())),
             ..Default::default()
         });
 
