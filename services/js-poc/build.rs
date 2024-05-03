@@ -26,6 +26,11 @@ extension!(
     esm_entry_point = "ext:fleek/bootstrap.js",
     esm = [
         dir "src/runtime/js",
+        "node/types.js",
+        "node/utils.js",
+        "node/error_codes.js",
+        "node/string_encoder.js",
+        "node/buffer.js",
         "fleek.js",
         "global.js",
         "bootstrap.js"
@@ -91,6 +96,7 @@ fn main() {
         deno_crypto::init_ops_and_esm(None),
         deno_webgpu::init_ops_and_esm(),
         deno_canvas::init_ops_and_esm(),
+        node_compat::init_ops_and_esm(),
         fleek::init_ops_and_esm(),
     ];
 

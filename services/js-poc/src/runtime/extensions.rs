@@ -10,9 +10,12 @@ use tracing::info;
 
 use crate::runtime::Permissions;
 
+extension!(node_compat, deps = [deno_web]);
+
 extension!(
     fleek,
     deps = [
+        node_compat,
         deno_webidl,
         deno_console,
         deno_url,
