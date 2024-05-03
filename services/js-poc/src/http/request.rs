@@ -30,8 +30,6 @@ pub fn extract(
         path.push('/');
     }
 
-    let frag = url.fragment().map(|f| f.to_string());
-
     let body = (!body.is_empty())
         .then(|| {
             // Parse input as a json value
@@ -69,7 +67,6 @@ pub fn extract(
             "method": method,
             "headers": headers,
             "path": path,
-            "fragment": frag,
             "query": query,
             "body": body,
     }));
@@ -103,7 +100,6 @@ mod tests {
                     "method": "Get",
                     "headers": null,
                     "path": "/",
-                    "fragment": null,
                     "query": null,
                     "body": null,
                 })),
@@ -126,7 +122,6 @@ mod tests {
                     "method": "Get",
                     "headers": null,
                     "path": "/",
-                    "fragment": null,
                     "query": null,
                     "body": "foobar",
                 })),
@@ -149,7 +144,6 @@ mod tests {
                     "method": "Get",
                     "headers": null,
                     "path": "/",
-                    "fragment": null,
                     "query": null,
                     "body": { "foo": "bar" },
                 })),
@@ -172,7 +166,6 @@ mod tests {
                     "method": "Get",
                     "headers": null,
                     "path": "/a",
-                    "fragment": null,
                     "query": null,
                     "body": null,
                 })),
@@ -195,7 +188,6 @@ mod tests {
                     "method": "Post",
                     "headers": null,
                     "path": "/a/b",
-                    "fragment": null,
                     "query": null,
                     "body": null,
                 })),
@@ -218,30 +210,6 @@ mod tests {
                     "method": "Get",
                     "headers": null,
                     "path": "/a/b",
-                    "fragment": null,
-                    "query": { "a": "4" },
-                    "body": null,
-                })),
-            })
-        );
-
-        // Request with path, a query parameter, and a url fragment
-        assert_eq!(
-            extract(
-                &Url::parse("http://fleek/blake3/content-hash/a/b?a=4#hello").unwrap(),
-                &HashMap::new(),
-                HttpMethod::GET,
-                vec![],
-            ),
-            Some(Request {
-                origin: Origin::Blake3,
-                uri: "content-hash".to_string(),
-                path: Some("/a/b".to_string()),
-                param: Some(json!({
-                    "method": "Get",
-                    "headers": null,
-                    "path": "/a/b",
-                    "fragment": "hello",
                     "query": { "a": "4" },
                     "body": null,
                 })),
