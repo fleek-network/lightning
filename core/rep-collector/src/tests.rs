@@ -11,7 +11,12 @@ use lightning_interfaces::types::{NodePorts, UpdateMethod, UpdatePayload, Update
 use lightning_interfaces::Weight;
 use lightning_notifier::Notifier;
 use lightning_signer::Signer;
-use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus, MockForwarder};
+use lightning_test_utils::consensus::{
+    Config as ConsensusConfig,
+    MockConsensus,
+    MockConsensusGroup,
+    MockForwarder,
+};
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_utils::application::QueryRunnerExt;
@@ -333,6 +338,14 @@ async fn test_reputation_calculation_and_query() {
     let owner_secret_key1 = AccountOwnerSecretKey::generate();
     let owner_public_key1 = owner_secret_key1.to_pk();
 
+    let consensus_group = MockConsensusGroup::new(ConsensusConfig {
+        min_ordering_time: 0,
+        max_ordering_time: 1,
+        probability_txn_lost: 0.0,
+        transactions_to_lose: HashSet::new(),
+        new_block_interval: Duration::from_secs(5),
+    });
+
     genesis.node_info.push(GenesisNode::new(
         owner_public_key1.into(),
         node_public_key1,
@@ -399,17 +412,11 @@ async fn test_reputation_calculation_and_query() {
                         db_path: None,
                         db_options: None,
                     })
-                    .with::<MockConsensus<TestBinding>>(ConsensusConfig {
-                        min_ordering_time: 0,
-                        max_ordering_time: 1,
-                        probability_txn_lost: 0.0,
-                        transactions_to_lose: HashSet::new(),
-                        new_block_interval: Duration::from_secs(5),
-                    })
                     .with::<ReputationAggregator<TestBinding>>(Config {
                         reporter_buffer_size: 1,
                     }),
             )
+            .with(consensus_group.clone())
             .with(keystore1),
     )
     .expect("failed to initialize node");
@@ -433,17 +440,11 @@ async fn test_reputation_calculation_and_query() {
                         db_path: None,
                         db_options: None,
                     })
-                    .with::<MockConsensus<TestBinding>>(ConsensusConfig {
-                        min_ordering_time: 0,
-                        max_ordering_time: 1,
-                        probability_txn_lost: 0.0,
-                        transactions_to_lose: HashSet::new(),
-                        new_block_interval: Duration::from_secs(5),
-                    })
                     .with::<ReputationAggregator<TestBinding>>(Config {
                         reporter_buffer_size: 1,
                     }),
             )
+            .with(consensus_group)
             .with(keystore2),
     )
     .expect("failed to initialize node");

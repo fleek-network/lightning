@@ -23,4 +23,3 @@ schemars.workspace = true
 ethers.workspace = true
 ruint = "1.11.1"
 url = "2.5.0"
-

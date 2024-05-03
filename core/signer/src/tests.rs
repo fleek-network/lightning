@@ -68,7 +68,7 @@ fn build_node(transactions_to_lose: &[u32]) -> Node<TestBinding> {
                 })
                 .with::<MockConsensus<TestBinding>>(ConsensusConfig {
                     min_ordering_time: 0,
-                    max_ordering_time: 2,
+                    max_ordering_time: 1,
                     probability_txn_lost: 0.0,
                     transactions_to_lose: transactions_to_lose.iter().copied().collect(),
                     new_block_interval: Duration::from_secs(5),

@@ -1,152 +1,164 @@
+//! This module introduces a pair implementation of a consensus and forwarder component that must be
+//! used together.
+//!
+//! Additionally it also exports a [MockConsensusGroup] for forcing multiple nodes to have the same
+//! stream of 'blocks'.
+
 use std::collections::HashSet;
 use std::marker::PhantomData;
 use std::time::Duration;
 
-use affair::{AsyncWorker, Executor, TokioSpawn};
+use affair::{AsyncWorkerUnordered, Executor, TokioSpawn};
+use fdi::Cloned;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Block, TransactionRequest};
-use rand::Rng;
+use rand::{thread_rng, Rng, SeedableRng};
+use rand_chacha::ChaCha12Rng;
+use rand_distr::{Bernoulli, Distribution};
 use serde::{Deserialize, Serialize};
+use tokio::sync::{broadcast, mpsc};
+use tokio::task::JoinSet;
 use tokio::time::{interval, sleep};
 
-/// A mock forwarder that sends transactions. MUST ALWAYS be used alongside [`MockConsensus`].
-pub struct MockForwarder<C>(MempoolSocket, PhantomData<C>);
+/// The mock consensus group object is used to attach multiple mock nodes into the same 'consensus'
+/// mechanism.
+///
+/// It can be viewed as a way to turn a [MockForwarder] of each one of the nodes using the same
+/// group into a brodcast sender and the receiver will be all of the [ExecutionEngineSocket]s of
+/// all of the nodes.
+pub struct MockConsensusGroup {
+    req_tx: Option<mpsc::Sender<TransactionRequest>>,
+    block_producer_rx: Option<broadcast::Receiver<Block>>,
+}
 
-impl<C: Collection> ForwarderInterface<C> for MockForwarder<C> {
-    fn mempool_socket(&self) -> MempoolSocket {
-        self.0.clone()
+impl MockConsensusGroup {
+    pub fn new(config: Config) -> Self {
+        let (req_tx, req_rx) = mpsc::channel(128);
+        let (block_producer_tx, block_producer_rx) = broadcast::channel(16);
+
+        tokio::task::Builder::new()
+            .name("MockConsensusGroup")
+            .spawn(group_worker(config, req_rx, block_producer_tx))
+            .unwrap();
+
+        Self {
+            req_tx: Some(req_tx),
+            block_producer_rx: Some(block_producer_rx),
+        }
+    }
+}
+
+impl Clone for MockConsensusGroup {
+    fn clone(&self) -> Self {
+        Self {
+            req_tx: self.req_tx.clone(),
+            block_producer_rx: self
+                .block_producer_rx
+                .as_ref()
+                .map(broadcast::Receiver::resubscribe),
+        }
+    }
+}
+
+impl Default for MockConsensusGroup {
+    fn default() -> Self {
+        Self::new(Config::default())
+    }
+}
+
+pub struct MockForwarder<C> {
+    socket: MempoolSocket,
+    c: PhantomData<C>,
+}
+
+impl<C: Collection> MockForwarder<C> {
+    fn new(sender: mpsc::Sender<TransactionRequest>) -> Self {
+        struct ProxyWorker(mpsc::Sender<TransactionRequest>);
+        impl AsyncWorkerUnordered for ProxyWorker {
+            type Request = TransactionRequest;
+            type Response = ();
+            async fn handle(&self, req: Self::Request) {
+                self.0.send(req).await.expect("Failed to send transaction.")
+            }
+        }
+        Self {
+            socket: TokioSpawn::spawn_async_unordered(ProxyWorker(sender)),
+            c: PhantomData,
+        }
     }
 }
 
 impl<C: Collection> BuildGraph for MockForwarder<C> {
     fn build_graph() -> fdi::DependencyGraph {
-        fdi::DependencyGraph::new().with_infallible(|consensus: &MockConsensus<C>| {
-            MockForwarder::<C>(consensus.socket.clone(), PhantomData)
+        fdi::DependencyGraph::new().with_infallible(|mut group: fdi::RefMut<MockConsensusGroup>| {
+            Self::new(group.req_tx.take().unwrap())
         })
     }
 }
 
-/// Mock consensus. MUST ALWAYS be used with [`MockForwarder`]
-#[allow(clippy::type_complexity)]
-pub struct MockConsensus<C: Collection> {
-    socket: MempoolSocket,
-    executor: ExecutionEngineSocket,
-    notifier: c![C::NotifierInterface::Emitter],
-    config: Config,
-}
-
-struct MockConsensusWorker<NE: Emitter> {
-    executor: ExecutionEngineSocket,
-    config: Config,
-    notifier: NE,
-    tx_count: u32,
-}
-
-impl<C: Collection> ConsensusInterface<C> for MockConsensus<C> {
-    type Certificate = ();
-}
-
-impl<C: Collection> ConfigConsumer for MockConsensus<C> {
-    const KEY: &'static str = "consensus";
-    type Config = Config;
-}
-
-impl<C: Collection> BuildGraph for MockConsensus<C> {
-    fn build_graph() -> fdi::DependencyGraph {
-        fdi::DependencyGraph::new()
-            .with_infallible(Self::new.on("start", fdi::consume(Self::start).spawn()))
+impl<C: Collection> ForwarderInterface<C> for MockForwarder<C> {
+    fn mempool_socket(&self) -> MempoolSocket {
+        self.socket.clone()
     }
 }
 
+/// Provides a controlled and mocked version of the consensus. Should be used in a collection with
+/// [MockForwarder].
+pub struct MockConsensus<C: Collection> {
+    group: broadcast::Receiver<Block>,
+    execution_socket: ExecutionEngineSocket,
+    notifier: c![C::NotifierInterface::Emitter],
+}
+
 impl<C: Collection> MockConsensus<C> {
-    /// Create a new consensus service with the provided config and executor.
     pub fn new(
-        config: &C::ConfigProviderInterface,
         app: &C::ApplicationInterface,
         notifier: &c!(C::NotifierInterface),
+        mut group: fdi::RefMut<MockConsensusGroup>,
     ) -> Self {
-        let config = config.get::<Self>();
-        let executor = app.transaction_executor();
         let notifier = notifier.get_emitter();
-
-        let worker = MockConsensusWorker {
-            executor: executor.clone(),
-            config: config.clone(),
-            notifier: notifier.clone(),
-            tx_count: 0,
-        };
-
-        let socket = TokioSpawn::spawn_async(worker);
-
         Self {
-            socket,
-            executor,
-            config,
+            group: group.block_producer_rx.take().unwrap(),
+            execution_socket: app.transaction_executor(),
             notifier,
         }
     }
 
-    async fn start(self, fdi::Cloned(waiter): fdi::Cloned<ShutdownWaiter>) {
-        let mut interval = interval(self.config.new_block_interval);
+    async fn start(mut this: fdi::Consume<Self>, Cloned(waiter): Cloned<ShutdownWaiter>) {
         waiter
             .run_until_shutdown(async move {
                 loop {
-                    interval.tick().await;
-
-                    let block = Block {
-                        transactions: vec![],
-                        digest: [0; 32],
-                    };
-
-                    let response = self
-                        .executor
+                    let block = this.group.recv().await.unwrap();
+                    let response = this
+                        .execution_socket
                         .run(block.clone())
                         .await
                         .map_err(|r| anyhow::anyhow!(format!("{r:?}")))
                         .unwrap();
-
-                    self.notifier.new_block(block, response);
+                    this.notifier.new_block(block, response);
                 }
             })
             .await;
     }
 }
 
-impl<NE: Emitter> AsyncWorker for MockConsensusWorker<NE> {
-    type Request = TransactionRequest;
-    type Response = ();
+impl<C: Collection> ConsensusInterface<C> for MockConsensus<C> {
+    type Certificate = ();
+}
 
-    async fn handle(&mut self, task: Self::Request) {
-        // Randomly wait before ordering the transaction to make it more realistic.
-        let range = self.config.min_ordering_time..self.config.max_ordering_time;
-        let ordering_duration = rand::thread_rng().gen_range(range);
-        sleep(Duration::from_secs(ordering_duration)).await;
-
-        // Randomly drop a transaction so we can handle this case.
-        if rand::thread_rng().gen_bool(self.config.probability_txn_lost) {
-            return;
-        }
-
-        self.tx_count += 1;
-
-        if self.config.transactions_to_lose.contains(&self.tx_count) {
-            return;
-        }
-
-        let block = Block {
-            transactions: vec![task],
-            digest: [0; 32],
-        };
-
-        let response = self
-            .executor
-            .run(block.clone())
-            .await
-            .map_err(|r| anyhow::anyhow!(format!("{r:?}")))
-            .unwrap();
-
-        self.notifier.new_block(block, response);
+impl<C: Collection> BuildGraph for MockConsensus<C> {
+    fn build_graph() -> fdi::DependencyGraph {
+        fdi::DependencyGraph::new()
+            .with_infallible(|config: fdi::Ref<C::ConfigProviderInterface>| {
+                MockConsensusGroup::new(config.get::<Self>())
+            })
+            .with_infallible(Self::new.on("start", Self::start.spawn()))
     }
+}
+
+impl<C: Collection> ConfigConsumer for MockConsensus<C> {
+    const KEY: &'static str = "mock_consensus";
+    type Config = Config;
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -171,9 +183,77 @@ impl Default for Config {
         Self {
             min_ordering_time: 0,
             max_ordering_time: 5,
-            probability_txn_lost: 0.1,
+            probability_txn_lost: 0.0,
             transactions_to_lose: HashSet::new(),
             new_block_interval: Duration::from_secs(5),
+        }
+    }
+}
+
+async fn group_worker(
+    config: Config,
+    mut req_rx: mpsc::Receiver<TransactionRequest>,
+    block_producer_tx: broadcast::Sender<Block>,
+) {
+    let mut interval = interval(config.new_block_interval);
+    let mut tx_count = 0;
+
+    // After each tx is received we want to add some random delay to it to make it more
+    // realistic.
+    let mut delayed_queue = JoinSet::new();
+
+    // This is a hack to force the JoinSet to never return `None`. This simplifies the
+    // tokio::select. Maybe there is utility future somewhere
+    delayed_queue.spawn(futures::future::pending::<TransactionRequest>());
+
+    let mut loss_prob_rng = ChaCha12Rng::from_seed(thread_rng().gen());
+    let loss_prob_distr = Bernoulli::new(config.probability_txn_lost).unwrap();
+
+    loop {
+        let block = tokio::select! {
+            Some(req) = delayed_queue.join_next() => {
+                Block {
+                    transactions: vec![req.unwrap()],
+                    digest: [0; 32],
+                }
+            },
+            Some(req) = req_rx.recv() => {
+                tx_count += 1;
+
+                if config.transactions_to_lose.contains(&tx_count) {
+                    continue;
+                }
+
+                if loss_prob_distr.sample(&mut loss_prob_rng) {
+                    continue;
+                }
+
+                // Randomly wait before ordering the transaction to make it more realistic.
+                let range = config.min_ordering_time..config.max_ordering_time;
+                let ordering_delay = rand::thread_rng().gen_range(range);
+                delayed_queue.spawn(async move {
+                    if ordering_delay > 0 {
+                        sleep(Duration::from_secs(ordering_delay)).await;
+                    }
+                    req
+                });
+
+                continue;
+            },
+            _ = interval.tick() => {
+                Block {
+                    transactions: vec![],
+                    digest: [0; 32],
+                }
+            },
+            else => {
+                break;
+            }
+
+        };
+
+        if block_producer_tx.send(block).is_err() {
+            return;
         }
     }
 }
