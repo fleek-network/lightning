@@ -92,7 +92,7 @@ mod tests {
             extract(
                 &Url::parse("http://fleek/blake3/content-hash/").unwrap(),
                 &HashMap::new(),
-                HttpMethod::Get,
+                HttpMethod::GET,
                 vec![],
             ),
             Some(Request {
@@ -115,7 +115,7 @@ mod tests {
             extract(
                 &Url::parse("http://fleek/blake3/content-hash/").unwrap(),
                 &HashMap::new(),
-                HttpMethod::Get,
+                HttpMethod::GET,
                 "foobar".into(),
             ),
             Some(Request {
@@ -138,7 +138,7 @@ mod tests {
             extract(
                 &Url::parse("http://fleek/blake3/content-hash/").unwrap(),
                 &HashMap::new(),
-                HttpMethod::Get,
+                HttpMethod::GET,
                 r#"{"foo": "bar"}"#.into(),
             ),
             Some(Request {
@@ -161,7 +161,7 @@ mod tests {
             extract(
                 &Url::parse("http://fleek/blake3/content-hash/a").unwrap(),
                 &HashMap::new(),
-                HttpMethod::Get,
+                HttpMethod::GET,
                 vec![],
             ),
             Some(Request {
@@ -184,7 +184,7 @@ mod tests {
             extract(
                 &Url::parse("http://fleek/blake3/content-hash/a/b").unwrap(),
                 &HashMap::new(),
-                HttpMethod::Post,
+                HttpMethod::POST,
                 vec![],
             ),
             Some(Request {
@@ -207,7 +207,7 @@ mod tests {
             extract(
                 &Url::parse("http://fleek/blake3/content-hash/a/b?a=4").unwrap(),
                 &HashMap::new(),
-                HttpMethod::Get,
+                HttpMethod::GET,
                 vec![],
             ),
             Some(Request {
@@ -230,7 +230,7 @@ mod tests {
             extract(
                 &Url::parse("http://fleek/blake3/content-hash/a/b?a=4#hello").unwrap(),
                 &HashMap::new(),
-                HttpMethod::Get,
+                HttpMethod::GET,
                 vec![],
             ),
             Some(Request {

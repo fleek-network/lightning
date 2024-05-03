@@ -19,10 +19,10 @@ pub struct ConnectionHeader {
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, PartialOrd, Eq)]
 pub enum HttpMethod {
-    Get,
-    Post,
-    Put,
-    Delete,
+    GET,
+    POST,
+    PUT,
+    DELETE,
 }
 
 ///  Response type used by a service to override the handshake http response fields when the

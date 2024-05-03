@@ -33,10 +33,10 @@ pub async fn handler<P: ExecutorProviderInterface>(
         .and_then(Service::try_from)?;
 
     let method = match method {
-        Method::GET => HttpMethod::Get,
-        Method::POST => HttpMethod::Post,
-        Method::PUT => HttpMethod::Put,
-        Method::DELETE => HttpMethod::Delete,
+        Method::GET => HttpMethod::GET,
+        Method::POST => HttpMethod::POST,
+        Method::PUT => HttpMethod::PUT,
+        Method::DELETE => HttpMethod::DELETE,
         _ => return Err((StatusCode::NOT_FOUND, "invalid method".to_string())),
     };
 
