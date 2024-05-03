@@ -21,8 +21,10 @@ pub struct ConnectionHeader {
 pub enum HttpMethod {
     GET,
     POST,
+    HEAD,
     PUT,
     DELETE,
+    PATCH,
 }
 
 ///  Response type used by a service to override the handshake http response fields when the

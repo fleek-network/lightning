@@ -35,8 +35,10 @@ pub async fn handler<P: ExecutorProviderInterface>(
     let method = match method {
         Method::GET => HttpMethod::GET,
         Method::POST => HttpMethod::POST,
+        Method::HEAD => HttpMethod::HEAD,
         Method::PUT => HttpMethod::PUT,
         Method::DELETE => HttpMethod::DELETE,
+        Method::PATCH => HttpMethod::PATCH,
         _ => return Err((StatusCode::NOT_FOUND, "invalid method".to_string())),
     };
 
