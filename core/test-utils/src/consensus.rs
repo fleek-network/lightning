@@ -195,7 +195,12 @@ async fn group_worker(
     mut req_rx: mpsc::Receiver<TransactionRequest>,
     block_producer_tx: broadcast::Sender<Block>,
 ) {
-    let mut interval = interval(config.new_block_interval);
+    let period = if config.new_block_interval.is_zero() {
+        Duration::from_secs(120)
+    } else {
+        config.new_block_interval
+    };
+    let mut interval = interval(period);
     let mut tx_count = 0;
 
     // After each tx is received we want to add some random delay to it to make it more
@@ -209,8 +214,11 @@ async fn group_worker(
     let mut loss_prob_rng = ChaCha12Rng::from_seed(thread_rng().gen());
     let loss_prob_distr = Bernoulli::new(config.probability_txn_lost).unwrap();
 
+    let mut payload = Vec::with_capacity(1024);
+    let mut prev_digest = [0; 32];
+
     loop {
-        let block = tokio::select! {
+        let mut block = tokio::select! {
             Some(req) = delayed_queue.join_next() => {
                 Block {
                     transactions: vec![req.unwrap()],
@@ -230,10 +238,12 @@ async fn group_worker(
 
                 // Randomly wait before ordering the transaction to make it more realistic.
                 let range = config.min_ordering_time..config.max_ordering_time;
-                let ordering_delay = rand::thread_rng().gen_range(range);
                 delayed_queue.spawn(async move {
-                    if ordering_delay > 0 {
-                        sleep(Duration::from_secs(ordering_delay)).await;
+                    if !range.is_empty() && config.max_ordering_time > 0 {
+                        let ordering_delay = rand::thread_rng().gen_range(range);
+                        if ordering_delay > 0 {
+                            sleep(Duration::from_secs(ordering_delay)).await;
+                        }
                     }
                     req
                 });
@@ -241,6 +251,9 @@ async fn group_worker(
                 continue;
             },
             _ = interval.tick() => {
+                if config.new_block_interval.is_zero() {
+                    continue;
+                }
                 Block {
                     transactions: vec![],
                     digest: [0; 32],
@@ -249,8 +262,16 @@ async fn group_worker(
             else => {
                 break;
             }
-
         };
+
+        // Compute the mock block digest.
+        payload.clear();
+        payload.extend(&prev_digest);
+        for tx in &block.transactions {
+            payload.extend(tx.hash());
+        }
+        block.digest = *fleek_blake3::hash(&payload).as_bytes();
+        prev_digest = block.digest;
 
         if block_producer_tx.send(block).is_err() {
             return;

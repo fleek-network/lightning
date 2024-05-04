@@ -78,6 +78,7 @@ ink-quill = { path = "lib/ink-quill" }
 resolved-pathbuf = { path = "lib/resolved-pathbuf" }
 panic-report = { path = "lib/panic-report" }
 better-shutdown = { path = "lib/better-shutdown" }
+fleek-blake3 = "1.5"
 
 # Since MystenLabs uses Hakari in the sui repository, and we bring narwhal in from there, this
 # results into all of their dependencies and packages to be listed in their workspace-hack crate.
