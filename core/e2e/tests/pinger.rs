@@ -30,14 +30,14 @@ async fn e2e_detect_offline_node() -> Result<()> {
         .with_min_port(10500)
         .with_num_nodes(5)
         .with_committee_size(4)
-        .with_epoch_time(25000)
+        .with_epoch_time(15000)
         .with_epoch_start(epoch_start)
         .persistence(true)
         .build();
     swarm.launch_genesis_committee().await.unwrap();
 
     // Wait for the epoch to change.
-    tokio::time::sleep(Duration::from_secs(30)).await;
+    tokio::time::sleep(Duration::from_secs(17)).await;
 
     // Make sure that all genesis nodes changed epoch.
     let request = json!({

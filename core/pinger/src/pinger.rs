@@ -18,9 +18,6 @@ use tracing::{error, info};
 
 use crate::config::Config;
 
-/// The duration after which a ping will be reported as unanswered
-const TIMEOUT: Duration = Duration::from_secs(15);
-
 pub struct Pinger<C: Collection> {
     inner: Option<PingerInner<C>>,
 }
@@ -99,7 +96,7 @@ impl<C: Collection> PingerInner<C> {
     async fn run(self) {
         // Note(matthias): should a node be able to respond to pings before it knows its node index?
         // In my opinion it should not because it is not fully functioning.
-        let mut interval = tokio::time::interval(Duration::from_secs(60));
+        let mut interval = tokio::time::interval(Duration::from_secs(2));
         let node_index = loop {
             tokio::select! {
                 _ = self.shutdown_waiter.wait_for_shutdown() => {
@@ -131,6 +128,7 @@ impl<C: Collection> PingerInner<C> {
         // The advantage of setting the interval dynamically is that ensures that every node is
         // pinged x amount of times per epoch.
         let mut interval = tokio::time::interval(self.config.ping_interval);
+        let timeout = self.config.timeout;
 
         let mut rng = SmallRng::from_entropy();
         let mut node_registry = self.get_node_registry(&mut rng);
@@ -203,7 +201,7 @@ impl<C: Collection> PingerInner<C> {
                             pending_req.insert((peer_index, id), Instant::now());
                             let tx = timeout_tx.clone();
                             tokio::spawn(async move {
-                                tokio::time::sleep(TIMEOUT).await;
+                                tokio::time::sleep(timeout).await;
                                 // We ignore the sending error because it can happen that the
                                 // pinger is shutdown while there are still pending timeout tasks.
                                 let _ = tx.send((peer_index, id)).await;
