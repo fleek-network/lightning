@@ -4,6 +4,7 @@ use triomphe::Arc;
 
 use crate::backtrace_list::BacktraceList;
 use crate::completion_fut::CompletionFuture;
+use crate::ctrlc::shutdown_stream;
 use crate::shared::SharedState;
 use crate::waiter::ShutdownWaiter;
 use crate::BacktraceListIter;
@@ -38,6 +39,19 @@ impl ShutdownController {
         ShutdownWaiter::new(self.inner.clone())
     }
 
+    /// Register the `ctrl+c` handler that will invoke [trigger_shutdown](Self::trigger_shutdown).
+    ///
+    /// Requires to be called within a tokio runtme.
+    #[cfg(any(unix, windows))]
+    pub fn install_ctrlc_handlers(&self) {
+        let inner = self.inner.clone();
+        tokio::spawn(async move {
+            tracing::info!("Waiting for a shutdown signal.");
+            shutdown_stream().await;
+            inner.trigger_shutdown();
+        });
+    }
+
     /// Trigger the shutdown event and wake up all of the outstanding shutdown futures.
     ///
     /// This method should only be called once and once called the system is marked as shutdown and
@@ -45,12 +59,14 @@ impl ShutdownController {
     ///
     /// This method immediately returns and does not wait for the shutdown to complete.
     pub fn trigger_shutdown(&self) {
+        tracing::info!("Sending the shutdown signal");
         self.inner.trigger_shutdown()
     }
 
     /// Returns a future that is resolved as soon as all of the futures waiting for shutdown
     /// have dropped.
     pub fn wait_for_completion(&self) -> CompletionFuture {
+        tracing::trace!("Waiting for completion");
         CompletionFuture::new(&self.inner)
     }
 
@@ -75,7 +91,6 @@ impl ShutdownController {
     ///
     /// Expect this method to be removed in future.
     pub async fn shutdown(&mut self) {
-        tracing::trace!("Shutting node down.");
         self.trigger_shutdown();
 
         for i in 0.. {
