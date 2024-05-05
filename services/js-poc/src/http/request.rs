@@ -97,7 +97,7 @@ mod tests {
                 uri: "content-hash".to_string(),
                 path: Some("/".to_string()),
                 param: Some(json!({
-                    "method": "Get",
+                    "method": "GET",
                     "headers": null,
                     "path": "/",
                     "query": null,
@@ -119,7 +119,7 @@ mod tests {
                 uri: "content-hash".to_string(),
                 path: Some("/".to_string()),
                 param: Some(json!({
-                    "method": "Get",
+                    "method": "GET",
                     "headers": null,
                     "path": "/",
                     "query": null,
@@ -141,7 +141,7 @@ mod tests {
                 uri: "content-hash".to_string(),
                 path: Some("/".to_string()),
                 param: Some(json!({
-                    "method": "Get",
+                    "method": "GET",
                     "headers": null,
                     "path": "/",
                     "query": null,
@@ -163,7 +163,7 @@ mod tests {
                 uri: "content-hash".to_string(),
                 path: Some("/a".to_string()),
                 param: Some(json!({
-                    "method": "Get",
+                    "method": "GET",
                     "headers": null,
                     "path": "/a",
                     "query": null,
@@ -185,7 +185,7 @@ mod tests {
                 uri: "content-hash".to_string(),
                 path: Some("/a/b".to_string()),
                 param: Some(json!({
-                    "method": "Post",
+                    "method": "POST",
                     "headers": null,
                     "path": "/a/b",
                     "query": null,
@@ -207,7 +207,7 @@ mod tests {
                 uri: "content-hash".to_string(),
                 path: Some("/a/b".to_string()),
                 param: Some(json!({
-                    "method": "Get",
+                    "method": "GET",
                     "headers": null,
                     "path": "/a/b",
                     "query": { "a": "4" },
