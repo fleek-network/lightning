@@ -17,11 +17,9 @@ where
 {
     match cmd {
         DevSubCmd::InitOnly => init::<C>(config_path).await,
-        // DevSubCmd::ShowOrder => show_order::<C>().await,
-        // DevSubCmd::DepGraph => dep_graph::<C>().await,
+        DevSubCmd::DepGraph => dep_graph::<C>().await,
         DevSubCmd::Store { input } => store(input).await,
         DevSubCmd::Fetch { remote, hash } => fetch::<C>(config_path, hash, remote).await,
-        _ => unimplemented!(),
     }
 }
 
@@ -35,29 +33,12 @@ async fn init<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>>(
     Ok(())
 }
 
-// async fn show_order<C: Collection>() -> Result<()> {
-//     let graph = C::build_graph();
-//     let sorted = graph
-//         .sort()
-//         .map_err(|e| anyhow!("Sort graph error: {e:?}"))?;
-//     for (i, tag) in sorted.iter().enumerate() {
-//         println!(
-//             "{:0width$}  {tag}\n      = {ty}",
-//             i + 1,
-//             width = 2,
-//             tag = tag.trait_name(),
-//             ty = tag.type_name()
-//         );
-//     }
-//     Ok(())
-// }
-//
-// async fn dep_graph<C: Collection>() -> Result<()> {
-//     let graph = C::build_graph();
-//     let mermaid = graph.mermaid("Lightning Dependency Graph");
-//     println!("{mermaid}");
-//     Ok(())
-// }
+async fn dep_graph<C: Collection>() -> Result<()> {
+    let graph = C::build_graph();
+    let mermaid = graph.viz("Lightning Dependency Graph");
+    println!("{mermaid}");
+    Ok(())
+}
 
 async fn store(input: Vec<PathBuf>) -> Result<()> {
     // Todo: is there a way to find the port for the locally running node?

@@ -50,8 +50,6 @@ pub enum Command {
 pub enum DevSubCmd {
     /// Initialize every service without starting the node.
     InitOnly,
-    /// Show the order at which the execution will happen.
-    ShowOrder,
     /// Dump the mermaid dependency graph of services.
     DepGraph,
     /// Store the provided files to the blockstore.
