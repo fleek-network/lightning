@@ -1,58 +1,61 @@
-pub mod config;
+use std::marker::PhantomData;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::thread::JoinHandle;
 
-use lightning_application::app::Application;
-use lightning_archive::archive::Archive;
-use lightning_blockstore::blockstore::Blockstore;
-use lightning_blockstore_server::BlockstoreServer;
-use lightning_broadcast::Broadcast;
-use lightning_consensus::consensus::Consensus;
-use lightning_fetcher::fetcher::Fetcher;
-use lightning_forwarder::Forwarder;
-use lightning_handshake::handshake::Handshake;
-use lightning_indexer::Indexer;
-use lightning_interfaces::partial;
-use lightning_keystore::Keystore;
-use lightning_notifier::Notifier;
-use lightning_origin_demuxer::OriginDemuxer;
-use lightning_pinger::Pinger;
-use lightning_pool::PoolProvider;
-use lightning_rep_collector::ReputationAggregator;
-use lightning_resolver::resolver::Resolver;
-use lightning_rpc::Rpc;
-use lightning_service_executor::shim::ServiceExecutor;
-use lightning_signer::Signer;
-use lightning_syncronizer::syncronizer::Syncronizer;
-use lightning_topology::Topology;
+use lightning_interfaces::prelude::*;
 
-use crate::config::TomlConfigProvider;
+/// A single [Node] instance that has ownership over its tokio runtime.
+pub struct ContainedNode<C: Collection> {
+    /// The dependency injection data provider which can contain most of the items that make up
+    /// a node.
+    provider: fdi::Provider,
 
-partial!(FinalTypes require full {
-    ConfigProviderInterface = TomlConfigProvider<Self>;
-    ApplicationInterface = Application<Self>;
-    BlockstoreInterface = Blockstore<Self>;
-    BlockstoreServerInterface = BlockstoreServer<Self>;
-    SyncronizerInterface = Syncronizer<Self>;
-    BroadcastInterface = Broadcast<Self>;
-    TopologyInterface = Topology<Self>;
-    ArchiveInterface = Archive<Self>;
-    ForwarderInterface = Forwarder<Self>;
-    ConsensusInterface = Consensus<Self>;
-    HandshakeInterface = Handshake<Self>;
-    NotifierInterface = Notifier<Self>;
-    OriginProviderInterface = OriginDemuxer<Self>;
-    ReputationAggregatorInterface = ReputationAggregator<Self>;
-    ResolverInterface = Resolver<Self>;
-    RpcInterface = Rpc<Self>;
-    ServiceExecutorInterface = ServiceExecutor<Self>;
-    KeystoreInterface = Keystore<Self>;
-    SignerInterface = Signer<Self>;
-    FetcherInterface = Fetcher<Self>;
-    PoolInterface = PoolProvider<Self>;
-    PingerInterface = Pinger<Self>;
-    IndexerInterface = Indexer<Self>;
-    DeliveryAcknowledgmentAggregatorInterface = lightning_interfaces::_hacks::Blanket;
-});
+    /// A handle to the work thread.
+    handle: JoinHandle<()>,
 
-// Create the collection modifier that can inject the mock consensus
-// into the FinalTypes (or other collections.).
-pub type WithMockConsensus = FinalTypes;
+    collection: PhantomData<C>,
+}
+
+impl<C: Collection> ContainedNode<C> {
+    pub fn new(provider: fdi::Provider, index: usize) -> Self {
+        let worker_id = AtomicUsize::new(0);
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .thread_name_fn(move || {
+                let id = worker_id.fetch_add(1, Ordering::SeqCst);
+                format!("NODE-{index}#{id}")
+            })
+            .enable_all()
+            .build()
+            .expect("Failed to build tokio runtime for node container.");
+
+        let handle = std::thread::Builder::new()
+            .name(format!("NODE-{index}#MAIN"))
+            .spawn(move || {
+                runtime.block_on(async move {
+                    //
+                });
+            })
+            .expect("Failed to spawn E2E thread");
+
+        Self {
+            provider,
+            handle,
+            collection: PhantomData,
+        }
+    }
+
+    /// Returns a reference to the data provider.
+    pub fn provider(&self) -> &fdi::Provider {
+        &self.provider
+    }
+
+    pub fn shutdown(self) {
+        self.handle.join().unwrap()
+    }
+}
+
+impl<C: Collection> Default for ContainedNode<C> {
+    fn default() -> Self {
+        Self::new(fdi::Provider::default(), 0)
+    }
+}

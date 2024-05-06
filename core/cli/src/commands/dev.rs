@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Blake3Hash, NodePorts};
-use lightning_node::config::TomlConfigProvider;
+use lightning_utils::config::TomlConfigProvider;
 use lightning_utils::rpc::rpc_request;
 use reqwest::Client;
 use resolved_pathbuf::ResolvedPathBuf;

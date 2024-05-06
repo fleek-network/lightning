@@ -1,0 +1,40 @@
+[package]
+name = "lightning-final-bindings"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+lightning-application = { path = "../application" }
+lightning-archive = { path = "../archive" }
+lightning-blockstore = { path = "../blockstore" }
+lightning-blockstore-server = { path = "../blockstore-server" }
+lightning-broadcast = { path = "../broadcast" }
+lightning-forwarder = { path = "../forwarder" }
+lightning-consensus = { path = "../consensus" }
+lightning-fetcher = { path = "../fetcher" }
+lightning-handshake = { path = "../handshake" }
+lightning-indexer = { path = "../indexer" }
+lightning-interfaces = { path = "../interfaces" }
+lightning-notifier = { path = "../notifier" }
+lightning-origin-demuxer = { path = "../origin-demuxer" }
+lightning-pool = { path = "../pool" }
+lightning-rep-collector = { path = "../rep-collector" }
+lightning-resolver = { path = "../resolver" }
+lightning-rpc = { path = "../rpc" }
+lightning-service-executor = { path = "../service-executor" }
+lightning-keystore = { path = "../keystore" }
+lightning-signer = { path = "../signer" }
+lightning-syncronizer = { path = "../syncronizer" }
+lightning-topology = { path = "../topology" }
+lightning-pinger = { path = "../pinger" }
+lightning-test-utils = { path = "../test-utils" }
+lightning-utils = { path = "../utils" }
+toml = "0.7"
+anyhow.workspace = true
+resolved-pathbuf.workspace = true
+tracing.workspace = true
+
+[features]
+default = []
+# Opt-in for compiling services directly inside the node
+services = ["lightning-service-executor/services"]

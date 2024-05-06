@@ -9,6 +9,7 @@ default-run = "lightning-node"
 [dependencies]
 lightning-interfaces = { path = "../interfaces" }
 lightning-node = { path = "../node" }
+lightning-final-bindings = { path = "../final-bindings" }
 lightning-utils = { path = "../utils" }
 
 # TODO: cli ideally shouldn't depend on this directly
@@ -55,7 +56,7 @@ fleek-blake3 = "1.5"
 [features]
 default = []
 # Opt-in for compiling services directly inside the node
-services = ["lightning-node/services"]
+services = ["lightning-final-bindings/services"]
 
 [[bin]]
 name = "lightning-node"

@@ -2,11 +2,11 @@ use std::sync::Mutex;
 
 use fleek_crypto::AccountOwnerSecretKey;
 use lightning_blockstore::blockstore::Blockstore;
+use lightning_final_bindings::FinalTypes;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::Staking;
-use lightning_node::config::TomlConfigProvider;
-use lightning_node::FinalTypes;
 use lightning_rpc::Rpc;
+use lightning_utils::config::TomlConfigProvider;
 
 use crate::container::Container;
 

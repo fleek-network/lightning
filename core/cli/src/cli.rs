@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
 use clap::Parser;
+use lightning_final_bindings::{FinalTypes, UseMockConsensus};
 use lightning_interfaces::Collection;
-use lightning_node::config::TomlConfigProvider;
-use lightning_node::{FinalTypes, WithMockConsensus};
+use lightning_utils::config::TomlConfigProvider;
 use resolved_pathbuf::ResolvedPathBuf;
 use tracing::{info, warn};
 use tracing_subscriber::prelude::*;
@@ -33,7 +33,7 @@ impl Cli {
         match self.args.with_mock_consensus {
             true => {
                 info!("Using MockConsensus");
-                self.run::<WithMockConsensus>(config_path).await
+                self.run::<UseMockConsensus>(config_path).await
             },
             false => self.run::<FinalTypes>(config_path).await,
         }

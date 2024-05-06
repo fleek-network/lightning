@@ -1,6 +1,6 @@
 use anyhow::Result;
 use lightning_interfaces::prelude::*;
-use lightning_node::config::TomlConfigProvider;
+use lightning_utils::config::TomlConfigProvider;
 use resolved_pathbuf::ResolvedPathBuf;
 
 pub async fn exec<C: Collection>(default: bool, config_path: ResolvedPathBuf) -> Result<()> {
