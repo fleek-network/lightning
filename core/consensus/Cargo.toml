@@ -47,3 +47,4 @@ tonic = { version = "0.8.2", features = ["transport", "tls"] }
 prometheus = "0.13.3"
 multiaddr = "0.17.1"
 fastcrypto = { git = "https://github.com/MystenLabs/fastcrypto", rev = "c961a01596a87e76f590c7e43aca9d57106dbbb1" }
+workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }

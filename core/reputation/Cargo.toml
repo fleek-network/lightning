@@ -9,6 +9,7 @@ edition = "2021"
 lightning-interfaces = {path="../interfaces"}
 fleek-crypto.workspace = true
 hp-fixed.workspace = true
+workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }
 
 [dev-dependencies]
 lightning-test-utils = {path="../test-utils"}

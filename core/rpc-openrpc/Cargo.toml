@@ -10,3 +10,4 @@ schemars = "0.8.16"
 serde.workspace = true
 serde_json.workspace = true
 versions = "5.0.1"
+workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }

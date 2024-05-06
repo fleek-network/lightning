@@ -21,6 +21,7 @@ tracing.workspace = true
 tracing-subscriber = { version = "0.3", features = [ "env-filter" ] }
 tokio.workspace = true
 url ="2.5.0"
+workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }
 
 [[bin]]
 name = "fn-service-2"

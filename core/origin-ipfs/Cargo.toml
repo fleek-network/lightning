@@ -23,6 +23,7 @@ tracing.workspace = true
 unsigned-varint = { version = "0.8", features = ["std"] }
 libipld = { version = "0.16", features = ["dag-cbor", "derive"] }
 thiserror = "1"
+workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }
 
 [dev-dependencies]
 fleek-crypto.workspace = true

@@ -32,6 +32,7 @@ rand.workspace = true
 panic-report.workspace = true
 os_info = "3.7.0"
 compile-time-run = "0.2.12"
+workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }
 
 [dev-dependencies]
 serial_test = "3.0.0"

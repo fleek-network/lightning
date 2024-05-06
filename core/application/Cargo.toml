@@ -31,6 +31,7 @@ fleek-crypto.workspace = true
 hp-fixed.workspace = true
 atomo-rocks.workspace = true
 resolved-pathbuf.workspace = true
+workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }
 
 
 [dev-dependencies]

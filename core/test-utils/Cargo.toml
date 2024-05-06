@@ -26,3 +26,4 @@ simplelog = "0.12.1"
 plotters = "0.3"
 rand_distr = "0.4"
 rand_chacha = "0.3"
+workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }

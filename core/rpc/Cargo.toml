@@ -38,6 +38,7 @@ lightning-utils = { path = "../utils" }
 alloy-primitives = "0.5.2"
 hyper = { version = "0.14.27", features = ["server", "full"] }
 futures.workspace = true
+workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }
 
 
 [dev-dependencies]

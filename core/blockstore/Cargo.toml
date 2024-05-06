@@ -22,3 +22,4 @@ tempdir.workspace = true
 tokio.workspace = true
 derive_more = "0.99"
 arrayref = "0.3"
+workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }

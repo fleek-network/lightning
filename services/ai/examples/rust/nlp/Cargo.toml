@@ -14,3 +14,4 @@ safetensors = "0.4"
 safetensors-ndarray = { path = "../../../../../lib/safetensors-ndarray" }
 tokenizers = { version = "0.15", default-features = false, features = [ "onig", "http" ] }
 tokio.workspace = true
+workspace-hack = { version = "0.1", path = "../../../../../etc/workspace-hack" }

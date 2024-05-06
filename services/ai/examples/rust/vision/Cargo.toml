@@ -12,3 +12,4 @@ safetensors = "0.4"
 safetensors-ndarray = { path = "../../../../../lib/safetensors-ndarray" }
 tokio.workspace = true
 common = { path = "../common" }
+workspace-hack = { version = "0.1", path = "../../../../../etc/workspace-hack" }

@@ -9,3 +9,4 @@ edition = "2021"
 lightning-interfaces = {path="../interfaces"}
 anyhow.workspace = true
 serde.workspace = true
+workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }

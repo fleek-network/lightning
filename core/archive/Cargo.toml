@@ -19,6 +19,7 @@ ethers.workspace = true
 rocksdb = "0.21"
 atomo-rocks.workspace = true
 atomo.workspace = true
+workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }
 
 
 [dev-dependencies]

@@ -46,3 +46,4 @@ fleek-blake3 = "1.5"
 toml = "0.7"
 resolve-path = "0.1.0"
 clap = { version = "4.2", features = ["derive"] }
+workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }

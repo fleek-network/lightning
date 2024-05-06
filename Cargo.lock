@@ -1819,6 +1819,9 @@ dependencies = [
 [[package]]
 name = "common"
 version = "0.0.0"
+dependencies = [
+ "workspace-hack 0.1.0",
+]
 
 [[package]]
 name = "compact_str"
@@ -3556,6 +3559,7 @@ dependencies = [
  "safetensors",
  "safetensors-ndarray",
  "tokio",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -3571,6 +3575,7 @@ dependencies = [
  "serde_json",
  "tokenizers",
  "tokio",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -3835,6 +3840,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "url",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -3852,6 +3858,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "url",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -3883,6 +3890,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "triomphe",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -5072,6 +5080,7 @@ dependencies = [
  "proc-macro2 1.0.74",
  "quote 1.0.35",
  "syn 2.0.46",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -5626,6 +5635,7 @@ dependencies = [
  "tokio",
  "toml 0.7.8",
  "tracing",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -5648,6 +5658,7 @@ dependencies = [
  "serde",
  "tokio",
  "tracing",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -5670,6 +5681,7 @@ dependencies = [
  "tokio",
  "tracing",
  "trait-variant",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -5697,6 +5709,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tracing",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -5737,6 +5750,7 @@ dependencies = [
  "tokio",
  "tokio-util 0.7.10",
  "tracing",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -5781,6 +5795,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -5824,6 +5839,7 @@ dependencies = [
  "tonic 0.8.3",
  "tracing",
  "typed-store",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -5846,6 +5862,7 @@ dependencies = [
  "serde",
  "tokio",
  "tracing",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -5891,6 +5908,7 @@ dependencies = [
  "tokio",
  "toml 0.7.8",
  "tracing",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -5925,6 +5943,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tracing",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -5960,6 +5979,7 @@ dependencies = [
  "resolved-pathbuf",
  "toml 0.7.8",
  "tracing",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -5980,6 +6000,7 @@ dependencies = [
  "tokio",
  "tonic 0.8.3",
  "tracing",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -6032,6 +6053,7 @@ dependencies = [
  "tracing",
  "triomphe",
  "url",
+ "workspace-hack 0.1.0",
  "wtransport",
 ]
 
@@ -6050,6 +6072,7 @@ dependencies = [
  "serde",
  "tokio",
  "tracing",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -6084,6 +6107,7 @@ dependencies = [
  "tracing",
  "trait-variant",
  "triomphe",
+ "workspace-hack 0.1.0",
  "zeroize",
 ]
 
@@ -6101,6 +6125,7 @@ dependencies = [
  "tokio",
  "tracing",
  "triomphe",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -6116,6 +6141,7 @@ dependencies = [
  "stdext",
  "tokio",
  "tracing",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -6125,6 +6151,7 @@ dependencies = [
  "lightning-interfaces",
  "tokio",
  "tracing",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -6136,6 +6163,7 @@ dependencies = [
  "lightning-interfaces",
  "lightning-utils",
  "tokio",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -6146,6 +6174,7 @@ dependencies = [
  "serde",
  "serde_json",
  "versions",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -6159,6 +6188,7 @@ dependencies = [
  "quote 1.0.35",
  "syn 1.0.109",
  "unescape",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -6168,6 +6198,7 @@ dependencies = [
  "anyhow",
  "lightning-interfaces",
  "serde",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -6189,6 +6220,7 @@ dependencies = [
  "lightning-test-utils",
  "serde",
  "tokio",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -6198,6 +6230,7 @@ dependencies = [
  "anyhow",
  "lightning-interfaces",
  "serde",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -6218,6 +6251,7 @@ dependencies = [
  "serde",
  "tokio",
  "url",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -6249,6 +6283,7 @@ dependencies = [
  "tokio-util 0.7.10",
  "tracing",
  "unsigned-varint 0.8.0",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -6269,6 +6304,7 @@ dependencies = [
  "serde",
  "tokio",
  "tracing",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -6307,6 +6343,7 @@ dependencies = [
  "tracing",
  "trait-variant",
  "webpki",
+ "workspace-hack 0.1.0",
  "x509-parser 0.15.1",
 ]
 
@@ -6330,6 +6367,7 @@ dependencies = [
  "serde",
  "tokio",
  "tracing",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -6341,6 +6379,7 @@ dependencies = [
  "lightning-interfaces",
  "lightning-test-utils",
  "rand 0.8.5",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -6366,6 +6405,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-test",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -6409,6 +6449,7 @@ dependencies = [
  "tokio",
  "tower",
  "tracing",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -6423,6 +6464,7 @@ dependencies = [
  "ink-quill",
  "lightning-types",
  "serde",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -6457,6 +6499,7 @@ dependencies = [
  "tracing",
  "triomphe",
  "which 5.0.0",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -6477,6 +6520,7 @@ dependencies = [
  "serde",
  "tokio",
  "tracing",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -6496,6 +6540,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tracing",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -6522,6 +6567,7 @@ dependencies = [
  "simplelog",
  "tokio",
  "tracing",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -6555,6 +6601,7 @@ dependencies = [
  "simulon",
  "tokio",
  "tracing",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -6578,6 +6625,7 @@ dependencies = [
  "serde",
  "thiserror",
  "url",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -6596,6 +6644,7 @@ dependencies = [
  "tokio",
  "toml 0.7.8",
  "tracing",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
@@ -7124,7 +7173,7 @@ dependencies = [
  "futures",
  "parking_lot",
  "tokio",
- "workspace-hack",
+ "workspace-hack 0.1.0 (git+https://github.com/fleek-network/empty-workspace-hack.git?rev=c07eb1e343a455d57a5481b50eada03c62b4f2c6)",
 ]
 
 [[package]]
@@ -7144,7 +7193,7 @@ dependencies = [
  "tokio",
  "tracing",
  "uuid 1.6.1",
- "workspace-hack",
+ "workspace-hack 0.1.0 (git+https://github.com/fleek-network/empty-workspace-hack.git?rev=c07eb1e343a455d57a5481b50eada03c62b4f2c6)",
 ]
 
 [[package]]
@@ -7168,7 +7217,7 @@ dependencies = [
  "tower",
  "tower-http 0.3.5",
  "tracing",
- "workspace-hack",
+ "workspace-hack 0.1.0 (git+https://github.com/fleek-network/empty-workspace-hack.git?rev=c07eb1e343a455d57a5481b50eada03c62b4f2c6)",
 ]
 
 [[package]]
@@ -7187,7 +7236,7 @@ dependencies = [
  "parking_lot",
  "roaring",
  "smallvec",
- "workspace-hack",
+ "workspace-hack 0.1.0 (git+https://github.com/fleek-network/empty-workspace-hack.git?rev=c07eb1e343a455d57a5481b50eada03c62b4f2c6)",
 ]
 
 [[package]]
@@ -7198,7 +7247,7 @@ dependencies = [
  "proc-macro2 1.0.74",
  "syn 1.0.109",
  "synstructure",
- "workspace-hack",
+ "workspace-hack 0.1.0 (git+https://github.com/fleek-network/empty-workspace-hack.git?rev=c07eb1e343a455d57a5481b50eada03c62b4f2c6)",
 ]
 
 [[package]]
@@ -7273,7 +7322,7 @@ dependencies = [
  "sui-protocol-config",
  "thiserror",
  "tracing",
- "workspace-hack",
+ "workspace-hack 0.1.0 (git+https://github.com/fleek-network/empty-workspace-hack.git?rev=c07eb1e343a455d57a5481b50eada03c62b4f2c6)",
 ]
 
 [[package]]
@@ -7299,7 +7348,7 @@ dependencies = [
  "tokio",
  "tracing",
  "typed-store",
- "workspace-hack",
+ "workspace-hack 0.1.0 (git+https://github.com/fleek-network/empty-workspace-hack.git?rev=c07eb1e343a455d57a5481b50eada03c62b4f2c6)",
 ]
 
 [[package]]
@@ -7311,7 +7360,7 @@ dependencies = [
  "fastcrypto",
  "serde",
  "shared-crypto",
- "workspace-hack",
+ "workspace-hack 0.1.0 (git+https://github.com/fleek-network/empty-workspace-hack.git?rev=c07eb1e343a455d57a5481b50eada03c62b4f2c6)",
 ]
 
 [[package]]
@@ -7328,7 +7377,7 @@ dependencies = [
  "once_cell",
  "rayon",
  "thiserror",
- "workspace-hack",
+ "workspace-hack 0.1.0 (git+https://github.com/fleek-network/empty-workspace-hack.git?rev=c07eb1e343a455d57a5481b50eada03c62b4f2c6)",
 ]
 
 [[package]]
@@ -7363,7 +7412,7 @@ dependencies = [
  "tonic 0.8.3",
  "tracing",
  "typed-store",
- "workspace-hack",
+ "workspace-hack 0.1.0 (git+https://github.com/fleek-network/empty-workspace-hack.git?rev=c07eb1e343a455d57a5481b50eada03c62b4f2c6)",
 ]
 
 [[package]]
@@ -7393,7 +7442,7 @@ dependencies = [
  "tokio",
  "tower",
  "tracing",
- "workspace-hack",
+ "workspace-hack 0.1.0 (git+https://github.com/fleek-network/empty-workspace-hack.git?rev=c07eb1e343a455d57a5481b50eada03c62b4f2c6)",
 ]
 
 [[package]]
@@ -7435,7 +7484,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "url",
- "workspace-hack",
+ "workspace-hack 0.1.0 (git+https://github.com/fleek-network/empty-workspace-hack.git?rev=c07eb1e343a455d57a5481b50eada03c62b4f2c6)",
 ]
 
 [[package]]
@@ -7479,7 +7528,7 @@ dependencies = [
  "tower",
  "tracing",
  "typed-store",
- "workspace-hack",
+ "workspace-hack 0.1.0 (git+https://github.com/fleek-network/empty-workspace-hack.git?rev=c07eb1e343a455d57a5481b50eada03c62b4f2c6)",
 ]
 
 [[package]]
@@ -7503,7 +7552,7 @@ dependencies = [
  "tokio",
  "tracing",
  "typed-store",
- "workspace-hack",
+ "workspace-hack 0.1.0 (git+https://github.com/fleek-network/empty-workspace-hack.git?rev=c07eb1e343a455d57a5481b50eada03c62b4f2c6)",
 ]
 
 [[package]]
@@ -7550,7 +7599,7 @@ dependencies = [
  "tonic-build",
  "tracing",
  "typed-store",
- "workspace-hack",
+ "workspace-hack 0.1.0 (git+https://github.com/fleek-network/empty-workspace-hack.git?rev=c07eb1e343a455d57a5481b50eada03c62b4f2c6)",
 ]
 
 [[package]]
@@ -7586,7 +7635,7 @@ dependencies = [
  "tower",
  "tracing",
  "typed-store",
- "workspace-hack",
+ "workspace-hack 0.1.0 (git+https://github.com/fleek-network/empty-workspace-hack.git?rev=c07eb1e343a455d57a5481b50eada03c62b4f2c6)",
 ]
 
 [[package]]
@@ -8871,7 +8920,7 @@ dependencies = [
  "anyhow",
  "prometheus",
  "protobuf",
- "workspace-hack",
+ "workspace-hack 0.1.0 (git+https://github.com/fleek-network/empty-workspace-hack.git?rev=c07eb1e343a455d57a5481b50eada03c62b4f2c6)",
 ]
 
 [[package]]
@@ -10643,7 +10692,7 @@ dependencies = [
  "fastcrypto",
  "serde",
  "serde_repr",
- "workspace-hack",
+ "workspace-hack 0.1.0 (git+https://github.com/fleek-network/empty-workspace-hack.git?rev=c07eb1e343a455d57a5481b50eada03c62b4f2c6)",
 ]
 
 [[package]]
@@ -11167,7 +11216,7 @@ version = "0.1.0"
 source = "git+https://github.com/MystenLabs/sui.git?rev=b06ada015694890d7c46347b13fbc3e9a763513c#b06ada015694890d7c46347b13fbc3e9a763513c"
 dependencies = [
  "serde_yaml",
- "workspace-hack",
+ "workspace-hack 0.1.0 (git+https://github.com/fleek-network/empty-workspace-hack.git?rev=c07eb1e343a455d57a5481b50eada03c62b4f2c6)",
 ]
 
 [[package]]
@@ -11184,7 +11233,7 @@ dependencies = [
  "once_cell",
  "sui-proc-macros",
  "tracing",
- "workspace-hack",
+ "workspace-hack 0.1.0 (git+https://github.com/fleek-network/empty-workspace-hack.git?rev=c07eb1e343a455d57a5481b50eada03c62b4f2c6)",
 ]
 
 [[package]]
@@ -11197,7 +11246,7 @@ dependencies = [
  "quote 1.0.35",
  "sui-enum-compat-util",
  "syn 2.0.46",
- "workspace-hack",
+ "workspace-hack 0.1.0 (git+https://github.com/fleek-network/empty-workspace-hack.git?rev=c07eb1e343a455d57a5481b50eada03c62b4f2c6)",
 ]
 
 [[package]]
@@ -11210,7 +11259,7 @@ dependencies = [
  "serde_with",
  "sui-protocol-config-macros",
  "tracing",
- "workspace-hack",
+ "workspace-hack 0.1.0 (git+https://github.com/fleek-network/empty-workspace-hack.git?rev=c07eb1e343a455d57a5481b50eada03c62b4f2c6)",
 ]
 
 [[package]]
@@ -11221,7 +11270,7 @@ dependencies = [
  "proc-macro2 1.0.74",
  "quote 1.0.35",
  "syn 1.0.109",
- "workspace-hack",
+ "workspace-hack 0.1.0 (git+https://github.com/fleek-network/empty-workspace-hack.git?rev=c07eb1e343a455d57a5481b50eada03c62b4f2c6)",
 ]
 
 [[package]]
@@ -11340,7 +11389,7 @@ dependencies = [
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
- "workspace-hack",
+ "workspace-hack 0.1.0 (git+https://github.com/fleek-network/empty-workspace-hack.git?rev=c07eb1e343a455d57a5481b50eada03c62b4f2c6)",
 ]
 
 [[package]]
@@ -12223,7 +12272,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
- "workspace-hack",
+ "workspace-hack 0.1.0 (git+https://github.com/fleek-network/empty-workspace-hack.git?rev=c07eb1e343a455d57a5481b50eada03c62b4f2c6)",
 ]
 
 [[package]]
@@ -13182,6 +13231,149 @@ dependencies = [
  "js-sys",
  "wasm-bindgen",
  "web-sys",
+]
+
+[[package]]
+name = "workspace-hack"
+version = "0.1.0"
+dependencies = [
+ "ahash 0.8.7",
+ "arc-swap",
+ "arrayvec",
+ "autometrics",
+ "axum 0.6.20",
+ "axum 0.7.4",
+ "base64 0.13.1",
+ "base64 0.21.5",
+ "bitflags 2.4.1",
+ "block-padding 0.3.3",
+ "bytemuck",
+ "byteorder",
+ "bytes",
+ "cbc",
+ "cc",
+ "chrono",
+ "cipher",
+ "clap 4.4.12",
+ "clap_builder",
+ "concurrent-queue",
+ "core-foundation",
+ "core-foundation-sys",
+ "core2",
+ "criterion",
+ "crossbeam-channel",
+ "crossbeam-deque",
+ "crossbeam-utils",
+ "crunchy",
+ "crypto-common",
+ "data-encoding",
+ "der 0.7.8",
+ "ecdsa",
+ "either",
+ "elliptic-curve",
+ "ethers-contract-abigen",
+ "fastcrypto",
+ "futures",
+ "futures-channel",
+ "futures-core",
+ "futures-executor",
+ "futures-io",
+ "futures-sink",
+ "futures-task",
+ "futures-util",
+ "generic-array",
+ "getrandom",
+ "hashbrown 0.12.3",
+ "hashbrown 0.13.2",
+ "hashbrown 0.14.3",
+ "hdrhistogram",
+ "hex",
+ "hkdf",
+ "hmac",
+ "hyper 0.14.28",
+ "hyper-rustls",
+ "image",
+ "indexmap 1.9.3",
+ "indexmap 2.1.0",
+ "inout",
+ "itertools 0.10.5",
+ "jpeg-decoder",
+ "k256",
+ "lazy_static",
+ "libc",
+ "linux-raw-sys",
+ "log",
+ "matrixmultiply",
+ "memchr",
+ "miniz_oxide",
+ "mio",
+ "multihash 0.19.1",
+ "nom",
+ "num-bigint",
+ "num-bigint-dig",
+ "num-complex",
+ "num-integer",
+ "num-iter",
+ "num-rational",
+ "num-traits",
+ "openssl",
+ "openssl-sys",
+ "p256",
+ "phf_shared 0.11.2",
+ "plotters",
+ "prettyplease 0.2.16",
+ "primitive-types",
+ "proc-macro2 1.0.74",
+ "prost 0.11.9",
+ "quinn",
+ "quinn-proto",
+ "quinn-udp",
+ "quote 1.0.35",
+ "rand 0.8.5",
+ "rand_chacha",
+ "regex",
+ "regex-automata 0.4.3",
+ "regex-syntax 0.8.2",
+ "reqwest",
+ "ring 0.16.20",
+ "ring 0.17.7",
+ "rocksdb",
+ "ruint",
+ "rustix",
+ "rustls 0.21.10",
+ "rustls-pki-types",
+ "schemars",
+ "scopeguard",
+ "sec1",
+ "security-framework-sys",
+ "semver 1.0.21",
+ "serde",
+ "serde_json",
+ "sha1 0.10.6",
+ "sha2 0.10.8",
+ "sha3 0.10.8",
+ "smallvec",
+ "socket2 0.5.5",
+ "spin 0.9.8",
+ "spki 0.7.3",
+ "syn 1.0.109",
+ "syn 2.0.46",
+ "time",
+ "tokio",
+ "tokio-rustls 0.24.1",
+ "tokio-stream",
+ "tokio-util 0.7.10",
+ "toml_datetime",
+ "tower",
+ "tracing",
+ "tracing-core",
+ "tracing-subscriber",
+ "unicode-bidi",
+ "unicode-normalization",
+ "url",
+ "uuid 1.6.1",
+ "web-sys",
+ "zeroize",
 ]
 
 [[package]]

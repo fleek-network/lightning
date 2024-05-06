@@ -16,6 +16,7 @@ tokio.workspace = true
 lru.workspace = true
 scc.workspace = true
 tracing.workspace = true
+workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }
 
 [dev-dependencies]
 lightning-test-utils = { path = "../test-utils" }

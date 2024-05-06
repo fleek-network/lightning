@@ -17,6 +17,7 @@ tokio-stream.workspace = true
 anyhow.workspace = true
 tracing.workspace = true
 thiserror = "1.0"
+workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }
 
 [dev-dependencies]
 lightning-test-utils = { path = "../test-utils" }

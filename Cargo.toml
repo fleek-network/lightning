@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "core/*",
     "core/interfaces/proc",
+    "etc/workspace-hack",
     "lib/*",
     "services/*",
     "services/ai/examples/rust/*",

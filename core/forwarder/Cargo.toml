@@ -19,6 +19,7 @@ rand = "0.8.5"
 # These dependencies MUST be pinned to the same versions used by `lightning-consensus`
 narwhal-types = { git = "https://github.com/MystenLabs/sui.git", rev = "b06ada015694890d7c46347b13fbc3e9a763513c", package = "narwhal-types" }
 tonic = { version = "0.8.3", features = ["transport", "tls"] }
+workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }
 
 [dev-dependencies]
 lightning-test-utils = { path = "../test-utils" }
