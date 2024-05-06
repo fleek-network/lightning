@@ -60,8 +60,8 @@ impl<C: Collection> Node<C> {
 
         let graph = C::build_graph();
 
-        let vis = graph.viz("Lightning Dependency Graph");
-        println!("{vis}");
+        // let vis = graph.viz("Lightning Dependency Graph");
+        // println!("{vis}");
 
         graph
             .init_all(&mut provider)
