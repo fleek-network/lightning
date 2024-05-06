@@ -63,9 +63,7 @@ impl<C: Collection> Node<C> {
         // let vis = graph.viz("Lightning Dependency Graph");
         // println!("{vis}");
 
-        graph
-            .init_all(&mut provider)
-            .expect("failed to init dependency graph");
+        graph.init_all(&mut provider)?;
 
         let shutdown = provider.take();
 
