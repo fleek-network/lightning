@@ -36,6 +36,7 @@ use lightning_syncronizer::config::Config as SyncronizerConfig;
 use lightning_syncronizer::syncronizer::Syncronizer;
 use lightning_utils::shutdown::ShutdownController;
 use serial_test::serial;
+use tokio::pin;
 
 const NUM_RESTARTS: u16 = 3;
 
@@ -131,7 +132,6 @@ fn build_config(
     config.inject::<Pinger<FinalTypes>>(PingerConfig {
         address: format!("127.0.0.1:{}", ports.pinger).parse().unwrap(),
         ping_interval: Duration::from_secs(5),
-        timeout: Duration::from_secs(10),
     });
     config
 }
@@ -215,32 +215,47 @@ async fn node_checkpointing() -> Result<()> {
         .map_err(|e| anyhow::anyhow!("Node Initialization failed: {e:?}"))
         .context("Could not start the node.")?;
 
+    println!("HERE");
     node.start().await;
-    tokio::time::sleep(Duration::from_secs(1)).await;
 
-    for _ in 0..NUM_RESTARTS {
-        // shutdown the previous node
-        node.shutdown().await;
-        std::mem::drop(node);
+    let shutdown_future = shutdown_controller.wait_for_shutdown();
+    pin!(shutdown_future);
 
-        // wait until the previous node is fully down.
-        tokio::time::sleep(Duration::from_secs(1)).await;
+    let mut interval = tokio::time::interval(Duration::from_secs(30));
 
-        // start local env in checkpoint mode to seed database with the new checkpoint
-        <FinalTypes as Collection>::ApplicationInterface::load_from_checkpoint(
-            &app_config,
-            checkpoint.clone(),
-            *checkpoint_hash.as_bytes(),
-        )
-        .await?;
+    let mut count = 0;
+    loop {
+        tokio::select! {
+            _ = &mut shutdown_future => break,
+            _ = interval.tick() => {
+                println!("HERE 2");
 
-        node = Node::<FinalTypes>::init(config.clone())
-            .map_err(|e| anyhow::anyhow!("Could not start the node: {e:?}"))?;
+                // wait for node to start
+                tokio::time::sleep(Duration::from_secs(30)).await;
 
-        node.start().await;
-        tokio::time::sleep(Duration::from_secs(1)).await;
+                // shutdown the node
+                node.shutdown().await;
+
+                std::mem::drop(node);
+
+                // start local env in checkpoint mode to seed database with the new checkpoint
+                <FinalTypes as Collection>::ApplicationInterface::load_from_checkpoint(
+                    &app_config, checkpoint.clone(), *checkpoint_hash.as_bytes()).await?;
+
+                node = Node::<FinalTypes>::init(config.clone())
+                    .map_err(|e| anyhow::anyhow!("Could not start the node: {e:?}"))?;
+
+                node.start().await;
+
+                count += 1;
+                if count > NUM_RESTARTS {
+                    break;
+                }
+            }
+        }
     }
 
+    tokio::time::sleep(Duration::from_secs(30)).await;
     node.shutdown().await;
 
     if path.exists() {

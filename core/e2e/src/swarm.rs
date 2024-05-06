@@ -482,7 +482,6 @@ fn build_config(
     config.inject::<Pinger<FinalTypes>>(PingerConfig {
         address: format!("127.0.0.1:{}", ports.pinger).parse().unwrap(),
         ping_interval: Duration::from_millis(1000),
-        timeout: Duration::from_millis(1000),
     });
     config
 }

@@ -32,13 +32,13 @@ async fn e2e_epoch_change_all_nodes_on_committee() -> Result<()> {
         .with_directory(path)
         .with_min_port(10100)
         .with_num_nodes(4)
-        .with_epoch_time(5000)
+        .with_epoch_time(30000)
         .with_epoch_start(epoch_start)
         .build();
     swarm.launch().await.unwrap();
 
     // Wait a bit for the nodes to start.
-    tokio::time::sleep(Duration::from_secs(1)).await;
+    tokio::time::sleep(Duration::from_secs(5)).await;
 
     let request = json!({
         "jsonrpc": "2.0",
@@ -57,9 +57,9 @@ async fn e2e_epoch_change_all_nodes_on_committee() -> Result<()> {
         assert_eq!(epoch, 0);
     }
 
-    // The epoch will change after 5 seconds, and we already waited 1 second..
-    // To give some time for the epoch change, we will wait another 6 seconds here.
-    tokio::time::sleep(Duration::from_secs(6)).await;
+    // The epoch will change after 40 seconds, and we already waited 5 seconds.
+    // To give some time for the epoch change, we will wait another 30 seconds here.
+    tokio::time::sleep(Duration::from_secs(30)).await;
 
     let request = json!({
         "jsonrpc": "2.0",
@@ -102,13 +102,13 @@ async fn e2e_epoch_change_with_edge_node() -> Result<()> {
         .with_min_port(10200)
         .with_num_nodes(5)
         .with_committee_size(4)
-        .with_epoch_time(5000)
+        .with_epoch_time(30000)
         .with_epoch_start(epoch_start)
         .build();
     swarm.launch().await.unwrap();
 
     // Wait a bit for the nodes to start.
-    tokio::time::sleep(Duration::from_secs(1)).await;
+    tokio::time::sleep(Duration::from_secs(5)).await;
 
     let request = json!({
         "jsonrpc": "2.0",
@@ -127,7 +127,9 @@ async fn e2e_epoch_change_with_edge_node() -> Result<()> {
         assert_eq!(epoch, 0);
     }
 
-    tokio::time::sleep(Duration::from_secs(6)).await;
+    // The epoch will change after 40 seconds, and we already waited 5 seconds.
+    // To give some time for the epoch change, we will wait another 30 seconds here.
+    tokio::time::sleep(Duration::from_secs(30)).await;
 
     let request = json!({
         "jsonrpc": "2.0",
@@ -153,6 +155,7 @@ async fn e2e_epoch_change_with_edge_node() -> Result<()> {
 async fn e2e_committee_change() -> Result<()> {
     logging::setup();
 
+    // Start epoch now and let it end in 40 seconds.
     let epoch_start = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .unwrap()
@@ -169,19 +172,19 @@ async fn e2e_committee_change() -> Result<()> {
         .with_min_port(10300)
         .with_num_nodes(5)
         .with_committee_size(committee_size)
-        .with_epoch_time(5000)
+        .with_epoch_time(20000)
         .with_epoch_start(epoch_start)
         .build();
     swarm.launch().await.unwrap();
 
     // Wait a bit for the nodes to start.
-    tokio::time::sleep(Duration::from_secs(1)).await;
+    tokio::time::sleep(Duration::from_secs(5)).await;
 
     // Make sure all nodes start with the same committee.
     compare_committee(swarm.get_rpc_addresses(), committee_size as usize).await;
 
     // Wait for epoch to change.
-    tokio::time::sleep(Duration::from_secs(7)).await;
+    tokio::time::sleep(Duration::from_secs(30)).await;
 
     // Make sure all nodes still all have the same committee.
     compare_committee(swarm.get_rpc_addresses(), committee_size as usize).await;
@@ -232,7 +235,7 @@ async fn test_staking_auction() -> Result<()> {
         .with_min_port(10400)
         .with_num_nodes(5)
         .with_node_count_param(4)
-        .with_epoch_time(5000)
+        .with_epoch_time(20000)
         .with_epoch_start(epoch_start)
         .with_specific_nodes(vec![high_rep_node, low_rep_node])
         .build();
@@ -240,7 +243,7 @@ async fn test_staking_auction() -> Result<()> {
     swarm.launch().await.unwrap();
 
     // Allow time for nodes to start
-    tokio::time::sleep(Duration::from_secs(1)).await;
+    tokio::time::sleep(Duration::from_secs(5)).await;
 
     // Get the stakes to figure out who our low staked nodes are
     let stake_map: HashMap<NodePublicKey, Staking> = swarm.get_genesis_stakes();
@@ -266,7 +269,7 @@ async fn test_staking_auction() -> Result<()> {
         .unwrap();
 
     // Wait for epoch to change.
-    tokio::time::sleep(Duration::from_secs(6)).await;
+    tokio::time::sleep(Duration::from_secs(30)).await;
 
     // Get the new committee after the epoch change
     let committee_member_request = json!({

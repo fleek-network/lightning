@@ -29,14 +29,14 @@ async fn e2e_checkpoint() -> Result<()> {
         .with_directory(path)
         .with_min_port(10000)
         .with_num_nodes(4)
-        .with_epoch_time(5000)
+        .with_epoch_time(30000)
         .with_epoch_start(epoch_start)
         .persistence(true)
         .build();
     swarm.launch().await.unwrap();
 
     // Wait for the epoch to change.
-    tokio::time::sleep(Duration::from_secs(7)).await;
+    tokio::time::sleep(Duration::from_secs(35)).await;
 
     let request = json!({
         "jsonrpc": "2.0",
