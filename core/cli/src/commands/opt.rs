@@ -232,13 +232,13 @@ async fn get_epoch_end_delta(
 async fn load_secret_key<C: Collection>(
     config_path: ResolvedPathBuf,
 ) -> Result<(NodePublicKey, NodeSecretKey)> {
-    let provider = TomlConfigProvider::<C>::load_or_write_config(config_path).await?;
-    let _config = provider.get::<C::KeystoreInterface>();
-    todo!()
-    // C::KeystoreInterface::init(config).map(|keystore| {
-    //     let sk = keystore.get_ed25519_sk();
-    //     (sk.to_pk(), sk)
-    // })
+    let config_provider = TomlConfigProvider::<C>::load_or_write_config(config_path).await;
+    let mut provider = fdi::Provider::default().with(config_provider);
+    let mut g = C::build_graph();
+    g.init_one::<C::KeystoreInterface>(&mut provider)?;
+    let keystore = provider.get::<C::KeystoreInterface>();
+    let sk = keystore.get_ed25519_sk();
+    Ok((sk.to_pk(), sk))
 }
 
 fn create_update_request(
