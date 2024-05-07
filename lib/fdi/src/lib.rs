@@ -27,7 +27,7 @@ pub use ext::MethodExt;
 pub use extractor::{Cloned, Consume, Extractor};
 pub use graph::{BuildGraph, DependencyGraph};
 pub use method::Method;
-pub use provider::{Provider, ProviderGuard, Ref, RefMut};
+pub use provider::{MultiThreadedProvider, Provider, ProviderGuard, Ref, RefMut};
 
 #[cfg(test)]
 mod tests;

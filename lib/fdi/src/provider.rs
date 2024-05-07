@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::ops::{Deref, DerefMut};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use parking_lot::lock_api::{RawRwLock as RawRwLockTrait, RawRwLockDowngrade};
 use parking_lot::{Mutex, RawRwLock, RwLock};
@@ -53,6 +54,13 @@ pub struct ProviderGuard {
     inner: Mutex<ProviderGuardInner>,
 }
 
+/// A provider that only allows access to Send+Sync objects.
+#[derive(Clone, Default)]
+pub struct MultiThreadedProvider {
+    local_provider_created: Arc<AtomicBool>,
+    provider: Provider,
+}
+
 struct ProviderGuardInner {
     /// For each requested value here we store an `Arc<Object>` of that value to keep the
     /// Object alive as long as this struct is dropped.
@@ -82,6 +90,10 @@ unsafe impl<T: 'static> Send for Ref<T> where T: Send {}
 unsafe impl<T: 'static> Send for RefMut<T> where T: Send {}
 unsafe impl<T: 'static> Sync for Ref<T> where T: Send + Sync {}
 unsafe impl<T: 'static> Sync for RefMut<T> where T: Send + Sync {}
+
+// SAFETY: Multi-threaded provider only provides access to Send+Sync objects.
+unsafe impl Send for MultiThreadedProvider {}
+unsafe impl Sync for MultiThreadedProvider {}
 
 impl Provider {
     /// Helper to insert the given value to the provider inline during construction.
@@ -187,6 +199,63 @@ impl Provider {
     pub fn trigger(&self, event: &'static str) -> usize {
         let mut store = self.get_mut::<Eventstore>();
         store.trigger(event, self)
+    }
+}
+
+impl MultiThreadedProvider {
+    /// Insert the given value to the provider.
+    ///
+    /// # Panics
+    ///
+    /// If a value with the same type already exists in the provider.
+    pub fn insert<T: 'static + Send + Sync>(&self, value: T) {
+        self.provider.insert(value);
+    }
+
+    /// Returns a shared reference for a value of type `T`.
+    ///
+    /// # Panics
+    ///
+    /// If the value does not exists in the provider or if there is an exclusive lock on the value.
+    pub fn get<T: 'static + Send + Sync>(&self) -> Ref<T> {
+        self.provider.get()
+    }
+
+    /// Returns a mutable and exclusive reference for a value of type `T`.
+    ///
+    /// # Panics
+    ///
+    /// If the value does not exists in the provider or if there is any other references to the
+    /// value.
+    pub fn get_mut<T: 'static + Send + Sync>(&self) -> Ref<T> {
+        self.provider.get()
+    }
+
+    /// Take the value of type `T` out of the provider.
+    ///
+    /// # Panics
+    ///
+    /// If the value does not exists in the provider or if there is any other references to the
+    /// value.
+    pub fn take<T: 'static + Send + Sync>(&self) -> T {
+        self.provider.take()
+    }
+
+    /// Returns a normal [Provider] that does not have any Send+Sync restrictions.
+    ///
+    /// # Panics
+    ///
+    /// We only allow creation of only one local provider from a multi-threaded provider. So this
+    /// method can only be called once.
+    pub fn get_local_provider(&self) -> Provider {
+        if self
+            .local_provider_created
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::Relaxed)
+            .is_err()
+        {
+            panic!("get_local_provider can only be called once.");
+        }
+        self.provider.clone()
     }
 }
 
