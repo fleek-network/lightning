@@ -28,7 +28,6 @@ triomphe = "0.1.9"
 smallvec = "1.11"
 axum = { version = "0.7", features = ["macros"] }
 axum-server = { version = "0.6", features = ["tls-rustls"] }
-ebpf-service = { path = "../../etc/ebpf/service" }
 str0m = "0.4.1"
 wtransport = { version = "0.1.9", features = ["dangerous-configuration"] }
 rand = "0.8"

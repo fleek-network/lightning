@@ -12,7 +12,6 @@ pub struct HandshakeConfig {
     pub transports: Vec<TransportConfig>,
     pub http_address: SocketAddr,
     pub https: Option<HttpsConfig>,
-    pub use_ebpf_service: bool,
 }
 
 impl Default for HandshakeConfig {
@@ -26,7 +25,6 @@ impl Default for HandshakeConfig {
             ],
             http_address: ([0, 0, 0, 0], 4220).into(),
             https: None,
-            use_ebpf_service: false,
         }
     }
 }

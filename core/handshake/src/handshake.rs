@@ -1,12 +1,10 @@
 use std::sync::atomic::AtomicU64;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use anyhow::Context as AnyhowContext;
 use async_channel::{bounded, Sender};
 use axum::{Extension, Router};
 use axum_server::Handle;
 use dashmap::DashMap;
-use ebpf_service::client::IpcSender;
 use fleek_crypto::NodePublicKey;
 use fn_sdk::header::{write_header, ConnectionHeader};
 use futures::stream::FuturesUnordered;
@@ -67,20 +65,6 @@ impl<C: Collection> Handshake<C> {
         fdi::Cloned(waiter): fdi::Cloned<ShutdownWaiter>,
     ) {
         let run = this.status.take().expect("restart not implemented.");
-
-        if self.config.use_ebpf_service {
-            if std::env::consts::OS != "linux" {
-                panic!("eBPF is a Linux-only feature");
-            }
-            let path: ResolvedPathBuf = "~/.lightning/ebpf"
-                .try_into()
-                .context("failed to resolve path")
-                .unwrap();
-            let stream = UnixStream::connect(path)
-                .await
-                .expect("failed to connect to eBPF service socket");
-            run.ctx.set_ebpf_service_socket(stream);
-        }
 
         // Spawn transports in parallel for accepting incoming handshakes.
         let routers = this
@@ -148,7 +132,6 @@ pub struct Context<P: ExecutorProviderInterface> {
     pub(crate) shutdown: ShutdownWaiter,
     connection_counter: Arc<AtomicU64>,
     connections: Arc<DashMap<u64, ConnectionEntry>>,
-    ebpf_socket: OnceCell<Arc<IpcSender>>,
 }
 
 struct ConnectionEntry {
@@ -168,7 +151,6 @@ impl<P: ExecutorProviderInterface> Context<P> {
             shutdown: waiter,
             connection_counter: AtomicU64::new(0).into(),
             connections: DashMap::new().into(),
-            ebpf_socket: OnceCell::new(),
         }
     }
 
@@ -302,16 +284,5 @@ impl<P: ExecutorProviderInterface> Context<P> {
 
     pub fn cleanup_connection(&self, connection_id: u64) {
         self.connections.remove(&connection_id);
-    }
-
-    pub fn set_ebpf_service_socket(&mut self, stream: UnixStream) {
-        let mut client = IpcSender::new();
-        // This was meant accommodate the init and start steps of the trait
-        // but since this/self object is clone, we wrap it in an arc but now we can't
-        // call init because we need a mutable. Let's improve this after big refactor.
-        client.init(stream);
-        self.ebpf_socket
-            .set(Arc::new(client))
-            .expect("to only be set once");
     }
 }
