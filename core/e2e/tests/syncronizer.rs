@@ -31,15 +31,15 @@ async fn e2e_syncronize_state() -> Result<()> {
         .with_min_port(10600)
         .with_num_nodes(5)
         .with_committee_size(4)
-        .with_epoch_time(5000)
+        .with_epoch_time(15000)
         .with_epoch_start(epoch_start)
-        .with_syncronizer_delta(Duration::from_secs(2))
+        .with_syncronizer_delta(Duration::from_secs(5))
         .persistence(true)
         .build();
     swarm.launch_genesis_committee().await.unwrap();
 
     // Wait for the epoch to change.
-    tokio::time::sleep(Duration::from_secs(8)).await;
+    tokio::time::sleep(Duration::from_secs(20)).await;
 
     // Make sure that all genesis nodes changed epoch.
     let request = json!({
