@@ -43,7 +43,11 @@ impl ConfigSource {
     /// Reads packet-filters from storage.
     pub async fn read_packet_filters(&self) -> anyhow::Result<Vec<PacketFilterRule>> {
         let content = fs::read_to_string(&self.paths.packet_filter).await?;
-        serde_json::from_str(&content).map_err(Into::into)
+        if !content.is_empty() {
+            serde_json::from_str(&content).map_err(Into::into)
+        } else {
+            Ok(Vec::new())
+        }
     }
 
     /// Writes packet-filters to storage.
