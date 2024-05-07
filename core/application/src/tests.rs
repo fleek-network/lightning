@@ -68,7 +68,7 @@ partial!(TestBinding {
     ApplicationInterface = Application<Self>;
 });
 
-const CHAIN_ID: ChainId = 1337;
+const CHAIN_ID: ChainId = 59330;
 
 pub struct Params {
     epoch_time: Option<u64>,
