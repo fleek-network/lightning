@@ -9,8 +9,10 @@ set -f
 
 # input waiting latency
 declare lat="0.1"
-# input of tokens stream as a first parameter
-declare input=${1:-""}
+# input of command as a first parameter
+declare cmd=${1:-""}
+# input of tokens stream as a second parameter
+declare input=${2:-""}
 # declare inputval=${2:-""}
 
 # declare -a lib_bin_cmds_arr=();
@@ -34,7 +36,7 @@ function graphs_layout_templator_gen () {
     readarray -t -n 0 -O 0 -u 0 lib_bin_names_arr <<< "${lib_bin_names}"
     declare -p lib_bin_names_arr;
 
-#    `man dot` documentation:
+#    Layouts description from `man dot` manual page documentation:
 #    dot - filter for drawing directed graphs
 #    neato - filter for drawing undirected graphs
 #    twopi - filter for radial layouts of graphs
@@ -73,10 +75,10 @@ function graphs_layout_templator_gen () {
             echo -e ":${layouts_code_arr[i]}\n"
             echo -e ":${layouts_modules_arr[i]}\n"
 
-            mkdir -vp "./graphs/${layouts_code_arr[i]}/"
-            mkdir -vp "./graphs/${layouts_modules_arr[i]}/"
-            cargo modules dependencies --verbose --all-features --no-externs --no-modules --layout "${layouts_code_arr[i]}" --package "${module}" | dot -Tsvg -Eminlen="30" -Gsize="100,56.25" -s100 -Gmindist="100.0" -Glayout="${layouts_code_arr[i]}" "-K${layouts_code_arr[i]}" > "./graphs/${layouts_code_arr[i]}/${module}.types_traits_fns.svg"
-            cargo modules dependencies --verbose --all-features --no-fns --no-traits --no-types --layout "${layouts_modules_arr[i]}" --package "${module}" | dot -Tsvg -Eminlen="30" -Gsize="100,56.25" -s100 -Gmindist="100.0" -Glayout="${layouts_modules_arr[i]}" "-K${layouts_modules_arr[i]}" > "./graphs/${layouts_modules_arr[i]}/${module}.crate_modules.svg"
+            mkdir -vp "./graphs/layouts/${layouts_code_arr[i]}/${module}/"
+            mkdir -vp "./graphs/layouts/${layouts_modules_arr[i]}/${module}/"
+            cargo modules dependencies --verbose --all-features --no-externs --no-modules --layout "${layouts_code_arr[i]}" --package "${module}" | dot -Tsvg -Eminlen="10" -Gmindist="100.0" -Gnodesep="1.0" -Granksep="1.0" -Gsize="100,56.25" -s100 -Glayout="${layouts_code_arr[i]}" "-K${layouts_code_arr[i]}" > "./graphs/layouts/${layouts_code_arr[i]}/${module}/${module}.types_traits_fns.svg"
+            cargo modules dependencies --verbose --all-features --no-fns --no-traits --no-types --layout "${layouts_modules_arr[i]}" --package "${module}" | dot -Tsvg -Eminlen="10" -Gmindist="100.0" -Gnodesep="1.0" -Granksep="1.0" -Gsize="100,56.25" -s100 -Glayout="${layouts_modules_arr[i]}" "-K${layouts_modules_arr[i]}" > "./graphs/layouts/${layouts_modules_arr[i]}/${module}/${module}.crate_modules.svg"
 
         elif [[ "${#lib_bin_cmds_arr[@]}" -eq ${#lib_bin_names_arr[@]} && "${#lib_bin_cmds_arr[@]}" -ne 0 ]]; then
 
@@ -86,10 +88,10 @@ function graphs_layout_templator_gen () {
             echo -e ":${layouts_code_arr[i]}\n"
             echo -e ":${layouts_modules_arr[i]}\n"
 
-            mkdir -vp "./graphs/${layouts_code_arr[i]}/"
-            mkdir -vp "./graphs/${layouts_modules_arr[i]}/"
-            cargo modules dependencies --verbose --all-features --no-externs --no-modules --layout "${layouts_code_arr[i]}" --package "${module}" ${lib_bin_cmds_arr[i]} | dot -Tsvg -Eminlen="30" -Gsize="100,56.25" -s100 -Gmindist="100.0" -Glayout="${layouts_code_arr[i]}" "-K${layouts_code_arr[i]}" > "./graphs/${layouts_code_arr[i]}/${module}.${lib_bin_names_arr[i]}.types_traits_fns.svg"
-            cargo modules dependencies --verbose --all-features --no-fns --no-traits --no-types --layout "${layouts_modules_arr[i]}" --package "${module}" ${lib_bin_cmds_arr[i]} | dot -Tsvg -Eminlen="30" -Gsize="100,56.25" -s100 -Gmindist="100.0" -Glayout="${layouts_modules_arr[i]}" "-K${layouts_modules_arr[i]}" > "./graphs/${layouts_modules_arr[i]}/${module}.${lib_bin_names_arr[i]}.crate_modules.svg"
+            mkdir -vp "./graphs/layouts/${layouts_code_arr[i]}/${module}/"
+            mkdir -vp "./graphs/layouts/${layouts_modules_arr[i]}/${module}/"
+            cargo modules dependencies --verbose --all-features --no-externs --no-modules --layout "${layouts_code_arr[i]}" --package "${module}" ${lib_bin_cmds_arr[i]} | dot -Tsvg -Eminlen="10" -Gmindist="100.0" -Gnodesep="1.0" -Granksep="1.0" -Gsize="100,56.25" -s100 -Glayout="${layouts_code_arr[i]}" "-K${layouts_code_arr[i]}" > "./graphs/layouts/${layouts_code_arr[i]}/${module}/${module}.${lib_bin_names_arr[i]}.types_traits_fns.svg"
+            cargo modules dependencies --verbose --all-features --no-fns --no-traits --no-types --layout "${layouts_modules_arr[i]}" --package "${module}" ${lib_bin_cmds_arr[i]} | dot -Tsvg -Eminlen="10" -Gmindist="100.0" -Gnodesep="1.0" -Granksep="1.0" -Gsize="100,56.25" -s100 -Glayout="${layouts_modules_arr[i]}" "-K${layouts_modules_arr[i]}" > "./graphs/layouts/${layouts_modules_arr[i]}/${module}/${module}.${lib_bin_names_arr[i]}.crate_modules.svg"
 
         fi
 
@@ -128,10 +130,14 @@ function modules_graphs_gen () {
             echo -e "Processing images...\n"
             echo -e "${module}:\n"
 
-            cargo modules dependencies --verbose --all-features --no-externs --no-modules --layout twopi --package "${module}" | dot -Tsvg -Eminlen="30" -Gsize="100,56.25" -s100 -Gmindist="100.0" -Glayout="twopi" -Ktwopi > "./graphs/${module}.types_traits_fns.svg"
-            cargo modules dependencies --verbose --all-features --no-fns --no-traits --no-types --layout sfdp --package "${module}" | dot -Tsvg -Eminlen="30" -Gsize="100,56.25" -s100 -Gmindist="100.0" -Glayout="sfdp" -Ksfdp > "./graphs/${module}.crate_modules.svg"
+            mkdir -vp "./graphs/crates_modules/${module}/"
+            cargo modules dependencies --verbose --all-features --no-externs --no-modules --layout twopi --package "${module}" | dot -Tsvg -Eminlen="10" -Gmindist="100.0" -Gnodesep="1.0" -Granksep="1.0" -Gsize="100,56.25" -s100 -Glayout="twopi" -Ktwopi > "./graphs/crates_modules/${module}/${module}.types_traits_fns.svg"
+            cargo modules dependencies --verbose --all-features --no-fns --no-traits --no-types --layout sfdp --package "${module}" | dot -Tsvg -Eminlen="10" -Gmindist="100.0" -Gnodesep="1.0" -Granksep="1.0" -Gsize="100,56.25" -s100 -Glayout="sfdp" -Ksfdp > "./graphs/crates_modules/${module}/${module}.crate_modules.svg"
 
-            graphs_layout_templator_gen "${module}"
+            # generate full bunch of graphs with all available layouts for crate modules
+            if [[ "${cmd}" == "-f" || "${cmd}" == "--full" ]]; then
+                graphs_layout_templator_gen "${module}"
+            fi
 
         elif [[ "${#lib_bin_cmds_arr[@]}" -eq ${#lib_bin_names_arr[@]} && "${#lib_bin_cmds_arr[@]}" -ne 0 ]]; then
 
@@ -144,10 +150,14 @@ function modules_graphs_gen () {
                 echo -e "::${lib_bin_names_arr[i]}:\n"
                 echo -e ":${lib_bin_cmds_arr[i]}\n"
 
-                cargo modules dependencies --verbose --all-features --no-externs --no-modules --layout twopi --package "${module}" ${lib_bin_cmds_arr[i]} | dot -Tsvg -Eminlen="30" -Gsize="100,56.25" -s100 -Gmindist="100.0" -Glayout="twopi" -Ktwopi > "./graphs/${module}.${lib_bin_names_arr[i]}.types_traits_fns.svg"
-                cargo modules dependencies --verbose --all-features --no-fns --no-traits --no-types --layout sfdp --package "${module}" ${lib_bin_cmds_arr[i]} | dot -Tsvg -Eminlen="30" -Gsize="100,56.25" -s100 -Gmindist="100.0" -Glayout="sfdp" -Ksfdp > "./graphs/${module}.${lib_bin_names_arr[i]}.crate_modules.svg"
+                mkdir -vp "./graphs/crates_modules/${module}/"
+                cargo modules dependencies --verbose --all-features --no-externs --no-modules --layout twopi --package "${module}" ${lib_bin_cmds_arr[i]} | dot -Tsvg -Eminlen="10" -Gmindist="100.0" -Gnodesep="1.0" -Granksep="1.0" -Gsize="100,56.25" -s100 -Glayout="twopi" -Ktwopi > "./graphs/crates_modules/${module}/${module}.${lib_bin_names_arr[i]}.types_traits_fns.svg"
+                cargo modules dependencies --verbose --all-features --no-fns --no-traits --no-types --layout sfdp --package "${module}" ${lib_bin_cmds_arr[i]} | dot -Tsvg -Eminlen="10" -Gmindist="100.0" -Gnodesep="1.0" -Granksep="1.0" -Gsize="100,56.25" -s100 -Glayout="sfdp" -Ksfdp > "./graphs/crates_modules/${module}/${module}.${lib_bin_names_arr[i]}.crate_modules.svg"
 
-                graphs_layout_templator_gen "${module}" "${lib_bin_cmds}" "${lib_bin_names}"
+                # generate full bunch of graphs with all available layouts for crate modules and its artifacts (libs and bins)
+                if [[ "${cmd}" == "-f" || "${cmd}" == "--full" ]]; then
+                    graphs_layout_templator_gen "${module}" "${lib_bin_cmds}" "${lib_bin_names}"
+                fi
 
             done
         fi
@@ -159,7 +169,7 @@ mkdir -vp ./graphs/
 
 read -a inputarray -r -d "" -e -t ${lat} -u 0 inarray < /dev/stdin
 
-if [[ "${1}" == "-h" || "${1}" == "--help" ]]; then
+if [[ "${cmd}" == "-h" || "${cmd}" == "--help" ]]; then
 
     echo -e "usage: graph_modules [-h | --help | input latency ] [input data array]"
 
