@@ -6149,6 +6149,7 @@ dependencies = [
 name = "lightning-node"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "lightning-interfaces",
  "tokio",
  "tracing",

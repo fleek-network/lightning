@@ -7,4 +7,5 @@ edition = "2021"
 lightning-interfaces = { path = "../interfaces" }
 tokio.workspace = true
 tracing.workspace = true
+anyhow.workspace = true
 workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }
