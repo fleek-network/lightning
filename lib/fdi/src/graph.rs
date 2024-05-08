@@ -265,7 +265,7 @@ impl DependencyGraph {
             // Remove it from the in_degree so that we can end up with only the
             // pending items once the queue is empty. (That would mean there is
             // a cycle)
-            in_degree.remove(&u);
+            in_degree.shift_remove(&u);
 
             if let Some(values) = self.graph.get(&u) {
                 for (_, v) in values {
