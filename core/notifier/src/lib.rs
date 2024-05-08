@@ -216,12 +216,13 @@ async fn before_epoch_change<Q>(
                     return;
                 }
             },
-            Some(_) = epoch_changed.recv() => {
+            changed = epoch_changed.recv() => {
+                if changed.is_none() {
+                    return;
+                }
+
                 continue;
             },
-            else => {
-                return;
-            }
         }
     }
 }

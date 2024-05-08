@@ -106,3 +106,47 @@ async fn sub_recv_last_works_async_drop() {
     let ret = timeout(Duration::from_millis(100), sub1.last()).await;
     assert_eq!(ret, Ok(None));
 }
+
+#[test]
+async fn sub_shutdown_1() {
+    let ctrl = ShutdownController::new(false);
+
+    let (tx, _) = broadcast::channel::<u8>(3);
+    let mut sub1 = BroadcastSub(tx.subscribe(), ctrl.waiter().into());
+
+    ctrl.trigger_shutdown();
+
+    let ret = timeout(Duration::from_millis(100), sub1.last()).await;
+    assert_eq!(ret, Ok(None));
+}
+
+#[test]
+async fn sub_shutdown_2() {
+    let ctrl = ShutdownController::new(false);
+
+    let (tx, _) = broadcast::channel::<u8>(3);
+    let mut sub1 = BroadcastSub(tx.subscribe(), ctrl.waiter().into());
+
+    let ret = timeout(Duration::from_millis(100), sub1.last()).await;
+    assert!(ret.is_err(), "To time out");
+
+    ctrl.trigger_shutdown();
+
+    let ret = timeout(Duration::from_millis(100), sub1.last()).await;
+    assert_eq!(ret, Ok(None));
+}
+
+#[test]
+async fn sub_shutdown_3() {
+    let ctrl = ShutdownController::new(false);
+    let (tx, _) = broadcast::channel::<u8>(3);
+    let mut sub1 = BroadcastSub(tx.subscribe(), ctrl.waiter().into());
+
+    tokio::spawn(async move {
+        sleep(Duration::from_micros(10)).await;
+        ctrl.trigger_shutdown();
+    });
+
+    let ret = timeout(Duration::from_millis(100), sub1.last()).await;
+    assert_eq!(ret, Ok(None));
+}
