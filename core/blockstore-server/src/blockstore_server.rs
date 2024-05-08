@@ -131,6 +131,10 @@ impl<C: Collection> BlockstoreServerInner<C> {
         > = HashMap::new();
         let mut tasks = JoinSet::new();
         let mut queue = VecDeque::new();
+
+        // Hack to force the JoinSet to never return `None`. This simplifies the tokio::select.
+        tasks.spawn(futures::future::pending());
+
         loop {
             tokio::select! {
                 req = self.pool_responder.get_next_request() => {
@@ -169,6 +173,7 @@ impl<C: Collection> BlockstoreServerInner<C> {
                         }
                         Err(e) => {
                             error!("Failed to receive request from pool: {e:?}");
+                            break;
                         }
                     }
                 }
@@ -217,6 +222,8 @@ impl<C: Collection> BlockstoreServerInner<C> {
                             rx
                         };
                         task.respond(rx);
+                    } else {
+                        break;
                     }
                 }
                 Some(res) = tasks.join_next() => {

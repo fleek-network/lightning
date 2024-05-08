@@ -1,5 +1,5 @@
 use lightning_interfaces::types::Event;
-use tokio::sync::{broadcast, mpsc, oneshot};
+use tokio::sync::{broadcast, mpsc};
 
 pub struct EventDistributor {
     /// A sender that receives events from the application layer
@@ -7,32 +7,21 @@ pub struct EventDistributor {
 
     /// A clonable reciever that can be used to register listeners
     broadcast_tx: broadcast::Sender<Event>,
-
-    /// Shutdown signal
-    shutdown: oneshot::Sender<()>,
 }
 
 impl EventDistributor {
     pub fn spawn() -> Self {
         let (event_tx, mut event_rx) = mpsc::channel(100);
         let (broadcast_tx, _) = broadcast::channel(100);
-        let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
 
         let this = Self {
             event_tx,
             broadcast_tx: broadcast_tx.clone(),
-            shutdown: shutdown_tx,
         };
 
         tokio::spawn(async move {
-            tokio::select! {
-                _ = Self::forward(&mut event_rx, &broadcast_tx) => {
-                    tracing::info!("consensous dropped the tx")
-                }
-                _ = shutdown_rx => {
-                    tracing::trace!("Event recieved shutdown signal")
-                }
-            }
+            Self::forward(&mut event_rx, &broadcast_tx).await;
+            tracing::info!("consensous dropped the tx");
         });
 
         this
@@ -54,10 +43,6 @@ impl EventDistributor {
                 }
             }
         }
-    }
-
-    pub async fn shutdown(self) {
-        let _ = self.shutdown.send(());
     }
 }
 

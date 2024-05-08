@@ -5693,6 +5693,7 @@ dependencies = [
  "blake3-tree",
  "bytes",
  "fleek-crypto",
+ "futures",
  "lightning-application",
  "lightning-blockstore",
  "lightning-indexer",

@@ -350,7 +350,7 @@ async fn insertion_task<C: Collection>(
                 let _ = inner.handle_block(n.block, n.response);
             },
             else => {
-                continue;
+                break;
             }
         }
     }

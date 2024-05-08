@@ -108,7 +108,8 @@ impl AggregatorInner {
                                 error!("Failed to serialize DACK: {e:?}");
                             }
                         }
-
+                    } else {
+                        break;
                     }
                 }
                 _ = interval.tick() => {

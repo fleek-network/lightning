@@ -89,6 +89,9 @@ impl<C: Collection> OriginFetcher<C> {
                         }
                     }
                 }
+                else => {
+                    break;
+                }
             }
         }
     }
