@@ -95,7 +95,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
         tokio::select! {
             biased;
             _ = &mut shutdown_future => {
-                return;
+                break;
             },
             Some((parcel, epoch_changed)) = rx_narwhal_batch.recv() => {
                 if !on_committee {
@@ -185,7 +185,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                                 txn_store.get_timeout(),
                                 timeout_tx.clone(),
                                 &mut pending_timeouts,
-                            ).await;
+                            );
                             info!("Received requested parcel with digest: {parcel_digest:?}");
                         }
 
@@ -222,7 +222,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                                         txn_store.get_timeout(),
                                         timeout_tx.clone(),
                                         &mut pending_timeouts,
-                                    ).await;
+                                    );
                                 }
                             }
                         }
@@ -298,7 +298,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                                         txn_store.get_timeout(),
                                         timeout_tx.clone(),
                                         &mut pending_timeouts,
-                                    ).await;
+                                    );
                                 }
                             }
                         }
@@ -347,18 +347,18 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
 // the intervals between executing parcels.
 // If we are missing a parcel, and the time that has passed since trying toexecute the last parcel
 // is larger than the expected time, we send out a request.
-async fn handle_not_executed(
+fn handle_not_executed(
     not_executed: NotExecuted,
     timeout: Duration,
     timeout_tx: mpsc::Sender<Digest>,
     pending_timeouts: &mut HashSet<Digest>,
 ) {
     if let NotExecuted::MissingParcel(digest) = not_executed {
-        set_parcel_timer(digest, timeout, timeout_tx, pending_timeouts).await;
+        set_parcel_timer(digest, timeout, timeout_tx, pending_timeouts);
     }
 }
 
-async fn set_parcel_timer(
+fn set_parcel_timer(
     digest: Digest,
     timeout: Duration,
     timeout_tx: mpsc::Sender<Digest>,
