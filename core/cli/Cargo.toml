@@ -7,10 +7,12 @@ default-run = "lightning-node"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+ebpf-service = { path = "../../etc/ebpf/service" }
 lightning-interfaces = { path = "../interfaces" }
 lightning-node = { path = "../node" }
 lightning-final-bindings = { path = "../final-bindings" }
 lightning-utils = { path = "../utils" }
+lightning-tui = { path = "../../etc/ebpf/tui" }
 
 fleek-crypto.workspace = true
 resolved-pathbuf.workspace = true
@@ -27,6 +29,7 @@ serde_json.workspace = true
 reqwest = { workspace = true, features = ["json"] }
 rand.workspace = true
 panic-report.workspace = true
+once_cell = "1.19"
 os_info = "3.7.0"
 compile-time-run = "0.2.12"
 workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }

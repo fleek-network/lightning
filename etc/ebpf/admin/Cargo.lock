@@ -1647,7 +1647,6 @@ dependencies = [
  "better-panic",
  "clap",
  "color-eyre",
- "common",
  "config",
  "crossterm",
  "derive_deref",

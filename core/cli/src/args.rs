@@ -2,6 +2,8 @@ use std::path::PathBuf;
 
 use clap::{arg, ArgAction, Parser, Subcommand};
 
+use crate::commands::admin::AdminSubCmd;
+
 #[derive(Parser)]
 #[command(about, version = crate::VERSION)]
 pub struct Args {
@@ -44,6 +46,9 @@ pub enum Command {
     /// Hidden developer subcommands.
     #[command(subcommand, hide = true)]
     Dev(DevSubCmd),
+    /// Applications for administrators.
+    #[command(subcommand)]
+    Admin(AdminSubCmd),
 }
 
 #[derive(Subcommand, Clone)]

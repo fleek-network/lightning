@@ -22,4 +22,4 @@ serde_json = "1.0"
 [features]
 default = ["client"]
 client = ["bytes", "log", "tokio", "anyhow"]
-server = ["aya/async_tokio", "aya-log", "bytes", "libc", "tokio", "log", "anyhow", "common"]
+server = ["aya", "aya-log", "bytes", "libc", "tokio", "log", "anyhow", "common"]

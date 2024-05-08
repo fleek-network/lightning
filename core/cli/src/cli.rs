@@ -9,7 +9,7 @@ use tracing_subscriber::prelude::*;
 use tracing_subscriber::EnvFilter;
 
 use crate::args::{Args, Command};
-use crate::commands::{dev, keys, opt, print_config, run};
+use crate::commands::{admin, dev, keys, opt, print_config, run};
 use crate::utils::fs::ensure_parent_exist;
 
 pub struct Cli {
@@ -49,6 +49,7 @@ impl Cli {
             Command::Opt(cmd) => opt::exec::<C>(cmd, config_path).await,
             Command::PrintConfig { default } => print_config::exec::<C>(default, config_path).await,
             Command::Dev(cmd) => dev::exec::<C>(cmd, config_path).await,
+            Command::Admin(cmd) => admin::exec(cmd).await,
         }
     }
 
