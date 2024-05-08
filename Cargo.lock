@@ -6161,6 +6161,7 @@ name = "lightning-notifier"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "futures",
  "lightning-application",
  "lightning-interfaces",
  "lightning-utils",

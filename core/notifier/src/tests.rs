@@ -1,4 +1,4 @@
-use lightning_interfaces::Subscriber;
+use lightning_interfaces::{ShutdownController, Subscriber};
 use tokio::sync::broadcast;
 use tokio::test;
 use tokio::time::{sleep, timeout, Duration};
@@ -7,9 +7,10 @@ use crate::BroadcastSub;
 
 #[test]
 async fn sub_is_cancel_safe() {
+    let ctrl = ShutdownController::new(false);
     let (tx, _) = broadcast::channel::<u8>(3);
-    let mut sub1 = BroadcastSub(tx.subscribe());
-    let mut sub2 = BroadcastSub(tx.subscribe());
+    let mut sub1 = BroadcastSub(tx.subscribe(), ctrl.waiter().into());
+    let mut sub2 = BroadcastSub(tx.subscribe(), ctrl.waiter().into());
     tx.send(1).expect("Failed to send");
 
     let mut sub1_got = false;
@@ -35,8 +36,9 @@ async fn sub_is_cancel_safe() {
 
 #[test]
 async fn sub_skips_lag() {
+    let ctrl = ShutdownController::new(false);
     let (tx, _) = broadcast::channel::<u8>(3);
-    let mut sub1 = BroadcastSub(tx.subscribe());
+    let mut sub1 = BroadcastSub(tx.subscribe(), ctrl.waiter().into());
 
     for i in 0..10 {
         tx.send(i).unwrap();
@@ -48,8 +50,9 @@ async fn sub_skips_lag() {
 
 #[test]
 async fn sub_recv_last_works() {
+    let ctrl = ShutdownController::new(false);
     let (tx, _) = broadcast::channel::<u8>(3);
-    let mut sub1 = BroadcastSub(tx.subscribe());
+    let mut sub1 = BroadcastSub(tx.subscribe(), ctrl.waiter().into());
 
     tx.send(0).unwrap();
     tx.send(1).unwrap();
@@ -80,8 +83,9 @@ async fn sub_recv_last_works() {
 
 #[test]
 async fn sub_recv_last_works_sync_drop() {
+    let ctrl = ShutdownController::new(false);
     let (tx, _) = broadcast::channel::<u8>(3);
-    let mut sub1 = BroadcastSub(tx.subscribe());
+    let mut sub1 = BroadcastSub(tx.subscribe(), ctrl.waiter().into());
     drop(tx);
 
     let ret = timeout(Duration::from_millis(10), sub1.last()).await;
@@ -90,8 +94,9 @@ async fn sub_recv_last_works_sync_drop() {
 
 #[test]
 async fn sub_recv_last_works_async_drop() {
+    let ctrl = ShutdownController::new(false);
     let (tx, _) = broadcast::channel::<u8>(3);
-    let mut sub1 = BroadcastSub(tx.subscribe());
+    let mut sub1 = BroadcastSub(tx.subscribe(), ctrl.waiter().into());
 
     tokio::spawn(async move {
         sleep(Duration::from_micros(10)).await;

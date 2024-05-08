@@ -10,6 +10,7 @@ lightning-interfaces = { path = "../interfaces" }
 lightning-utils = { path = "../utils" }
 tokio.workspace = true
 anyhow.workspace = true
+futures.workspace = true
 workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }
 
 [dev-dependencies]

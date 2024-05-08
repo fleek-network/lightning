@@ -1,8 +1,13 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use futures::future::{select, Either};
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Block, BlockExecutionResponse};
-use lightning_interfaces::{BlockExecutedNotification, EpochChangedNotification};
+use lightning_interfaces::{
+    BlockExecutedNotification,
+    EpochChangedNotification,
+    OwnedShutdownSignal,
+};
 use lightning_utils::application::QueryRunnerExt;
 use tokio::pin;
 use tokio::sync::broadcast;
@@ -13,10 +18,8 @@ mod tests;
 
 pub struct Notifier<C: Collection> {
     query_runner: c![C::ApplicationInterface::SyncExecutor],
-    // TODO(qti3e):
-    // This shouldn't really be owned here. get_emitter should move this out and we should only
-    // keep a Weak reference to the senders (to subscribe).
     notify: NotificationsEmitter,
+    waiter: ShutdownWaiter,
 }
 
 impl<C: Collection> Clone for Notifier<C> {
@@ -24,15 +27,20 @@ impl<C: Collection> Clone for Notifier<C> {
         Self {
             query_runner: self.query_runner.clone(),
             notify: self.notify.clone(),
+            waiter: self.waiter.clone(),
         }
     }
 }
 
 impl<C: Collection> Notifier<C> {
-    fn new(app: &c![C::ApplicationInterface]) -> Self {
+    fn new(
+        app: &c![C::ApplicationInterface],
+        fdi::Cloned(waiter): fdi::Cloned<ShutdownWaiter>,
+    ) -> Self {
         Self {
             query_runner: app.sync_query(),
             notify: NotificationsEmitter::default(),
+            waiter,
         }
     }
 }
@@ -51,23 +59,32 @@ impl<C: Collection> NotifierInterface<C> for Notifier<C> {
     }
 
     fn subscribe_block_executed(&self) -> impl Subscriber<BlockExecutedNotification> {
-        BroadcastSub(self.notify.block_executed.subscribe())
+        BroadcastSub(
+            self.notify.block_executed.subscribe(),
+            self.waiter.wait_for_shutdown_owned(),
+        )
     }
 
     fn subscribe_epoch_changed(&self) -> impl Subscriber<EpochChangedNotification> {
-        BroadcastSub(self.notify.epoch_changed.subscribe())
+        BroadcastSub(
+            self.notify.epoch_changed.subscribe(),
+            self.waiter.wait_for_shutdown_owned(),
+        )
     }
 
     fn subscribe_before_epoch_change(&self, duration: Duration) -> impl Subscriber<()> {
         let (sender, rx) = broadcast::channel(8);
-        let epoch_changed = BroadcastSub(self.notify.epoch_changed.subscribe());
+        let epoch_changed = BroadcastSub(
+            self.notify.epoch_changed.subscribe(),
+            self.waiter.wait_for_shutdown_owned(),
+        );
         tokio::spawn(before_epoch_change(
             sender,
             self.query_runner.clone(),
             duration,
             epoch_changed,
         ));
-        BroadcastSub(rx)
+        BroadcastSub(rx, self.waiter.wait_for_shutdown_owned())
     }
 }
 
@@ -104,7 +121,7 @@ impl Emitter for NotificationsEmitter {
 }
 
 /// Provides an implementation for [`Subscriber`] backed by a tokio broadcast.
-pub(crate) struct BroadcastSub<T>(pub broadcast::Receiver<T>);
+pub(crate) struct BroadcastSub<T>(pub broadcast::Receiver<T>, pub OwnedShutdownSignal);
 
 impl<T> Subscriber<T> for BroadcastSub<T>
 where
@@ -112,10 +129,18 @@ where
 {
     async fn recv(&mut self) -> Option<T> {
         loop {
-            match self.0.recv().await {
-                Ok(item) => break Some(item),
-                Err(broadcast::error::RecvError::Closed) => break None,
-                Err(broadcast::error::RecvError::Lagged(_)) => continue,
+            let recv = self.0.recv();
+            pin!(recv);
+
+            match select(recv, &mut self.1).await {
+                Either::Left((Ok(item), _)) => break Some(item),
+                Either::Left((Err(broadcast::error::RecvError::Closed), _)) => {
+                    break None;
+                },
+                Either::Left((Err(broadcast::error::RecvError::Lagged(_)), _)) => {
+                    continue;
+                },
+                Either::Right(_) => return None,
             }
         }
     }
@@ -146,13 +171,7 @@ where
 
         // Await for the next message. Unless we are lagged behind due to channel capacity this
         // should only loop once.
-        loop {
-            match self.0.recv().await {
-                Ok(item) => break Some(item),
-                Err(broadcast::error::RecvError::Closed) => break None,
-                Err(broadcast::error::RecvError::Lagged(_)) => continue,
-            }
-        }
+        self.recv().await
     }
 }
 
