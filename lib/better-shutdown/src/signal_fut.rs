@@ -7,7 +7,10 @@ use futures::Future;
 use crate::shared::{SharedState, NUM_SHARED_SHARDS};
 use crate::wait_list::{WaitList, WaitListSlotPos};
 
-/// A future that is resolved once the shutdown is triggered.
+/// A future that is resolved once the shutdown is triggered. It has the life time of the
+/// waiter it was created from.
+///
+/// There is also an owned version.
 pub struct ShutdownSignal<'a> {
     /// Our reference to the state shared between all of the waiters/futures under the same
     /// shutdown controller.

@@ -7,7 +7,7 @@ use triomphe::Arc;
 
 use crate::shared::{SharedState, NUM_SHARED_SHARDS};
 use crate::wait_list::WaitList;
-use crate::ShutdownSignal;
+use crate::{OwnedShutdownSignal, ShutdownSignal};
 
 /// The waiter end of a [ShutdownController] it can be cloned and passed around.
 ///
@@ -74,6 +74,12 @@ impl ShutdownWaiter {
         ShutdownSignal::new(&self.inner, self.dedicated.as_deref())
     }
 
+    /// Returns an owned future that will be resolved once shutdown is called.
+    #[inline(always)]
+    pub fn wait_for_shutdown_owned(&self) -> OwnedShutdownSignal {
+        OwnedShutdownSignal::new(self.inner.clone(), self.dedicated.clone())
+    }
+
     /// Run a function until a shutdown signal is received.
     ///
     /// This method is recommended to use for run loops that are spawned, since the notify permit
@@ -125,5 +131,11 @@ impl ShutdownWaiter {
         O: Future<Output = ControlFlow<R>>,
     {
         self.fold_until_shutdown((), |_| task()).await
+    }
+}
+
+impl From<ShutdownWaiter> for OwnedShutdownSignal {
+    fn from(waiter: ShutdownWaiter) -> Self {
+        OwnedShutdownSignal::new(waiter.inner, waiter.dedicated)
     }
 }

@@ -345,3 +345,42 @@ fn test_15() {
     let result = com_future.poll_unpin(&mut Context::from_waker(&com_waker));
     assert_eq!(result, Poll::Ready(()));
 }
+
+#[test]
+fn test_16() {
+    let ctrl = ShutdownController::new(false);
+    ctrl.trigger_shutdown();
+    let waiter = ctrl.waiter();
+    let (counter, waker) = new_waker();
+    let mut future = waiter.wait_for_shutdown_owned();
+    let result = future.poll_unpin(&mut Context::from_waker(&waker));
+    assert_eq!(counter.get(), 0);
+    assert_eq!(result, Poll::Ready(()));
+}
+
+#[test]
+fn test_17() {
+    let ctrl = ShutdownController::new(false);
+    let waiter = ctrl.waiter();
+    let (counter, waker) = new_waker();
+    let mut future = waiter.wait_for_shutdown_owned();
+    let result = future.poll_unpin(&mut Context::from_waker(&waker));
+    assert_eq!(counter.get(), 0);
+    assert_eq!(result, Poll::Pending);
+    ctrl.trigger_shutdown();
+    let result = future.poll_unpin(&mut Context::from_waker(&waker));
+    assert_eq!(counter.get(), 1);
+    assert_eq!(result, Poll::Ready(()));
+    let pending_future = future;
+
+    let (counter, waker) = new_waker();
+    let mut future = ctrl.wait_for_completion();
+    let result = future.poll_unpin(&mut Context::from_waker(&waker));
+    assert_eq!(counter.get(), 0);
+    assert_eq!(result, Poll::Pending);
+
+    drop(pending_future);
+    let result = future.poll_unpin(&mut Context::from_waker(&waker));
+    assert_eq!(counter.get(), 1);
+    assert_eq!(result, Poll::Ready(()));
+}

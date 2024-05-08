@@ -1,3 +1,4 @@
+use std::num::NonZeroUsize;
 use std::task::{Context, Poll, Waker};
 
 use crate::backtrace_list::BacktraceList;
@@ -60,8 +61,25 @@ pub struct WaitListEntry {
 
 /// An owning opaque pointer to a position in a wait list. It's simply a usize index that is not
 /// Copy and Clone.
+#[repr(transparent)]
 pub struct WaitListSlotPos {
-    index: usize,
+    // This allows us to use some memory layout optimizations when we put this in an Option.
+    value: NonZeroUsize,
+}
+
+impl WaitListSlotPos {
+    #[inline(always)]
+    fn new(index: usize) -> Self {
+        Self {
+            // SAFETY: index >= 0 -> index + 1 >= 1 -> (index + 1) != 0
+            value: unsafe { NonZeroUsize::new_unchecked(index + 1) },
+        }
+    }
+
+    #[inline(always)]
+    fn get(&self) -> usize {
+        usize::from(self.value) - 1
+    }
 }
 
 impl Default for WaitList {
@@ -124,23 +142,23 @@ impl WaitList {
                 };
 
                 self.arena[index] = ArenaEntry::Item(e);
-                return Ok(WaitListSlotPos { index });
+                return Ok(WaitListSlotPos::new(index));
             }
         }
 
         self.arena.push(ArenaEntry::Item(e));
-        Ok(WaitListSlotPos { index: vec_len })
+        Ok(WaitListSlotPos::new(vec_len))
     }
 
     /// Remove a previously registered waker from the list.
     #[inline]
     pub fn deregister(&mut self, ptr: WaitListSlotPos) {
         self.len -= 1;
-        self.arena[ptr.index] = match self.last_freed {
+        self.arena[ptr.get()] = match self.last_freed {
             Some(index) => ArenaEntry::Link(index),
             None => ArenaEntry::Empty,
         };
-        self.last_freed = Some(ptr.index);
+        self.last_freed = Some(ptr.get());
     }
 
     /// Close the wait list making it not accept new registerations.
@@ -206,7 +224,7 @@ impl WaitList {
         if let Some(idx) = &*prev_index {
             // As long as the index does exists the value at that position is not null and is valid
             // entry.
-            match &mut self.arena[idx.index] {
+            match &mut self.arena[idx.get()] {
                 ArenaEntry::Item(entry) => {
                     entry.waker = waker;
                     entry.backtrace = backtrace;
