@@ -8,4 +8,5 @@ lightning-interfaces = { path = "../interfaces" }
 tokio.workspace = true
 tracing.workspace = true
 anyhow.workspace = true
+thread-local-panic-hook = "0.1.0"
 workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }

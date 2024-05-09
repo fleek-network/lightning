@@ -5,7 +5,7 @@ use std::time::Duration;
 use anyhow::Result;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::ShutdownController;
-use tokio::runtime::{Runtime, UnhandledPanic};
+use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 use tokio::time::timeout;
 
@@ -26,16 +26,6 @@ pub struct ContainedNode<C: Collection> {
 
 impl<C: Collection> ContainedNode<C> {
     pub fn new(provider: fdi::MultiThreadedProvider, name: Option<String>) -> Self {
-        let worker_id = AtomicUsize::new(0);
-        let runtime = tokio::runtime::Builder::new_multi_thread()
-            .thread_name_fn(move || {
-                let id = worker_id.fetch_add(1, Ordering::SeqCst);
-                format!("{}#{id}", name.as_deref().unwrap_or("LIGHTNING"))
-            })
-            .enable_all()
-            .build()
-            .expect("Failed to build tokio runtime for node container.");
-
         // Create and insert the shutdown controller to the provider.
         let trace_shutdown = std::env::var("TRACE_SHUTDOWN").is_ok();
         let shutdown = ShutdownController::new(trace_shutdown);
@@ -44,6 +34,29 @@ impl<C: Collection> ContainedNode<C> {
 
         // Will make the shutdown controller listen for ctrl+c.
         shutdown.install_ctrlc_handlers();
+
+        // Get the trigger permit from the shutdown controller to be passed into each thread.
+        let permit = shutdown.permit();
+
+        // Create the tokio runtime.
+        let worker_id = AtomicUsize::new(0);
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .thread_name_fn(move || {
+                let id = worker_id.fetch_add(1, Ordering::SeqCst);
+                format!("{}#{id}", name.as_deref().unwrap_or("LIGHTNING"))
+            })
+            .on_thread_start(move || {
+                let permit = permit.clone();
+                thread_local_panic_hook::update_hook(move |prev, info| {
+                    tracing::error!("Uncaught panic in detected in worker. Shutting node down.");
+                    permit.trigger_shutdown();
+                    // bubble up and call the previous panic handler.
+                    prev(info);
+                });
+            })
+            .enable_all()
+            .build()
+            .expect("Failed to build tokio runtime for node container.");
 
         Self {
             provider,
@@ -54,7 +67,7 @@ impl<C: Collection> ContainedNode<C> {
     }
 
     /// Start the node and return a handle to the task that started the node. The task returns as
-    /// soon as the node
+    /// soon as the node starts up.
     pub fn spawn(&self) -> JoinHandle<Result<()>> {
         let provider = self.provider.clone();
 

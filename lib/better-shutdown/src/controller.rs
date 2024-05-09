@@ -18,6 +18,13 @@ pub struct ShutdownController {
     backtrace_list: BacktraceList,
 }
 
+/// A permit to trigger shutdown on a remote [ShutdownController]. This is obtained by calling
+/// [ShutdownController::permit].
+#[derive(Clone)]
+pub struct TriggerPermit {
+    inner: Arc<SharedState>,
+}
+
 impl Default for ShutdownController {
     fn default() -> Self {
         Self::new(false)
@@ -30,6 +37,14 @@ impl ShutdownController {
         ShutdownController {
             inner: Arc::new(SharedState::new(capture_backtrace)),
             backtrace_list: BacktraceList::default(),
+        }
+    }
+
+    /// Returns a [TriggerPermit] which can be used to trigger shutdown from another
+    /// place.
+    pub fn permit(&self) -> TriggerPermit {
+        TriggerPermit {
+            inner: self.inner.clone(),
         }
     }
 
@@ -124,5 +139,13 @@ impl ShutdownController {
                 eprintln!("Pending task backtrace #{i}:\n{trace:#?}");
             }
         }
+    }
+}
+
+impl TriggerPermit {
+    /// Trigger the shutdown on the controller.
+    pub fn trigger_shutdown(&self) {
+        tracing::info!("Sending the shutdown signal from a permit.");
+        self.inner.trigger_shutdown()
     }
 }

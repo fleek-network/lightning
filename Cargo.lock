@@ -6151,6 +6151,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "lightning-interfaces",
+ "thread-local-panic-hook",
  "tokio",
  "tracing",
  "workspace-hack 0.1.0",
@@ -11472,6 +11473,12 @@ dependencies = [
  "quote 1.0.35",
  "syn 2.0.46",
 ]
+
+[[package]]
+name = "thread-local-panic-hook"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e70399498abd3ec85f99a2f2d765c8638588e20361678af93a9f47de96719743"
 
 [[package]]
 name = "thread_local"
