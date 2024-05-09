@@ -33,7 +33,6 @@ impl<C: Collection> ContainedNode<C> {
                 format!("{}#{id}", name.as_deref().unwrap_or("LIGHTNING"))
             })
             .enable_all()
-            .unhandled_panic(UnhandledPanic::ShutdownRuntime)
             .build()
             .expect("Failed to build tokio runtime for node container.");
 
