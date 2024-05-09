@@ -112,7 +112,6 @@ impl Runtime {
             ],
             startup_snapshot: Some(SNAPSHOT),
             op_metrics_factory_fn: Some(tape.op_metrics_factory_fn()),
-            // Heap initializes with 1KiB, maxes out at 10MiB
             create_params: Some(CreateParams::default().heap_limits(HEAP_INIT, HEAP_LIMIT)),
             module_loader: Some(Rc::new(module_loader::node_crypto())),
             ..Default::default()
@@ -170,6 +169,7 @@ impl Runtime {
         {
             let main = self.deno.get_module_namespace(id)?;
             let scope = &mut self.deno.handle_scope();
+            let scope = &mut v8::TryCatch::new(scope);
             let main_local = v8::Local::new(scope, main);
 
             // Get bootstrap function pointer
@@ -191,6 +191,11 @@ impl Runtime {
 
             // call function and move response into a global ref
             let Some(res) = main_fn.call(scope, undefined.into(), &[param]) else {
+                if let Some(exception) = scope.exception() {
+                    let error = deno_core::error::JsError::from_v8_exception(scope, exception);
+                    return Err(error.into());
+                }
+
                 return Ok(None);
             };
             Ok(Some(Global::new(scope, res)))
