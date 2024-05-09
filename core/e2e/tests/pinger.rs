@@ -83,6 +83,6 @@ async fn e2e_detect_offline_node() -> Result<()> {
         assert_eq!(node_info.participation, Participation::False);
     }
 
-    swarm.shutdown();
+    swarm.shutdown().await;
     Ok(())
 }

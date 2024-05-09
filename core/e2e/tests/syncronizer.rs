@@ -27,7 +27,7 @@ async fn e2e_syncronize_state() -> Result<()> {
         fs::remove_dir_all(&path).expect("Failed to clean up swarm directory before test.");
     }
     let swarm = Swarm::builder()
-        .with_directory(path)
+        .with_directory(path.clone())
         .with_min_port(10600)
         .with_num_nodes(5)
         .with_committee_size(4)
@@ -64,8 +64,7 @@ async fn e2e_syncronize_state() -> Result<()> {
 
     // Get the checkpoint receivers from the syncronizer for the node that is not on the genesis
     // committee.
-    let (pubkey, syncro) = swarm.get_non_genesis_committee_syncronizer().pop().unwrap();
-    let syncronizer = syncro.unwrap();
+    let (pubkey, syncronizer) = swarm.get_non_genesis_committee_syncronizer().pop().unwrap();
 
     // Wait for the syncronizer to detect that we are behind and send the checkpoint hash.
     let ckpt_hash = syncronizer.next_checkpoint_hash().await;
@@ -79,6 +78,7 @@ async fn e2e_syncronize_state() -> Result<()> {
     let hash = blake3::hash(&checkpoint);
     assert_eq!(hash, ckpt_hash);
 
-    swarm.shutdown();
+    swarm.shutdown().await;
+
     Ok(())
 }

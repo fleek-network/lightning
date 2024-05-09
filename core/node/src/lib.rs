@@ -42,7 +42,7 @@ impl<C: Collection> ContainedNode<C> {
         shutdown.install_ctrlc_handlers();
 
         // Get the trigger permit from the shutdown controller to be passed into each thread.
-        let permit = shutdown.permit();
+        //let permit = shutdown.permit();
 
         // Create the tokio runtime.
         let worker_id = AtomicUsize::new(0);
@@ -53,10 +53,10 @@ impl<C: Collection> ContainedNode<C> {
                 format!("{node_name}#{id}")
             })
             .on_thread_start(move || {
-                let permit = permit.clone();
+                //let permit = permit.clone();
                 thread_local_panic_hook::update_hook(move |prev, info| {
-                    tracing::error!("Uncaught panic in detected in worker. Shutting node down.");
-                    permit.trigger_shutdown();
+                    tracing::error!("Uncaught panic detected in worker.");
+                    //permit.trigger_shutdown();
                     // bubble up and call the previous panic handler.
                     prev(info);
                 });

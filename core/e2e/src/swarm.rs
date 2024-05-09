@@ -53,7 +53,10 @@ pub struct Swarm {
 
 impl Drop for Swarm {
     fn drop(&mut self) {
-        self.shutdown_internal();
+        for (_, node) in self.nodes.drain() {
+            drop(node.shutdown());
+        }
+        self.cleanup();
     }
 }
 
@@ -89,8 +92,15 @@ impl Swarm {
         Ok(())
     }
 
-    pub fn shutdown(mut self) {
-        self.shutdown_internal();
+    pub async fn shutdown(mut self) {
+        let mut handles = Vec::new();
+        for (_, node) in self.nodes.drain() {
+            handles.push(tokio::spawn(node.shutdown()));
+        }
+        for handle in handles {
+            handle.await.unwrap();
+        }
+        self.cleanup();
     }
 
     pub fn get_rpc_addresses(&self) -> HashMap<NodePublicKey, String> {
@@ -127,7 +137,7 @@ impl Swarm {
         &self,
     ) -> Vec<(
         NodePublicKey,
-        Option<fdi::Ref<c!(FinalTypes::SyncronizerInterface)>>,
+        fdi::Ref<c!(FinalTypes::SyncronizerInterface)>,
     )> {
         self.nodes
             .iter()
@@ -136,7 +146,7 @@ impl Swarm {
             .collect()
     }
 
-    pub fn get_blockstores(&self) -> Vec<Option<Blockstore<FinalTypes>>> {
+    pub fn get_blockstores(&self) -> Vec<Blockstore<FinalTypes>> {
         self.nodes
             .values()
             .map(|node| node.take_blockstore())
@@ -144,11 +154,10 @@ impl Swarm {
     }
 
     pub fn get_blockstore(&self, node: &NodePublicKey) -> Option<Blockstore<FinalTypes>> {
-        self.nodes.get(node).and_then(|node| node.take_blockstore())
+        self.nodes.get(node).map(|node| node.take_blockstore())
     }
 
-    fn shutdown_internal(&mut self) {
-        self.nodes.values().for_each(|node| node.shutdown());
+    fn cleanup(&mut self) {
         if self.directory.exists() {
             fs::remove_dir_all(&self.directory).expect("Failed to clean up swarm directory.");
         }

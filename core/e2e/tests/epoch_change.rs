@@ -78,7 +78,7 @@ async fn e2e_epoch_change_all_nodes_on_committee() -> Result<()> {
         assert_eq!(epoch, 1);
     }
 
-    swarm.shutdown();
+    swarm.shutdown().await;
     Ok(())
 }
 
@@ -147,6 +147,8 @@ async fn e2e_epoch_change_with_edge_node() -> Result<()> {
             .expect("Failed to parse response.");
         assert_eq!(epoch, 1);
     }
+
+    swarm.shutdown().await;
     Ok(())
 }
 
@@ -188,12 +190,14 @@ async fn e2e_committee_change() -> Result<()> {
 
     // Make sure all nodes still all have the same committee.
     compare_committee(swarm.get_rpc_addresses(), committee_size as usize).await;
+
+    swarm.shutdown().await;
     Ok(())
 }
 
 #[tokio::test]
 #[serial]
-async fn test_staking_auction() -> Result<()> {
+async fn e2e_test_staking_auction() -> Result<()> {
     logging::setup();
 
     // Start epoch now and let it end in 40 seconds.
@@ -328,6 +332,8 @@ async fn test_staking_auction() -> Result<()> {
     } else {
         assert!(!current_committee.contains(low_stake_nodes[1]));
     }
+
+    swarm.shutdown().await;
     Ok(())
 }
 

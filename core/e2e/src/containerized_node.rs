@@ -1,20 +1,18 @@
-use std::sync::Mutex;
-
 use fleek_crypto::AccountOwnerSecretKey;
+use futures::Future;
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_final_bindings::FinalTypes;
+use lightning_interfaces::fdi::MultiThreadedProvider;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::Staking;
+use lightning_node::ContainedNode;
 use lightning_rpc::Rpc;
 use lightning_utils::config::TomlConfigProvider;
-
-use crate::container::Container;
 
 pub struct ContainerizedNode {
     config: TomlConfigProvider<FinalTypes>,
     owner_secret_key: AccountOwnerSecretKey,
-    container: Mutex<Option<Container<FinalTypes>>>,
-    runtime_type: RuntimeType,
+    node: ContainedNode<FinalTypes>,
     index: usize,
     genesis_stake: Staking,
     is_genesis_committee: bool,
@@ -28,11 +26,13 @@ impl ContainerizedNode {
         is_genesis_committee: bool,
         genesis_stake: Staking,
     ) -> Self {
+        let provider = MultiThreadedProvider::default();
+        provider.insert(config.clone());
+        let node = ContainedNode::<FinalTypes>::new(provider, None);
         Self {
             config,
             owner_secret_key,
-            container: Default::default(),
-            runtime_type: RuntimeType::MultiThreaded,
+            node,
             index,
             genesis_stake,
             is_genesis_committee,
@@ -41,20 +41,19 @@ impl ContainerizedNode {
 
     pub async fn start(&self) -> anyhow::Result<()> {
         // This function has to return a result in order to use try_join_all in swarm.rs
-        *self.container.lock().unwrap() =
-            Some(Container::spawn(self.index, self.config.clone(), self.runtime_type).await);
+        let handle = self.node.spawn();
+        handle.await.unwrap()?;
+
         Ok(())
     }
 
-    pub fn shutdown(&self) {
-        if let Some(container) = &mut self.container.lock().unwrap().take() {
-            container.shutdown();
-        }
+    pub fn shutdown(self) -> impl Future<Output = ()> {
+        self.node.shutdown()
     }
 
-    pub fn is_running(&self) -> bool {
-        self.container.lock().unwrap().is_some()
-    }
+    //pub fn is_running(&self) -> bool {
+    //    self.node.lock().unwrap().is_some()
+    //}
 
     pub fn get_rpc_address(&self) -> String {
         let config = self.config.get::<Rpc<FinalTypes>>();
@@ -73,28 +72,17 @@ impl ContainerizedNode {
         self.genesis_stake.clone()
     }
 
-    pub fn take_syncronizer(&self) -> Option<fdi::Ref<c!(FinalTypes::SyncronizerInterface)>> {
-        let container = self.container.lock().unwrap().take();
-        if let Some(mut container) = container {
-            let syncronizer = container.take_ckpt_rx();
-            *self.container.lock().unwrap() = Some(container);
-            syncronizer
-        } else {
-            *self.container.lock().unwrap() = None;
-            None
-        }
+    pub fn take_syncronizer(&self) -> fdi::Ref<c!(FinalTypes::SyncronizerInterface)> {
+        self.node
+            .provider()
+            .get::<<FinalTypes as Collection>::SyncronizerInterface>()
     }
 
-    pub fn take_blockstore(&self) -> Option<Blockstore<FinalTypes>> {
-        let container = self.container.lock().unwrap().take();
-        if let Some(mut container) = container {
-            let blockstore = container.take_blockstore();
-            *self.container.lock().unwrap() = Some(container);
-            blockstore
-        } else {
-            *self.container.lock().unwrap() = None;
-            None
-        }
+    pub fn take_blockstore(&self) -> Blockstore<FinalTypes> {
+        self.node
+            .provider()
+            .get::<<FinalTypes as Collection>::BlockstoreInterface>()
+            .clone()
     }
 
     pub fn is_genesis_committee(&self) -> bool {
@@ -102,7 +90,6 @@ impl ContainerizedNode {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
 pub enum RuntimeType {
     SingleThreaded,
     MultiThreaded,

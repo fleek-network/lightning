@@ -82,6 +82,6 @@ async fn e2e_checkpoint() -> Result<()> {
     // TODO(matthias): read the block stores of all the nodes and make sure they all stored the
     // checkpoint
 
-    swarm.shutdown();
+    swarm.shutdown().await;
     Ok(())
 }
