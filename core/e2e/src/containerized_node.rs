@@ -51,10 +51,6 @@ impl ContainerizedNode {
         self.node.shutdown()
     }
 
-    //pub fn is_running(&self) -> bool {
-    //    self.node.lock().unwrap().is_some()
-    //}
-
     pub fn get_rpc_address(&self) -> String {
         let config = self.config.get::<Rpc<FinalTypes>>();
         format!("http://{}", config.addr())
@@ -88,9 +84,4 @@ impl ContainerizedNode {
     pub fn is_genesis_committee(&self) -> bool {
         self.is_genesis_committee
     }
-}
-
-pub enum RuntimeType {
-    SingleThreaded,
-    MultiThreaded,
 }
