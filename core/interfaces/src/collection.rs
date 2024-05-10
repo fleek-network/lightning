@@ -115,6 +115,7 @@ impl<C: Collection> Node<C> {
                 continue;
             };
 
+            eprintln!("Printing pending backtraces:");
             for (i, trace) in iter.enumerate() {
                 eprintln!("Pending task backtrace #{i}:\n{trace:#?}");
             }

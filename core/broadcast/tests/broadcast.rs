@@ -16,6 +16,7 @@ use lightning_interfaces::prelude::*;
 use lightning_interfaces::schema::broadcast::{Advr, Frame, Message, MessageInternedId, Want};
 use lightning_interfaces::schema::{AutoImplSerde, LightningMessage};
 use lightning_interfaces::types::{NodeIndex, Topic};
+use lightning_interfaces::ShutdownController;
 use lightning_test_utils::logging;
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
@@ -278,15 +279,16 @@ impl From<ExampleMessage> for Vec<u8> {
 fn spawn_context(duration: Duration) -> (PubSubI<ExampleMessage>, ControlledBackend) {
     let backend = ControlledBackend::default();
     let ctx = Context::new(Database::default(), backend.clone());
-    let (shutdown_tx, shutdown_rx) = oneshot::channel();
+    let ctrl = ShutdownController::new(false);
+    let waiter = ctrl.waiter();
     let pubsub = PubSubI::<ExampleMessage>::new(Topic::Debug, ctx.get_command_sender());
     RUNTIME.with(|rt| {
         rt.spawn(async move {
             ControlledBackend::sleep(duration).await;
-            shutdown_tx.send(());
+            ctrl.trigger_shutdown();
         });
         rt.spawn(async move {
-            ctx.run(shutdown_rx).await;
+            ctx.run(waiter).await;
         })
     });
     (pubsub, backend)

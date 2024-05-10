@@ -18,7 +18,8 @@ use lightning_interfaces::schema::LightningMessage;
 use lightning_interfaces::types::{Digest, NodeIndex, Topic};
 use lightning_interfaces::Weight;
 use lightning_metrics::{histogram, increment_counter};
-use tokio::sync::{mpsc, oneshot};
+use tokio::pin;
+use tokio::sync::mpsc;
 use tracing::{debug, error, info, trace};
 
 use crate::backend::LightningBackend;
@@ -475,7 +476,7 @@ impl<B: BroadcastBackend> Context<B> {
         B::now()
     }
 
-    pub async fn run(mut self, mut shutdown: tokio::sync::oneshot::Receiver<()>) -> Self {
+    pub async fn run(mut self, waiter: ShutdownWaiter) -> Self {
         info!("Starting broadcast for node");
 
         // During initialization the application state might have not had loaded, and at
@@ -487,6 +488,9 @@ impl<B: BroadcastBackend> Context<B> {
         if let Some(node_index) = self.backend.get_our_index() {
             let _ = self.current_node_index.set(node_index);
         }
+
+        let shutdown = waiter.into_future();
+        pin!(shutdown);
 
         loop {
             debug!("waiting for next event.");
@@ -530,16 +534,8 @@ impl<C: Collection> Context<LightningBackend<C>> {
     where
         Self: Send,
     {
-        let (shutdown_tx, shutdown) = oneshot::channel();
         tokio::spawn(async move {
-            info!("spawning broadcast event loop");
-            let tmp = self.run(shutdown).await;
-            info!("broadcast shut down sucessfully");
-            tmp
-        });
-        tokio::spawn(async move {
-            waiter.wait_for_shutdown().await;
-            shutdown_tx.send(()).expect("failed to send shutdown.");
+            self.run(waiter).await;
         });
     }
 }

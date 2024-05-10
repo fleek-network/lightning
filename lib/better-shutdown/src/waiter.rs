@@ -80,6 +80,12 @@ impl ShutdownWaiter {
         OwnedShutdownSignal::new(self.inner.clone(), self.dedicated.clone())
     }
 
+    /// Create a new [OwnedShutdownSignal] from this waiter.
+    #[inline(always)]
+    pub fn into_future(self) -> OwnedShutdownSignal {
+        Self::into(self)
+    }
+
     /// Run a function until a shutdown signal is received.
     ///
     /// This method is recommended to use for run loops that are spawned, since the notify permit

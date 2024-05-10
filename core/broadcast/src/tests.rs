@@ -144,6 +144,8 @@ async fn create_peer(
 
 #[tokio::test]
 async fn test_send() {
+    lightning_test_utils::logging::setup();
+
     // Initialize three broadcasts
     let (peers, path) = get_broadcasts("send", 28000, 3).await;
     let query_runner = peers[0].sync_query();
@@ -199,6 +201,9 @@ async fn test_send() {
         }
     });
 
+    // give time to pool to make the connections.
+    // TODO(qti3e): pool should ideally have a way in future to somehow make this not needed.
+    tokio::time::sleep(Duration::from_millis(300)).await;
     // node1 sends the message over the broadcast
     pub_sub1.send(&Frame::Message(message), None).await.unwrap();
 

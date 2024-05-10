@@ -6,7 +6,7 @@ use bytes::Bytes;
 use lightning_broadcast::{Context, Database, PubSubI, SimulonBackend};
 use lightning_interfaces::schema::AutoImplSerde;
 use lightning_interfaces::types::Topic;
-use lightning_interfaces::PubSub;
+use lightning_interfaces::{PubSub, ShutdownController};
 use lightning_topology::Connections;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -131,13 +131,14 @@ pub async fn exec(n: usize) {
         }
     });
 
-    let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
+    let ctrl = ShutdownController::new(false);
+    let waiter = ctrl.waiter();
     simulon::api::spawn(async move {
-        ctx.run(shutdown_rx).await;
+        ctx.run(waiter).await;
     });
     simulon::api::spawn(async move {
         simulon::api::sleep(Duration::from_secs(1800)).await;
-        shutdown_tx.send(()).expect("failed to shutdown");
+        ctrl.trigger_shutdown();
     })
 }
 
