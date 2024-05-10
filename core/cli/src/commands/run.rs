@@ -40,7 +40,7 @@ where
 
         tokio::select! {
             _ = &mut shutdown_future => break,
-            checkpoint_hash = checkpoint_fut => {
+            Some(checkpoint_hash) = checkpoint_fut => {
                 // get the checkpoint from the blockstore
                 let checkpoint = node
                     .provider()

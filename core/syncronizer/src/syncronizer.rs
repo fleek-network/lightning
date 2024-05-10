@@ -168,11 +168,11 @@ impl<C: Collection> fdi::BuildGraph for Syncronizer<C> {
 impl<C: Collection> SyncronizerInterface<C> for Syncronizer<C> {
     /// Returns a socket that will send accross the blake3hash of the checkpoint
     /// Will send it after it has already downloaded from the blockstore server
-    async fn next_checkpoint_hash(&self) -> Blake3Hash {
+    async fn next_checkpoint_hash(&self) -> Option<Blake3Hash> {
         let State::Running(rx) = &self.state else {
             panic!("syncronizer must be started");
         };
-        rx.recv().await.unwrap()
+        rx.recv().await.ok()
     }
 }
 

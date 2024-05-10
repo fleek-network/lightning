@@ -67,7 +67,7 @@ async fn e2e_syncronize_state() -> Result<()> {
     let (pubkey, syncronizer) = swarm.get_non_genesis_committee_syncronizer().pop().unwrap();
 
     // Wait for the syncronizer to detect that we are behind and send the checkpoint hash.
-    let ckpt_hash = syncronizer.next_checkpoint_hash().await;
+    let ckpt_hash = syncronizer.next_checkpoint_hash().await.unwrap();
 
     // Get the hash for this checkpoint from our blockstore. The syncronizer should have downloaded
     // it.
