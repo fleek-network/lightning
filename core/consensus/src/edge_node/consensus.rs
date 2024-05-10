@@ -11,7 +11,7 @@ use quick_cache::unsync::Cache;
 use tokio::pin;
 use tokio::sync::{mpsc, Notify};
 use tokio::task::JoinHandle;
-use tracing::info;
+use tracing::{error, info};
 
 use super::transaction_store::{NotExecuted, TransactionStore};
 use crate::consensus::PubSubMsg;
@@ -57,7 +57,13 @@ impl EdgeConsensus {
         self.tx_shutdown.notify_one();
 
         // Gracefully wait for all the subtasks to finish and return.
-        self.handle.await.unwrap();
+        if let Err(e) = self.handle.await {
+            error!(
+                "Failed to join handle in file {} at line {}: {e}",
+                file!(),
+                line!()
+            );
+        }
     }
 }
 
