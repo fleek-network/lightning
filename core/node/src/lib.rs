@@ -38,9 +38,6 @@ impl<C: Collection> ContainedNode<C> {
         let waiter = shutdown.waiter();
         provider.insert(waiter);
 
-        // Will make the shutdown controller listen for ctrl+c.
-        shutdown.install_ctrlc_handlers();
-
         // Get the trigger permit from the shutdown controller to be passed into each thread.
         //let permit = shutdown.permit();
 
@@ -64,6 +61,12 @@ impl<C: Collection> ContainedNode<C> {
             .enable_all()
             .build()
             .expect("Failed to build tokio runtime for node container.");
+
+        // Run the `install_ctrlc_handlers` in the context of Tokio.
+        let guard = runtime.enter();
+        // Will make the shutdown controller listen for ctrl+c.
+        shutdown.install_ctrlc_handlers();
+        drop(guard);
 
         Self {
             name,
@@ -108,27 +111,26 @@ impl<C: Collection> ContainedNode<C> {
         self.shutdown.trigger_shutdown();
 
         let task_name = format!("{}::RuntimeDrop", self.name);
+        let duration = Duration::from_secs(30);
 
         // Give the runtime 30 seconds to stop.
         match tokio::runtime::Handle::try_current() {
             Ok(handle) => {
-                tokio::task::Builder::new()
-                    .name(&task_name)
-                    .spawn_blocking_on(
-                        || {
-                            self.runtime.shutdown_timeout(Duration::from_secs(30));
-                        },
-                        &handle,
-                    )
-                    .unwrap();
+                tokio::spawn(async move {
+                    tokio::time::sleep(duration).await;
+                    tokio::task::Builder::new()
+                        .name(&task_name)
+                        .spawn_blocking_on(
+                            || {
+                                self.runtime.shutdown_background();
+                            },
+                            &handle,
+                        )
+                        .unwrap();
+                });
             },
             Err(_) => {
-                std::thread::Builder::new()
-                    .name(task_name)
-                    .spawn(|| {
-                        self.runtime.shutdown_timeout(Duration::from_secs(30));
-                    })
-                    .unwrap();
+                todo!("Not yet supported outside a tokio runtime.");
             },
         };
 
