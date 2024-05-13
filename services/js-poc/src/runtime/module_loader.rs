@@ -6,7 +6,6 @@ pub fn node_modules() -> StaticModuleLoader {
     let https_source = include_str!("js/node_https.js");
     let stream_source = include_str!("js/node_stream.js");
     let path_source = include_str!("js/node_path.js");
-    let async_hooks_source = include_str!("js/node_async_hooks.js");
     let modules = vec![
         (
             ModuleSpecifier::parse("node:crypto").unwrap(),
@@ -19,10 +18,6 @@ pub fn node_modules() -> StaticModuleLoader {
             stream_source,
         ),
         (ModuleSpecifier::parse("node:path").unwrap(), path_source),
-        (
-            ModuleSpecifier::parse("node:async_hooks").unwrap(),
-            async_hooks_source,
-        ),
     ];
     StaticModuleLoader::new(modules)
 }
