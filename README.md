@@ -8,7 +8,7 @@ Lightning is the open-source Rust implementation of Fleek Network.
 [![Build & Tests](https://github.com/fleek-network/lightning/actions/workflows/cron.yml/badge.svg?branch=main)](https://github.com/fleek-network/lightning/actions/workflows/cron.yml)
 [![Code Coverage](https://codecov.io/github/fleek-network/lightning/branch/main/graph/badge.svg?token=7SN9432OHC)](https://codecov.io/github/fleek-network/lightning)
 
-This repository contains the source code for the implementation of *Fleek Network*.
+This repository contains the source code for the implementation of _Fleek Network_.
 
 Here is the directory schema:
 
@@ -52,16 +52,15 @@ lightning
 There are 3 top level directories `lib` & `core` and `services`:
 
 1. `lib`: Any open source libraries we create to solve our own problems,
-these libraries are released with the friendly licenses with the Rust
-ecosystem (`MIT` | `Apache`).
+   these libraries are released with the friendly licenses with the Rust
+   ecosystem (`MIT` | `Apache`).
 
 2. `core`: This is all of the implementation of the core protocol, the main crate
-is `node` which contains our most important and released `main.rs`. Another important
-crate that is advised to everyone to get familiar with is `interfaces` which contains
-the top-down specification of all of the project.
+   is `node` which contains our most important and released `main.rs`. Another important
+   crate that is advised to everyone to get familiar with is `interfaces` which contains
+   the top-down specification of all of the project.
 
 3. `services`: Our services which we build using the `SDK`.
-
 
 # Interfaces
 
