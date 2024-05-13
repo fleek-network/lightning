@@ -113,7 +113,7 @@ impl Runtime {
             startup_snapshot: Some(SNAPSHOT),
             op_metrics_factory_fn: Some(tape.op_metrics_factory_fn()),
             create_params: Some(CreateParams::default().heap_limits(HEAP_INIT, HEAP_LIMIT)),
-            module_loader: Some(Rc::new(module_loader::node_crypto())),
+            module_loader: Some(Rc::new(module_loader::node_modules())),
             ..Default::default()
         });
 
