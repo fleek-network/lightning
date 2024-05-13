@@ -9,6 +9,7 @@ use clap::Parser;
 use cli::Cli;
 use color_eyre::{Report, Result};
 use ebpf_service::PathConfig;
+use log::debug;
 use once_cell::sync::OnceCell;
 use resolved_pathbuf::ResolvedPathBuf;
 
@@ -43,6 +44,11 @@ fn main() -> Result<()> {
                 .expect("Path resolution not to fail"),
         )
         .expect("Not to be initialized yet");
+
+    debug!(
+        "binding socket to path {}",
+        BIND_PATH.get().expect("To be initialized").display()
+    );
 
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
