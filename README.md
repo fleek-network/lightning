@@ -5,8 +5,8 @@ Lightning is the open-source Rust implementation of Fleek Network.
 # Lightning - Fleek Network Node
 
 [![Commits](https://github.com/fleek-network/lightning/actions/workflows/commits.yml/badge.svg)](https://github.com/fleek-network/lightning/actions/workflows/commits.yml)
-[![Build & Tests](https://github.com/fleek-network/lightning/actions/workflows/cron.yml/badge.svg?branch=main)](https://github.com/fleek-network/lightning/actions/workflows/cron.yml)
 [![Code Coverage](https://codecov.io/github/fleek-network/lightning/branch/main/graph/badge.svg?token=7SN9432OHC)](https://codecov.io/github/fleek-network/lightning)
+![Build & Tests](https://img.shields.io/endpoint.svg?url=https%3A%2F%2Fgarnix.io%2Fapi%2Fbadges%2Ffleek-network%2Flightning%3Fbranch%3Dmain)
 
 This repository contains the source code for the implementation of _Fleek Network_.
 
