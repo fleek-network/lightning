@@ -1,7 +1,11 @@
-# **Graphs Visualizations Generator**
+# **GraphViz's Visualizations Generator**
+
+#### **GraphViz Visualizations Generator for the codebase and crates/modules.**
 
 This tool generates graph diagrams for the whole codebase or separate exact crates/modules.
 It can generate graphs of dependencies for modules in a crate, and graphs for code internals inside modules of a crate (package), visualizing interrelations of types, traits (abstract types, interfaces), and functions/methods to them.
+
+It can be used for documentation, onboarding new team-mates, and for analyzing the points of future architectural improvements.
 
 ## **Requirements:**
 
@@ -62,3 +66,8 @@ Graph of dependencies for modules in `lightning-service-executor` crate:
 
 Graph for code internals inside modules of `lightning-service-executor` crate (package), picturing interrelations of types, traits (abstract types, interfaces), and functions/methods to them:
 ![`lightning-service-executor` crate types/traits/functions interrelations](graphs_examples/crates_modules/lightning-service-executor/lightning-service-executor.types_traits_fns.svg)
+
+*Note:*
+
+The whole set of visualizations (exhaustive full set of code visualizations for `fdi` and `infusion` based branches of codebase, including visualizations for every crate/package and modules in `cargo` workspace, and visualizations using all
+available `GraphViz` layout algorithms) will remain in [`docs/graphs` branch in git history](https://github.com/fleek-network/lightning/tree/9c4c9cb1a2a99001e18b34fe989500ab33cb2198/docs/code_internals_visualizing) for any reference.
