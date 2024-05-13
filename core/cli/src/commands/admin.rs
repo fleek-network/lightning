@@ -12,7 +12,7 @@ use tracing::debug;
 #[cfg(feature = "ebpf")]
 use crate::commands::ebpf;
 #[cfg(feature = "ebpf")]
-use crate::commands::ebpf::EbpfCommand;
+use crate::commands::ebpf::EbpfCmd;
 
 pub static BIND_PATH: OnceCell<ResolvedPathBuf> = OnceCell::new();
 pub static PATH_CONFIG: OnceCell<PathConfig> = OnceCell::new();
@@ -24,7 +24,7 @@ pub enum AdminSubCmd {
     #[cfg(feature = "ebpf")]
     #[clap(subcommand)]
     /// Start the eBPF Control Application.
-    Ebpf(EbpfCommand),
+    Ebpf(EbpfCmd),
 }
 
 #[derive(Args, Debug)]

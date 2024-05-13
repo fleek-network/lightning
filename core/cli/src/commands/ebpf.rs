@@ -6,10 +6,10 @@ use clap::Subcommand;
 
 use crate::commands::admin::{BIND_PATH, PATH_CONFIG};
 
-pub fn exec(cmd: EbpfCommand) -> Result<()> {
+pub fn exec(cmd: EbpfCmd) -> Result<()> {
     match cmd {
-        EbpfCommand::Build { target, release } => build_bpf_program(target, release),
-        EbpfCommand::Run {
+        EbpfCmd::Build { target, release } => build_bpf_program(target, release),
+        EbpfCmd::Run {
             target,
             release,
             iface,
@@ -18,7 +18,7 @@ pub fn exec(cmd: EbpfCommand) -> Result<()> {
 }
 
 #[derive(Debug, Subcommand)]
-pub enum EbpfCommand {
+pub enum EbpfCmd {
     /// Build eBPF program.
     Build {
         /// Set the target triple of the BPF program.
