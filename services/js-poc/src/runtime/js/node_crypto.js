@@ -2192,13 +2192,13 @@ function dew$g() {
   const base64 = dew$2$1();
   const ieee754 = dew$1$1();
   const customInspectSymbol = typeof Symbol === "function" && typeof Symbol["for"] === "function" ? Symbol["for"]("nodejs.util.inspect.custom") : null;
-  exports$g.Buffer = Buffer2;
+  exports$g.Buffer = Buffer;
   exports$g.SlowBuffer = SlowBuffer;
   exports$g.INSPECT_MAX_BYTES = 50;
   const K_MAX_LENGTH = 2147483647;
   exports$g.kMaxLength = K_MAX_LENGTH;
-  Buffer2.TYPED_ARRAY_SUPPORT = typedArraySupport();
-  if (!Buffer2.TYPED_ARRAY_SUPPORT && typeof console !== "undefined" && typeof console.error === "function") {
+  Buffer.TYPED_ARRAY_SUPPORT = typedArraySupport();
+  if (!Buffer.TYPED_ARRAY_SUPPORT && typeof console !== "undefined" && typeof console.error === "function") {
     console.error("This browser lacks typed array (Uint8Array) support which is required by `buffer` v5.x. Use `buffer` v4.x if you require old browser support.");
   }
   function typedArraySupport() {
@@ -2216,18 +2216,18 @@ function dew$g() {
       return false;
     }
   }
-  Object.defineProperty(Buffer2.prototype, "parent", {
+  Object.defineProperty(Buffer.prototype, "parent", {
     enumerable: true,
     get: function() {
-      if (!Buffer2.isBuffer(this))
+      if (!Buffer.isBuffer(this))
         return void 0;
       return this.buffer;
     }
   });
-  Object.defineProperty(Buffer2.prototype, "offset", {
+  Object.defineProperty(Buffer.prototype, "offset", {
     enumerable: true,
     get: function() {
-      if (!Buffer2.isBuffer(this))
+      if (!Buffer.isBuffer(this))
         return void 0;
       return this.byteOffset;
     }
@@ -2237,10 +2237,10 @@ function dew$g() {
       throw new RangeError('The value "' + length + '" is invalid for option "size"');
     }
     const buf = new Uint8Array(length);
-    Object.setPrototypeOf(buf, Buffer2.prototype);
+    Object.setPrototypeOf(buf, Buffer.prototype);
     return buf;
   }
-  function Buffer2(arg, encodingOrOffset, length) {
+  function Buffer(arg, encodingOrOffset, length) {
     if (typeof arg === "number") {
       if (typeof encodingOrOffset === "string") {
         throw new TypeError('The "string" argument must be of type string. Received type number');
@@ -2249,7 +2249,7 @@ function dew$g() {
     }
     return from(arg, encodingOrOffset, length);
   }
-  Buffer2.poolSize = 8192;
+  Buffer.poolSize = 8192;
   function from(value, encodingOrOffset, length) {
     if (typeof value === "string") {
       return fromString(value, encodingOrOffset);
@@ -2271,21 +2271,21 @@ function dew$g() {
     }
     const valueOf = value.valueOf && value.valueOf();
     if (valueOf != null && valueOf !== value) {
-      return Buffer2.from(valueOf, encodingOrOffset, length);
+      return Buffer.from(valueOf, encodingOrOffset, length);
     }
     const b4 = fromObject(value);
     if (b4)
       return b4;
     if (typeof Symbol !== "undefined" && Symbol.toPrimitive != null && typeof value[Symbol.toPrimitive] === "function") {
-      return Buffer2.from(value[Symbol.toPrimitive]("string"), encodingOrOffset, length);
+      return Buffer.from(value[Symbol.toPrimitive]("string"), encodingOrOffset, length);
     }
     throw new TypeError("The first argument must be one of type string, Buffer, ArrayBuffer, Array, or Array-like Object. Received type " + typeof value);
   }
-  Buffer2.from = function(value, encodingOrOffset, length) {
+  Buffer.from = function(value, encodingOrOffset, length) {
     return from(value, encodingOrOffset, length);
   };
-  Object.setPrototypeOf(Buffer2.prototype, Uint8Array.prototype);
-  Object.setPrototypeOf(Buffer2, Uint8Array);
+  Object.setPrototypeOf(Buffer.prototype, Uint8Array.prototype);
+  Object.setPrototypeOf(Buffer, Uint8Array);
   function assertSize(size) {
     if (typeof size !== "number") {
       throw new TypeError('"size" argument must be of type number');
@@ -2303,24 +2303,24 @@ function dew$g() {
     }
     return createBuffer(size);
   }
-  Buffer2.alloc = function(size, fill, encoding) {
+  Buffer.alloc = function(size, fill, encoding) {
     return alloc(size, fill, encoding);
   };
   function allocUnsafe(size) {
     assertSize(size);
     return createBuffer(size < 0 ? 0 : checked(size) | 0);
   }
-  Buffer2.allocUnsafe = function(size) {
+  Buffer.allocUnsafe = function(size) {
     return allocUnsafe(size);
   };
-  Buffer2.allocUnsafeSlow = function(size) {
+  Buffer.allocUnsafeSlow = function(size) {
     return allocUnsafe(size);
   };
   function fromString(string, encoding) {
     if (typeof encoding !== "string" || encoding === "") {
       encoding = "utf8";
     }
-    if (!Buffer2.isEncoding(encoding)) {
+    if (!Buffer.isEncoding(encoding)) {
       throw new TypeError("Unknown encoding: " + encoding);
     }
     const length = byteLength(string, encoding) | 0;
@@ -2361,11 +2361,11 @@ function dew$g() {
     } else {
       buf = new Uint8Array(array, byteOffset, length);
     }
-    Object.setPrototypeOf(buf, Buffer2.prototype);
+    Object.setPrototypeOf(buf, Buffer.prototype);
     return buf;
   }
   function fromObject(obj) {
-    if (Buffer2.isBuffer(obj)) {
+    if (Buffer.isBuffer(obj)) {
       const len = checked(obj.length) | 0;
       const buf = createBuffer(len);
       if (buf.length === 0) {
@@ -2394,17 +2394,17 @@ function dew$g() {
     if (+length != length) {
       length = 0;
     }
-    return Buffer2.alloc(+length);
+    return Buffer.alloc(+length);
   }
-  Buffer2.isBuffer = function isBuffer2(b4) {
-    return b4 != null && b4._isBuffer === true && b4 !== Buffer2.prototype;
+  Buffer.isBuffer = function isBuffer2(b4) {
+    return b4 != null && b4._isBuffer === true && b4 !== Buffer.prototype;
   };
-  Buffer2.compare = function compare(a6, b4) {
+  Buffer.compare = function compare(a6, b4) {
     if (isInstance(a6, Uint8Array))
-      a6 = Buffer2.from(a6, a6.offset, a6.byteLength);
+      a6 = Buffer.from(a6, a6.offset, a6.byteLength);
     if (isInstance(b4, Uint8Array))
-      b4 = Buffer2.from(b4, b4.offset, b4.byteLength);
-    if (!Buffer2.isBuffer(a6) || !Buffer2.isBuffer(b4)) {
+      b4 = Buffer.from(b4, b4.offset, b4.byteLength);
+    if (!Buffer.isBuffer(a6) || !Buffer.isBuffer(b4)) {
       throw new TypeError('The "buf1", "buf2" arguments must be one of type Buffer or Uint8Array');
     }
     if (a6 === b4)
@@ -2424,7 +2424,7 @@ function dew$g() {
       return 1;
     return 0;
   };
-  Buffer2.isEncoding = function isEncoding(encoding) {
+  Buffer.isEncoding = function isEncoding(encoding) {
     switch (String(encoding).toLowerCase()) {
       case "hex":
       case "utf8":
@@ -2442,12 +2442,12 @@ function dew$g() {
         return false;
     }
   };
-  Buffer2.concat = function concat(list, length) {
+  Buffer.concat = function concat(list, length) {
     if (!Array.isArray(list)) {
       throw new TypeError('"list" argument must be an Array of Buffers');
     }
     if (list.length === 0) {
-      return Buffer2.alloc(0);
+      return Buffer.alloc(0);
     }
     let i6;
     if (length === void 0) {
@@ -2456,19 +2456,19 @@ function dew$g() {
         length += list[i6].length;
       }
     }
-    const buffer2 = Buffer2.allocUnsafe(length);
+    const buffer2 = Buffer.allocUnsafe(length);
     let pos = 0;
     for (i6 = 0; i6 < list.length; ++i6) {
       let buf = list[i6];
       if (isInstance(buf, Uint8Array)) {
         if (pos + buf.length > buffer2.length) {
-          if (!Buffer2.isBuffer(buf))
-            buf = Buffer2.from(buf);
+          if (!Buffer.isBuffer(buf))
+            buf = Buffer.from(buf);
           buf.copy(buffer2, pos);
         } else {
           Uint8Array.prototype.set.call(buffer2, buf, pos);
         }
-      } else if (!Buffer2.isBuffer(buf)) {
+      } else if (!Buffer.isBuffer(buf)) {
         throw new TypeError('"list" argument must be an Array of Buffers');
       } else {
         buf.copy(buffer2, pos);
@@ -2478,7 +2478,7 @@ function dew$g() {
     return buffer2;
   };
   function byteLength(string, encoding) {
-    if (Buffer2.isBuffer(string)) {
+    if (Buffer.isBuffer(string)) {
       return string.length;
     }
     if (ArrayBuffer.isView(string) || isInstance(string, ArrayBuffer)) {
@@ -2519,7 +2519,7 @@ function dew$g() {
       }
     }
   }
-  Buffer2.byteLength = byteLength;
+  Buffer.byteLength = byteLength;
   function slowToString(encoding, start, end) {
     let loweredCase = false;
     if (start === void 0 || start < 0) {
@@ -2568,13 +2568,13 @@ function dew$g() {
       }
     }
   }
-  Buffer2.prototype._isBuffer = true;
+  Buffer.prototype._isBuffer = true;
   function swap(b4, n6, m5) {
     const i6 = b4[n6];
     b4[n6] = b4[m5];
     b4[m5] = i6;
   }
-  Buffer2.prototype.swap16 = function swap16() {
+  Buffer.prototype.swap16 = function swap16() {
     const len = this.length;
     if (len % 2 !== 0) {
       throw new RangeError("Buffer size must be a multiple of 16-bits");
@@ -2584,7 +2584,7 @@ function dew$g() {
     }
     return this;
   };
-  Buffer2.prototype.swap32 = function swap32() {
+  Buffer.prototype.swap32 = function swap32() {
     const len = this.length;
     if (len % 4 !== 0) {
       throw new RangeError("Buffer size must be a multiple of 32-bits");
@@ -2595,7 +2595,7 @@ function dew$g() {
     }
     return this;
   };
-  Buffer2.prototype.swap64 = function swap64() {
+  Buffer.prototype.swap64 = function swap64() {
     const len = this.length;
     if (len % 8 !== 0) {
       throw new RangeError("Buffer size must be a multiple of 64-bits");
@@ -2608,7 +2608,7 @@ function dew$g() {
     }
     return this;
   };
-  Buffer2.prototype.toString = function toString() {
+  Buffer.prototype.toString = function toString() {
     const length = this.length;
     if (length === 0)
       return "";
@@ -2616,15 +2616,15 @@ function dew$g() {
       return utf8Slice(this, 0, length);
     return slowToString.apply(this, arguments);
   };
-  Buffer2.prototype.toLocaleString = Buffer2.prototype.toString;
-  Buffer2.prototype.equals = function equals(b4) {
-    if (!Buffer2.isBuffer(b4))
+  Buffer.prototype.toLocaleString = Buffer.prototype.toString;
+  Buffer.prototype.equals = function equals(b4) {
+    if (!Buffer.isBuffer(b4))
       throw new TypeError("Argument must be a Buffer");
     if (this === b4)
       return true;
-    return Buffer2.compare(this, b4) === 0;
+    return Buffer.compare(this, b4) === 0;
   };
-  Buffer2.prototype.inspect = function inspect2() {
+  Buffer.prototype.inspect = function inspect2() {
     let str = "";
     const max = exports$g.INSPECT_MAX_BYTES;
     str = this.toString("hex", 0, max).replace(/(.{2})/g, "$1 ").trim();
@@ -2633,13 +2633,13 @@ function dew$g() {
     return "<Buffer " + str + ">";
   };
   if (customInspectSymbol) {
-    Buffer2.prototype[customInspectSymbol] = Buffer2.prototype.inspect;
+    Buffer.prototype[customInspectSymbol] = Buffer.prototype.inspect;
   }
-  Buffer2.prototype.compare = function compare(target, start, end, thisStart, thisEnd) {
+  Buffer.prototype.compare = function compare(target, start, end, thisStart, thisEnd) {
     if (isInstance(target, Uint8Array)) {
-      target = Buffer2.from(target, target.offset, target.byteLength);
+      target = Buffer.from(target, target.offset, target.byteLength);
     }
-    if (!Buffer2.isBuffer(target)) {
+    if (!Buffer.isBuffer(target)) {
       throw new TypeError('The "target" argument must be one of type Buffer or Uint8Array. Received type ' + typeof target);
     }
     if (start === void 0) {
@@ -2719,9 +2719,9 @@ function dew$g() {
         return -1;
     }
     if (typeof val === "string") {
-      val = Buffer2.from(val, encoding);
+      val = Buffer.from(val, encoding);
     }
-    if (Buffer2.isBuffer(val)) {
+    if (Buffer.isBuffer(val)) {
       if (val.length === 0) {
         return -1;
       }
@@ -2794,13 +2794,13 @@ function dew$g() {
     }
     return -1;
   }
-  Buffer2.prototype.includes = function includes(val, byteOffset, encoding) {
+  Buffer.prototype.includes = function includes(val, byteOffset, encoding) {
     return this.indexOf(val, byteOffset, encoding) !== -1;
   };
-  Buffer2.prototype.indexOf = function indexOf2(val, byteOffset, encoding) {
+  Buffer.prototype.indexOf = function indexOf2(val, byteOffset, encoding) {
     return bidirectionalIndexOf(this, val, byteOffset, encoding, true);
   };
-  Buffer2.prototype.lastIndexOf = function lastIndexOf(val, byteOffset, encoding) {
+  Buffer.prototype.lastIndexOf = function lastIndexOf(val, byteOffset, encoding) {
     return bidirectionalIndexOf(this, val, byteOffset, encoding, false);
   };
   function hexWrite(buf, string, offset, length) {
@@ -2839,7 +2839,7 @@ function dew$g() {
   function ucs2Write(buf, string, offset, length) {
     return blitBuffer(utf16leToBytes(string, buf.length - offset), buf, offset, length);
   }
-  Buffer2.prototype.write = function write(string, offset, length, encoding) {
+  Buffer.prototype.write = function write(string, offset, length, encoding) {
     if (offset === void 0) {
       encoding = "utf8";
       length = this.length;
@@ -2896,7 +2896,7 @@ function dew$g() {
       }
     }
   };
-  Buffer2.prototype.toJSON = function toJSON() {
+  Buffer.prototype.toJSON = function toJSON() {
     return {
       type: "Buffer",
       data: Array.prototype.slice.call(this._arr || this, 0)
@@ -3018,7 +3018,7 @@ function dew$g() {
     }
     return res;
   }
-  Buffer2.prototype.slice = function slice(start, end) {
+  Buffer.prototype.slice = function slice(start, end) {
     const len = this.length;
     start = ~~start;
     end = end === void 0 ? len : ~~end;
@@ -3039,7 +3039,7 @@ function dew$g() {
     if (end < start)
       end = start;
     const newBuf = this.subarray(start, end);
-    Object.setPrototypeOf(newBuf, Buffer2.prototype);
+    Object.setPrototypeOf(newBuf, Buffer.prototype);
     return newBuf;
   };
   function checkOffset(offset, ext, length) {
@@ -3048,7 +3048,7 @@ function dew$g() {
     if (offset + ext > length)
       throw new RangeError("Trying to access beyond buffer length");
   }
-  Buffer2.prototype.readUintLE = Buffer2.prototype.readUIntLE = function readUIntLE(offset, byteLength2, noAssert) {
+  Buffer.prototype.readUintLE = Buffer.prototype.readUIntLE = function readUIntLE(offset, byteLength2, noAssert) {
     offset = offset >>> 0;
     byteLength2 = byteLength2 >>> 0;
     if (!noAssert)
@@ -3061,7 +3061,7 @@ function dew$g() {
     }
     return val;
   };
-  Buffer2.prototype.readUintBE = Buffer2.prototype.readUIntBE = function readUIntBE(offset, byteLength2, noAssert) {
+  Buffer.prototype.readUintBE = Buffer.prototype.readUIntBE = function readUIntBE(offset, byteLength2, noAssert) {
     offset = offset >>> 0;
     byteLength2 = byteLength2 >>> 0;
     if (!noAssert) {
@@ -3074,37 +3074,37 @@ function dew$g() {
     }
     return val;
   };
-  Buffer2.prototype.readUint8 = Buffer2.prototype.readUInt8 = function readUInt8(offset, noAssert) {
+  Buffer.prototype.readUint8 = Buffer.prototype.readUInt8 = function readUInt8(offset, noAssert) {
     offset = offset >>> 0;
     if (!noAssert)
       checkOffset(offset, 1, this.length);
     return this[offset];
   };
-  Buffer2.prototype.readUint16LE = Buffer2.prototype.readUInt16LE = function readUInt16LE(offset, noAssert) {
+  Buffer.prototype.readUint16LE = Buffer.prototype.readUInt16LE = function readUInt16LE(offset, noAssert) {
     offset = offset >>> 0;
     if (!noAssert)
       checkOffset(offset, 2, this.length);
     return this[offset] | this[offset + 1] << 8;
   };
-  Buffer2.prototype.readUint16BE = Buffer2.prototype.readUInt16BE = function readUInt16BE(offset, noAssert) {
+  Buffer.prototype.readUint16BE = Buffer.prototype.readUInt16BE = function readUInt16BE(offset, noAssert) {
     offset = offset >>> 0;
     if (!noAssert)
       checkOffset(offset, 2, this.length);
     return this[offset] << 8 | this[offset + 1];
   };
-  Buffer2.prototype.readUint32LE = Buffer2.prototype.readUInt32LE = function readUInt32LE(offset, noAssert) {
+  Buffer.prototype.readUint32LE = Buffer.prototype.readUInt32LE = function readUInt32LE(offset, noAssert) {
     offset = offset >>> 0;
     if (!noAssert)
       checkOffset(offset, 4, this.length);
     return (this[offset] | this[offset + 1] << 8 | this[offset + 2] << 16) + this[offset + 3] * 16777216;
   };
-  Buffer2.prototype.readUint32BE = Buffer2.prototype.readUInt32BE = function readUInt32BE(offset, noAssert) {
+  Buffer.prototype.readUint32BE = Buffer.prototype.readUInt32BE = function readUInt32BE(offset, noAssert) {
     offset = offset >>> 0;
     if (!noAssert)
       checkOffset(offset, 4, this.length);
     return this[offset] * 16777216 + (this[offset + 1] << 16 | this[offset + 2] << 8 | this[offset + 3]);
   };
-  Buffer2.prototype.readBigUInt64LE = defineBigIntMethod(function readBigUInt64LE(offset) {
+  Buffer.prototype.readBigUInt64LE = defineBigIntMethod(function readBigUInt64LE(offset) {
     offset = offset >>> 0;
     validateNumber(offset, "offset");
     const first = this[offset];
@@ -3116,7 +3116,7 @@ function dew$g() {
     const hi = this[++offset] + this[++offset] * 2 ** 8 + this[++offset] * 2 ** 16 + last * 2 ** 24;
     return BigInt(lo) + (BigInt(hi) << BigInt(32));
   });
-  Buffer2.prototype.readBigUInt64BE = defineBigIntMethod(function readBigUInt64BE(offset) {
+  Buffer.prototype.readBigUInt64BE = defineBigIntMethod(function readBigUInt64BE(offset) {
     offset = offset >>> 0;
     validateNumber(offset, "offset");
     const first = this[offset];
@@ -3128,7 +3128,7 @@ function dew$g() {
     const lo = this[++offset] * 2 ** 24 + this[++offset] * 2 ** 16 + this[++offset] * 2 ** 8 + last;
     return (BigInt(hi) << BigInt(32)) + BigInt(lo);
   });
-  Buffer2.prototype.readIntLE = function readIntLE(offset, byteLength2, noAssert) {
+  Buffer.prototype.readIntLE = function readIntLE(offset, byteLength2, noAssert) {
     offset = offset >>> 0;
     byteLength2 = byteLength2 >>> 0;
     if (!noAssert)
@@ -3144,7 +3144,7 @@ function dew$g() {
       val -= Math.pow(2, 8 * byteLength2);
     return val;
   };
-  Buffer2.prototype.readIntBE = function readIntBE(offset, byteLength2, noAssert) {
+  Buffer.prototype.readIntBE = function readIntBE(offset, byteLength2, noAssert) {
     offset = offset >>> 0;
     byteLength2 = byteLength2 >>> 0;
     if (!noAssert)
@@ -3160,7 +3160,7 @@ function dew$g() {
       val -= Math.pow(2, 8 * byteLength2);
     return val;
   };
-  Buffer2.prototype.readInt8 = function readInt8(offset, noAssert) {
+  Buffer.prototype.readInt8 = function readInt8(offset, noAssert) {
     offset = offset >>> 0;
     if (!noAssert)
       checkOffset(offset, 1, this.length);
@@ -3168,33 +3168,33 @@ function dew$g() {
       return this[offset];
     return (255 - this[offset] + 1) * -1;
   };
-  Buffer2.prototype.readInt16LE = function readInt16LE(offset, noAssert) {
+  Buffer.prototype.readInt16LE = function readInt16LE(offset, noAssert) {
     offset = offset >>> 0;
     if (!noAssert)
       checkOffset(offset, 2, this.length);
     const val = this[offset] | this[offset + 1] << 8;
     return val & 32768 ? val | 4294901760 : val;
   };
-  Buffer2.prototype.readInt16BE = function readInt16BE(offset, noAssert) {
+  Buffer.prototype.readInt16BE = function readInt16BE(offset, noAssert) {
     offset = offset >>> 0;
     if (!noAssert)
       checkOffset(offset, 2, this.length);
     const val = this[offset + 1] | this[offset] << 8;
     return val & 32768 ? val | 4294901760 : val;
   };
-  Buffer2.prototype.readInt32LE = function readInt32LE(offset, noAssert) {
+  Buffer.prototype.readInt32LE = function readInt32LE(offset, noAssert) {
     offset = offset >>> 0;
     if (!noAssert)
       checkOffset(offset, 4, this.length);
     return this[offset] | this[offset + 1] << 8 | this[offset + 2] << 16 | this[offset + 3] << 24;
   };
-  Buffer2.prototype.readInt32BE = function readInt32BE(offset, noAssert) {
+  Buffer.prototype.readInt32BE = function readInt32BE(offset, noAssert) {
     offset = offset >>> 0;
     if (!noAssert)
       checkOffset(offset, 4, this.length);
     return this[offset] << 24 | this[offset + 1] << 16 | this[offset + 2] << 8 | this[offset + 3];
   };
-  Buffer2.prototype.readBigInt64LE = defineBigIntMethod(function readBigInt64LE(offset) {
+  Buffer.prototype.readBigInt64LE = defineBigIntMethod(function readBigInt64LE(offset) {
     offset = offset >>> 0;
     validateNumber(offset, "offset");
     const first = this[offset];
@@ -3205,7 +3205,7 @@ function dew$g() {
     const val = this[offset + 4] + this[offset + 5] * 2 ** 8 + this[offset + 6] * 2 ** 16 + (last << 24);
     return (BigInt(val) << BigInt(32)) + BigInt(first + this[++offset] * 2 ** 8 + this[++offset] * 2 ** 16 + this[++offset] * 2 ** 24);
   });
-  Buffer2.prototype.readBigInt64BE = defineBigIntMethod(function readBigInt64BE(offset) {
+  Buffer.prototype.readBigInt64BE = defineBigIntMethod(function readBigInt64BE(offset) {
     offset = offset >>> 0;
     validateNumber(offset, "offset");
     const first = this[offset];
@@ -3217,39 +3217,39 @@ function dew$g() {
     this[++offset] * 2 ** 16 + this[++offset] * 2 ** 8 + this[++offset];
     return (BigInt(val) << BigInt(32)) + BigInt(this[++offset] * 2 ** 24 + this[++offset] * 2 ** 16 + this[++offset] * 2 ** 8 + last);
   });
-  Buffer2.prototype.readFloatLE = function readFloatLE(offset, noAssert) {
+  Buffer.prototype.readFloatLE = function readFloatLE(offset, noAssert) {
     offset = offset >>> 0;
     if (!noAssert)
       checkOffset(offset, 4, this.length);
     return ieee754.read(this, offset, true, 23, 4);
   };
-  Buffer2.prototype.readFloatBE = function readFloatBE(offset, noAssert) {
+  Buffer.prototype.readFloatBE = function readFloatBE(offset, noAssert) {
     offset = offset >>> 0;
     if (!noAssert)
       checkOffset(offset, 4, this.length);
     return ieee754.read(this, offset, false, 23, 4);
   };
-  Buffer2.prototype.readDoubleLE = function readDoubleLE(offset, noAssert) {
+  Buffer.prototype.readDoubleLE = function readDoubleLE(offset, noAssert) {
     offset = offset >>> 0;
     if (!noAssert)
       checkOffset(offset, 8, this.length);
     return ieee754.read(this, offset, true, 52, 8);
   };
-  Buffer2.prototype.readDoubleBE = function readDoubleBE(offset, noAssert) {
+  Buffer.prototype.readDoubleBE = function readDoubleBE(offset, noAssert) {
     offset = offset >>> 0;
     if (!noAssert)
       checkOffset(offset, 8, this.length);
     return ieee754.read(this, offset, false, 52, 8);
   };
   function checkInt(buf, value, offset, ext, max, min) {
-    if (!Buffer2.isBuffer(buf))
+    if (!Buffer.isBuffer(buf))
       throw new TypeError('"buffer" argument must be a Buffer instance');
     if (value > max || value < min)
       throw new RangeError('"value" argument is out of bounds');
     if (offset + ext > buf.length)
       throw new RangeError("Index out of range");
   }
-  Buffer2.prototype.writeUintLE = Buffer2.prototype.writeUIntLE = function writeUIntLE(value, offset, byteLength2, noAssert) {
+  Buffer.prototype.writeUintLE = Buffer.prototype.writeUIntLE = function writeUIntLE(value, offset, byteLength2, noAssert) {
     value = +value;
     offset = offset >>> 0;
     byteLength2 = byteLength2 >>> 0;
@@ -3265,7 +3265,7 @@ function dew$g() {
     }
     return offset + byteLength2;
   };
-  Buffer2.prototype.writeUintBE = Buffer2.prototype.writeUIntBE = function writeUIntBE(value, offset, byteLength2, noAssert) {
+  Buffer.prototype.writeUintBE = Buffer.prototype.writeUIntBE = function writeUIntBE(value, offset, byteLength2, noAssert) {
     value = +value;
     offset = offset >>> 0;
     byteLength2 = byteLength2 >>> 0;
@@ -3281,7 +3281,7 @@ function dew$g() {
     }
     return offset + byteLength2;
   };
-  Buffer2.prototype.writeUint8 = Buffer2.prototype.writeUInt8 = function writeUInt8(value, offset, noAssert) {
+  Buffer.prototype.writeUint8 = Buffer.prototype.writeUInt8 = function writeUInt8(value, offset, noAssert) {
     value = +value;
     offset = offset >>> 0;
     if (!noAssert)
@@ -3289,7 +3289,7 @@ function dew$g() {
     this[offset] = value & 255;
     return offset + 1;
   };
-  Buffer2.prototype.writeUint16LE = Buffer2.prototype.writeUInt16LE = function writeUInt16LE(value, offset, noAssert) {
+  Buffer.prototype.writeUint16LE = Buffer.prototype.writeUInt16LE = function writeUInt16LE(value, offset, noAssert) {
     value = +value;
     offset = offset >>> 0;
     if (!noAssert)
@@ -3298,7 +3298,7 @@ function dew$g() {
     this[offset + 1] = value >>> 8;
     return offset + 2;
   };
-  Buffer2.prototype.writeUint16BE = Buffer2.prototype.writeUInt16BE = function writeUInt16BE(value, offset, noAssert) {
+  Buffer.prototype.writeUint16BE = Buffer.prototype.writeUInt16BE = function writeUInt16BE(value, offset, noAssert) {
     value = +value;
     offset = offset >>> 0;
     if (!noAssert)
@@ -3307,7 +3307,7 @@ function dew$g() {
     this[offset + 1] = value & 255;
     return offset + 2;
   };
-  Buffer2.prototype.writeUint32LE = Buffer2.prototype.writeUInt32LE = function writeUInt32LE(value, offset, noAssert) {
+  Buffer.prototype.writeUint32LE = Buffer.prototype.writeUInt32LE = function writeUInt32LE(value, offset, noAssert) {
     value = +value;
     offset = offset >>> 0;
     if (!noAssert)
@@ -3318,7 +3318,7 @@ function dew$g() {
     this[offset] = value & 255;
     return offset + 4;
   };
-  Buffer2.prototype.writeUint32BE = Buffer2.prototype.writeUInt32BE = function writeUInt32BE(value, offset, noAssert) {
+  Buffer.prototype.writeUint32BE = Buffer.prototype.writeUInt32BE = function writeUInt32BE(value, offset, noAssert) {
     value = +value;
     offset = offset >>> 0;
     if (!noAssert)
@@ -3369,13 +3369,13 @@ function dew$g() {
     buf[offset] = hi;
     return offset + 8;
   }
-  Buffer2.prototype.writeBigUInt64LE = defineBigIntMethod(function writeBigUInt64LE(value, offset = 0) {
+  Buffer.prototype.writeBigUInt64LE = defineBigIntMethod(function writeBigUInt64LE(value, offset = 0) {
     return wrtBigUInt64LE(this, value, offset, BigInt(0), BigInt("0xffffffffffffffff"));
   });
-  Buffer2.prototype.writeBigUInt64BE = defineBigIntMethod(function writeBigUInt64BE(value, offset = 0) {
+  Buffer.prototype.writeBigUInt64BE = defineBigIntMethod(function writeBigUInt64BE(value, offset = 0) {
     return wrtBigUInt64BE(this, value, offset, BigInt(0), BigInt("0xffffffffffffffff"));
   });
-  Buffer2.prototype.writeIntLE = function writeIntLE(value, offset, byteLength2, noAssert) {
+  Buffer.prototype.writeIntLE = function writeIntLE(value, offset, byteLength2, noAssert) {
     value = +value;
     offset = offset >>> 0;
     if (!noAssert) {
@@ -3394,7 +3394,7 @@ function dew$g() {
     }
     return offset + byteLength2;
   };
-  Buffer2.prototype.writeIntBE = function writeIntBE(value, offset, byteLength2, noAssert) {
+  Buffer.prototype.writeIntBE = function writeIntBE(value, offset, byteLength2, noAssert) {
     value = +value;
     offset = offset >>> 0;
     if (!noAssert) {
@@ -3413,7 +3413,7 @@ function dew$g() {
     }
     return offset + byteLength2;
   };
-  Buffer2.prototype.writeInt8 = function writeInt8(value, offset, noAssert) {
+  Buffer.prototype.writeInt8 = function writeInt8(value, offset, noAssert) {
     value = +value;
     offset = offset >>> 0;
     if (!noAssert)
@@ -3423,7 +3423,7 @@ function dew$g() {
     this[offset] = value & 255;
     return offset + 1;
   };
-  Buffer2.prototype.writeInt16LE = function writeInt16LE(value, offset, noAssert) {
+  Buffer.prototype.writeInt16LE = function writeInt16LE(value, offset, noAssert) {
     value = +value;
     offset = offset >>> 0;
     if (!noAssert)
@@ -3432,7 +3432,7 @@ function dew$g() {
     this[offset + 1] = value >>> 8;
     return offset + 2;
   };
-  Buffer2.prototype.writeInt16BE = function writeInt16BE(value, offset, noAssert) {
+  Buffer.prototype.writeInt16BE = function writeInt16BE(value, offset, noAssert) {
     value = +value;
     offset = offset >>> 0;
     if (!noAssert)
@@ -3441,7 +3441,7 @@ function dew$g() {
     this[offset + 1] = value & 255;
     return offset + 2;
   };
-  Buffer2.prototype.writeInt32LE = function writeInt32LE(value, offset, noAssert) {
+  Buffer.prototype.writeInt32LE = function writeInt32LE(value, offset, noAssert) {
     value = +value;
     offset = offset >>> 0;
     if (!noAssert)
@@ -3452,7 +3452,7 @@ function dew$g() {
     this[offset + 3] = value >>> 24;
     return offset + 4;
   };
-  Buffer2.prototype.writeInt32BE = function writeInt32BE(value, offset, noAssert) {
+  Buffer.prototype.writeInt32BE = function writeInt32BE(value, offset, noAssert) {
     value = +value;
     offset = offset >>> 0;
     if (!noAssert)
@@ -3465,10 +3465,10 @@ function dew$g() {
     this[offset + 3] = value & 255;
     return offset + 4;
   };
-  Buffer2.prototype.writeBigInt64LE = defineBigIntMethod(function writeBigInt64LE(value, offset = 0) {
+  Buffer.prototype.writeBigInt64LE = defineBigIntMethod(function writeBigInt64LE(value, offset = 0) {
     return wrtBigUInt64LE(this, value, offset, -BigInt("0x8000000000000000"), BigInt("0x7fffffffffffffff"));
   });
-  Buffer2.prototype.writeBigInt64BE = defineBigIntMethod(function writeBigInt64BE(value, offset = 0) {
+  Buffer.prototype.writeBigInt64BE = defineBigIntMethod(function writeBigInt64BE(value, offset = 0) {
     return wrtBigUInt64BE(this, value, offset, -BigInt("0x8000000000000000"), BigInt("0x7fffffffffffffff"));
   });
   function checkIEEE754(buf, value, offset, ext, max, min) {
@@ -3486,10 +3486,10 @@ function dew$g() {
     ieee754.write(buf, value, offset, littleEndian, 23, 4);
     return offset + 4;
   }
-  Buffer2.prototype.writeFloatLE = function writeFloatLE(value, offset, noAssert) {
+  Buffer.prototype.writeFloatLE = function writeFloatLE(value, offset, noAssert) {
     return writeFloat(this, value, offset, true, noAssert);
   };
-  Buffer2.prototype.writeFloatBE = function writeFloatBE(value, offset, noAssert) {
+  Buffer.prototype.writeFloatBE = function writeFloatBE(value, offset, noAssert) {
     return writeFloat(this, value, offset, false, noAssert);
   };
   function writeDouble(buf, value, offset, littleEndian, noAssert) {
@@ -3501,14 +3501,14 @@ function dew$g() {
     ieee754.write(buf, value, offset, littleEndian, 52, 8);
     return offset + 8;
   }
-  Buffer2.prototype.writeDoubleLE = function writeDoubleLE(value, offset, noAssert) {
+  Buffer.prototype.writeDoubleLE = function writeDoubleLE(value, offset, noAssert) {
     return writeDouble(this, value, offset, true, noAssert);
   };
-  Buffer2.prototype.writeDoubleBE = function writeDoubleBE(value, offset, noAssert) {
+  Buffer.prototype.writeDoubleBE = function writeDoubleBE(value, offset, noAssert) {
     return writeDouble(this, value, offset, false, noAssert);
   };
-  Buffer2.prototype.copy = function copy(target, targetStart, start, end) {
-    if (!Buffer2.isBuffer(target))
+  Buffer.prototype.copy = function copy(target, targetStart, start, end) {
+    if (!Buffer.isBuffer(target))
       throw new TypeError("argument should be a Buffer");
     if (!start)
       start = 0;
@@ -3544,7 +3544,7 @@ function dew$g() {
     }
     return len;
   };
-  Buffer2.prototype.fill = function fill(val, start, end, encoding) {
+  Buffer.prototype.fill = function fill(val, start, end, encoding) {
     if (typeof val === "string") {
       if (typeof start === "string") {
         encoding = start;
@@ -3557,7 +3557,7 @@ function dew$g() {
       if (encoding !== void 0 && typeof encoding !== "string") {
         throw new TypeError("encoding must be a string");
       }
-      if (typeof encoding === "string" && !Buffer2.isEncoding(encoding)) {
+      if (typeof encoding === "string" && !Buffer.isEncoding(encoding)) {
         throw new TypeError("Unknown encoding: " + encoding);
       }
       if (val.length === 1) {
@@ -3587,7 +3587,7 @@ function dew$g() {
         this[i6] = val;
       }
     } else {
-      const bytes = Buffer2.isBuffer(val) ? val : Buffer2.from(val, encoding);
+      const bytes = Buffer.isBuffer(val) ? val : Buffer.from(val, encoding);
       const len = bytes.length;
       if (len === 0) {
         throw new TypeError('The value "' + val + '" is invalid for argument "value"');
@@ -3941,11 +3941,11 @@ function dew$d() {
       _defineProperties(Constructor, staticProps);
     return Constructor;
   }
-  var _require = buffer, Buffer2 = _require.Buffer;
+  var _require = buffer, Buffer = _require.Buffer;
   var _require2 = X, inspect2 = _require2.inspect;
   var custom = inspect2 && inspect2.custom || "inspect";
   function copyBuffer(src, target, offset) {
-    Buffer2.prototype.copy.call(src, target, offset);
+    Buffer.prototype.copy.call(src, target, offset);
   }
   exports$d = /* @__PURE__ */ function() {
     function BufferList() {
@@ -4015,8 +4015,8 @@ function dew$d() {
       key: "concat",
       value: function concat(n6) {
         if (this.length === 0)
-          return Buffer2.alloc(0);
-        var ret = Buffer2.allocUnsafe(n6 >>> 0);
+          return Buffer.alloc(0);
+        var ret = Buffer.allocUnsafe(n6 >>> 0);
         var p6 = this.head;
         var i6 = 0;
         while (p6) {
@@ -4084,7 +4084,7 @@ function dew$d() {
     }, {
       key: "_getBuffer",
       value: function _getBuffer(n6) {
-        var ret = Buffer2.allocUnsafe(n6);
+        var ret = Buffer.allocUnsafe(n6);
         var p6 = this.head;
         var c6 = 1;
         p6.data.copy(ret);
@@ -4415,14 +4415,14 @@ function dew$8() {
     deprecate: dew$9()
   };
   var Stream = dew$e();
-  var Buffer2 = buffer.Buffer;
+  var Buffer = buffer.Buffer;
   var OurUint8Array = _global$1.Uint8Array || function() {
   };
   function _uint8ArrayToBuffer(chunk) {
-    return Buffer2.from(chunk);
+    return Buffer.from(chunk);
   }
   function _isUint8Array(obj) {
-    return Buffer2.isBuffer(obj) || obj instanceof OurUint8Array;
+    return Buffer.isBuffer(obj) || obj instanceof OurUint8Array;
   }
   var destroyImpl = dew$c();
   var _require = dew$a(), getHighWaterMark = _require.getHighWaterMark;
@@ -4550,7 +4550,7 @@ function dew$8() {
     var state = this._writableState;
     var ret = false;
     var isBuf = !state.objectMode && _isUint8Array(chunk);
-    if (isBuf && !Buffer2.isBuffer(chunk)) {
+    if (isBuf && !Buffer.isBuffer(chunk)) {
       chunk = _uint8ArrayToBuffer(chunk);
     }
     if (typeof encoding === "function") {
@@ -4601,7 +4601,7 @@ function dew$8() {
   });
   function decodeChunk(state, chunk, encoding) {
     if (!state.objectMode && state.decodeStrings !== false && typeof chunk === "string") {
-      chunk = Buffer2.from(chunk, encoding);
+      chunk = Buffer.from(chunk, encoding);
     }
     return chunk;
   }
@@ -5289,14 +5289,14 @@ function dew$3() {
     return emitter.listeners(type).length;
   };
   var Stream = dew$e();
-  var Buffer2 = buffer.Buffer;
+  var Buffer = buffer.Buffer;
   var OurUint8Array = _global2.Uint8Array || function() {
   };
   function _uint8ArrayToBuffer(chunk) {
-    return Buffer2.from(chunk);
+    return Buffer.from(chunk);
   }
   function _isUint8Array(obj) {
-    return Buffer2.isBuffer(obj) || obj instanceof OurUint8Array;
+    return Buffer.isBuffer(obj) || obj instanceof OurUint8Array;
   }
   var debugUtil = X;
   var debug;
@@ -5409,7 +5409,7 @@ function dew$3() {
       if (typeof chunk === "string") {
         encoding = encoding || state.defaultEncoding;
         if (encoding !== state.encoding) {
-          chunk = Buffer2.from(chunk, encoding);
+          chunk = Buffer.from(chunk, encoding);
           encoding = "";
         }
         skipChunkCheck = true;
@@ -5435,7 +5435,7 @@ function dew$3() {
       if (er) {
         errorOrDestroy(stream2, er);
       } else if (state.objectMode || chunk && chunk.length > 0) {
-        if (typeof chunk !== "string" && !state.objectMode && Object.getPrototypeOf(chunk) !== Buffer2.prototype) {
+        if (typeof chunk !== "string" && !state.objectMode && Object.getPrototypeOf(chunk) !== Buffer.prototype) {
           chunk = _uint8ArrayToBuffer(chunk);
         }
         if (addToFront) {
@@ -6318,33 +6318,33 @@ function dew$2P() {
     return exports$2Q;
   _dewExec$2P = true;
   var buffer$1 = buffer;
-  var Buffer2 = buffer$1.Buffer;
+  var Buffer = buffer$1.Buffer;
   function copyProps(src, dst) {
     for (var key in src) {
       dst[key] = src[key];
     }
   }
-  if (Buffer2.from && Buffer2.alloc && Buffer2.allocUnsafe && Buffer2.allocUnsafeSlow) {
+  if (Buffer.from && Buffer.alloc && Buffer.allocUnsafe && Buffer.allocUnsafeSlow) {
     exports$2Q = buffer$1;
   } else {
     copyProps(buffer$1, exports$2Q);
     exports$2Q.Buffer = SafeBuffer;
   }
   function SafeBuffer(arg, encodingOrOffset, length) {
-    return Buffer2(arg, encodingOrOffset, length);
+    return Buffer(arg, encodingOrOffset, length);
   }
-  copyProps(Buffer2, SafeBuffer);
+  copyProps(Buffer, SafeBuffer);
   SafeBuffer.from = function(arg, encodingOrOffset, length) {
     if (typeof arg === "number") {
       throw new TypeError("Argument must not be a number");
     }
-    return Buffer2(arg, encodingOrOffset, length);
+    return Buffer(arg, encodingOrOffset, length);
   };
   SafeBuffer.alloc = function(size, fill, encoding) {
     if (typeof size !== "number") {
       throw new TypeError("Argument must be a number");
     }
-    var buf = Buffer2(size);
+    var buf = Buffer(size);
     if (fill !== void 0) {
       if (typeof encoding === "string") {
         buf.fill(fill, encoding);
@@ -6360,7 +6360,7 @@ function dew$2P() {
     if (typeof size !== "number") {
       throw new TypeError("Argument must be a number");
     }
-    return Buffer2(size);
+    return Buffer(size);
   };
   SafeBuffer.allocUnsafeSlow = function(size) {
     if (typeof size !== "number") {
@@ -6383,7 +6383,7 @@ function dew$2O() {
   function oldBrowser() {
     throw new Error("Secure random number generation is not supported by this browser.\nUse Chrome, Firefox or Internet Explorer 11");
   }
-  var Buffer2 = dew$2P().Buffer;
+  var Buffer = dew$2P().Buffer;
   var crypto2 = _global$U.crypto || _global$U.msCrypto;
   if (crypto2 && crypto2.getRandomValues) {
     exports$2P = randomBytes2;
@@ -6393,7 +6393,7 @@ function dew$2O() {
   function randomBytes2(size, cb) {
     if (size > MAX_UINT32)
       throw new RangeError("requested too many random bytes");
-    var bytes = Buffer2.allocUnsafe(size);
+    var bytes = Buffer.allocUnsafe(size);
     if (size > 0) {
       if (size > MAX_BYTES) {
         for (var generated = 0; generated < size; generated += MAX_BYTES) {
@@ -6419,34 +6419,34 @@ function dew$2N() {
     return exports$2O;
   _dewExec$2N = true;
   var buffer$1 = buffer;
-  var Buffer2 = buffer$1.Buffer;
+  var Buffer = buffer$1.Buffer;
   function copyProps(src, dst) {
     for (var key in src) {
       dst[key] = src[key];
     }
   }
-  if (Buffer2.from && Buffer2.alloc && Buffer2.allocUnsafe && Buffer2.allocUnsafeSlow) {
+  if (Buffer.from && Buffer.alloc && Buffer.allocUnsafe && Buffer.allocUnsafeSlow) {
     exports$2O = buffer$1;
   } else {
     copyProps(buffer$1, exports$2O);
     exports$2O.Buffer = SafeBuffer;
   }
   function SafeBuffer(arg, encodingOrOffset, length) {
-    return Buffer2(arg, encodingOrOffset, length);
+    return Buffer(arg, encodingOrOffset, length);
   }
-  SafeBuffer.prototype = Object.create(Buffer2.prototype);
-  copyProps(Buffer2, SafeBuffer);
+  SafeBuffer.prototype = Object.create(Buffer.prototype);
+  copyProps(Buffer, SafeBuffer);
   SafeBuffer.from = function(arg, encodingOrOffset, length) {
     if (typeof arg === "number") {
       throw new TypeError("Argument must not be a number");
     }
-    return Buffer2(arg, encodingOrOffset, length);
+    return Buffer(arg, encodingOrOffset, length);
   };
   SafeBuffer.alloc = function(size, fill, encoding) {
     if (typeof size !== "number") {
       throw new TypeError("Argument must be a number");
     }
-    var buf = Buffer2(size);
+    var buf = Buffer(size);
     if (fill !== void 0) {
       if (typeof encoding === "string") {
         buf.fill(fill, encoding);
@@ -6462,7 +6462,7 @@ function dew$2N() {
     if (typeof size !== "number") {
       throw new TypeError("Argument must be a number");
     }
-    return Buffer2(size);
+    return Buffer(size);
   };
   SafeBuffer.allocUnsafeSlow = function(size) {
     if (typeof size !== "number") {
@@ -6478,17 +6478,17 @@ function dew$2M() {
   if (_dewExec$2M)
     return exports$2N;
   _dewExec$2M = true;
-  var Buffer2 = dew$2N().Buffer;
+  var Buffer = dew$2N().Buffer;
   var Transform = dew3().Transform;
   var inherits2 = dew$f();
   function throwIfNotStringOrBuffer(val, prefix) {
-    if (!Buffer2.isBuffer(val) && typeof val !== "string") {
+    if (!Buffer.isBuffer(val) && typeof val !== "string") {
       throw new TypeError(prefix + " must be a string or a buffer");
     }
   }
   function HashBase(blockSize) {
     Transform.call(this);
-    this._block = Buffer2.allocUnsafe(blockSize);
+    this._block = Buffer.allocUnsafe(blockSize);
     this._blockSize = blockSize;
     this._blockOffset = 0;
     this._length = [0, 0, 0, 0];
@@ -6517,8 +6517,8 @@ function dew$2M() {
     throwIfNotStringOrBuffer(data, "Data");
     if (this._finalized)
       throw new Error("Digest already called");
-    if (!Buffer2.isBuffer(data))
-      data = Buffer2.from(data, encoding);
+    if (!Buffer.isBuffer(data))
+      data = Buffer.from(data, encoding);
     var block = this._block;
     var offset = 0;
     while (this._blockOffset + data.length - offset >= this._blockSize) {
@@ -6567,7 +6567,7 @@ function dew$2L() {
   _dewExec$2L = true;
   var inherits2 = dew$f();
   var HashBase = dew$2M();
-  var Buffer2 = dew$2P().Buffer;
+  var Buffer = dew$2P().Buffer;
   var ARRAY16 = new Array(16);
   function MD5() {
     HashBase.call(this, 64);
@@ -6665,7 +6665,7 @@ function dew$2L() {
     this._block.writeUInt32LE(this._length[0], 56);
     this._block.writeUInt32LE(this._length[1], 60);
     this._update();
-    var buffer2 = Buffer2.allocUnsafe(16);
+    var buffer2 = Buffer.allocUnsafe(16);
     buffer2.writeInt32LE(this._a, 0);
     buffer2.writeInt32LE(this._b, 4);
     buffer2.writeInt32LE(this._c, 8);
@@ -6696,7 +6696,7 @@ function dew$2K() {
   if (_dewExec$2K)
     return exports$2L;
   _dewExec$2K = true;
-  var Buffer2 = buffer.Buffer;
+  var Buffer = buffer.Buffer;
   var inherits2 = dew$f();
   var HashBase = dew$2M();
   var ARRAY16 = new Array(16);
@@ -6777,7 +6777,7 @@ function dew$2K() {
     this._block.writeUInt32LE(this._length[0], 56);
     this._block.writeUInt32LE(this._length[1], 60);
     this._update();
-    var buffer2 = Buffer2.alloc ? Buffer2.alloc(20) : new Buffer2(20);
+    var buffer2 = Buffer.alloc ? Buffer.alloc(20) : new Buffer(20);
     buffer2.writeInt32LE(this._a, 0);
     buffer2.writeInt32LE(this._b, 4);
     buffer2.writeInt32LE(this._c, 8);
@@ -6813,9 +6813,9 @@ function dew$2J() {
   if (_dewExec$2J)
     return exports$2K;
   _dewExec$2J = true;
-  var Buffer2 = dew$2P().Buffer;
+  var Buffer = dew$2P().Buffer;
   function Hash2(blockSize, finalSize) {
-    (this || _global$T)._block = Buffer2.alloc(blockSize);
+    (this || _global$T)._block = Buffer.alloc(blockSize);
     (this || _global$T)._finalSize = finalSize;
     (this || _global$T)._blockSize = blockSize;
     (this || _global$T)._len = 0;
@@ -6823,7 +6823,7 @@ function dew$2J() {
   Hash2.prototype.update = function(data, enc) {
     if (typeof data === "string") {
       enc = enc || "utf8";
-      data = Buffer2.from(data, enc);
+      data = Buffer.from(data, enc);
     }
     var block = (this || _global$T)._block;
     var blockSize = (this || _global$T)._blockSize;
@@ -6880,7 +6880,7 @@ function dew$2I() {
   _dewExec$2I = true;
   var inherits2 = dew$f();
   var Hash2 = dew$2J();
-  var Buffer2 = dew$2P().Buffer;
+  var Buffer = dew$2P().Buffer;
   var K3 = [1518500249, 1859775393, 2400959708 | 0, 3395469782 | 0];
   var W3 = new Array(80);
   function Sha() {
@@ -6937,7 +6937,7 @@ function dew$2I() {
     (this || _global$S)._e = e8 + (this || _global$S)._e | 0;
   };
   Sha.prototype._hash = function() {
-    var H3 = Buffer2.allocUnsafe(20);
+    var H3 = Buffer.allocUnsafe(20);
     H3.writeInt32BE((this || _global$S)._a | 0, 0);
     H3.writeInt32BE((this || _global$S)._b | 0, 4);
     H3.writeInt32BE((this || _global$S)._c | 0, 8);
@@ -6957,7 +6957,7 @@ function dew$2H() {
   _dewExec$2H = true;
   var inherits2 = dew$f();
   var Hash2 = dew$2J();
-  var Buffer2 = dew$2P().Buffer;
+  var Buffer = dew$2P().Buffer;
   var K3 = [1518500249, 1859775393, 2400959708 | 0, 3395469782 | 0];
   var W3 = new Array(80);
   function Sha1() {
@@ -7017,7 +7017,7 @@ function dew$2H() {
     (this || _global$R)._e = e8 + (this || _global$R)._e | 0;
   };
   Sha1.prototype._hash = function() {
-    var H3 = Buffer2.allocUnsafe(20);
+    var H3 = Buffer.allocUnsafe(20);
     H3.writeInt32BE((this || _global$R)._a | 0, 0);
     H3.writeInt32BE((this || _global$R)._b | 0, 4);
     H3.writeInt32BE((this || _global$R)._c | 0, 8);
@@ -7037,7 +7037,7 @@ function dew$2G() {
   _dewExec$2G = true;
   var inherits2 = dew$f();
   var Hash2 = dew$2J();
-  var Buffer2 = dew$2P().Buffer;
+  var Buffer = dew$2P().Buffer;
   var K3 = [1116352408, 1899447441, 3049323471, 3921009573, 961987163, 1508970993, 2453635748, 2870763221, 3624381080, 310598401, 607225278, 1426881987, 1925078388, 2162078206, 2614888103, 3248222580, 3835390401, 4022224774, 264347078, 604807628, 770255983, 1249150122, 1555081692, 1996064986, 2554220882, 2821834349, 2952996808, 3210313671, 3336571891, 3584528711, 113926993, 338241895, 666307205, 773529912, 1294757372, 1396182291, 1695183700, 1986661051, 2177026350, 2456956037, 2730485921, 2820302411, 3259730800, 3345764771, 3516065817, 3600352804, 4094571909, 275423344, 430227734, 506948616, 659060556, 883997877, 958139571, 1322822218, 1537002063, 1747873779, 1955562222, 2024104815, 2227730452, 2361852424, 2428436474, 2756734187, 3204031479, 3329325298];
   var W3 = new Array(64);
   function Sha256() {
@@ -7111,7 +7111,7 @@ function dew$2G() {
     (this || _global$Q)._h = h6 + (this || _global$Q)._h | 0;
   };
   Sha256.prototype._hash = function() {
-    var H3 = Buffer2.allocUnsafe(32);
+    var H3 = Buffer.allocUnsafe(32);
     H3.writeInt32BE((this || _global$Q)._a, 0);
     H3.writeInt32BE((this || _global$Q)._b, 4);
     H3.writeInt32BE((this || _global$Q)._c, 8);
@@ -7135,7 +7135,7 @@ function dew$2F() {
   var inherits2 = dew$f();
   var Sha256 = dew$2G();
   var Hash2 = dew$2J();
-  var Buffer2 = dew$2P().Buffer;
+  var Buffer = dew$2P().Buffer;
   var W3 = new Array(64);
   function Sha224() {
     this.init();
@@ -7155,7 +7155,7 @@ function dew$2F() {
     return this || _global$P;
   };
   Sha224.prototype._hash = function() {
-    var H3 = Buffer2.allocUnsafe(28);
+    var H3 = Buffer.allocUnsafe(28);
     H3.writeInt32BE((this || _global$P)._a, 0);
     H3.writeInt32BE((this || _global$P)._b, 4);
     H3.writeInt32BE((this || _global$P)._c, 8);
@@ -7177,7 +7177,7 @@ function dew$2E() {
   _dewExec$2E = true;
   var inherits2 = dew$f();
   var Hash2 = dew$2J();
-  var Buffer2 = dew$2P().Buffer;
+  var Buffer = dew$2P().Buffer;
   var K3 = [1116352408, 3609767458, 1899447441, 602891725, 3049323471, 3964484399, 3921009573, 2173295548, 961987163, 4081628472, 1508970993, 3053834265, 2453635748, 2937671579, 2870763221, 3664609560, 3624381080, 2734883394, 310598401, 1164996542, 607225278, 1323610764, 1426881987, 3590304994, 1925078388, 4068182383, 2162078206, 991336113, 2614888103, 633803317, 3248222580, 3479774868, 3835390401, 2666613458, 4022224774, 944711139, 264347078, 2341262773, 604807628, 2007800933, 770255983, 1495990901, 1249150122, 1856431235, 1555081692, 3175218132, 1996064986, 2198950837, 2554220882, 3999719339, 2821834349, 766784016, 2952996808, 2566594879, 3210313671, 3203337956, 3336571891, 1034457026, 3584528711, 2466948901, 113926993, 3758326383, 338241895, 168717936, 666307205, 1188179964, 773529912, 1546045734, 1294757372, 1522805485, 1396182291, 2643833823, 1695183700, 2343527390, 1986661051, 1014477480, 2177026350, 1206759142, 2456956037, 344077627, 2730485921, 1290863460, 2820302411, 3158454273, 3259730800, 3505952657, 3345764771, 106217008, 3516065817, 3606008344, 3600352804, 1432725776, 4094571909, 1467031594, 275423344, 851169720, 430227734, 3100823752, 506948616, 1363258195, 659060556, 3750685593, 883997877, 3785050280, 958139571, 3318307427, 1322822218, 3812723403, 1537002063, 2003034995, 1747873779, 3602036899, 1955562222, 1575990012, 2024104815, 1125592928, 2227730452, 2716904306, 2361852424, 442776044, 2428436474, 593698344, 2756734187, 3733110249, 3204031479, 2999351573, 3329325298, 3815920427, 3391569614, 3928383900, 3515267271, 566280711, 3940187606, 3454069534, 4118630271, 4000239992, 116418474, 1914138554, 174292421, 2731055270, 289380356, 3203993006, 460393269, 320620315, 685471733, 587496836, 852142971, 1086792851, 1017036298, 365543100, 1126000580, 2618297676, 1288033470, 3409855158, 1501505948, 4234509866, 1607167915, 987167468, 1816402316, 1246189591];
   var W3 = new Array(160);
   function Sha512() {
@@ -7334,7 +7334,7 @@ function dew$2E() {
     (this || _global$O)._hh = (this || _global$O)._hh + hh + getCarry((this || _global$O)._hl, hl) | 0;
   };
   Sha512.prototype._hash = function() {
-    var H3 = Buffer2.allocUnsafe(64);
+    var H3 = Buffer.allocUnsafe(64);
     function writeInt64BE(h6, l6, offset) {
       H3.writeInt32BE(h6, offset);
       H3.writeInt32BE(l6, offset + 4);
@@ -7362,7 +7362,7 @@ function dew$2D() {
   var inherits2 = dew$f();
   var SHA512 = dew$2E();
   var Hash2 = dew$2J();
-  var Buffer2 = dew$2P().Buffer;
+  var Buffer = dew$2P().Buffer;
   var W3 = new Array(160);
   function Sha384() {
     this.init();
@@ -7390,7 +7390,7 @@ function dew$2D() {
     return this || _global$N;
   };
   Sha384.prototype._hash = function() {
-    var H3 = Buffer2.allocUnsafe(48);
+    var H3 = Buffer.allocUnsafe(48);
     function writeInt64BE(h6, l6, offset) {
       H3.writeInt32BE(h6, offset);
       H3.writeInt32BE(l6, offset + 4);
@@ -7543,11 +7543,11 @@ function dew$d$2() {
       _defineProperties(Constructor, staticProps);
     return Constructor;
   }
-  var _require = e$1$1, Buffer2 = _require.Buffer;
+  var _require = e$1$1, Buffer = _require.Buffer;
   var _require2 = X, inspect2 = _require2.inspect;
   var custom = inspect2 && inspect2.custom || "inspect";
   function copyBuffer(src, target, offset) {
-    Buffer2.prototype.copy.call(src, target, offset);
+    Buffer.prototype.copy.call(src, target, offset);
   }
   exports$d$2 = /* @__PURE__ */ function() {
     function BufferList() {
@@ -7617,8 +7617,8 @@ function dew$d$2() {
       key: "concat",
       value: function concat(n6) {
         if (this.length === 0)
-          return Buffer2.alloc(0);
-        var ret = Buffer2.allocUnsafe(n6 >>> 0);
+          return Buffer.alloc(0);
+        var ret = Buffer.allocUnsafe(n6 >>> 0);
         var p6 = this.head;
         var i6 = 0;
         while (p6) {
@@ -7686,7 +7686,7 @@ function dew$d$2() {
     }, {
       key: "_getBuffer",
       value: function _getBuffer(n6) {
-        var ret = Buffer2.allocUnsafe(n6);
+        var ret = Buffer.allocUnsafe(n6);
         var p6 = this.head;
         var c6 = 1;
         p6.data.copy(ret);
@@ -8017,14 +8017,14 @@ function dew$8$2() {
     deprecate: dew$9$2()
   };
   var Stream = dew$e$2();
-  var Buffer2 = e$1$1.Buffer;
+  var Buffer = e$1$1.Buffer;
   var OurUint8Array = _global$1$2.Uint8Array || function() {
   };
   function _uint8ArrayToBuffer(chunk) {
-    return Buffer2.from(chunk);
+    return Buffer.from(chunk);
   }
   function _isUint8Array(obj) {
-    return Buffer2.isBuffer(obj) || obj instanceof OurUint8Array;
+    return Buffer.isBuffer(obj) || obj instanceof OurUint8Array;
   }
   var destroyImpl = dew$c$2();
   var _require = dew$a$2(), getHighWaterMark = _require.getHighWaterMark;
@@ -8152,7 +8152,7 @@ function dew$8$2() {
     var state = this._writableState;
     var ret = false;
     var isBuf = !state.objectMode && _isUint8Array(chunk);
-    if (isBuf && !Buffer2.isBuffer(chunk)) {
+    if (isBuf && !Buffer.isBuffer(chunk)) {
       chunk = _uint8ArrayToBuffer(chunk);
     }
     if (typeof encoding === "function") {
@@ -8203,7 +8203,7 @@ function dew$8$2() {
   });
   function decodeChunk(state, chunk, encoding) {
     if (!state.objectMode && state.decodeStrings !== false && typeof chunk === "string") {
-      chunk = Buffer2.from(chunk, encoding);
+      chunk = Buffer.from(chunk, encoding);
     }
     return chunk;
   }
@@ -8891,14 +8891,14 @@ function dew$3$2() {
     return emitter.listeners(type).length;
   };
   var Stream = dew$e$2();
-  var Buffer2 = e$1$1.Buffer;
+  var Buffer = e$1$1.Buffer;
   var OurUint8Array = _global$M.Uint8Array || function() {
   };
   function _uint8ArrayToBuffer(chunk) {
-    return Buffer2.from(chunk);
+    return Buffer.from(chunk);
   }
   function _isUint8Array(obj) {
-    return Buffer2.isBuffer(obj) || obj instanceof OurUint8Array;
+    return Buffer.isBuffer(obj) || obj instanceof OurUint8Array;
   }
   var debugUtil = X;
   var debug;
@@ -9011,7 +9011,7 @@ function dew$3$2() {
       if (typeof chunk === "string") {
         encoding = encoding || state.defaultEncoding;
         if (encoding !== state.encoding) {
-          chunk = Buffer2.from(chunk, encoding);
+          chunk = Buffer.from(chunk, encoding);
           encoding = "";
         }
         skipChunkCheck = true;
@@ -9037,7 +9037,7 @@ function dew$3$2() {
       if (er) {
         errorOrDestroy(stream2, er);
       } else if (state.objectMode || chunk && chunk.length > 0) {
-        if (typeof chunk !== "string" && !state.objectMode && Object.getPrototypeOf(chunk) !== Buffer2.prototype) {
+        if (typeof chunk !== "string" && !state.objectMode && Object.getPrototypeOf(chunk) !== Buffer.prototype) {
           chunk = _uint8ArrayToBuffer(chunk);
         }
         if (addToFront) {
@@ -9995,7 +9995,7 @@ function dew$2z() {
   if (_dewExec$2z)
     return exports$2A;
   _dewExec$2z = true;
-  var Buffer2 = dew$2P().Buffer;
+  var Buffer = dew$2P().Buffer;
   var Transform = stream.Transform;
   var StringDecoder = e$12.StringDecoder;
   var inherits2 = dew$f();
@@ -10017,7 +10017,7 @@ function dew$2z() {
   inherits2(CipherBase, Transform);
   CipherBase.prototype.update = function(data, inputEnc, outputEnc) {
     if (typeof data === "string") {
-      data = Buffer2.from(data, inputEnc);
+      data = Buffer.from(data, inputEnc);
     }
     var outData = this._update(data);
     if ((this || _global$K).hashMode)
@@ -10062,7 +10062,7 @@ function dew$2z() {
     done(err);
   };
   CipherBase.prototype._finalOrDigest = function(outputEnc) {
-    var outData = this.__final() || Buffer2.alloc(0);
+    var outData = this.__final() || Buffer.alloc(0);
     if (outputEnc) {
       outData = this._toString(outData, outputEnc, true);
     }
@@ -10123,24 +10123,24 @@ function dew$2x() {
     return exports$2y;
   _dewExec$2x = true;
   var inherits2 = dew$f();
-  var Buffer2 = dew$2P().Buffer;
+  var Buffer = dew$2P().Buffer;
   var Base = dew$2z();
-  var ZEROS = Buffer2.alloc(128);
+  var ZEROS = Buffer.alloc(128);
   var blocksize = 64;
   function Hmac2(alg, key) {
     Base.call(this, "digest");
     if (typeof key === "string") {
-      key = Buffer2.from(key);
+      key = Buffer.from(key);
     }
     this._alg = alg;
     this._key = key;
     if (key.length > blocksize) {
       key = alg(key);
     } else if (key.length < blocksize) {
-      key = Buffer2.concat([key, ZEROS], blocksize);
+      key = Buffer.concat([key, ZEROS], blocksize);
     }
-    var ipad = this._ipad = Buffer2.allocUnsafe(blocksize);
-    var opad = this._opad = Buffer2.allocUnsafe(blocksize);
+    var ipad = this._ipad = Buffer.allocUnsafe(blocksize);
+    var opad = this._opad = Buffer.allocUnsafe(blocksize);
     for (var i6 = 0; i6 < blocksize; i6++) {
       ipad[i6] = key[i6] ^ 54;
       opad[i6] = key[i6] ^ 92;
@@ -10152,8 +10152,8 @@ function dew$2x() {
     this._hash.push(data);
   };
   Hmac2.prototype._final = function() {
-    var h6 = this._alg(Buffer2.concat(this._hash));
-    return this._alg(Buffer2.concat([this._opad, h6]));
+    var h6 = this._alg(Buffer.concat(this._hash));
+    return this._alg(Buffer.concat([this._opad, h6]));
   };
   exports$2y = Hmac2;
   return exports$2y;
@@ -10179,15 +10179,15 @@ function dew$2v() {
   var inherits2 = dew$f();
   var Legacy = dew$2x();
   var Base = dew$2z();
-  var Buffer2 = dew$2P().Buffer;
+  var Buffer = dew$2P().Buffer;
   var md5 = dew$2w();
   var RIPEMD160 = dew$2K();
   var sha = dew$2C();
-  var ZEROS = Buffer2.alloc(128);
+  var ZEROS = Buffer.alloc(128);
   function Hmac2(alg, key) {
     Base.call(this, "digest");
     if (typeof key === "string") {
-      key = Buffer2.from(key);
+      key = Buffer.from(key);
     }
     var blocksize = alg === "sha512" || alg === "sha384" ? 128 : 64;
     this._alg = alg;
@@ -10196,10 +10196,10 @@ function dew$2v() {
       var hash = alg === "rmd160" ? new RIPEMD160() : sha(alg);
       key = hash.update(key).digest();
     } else if (key.length < blocksize) {
-      key = Buffer2.concat([key, ZEROS], blocksize);
+      key = Buffer.concat([key, ZEROS], blocksize);
     }
-    var ipad = this._ipad = Buffer2.allocUnsafe(blocksize);
-    var opad = this._opad = Buffer2.allocUnsafe(blocksize);
+    var ipad = this._ipad = Buffer.allocUnsafe(blocksize);
+    var opad = this._opad = Buffer.allocUnsafe(blocksize);
     for (var i6 = 0; i6 < blocksize; i6++) {
       ipad[i6] = key[i6] ^ 54;
       opad[i6] = key[i6] ^ 92;
@@ -10438,14 +10438,14 @@ function dew$2r() {
   if (_dewExec$2r)
     return exports$2s;
   _dewExec$2r = true;
-  var Buffer2 = dew$2P().Buffer;
+  var Buffer = dew$2P().Buffer;
   exports$2s = function(thing, encoding, name) {
-    if (Buffer2.isBuffer(thing)) {
+    if (Buffer.isBuffer(thing)) {
       return thing;
     } else if (typeof thing === "string") {
-      return Buffer2.from(thing, encoding);
+      return Buffer.from(thing, encoding);
     } else if (ArrayBuffer.isView(thing)) {
-      return Buffer2.from(thing.buffer);
+      return Buffer.from(thing.buffer);
     } else {
       throw new TypeError(name + " must be a string, a Buffer, a typed array or a DataView");
     }
@@ -10462,11 +10462,11 @@ function dew$2q() {
   var md5 = dew$2w();
   var RIPEMD160 = dew$2K();
   var sha = dew$2C();
-  var Buffer2 = dew$2P().Buffer;
+  var Buffer = dew$2P().Buffer;
   var checkParameters = dew$2t();
   var defaultEncoding = dew$2s();
   var toBuffer = dew$2r();
-  var ZEROS = Buffer2.alloc(128);
+  var ZEROS = Buffer.alloc(128);
   var sizes = {
     md5: 16,
     sha1: 20,
@@ -10483,15 +10483,15 @@ function dew$2q() {
     if (key.length > blocksize) {
       key = hash(key);
     } else if (key.length < blocksize) {
-      key = Buffer2.concat([key, ZEROS], blocksize);
+      key = Buffer.concat([key, ZEROS], blocksize);
     }
-    var ipad = Buffer2.allocUnsafe(blocksize + sizes[alg]);
-    var opad = Buffer2.allocUnsafe(blocksize + sizes[alg]);
+    var ipad = Buffer.allocUnsafe(blocksize + sizes[alg]);
+    var opad = Buffer.allocUnsafe(blocksize + sizes[alg]);
     for (var i6 = 0; i6 < blocksize; i6++) {
       ipad[i6] = key[i6] ^ 54;
       opad[i6] = key[i6] ^ 92;
     }
-    var ipad1 = Buffer2.allocUnsafe(blocksize + saltLen + 4);
+    var ipad1 = Buffer.allocUnsafe(blocksize + saltLen + 4);
     ipad.copy(ipad1, 0, 0, blocksize);
     (this || _global$I).ipad1 = ipad1;
     (this || _global$I).ipad2 = ipad;
@@ -10526,8 +10526,8 @@ function dew$2q() {
     salt = toBuffer(salt, defaultEncoding, "Salt");
     digest = digest || "sha1";
     var hmac = new Hmac2(digest, password, salt.length);
-    var DK = Buffer2.allocUnsafe(keylen);
-    var block1 = Buffer2.allocUnsafe(salt.length + 4);
+    var DK = Buffer.allocUnsafe(keylen);
+    var block1 = Buffer.allocUnsafe(salt.length + 4);
     salt.copy(block1, 0, 0, salt.length);
     var destPos = 0;
     var hLen = sizes[digest];
@@ -10556,7 +10556,7 @@ function dew$2p() {
   if (_dewExec$2p)
     return exports$2q;
   _dewExec$2p = true;
-  var Buffer2 = dew$2P().Buffer;
+  var Buffer = dew$2P().Buffer;
   var checkParameters = dew$2t();
   var defaultEncoding = dew$2s();
   var sync = dew$2q();
@@ -10585,7 +10585,7 @@ function dew$2p() {
     if (checks[algo] !== void 0) {
       return checks[algo];
     }
-    ZERO_BUF = ZERO_BUF || Buffer2.alloc(8);
+    ZERO_BUF = ZERO_BUF || Buffer.alloc(8);
     var prom = browserPbkdf2(ZERO_BUF, ZERO_BUF, 10, 128, algo).then(function() {
       return true;
     }).catch(function() {
@@ -10623,7 +10623,7 @@ function dew$2p() {
         }
       }, key, length << 3);
     }).then(function(res) {
-      return Buffer2.from(res);
+      return Buffer.from(res);
     });
   }
   function resolvePromise(promise, callback) {
@@ -11268,7 +11268,7 @@ function dew$2g() {
   var CipherBase = dew$2z();
   var des = dew$2h();
   var inherits2 = dew$f();
-  var Buffer2 = dew$2P().Buffer;
+  var Buffer = dew$2P().Buffer;
   var modes = {
     "des-ede3-cbc": des.CBC.instantiate(des.EDE),
     "des-ede3": des.EDE,
@@ -11292,15 +11292,15 @@ function dew$2g() {
       type = "encrypt";
     }
     var key = opts.key;
-    if (!Buffer2.isBuffer(key)) {
-      key = Buffer2.from(key);
+    if (!Buffer.isBuffer(key)) {
+      key = Buffer.from(key);
     }
     if (modeName === "des-ede" || modeName === "des-ede-cbc") {
-      key = Buffer2.concat([key, key.slice(0, 8)]);
+      key = Buffer.concat([key, key.slice(0, 8)]);
     }
     var iv = opts.iv;
-    if (!Buffer2.isBuffer(iv)) {
-      iv = Buffer2.from(iv);
+    if (!Buffer.isBuffer(iv)) {
+      iv = Buffer.from(iv);
     }
     (this || _global$G)._des = mode.create({
       key,
@@ -11309,10 +11309,10 @@ function dew$2g() {
     });
   }
   DES.prototype._update = function(data) {
-    return Buffer2.from((this || _global$G)._des.update(data));
+    return Buffer.from((this || _global$G)._des.update(data));
   };
   DES.prototype._final = function() {
-    return Buffer2.from((this || _global$G)._des.final());
+    return Buffer.from((this || _global$G)._des.final());
   };
   return exports$2h;
 }
@@ -11336,10 +11336,10 @@ function dew$2e() {
   if (_dewExec$2e)
     return exports$2f;
   _dewExec$2e = true;
-  var Buffer2 = buffer.Buffer;
+  var Buffer = buffer.Buffer;
   exports$2f = function xor(a6, b4) {
     var length = Math.min(a6.length, b4.length);
-    var buffer2 = new Buffer2(length);
+    var buffer2 = new Buffer(length);
     for (var i6 = 0; i6 < length; ++i6) {
       buffer2[i6] = a6[i6] ^ b4[i6];
     }
@@ -11373,29 +11373,29 @@ function dew$2c() {
   if (_dewExec$2c)
     return exports$2d;
   _dewExec$2c = true;
-  var Buffer2 = dew$2P().Buffer;
+  var Buffer = dew$2P().Buffer;
   var xor = dew$2e();
   function encryptStart(self2, data, decrypt) {
     var len = data.length;
     var out = xor(data, self2._cache);
     self2._cache = self2._cache.slice(len);
-    self2._prev = Buffer2.concat([self2._prev, decrypt ? data : out]);
+    self2._prev = Buffer.concat([self2._prev, decrypt ? data : out]);
     return out;
   }
   exports$2d.encrypt = function(self2, data, decrypt) {
-    var out = Buffer2.allocUnsafe(0);
+    var out = Buffer.allocUnsafe(0);
     var len;
     while (data.length) {
       if (self2._cache.length === 0) {
         self2._cache = self2._cipher.encryptBlock(self2._prev);
-        self2._prev = Buffer2.allocUnsafe(0);
+        self2._prev = Buffer.allocUnsafe(0);
       }
       if (self2._cache.length <= data.length) {
         len = self2._cache.length;
-        out = Buffer2.concat([out, encryptStart(self2, data.slice(0, len), decrypt)]);
+        out = Buffer.concat([out, encryptStart(self2, data.slice(0, len), decrypt)]);
         data = data.slice(len);
       } else {
-        out = Buffer2.concat([out, encryptStart(self2, data, decrypt)]);
+        out = Buffer.concat([out, encryptStart(self2, data, decrypt)]);
         break;
       }
     }
@@ -11409,16 +11409,16 @@ function dew$2b() {
   if (_dewExec$2b)
     return exports$2c;
   _dewExec$2b = true;
-  var Buffer2 = dew$2P().Buffer;
+  var Buffer = dew$2P().Buffer;
   function encryptByte(self2, byteParam, decrypt) {
     var pad = self2._cipher.encryptBlock(self2._prev);
     var out = pad[0] ^ byteParam;
-    self2._prev = Buffer2.concat([self2._prev.slice(1), Buffer2.from([decrypt ? byteParam : out])]);
+    self2._prev = Buffer.concat([self2._prev.slice(1), Buffer.from([decrypt ? byteParam : out])]);
     return out;
   }
   exports$2c.encrypt = function(self2, chunk, decrypt) {
     var len = chunk.length;
-    var out = Buffer2.allocUnsafe(len);
+    var out = Buffer.allocUnsafe(len);
     var i6 = -1;
     while (++i6 < len) {
       out[i6] = encryptByte(self2, chunk[i6], decrypt);
@@ -11433,7 +11433,7 @@ function dew$2a() {
   if (_dewExec$2a)
     return exports$2b;
   _dewExec$2a = true;
-  var Buffer2 = dew$2P().Buffer;
+  var Buffer = dew$2P().Buffer;
   function encryptByte(self2, byteParam, decrypt) {
     var pad;
     var i6 = -1;
@@ -11452,8 +11452,8 @@ function dew$2a() {
   function shiftIn(buffer2, value) {
     var len = buffer2.length;
     var i6 = -1;
-    var out = Buffer2.allocUnsafe(buffer2.length);
-    buffer2 = Buffer2.concat([buffer2, Buffer2.from([value])]);
+    var out = Buffer.allocUnsafe(buffer2.length);
+    buffer2 = Buffer.concat([buffer2, Buffer.from([value])]);
     while (++i6 < len) {
       out[i6] = buffer2[i6] << 1 | buffer2[i6 + 1] >> 7;
     }
@@ -11461,7 +11461,7 @@ function dew$2a() {
   }
   exports$2b.encrypt = function(self2, chunk, decrypt) {
     var len = chunk.length;
-    var out = Buffer2.allocUnsafe(len);
+    var out = Buffer.allocUnsafe(len);
     var i6 = -1;
     while (++i6 < len) {
       out[i6] = encryptByte(self2, chunk[i6], decrypt);
@@ -11476,7 +11476,7 @@ function dew$29() {
   if (_dewExec$29)
     return exports$2a;
   _dewExec$29 = true;
-  var Buffer2 = buffer.Buffer;
+  var Buffer = buffer.Buffer;
   var xor = dew$2e();
   function getBlock(self2) {
     self2._prev = self2._cipher.encryptBlock(self2._prev);
@@ -11484,7 +11484,7 @@ function dew$29() {
   }
   exports$2a.encrypt = function(self2, chunk) {
     while (self2._cache.length < chunk.length) {
-      self2._cache = Buffer2.concat([self2._cache, getBlock(self2)]);
+      self2._cache = Buffer.concat([self2._cache, getBlock(self2)]);
     }
     var pad = self2._cache.slice(0, chunk.length);
     self2._cache = self2._cache.slice(chunk.length);
@@ -11522,7 +11522,7 @@ function dew$27() {
     return exports$28;
   _dewExec$27 = true;
   var xor = dew$2e();
-  var Buffer2 = dew$2P().Buffer;
+  var Buffer = dew$2P().Buffer;
   var incr32 = dew$28();
   function getBlock(self2) {
     var out = self2._cipher.encryptBlockRaw(self2._prev);
@@ -11533,7 +11533,7 @@ function dew$27() {
   exports$28.encrypt = function(self2, chunk) {
     var chunkNum = Math.ceil(chunk.length / blockSize);
     var start = self2._cache.length;
-    self2._cache = Buffer2.concat([self2._cache, Buffer2.allocUnsafe(chunkNum * blockSize)]);
+    self2._cache = Buffer.concat([self2._cache, Buffer.allocUnsafe(chunkNum * blockSize)]);
     for (var i6 = 0; i6 < chunkNum; i6++) {
       var out = getBlock(self2);
       var offset = start + i6 * blockSize;
@@ -11769,10 +11769,10 @@ function dew$25() {
   if (_dewExec$25)
     return exports$26;
   _dewExec$25 = true;
-  var Buffer2 = dew$2P().Buffer;
+  var Buffer = dew$2P().Buffer;
   function asUInt32Array(buf) {
-    if (!Buffer2.isBuffer(buf))
-      buf = Buffer2.from(buf);
+    if (!Buffer.isBuffer(buf))
+      buf = Buffer.from(buf);
     var len = buf.length / 4 | 0;
     var out = new Array(len);
     for (var i6 = 0; i6 < len; i6++) {
@@ -11912,7 +11912,7 @@ function dew$25() {
   };
   AES.prototype.encryptBlock = function(M4) {
     var out = this.encryptBlockRaw(M4);
-    var buf = Buffer2.allocUnsafe(16);
+    var buf = Buffer.allocUnsafe(16);
     buf.writeUInt32BE(out[0], 0);
     buf.writeUInt32BE(out[1], 4);
     buf.writeUInt32BE(out[2], 8);
@@ -11925,7 +11925,7 @@ function dew$25() {
     M4[1] = M4[3];
     M4[3] = m1;
     var out = cryptBlock(M4, (this || _global$F)._invKeySchedule, G3.INV_SUB_MIX, G3.INV_SBOX, (this || _global$F)._nRounds);
-    var buf = Buffer2.allocUnsafe(16);
+    var buf = Buffer.allocUnsafe(16);
     buf.writeUInt32BE(out[0], 0);
     buf.writeUInt32BE(out[3], 4);
     buf.writeUInt32BE(out[2], 8);
@@ -11947,13 +11947,13 @@ function dew$24() {
   if (_dewExec$24)
     return exports$25;
   _dewExec$24 = true;
-  var Buffer2 = dew$2P().Buffer;
-  var ZEROES = Buffer2.alloc(16, 0);
+  var Buffer = dew$2P().Buffer;
+  var ZEROES = Buffer.alloc(16, 0);
   function toArray(buf) {
     return [buf.readUInt32BE(0), buf.readUInt32BE(4), buf.readUInt32BE(8), buf.readUInt32BE(12)];
   }
   function fromArray(out) {
-    var buf = Buffer2.allocUnsafe(16);
+    var buf = Buffer.allocUnsafe(16);
     buf.writeUInt32BE(out[0] >>> 0, 0);
     buf.writeUInt32BE(out[1] >>> 0, 4);
     buf.writeUInt32BE(out[2] >>> 0, 8);
@@ -11962,8 +11962,8 @@ function dew$24() {
   }
   function GHASH(key) {
     (this || _global$E).h = key;
-    (this || _global$E).state = Buffer2.alloc(16, 0);
-    (this || _global$E).cache = Buffer2.allocUnsafe(0);
+    (this || _global$E).state = Buffer.alloc(16, 0);
+    (this || _global$E).cache = Buffer.allocUnsafe(0);
   }
   GHASH.prototype.ghash = function(block) {
     var i6 = -1;
@@ -11997,7 +11997,7 @@ function dew$24() {
     (this || _global$E).state = fromArray(Zi);
   };
   GHASH.prototype.update = function(buf) {
-    (this || _global$E).cache = Buffer2.concat([(this || _global$E).cache, buf]);
+    (this || _global$E).cache = Buffer.concat([(this || _global$E).cache, buf]);
     var chunk;
     while ((this || _global$E).cache.length >= 16) {
       chunk = (this || _global$E).cache.slice(0, 16);
@@ -12007,7 +12007,7 @@ function dew$24() {
   };
   GHASH.prototype.final = function(abl, bl) {
     if ((this || _global$E).cache.length) {
-      this.ghash(Buffer2.concat([(this || _global$E).cache, ZEROES], 16));
+      this.ghash(Buffer.concat([(this || _global$E).cache, ZEROES], 16));
     }
     this.ghash(fromArray([0, abl, 0, bl]));
     return (this || _global$E).state;
@@ -12023,7 +12023,7 @@ function dew$23() {
     return exports$24;
   _dewExec$23 = true;
   var aes = dew$25();
-  var Buffer2 = dew$2P().Buffer;
+  var Buffer = dew$2P().Buffer;
   var Transform = dew$2z();
   var inherits2 = dew$f();
   var GHASH = dew$24();
@@ -12041,8 +12041,8 @@ function dew$23() {
   }
   function calcIv(self2, iv, ck) {
     if (iv.length === 12) {
-      self2._finID = Buffer2.concat([iv, Buffer2.from([0, 0, 0, 1])]);
-      return Buffer2.concat([iv, Buffer2.from([0, 0, 0, 2])]);
+      self2._finID = Buffer.concat([iv, Buffer.from([0, 0, 0, 1])]);
+      return Buffer.concat([iv, Buffer.from([0, 0, 0, 2])]);
     }
     var ghash = new GHASH(ck);
     var len = iv.length;
@@ -12050,28 +12050,28 @@ function dew$23() {
     ghash.update(iv);
     if (toPad) {
       toPad = 16 - toPad;
-      ghash.update(Buffer2.alloc(toPad, 0));
+      ghash.update(Buffer.alloc(toPad, 0));
     }
-    ghash.update(Buffer2.alloc(8, 0));
+    ghash.update(Buffer.alloc(8, 0));
     var ivBits = len * 8;
-    var tail = Buffer2.alloc(8);
+    var tail = Buffer.alloc(8);
     tail.writeUIntBE(ivBits, 0, 8);
     ghash.update(tail);
     self2._finID = ghash.state;
-    var out = Buffer2.from(self2._finID);
+    var out = Buffer.from(self2._finID);
     incr32(out);
     return out;
   }
   function StreamCipher(mode, key, iv, decrypt) {
     Transform.call(this || _global$D);
-    var h6 = Buffer2.alloc(4, 0);
+    var h6 = Buffer.alloc(4, 0);
     (this || _global$D)._cipher = new aes.AES(key);
     var ck = (this || _global$D)._cipher.encryptBlock(h6);
     (this || _global$D)._ghash = new GHASH(ck);
     iv = calcIv(this || _global$D, iv, ck);
-    (this || _global$D)._prev = Buffer2.from(iv);
-    (this || _global$D)._cache = Buffer2.allocUnsafe(0);
-    (this || _global$D)._secCache = Buffer2.allocUnsafe(0);
+    (this || _global$D)._prev = Buffer.from(iv);
+    (this || _global$D)._cache = Buffer.allocUnsafe(0);
+    (this || _global$D)._secCache = Buffer.allocUnsafe(0);
     (this || _global$D)._decrypt = decrypt;
     (this || _global$D)._alen = 0;
     (this || _global$D)._len = 0;
@@ -12084,7 +12084,7 @@ function dew$23() {
     if (!(this || _global$D)._called && (this || _global$D)._alen) {
       var rump = 16 - (this || _global$D)._alen % 16;
       if (rump < 16) {
-        rump = Buffer2.alloc(rump, 0);
+        rump = Buffer.alloc(rump, 0);
         (this || _global$D)._ghash.update(rump);
       }
     }
@@ -12108,7 +12108,7 @@ function dew$23() {
     (this || _global$D)._cipher.scrub();
   };
   StreamCipher.prototype.getAuthTag = function getAuthTag() {
-    if ((this || _global$D)._decrypt || !Buffer2.isBuffer((this || _global$D)._authTag))
+    if ((this || _global$D)._decrypt || !Buffer.isBuffer((this || _global$D)._authTag))
       throw new Error("Attempting to get auth tag in unsupported state");
     return (this || _global$D)._authTag;
   };
@@ -12134,15 +12134,15 @@ function dew$22() {
     return exports$23;
   _dewExec$22 = true;
   var aes = dew$25();
-  var Buffer2 = dew$2P().Buffer;
+  var Buffer = dew$2P().Buffer;
   var Transform = dew$2z();
   var inherits2 = dew$f();
   function StreamCipher(mode, key, iv, decrypt) {
     Transform.call(this || _global$C);
     (this || _global$C)._cipher = new aes.AES(key);
-    (this || _global$C)._prev = Buffer2.from(iv);
-    (this || _global$C)._cache = Buffer2.allocUnsafe(0);
-    (this || _global$C)._secCache = Buffer2.allocUnsafe(0);
+    (this || _global$C)._prev = Buffer.from(iv);
+    (this || _global$C)._cache = Buffer.allocUnsafe(0);
+    (this || _global$C)._secCache = Buffer.allocUnsafe(0);
     (this || _global$C)._decrypt = decrypt;
     (this || _global$C)._mode = mode;
   }
@@ -12162,21 +12162,21 @@ function dew$21() {
   if (_dewExec$21)
     return exports$22;
   _dewExec$21 = true;
-  var Buffer2 = dew$2P().Buffer;
+  var Buffer = dew$2P().Buffer;
   var MD5 = dew$2L();
   function EVP_BytesToKey(password, salt, keyBits, ivLen) {
-    if (!Buffer2.isBuffer(password))
-      password = Buffer2.from(password, "binary");
+    if (!Buffer.isBuffer(password))
+      password = Buffer.from(password, "binary");
     if (salt) {
-      if (!Buffer2.isBuffer(salt))
-        salt = Buffer2.from(salt, "binary");
+      if (!Buffer.isBuffer(salt))
+        salt = Buffer.from(salt, "binary");
       if (salt.length !== 8)
         throw new RangeError("salt should be Buffer with 8 byte length");
     }
     var keyLen = keyBits / 8;
-    var key = Buffer2.alloc(keyLen);
-    var iv = Buffer2.alloc(ivLen || 0);
-    var tmp = Buffer2.alloc(0);
+    var key = Buffer.alloc(keyLen);
+    var iv = Buffer.alloc(ivLen || 0);
+    var tmp = Buffer.alloc(0);
     while (keyLen > 0 || ivLen > 0) {
       var hash = new MD5();
       hash.update(tmp);
@@ -12216,7 +12216,7 @@ function dew$20() {
   _dewExec$20 = true;
   var MODES = dew$26();
   var AuthCipher = dew$23();
-  var Buffer2 = dew$2P().Buffer;
+  var Buffer = dew$2P().Buffer;
   var StreamCipher = dew$22();
   var Transform = dew$2z();
   var aes = dew$25();
@@ -12226,7 +12226,7 @@ function dew$20() {
     Transform.call(this || _global$B);
     (this || _global$B)._cache = new Splitter();
     (this || _global$B)._cipher = new aes.AES(key);
-    (this || _global$B)._prev = Buffer2.from(iv);
+    (this || _global$B)._prev = Buffer.from(iv);
     (this || _global$B)._mode = mode;
     (this || _global$B)._autopadding = true;
   }
@@ -12240,9 +12240,9 @@ function dew$20() {
       thing = (this || _global$B)._mode.encrypt(this || _global$B, chunk);
       out.push(thing);
     }
-    return Buffer2.concat(out);
+    return Buffer.concat(out);
   };
-  var PADDING = Buffer2.alloc(16, 16);
+  var PADDING = Buffer.alloc(16, 16);
   Cipher2.prototype._final = function() {
     var chunk = (this || _global$B)._cache.flush();
     if ((this || _global$B)._autopadding) {
@@ -12260,10 +12260,10 @@ function dew$20() {
     return this || _global$B;
   };
   function Splitter() {
-    (this || _global$B).cache = Buffer2.allocUnsafe(0);
+    (this || _global$B).cache = Buffer.allocUnsafe(0);
   }
   Splitter.prototype.add = function(data) {
-    (this || _global$B).cache = Buffer2.concat([(this || _global$B).cache, data]);
+    (this || _global$B).cache = Buffer.concat([(this || _global$B).cache, data]);
   };
   Splitter.prototype.get = function() {
     if ((this || _global$B).cache.length > 15) {
@@ -12275,23 +12275,23 @@ function dew$20() {
   };
   Splitter.prototype.flush = function() {
     var len = 16 - (this || _global$B).cache.length;
-    var padBuff = Buffer2.allocUnsafe(len);
+    var padBuff = Buffer.allocUnsafe(len);
     var i6 = -1;
     while (++i6 < len) {
       padBuff.writeUInt8(len, i6);
     }
-    return Buffer2.concat([(this || _global$B).cache, padBuff]);
+    return Buffer.concat([(this || _global$B).cache, padBuff]);
   };
   function createCipheriv2(suite, password, iv) {
     var config = MODES[suite.toLowerCase()];
     if (!config)
       throw new TypeError("invalid suite type");
     if (typeof password === "string")
-      password = Buffer2.from(password);
+      password = Buffer.from(password);
     if (password.length !== config.key / 8)
       throw new TypeError("invalid key length " + password.length);
     if (typeof iv === "string")
-      iv = Buffer2.from(iv);
+      iv = Buffer.from(iv);
     if (config.mode !== "GCM" && iv.length !== config.iv)
       throw new TypeError("invalid iv length " + iv.length);
     if (config.type === "stream") {
@@ -12320,7 +12320,7 @@ function dew$1$() {
     return exports$20;
   _dewExec$1$ = true;
   var AuthCipher = dew$23();
-  var Buffer2 = dew$2P().Buffer;
+  var Buffer = dew$2P().Buffer;
   var MODES = dew$26();
   var StreamCipher = dew$22();
   var Transform = dew$2z();
@@ -12332,7 +12332,7 @@ function dew$1$() {
     (this || _global$A)._cache = new Splitter();
     (this || _global$A)._last = void 0;
     (this || _global$A)._cipher = new aes.AES(key);
-    (this || _global$A)._prev = Buffer2.from(iv);
+    (this || _global$A)._prev = Buffer.from(iv);
     (this || _global$A)._mode = mode;
     (this || _global$A)._autopadding = true;
   }
@@ -12346,7 +12346,7 @@ function dew$1$() {
       thing = (this || _global$A)._mode.decrypt(this || _global$A, chunk);
       out.push(thing);
     }
-    return Buffer2.concat(out);
+    return Buffer.concat(out);
   };
   Decipher2.prototype._final = function() {
     var chunk = (this || _global$A)._cache.flush();
@@ -12361,10 +12361,10 @@ function dew$1$() {
     return this || _global$A;
   };
   function Splitter() {
-    (this || _global$A).cache = Buffer2.allocUnsafe(0);
+    (this || _global$A).cache = Buffer.allocUnsafe(0);
   }
   Splitter.prototype.add = function(data) {
-    (this || _global$A).cache = Buffer2.concat([(this || _global$A).cache, data]);
+    (this || _global$A).cache = Buffer.concat([(this || _global$A).cache, data]);
   };
   Splitter.prototype.get = function(autoPadding) {
     var out;
@@ -12407,11 +12407,11 @@ function dew$1$() {
     if (!config)
       throw new TypeError("invalid suite type");
     if (typeof iv === "string")
-      iv = Buffer2.from(iv);
+      iv = Buffer.from(iv);
     if (config.mode !== "GCM" && iv.length !== config.iv)
       throw new TypeError("invalid iv length " + iv.length);
     if (typeof password === "string")
-      password = Buffer2.from(password);
+      password = Buffer.from(password);
     if (password.length !== config.key / 8)
       throw new TypeError("invalid key length " + password.length);
     if (config.type === "stream") {
@@ -12605,12 +12605,12 @@ function dew$1X() {
     }
     BN.BN = BN;
     BN.wordSize = 26;
-    var Buffer2;
+    var Buffer;
     try {
       if (typeof window !== "undefined" && typeof window.Buffer !== "undefined") {
-        Buffer2 = window.Buffer;
+        Buffer = window.Buffer;
       } else {
-        Buffer2 = buffer.Buffer;
+        Buffer = buffer.Buffer;
       }
     } catch (e8) {
     }
@@ -12938,8 +12938,8 @@ function dew$1X() {
       return this.toString(16);
     };
     BN.prototype.toBuffer = function toBuffer(endian, length) {
-      assert(typeof Buffer2 !== "undefined");
-      return this.toArrayLike(Buffer2, endian, length);
+      assert(typeof Buffer !== "undefined");
+      return this.toArrayLike(Buffer, endian, length);
     };
     BN.prototype.toArray = function toArray(endian, length) {
       return this.toArrayLike(Array, endian, length);
@@ -15335,12 +15335,12 @@ function dew$1W() {
     }
     BN.BN = BN;
     BN.wordSize = 26;
-    var Buffer2;
+    var Buffer;
     try {
       if (typeof window !== "undefined" && typeof window.Buffer !== "undefined") {
-        Buffer2 = window.Buffer;
+        Buffer = window.Buffer;
       } else {
-        Buffer2 = buffer.Buffer;
+        Buffer = buffer.Buffer;
       }
     } catch (e8) {
     }
@@ -15668,8 +15668,8 @@ function dew$1W() {
       return this.toString(16);
     };
     BN.prototype.toBuffer = function toBuffer(endian, length) {
-      assert(typeof Buffer2 !== "undefined");
-      return this.toArrayLike(Buffer2, endian, length);
+      assert(typeof Buffer !== "undefined");
+      return this.toArrayLike(Buffer, endian, length);
     };
     BN.prototype.toArray = function toArray(endian, length) {
       return this.toArrayLike(Array, endian, length);
@@ -18043,34 +18043,34 @@ function dew$1T() {
     return exports$1U;
   _dewExec$1T = true;
   var buffer2 = e$1$1;
-  var Buffer2 = buffer2.Buffer;
+  var Buffer = buffer2.Buffer;
   function copyProps(src, dst) {
     for (var key in src) {
       dst[key] = src[key];
     }
   }
-  if (Buffer2.from && Buffer2.alloc && Buffer2.allocUnsafe && Buffer2.allocUnsafeSlow) {
+  if (Buffer.from && Buffer.alloc && Buffer.allocUnsafe && Buffer.allocUnsafeSlow) {
     exports$1U = buffer2;
   } else {
     copyProps(buffer2, exports$1U);
     exports$1U.Buffer = SafeBuffer;
   }
   function SafeBuffer(arg, encodingOrOffset, length) {
-    return Buffer2(arg, encodingOrOffset, length);
+    return Buffer(arg, encodingOrOffset, length);
   }
-  SafeBuffer.prototype = Object.create(Buffer2.prototype);
-  copyProps(Buffer2, SafeBuffer);
+  SafeBuffer.prototype = Object.create(Buffer.prototype);
+  copyProps(Buffer, SafeBuffer);
   SafeBuffer.from = function(arg, encodingOrOffset, length) {
     if (typeof arg === "number") {
       throw new TypeError("Argument must not be a number");
     }
-    return Buffer2(arg, encodingOrOffset, length);
+    return Buffer(arg, encodingOrOffset, length);
   };
   SafeBuffer.alloc = function(size, fill, encoding) {
     if (typeof size !== "number") {
       throw new TypeError("Argument must be a number");
     }
-    var buf = Buffer2(size);
+    var buf = Buffer(size);
     if (fill !== void 0) {
       if (typeof encoding === "string") {
         buf.fill(fill, encoding);
@@ -18086,7 +18086,7 @@ function dew$1T() {
     if (typeof size !== "number") {
       throw new TypeError("Argument must be a number");
     }
-    return Buffer2(size);
+    return Buffer(size);
   };
   SafeBuffer.allocUnsafeSlow = function(size) {
     if (typeof size !== "number") {
@@ -18109,7 +18109,7 @@ function dew$1S() {
   function oldBrowser() {
     throw new Error("Secure random number generation is not supported by this browser.\nUse Chrome, Firefox or Internet Explorer 11");
   }
-  var Buffer2 = dew$1T().Buffer;
+  var Buffer = dew$1T().Buffer;
   var crypto2 = _global$w.crypto || _global$w.msCrypto;
   if (crypto2 && crypto2.getRandomValues) {
     exports$1T = randomBytes2;
@@ -18119,7 +18119,7 @@ function dew$1S() {
   function randomBytes2(size, cb) {
     if (size > MAX_UINT32)
       throw new RangeError("requested too many random bytes");
-    var bytes = Buffer2.allocUnsafe(size);
+    var bytes = Buffer.allocUnsafe(size);
     if (size > 0) {
       if (size > MAX_BYTES) {
         for (var generated = 0; generated < size; generated += MAX_BYTES) {
@@ -18144,17 +18144,17 @@ function dew$1R() {
   if (_dewExec$1R)
     return exports$1S;
   _dewExec$1R = true;
-  var Buffer2 = dew$1T().Buffer;
+  var Buffer = dew$1T().Buffer;
   var Transform = dew$1V().Transform;
   var inherits2 = dew$f$2();
   function throwIfNotStringOrBuffer(val, prefix) {
-    if (!Buffer2.isBuffer(val) && typeof val !== "string") {
+    if (!Buffer.isBuffer(val) && typeof val !== "string") {
       throw new TypeError(prefix + " must be a string or a buffer");
     }
   }
   function HashBase(blockSize) {
     Transform.call(this);
-    this._block = Buffer2.allocUnsafe(blockSize);
+    this._block = Buffer.allocUnsafe(blockSize);
     this._blockSize = blockSize;
     this._blockOffset = 0;
     this._length = [0, 0, 0, 0];
@@ -18183,8 +18183,8 @@ function dew$1R() {
     throwIfNotStringOrBuffer(data, "Data");
     if (this._finalized)
       throw new Error("Digest already called");
-    if (!Buffer2.isBuffer(data))
-      data = Buffer2.from(data, encoding);
+    if (!Buffer.isBuffer(data))
+      data = Buffer.from(data, encoding);
     var block = this._block;
     var offset = 0;
     while (this._blockOffset + data.length - offset >= this._blockSize) {
@@ -18233,7 +18233,7 @@ function dew$1Q() {
   _dewExec$1Q = true;
   var inherits2 = dew$f$2();
   var HashBase = dew$1R();
-  var Buffer2 = dew$1T().Buffer;
+  var Buffer = dew$1T().Buffer;
   var ARRAY16 = new Array(16);
   function MD5() {
     HashBase.call(this, 64);
@@ -18331,7 +18331,7 @@ function dew$1Q() {
     this._block.writeUInt32LE(this._length[0], 56);
     this._block.writeUInt32LE(this._length[1], 60);
     this._update();
-    var buffer2 = Buffer2.allocUnsafe(16);
+    var buffer2 = Buffer.allocUnsafe(16);
     buffer2.writeInt32LE(this._a, 0);
     buffer2.writeInt32LE(this._b, 4);
     buffer2.writeInt32LE(this._c, 8);
@@ -18362,7 +18362,7 @@ function dew$1P() {
   if (_dewExec$1P)
     return exports$1Q;
   _dewExec$1P = true;
-  var Buffer2 = e$1$1.Buffer;
+  var Buffer = e$1$1.Buffer;
   var inherits2 = dew$f$2();
   var HashBase = dew$1R();
   var ARRAY16 = new Array(16);
@@ -18443,7 +18443,7 @@ function dew$1P() {
     this._block.writeUInt32LE(this._length[0], 56);
     this._block.writeUInt32LE(this._length[1], 60);
     this._update();
-    var buffer2 = Buffer2.alloc ? Buffer2.alloc(20) : new Buffer2(20);
+    var buffer2 = Buffer.alloc ? Buffer.alloc(20) : new Buffer(20);
     buffer2.writeInt32LE(this._a, 0);
     buffer2.writeInt32LE(this._b, 4);
     buffer2.writeInt32LE(this._c, 8);
@@ -18479,9 +18479,9 @@ function dew$1O() {
   if (_dewExec$1O)
     return exports$1P;
   _dewExec$1O = true;
-  var Buffer2 = dew$1T().Buffer;
+  var Buffer = dew$1T().Buffer;
   function Hash2(blockSize, finalSize) {
-    (this || _global$v)._block = Buffer2.alloc(blockSize);
+    (this || _global$v)._block = Buffer.alloc(blockSize);
     (this || _global$v)._finalSize = finalSize;
     (this || _global$v)._blockSize = blockSize;
     (this || _global$v)._len = 0;
@@ -18489,7 +18489,7 @@ function dew$1O() {
   Hash2.prototype.update = function(data, enc) {
     if (typeof data === "string") {
       enc = enc || "utf8";
-      data = Buffer2.from(data, enc);
+      data = Buffer.from(data, enc);
     }
     var block = (this || _global$v)._block;
     var blockSize = (this || _global$v)._blockSize;
@@ -18546,7 +18546,7 @@ function dew$1N() {
   _dewExec$1N = true;
   var inherits2 = dew$f$2();
   var Hash2 = dew$1O();
-  var Buffer2 = dew$1T().Buffer;
+  var Buffer = dew$1T().Buffer;
   var K3 = [1518500249, 1859775393, 2400959708 | 0, 3395469782 | 0];
   var W3 = new Array(80);
   function Sha() {
@@ -18603,7 +18603,7 @@ function dew$1N() {
     (this || _global$u)._e = e8 + (this || _global$u)._e | 0;
   };
   Sha.prototype._hash = function() {
-    var H3 = Buffer2.allocUnsafe(20);
+    var H3 = Buffer.allocUnsafe(20);
     H3.writeInt32BE((this || _global$u)._a | 0, 0);
     H3.writeInt32BE((this || _global$u)._b | 0, 4);
     H3.writeInt32BE((this || _global$u)._c | 0, 8);
@@ -18623,7 +18623,7 @@ function dew$1M() {
   _dewExec$1M = true;
   var inherits2 = dew$f$2();
   var Hash2 = dew$1O();
-  var Buffer2 = dew$1T().Buffer;
+  var Buffer = dew$1T().Buffer;
   var K3 = [1518500249, 1859775393, 2400959708 | 0, 3395469782 | 0];
   var W3 = new Array(80);
   function Sha1() {
@@ -18683,7 +18683,7 @@ function dew$1M() {
     (this || _global$t)._e = e8 + (this || _global$t)._e | 0;
   };
   Sha1.prototype._hash = function() {
-    var H3 = Buffer2.allocUnsafe(20);
+    var H3 = Buffer.allocUnsafe(20);
     H3.writeInt32BE((this || _global$t)._a | 0, 0);
     H3.writeInt32BE((this || _global$t)._b | 0, 4);
     H3.writeInt32BE((this || _global$t)._c | 0, 8);
@@ -18703,7 +18703,7 @@ function dew$1L() {
   _dewExec$1L = true;
   var inherits2 = dew$f$2();
   var Hash2 = dew$1O();
-  var Buffer2 = dew$1T().Buffer;
+  var Buffer = dew$1T().Buffer;
   var K3 = [1116352408, 1899447441, 3049323471, 3921009573, 961987163, 1508970993, 2453635748, 2870763221, 3624381080, 310598401, 607225278, 1426881987, 1925078388, 2162078206, 2614888103, 3248222580, 3835390401, 4022224774, 264347078, 604807628, 770255983, 1249150122, 1555081692, 1996064986, 2554220882, 2821834349, 2952996808, 3210313671, 3336571891, 3584528711, 113926993, 338241895, 666307205, 773529912, 1294757372, 1396182291, 1695183700, 1986661051, 2177026350, 2456956037, 2730485921, 2820302411, 3259730800, 3345764771, 3516065817, 3600352804, 4094571909, 275423344, 430227734, 506948616, 659060556, 883997877, 958139571, 1322822218, 1537002063, 1747873779, 1955562222, 2024104815, 2227730452, 2361852424, 2428436474, 2756734187, 3204031479, 3329325298];
   var W3 = new Array(64);
   function Sha256() {
@@ -18777,7 +18777,7 @@ function dew$1L() {
     (this || _global$s)._h = h6 + (this || _global$s)._h | 0;
   };
   Sha256.prototype._hash = function() {
-    var H3 = Buffer2.allocUnsafe(32);
+    var H3 = Buffer.allocUnsafe(32);
     H3.writeInt32BE((this || _global$s)._a, 0);
     H3.writeInt32BE((this || _global$s)._b, 4);
     H3.writeInt32BE((this || _global$s)._c, 8);
@@ -18801,7 +18801,7 @@ function dew$1K() {
   var inherits2 = dew$f$2();
   var Sha256 = dew$1L();
   var Hash2 = dew$1O();
-  var Buffer2 = dew$1T().Buffer;
+  var Buffer = dew$1T().Buffer;
   var W3 = new Array(64);
   function Sha224() {
     this.init();
@@ -18821,7 +18821,7 @@ function dew$1K() {
     return this || _global$r;
   };
   Sha224.prototype._hash = function() {
-    var H3 = Buffer2.allocUnsafe(28);
+    var H3 = Buffer.allocUnsafe(28);
     H3.writeInt32BE((this || _global$r)._a, 0);
     H3.writeInt32BE((this || _global$r)._b, 4);
     H3.writeInt32BE((this || _global$r)._c, 8);
@@ -18843,7 +18843,7 @@ function dew$1J() {
   _dewExec$1J = true;
   var inherits2 = dew$f$2();
   var Hash2 = dew$1O();
-  var Buffer2 = dew$1T().Buffer;
+  var Buffer = dew$1T().Buffer;
   var K3 = [1116352408, 3609767458, 1899447441, 602891725, 3049323471, 3964484399, 3921009573, 2173295548, 961987163, 4081628472, 1508970993, 3053834265, 2453635748, 2937671579, 2870763221, 3664609560, 3624381080, 2734883394, 310598401, 1164996542, 607225278, 1323610764, 1426881987, 3590304994, 1925078388, 4068182383, 2162078206, 991336113, 2614888103, 633803317, 3248222580, 3479774868, 3835390401, 2666613458, 4022224774, 944711139, 264347078, 2341262773, 604807628, 2007800933, 770255983, 1495990901, 1249150122, 1856431235, 1555081692, 3175218132, 1996064986, 2198950837, 2554220882, 3999719339, 2821834349, 766784016, 2952996808, 2566594879, 3210313671, 3203337956, 3336571891, 1034457026, 3584528711, 2466948901, 113926993, 3758326383, 338241895, 168717936, 666307205, 1188179964, 773529912, 1546045734, 1294757372, 1522805485, 1396182291, 2643833823, 1695183700, 2343527390, 1986661051, 1014477480, 2177026350, 1206759142, 2456956037, 344077627, 2730485921, 1290863460, 2820302411, 3158454273, 3259730800, 3505952657, 3345764771, 106217008, 3516065817, 3606008344, 3600352804, 1432725776, 4094571909, 1467031594, 275423344, 851169720, 430227734, 3100823752, 506948616, 1363258195, 659060556, 3750685593, 883997877, 3785050280, 958139571, 3318307427, 1322822218, 3812723403, 1537002063, 2003034995, 1747873779, 3602036899, 1955562222, 1575990012, 2024104815, 1125592928, 2227730452, 2716904306, 2361852424, 442776044, 2428436474, 593698344, 2756734187, 3733110249, 3204031479, 2999351573, 3329325298, 3815920427, 3391569614, 3928383900, 3515267271, 566280711, 3940187606, 3454069534, 4118630271, 4000239992, 116418474, 1914138554, 174292421, 2731055270, 289380356, 3203993006, 460393269, 320620315, 685471733, 587496836, 852142971, 1086792851, 1017036298, 365543100, 1126000580, 2618297676, 1288033470, 3409855158, 1501505948, 4234509866, 1607167915, 987167468, 1816402316, 1246189591];
   var W3 = new Array(160);
   function Sha512() {
@@ -19000,7 +19000,7 @@ function dew$1J() {
     (this || _global$q)._hh = (this || _global$q)._hh + hh + getCarry((this || _global$q)._hl, hl) | 0;
   };
   Sha512.prototype._hash = function() {
-    var H3 = Buffer2.allocUnsafe(64);
+    var H3 = Buffer.allocUnsafe(64);
     function writeInt64BE(h6, l6, offset) {
       H3.writeInt32BE(h6, offset);
       H3.writeInt32BE(l6, offset + 4);
@@ -19028,7 +19028,7 @@ function dew$1I() {
   var inherits2 = dew$f$2();
   var SHA512 = dew$1J();
   var Hash2 = dew$1O();
-  var Buffer2 = dew$1T().Buffer;
+  var Buffer = dew$1T().Buffer;
   var W3 = new Array(160);
   function Sha384() {
     this.init();
@@ -19056,7 +19056,7 @@ function dew$1I() {
     return this || _global$p;
   };
   Sha384.prototype._hash = function() {
-    var H3 = Buffer2.allocUnsafe(48);
+    var H3 = Buffer.allocUnsafe(48);
     function writeInt64BE(h6, l6, offset) {
       H3.writeInt32BE(h6, offset);
       H3.writeInt32BE(l6, offset + 4);
@@ -20839,7 +20839,7 @@ function dew$1G() {
   if (_dewExec$1G)
     return exports$1H;
   _dewExec$1G = true;
-  var Buffer2 = dew$1T().Buffer;
+  var Buffer = dew$1T().Buffer;
   var Transform = b$i.Transform;
   var StringDecoder = e$12.StringDecoder;
   var inherits2 = dew$f$2();
@@ -20861,7 +20861,7 @@ function dew$1G() {
   inherits2(CipherBase, Transform);
   CipherBase.prototype.update = function(data, inputEnc, outputEnc) {
     if (typeof data === "string") {
-      data = Buffer2.from(data, inputEnc);
+      data = Buffer.from(data, inputEnc);
     }
     var outData = this._update(data);
     if ((this || _global$o).hashMode)
@@ -20906,7 +20906,7 @@ function dew$1G() {
     done(err);
   };
   CipherBase.prototype._finalOrDigest = function(outputEnc) {
-    var outData = this.__final() || Buffer2.alloc(0);
+    var outData = this.__final() || Buffer.alloc(0);
     if (outputEnc) {
       outData = this._toString(outData, outputEnc, true);
     }
@@ -20967,24 +20967,24 @@ function dew$1E() {
     return exports$1F;
   _dewExec$1E = true;
   var inherits2 = dew$f$2();
-  var Buffer2 = dew$1T().Buffer;
+  var Buffer = dew$1T().Buffer;
   var Base = dew$1G();
-  var ZEROS = Buffer2.alloc(128);
+  var ZEROS = Buffer.alloc(128);
   var blocksize = 64;
   function Hmac2(alg, key) {
     Base.call(this, "digest");
     if (typeof key === "string") {
-      key = Buffer2.from(key);
+      key = Buffer.from(key);
     }
     this._alg = alg;
     this._key = key;
     if (key.length > blocksize) {
       key = alg(key);
     } else if (key.length < blocksize) {
-      key = Buffer2.concat([key, ZEROS], blocksize);
+      key = Buffer.concat([key, ZEROS], blocksize);
     }
-    var ipad = this._ipad = Buffer2.allocUnsafe(blocksize);
-    var opad = this._opad = Buffer2.allocUnsafe(blocksize);
+    var ipad = this._ipad = Buffer.allocUnsafe(blocksize);
+    var opad = this._opad = Buffer.allocUnsafe(blocksize);
     for (var i6 = 0; i6 < blocksize; i6++) {
       ipad[i6] = key[i6] ^ 54;
       opad[i6] = key[i6] ^ 92;
@@ -20996,8 +20996,8 @@ function dew$1E() {
     this._hash.push(data);
   };
   Hmac2.prototype._final = function() {
-    var h6 = this._alg(Buffer2.concat(this._hash));
-    return this._alg(Buffer2.concat([this._opad, h6]));
+    var h6 = this._alg(Buffer.concat(this._hash));
+    return this._alg(Buffer.concat([this._opad, h6]));
   };
   exports$1F = Hmac2;
   return exports$1F;
@@ -21023,15 +21023,15 @@ function dew$1C() {
   var inherits2 = dew$f$2();
   var Legacy = dew$1E();
   var Base = dew$1G();
-  var Buffer2 = dew$1T().Buffer;
+  var Buffer = dew$1T().Buffer;
   var md5 = dew$1D();
   var RIPEMD160 = dew$1P();
   var sha = dew$1H();
-  var ZEROS = Buffer2.alloc(128);
+  var ZEROS = Buffer.alloc(128);
   function Hmac2(alg, key) {
     Base.call(this, "digest");
     if (typeof key === "string") {
-      key = Buffer2.from(key);
+      key = Buffer.from(key);
     }
     var blocksize = alg === "sha512" || alg === "sha384" ? 128 : 64;
     this._alg = alg;
@@ -21040,10 +21040,10 @@ function dew$1C() {
       var hash = alg === "rmd160" ? new RIPEMD160() : sha(alg);
       key = hash.update(key).digest();
     } else if (key.length < blocksize) {
-      key = Buffer2.concat([key, ZEROS], blocksize);
+      key = Buffer.concat([key, ZEROS], blocksize);
     }
-    var ipad = this._ipad = Buffer2.allocUnsafe(blocksize);
-    var opad = this._opad = Buffer2.allocUnsafe(blocksize);
+    var ipad = this._ipad = Buffer.allocUnsafe(blocksize);
+    var opad = this._opad = Buffer.allocUnsafe(blocksize);
     for (var i6 = 0; i6 < blocksize; i6++) {
       ipad[i6] = key[i6] ^ 54;
       opad[i6] = key[i6] ^ 92;
@@ -21282,14 +21282,14 @@ function dew$1y() {
   if (_dewExec$1y)
     return exports$1z;
   _dewExec$1y = true;
-  var Buffer2 = dew$1T().Buffer;
+  var Buffer = dew$1T().Buffer;
   exports$1z = function(thing, encoding, name) {
-    if (Buffer2.isBuffer(thing)) {
+    if (Buffer.isBuffer(thing)) {
       return thing;
     } else if (typeof thing === "string") {
-      return Buffer2.from(thing, encoding);
+      return Buffer.from(thing, encoding);
     } else if (ArrayBuffer.isView(thing)) {
-      return Buffer2.from(thing.buffer);
+      return Buffer.from(thing.buffer);
     } else {
       throw new TypeError(name + " must be a string, a Buffer, a typed array or a DataView");
     }
@@ -21306,11 +21306,11 @@ function dew$1x() {
   var md5 = dew$1D();
   var RIPEMD160 = dew$1P();
   var sha = dew$1H();
-  var Buffer2 = dew$1T().Buffer;
+  var Buffer = dew$1T().Buffer;
   var checkParameters = dew$1A();
   var defaultEncoding = dew$1z();
   var toBuffer = dew$1y();
-  var ZEROS = Buffer2.alloc(128);
+  var ZEROS = Buffer.alloc(128);
   var sizes = {
     md5: 16,
     sha1: 20,
@@ -21327,15 +21327,15 @@ function dew$1x() {
     if (key.length > blocksize) {
       key = hash(key);
     } else if (key.length < blocksize) {
-      key = Buffer2.concat([key, ZEROS], blocksize);
+      key = Buffer.concat([key, ZEROS], blocksize);
     }
-    var ipad = Buffer2.allocUnsafe(blocksize + sizes[alg]);
-    var opad = Buffer2.allocUnsafe(blocksize + sizes[alg]);
+    var ipad = Buffer.allocUnsafe(blocksize + sizes[alg]);
+    var opad = Buffer.allocUnsafe(blocksize + sizes[alg]);
     for (var i6 = 0; i6 < blocksize; i6++) {
       ipad[i6] = key[i6] ^ 54;
       opad[i6] = key[i6] ^ 92;
     }
-    var ipad1 = Buffer2.allocUnsafe(blocksize + saltLen + 4);
+    var ipad1 = Buffer.allocUnsafe(blocksize + saltLen + 4);
     ipad.copy(ipad1, 0, 0, blocksize);
     (this || _global$m).ipad1 = ipad1;
     (this || _global$m).ipad2 = ipad;
@@ -21370,8 +21370,8 @@ function dew$1x() {
     salt = toBuffer(salt, defaultEncoding, "Salt");
     digest = digest || "sha1";
     var hmac = new Hmac2(digest, password, salt.length);
-    var DK = Buffer2.allocUnsafe(keylen);
-    var block1 = Buffer2.allocUnsafe(salt.length + 4);
+    var DK = Buffer.allocUnsafe(keylen);
+    var block1 = Buffer.allocUnsafe(salt.length + 4);
     salt.copy(block1, 0, 0, salt.length);
     var destPos = 0;
     var hLen = sizes[digest];
@@ -21400,7 +21400,7 @@ function dew$1w() {
   if (_dewExec$1w)
     return exports$1x;
   _dewExec$1w = true;
-  var Buffer2 = dew$1T().Buffer;
+  var Buffer = dew$1T().Buffer;
   var checkParameters = dew$1A();
   var defaultEncoding = dew$1z();
   var sync = dew$1x();
@@ -21429,7 +21429,7 @@ function dew$1w() {
     if (checks[algo] !== void 0) {
       return checks[algo];
     }
-    ZERO_BUF = ZERO_BUF || Buffer2.alloc(8);
+    ZERO_BUF = ZERO_BUF || Buffer.alloc(8);
     var prom = browserPbkdf2(ZERO_BUF, ZERO_BUF, 10, 128, algo).then(function() {
       return true;
     }).catch(function() {
@@ -21467,7 +21467,7 @@ function dew$1w() {
         }
       }, key, length << 3);
     }).then(function(res) {
-      return Buffer2.from(res);
+      return Buffer.from(res);
     });
   }
   function resolvePromise(promise, callback) {
@@ -22112,7 +22112,7 @@ function dew$1n() {
   var CipherBase = dew$1G();
   var des = dew$1o();
   var inherits2 = dew$f$2();
-  var Buffer2 = dew$1T().Buffer;
+  var Buffer = dew$1T().Buffer;
   var modes = {
     "des-ede3-cbc": des.CBC.instantiate(des.EDE),
     "des-ede3": des.EDE,
@@ -22136,15 +22136,15 @@ function dew$1n() {
       type = "encrypt";
     }
     var key = opts.key;
-    if (!Buffer2.isBuffer(key)) {
-      key = Buffer2.from(key);
+    if (!Buffer.isBuffer(key)) {
+      key = Buffer.from(key);
     }
     if (modeName === "des-ede" || modeName === "des-ede-cbc") {
-      key = Buffer2.concat([key, key.slice(0, 8)]);
+      key = Buffer.concat([key, key.slice(0, 8)]);
     }
     var iv = opts.iv;
-    if (!Buffer2.isBuffer(iv)) {
-      iv = Buffer2.from(iv);
+    if (!Buffer.isBuffer(iv)) {
+      iv = Buffer.from(iv);
     }
     (this || _global$k)._des = mode.create({
       key,
@@ -22153,10 +22153,10 @@ function dew$1n() {
     });
   }
   DES.prototype._update = function(data) {
-    return Buffer2.from((this || _global$k)._des.update(data));
+    return Buffer.from((this || _global$k)._des.update(data));
   };
   DES.prototype._final = function() {
-    return Buffer2.from((this || _global$k)._des.final());
+    return Buffer.from((this || _global$k)._des.final());
   };
   return exports$1o;
 }
@@ -22180,10 +22180,10 @@ function dew$1l() {
   if (_dewExec$1l)
     return exports$1m;
   _dewExec$1l = true;
-  var Buffer2 = e$1$1.Buffer;
+  var Buffer = e$1$1.Buffer;
   exports$1m = function xor(a6, b4) {
     var length = Math.min(a6.length, b4.length);
-    var buffer2 = new Buffer2(length);
+    var buffer2 = new Buffer(length);
     for (var i6 = 0; i6 < length; ++i6) {
       buffer2[i6] = a6[i6] ^ b4[i6];
     }
@@ -22217,29 +22217,29 @@ function dew$1j() {
   if (_dewExec$1j)
     return exports$1k;
   _dewExec$1j = true;
-  var Buffer2 = dew$1T().Buffer;
+  var Buffer = dew$1T().Buffer;
   var xor = dew$1l();
   function encryptStart(self2, data, decrypt) {
     var len = data.length;
     var out = xor(data, self2._cache);
     self2._cache = self2._cache.slice(len);
-    self2._prev = Buffer2.concat([self2._prev, decrypt ? data : out]);
+    self2._prev = Buffer.concat([self2._prev, decrypt ? data : out]);
     return out;
   }
   exports$1k.encrypt = function(self2, data, decrypt) {
-    var out = Buffer2.allocUnsafe(0);
+    var out = Buffer.allocUnsafe(0);
     var len;
     while (data.length) {
       if (self2._cache.length === 0) {
         self2._cache = self2._cipher.encryptBlock(self2._prev);
-        self2._prev = Buffer2.allocUnsafe(0);
+        self2._prev = Buffer.allocUnsafe(0);
       }
       if (self2._cache.length <= data.length) {
         len = self2._cache.length;
-        out = Buffer2.concat([out, encryptStart(self2, data.slice(0, len), decrypt)]);
+        out = Buffer.concat([out, encryptStart(self2, data.slice(0, len), decrypt)]);
         data = data.slice(len);
       } else {
-        out = Buffer2.concat([out, encryptStart(self2, data, decrypt)]);
+        out = Buffer.concat([out, encryptStart(self2, data, decrypt)]);
         break;
       }
     }
@@ -22253,16 +22253,16 @@ function dew$1i() {
   if (_dewExec$1i)
     return exports$1j;
   _dewExec$1i = true;
-  var Buffer2 = dew$1T().Buffer;
+  var Buffer = dew$1T().Buffer;
   function encryptByte(self2, byteParam, decrypt) {
     var pad = self2._cipher.encryptBlock(self2._prev);
     var out = pad[0] ^ byteParam;
-    self2._prev = Buffer2.concat([self2._prev.slice(1), Buffer2.from([decrypt ? byteParam : out])]);
+    self2._prev = Buffer.concat([self2._prev.slice(1), Buffer.from([decrypt ? byteParam : out])]);
     return out;
   }
   exports$1j.encrypt = function(self2, chunk, decrypt) {
     var len = chunk.length;
-    var out = Buffer2.allocUnsafe(len);
+    var out = Buffer.allocUnsafe(len);
     var i6 = -1;
     while (++i6 < len) {
       out[i6] = encryptByte(self2, chunk[i6], decrypt);
@@ -22277,7 +22277,7 @@ function dew$1h() {
   if (_dewExec$1h)
     return exports$1i;
   _dewExec$1h = true;
-  var Buffer2 = dew$1T().Buffer;
+  var Buffer = dew$1T().Buffer;
   function encryptByte(self2, byteParam, decrypt) {
     var pad;
     var i6 = -1;
@@ -22296,8 +22296,8 @@ function dew$1h() {
   function shiftIn(buffer2, value) {
     var len = buffer2.length;
     var i6 = -1;
-    var out = Buffer2.allocUnsafe(buffer2.length);
-    buffer2 = Buffer2.concat([buffer2, Buffer2.from([value])]);
+    var out = Buffer.allocUnsafe(buffer2.length);
+    buffer2 = Buffer.concat([buffer2, Buffer.from([value])]);
     while (++i6 < len) {
       out[i6] = buffer2[i6] << 1 | buffer2[i6 + 1] >> 7;
     }
@@ -22305,7 +22305,7 @@ function dew$1h() {
   }
   exports$1i.encrypt = function(self2, chunk, decrypt) {
     var len = chunk.length;
-    var out = Buffer2.allocUnsafe(len);
+    var out = Buffer.allocUnsafe(len);
     var i6 = -1;
     while (++i6 < len) {
       out[i6] = encryptByte(self2, chunk[i6], decrypt);
@@ -22320,7 +22320,7 @@ function dew$1g() {
   if (_dewExec$1g)
     return exports$1h;
   _dewExec$1g = true;
-  var Buffer2 = e$1$1.Buffer;
+  var Buffer = e$1$1.Buffer;
   var xor = dew$1l();
   function getBlock(self2) {
     self2._prev = self2._cipher.encryptBlock(self2._prev);
@@ -22328,7 +22328,7 @@ function dew$1g() {
   }
   exports$1h.encrypt = function(self2, chunk) {
     while (self2._cache.length < chunk.length) {
-      self2._cache = Buffer2.concat([self2._cache, getBlock(self2)]);
+      self2._cache = Buffer.concat([self2._cache, getBlock(self2)]);
     }
     var pad = self2._cache.slice(0, chunk.length);
     self2._cache = self2._cache.slice(chunk.length);
@@ -22366,7 +22366,7 @@ function dew$1e() {
     return exports$1f;
   _dewExec$1e = true;
   var xor = dew$1l();
-  var Buffer2 = dew$1T().Buffer;
+  var Buffer = dew$1T().Buffer;
   var incr32 = dew$1f();
   function getBlock(self2) {
     var out = self2._cipher.encryptBlockRaw(self2._prev);
@@ -22377,7 +22377,7 @@ function dew$1e() {
   exports$1f.encrypt = function(self2, chunk) {
     var chunkNum = Math.ceil(chunk.length / blockSize);
     var start = self2._cache.length;
-    self2._cache = Buffer2.concat([self2._cache, Buffer2.allocUnsafe(chunkNum * blockSize)]);
+    self2._cache = Buffer.concat([self2._cache, Buffer.allocUnsafe(chunkNum * blockSize)]);
     for (var i6 = 0; i6 < chunkNum; i6++) {
       var out = getBlock(self2);
       var offset = start + i6 * blockSize;
@@ -22613,10 +22613,10 @@ function dew$1c() {
   if (_dewExec$1c)
     return exports$1d;
   _dewExec$1c = true;
-  var Buffer2 = dew$1T().Buffer;
+  var Buffer = dew$1T().Buffer;
   function asUInt32Array(buf) {
-    if (!Buffer2.isBuffer(buf))
-      buf = Buffer2.from(buf);
+    if (!Buffer.isBuffer(buf))
+      buf = Buffer.from(buf);
     var len = buf.length / 4 | 0;
     var out = new Array(len);
     for (var i6 = 0; i6 < len; i6++) {
@@ -22756,7 +22756,7 @@ function dew$1c() {
   };
   AES.prototype.encryptBlock = function(M4) {
     var out = this.encryptBlockRaw(M4);
-    var buf = Buffer2.allocUnsafe(16);
+    var buf = Buffer.allocUnsafe(16);
     buf.writeUInt32BE(out[0], 0);
     buf.writeUInt32BE(out[1], 4);
     buf.writeUInt32BE(out[2], 8);
@@ -22769,7 +22769,7 @@ function dew$1c() {
     M4[1] = M4[3];
     M4[3] = m1;
     var out = cryptBlock(M4, (this || _global$j)._invKeySchedule, G3.INV_SUB_MIX, G3.INV_SBOX, (this || _global$j)._nRounds);
-    var buf = Buffer2.allocUnsafe(16);
+    var buf = Buffer.allocUnsafe(16);
     buf.writeUInt32BE(out[0], 0);
     buf.writeUInt32BE(out[3], 4);
     buf.writeUInt32BE(out[2], 8);
@@ -22791,13 +22791,13 @@ function dew$1b() {
   if (_dewExec$1b)
     return exports$1c;
   _dewExec$1b = true;
-  var Buffer2 = dew$1T().Buffer;
-  var ZEROES = Buffer2.alloc(16, 0);
+  var Buffer = dew$1T().Buffer;
+  var ZEROES = Buffer.alloc(16, 0);
   function toArray(buf) {
     return [buf.readUInt32BE(0), buf.readUInt32BE(4), buf.readUInt32BE(8), buf.readUInt32BE(12)];
   }
   function fromArray(out) {
-    var buf = Buffer2.allocUnsafe(16);
+    var buf = Buffer.allocUnsafe(16);
     buf.writeUInt32BE(out[0] >>> 0, 0);
     buf.writeUInt32BE(out[1] >>> 0, 4);
     buf.writeUInt32BE(out[2] >>> 0, 8);
@@ -22806,8 +22806,8 @@ function dew$1b() {
   }
   function GHASH(key) {
     (this || _global$i).h = key;
-    (this || _global$i).state = Buffer2.alloc(16, 0);
-    (this || _global$i).cache = Buffer2.allocUnsafe(0);
+    (this || _global$i).state = Buffer.alloc(16, 0);
+    (this || _global$i).cache = Buffer.allocUnsafe(0);
   }
   GHASH.prototype.ghash = function(block) {
     var i6 = -1;
@@ -22841,7 +22841,7 @@ function dew$1b() {
     (this || _global$i).state = fromArray(Zi);
   };
   GHASH.prototype.update = function(buf) {
-    (this || _global$i).cache = Buffer2.concat([(this || _global$i).cache, buf]);
+    (this || _global$i).cache = Buffer.concat([(this || _global$i).cache, buf]);
     var chunk;
     while ((this || _global$i).cache.length >= 16) {
       chunk = (this || _global$i).cache.slice(0, 16);
@@ -22851,7 +22851,7 @@ function dew$1b() {
   };
   GHASH.prototype.final = function(abl, bl) {
     if ((this || _global$i).cache.length) {
-      this.ghash(Buffer2.concat([(this || _global$i).cache, ZEROES], 16));
+      this.ghash(Buffer.concat([(this || _global$i).cache, ZEROES], 16));
     }
     this.ghash(fromArray([0, abl, 0, bl]));
     return (this || _global$i).state;
@@ -22867,7 +22867,7 @@ function dew$1a() {
     return exports$1b;
   _dewExec$1a = true;
   var aes = dew$1c();
-  var Buffer2 = dew$1T().Buffer;
+  var Buffer = dew$1T().Buffer;
   var Transform = dew$1G();
   var inherits2 = dew$f$2();
   var GHASH = dew$1b();
@@ -22885,8 +22885,8 @@ function dew$1a() {
   }
   function calcIv(self2, iv, ck) {
     if (iv.length === 12) {
-      self2._finID = Buffer2.concat([iv, Buffer2.from([0, 0, 0, 1])]);
-      return Buffer2.concat([iv, Buffer2.from([0, 0, 0, 2])]);
+      self2._finID = Buffer.concat([iv, Buffer.from([0, 0, 0, 1])]);
+      return Buffer.concat([iv, Buffer.from([0, 0, 0, 2])]);
     }
     var ghash = new GHASH(ck);
     var len = iv.length;
@@ -22894,28 +22894,28 @@ function dew$1a() {
     ghash.update(iv);
     if (toPad) {
       toPad = 16 - toPad;
-      ghash.update(Buffer2.alloc(toPad, 0));
+      ghash.update(Buffer.alloc(toPad, 0));
     }
-    ghash.update(Buffer2.alloc(8, 0));
+    ghash.update(Buffer.alloc(8, 0));
     var ivBits = len * 8;
-    var tail = Buffer2.alloc(8);
+    var tail = Buffer.alloc(8);
     tail.writeUIntBE(ivBits, 0, 8);
     ghash.update(tail);
     self2._finID = ghash.state;
-    var out = Buffer2.from(self2._finID);
+    var out = Buffer.from(self2._finID);
     incr32(out);
     return out;
   }
   function StreamCipher(mode, key, iv, decrypt) {
     Transform.call(this || _global$h);
-    var h6 = Buffer2.alloc(4, 0);
+    var h6 = Buffer.alloc(4, 0);
     (this || _global$h)._cipher = new aes.AES(key);
     var ck = (this || _global$h)._cipher.encryptBlock(h6);
     (this || _global$h)._ghash = new GHASH(ck);
     iv = calcIv(this || _global$h, iv, ck);
-    (this || _global$h)._prev = Buffer2.from(iv);
-    (this || _global$h)._cache = Buffer2.allocUnsafe(0);
-    (this || _global$h)._secCache = Buffer2.allocUnsafe(0);
+    (this || _global$h)._prev = Buffer.from(iv);
+    (this || _global$h)._cache = Buffer.allocUnsafe(0);
+    (this || _global$h)._secCache = Buffer.allocUnsafe(0);
     (this || _global$h)._decrypt = decrypt;
     (this || _global$h)._alen = 0;
     (this || _global$h)._len = 0;
@@ -22928,7 +22928,7 @@ function dew$1a() {
     if (!(this || _global$h)._called && (this || _global$h)._alen) {
       var rump = 16 - (this || _global$h)._alen % 16;
       if (rump < 16) {
-        rump = Buffer2.alloc(rump, 0);
+        rump = Buffer.alloc(rump, 0);
         (this || _global$h)._ghash.update(rump);
       }
     }
@@ -22952,7 +22952,7 @@ function dew$1a() {
     (this || _global$h)._cipher.scrub();
   };
   StreamCipher.prototype.getAuthTag = function getAuthTag() {
-    if ((this || _global$h)._decrypt || !Buffer2.isBuffer((this || _global$h)._authTag))
+    if ((this || _global$h)._decrypt || !Buffer.isBuffer((this || _global$h)._authTag))
       throw new Error("Attempting to get auth tag in unsupported state");
     return (this || _global$h)._authTag;
   };
@@ -22978,15 +22978,15 @@ function dew$19() {
     return exports$1a;
   _dewExec$19 = true;
   var aes = dew$1c();
-  var Buffer2 = dew$1T().Buffer;
+  var Buffer = dew$1T().Buffer;
   var Transform = dew$1G();
   var inherits2 = dew$f$2();
   function StreamCipher(mode, key, iv, decrypt) {
     Transform.call(this || _global$g);
     (this || _global$g)._cipher = new aes.AES(key);
-    (this || _global$g)._prev = Buffer2.from(iv);
-    (this || _global$g)._cache = Buffer2.allocUnsafe(0);
-    (this || _global$g)._secCache = Buffer2.allocUnsafe(0);
+    (this || _global$g)._prev = Buffer.from(iv);
+    (this || _global$g)._cache = Buffer.allocUnsafe(0);
+    (this || _global$g)._secCache = Buffer.allocUnsafe(0);
     (this || _global$g)._decrypt = decrypt;
     (this || _global$g)._mode = mode;
   }
@@ -23006,21 +23006,21 @@ function dew$18() {
   if (_dewExec$18)
     return exports$19;
   _dewExec$18 = true;
-  var Buffer2 = dew$1T().Buffer;
+  var Buffer = dew$1T().Buffer;
   var MD5 = dew$1Q();
   function EVP_BytesToKey(password, salt, keyBits, ivLen) {
-    if (!Buffer2.isBuffer(password))
-      password = Buffer2.from(password, "binary");
+    if (!Buffer.isBuffer(password))
+      password = Buffer.from(password, "binary");
     if (salt) {
-      if (!Buffer2.isBuffer(salt))
-        salt = Buffer2.from(salt, "binary");
+      if (!Buffer.isBuffer(salt))
+        salt = Buffer.from(salt, "binary");
       if (salt.length !== 8)
         throw new RangeError("salt should be Buffer with 8 byte length");
     }
     var keyLen = keyBits / 8;
-    var key = Buffer2.alloc(keyLen);
-    var iv = Buffer2.alloc(ivLen || 0);
-    var tmp = Buffer2.alloc(0);
+    var key = Buffer.alloc(keyLen);
+    var iv = Buffer.alloc(ivLen || 0);
+    var tmp = Buffer.alloc(0);
     while (keyLen > 0 || ivLen > 0) {
       var hash = new MD5();
       hash.update(tmp);
@@ -23060,7 +23060,7 @@ function dew$17() {
   _dewExec$17 = true;
   var MODES = dew$1d();
   var AuthCipher = dew$1a();
-  var Buffer2 = dew$1T().Buffer;
+  var Buffer = dew$1T().Buffer;
   var StreamCipher = dew$19();
   var Transform = dew$1G();
   var aes = dew$1c();
@@ -23070,7 +23070,7 @@ function dew$17() {
     Transform.call(this || _global$f);
     (this || _global$f)._cache = new Splitter();
     (this || _global$f)._cipher = new aes.AES(key);
-    (this || _global$f)._prev = Buffer2.from(iv);
+    (this || _global$f)._prev = Buffer.from(iv);
     (this || _global$f)._mode = mode;
     (this || _global$f)._autopadding = true;
   }
@@ -23084,9 +23084,9 @@ function dew$17() {
       thing = (this || _global$f)._mode.encrypt(this || _global$f, chunk);
       out.push(thing);
     }
-    return Buffer2.concat(out);
+    return Buffer.concat(out);
   };
-  var PADDING = Buffer2.alloc(16, 16);
+  var PADDING = Buffer.alloc(16, 16);
   Cipher2.prototype._final = function() {
     var chunk = (this || _global$f)._cache.flush();
     if ((this || _global$f)._autopadding) {
@@ -23104,10 +23104,10 @@ function dew$17() {
     return this || _global$f;
   };
   function Splitter() {
-    (this || _global$f).cache = Buffer2.allocUnsafe(0);
+    (this || _global$f).cache = Buffer.allocUnsafe(0);
   }
   Splitter.prototype.add = function(data) {
-    (this || _global$f).cache = Buffer2.concat([(this || _global$f).cache, data]);
+    (this || _global$f).cache = Buffer.concat([(this || _global$f).cache, data]);
   };
   Splitter.prototype.get = function() {
     if ((this || _global$f).cache.length > 15) {
@@ -23119,23 +23119,23 @@ function dew$17() {
   };
   Splitter.prototype.flush = function() {
     var len = 16 - (this || _global$f).cache.length;
-    var padBuff = Buffer2.allocUnsafe(len);
+    var padBuff = Buffer.allocUnsafe(len);
     var i6 = -1;
     while (++i6 < len) {
       padBuff.writeUInt8(len, i6);
     }
-    return Buffer2.concat([(this || _global$f).cache, padBuff]);
+    return Buffer.concat([(this || _global$f).cache, padBuff]);
   };
   function createCipheriv2(suite, password, iv) {
     var config = MODES[suite.toLowerCase()];
     if (!config)
       throw new TypeError("invalid suite type");
     if (typeof password === "string")
-      password = Buffer2.from(password);
+      password = Buffer.from(password);
     if (password.length !== config.key / 8)
       throw new TypeError("invalid key length " + password.length);
     if (typeof iv === "string")
-      iv = Buffer2.from(iv);
+      iv = Buffer.from(iv);
     if (config.mode !== "GCM" && iv.length !== config.iv)
       throw new TypeError("invalid iv length " + iv.length);
     if (config.type === "stream") {
@@ -23164,7 +23164,7 @@ function dew$16() {
     return exports$17;
   _dewExec$16 = true;
   var AuthCipher = dew$1a();
-  var Buffer2 = dew$1T().Buffer;
+  var Buffer = dew$1T().Buffer;
   var MODES = dew$1d();
   var StreamCipher = dew$19();
   var Transform = dew$1G();
@@ -23176,7 +23176,7 @@ function dew$16() {
     (this || _global$e)._cache = new Splitter();
     (this || _global$e)._last = void 0;
     (this || _global$e)._cipher = new aes.AES(key);
-    (this || _global$e)._prev = Buffer2.from(iv);
+    (this || _global$e)._prev = Buffer.from(iv);
     (this || _global$e)._mode = mode;
     (this || _global$e)._autopadding = true;
   }
@@ -23190,7 +23190,7 @@ function dew$16() {
       thing = (this || _global$e)._mode.decrypt(this || _global$e, chunk);
       out.push(thing);
     }
-    return Buffer2.concat(out);
+    return Buffer.concat(out);
   };
   Decipher2.prototype._final = function() {
     var chunk = (this || _global$e)._cache.flush();
@@ -23205,10 +23205,10 @@ function dew$16() {
     return this || _global$e;
   };
   function Splitter() {
-    (this || _global$e).cache = Buffer2.allocUnsafe(0);
+    (this || _global$e).cache = Buffer.allocUnsafe(0);
   }
   Splitter.prototype.add = function(data) {
-    (this || _global$e).cache = Buffer2.concat([(this || _global$e).cache, data]);
+    (this || _global$e).cache = Buffer.concat([(this || _global$e).cache, data]);
   };
   Splitter.prototype.get = function(autoPadding) {
     var out;
@@ -23251,11 +23251,11 @@ function dew$16() {
     if (!config)
       throw new TypeError("invalid suite type");
     if (typeof iv === "string")
-      iv = Buffer2.from(iv);
+      iv = Buffer.from(iv);
     if (config.mode !== "GCM" && iv.length !== config.iv)
       throw new TypeError("invalid iv length " + iv.length);
     if (typeof password === "string")
-      password = Buffer2.from(password);
+      password = Buffer.from(password);
     if (password.length !== config.key / 8)
       throw new TypeError("invalid key length " + password.length);
     if (config.type === "stream") {
@@ -23449,12 +23449,12 @@ function dew$12() {
     }
     BN.BN = BN;
     BN.wordSize = 26;
-    var Buffer2;
+    var Buffer;
     try {
       if (typeof window !== "undefined" && typeof window.Buffer !== "undefined") {
-        Buffer2 = window.Buffer;
+        Buffer = window.Buffer;
       } else {
-        Buffer2 = e$1$1.Buffer;
+        Buffer = e$1$1.Buffer;
       }
     } catch (e8) {
     }
@@ -23782,8 +23782,8 @@ function dew$12() {
       return this.toString(16);
     };
     BN.prototype.toBuffer = function toBuffer(endian, length) {
-      assert(typeof Buffer2 !== "undefined");
-      return this.toArrayLike(Buffer2, endian, length);
+      assert(typeof Buffer !== "undefined");
+      return this.toArrayLike(Buffer, endian, length);
     };
     BN.prototype.toArray = function toArray(endian, length) {
       return this.toArrayLike(Array, endian, length);
@@ -26179,12 +26179,12 @@ function dew$11$1() {
     }
     BN.BN = BN;
     BN.wordSize = 26;
-    var Buffer2;
+    var Buffer;
     try {
       if (typeof window !== "undefined" && typeof window.Buffer !== "undefined") {
-        Buffer2 = window.Buffer;
+        Buffer = window.Buffer;
       } else {
-        Buffer2 = e$1$1.Buffer;
+        Buffer = e$1$1.Buffer;
       }
     } catch (e8) {
     }
@@ -26512,8 +26512,8 @@ function dew$11$1() {
       return this.toString(16);
     };
     BN.prototype.toBuffer = function toBuffer(endian, length) {
-      assert(typeof Buffer2 !== "undefined");
-      return this.toArrayLike(Buffer2, endian, length);
+      assert(typeof Buffer !== "undefined");
+      return this.toArrayLike(Buffer, endian, length);
     };
     BN.prototype.toArray = function toArray(endian, length) {
       return this.toArrayLike(Array, endian, length);
@@ -34620,7 +34620,7 @@ function dew$Z$1() {
   if (_dewExec$Z$1)
     return exports$Z$1;
   _dewExec$Z$1 = true;
-  var Buffer2 = e$1$1.Buffer;
+  var Buffer = e$1$1.Buffer;
   var BN = dew$12();
   var MillerRabin = dew$$$1();
   var millerRabin = new MillerRabin();
@@ -34634,16 +34634,16 @@ function dew$Z$1() {
   exports$Z$1 = DH;
   function setPublicKey(pub, enc) {
     enc = enc || "utf8";
-    if (!Buffer2.isBuffer(pub)) {
-      pub = new Buffer2(pub, enc);
+    if (!Buffer.isBuffer(pub)) {
+      pub = new Buffer(pub, enc);
     }
     (this || _global$8$1)._pub = new BN(pub);
     return this || _global$8$1;
   }
   function setPrivateKey(priv, enc) {
     enc = enc || "utf8";
-    if (!Buffer2.isBuffer(priv)) {
-      priv = new Buffer2(priv, enc);
+    if (!Buffer.isBuffer(priv)) {
+      priv = new Buffer(priv, enc);
     }
     (this || _global$8$1)._priv = new BN(priv);
     return this || _global$8$1;
@@ -34723,12 +34723,12 @@ function dew$Z$1() {
     other = new BN(other);
     other = other.toRed((this || _global$8$1)._prime);
     var secret = other.redPow((this || _global$8$1)._priv).fromRed();
-    var out = new Buffer2(secret.toArray());
+    var out = new Buffer(secret.toArray());
     var prime = this.getPrime();
     if (out.length < prime.length) {
-      var front = new Buffer2(prime.length - out.length);
+      var front = new Buffer(prime.length - out.length);
       front.fill(0);
-      out = Buffer2.concat([front, out]);
+      out = Buffer.concat([front, out]);
     }
     return out;
   };
@@ -34746,15 +34746,15 @@ function dew$Z$1() {
   };
   DH.prototype.setGenerator = function(gen, enc) {
     enc = enc || "utf8";
-    if (!Buffer2.isBuffer(gen)) {
-      gen = new Buffer2(gen, enc);
+    if (!Buffer.isBuffer(gen)) {
+      gen = new Buffer(gen, enc);
     }
     (this || _global$8$1).__gen = gen;
     (this || _global$8$1)._gen = new BN(gen);
     return this || _global$8$1;
   };
   function formatReturnValue(bn, enc) {
-    var buf = new Buffer2(bn.toArray());
+    var buf = new Buffer(bn.toArray());
     if (!enc) {
       return buf;
     } else {
@@ -34769,13 +34769,13 @@ function dew$Y$1() {
   if (_dewExec$Y$1)
     return exports$Y$1;
   _dewExec$Y$1 = true;
-  var Buffer2 = e$1$1.Buffer;
+  var Buffer = e$1$1.Buffer;
   var generatePrime = dew$_$1();
   var primes = _primes$1;
   var DH = dew$Z$1();
   function getDiffieHellman2(mod) {
-    var prime = new Buffer2(primes[mod].prime, "hex");
-    var gen = new Buffer2(primes[mod].gen, "hex");
+    var prime = new Buffer(primes[mod].prime, "hex");
+    var gen = new Buffer(primes[mod].gen, "hex");
     return new DH(prime, gen);
   }
   var ENCODINGS = {
@@ -34784,20 +34784,20 @@ function dew$Y$1() {
     "base64": true
   };
   function createDiffieHellman2(prime, enc, generator, genc) {
-    if (Buffer2.isBuffer(enc) || ENCODINGS[enc] === void 0) {
+    if (Buffer.isBuffer(enc) || ENCODINGS[enc] === void 0) {
       return createDiffieHellman2(prime, "binary", enc, generator);
     }
     enc = enc || "binary";
     genc = genc || "binary";
-    generator = generator || new Buffer2([2]);
-    if (!Buffer2.isBuffer(generator)) {
-      generator = new Buffer2(generator, genc);
+    generator = generator || new Buffer([2]);
+    if (!Buffer.isBuffer(generator)) {
+      generator = new Buffer(generator, genc);
     }
     if (typeof prime === "number") {
       return new DH(generatePrime(prime, generator), generator, true);
     }
-    if (!Buffer2.isBuffer(prime)) {
-      prime = new Buffer2(prime, enc);
+    if (!Buffer.isBuffer(prime)) {
+      prime = new Buffer(prime, enc);
     }
     return new DH(prime, generator, true);
   }
@@ -34851,12 +34851,12 @@ function dew$X$1() {
     }
     BN.BN = BN;
     BN.wordSize = 26;
-    var Buffer2;
+    var Buffer;
     try {
       if (typeof window !== "undefined" && typeof window.Buffer !== "undefined") {
-        Buffer2 = window.Buffer;
+        Buffer = window.Buffer;
       } else {
-        Buffer2 = e$1$1.Buffer;
+        Buffer = e$1$1.Buffer;
       }
     } catch (e8) {
     }
@@ -35206,9 +35206,9 @@ function dew$X$1() {
     BN.prototype.toJSON = function toJSON() {
       return this.toString(16, 2);
     };
-    if (Buffer2) {
+    if (Buffer) {
       BN.prototype.toBuffer = function toBuffer(endian, length) {
-        return this.toArrayLike(Buffer2, endian, length);
+        return this.toArrayLike(Buffer, endian, length);
       };
     }
     BN.prototype.toArray = function toArray(endian, length) {
@@ -37481,7 +37481,7 @@ function dew$W$1() {
   if (_dewExec$W$1)
     return exports$W$1;
   _dewExec$W$1 = true;
-  var Buffer2 = e$1$1.Buffer;
+  var Buffer = e$1$1.Buffer;
   var BN = dew$X$1();
   var randomBytes2 = dew$1S();
   function blind(priv) {
@@ -37512,7 +37512,7 @@ function dew$W$1() {
     var m1 = c1.redPow(priv.exponent1).fromRed();
     var m22 = c22.redPow(priv.exponent2).fromRed();
     var h6 = m1.isub(m22).imul(qinv).umod(p6).imul(q3);
-    return m22.iadd(h6).imul(blinds.unblinder).umod(priv.modulus).toArrayLike(Buffer2, "be", len);
+    return m22.iadd(h6).imul(blinds.unblinder).umod(priv.modulus).toArrayLike(Buffer, "be", len);
   }
   crt.getr = getr;
   exports$W$1 = crt;
@@ -37652,12 +37652,12 @@ function dew$V$1() {
     }
     BN.BN = BN;
     BN.wordSize = 26;
-    var Buffer2;
+    var Buffer;
     try {
       if (typeof window !== "undefined" && typeof window.Buffer !== "undefined") {
-        Buffer2 = window.Buffer;
+        Buffer = window.Buffer;
       } else {
-        Buffer2 = e$1$1.Buffer;
+        Buffer = e$1$1.Buffer;
       }
     } catch (e8) {
     }
@@ -37985,8 +37985,8 @@ function dew$V$1() {
       return this.toString(16);
     };
     BN.prototype.toBuffer = function toBuffer(endian, length) {
-      assert(typeof Buffer2 !== "undefined");
-      return this.toArrayLike(Buffer2, endian, length);
+      assert(typeof Buffer !== "undefined");
+      return this.toArrayLike(Buffer, endian, length);
     };
     BN.prototype.toArray = function toArray(endian, length) {
       return this.toArrayLike(Array, endian, length);
@@ -43441,12 +43441,12 @@ function dew$x$1() {
     }
     BN.BN = BN;
     BN.wordSize = 26;
-    var Buffer2;
+    var Buffer;
     try {
       if (typeof window !== "undefined" && typeof window.Buffer !== "undefined") {
-        Buffer2 = window.Buffer;
+        Buffer = window.Buffer;
       } else {
-        Buffer2 = e$1$1.Buffer;
+        Buffer = e$1$1.Buffer;
       }
     } catch (e8) {
     }
@@ -43774,8 +43774,8 @@ function dew$x$1() {
       return this.toString(16);
     };
     BN.prototype.toBuffer = function toBuffer(endian, length) {
-      assert(typeof Buffer2 !== "undefined");
-      return this.toArrayLike(Buffer2, endian, length);
+      assert(typeof Buffer !== "undefined");
+      return this.toArrayLike(Buffer, endian, length);
     };
     BN.prototype.toArray = function toArray(endian, length) {
       return this.toArrayLike(Array, endian, length);
@@ -46133,7 +46133,7 @@ function dew$w$1() {
   _dewExec$w$1 = true;
   var process2 = T;
   var buffer2 = e$1$1;
-  var Buffer2 = buffer2.Buffer;
+  var Buffer = buffer2.Buffer;
   var safer = {};
   var key;
   for (key in buffer2) {
@@ -46144,14 +46144,14 @@ function dew$w$1() {
     safer[key] = buffer2[key];
   }
   var Safer = safer.Buffer = {};
-  for (key in Buffer2) {
-    if (!Buffer2.hasOwnProperty(key))
+  for (key in Buffer) {
+    if (!Buffer.hasOwnProperty(key))
       continue;
     if (key === "allocUnsafe" || key === "allocUnsafeSlow")
       continue;
-    Safer[key] = Buffer2[key];
+    Safer[key] = Buffer[key];
   }
-  safer.Buffer.prototype = Buffer2.prototype;
+  safer.Buffer.prototype = Buffer.prototype;
   if (!Safer.from || Safer.from === Uint8Array.from) {
     Safer.from = function(value, encodingOrOffset, length) {
       if (typeof value === "number") {
@@ -46160,7 +46160,7 @@ function dew$w$1() {
       if (value && typeof value.length === "undefined") {
         throw new TypeError("The first argument must be one of type string, Buffer, ArrayBuffer, Array, or Array-like Object. Received type " + typeof value);
       }
-      return Buffer2(value, encodingOrOffset, length);
+      return Buffer(value, encodingOrOffset, length);
     };
   }
   if (!Safer.alloc) {
@@ -46171,7 +46171,7 @@ function dew$w$1() {
       if (size < 0 || size >= 2 * (1 << 30)) {
         throw new RangeError('The value "' + size + '" is invalid for option "size"');
       }
-      var buf = Buffer2(size);
+      var buf = Buffer(size);
       if (!fill || fill.length === 0) {
         buf.fill(0);
       } else if (typeof encoding === "string") {
@@ -46312,10 +46312,10 @@ function dew$u$1() {
   _dewExec$u$1 = true;
   const inherits2 = dew$f$2();
   const Reporter = dew$v$1().Reporter;
-  const Buffer2 = dew$w$1().Buffer;
+  const Buffer = dew$w$1().Buffer;
   function DecoderBuffer(base, options) {
     Reporter.call(this, options);
-    if (!Buffer2.isBuffer(base)) {
+    if (!Buffer.isBuffer(base)) {
       this.error("Input not Buffer");
       return;
     }
@@ -46329,7 +46329,7 @@ function dew$u$1() {
     if (data instanceof DecoderBuffer) {
       return true;
     }
-    const isCompatible = typeof data === "object" && Buffer2.isBuffer(data.base) && data.constructor.name === "DecoderBuffer" && typeof data.offset === "number" && typeof data.length === "number" && typeof data.save === "function" && typeof data.restore === "function" && typeof data.isEmpty === "function" && typeof data.readUInt8 === "function" && typeof data.skip === "function" && typeof data.raw === "function";
+    const isCompatible = typeof data === "object" && Buffer.isBuffer(data.base) && data.constructor.name === "DecoderBuffer" && typeof data.offset === "number" && typeof data.length === "number" && typeof data.save === "function" && typeof data.restore === "function" && typeof data.isEmpty === "function" && typeof data.readUInt8 === "function" && typeof data.skip === "function" && typeof data.raw === "function";
     return isCompatible;
   };
   DecoderBuffer.prototype.save = function save() {
@@ -46384,8 +46384,8 @@ function dew$u$1() {
       this.length = 1;
     } else if (typeof value === "string") {
       this.value = value;
-      this.length = Buffer2.byteLength(value);
-    } else if (Buffer2.isBuffer(value)) {
+      this.length = Buffer.byteLength(value);
+    } else if (Buffer.isBuffer(value)) {
       this.value = value;
       this.length = value.length;
     } else {
@@ -46402,7 +46402,7 @@ function dew$u$1() {
   };
   EncoderBuffer.prototype.join = function join(out, offset) {
     if (!out)
-      out = Buffer2.alloc(this.length);
+      out = Buffer.alloc(this.length);
     if (!offset)
       offset = 0;
     if (this.length === 0)
@@ -46417,7 +46417,7 @@ function dew$u$1() {
         out[offset] = this.value;
       else if (typeof this.value === "string")
         out.write(this.value, offset);
-      else if (Buffer2.isBuffer(this.value))
+      else if (Buffer.isBuffer(this.value))
         this.value.copy(out, offset);
       offset += this.length;
     }
@@ -46948,7 +46948,7 @@ function dew$r$1() {
     return exports$r$1;
   _dewExec$r$1 = true;
   const inherits2 = dew$f$2();
-  const Buffer2 = dew$w$1().Buffer;
+  const Buffer = dew$w$1().Buffer;
   const Node = dew$t$1();
   const der = dew$s$1();
   function DEREncoder(entity) {
@@ -46969,7 +46969,7 @@ function dew$r$1() {
   DERNode.prototype._encodeComposite = function encodeComposite(tag, primitive, cls, content) {
     const encodedTag = encodeTag(tag, primitive, cls, this.reporter);
     if (content.length < 128) {
-      const header2 = Buffer2.alloc(2);
+      const header2 = Buffer.alloc(2);
       header2[0] = encodedTag;
       header2[1] = content.length;
       return this._createEncoderBuffer([header2, content]);
@@ -46977,7 +46977,7 @@ function dew$r$1() {
     let lenOctets = 1;
     for (let i6 = content.length; i6 >= 256; i6 >>= 8)
       lenOctets++;
-    const header = Buffer2.alloc(1 + 1 + lenOctets);
+    const header = Buffer.alloc(1 + 1 + lenOctets);
     header[0] = encodedTag;
     header[1] = 128 | lenOctets;
     for (let i6 = 1 + lenOctets, j4 = content.length; j4 > 0; i6--, j4 >>= 8)
@@ -46988,7 +46988,7 @@ function dew$r$1() {
     if (tag === "bitstr") {
       return this._createEncoderBuffer([str.unused | 0, str.data]);
     } else if (tag === "bmpstr") {
-      const buf = Buffer2.alloc(str.length * 2);
+      const buf = Buffer.alloc(str.length * 2);
       for (let i6 = 0; i6 < str.length; i6++) {
         buf.writeUInt16BE(str.charCodeAt(i6), i6 * 2);
       }
@@ -47039,7 +47039,7 @@ function dew$r$1() {
       for (size++; ident >= 128; ident >>= 7)
         size++;
     }
-    const objid = Buffer2.alloc(size);
+    const objid = Buffer.alloc(size);
     let offset = objid.length - 1;
     for (let i6 = id.length - 1; i6 >= 0; i6--) {
       let ident = id[i6];
@@ -47079,18 +47079,18 @@ function dew$r$1() {
       }
       num = values[num];
     }
-    if (typeof num !== "number" && !Buffer2.isBuffer(num)) {
+    if (typeof num !== "number" && !Buffer.isBuffer(num)) {
       const numArray = num.toArray();
       if (!num.sign && numArray[0] & 128) {
         numArray.unshift(0);
       }
-      num = Buffer2.from(numArray);
+      num = Buffer.from(numArray);
     }
-    if (Buffer2.isBuffer(num)) {
+    if (Buffer.isBuffer(num)) {
       let size2 = num.length;
       if (num.length === 0)
         size2++;
-      const out2 = Buffer2.alloc(size2);
+      const out2 = Buffer.alloc(size2);
       num.copy(out2);
       if (num.length === 0)
         out2[0] = 0;
@@ -47111,7 +47111,7 @@ function dew$r$1() {
     if (out[0] & 128) {
       out.unshift(0);
     }
-    return this._createEncoderBuffer(Buffer2.from(out));
+    return this._createEncoderBuffer(Buffer.from(out));
   };
   DERNode.prototype._encodeBool = function encodeBool(value) {
     return this._createEncoderBuffer(value ? 255 : 0);
@@ -47466,7 +47466,7 @@ function dew$n$1() {
     return exports$n$1;
   _dewExec$n$1 = true;
   const inherits2 = dew$f$2();
-  const Buffer2 = dew$w$1().Buffer;
+  const Buffer = dew$w$1().Buffer;
   const DERDecoder = dew$o$1();
   function PEMDecoder(entity) {
     DERDecoder.call(this, entity);
@@ -47501,7 +47501,7 @@ function dew$n$1() {
       throw new Error("PEM section not found for: " + label);
     const base64 = lines.slice(start + 1, end).join("");
     base64.replace(/[^a-z0-9+/=]+/gi, "");
-    const input = Buffer2.from(base64, "base64");
+    const input = Buffer.from(base64, "base64");
     return DERDecoder.prototype.decode.call(this, input, options);
   };
   return exports$n$1;
@@ -47740,24 +47740,24 @@ function dew$f$1() {
   var fullRegex = /^-----BEGIN ((?:.*? KEY)|CERTIFICATE)-----([0-9A-z\n\r+/=]+)-----END \1-----$/m;
   var evp = dew$18();
   var ciphers = dew$15();
-  var Buffer2 = dew$1T().Buffer;
+  var Buffer = dew$1T().Buffer;
   exports$f$1 = function(okey, password) {
     var key = okey.toString();
     var match = key.match(findProc);
     var decrypted;
     if (!match) {
       var match2 = key.match(fullRegex);
-      decrypted = Buffer2.from(match2[2].replace(/[\r\n]/g, ""), "base64");
+      decrypted = Buffer.from(match2[2].replace(/[\r\n]/g, ""), "base64");
     } else {
       var suite = "aes" + match[1];
-      var iv = Buffer2.from(match[2], "hex");
-      var cipherText = Buffer2.from(match[3].replace(/[\r\n]/g, ""), "base64");
+      var iv = Buffer.from(match[2], "hex");
+      var cipherText = Buffer.from(match[3].replace(/[\r\n]/g, ""), "base64");
       var cipherKey = evp(password, iv.slice(0, 8), parseInt(match[1], 10)).key;
       var out = [];
       var cipher = ciphers.createDecipheriv(suite, cipherKey, iv);
       out.push(cipher.update(cipherText));
       out.push(cipher.final());
-      decrypted = Buffer2.concat(out);
+      decrypted = Buffer.concat(out);
     }
     var tag = key.match(startRegex)[1];
     return {
@@ -47778,16 +47778,16 @@ function dew$e$1() {
   var fixProc = dew$f$1();
   var ciphers = dew$15();
   var compat = dew$1v();
-  var Buffer2 = dew$1T().Buffer;
+  var Buffer = dew$1T().Buffer;
   exports$e$1 = parseKeys;
   function parseKeys(buffer2) {
     var password;
-    if (typeof buffer2 === "object" && !Buffer2.isBuffer(buffer2)) {
+    if (typeof buffer2 === "object" && !Buffer.isBuffer(buffer2)) {
       password = buffer2.passphrase;
       buffer2 = buffer2.key;
     }
     if (typeof buffer2 === "string") {
-      buffer2 = Buffer2.from(buffer2);
+      buffer2 = Buffer.from(buffer2);
     }
     var stripped = fixProc(buffer2, password);
     var type = stripped.tag;
@@ -47874,7 +47874,7 @@ function dew$e$1() {
     var out = [];
     out.push(cipher.update(cipherText));
     out.push(cipher.final());
-    return Buffer2.concat(out);
+    return Buffer.concat(out);
   }
   return exports$e$1;
 }
@@ -47892,7 +47892,7 @@ function dew$d$1() {
   if (_dewExec$d$1)
     return exports$d$1;
   _dewExec$d$1 = true;
-  var Buffer2 = dew$1T().Buffer;
+  var Buffer = dew$1T().Buffer;
   var createHmac2 = dew$1C();
   var crt = dew$W$1();
   var EC = dew$y$1().ec;
@@ -47913,7 +47913,7 @@ function dew$d$1() {
       if (signType !== "rsa" && signType !== "ecdsa/rsa")
         throw new Error("wrong private key type");
     }
-    hash = Buffer2.concat([tag, hash]);
+    hash = Buffer.concat([tag, hash]);
     var len = priv.modulus.byteLength();
     var pad = [0, 1];
     while (hash.length + pad.length + 1 < len)
@@ -47932,7 +47932,7 @@ function dew$d$1() {
     var curve = new EC(curveId);
     var key = curve.keyFromPrivate(priv.privateKey);
     var out = key.sign(hash);
-    return Buffer2.from(out.toDER());
+    return Buffer.from(out.toDER());
   }
   function dsaSign(hash, priv, algo) {
     var x4 = priv.params.priv_key;
@@ -47965,22 +47965,22 @@ function dew$d$1() {
     var total = r6.length + s6.length + 4;
     var res = [48, total, 2, r6.length];
     res = res.concat(r6, [2, s6.length], s6);
-    return Buffer2.from(res);
+    return Buffer.from(res);
   }
   function getKey(x4, q3, hash, algo) {
-    x4 = Buffer2.from(x4.toArray());
+    x4 = Buffer.from(x4.toArray());
     if (x4.length < q3.byteLength()) {
-      var zeros = Buffer2.alloc(q3.byteLength() - x4.length);
-      x4 = Buffer2.concat([zeros, x4]);
+      var zeros = Buffer.alloc(q3.byteLength() - x4.length);
+      x4 = Buffer.concat([zeros, x4]);
     }
     var hlen = hash.length;
     var hbits = bits2octets(hash, q3);
-    var v5 = Buffer2.alloc(hlen);
+    var v5 = Buffer.alloc(hlen);
     v5.fill(1);
-    var k4 = Buffer2.alloc(hlen);
-    k4 = createHmac2(algo, k4).update(v5).update(Buffer2.from([0])).update(x4).update(hbits).digest();
+    var k4 = Buffer.alloc(hlen);
+    k4 = createHmac2(algo, k4).update(v5).update(Buffer.from([0])).update(x4).update(hbits).digest();
     v5 = createHmac2(algo, k4).update(v5).digest();
-    k4 = createHmac2(algo, k4).update(v5).update(Buffer2.from([1])).update(x4).update(hbits).digest();
+    k4 = createHmac2(algo, k4).update(v5).update(Buffer.from([1])).update(x4).update(hbits).digest();
     v5 = createHmac2(algo, k4).update(v5).digest();
     return {
       k: k4,
@@ -47997,10 +47997,10 @@ function dew$d$1() {
   function bits2octets(bits, q3) {
     bits = bits2int(bits, q3);
     bits = bits.mod(q3);
-    var out = Buffer2.from(bits.toArray());
+    var out = Buffer.from(bits.toArray());
     if (out.length < q3.byteLength()) {
-      var zeros = Buffer2.alloc(q3.byteLength() - out.length);
-      out = Buffer2.concat([zeros, out]);
+      var zeros = Buffer.alloc(q3.byteLength() - out.length);
+      out = Buffer.concat([zeros, out]);
     }
     return out;
   }
@@ -48008,13 +48008,13 @@ function dew$d$1() {
     var t6;
     var k4;
     do {
-      t6 = Buffer2.alloc(0);
+      t6 = Buffer.alloc(0);
       while (t6.length * 8 < q3.bitLength()) {
         kv.v = createHmac2(algo, kv.k).update(kv.v).digest();
-        t6 = Buffer2.concat([t6, kv.v]);
+        t6 = Buffer.concat([t6, kv.v]);
       }
       k4 = bits2int(t6, q3);
-      kv.k = createHmac2(algo, kv.k).update(kv.v).update(Buffer2.from([0])).digest();
+      kv.k = createHmac2(algo, kv.k).update(kv.v).update(Buffer.from([0])).digest();
       kv.v = createHmac2(algo, kv.k).update(kv.v).digest();
     } while (k4.cmp(q3) !== -1);
     return k4;
@@ -48033,7 +48033,7 @@ function dew$c$1() {
   if (_dewExec$c$1)
     return exports$c$1;
   _dewExec$c$1 = true;
-  var Buffer2 = dew$1T().Buffer;
+  var Buffer = dew$1T().Buffer;
   var BN = dew$X$1();
   var EC = dew$y$1().ec;
   var parseKeys = dew$e$1();
@@ -48052,7 +48052,7 @@ function dew$c$1() {
       if (signType !== "rsa" && signType !== "ecdsa/rsa")
         throw new Error("wrong public key type");
     }
-    hash = Buffer2.concat([tag, hash]);
+    hash = Buffer.concat([tag, hash]);
     var len = pub.modulus.byteLength();
     var pad = [1];
     var padNum = 0;
@@ -48065,11 +48065,11 @@ function dew$c$1() {
     while (++i6 < hash.length) {
       pad.push(hash[i6]);
     }
-    pad = Buffer2.from(pad);
+    pad = Buffer.from(pad);
     var red = BN.mont(pub.modulus);
     sig = new BN(sig).toRed(red);
     sig = sig.redPow(new BN(pub.publicExponent));
-    sig = Buffer2.from(sig.fromRed().toArray());
+    sig = Buffer.from(sig.fromRed().toArray());
     var out = padNum < 8 ? 1 : 0;
     len = Math.min(sig.length, pad.length);
     if (sig.length !== pad.length)
@@ -48118,7 +48118,7 @@ function dew$b$1() {
   if (_dewExec$b$1)
     return exports$b$1;
   _dewExec$b$1 = true;
-  var Buffer2 = dew$1T().Buffer;
+  var Buffer = dew$1T().Buffer;
   var createHash2 = dew$1F();
   var stream2 = dew$1V();
   var inherits2 = dew$f$2();
@@ -48126,7 +48126,7 @@ function dew$b$1() {
   var verify = dew$c$1();
   var algorithms = _algorithms;
   Object.keys(algorithms).forEach(function(key) {
-    algorithms[key].id = Buffer2.from(algorithms[key].id, "hex");
+    algorithms[key].id = Buffer.from(algorithms[key].id, "hex");
     algorithms[key.toLowerCase()] = algorithms[key];
   });
   function Sign2(algorithm) {
@@ -48146,7 +48146,7 @@ function dew$b$1() {
   };
   Sign2.prototype.update = function update(data, enc) {
     if (typeof data === "string")
-      data = Buffer2.from(data, enc);
+      data = Buffer.from(data, enc);
     (this || _global$4$1)._hash.update(data);
     return this || _global$4$1;
   };
@@ -48172,13 +48172,13 @@ function dew$b$1() {
   };
   Verify2.prototype.update = function update(data, enc) {
     if (typeof data === "string")
-      data = Buffer2.from(data, enc);
+      data = Buffer.from(data, enc);
     (this || _global$4$1)._hash.update(data);
     return this || _global$4$1;
   };
   Verify2.prototype.verify = function verifyMethod(key, sig, enc) {
     if (typeof sig === "string")
-      sig = Buffer2.from(sig, enc);
+      sig = Buffer.from(sig, enc);
     this.end();
     var hash = (this || _global$4$1)._hash.digest();
     return verify(sig, hash, key, (this || _global$4$1)._signType, (this || _global$4$1)._tag);
@@ -48243,12 +48243,12 @@ function dew$a$1() {
     }
     BN.BN = BN;
     BN.wordSize = 26;
-    var Buffer2;
+    var Buffer;
     try {
       if (typeof window !== "undefined" && typeof window.Buffer !== "undefined") {
-        Buffer2 = window.Buffer;
+        Buffer = window.Buffer;
       } else {
-        Buffer2 = e$1$1.Buffer;
+        Buffer = e$1$1.Buffer;
       }
     } catch (e8) {
     }
@@ -48576,8 +48576,8 @@ function dew$a$1() {
       return this.toString(16);
     };
     BN.prototype.toBuffer = function toBuffer(endian, length) {
-      assert(typeof Buffer2 !== "undefined");
-      return this.toArrayLike(Buffer2, endian, length);
+      assert(typeof Buffer !== "undefined");
+      return this.toArrayLike(Buffer, endian, length);
     };
     BN.prototype.toArray = function toArray(endian, length) {
       return this.toArrayLike(Array, endian, length);
@@ -50934,7 +50934,7 @@ function dew$9$1() {
   if (_dewExec$9$1)
     return exports$9$1;
   _dewExec$9$1 = true;
-  var Buffer2 = e$1$1.Buffer;
+  var Buffer = e$1$1.Buffer;
   var elliptic = dew$y$1();
   var BN = dew$a$1();
   exports$9$1 = function createECDH2(curve) {
@@ -50991,8 +50991,8 @@ function dew$9$1() {
   };
   ECDH.prototype.computeSecret = function(other, inenc, enc) {
     inenc = inenc || "utf8";
-    if (!Buffer2.isBuffer(other)) {
-      other = new Buffer2(other, inenc);
+    if (!Buffer.isBuffer(other)) {
+      other = new Buffer(other, inenc);
     }
     var otherPub = (this || _global$2$1).curve.keyFromPublic(other).getPublic();
     var out = otherPub.mul((this || _global$2$1).keys.getPrivate()).getX();
@@ -51014,16 +51014,16 @@ function dew$9$1() {
   };
   ECDH.prototype.setPublicKey = function(pub, enc) {
     enc = enc || "utf8";
-    if (!Buffer2.isBuffer(pub)) {
-      pub = new Buffer2(pub, enc);
+    if (!Buffer.isBuffer(pub)) {
+      pub = new Buffer(pub, enc);
     }
     (this || _global$2$1).keys._importPublic(pub);
     return this || _global$2$1;
   };
   ECDH.prototype.setPrivateKey = function(priv, enc) {
     enc = enc || "utf8";
-    if (!Buffer2.isBuffer(priv)) {
-      priv = new Buffer2(priv, enc);
+    if (!Buffer.isBuffer(priv)) {
+      priv = new Buffer(priv, enc);
     }
     var _priv = new BN(priv);
     _priv = _priv.toString(16);
@@ -51035,11 +51035,11 @@ function dew$9$1() {
     if (!Array.isArray(bn)) {
       bn = bn.toArray();
     }
-    var buf = new Buffer2(bn);
+    var buf = new Buffer(bn);
     if (len && buf.length < len) {
-      var zeros = new Buffer2(len - buf.length);
+      var zeros = new Buffer(len - buf.length);
       zeros.fill(0);
-      buf = Buffer2.concat([zeros, buf]);
+      buf = Buffer.concat([zeros, buf]);
     }
     if (!enc) {
       return buf;
@@ -51056,19 +51056,19 @@ function dew$8$1() {
     return exports$8$1;
   _dewExec$8$1 = true;
   var createHash2 = dew$1F();
-  var Buffer2 = dew$1T().Buffer;
+  var Buffer = dew$1T().Buffer;
   exports$8$1 = function(seed, len) {
-    var t6 = Buffer2.alloc(0);
+    var t6 = Buffer.alloc(0);
     var i6 = 0;
     var c6;
     while (t6.length < len) {
       c6 = i2ops(i6++);
-      t6 = Buffer2.concat([t6, createHash2("sha1").update(seed).update(c6).digest()]);
+      t6 = Buffer.concat([t6, createHash2("sha1").update(seed).update(c6).digest()]);
     }
     return t6.slice(0, len);
   };
   function i2ops(c6) {
-    var out = Buffer2.allocUnsafe(4);
+    var out = Buffer.allocUnsafe(4);
     out.writeUInt32BE(c6, 0);
     return out;
   }
@@ -51136,12 +51136,12 @@ function dew$6$1() {
     }
     BN.BN = BN;
     BN.wordSize = 26;
-    var Buffer2;
+    var Buffer;
     try {
       if (typeof window !== "undefined" && typeof window.Buffer !== "undefined") {
-        Buffer2 = window.Buffer;
+        Buffer = window.Buffer;
       } else {
-        Buffer2 = e$1$1.Buffer;
+        Buffer = e$1$1.Buffer;
       }
     } catch (e8) {
     }
@@ -51469,8 +51469,8 @@ function dew$6$1() {
       return this.toString(16);
     };
     BN.prototype.toBuffer = function toBuffer(endian, length) {
-      assert(typeof Buffer2 !== "undefined");
-      return this.toArrayLike(Buffer2, endian, length);
+      assert(typeof Buffer !== "undefined");
+      return this.toArrayLike(Buffer, endian, length);
     };
     BN.prototype.toArray = function toArray(endian, length) {
       return this.toArrayLike(Array, endian, length);
@@ -53827,9 +53827,9 @@ function dew$5$1() {
     return exports$5$1;
   _dewExec$5$1 = true;
   var BN = dew$6$1();
-  var Buffer2 = dew$1T().Buffer;
+  var Buffer = dew$1T().Buffer;
   function withPublic(paddedMsg, key) {
-    return Buffer2.from(paddedMsg.toRed(BN.mont(key.modulus)).redPow(new BN(key.publicExponent)).fromRed().toArray());
+    return Buffer.from(paddedMsg.toRed(BN.mont(key.modulus)).redPow(new BN(key.publicExponent)).fromRed().toArray());
   }
   exports$5$1 = withPublic;
   return exports$5$1;
@@ -53848,7 +53848,7 @@ function dew$4$1() {
   var BN = dew$6$1();
   var withPublic = dew$5$1();
   var crt = dew$W$1();
-  var Buffer2 = dew$1T().Buffer;
+  var Buffer = dew$1T().Buffer;
   exports$4$1 = function publicEncrypt2(publicKey, msg, reverse) {
     var padding;
     if (publicKey.padding) {
@@ -53881,18 +53881,18 @@ function dew$4$1() {
   function oaep(key, msg) {
     var k4 = key.modulus.byteLength();
     var mLen = msg.length;
-    var iHash = createHash2("sha1").update(Buffer2.alloc(0)).digest();
+    var iHash = createHash2("sha1").update(Buffer.alloc(0)).digest();
     var hLen = iHash.length;
     var hLen2 = 2 * hLen;
     if (mLen > k4 - hLen2 - 2) {
       throw new Error("message too long");
     }
-    var ps = Buffer2.alloc(k4 - mLen - hLen2 - 2);
+    var ps = Buffer.alloc(k4 - mLen - hLen2 - 2);
     var dblen = k4 - hLen - 1;
     var seed = randomBytes2(hLen);
-    var maskedDb = xor(Buffer2.concat([iHash, ps, Buffer2.alloc(1, 1), msg], dblen), mgf(seed, dblen));
+    var maskedDb = xor(Buffer.concat([iHash, ps, Buffer.alloc(1, 1), msg], dblen), mgf(seed, dblen));
     var maskedSeed = xor(seed, mgf(maskedDb, hLen));
-    return new BN(Buffer2.concat([Buffer2.alloc(1), maskedSeed, maskedDb], k4));
+    return new BN(Buffer.concat([Buffer.alloc(1), maskedSeed, maskedDb], k4));
   }
   function pkcs1(key, msg, reverse) {
     var mLen = msg.length;
@@ -53902,14 +53902,14 @@ function dew$4$1() {
     }
     var ps;
     if (reverse) {
-      ps = Buffer2.alloc(k4 - mLen - 3, 255);
+      ps = Buffer.alloc(k4 - mLen - 3, 255);
     } else {
       ps = nonZero(k4 - mLen - 3);
     }
-    return new BN(Buffer2.concat([Buffer2.from([0, reverse ? 1 : 2]), ps, Buffer2.alloc(1), msg], k4));
+    return new BN(Buffer.concat([Buffer.from([0, reverse ? 1 : 2]), ps, Buffer.alloc(1), msg], k4));
   }
   function nonZero(len) {
-    var out = Buffer2.allocUnsafe(len);
+    var out = Buffer.allocUnsafe(len);
     var i6 = 0;
     var cache = randomBytes2(len * 2);
     var cur = 0;
@@ -53941,7 +53941,7 @@ function dew$3$1() {
   var crt = dew$W$1();
   var createHash2 = dew$1F();
   var withPublic = dew$5$1();
-  var Buffer2 = dew$1T().Buffer;
+  var Buffer = dew$1T().Buffer;
   exports$3$1 = function privateDecrypt2(privateKey, enc, reverse) {
     var padding;
     if (privateKey.padding) {
@@ -53962,8 +53962,8 @@ function dew$3$1() {
     } else {
       msg = crt(enc, key);
     }
-    var zBuffer = Buffer2.alloc(k4 - msg.length);
-    msg = Buffer2.concat([zBuffer, msg], k4);
+    var zBuffer = Buffer.alloc(k4 - msg.length);
+    msg = Buffer.concat([zBuffer, msg], k4);
     if (padding === 4) {
       return oaep(key, msg);
     } else if (padding === 1) {
@@ -53976,7 +53976,7 @@ function dew$3$1() {
   };
   function oaep(key, msg) {
     var k4 = key.modulus.byteLength();
-    var iHash = createHash2("sha1").update(Buffer2.alloc(0)).digest();
+    var iHash = createHash2("sha1").update(Buffer.alloc(0)).digest();
     var hLen = iHash.length;
     if (msg[0] !== 0) {
       throw new Error("decryption error");
@@ -54020,8 +54020,8 @@ function dew$3$1() {
     return msg.slice(i6);
   }
   function compare(a6, b4) {
-    a6 = Buffer2.from(a6);
-    b4 = Buffer2.from(b4);
+    a6 = Buffer.from(a6);
+    b4 = Buffer.from(b4);
     var dif = 0;
     var len = a6.length;
     if (a6.length !== b4.length) {
@@ -54065,7 +54065,7 @@ function dew$1$12() {
   }
   var safeBuffer = dew$1T();
   var randombytes = dew$1S();
-  var Buffer2 = safeBuffer.Buffer;
+  var Buffer = safeBuffer.Buffer;
   var kBufferMaxLength = safeBuffer.kMaxLength;
   var crypto2 = _global$x.crypto || _global$x.msCrypto;
   var kMaxUint32 = Math.pow(2, 32) - 1;
@@ -54099,7 +54099,7 @@ function dew$1$12() {
     exports$1$12.randomFillSync = oldBrowser;
   }
   function randomFill2(buf, offset, size, cb) {
-    if (!Buffer2.isBuffer(buf) && !(buf instanceof _global$x.Uint8Array)) {
+    if (!Buffer.isBuffer(buf) && !(buf instanceof _global$x.Uint8Array)) {
       throw new TypeError('"buf" argument must be a Buffer or Uint8Array');
     }
     if (typeof offset === "function") {
@@ -54147,7 +54147,7 @@ function dew$1$12() {
     if (typeof offset === "undefined") {
       offset = 0;
     }
-    if (!Buffer2.isBuffer(buf) && !(buf instanceof _global$x.Uint8Array)) {
+    if (!Buffer.isBuffer(buf) && !(buf instanceof _global$x.Uint8Array)) {
       throw new TypeError('"buf" argument must be a Buffer or Uint8Array');
     }
     assertOffset(offset, buf.length);
@@ -54561,7 +54561,7 @@ function dew$_() {
   if (_dewExec$_)
     return exports$$;
   _dewExec$_ = true;
-  var Buffer2 = buffer.Buffer;
+  var Buffer = buffer.Buffer;
   var BN = dew$1X();
   var MillerRabin = dew$10();
   var millerRabin = new MillerRabin();
@@ -54575,16 +54575,16 @@ function dew$_() {
   exports$$ = DH;
   function setPublicKey(pub, enc) {
     enc = enc || "utf8";
-    if (!Buffer2.isBuffer(pub)) {
-      pub = new Buffer2(pub, enc);
+    if (!Buffer.isBuffer(pub)) {
+      pub = new Buffer(pub, enc);
     }
     (this || _global$8)._pub = new BN(pub);
     return this || _global$8;
   }
   function setPrivateKey(priv, enc) {
     enc = enc || "utf8";
-    if (!Buffer2.isBuffer(priv)) {
-      priv = new Buffer2(priv, enc);
+    if (!Buffer.isBuffer(priv)) {
+      priv = new Buffer(priv, enc);
     }
     (this || _global$8)._priv = new BN(priv);
     return this || _global$8;
@@ -54664,12 +54664,12 @@ function dew$_() {
     other = new BN(other);
     other = other.toRed((this || _global$8)._prime);
     var secret = other.redPow((this || _global$8)._priv).fromRed();
-    var out = new Buffer2(secret.toArray());
+    var out = new Buffer(secret.toArray());
     var prime = this.getPrime();
     if (out.length < prime.length) {
-      var front = new Buffer2(prime.length - out.length);
+      var front = new Buffer(prime.length - out.length);
       front.fill(0);
-      out = Buffer2.concat([front, out]);
+      out = Buffer.concat([front, out]);
     }
     return out;
   };
@@ -54687,15 +54687,15 @@ function dew$_() {
   };
   DH.prototype.setGenerator = function(gen, enc) {
     enc = enc || "utf8";
-    if (!Buffer2.isBuffer(gen)) {
-      gen = new Buffer2(gen, enc);
+    if (!Buffer.isBuffer(gen)) {
+      gen = new Buffer(gen, enc);
     }
     (this || _global$8).__gen = gen;
     (this || _global$8)._gen = new BN(gen);
     return this || _global$8;
   };
   function formatReturnValue(bn, enc) {
-    var buf = new Buffer2(bn.toArray());
+    var buf = new Buffer(bn.toArray());
     if (!enc) {
       return buf;
     } else {
@@ -54710,13 +54710,13 @@ function dew$Z() {
   if (_dewExec$Z)
     return exports$_;
   _dewExec$Z = true;
-  var Buffer2 = buffer.Buffer;
+  var Buffer = buffer.Buffer;
   var generatePrime = dew$$();
   var primes = _primes;
   var DH = dew$_();
   function getDiffieHellman2(mod) {
-    var prime = new Buffer2(primes[mod].prime, "hex");
-    var gen = new Buffer2(primes[mod].gen, "hex");
+    var prime = new Buffer(primes[mod].prime, "hex");
+    var gen = new Buffer(primes[mod].gen, "hex");
     return new DH(prime, gen);
   }
   var ENCODINGS = {
@@ -54725,20 +54725,20 @@ function dew$Z() {
     "base64": true
   };
   function createDiffieHellman2(prime, enc, generator, genc) {
-    if (Buffer2.isBuffer(enc) || ENCODINGS[enc] === void 0) {
+    if (Buffer.isBuffer(enc) || ENCODINGS[enc] === void 0) {
       return createDiffieHellman2(prime, "binary", enc, generator);
     }
     enc = enc || "binary";
     genc = genc || "binary";
-    generator = generator || new Buffer2([2]);
-    if (!Buffer2.isBuffer(generator)) {
-      generator = new Buffer2(generator, genc);
+    generator = generator || new Buffer([2]);
+    if (!Buffer.isBuffer(generator)) {
+      generator = new Buffer(generator, genc);
     }
     if (typeof prime === "number") {
       return new DH(generatePrime(prime, generator), generator, true);
     }
-    if (!Buffer2.isBuffer(prime)) {
-      prime = new Buffer2(prime, enc);
+    if (!Buffer.isBuffer(prime)) {
+      prime = new Buffer(prime, enc);
     }
     return new DH(prime, generator, true);
   }
@@ -54753,34 +54753,34 @@ function dew$Y() {
     return exports$Z;
   _dewExec$Y = true;
   var buffer$1 = buffer;
-  var Buffer2 = buffer$1.Buffer;
+  var Buffer = buffer$1.Buffer;
   function copyProps(src, dst) {
     for (var key in src) {
       dst[key] = src[key];
     }
   }
-  if (Buffer2.from && Buffer2.alloc && Buffer2.allocUnsafe && Buffer2.allocUnsafeSlow) {
+  if (Buffer.from && Buffer.alloc && Buffer.allocUnsafe && Buffer.allocUnsafeSlow) {
     exports$Z = buffer$1;
   } else {
     copyProps(buffer$1, exports$Z);
     exports$Z.Buffer = SafeBuffer;
   }
   function SafeBuffer(arg, encodingOrOffset, length) {
-    return Buffer2(arg, encodingOrOffset, length);
+    return Buffer(arg, encodingOrOffset, length);
   }
-  SafeBuffer.prototype = Object.create(Buffer2.prototype);
-  copyProps(Buffer2, SafeBuffer);
+  SafeBuffer.prototype = Object.create(Buffer.prototype);
+  copyProps(Buffer, SafeBuffer);
   SafeBuffer.from = function(arg, encodingOrOffset, length) {
     if (typeof arg === "number") {
       throw new TypeError("Argument must not be a number");
     }
-    return Buffer2(arg, encodingOrOffset, length);
+    return Buffer(arg, encodingOrOffset, length);
   };
   SafeBuffer.alloc = function(size, fill, encoding) {
     if (typeof size !== "number") {
       throw new TypeError("Argument must be a number");
     }
-    var buf = Buffer2(size);
+    var buf = Buffer(size);
     if (fill !== void 0) {
       if (typeof encoding === "string") {
         buf.fill(fill, encoding);
@@ -54796,7 +54796,7 @@ function dew$Y() {
     if (typeof size !== "number") {
       throw new TypeError("Argument must be a number");
     }
-    return Buffer2(size);
+    return Buffer(size);
   };
   SafeBuffer.allocUnsafeSlow = function(size) {
     if (typeof size !== "number") {
@@ -54852,12 +54852,12 @@ function dew$X() {
     }
     BN.BN = BN;
     BN.wordSize = 26;
-    var Buffer2;
+    var Buffer;
     try {
       if (typeof window !== "undefined" && typeof window.Buffer !== "undefined") {
-        Buffer2 = window.Buffer;
+        Buffer = window.Buffer;
       } else {
-        Buffer2 = buffer.Buffer;
+        Buffer = buffer.Buffer;
       }
     } catch (e8) {
     }
@@ -55207,9 +55207,9 @@ function dew$X() {
     BN.prototype.toJSON = function toJSON() {
       return this.toString(16, 2);
     };
-    if (Buffer2) {
+    if (Buffer) {
       BN.prototype.toBuffer = function toBuffer(endian, length) {
-        return this.toArrayLike(Buffer2, endian, length);
+        return this.toArrayLike(Buffer, endian, length);
       };
     }
     BN.prototype.toArray = function toArray(endian, length) {
@@ -57482,7 +57482,7 @@ function dew$W() {
   if (_dewExec$W)
     return exports$X;
   _dewExec$W = true;
-  var Buffer2 = buffer.Buffer;
+  var Buffer = buffer.Buffer;
   var BN = dew$X();
   var randomBytes2 = dew$2O();
   function blind(priv) {
@@ -57513,7 +57513,7 @@ function dew$W() {
     var m1 = c1.redPow(priv.exponent1).fromRed();
     var m22 = c22.redPow(priv.exponent2).fromRed();
     var h6 = m1.isub(m22).imul(qinv).umod(p6).imul(q3);
-    return m22.iadd(h6).imul(blinds.unblinder).umod(priv.modulus).toArrayLike(Buffer2, "be", len);
+    return m22.iadd(h6).imul(blinds.unblinder).umod(priv.modulus).toArrayLike(Buffer, "be", len);
   }
   crt.getr = getr;
   exports$X = crt;
@@ -57621,12 +57621,12 @@ function dew$V() {
     }
     BN.BN = BN;
     BN.wordSize = 26;
-    var Buffer2;
+    var Buffer;
     try {
       if (typeof window !== "undefined" && typeof window.Buffer !== "undefined") {
-        Buffer2 = window.Buffer;
+        Buffer = window.Buffer;
       } else {
-        Buffer2 = buffer.Buffer;
+        Buffer = buffer.Buffer;
       }
     } catch (e8) {
     }
@@ -57954,8 +57954,8 @@ function dew$V() {
       return this.toString(16);
     };
     BN.prototype.toBuffer = function toBuffer(endian, length) {
-      assert(typeof Buffer2 !== "undefined");
-      return this.toArrayLike(Buffer2, endian, length);
+      assert(typeof Buffer !== "undefined");
+      return this.toArrayLike(Buffer, endian, length);
     };
     BN.prototype.toArray = function toArray(endian, length) {
       return this.toArrayLike(Array, endian, length);
@@ -63410,12 +63410,12 @@ function dew$x() {
     }
     BN.BN = BN;
     BN.wordSize = 26;
-    var Buffer2;
+    var Buffer;
     try {
       if (typeof window !== "undefined" && typeof window.Buffer !== "undefined") {
-        Buffer2 = window.Buffer;
+        Buffer = window.Buffer;
       } else {
-        Buffer2 = buffer.Buffer;
+        Buffer = buffer.Buffer;
       }
     } catch (e8) {
     }
@@ -63743,8 +63743,8 @@ function dew$x() {
       return this.toString(16);
     };
     BN.prototype.toBuffer = function toBuffer(endian, length) {
-      assert(typeof Buffer2 !== "undefined");
-      return this.toArrayLike(Buffer2, endian, length);
+      assert(typeof Buffer !== "undefined");
+      return this.toArrayLike(Buffer, endian, length);
     };
     BN.prototype.toArray = function toArray(endian, length) {
       return this.toArrayLike(Array, endian, length);
@@ -66102,7 +66102,7 @@ function dew$w() {
   _dewExec$w = true;
   var process$1 = process;
   var buffer$1 = buffer;
-  var Buffer2 = buffer$1.Buffer;
+  var Buffer = buffer$1.Buffer;
   var safer = {};
   var key;
   for (key in buffer$1) {
@@ -66113,14 +66113,14 @@ function dew$w() {
     safer[key] = buffer$1[key];
   }
   var Safer = safer.Buffer = {};
-  for (key in Buffer2) {
-    if (!Buffer2.hasOwnProperty(key))
+  for (key in Buffer) {
+    if (!Buffer.hasOwnProperty(key))
       continue;
     if (key === "allocUnsafe" || key === "allocUnsafeSlow")
       continue;
-    Safer[key] = Buffer2[key];
+    Safer[key] = Buffer[key];
   }
-  safer.Buffer.prototype = Buffer2.prototype;
+  safer.Buffer.prototype = Buffer.prototype;
   if (!Safer.from || Safer.from === Uint8Array.from) {
     Safer.from = function(value, encodingOrOffset, length) {
       if (typeof value === "number") {
@@ -66129,7 +66129,7 @@ function dew$w() {
       if (value && typeof value.length === "undefined") {
         throw new TypeError("The first argument must be one of type string, Buffer, ArrayBuffer, Array, or Array-like Object. Received type " + typeof value);
       }
-      return Buffer2(value, encodingOrOffset, length);
+      return Buffer(value, encodingOrOffset, length);
     };
   }
   if (!Safer.alloc) {
@@ -66140,7 +66140,7 @@ function dew$w() {
       if (size < 0 || size >= 2 * (1 << 30)) {
         throw new RangeError('The value "' + size + '" is invalid for option "size"');
       }
-      var buf = Buffer2(size);
+      var buf = Buffer(size);
       if (!fill || fill.length === 0) {
         buf.fill(0);
       } else if (typeof encoding === "string") {
@@ -66281,10 +66281,10 @@ function dew$u() {
   _dewExec$u = true;
   const inherits2 = dew$f();
   const Reporter = dew$v().Reporter;
-  const Buffer2 = dew$w().Buffer;
+  const Buffer = dew$w().Buffer;
   function DecoderBuffer(base, options) {
     Reporter.call(this, options);
-    if (!Buffer2.isBuffer(base)) {
+    if (!Buffer.isBuffer(base)) {
       this.error("Input not Buffer");
       return;
     }
@@ -66298,7 +66298,7 @@ function dew$u() {
     if (data instanceof DecoderBuffer) {
       return true;
     }
-    const isCompatible = typeof data === "object" && Buffer2.isBuffer(data.base) && data.constructor.name === "DecoderBuffer" && typeof data.offset === "number" && typeof data.length === "number" && typeof data.save === "function" && typeof data.restore === "function" && typeof data.isEmpty === "function" && typeof data.readUInt8 === "function" && typeof data.skip === "function" && typeof data.raw === "function";
+    const isCompatible = typeof data === "object" && Buffer.isBuffer(data.base) && data.constructor.name === "DecoderBuffer" && typeof data.offset === "number" && typeof data.length === "number" && typeof data.save === "function" && typeof data.restore === "function" && typeof data.isEmpty === "function" && typeof data.readUInt8 === "function" && typeof data.skip === "function" && typeof data.raw === "function";
     return isCompatible;
   };
   DecoderBuffer.prototype.save = function save() {
@@ -66353,8 +66353,8 @@ function dew$u() {
       this.length = 1;
     } else if (typeof value === "string") {
       this.value = value;
-      this.length = Buffer2.byteLength(value);
-    } else if (Buffer2.isBuffer(value)) {
+      this.length = Buffer.byteLength(value);
+    } else if (Buffer.isBuffer(value)) {
       this.value = value;
       this.length = value.length;
     } else {
@@ -66371,7 +66371,7 @@ function dew$u() {
   };
   EncoderBuffer.prototype.join = function join(out, offset) {
     if (!out)
-      out = Buffer2.alloc(this.length);
+      out = Buffer.alloc(this.length);
     if (!offset)
       offset = 0;
     if (this.length === 0)
@@ -66386,7 +66386,7 @@ function dew$u() {
         out[offset] = this.value;
       else if (typeof this.value === "string")
         out.write(this.value, offset);
-      else if (Buffer2.isBuffer(this.value))
+      else if (Buffer.isBuffer(this.value))
         this.value.copy(out, offset);
       offset += this.length;
     }
@@ -66917,7 +66917,7 @@ function dew$r() {
     return exports$s;
   _dewExec$r = true;
   const inherits2 = dew$f();
-  const Buffer2 = dew$w().Buffer;
+  const Buffer = dew$w().Buffer;
   const Node = dew$t();
   const der = dew$s();
   function DEREncoder(entity) {
@@ -66938,7 +66938,7 @@ function dew$r() {
   DERNode.prototype._encodeComposite = function encodeComposite(tag, primitive, cls, content) {
     const encodedTag = encodeTag(tag, primitive, cls, this.reporter);
     if (content.length < 128) {
-      const header2 = Buffer2.alloc(2);
+      const header2 = Buffer.alloc(2);
       header2[0] = encodedTag;
       header2[1] = content.length;
       return this._createEncoderBuffer([header2, content]);
@@ -66946,7 +66946,7 @@ function dew$r() {
     let lenOctets = 1;
     for (let i6 = content.length; i6 >= 256; i6 >>= 8)
       lenOctets++;
-    const header = Buffer2.alloc(1 + 1 + lenOctets);
+    const header = Buffer.alloc(1 + 1 + lenOctets);
     header[0] = encodedTag;
     header[1] = 128 | lenOctets;
     for (let i6 = 1 + lenOctets, j4 = content.length; j4 > 0; i6--, j4 >>= 8)
@@ -66957,7 +66957,7 @@ function dew$r() {
     if (tag === "bitstr") {
       return this._createEncoderBuffer([str.unused | 0, str.data]);
     } else if (tag === "bmpstr") {
-      const buf = Buffer2.alloc(str.length * 2);
+      const buf = Buffer.alloc(str.length * 2);
       for (let i6 = 0; i6 < str.length; i6++) {
         buf.writeUInt16BE(str.charCodeAt(i6), i6 * 2);
       }
@@ -67008,7 +67008,7 @@ function dew$r() {
       for (size++; ident >= 128; ident >>= 7)
         size++;
     }
-    const objid = Buffer2.alloc(size);
+    const objid = Buffer.alloc(size);
     let offset = objid.length - 1;
     for (let i6 = id.length - 1; i6 >= 0; i6--) {
       let ident = id[i6];
@@ -67048,18 +67048,18 @@ function dew$r() {
       }
       num = values[num];
     }
-    if (typeof num !== "number" && !Buffer2.isBuffer(num)) {
+    if (typeof num !== "number" && !Buffer.isBuffer(num)) {
       const numArray = num.toArray();
       if (!num.sign && numArray[0] & 128) {
         numArray.unshift(0);
       }
-      num = Buffer2.from(numArray);
+      num = Buffer.from(numArray);
     }
-    if (Buffer2.isBuffer(num)) {
+    if (Buffer.isBuffer(num)) {
       let size2 = num.length;
       if (num.length === 0)
         size2++;
-      const out2 = Buffer2.alloc(size2);
+      const out2 = Buffer.alloc(size2);
       num.copy(out2);
       if (num.length === 0)
         out2[0] = 0;
@@ -67080,7 +67080,7 @@ function dew$r() {
     if (out[0] & 128) {
       out.unshift(0);
     }
-    return this._createEncoderBuffer(Buffer2.from(out));
+    return this._createEncoderBuffer(Buffer.from(out));
   };
   DERNode.prototype._encodeBool = function encodeBool(value) {
     return this._createEncoderBuffer(value ? 255 : 0);
@@ -67435,7 +67435,7 @@ function dew$n() {
     return exports$o;
   _dewExec$n = true;
   const inherits2 = dew$f();
-  const Buffer2 = dew$w().Buffer;
+  const Buffer = dew$w().Buffer;
   const DERDecoder = dew$o();
   function PEMDecoder(entity) {
     DERDecoder.call(this, entity);
@@ -67470,7 +67470,7 @@ function dew$n() {
       throw new Error("PEM section not found for: " + label);
     const base64 = lines.slice(start + 1, end).join("");
     base64.replace(/[^a-z0-9+/=]+/gi, "");
-    const input = Buffer2.from(base64, "base64");
+    const input = Buffer.from(base64, "base64");
     return DERDecoder.prototype.decode.call(this, input, options);
   };
   return exports$o;
@@ -67709,24 +67709,24 @@ function dew$f2() {
   var fullRegex = /^-----BEGIN ((?:.*? KEY)|CERTIFICATE)-----([0-9A-z\n\r+/=]+)-----END \1-----$/m;
   var evp = dew$21();
   var ciphers = dew$1_();
-  var Buffer2 = dew$2P().Buffer;
+  var Buffer = dew$2P().Buffer;
   exports$g2 = function(okey, password) {
     var key = okey.toString();
     var match = key.match(findProc);
     var decrypted;
     if (!match) {
       var match2 = key.match(fullRegex);
-      decrypted = Buffer2.from(match2[2].replace(/[\r\n]/g, ""), "base64");
+      decrypted = Buffer.from(match2[2].replace(/[\r\n]/g, ""), "base64");
     } else {
       var suite = "aes" + match[1];
-      var iv = Buffer2.from(match[2], "hex");
-      var cipherText = Buffer2.from(match[3].replace(/[\r\n]/g, ""), "base64");
+      var iv = Buffer.from(match[2], "hex");
+      var cipherText = Buffer.from(match[3].replace(/[\r\n]/g, ""), "base64");
       var cipherKey = evp(password, iv.slice(0, 8), parseInt(match[1], 10)).key;
       var out = [];
       var cipher = ciphers.createDecipheriv(suite, cipherKey, iv);
       out.push(cipher.update(cipherText));
       out.push(cipher.final());
-      decrypted = Buffer2.concat(out);
+      decrypted = Buffer.concat(out);
     }
     var tag = key.match(startRegex)[1];
     return {
@@ -67747,16 +67747,16 @@ function dew$e2() {
   var fixProc = dew$f2();
   var ciphers = dew$1_();
   var compat = dew$2o();
-  var Buffer2 = dew$2P().Buffer;
+  var Buffer = dew$2P().Buffer;
   exports$f2 = parseKeys;
   function parseKeys(buffer2) {
     var password;
-    if (typeof buffer2 === "object" && !Buffer2.isBuffer(buffer2)) {
+    if (typeof buffer2 === "object" && !Buffer.isBuffer(buffer2)) {
       password = buffer2.passphrase;
       buffer2 = buffer2.key;
     }
     if (typeof buffer2 === "string") {
-      buffer2 = Buffer2.from(buffer2);
+      buffer2 = Buffer.from(buffer2);
     }
     var stripped = fixProc(buffer2, password);
     var type = stripped.tag;
@@ -67843,7 +67843,7 @@ function dew$e2() {
     var out = [];
     out.push(cipher.update(cipherText));
     out.push(cipher.final());
-    return Buffer2.concat(out);
+    return Buffer.concat(out);
   }
   return exports$f2;
 }
@@ -67861,7 +67861,7 @@ function dew$d2() {
   if (_dewExec$d2)
     return exports$e2;
   _dewExec$d2 = true;
-  var Buffer2 = dew$Y().Buffer;
+  var Buffer = dew$Y().Buffer;
   var createHmac2 = dew$2v();
   var crt = dew$W();
   var EC = dew$y().ec;
@@ -67882,7 +67882,7 @@ function dew$d2() {
       if (signType !== "rsa" && signType !== "ecdsa/rsa")
         throw new Error("wrong private key type");
     }
-    hash = Buffer2.concat([tag, hash]);
+    hash = Buffer.concat([tag, hash]);
     var len = priv.modulus.byteLength();
     var pad = [0, 1];
     while (hash.length + pad.length + 1 < len)
@@ -67901,7 +67901,7 @@ function dew$d2() {
     var curve = new EC(curveId);
     var key = curve.keyFromPrivate(priv.privateKey);
     var out = key.sign(hash);
-    return Buffer2.from(out.toDER());
+    return Buffer.from(out.toDER());
   }
   function dsaSign(hash, priv, algo) {
     var x4 = priv.params.priv_key;
@@ -67934,22 +67934,22 @@ function dew$d2() {
     var total = r6.length + s6.length + 4;
     var res = [48, total, 2, r6.length];
     res = res.concat(r6, [2, s6.length], s6);
-    return Buffer2.from(res);
+    return Buffer.from(res);
   }
   function getKey(x4, q3, hash, algo) {
-    x4 = Buffer2.from(x4.toArray());
+    x4 = Buffer.from(x4.toArray());
     if (x4.length < q3.byteLength()) {
-      var zeros = Buffer2.alloc(q3.byteLength() - x4.length);
-      x4 = Buffer2.concat([zeros, x4]);
+      var zeros = Buffer.alloc(q3.byteLength() - x4.length);
+      x4 = Buffer.concat([zeros, x4]);
     }
     var hlen = hash.length;
     var hbits = bits2octets(hash, q3);
-    var v5 = Buffer2.alloc(hlen);
+    var v5 = Buffer.alloc(hlen);
     v5.fill(1);
-    var k4 = Buffer2.alloc(hlen);
-    k4 = createHmac2(algo, k4).update(v5).update(Buffer2.from([0])).update(x4).update(hbits).digest();
+    var k4 = Buffer.alloc(hlen);
+    k4 = createHmac2(algo, k4).update(v5).update(Buffer.from([0])).update(x4).update(hbits).digest();
     v5 = createHmac2(algo, k4).update(v5).digest();
-    k4 = createHmac2(algo, k4).update(v5).update(Buffer2.from([1])).update(x4).update(hbits).digest();
+    k4 = createHmac2(algo, k4).update(v5).update(Buffer.from([1])).update(x4).update(hbits).digest();
     v5 = createHmac2(algo, k4).update(v5).digest();
     return {
       k: k4,
@@ -67966,10 +67966,10 @@ function dew$d2() {
   function bits2octets(bits, q3) {
     bits = bits2int(bits, q3);
     bits = bits.mod(q3);
-    var out = Buffer2.from(bits.toArray());
+    var out = Buffer.from(bits.toArray());
     if (out.length < q3.byteLength()) {
-      var zeros = Buffer2.alloc(q3.byteLength() - out.length);
-      out = Buffer2.concat([zeros, out]);
+      var zeros = Buffer.alloc(q3.byteLength() - out.length);
+      out = Buffer.concat([zeros, out]);
     }
     return out;
   }
@@ -67977,13 +67977,13 @@ function dew$d2() {
     var t6;
     var k4;
     do {
-      t6 = Buffer2.alloc(0);
+      t6 = Buffer.alloc(0);
       while (t6.length * 8 < q3.bitLength()) {
         kv.v = createHmac2(algo, kv.k).update(kv.v).digest();
-        t6 = Buffer2.concat([t6, kv.v]);
+        t6 = Buffer.concat([t6, kv.v]);
       }
       k4 = bits2int(t6, q3);
-      kv.k = createHmac2(algo, kv.k).update(kv.v).update(Buffer2.from([0])).digest();
+      kv.k = createHmac2(algo, kv.k).update(kv.v).update(Buffer.from([0])).digest();
       kv.v = createHmac2(algo, kv.k).update(kv.v).digest();
     } while (k4.cmp(q3) !== -1);
     return k4;
@@ -68002,7 +68002,7 @@ function dew$c2() {
   if (_dewExec$c2)
     return exports$d2;
   _dewExec$c2 = true;
-  var Buffer2 = dew$Y().Buffer;
+  var Buffer = dew$Y().Buffer;
   var BN = dew$X();
   var EC = dew$y().ec;
   var parseKeys = dew$e2();
@@ -68021,7 +68021,7 @@ function dew$c2() {
       if (signType !== "rsa" && signType !== "ecdsa/rsa")
         throw new Error("wrong public key type");
     }
-    hash = Buffer2.concat([tag, hash]);
+    hash = Buffer.concat([tag, hash]);
     var len = pub.modulus.byteLength();
     var pad = [1];
     var padNum = 0;
@@ -68034,11 +68034,11 @@ function dew$c2() {
     while (++i6 < hash.length) {
       pad.push(hash[i6]);
     }
-    pad = Buffer2.from(pad);
+    pad = Buffer.from(pad);
     var red = BN.mont(pub.modulus);
     sig = new BN(sig).toRed(red);
     sig = sig.redPow(new BN(pub.publicExponent));
-    sig = Buffer2.from(sig.fromRed().toArray());
+    sig = Buffer.from(sig.fromRed().toArray());
     var out = padNum < 8 ? 1 : 0;
     len = Math.min(sig.length, pad.length);
     if (sig.length !== pad.length)
@@ -68087,7 +68087,7 @@ function dew$b2() {
   if (_dewExec$b2)
     return exports$c2;
   _dewExec$b2 = true;
-  var Buffer2 = dew$Y().Buffer;
+  var Buffer = dew$Y().Buffer;
   var createHash2 = dew$2y();
   var stream2 = dew3();
   var inherits2 = dew$f();
@@ -68095,7 +68095,7 @@ function dew$b2() {
   var verify = dew$c2();
   var algorithms = _algorithms$1;
   Object.keys(algorithms).forEach(function(key) {
-    algorithms[key].id = Buffer2.from(algorithms[key].id, "hex");
+    algorithms[key].id = Buffer.from(algorithms[key].id, "hex");
     algorithms[key.toLowerCase()] = algorithms[key];
   });
   function Sign2(algorithm) {
@@ -68115,7 +68115,7 @@ function dew$b2() {
   };
   Sign2.prototype.update = function update(data, enc) {
     if (typeof data === "string")
-      data = Buffer2.from(data, enc);
+      data = Buffer.from(data, enc);
     (this || _global$4)._hash.update(data);
     return this || _global$4;
   };
@@ -68141,13 +68141,13 @@ function dew$b2() {
   };
   Verify2.prototype.update = function update(data, enc) {
     if (typeof data === "string")
-      data = Buffer2.from(data, enc);
+      data = Buffer.from(data, enc);
     (this || _global$4)._hash.update(data);
     return this || _global$4;
   };
   Verify2.prototype.verify = function verifyMethod(key, sig, enc) {
     if (typeof sig === "string")
-      sig = Buffer2.from(sig, enc);
+      sig = Buffer.from(sig, enc);
     this.end();
     var hash = (this || _global$4)._hash.digest();
     return verify(sig, hash, key, (this || _global$4)._signType, (this || _global$4)._tag);
@@ -68212,12 +68212,12 @@ function dew$a2() {
     }
     BN.BN = BN;
     BN.wordSize = 26;
-    var Buffer2;
+    var Buffer;
     try {
       if (typeof window !== "undefined" && typeof window.Buffer !== "undefined") {
-        Buffer2 = window.Buffer;
+        Buffer = window.Buffer;
       } else {
-        Buffer2 = buffer.Buffer;
+        Buffer = buffer.Buffer;
       }
     } catch (e8) {
     }
@@ -68545,8 +68545,8 @@ function dew$a2() {
       return this.toString(16);
     };
     BN.prototype.toBuffer = function toBuffer(endian, length) {
-      assert(typeof Buffer2 !== "undefined");
-      return this.toArrayLike(Buffer2, endian, length);
+      assert(typeof Buffer !== "undefined");
+      return this.toArrayLike(Buffer, endian, length);
     };
     BN.prototype.toArray = function toArray(endian, length) {
       return this.toArrayLike(Array, endian, length);
@@ -70903,7 +70903,7 @@ function dew$92() {
   if (_dewExec$92)
     return exports$a2;
   _dewExec$92 = true;
-  var Buffer2 = buffer.Buffer;
+  var Buffer = buffer.Buffer;
   var elliptic = dew$y();
   var BN = dew$a2();
   exports$a2 = function createECDH2(curve) {
@@ -70960,8 +70960,8 @@ function dew$92() {
   };
   ECDH.prototype.computeSecret = function(other, inenc, enc) {
     inenc = inenc || "utf8";
-    if (!Buffer2.isBuffer(other)) {
-      other = new Buffer2(other, inenc);
+    if (!Buffer.isBuffer(other)) {
+      other = new Buffer(other, inenc);
     }
     var otherPub = (this || _global$22).curve.keyFromPublic(other).getPublic();
     var out = otherPub.mul((this || _global$22).keys.getPrivate()).getX();
@@ -70983,16 +70983,16 @@ function dew$92() {
   };
   ECDH.prototype.setPublicKey = function(pub, enc) {
     enc = enc || "utf8";
-    if (!Buffer2.isBuffer(pub)) {
-      pub = new Buffer2(pub, enc);
+    if (!Buffer.isBuffer(pub)) {
+      pub = new Buffer(pub, enc);
     }
     (this || _global$22).keys._importPublic(pub);
     return this || _global$22;
   };
   ECDH.prototype.setPrivateKey = function(priv, enc) {
     enc = enc || "utf8";
-    if (!Buffer2.isBuffer(priv)) {
-      priv = new Buffer2(priv, enc);
+    if (!Buffer.isBuffer(priv)) {
+      priv = new Buffer(priv, enc);
     }
     var _priv = new BN(priv);
     _priv = _priv.toString(16);
@@ -71004,11 +71004,11 @@ function dew$92() {
     if (!Array.isArray(bn)) {
       bn = bn.toArray();
     }
-    var buf = new Buffer2(bn);
+    var buf = new Buffer(bn);
     if (len && buf.length < len) {
-      var zeros = new Buffer2(len - buf.length);
+      var zeros = new Buffer(len - buf.length);
       zeros.fill(0);
-      buf = Buffer2.concat([zeros, buf]);
+      buf = Buffer.concat([zeros, buf]);
     }
     if (!enc) {
       return buf;
@@ -71025,19 +71025,19 @@ function dew$82() {
     return exports$92;
   _dewExec$82 = true;
   var createHash2 = dew$2y();
-  var Buffer2 = dew$2P().Buffer;
+  var Buffer = dew$2P().Buffer;
   exports$92 = function(seed, len) {
-    var t6 = Buffer2.alloc(0);
+    var t6 = Buffer.alloc(0);
     var i6 = 0;
     var c6;
     while (t6.length < len) {
       c6 = i2ops(i6++);
-      t6 = Buffer2.concat([t6, createHash2("sha1").update(seed).update(c6).digest()]);
+      t6 = Buffer.concat([t6, createHash2("sha1").update(seed).update(c6).digest()]);
     }
     return t6.slice(0, len);
   };
   function i2ops(c6) {
-    var out = Buffer2.allocUnsafe(4);
+    var out = Buffer.allocUnsafe(4);
     out.writeUInt32BE(c6, 0);
     return out;
   }
@@ -71105,12 +71105,12 @@ function dew$62() {
     }
     BN.BN = BN;
     BN.wordSize = 26;
-    var Buffer2;
+    var Buffer;
     try {
       if (typeof window !== "undefined" && typeof window.Buffer !== "undefined") {
-        Buffer2 = window.Buffer;
+        Buffer = window.Buffer;
       } else {
-        Buffer2 = buffer.Buffer;
+        Buffer = buffer.Buffer;
       }
     } catch (e8) {
     }
@@ -71438,8 +71438,8 @@ function dew$62() {
       return this.toString(16);
     };
     BN.prototype.toBuffer = function toBuffer(endian, length) {
-      assert(typeof Buffer2 !== "undefined");
-      return this.toArrayLike(Buffer2, endian, length);
+      assert(typeof Buffer !== "undefined");
+      return this.toArrayLike(Buffer, endian, length);
     };
     BN.prototype.toArray = function toArray(endian, length) {
       return this.toArrayLike(Array, endian, length);
@@ -73796,9 +73796,9 @@ function dew$52() {
     return exports$62;
   _dewExec$52 = true;
   var BN = dew$62();
-  var Buffer2 = dew$2P().Buffer;
+  var Buffer = dew$2P().Buffer;
   function withPublic(paddedMsg, key) {
-    return Buffer2.from(paddedMsg.toRed(BN.mont(key.modulus)).redPow(new BN(key.publicExponent)).fromRed().toArray());
+    return Buffer.from(paddedMsg.toRed(BN.mont(key.modulus)).redPow(new BN(key.publicExponent)).fromRed().toArray());
   }
   exports$62 = withPublic;
   return exports$62;
@@ -73817,7 +73817,7 @@ function dew$42() {
   var BN = dew$62();
   var withPublic = dew$52();
   var crt = dew$W();
-  var Buffer2 = dew$2P().Buffer;
+  var Buffer = dew$2P().Buffer;
   exports$52 = function publicEncrypt2(publicKey, msg, reverse) {
     var padding;
     if (publicKey.padding) {
@@ -73850,18 +73850,18 @@ function dew$42() {
   function oaep(key, msg) {
     var k4 = key.modulus.byteLength();
     var mLen = msg.length;
-    var iHash = createHash2("sha1").update(Buffer2.alloc(0)).digest();
+    var iHash = createHash2("sha1").update(Buffer.alloc(0)).digest();
     var hLen = iHash.length;
     var hLen2 = 2 * hLen;
     if (mLen > k4 - hLen2 - 2) {
       throw new Error("message too long");
     }
-    var ps = Buffer2.alloc(k4 - mLen - hLen2 - 2);
+    var ps = Buffer.alloc(k4 - mLen - hLen2 - 2);
     var dblen = k4 - hLen - 1;
     var seed = randomBytes2(hLen);
-    var maskedDb = xor(Buffer2.concat([iHash, ps, Buffer2.alloc(1, 1), msg], dblen), mgf(seed, dblen));
+    var maskedDb = xor(Buffer.concat([iHash, ps, Buffer.alloc(1, 1), msg], dblen), mgf(seed, dblen));
     var maskedSeed = xor(seed, mgf(maskedDb, hLen));
-    return new BN(Buffer2.concat([Buffer2.alloc(1), maskedSeed, maskedDb], k4));
+    return new BN(Buffer.concat([Buffer.alloc(1), maskedSeed, maskedDb], k4));
   }
   function pkcs1(key, msg, reverse) {
     var mLen = msg.length;
@@ -73871,14 +73871,14 @@ function dew$42() {
     }
     var ps;
     if (reverse) {
-      ps = Buffer2.alloc(k4 - mLen - 3, 255);
+      ps = Buffer.alloc(k4 - mLen - 3, 255);
     } else {
       ps = nonZero(k4 - mLen - 3);
     }
-    return new BN(Buffer2.concat([Buffer2.from([0, reverse ? 1 : 2]), ps, Buffer2.alloc(1), msg], k4));
+    return new BN(Buffer.concat([Buffer.from([0, reverse ? 1 : 2]), ps, Buffer.alloc(1), msg], k4));
   }
   function nonZero(len) {
-    var out = Buffer2.allocUnsafe(len);
+    var out = Buffer.allocUnsafe(len);
     var i6 = 0;
     var cache = randomBytes2(len * 2);
     var cur = 0;
@@ -73910,7 +73910,7 @@ function dew$32() {
   var crt = dew$W();
   var createHash2 = dew$2y();
   var withPublic = dew$52();
-  var Buffer2 = dew$2P().Buffer;
+  var Buffer = dew$2P().Buffer;
   exports$42 = function privateDecrypt2(privateKey, enc, reverse) {
     var padding;
     if (privateKey.padding) {
@@ -73931,8 +73931,8 @@ function dew$32() {
     } else {
       msg = crt(enc, key);
     }
-    var zBuffer = Buffer2.alloc(k4 - msg.length);
-    msg = Buffer2.concat([zBuffer, msg], k4);
+    var zBuffer = Buffer.alloc(k4 - msg.length);
+    msg = Buffer.concat([zBuffer, msg], k4);
     if (padding === 4) {
       return oaep(key, msg);
     } else if (padding === 1) {
@@ -73945,7 +73945,7 @@ function dew$32() {
   };
   function oaep(key, msg) {
     var k4 = key.modulus.byteLength();
-    var iHash = createHash2("sha1").update(Buffer2.alloc(0)).digest();
+    var iHash = createHash2("sha1").update(Buffer.alloc(0)).digest();
     var hLen = iHash.length;
     if (msg[0] !== 0) {
       throw new Error("decryption error");
@@ -73989,8 +73989,8 @@ function dew$32() {
     return msg.slice(i6);
   }
   function compare(a6, b4) {
-    a6 = Buffer2.from(a6);
-    b4 = Buffer2.from(b4);
+    a6 = Buffer.from(a6);
+    b4 = Buffer.from(b4);
     var dif = 0;
     var len = a6.length;
     if (a6.length !== b4.length) {
@@ -74034,7 +74034,7 @@ function dew$110() {
   }
   var safeBuffer = dew$2P();
   var randombytes = dew$2O();
-  var Buffer2 = safeBuffer.Buffer;
+  var Buffer = safeBuffer.Buffer;
   var kBufferMaxLength = safeBuffer.kMaxLength;
   var crypto2 = _global3.crypto || _global3.msCrypto;
   var kMaxUint32 = Math.pow(2, 32) - 1;
@@ -74068,7 +74068,7 @@ function dew$110() {
     exports$210.randomFillSync = oldBrowser;
   }
   function randomFill2(buf, offset, size, cb) {
-    if (!Buffer2.isBuffer(buf) && !(buf instanceof _global3.Uint8Array)) {
+    if (!Buffer.isBuffer(buf) && !(buf instanceof _global3.Uint8Array)) {
       throw new TypeError('"buf" argument must be a Buffer or Uint8Array');
     }
     if (typeof offset === "function") {
@@ -74116,7 +74116,7 @@ function dew$110() {
     if (typeof offset === "undefined") {
       offset = 0;
     }
-    if (!Buffer2.isBuffer(buf) && !(buf instanceof _global3.Uint8Array)) {
+    if (!Buffer.isBuffer(buf) && !(buf instanceof _global3.Uint8Array)) {
       throw new TypeError('"buf" argument must be a Buffer or Uint8Array');
     }
     assertOffset(offset, buf.length);
