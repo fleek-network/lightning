@@ -111,7 +111,8 @@ impl SharedMap {
         let mut new = std::collections::HashMap::new();
         for profile in profiles {
             let exec = file_from_path(profile.name.as_ref().unwrap_or(&GLOBAL_PROFILE)).await?;
-            let mut file_open_rules = vec![lightning_ebpf_common::FileRule::default(); MAX_FILE_RULES];
+            let mut file_open_rules =
+                vec![lightning_ebpf_common::FileRule::default(); MAX_FILE_RULES];
             for (i, rule) in profile.file_rules.iter().enumerate() {
                 // Todo: check for other types of accesses.
                 if rule.operations == FileRule::OPEN_MASK {

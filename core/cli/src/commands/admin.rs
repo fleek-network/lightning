@@ -9,7 +9,9 @@ use once_cell::sync::OnceCell;
 use resolved_pathbuf::ResolvedPathBuf;
 use tracing::debug;
 
+#[cfg(feature = "ebpf")]
 use crate::commands::ebpf;
+#[cfg(feature = "ebpf")]
 use crate::commands::ebpf::EbpfCommand;
 
 pub static BIND_PATH: OnceCell<ResolvedPathBuf> = OnceCell::new();
@@ -19,6 +21,7 @@ pub static PATH_CONFIG: OnceCell<PathConfig> = OnceCell::new();
 pub enum AdminSubCmd {
     /// Start the Admin TUI.
     Tui(TuiCmd),
+    #[cfg(feature = "ebpf")]
     #[clap(subcommand)]
     /// Start the eBPF Control Application.
     Ebpf(EbpfCommand),
@@ -75,6 +78,7 @@ pub async fn exec(cmd: AdminSubCmd) -> Result<()> {
 
     match cmd {
         AdminSubCmd::Tui(cmd) => tui(cmd).await,
+        #[cfg(feature = "ebpf")]
         AdminSubCmd::Ebpf(cmd) => ebpf::exec(cmd),
     }
 }
