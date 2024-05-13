@@ -1,5 +1,5 @@
 [package]
-name = "common"
+name = "lightning-ebpf-common"
 version = "0.0.0"
 edition = "2021"
 

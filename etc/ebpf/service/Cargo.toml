@@ -9,7 +9,7 @@ anyhow = { version = "1.0", optional = true }
 aya = { git = "https://github.com/aya-rs/aya", rev = "e5d107d", features = ["async_tokio"], optional = true }
 aya-log = { git = "https://github.com/aya-rs/aya", rev = "e5d107d", optional = true }
 bytes = { version = "1.4", optional = true }
-common = { path = "../common", features = ["userspace"], optional = true }
+lightning-ebpf-common = { path = "../common", features = ["userspace"], optional = true }
 notify = { version = "6.1"}
 libc = { version = "0.2", optional = true }
 log = { version = "0.4", optional = true }
@@ -22,4 +22,4 @@ serde_json = "1.0"
 [features]
 default = ["client"]
 client = ["bytes", "log", "tokio", "anyhow"]
-server = ["aya", "aya-log", "bytes", "libc", "tokio", "log", "anyhow", "common"]
+server = ["aya", "aya-log", "bytes", "libc", "tokio", "log", "anyhow", "lightning-ebpf-common"]

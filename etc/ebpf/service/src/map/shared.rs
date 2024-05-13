@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use anyhow::bail;
 use aya::maps::{HashMap, MapData};
-use common::{
+use lightning_ebpf_common::{
     File,
     FileRuleList,
     PacketFilter,
@@ -111,7 +111,7 @@ impl SharedMap {
         let mut new = std::collections::HashMap::new();
         for profile in profiles {
             let exec = file_from_path(profile.name.as_ref().unwrap_or(&GLOBAL_PROFILE)).await?;
-            let mut file_open_rules = vec![common::FileRule::default(); MAX_FILE_RULES];
+            let mut file_open_rules = vec![lightning_ebpf_common::FileRule::default(); MAX_FILE_RULES];
             for (i, rule) in profile.file_rules.iter().enumerate() {
                 // Todo: check for other types of accesses.
                 if rule.operations == FileRule::OPEN_MASK {
@@ -128,7 +128,7 @@ impl SharedMap {
                 }
             }
 
-            let rules: [common::FileRule; MAX_FILE_RULES] =
+            let rules: [lightning_ebpf_common::FileRule; MAX_FILE_RULES] =
                 file_open_rules.try_into().expect("Vec len is hardcoded");
             new.insert(exec, FileRuleList { rules });
         }
@@ -156,7 +156,7 @@ impl SharedMap {
     pub async fn update_file_rules(&self, path: PathBuf) -> anyhow::Result<()> {
         let profile = self.config_src.read_profile(Some(path.as_os_str())).await?;
         let exec = file_from_path(profile.name.as_ref().unwrap_or(&GLOBAL_PROFILE)).await?;
-        let mut file_open_rules = vec![common::FileRule::default(); MAX_FILE_RULES];
+        let mut file_open_rules = vec![lightning_ebpf_common::FileRule::default(); MAX_FILE_RULES];
         for (i, rule) in profile.file_rules.iter().enumerate() {
             // Todo: check for other types of accesses.
             if rule.operations == FileRule::OPEN_MASK {
@@ -173,7 +173,7 @@ impl SharedMap {
             }
         }
 
-        let rules: [common::FileRule; MAX_FILE_RULES] =
+        let rules: [lightning_ebpf_common::FileRule; MAX_FILE_RULES] =
             file_open_rules.try_into().expect("Vec len is hardcoded");
 
         let mut maps = self.file_open_rules.lock().await;

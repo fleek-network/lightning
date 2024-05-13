@@ -590,6 +590,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "assert_matches"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b34d609dfbaf33d6889b2b7106d3ca345eacad44200913df5ba02bfd31d2ba9"
+
+[[package]]
 name = "async-channel"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -947,6 +953,57 @@ dependencies = [
 ]
 
 [[package]]
+name = "aya"
+version = "0.12.0"
+source = "git+https://github.com/aya-rs/aya?rev=e5d107d#e5d107dd50b13ccf9783b9af4e79b57b02c1f0f3"
+dependencies = [
+ "assert_matches",
+ "aya-obj",
+ "bitflags 2.4.1",
+ "bytes",
+ "lazy_static",
+ "libc",
+ "log",
+ "object 0.34.0",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "aya-log"
+version = "0.2.0"
+source = "git+https://github.com/aya-rs/aya?rev=e5d107d#e5d107dd50b13ccf9783b9af4e79b57b02c1f0f3"
+dependencies = [
+ "aya",
+ "aya-log-common",
+ "bytes",
+ "log",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "aya-log-common"
+version = "0.1.14"
+source = "git+https://github.com/aya-rs/aya?rev=e5d107d#e5d107dd50b13ccf9783b9af4e79b57b02c1f0f3"
+dependencies = [
+ "num_enum 0.7.1",
+]
+
+[[package]]
+name = "aya-obj"
+version = "0.1.0"
+source = "git+https://github.com/aya-rs/aya?rev=e5d107d#e5d107dd50b13ccf9783b9af4e79b57b02c1f0f3"
+dependencies = [
+ "bytes",
+ "core-error",
+ "hashbrown 0.14.3",
+ "log",
+ "object 0.34.0",
+ "thiserror",
+]
+
+[[package]]
 name = "backoff"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -971,7 +1028,7 @@ dependencies = [
  "cfg-if",
  "libc",
  "miniz_oxide",
- "object",
+ "object 0.32.2",
  "rustc-demangle",
 ]
 
@@ -2079,6 +2136,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "147be55d677052dabc6b22252d5dd0fd4c29c8c27aa4f2fbef0f94aa003b406f"
 
 [[package]]
+name = "core-error"
+version = "0.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "efcdb2972eb64230b4c50646d8498ff73f5128d196a90c7236eec4cbe8619b8f"
+dependencies = [
+ "version_check",
+]
+
+[[package]]
 name = "core-foundation"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3161,7 +3227,11 @@ name = "ebpf-service"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "aya",
+ "aya-log",
  "bytes",
+ "libc",
+ "lightning-ebpf-common",
  "log",
  "notify",
  "once_cell",
@@ -6552,6 +6622,8 @@ name = "lightning-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aya",
+ "aya-log",
  "clap 4.4.12",
  "compile-time-run",
  "console-subscriber",
@@ -6706,6 +6778,13 @@ dependencies = [
  "toml 0.7.8",
  "tracing",
  "workspace-hack 0.1.0",
+]
+
+[[package]]
+name = "lightning-ebpf-common"
+version = "0.0.0"
+dependencies = [
+ "aya",
 ]
 
 [[package]]
@@ -8801,6 +8880,15 @@ name = "object"
 version = "0.32.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a6a622008b6e321afc04970976f62ee297fdbaa6f95318ca343e3eebb9648441"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
+name = "object"
+version = "0.34.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d7090bae93f8585aad99e595b7073c5de9ba89fbd6b4e9f0cdd7a10177273ac8"
 dependencies = [
  "memchr",
 ]

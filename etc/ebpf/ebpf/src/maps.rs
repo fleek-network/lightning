@@ -1,6 +1,6 @@
 use aya_ebpf::macros::map;
 use aya_ebpf::maps::{HashMap, LpmTrie};
-use common::{File, FileRuleList, PacketFilter, PacketFilterParams, SubnetFilterParams};
+use lightning_ebpf_common::{File, FileRuleList, PacketFilter, PacketFilterParams, SubnetFilterParams};
 
 #[map]
 pub static PACKET_FILTERS: HashMap<PacketFilter, PacketFilterParams> =

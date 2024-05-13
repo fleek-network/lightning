@@ -6,7 +6,7 @@ use aya::programs::{Xdp, XdpFlags};
 use aya::{include_bytes_aligned, Ebpf};
 use aya_log::EbpfLogger;
 use clap::Parser;
-use common::PacketFilter;
+use lightning_ebpf_common::PacketFilter;
 use tokio::signal;
 
 #[derive(Debug, Parser)]

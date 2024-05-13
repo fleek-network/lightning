@@ -401,13 +401,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "acbf1af155f9b9ef647e42cdc158db4b64a1b61f743629225fde6f3e0be2a7c7"
 
 [[package]]
-name = "common"
-version = "0.0.0"
-dependencies = [
- "aya",
-]
-
-[[package]]
 name = "compact_str"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -686,8 +679,8 @@ dependencies = [
  "aya",
  "aya-log",
  "bytes",
- "common",
  "libc",
+ "lightning-ebpf-common",
  "log",
  "notify",
  "once_cell",
@@ -1627,16 +1620,23 @@ dependencies = [
  "aya-log",
  "clap",
  "color-eyre",
- "common",
  "ebpf-service",
  "env_logger",
  "libc",
+ "lightning-ebpf-common",
  "lightning-tui",
  "log",
  "once_cell",
  "resolved-pathbuf",
  "tokio",
  "vergen",
+]
+
+[[package]]
+name = "lightning-ebpf-common"
+version = "0.0.0"
+dependencies = [
+ "aya",
 ]
 
 [[package]]

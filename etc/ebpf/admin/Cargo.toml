@@ -11,7 +11,7 @@ aya = { git = "https://github.com/aya-rs/aya", rev = "e5d107d", features = ["asy
 aya-log = { git = "https://github.com/aya-rs/aya", rev = "e5d107d" }
 clap = { version = "4.4", features = ["derive"] }
 color-eyre = "0.6.2"
-common = { path = "../common", features = ["userspace"] }
+lightning-ebpf-common = { path = "../common", features = ["userspace"] }
 ebpf-service = { path = "../service", default-features = false, features = ["client", "server"] }
 env_logger = "0.11"
 libc = "0.2"

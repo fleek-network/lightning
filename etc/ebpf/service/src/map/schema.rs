@@ -3,7 +3,7 @@ use std::net::Ipv4Addr;
 use std::path::PathBuf;
 
 #[cfg(feature = "server")]
-use common::{PacketFilter, PacketFilterParams};
+use lightning_ebpf_common::{PacketFilter, PacketFilterParams};
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
 

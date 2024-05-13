@@ -6,7 +6,7 @@ use aya::programs::{Lsm, Xdp, XdpFlags};
 use aya::{include_bytes_aligned, Btf, Ebpf};
 use aya_log::EbpfLogger;
 use clap::Parser;
-use common::{File, FileRuleList, PacketFilter, PacketFilterParams};
+use lightning_ebpf_common::{File, FileRuleList, PacketFilter, PacketFilterParams};
 use ebpf_service::map::SharedMap;
 use ebpf_service::server::Server;
 use ebpf_service::{ConfigSource, PathConfig};

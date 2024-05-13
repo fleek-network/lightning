@@ -14,6 +14,8 @@ lightning-final-bindings = { path = "../final-bindings" }
 lightning-utils = { path = "../utils" }
 lightning-tui = { path = "../../etc/ebpf/tui" }
 
+aya = { git = "https://github.com/aya-rs/aya", rev = "e5d107d", features = ["async_tokio"], optional = true }
+aya-log = { git = "https://github.com/aya-rs/aya", rev = "e5d107d", optional = true }
 fleek-crypto.workspace = true
 resolved-pathbuf.workspace = true
 tokio.workspace = true
@@ -58,6 +60,7 @@ fleek-blake3 = "1.5"
 default = []
 # Opt-in for compiling services directly inside the node
 services = ["lightning-final-bindings/services"]
+ebpf = ["aya", "aya-log", "ebpf-service/server"]
 
 [[bin]]
 name = "lightning-node"

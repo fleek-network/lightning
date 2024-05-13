@@ -2,7 +2,7 @@ use aya_ebpf::cty::c_long;
 use aya_ebpf::macros::lsm;
 use aya_ebpf::programs::LsmContext;
 use aya_log_ebpf::info;
-use common::File;
+use lightning_ebpf_common::File;
 
 use crate::{access, maps, vmlinux};
 

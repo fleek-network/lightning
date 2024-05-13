@@ -4,7 +4,7 @@ use aya_ebpf::bindings::xdp_action;
 use aya_ebpf::macros::xdp;
 use aya_ebpf::maps::lpm_trie::Key;
 use aya_ebpf::programs::XdpContext;
-use common::{PacketFilter, PacketFilterParams, SubnetFilterParams};
+use lightning_ebpf_common::{PacketFilter, PacketFilterParams, SubnetFilterParams};
 use memoffset::offset_of;
 use network_types::eth::{EthHdr, EtherType};
 use network_types::ip::{IpProto, Ipv4Hdr};
