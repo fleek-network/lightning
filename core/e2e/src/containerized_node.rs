@@ -28,7 +28,7 @@ impl ContainerizedNode {
     ) -> Self {
         let provider = MultiThreadedProvider::default();
         provider.insert(config.clone());
-        let node = ContainedNode::<FinalTypes>::new(provider, None);
+        let node = ContainedNode::<FinalTypes>::new(provider, Some(format!("NODE-{index}")));
         Self {
             config,
             owner_secret_key,
