@@ -20,6 +20,7 @@ use hp_fixed::unsigned::HpUfixed;
 use lightning_types::{
     AccountInfo,
     Blake3Hash,
+    ChainId,
     Committee,
     CommodityTypes,
     Metadata,
@@ -87,6 +88,12 @@ pub trait ApplicationInterface<C: Collection>:
         checkpoint: Vec<u8>,
         checkpoint_hash: [u8; 32],
     ) -> Result<()>;
+
+    /// Used to get the chain id from the genesis file instead of state
+    fn get_chain_id() -> Result<ChainId>;
+
+    /// Returns the committee from the geneis of the network
+    fn get_genesis_committee() -> Result<Vec<NodeInfo>>;
 }
 
 #[interfaces_proc::blank]

@@ -9,7 +9,6 @@ use fleek_crypto::{
     TransactionSender,
     TransactionSignature,
 };
-use lightning_application::genesis::Genesis;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
     ChainId,
@@ -51,8 +50,8 @@ async fn opt_in<C: Collection>(config_path: ResolvedPathBuf) -> Result<()> {
         .connect_timeout(Duration::from_secs(5))
         .build()?;
 
-    let genesis_committee =
-        get_genesis_committee().context("Failed to load genesis committee info.")?;
+    let genesis_committee = C::ApplicationInterface::get_genesis_committee()
+        .context("Failed to load genesis committee info.")?;
 
     let node_info = query_node_info(public_key, &genesis_committee, &rpc_client)
         .await
@@ -75,7 +74,8 @@ async fn opt_in<C: Collection>(config_path: ResolvedPathBuf) -> Result<()> {
         return Ok(());
     }
 
-    let chain_id = get_chain_id().context("Failed to load Chain ID from genesis.")?;
+    let chain_id =
+        C::ApplicationInterface::get_chain_id().context("Failed to load Chain ID from genesis.")?;
 
     let tx = create_update_request(
         UpdateMethod::OptIn {},
@@ -118,8 +118,8 @@ async fn opt_out<C: Collection>(config_path: ResolvedPathBuf) -> Result<()> {
         .connect_timeout(Duration::from_secs(5))
         .build()?;
 
-    let genesis_committee =
-        get_genesis_committee().context("Failed to load genesis committee info.")?;
+    let genesis_committee = C::ApplicationInterface::get_genesis_committee()
+        .context("Failed to load genesis committee info.")?;
 
     let node_info = query_node_info(public_key, &genesis_committee, &rpc_client)
         .await
@@ -132,7 +132,8 @@ async fn opt_out<C: Collection>(config_path: ResolvedPathBuf) -> Result<()> {
         return Ok(());
     }
 
-    let chain_id = get_chain_id().context("Failed to load Chain ID from genesis.")?;
+    let chain_id =
+        C::ApplicationInterface::get_chain_id().context("Failed to load Chain ID from genesis.")?;
 
     let tx = create_update_request(
         UpdateMethod::OptOut {},
@@ -170,8 +171,8 @@ async fn status<C: Collection>(config_path: ResolvedPathBuf) -> Result<()> {
         .connect_timeout(Duration::from_secs(5))
         .build()?;
 
-    let genesis_committee =
-        get_genesis_committee().context("Failed to load genesis committee info.")?;
+    let genesis_committee = C::ApplicationInterface::get_genesis_committee()
+        .context("Failed to load genesis committee info.")?;
 
     let node_info = query_node_info(public_key, &genesis_committee, &rpc_client)
         .await
@@ -261,21 +262,6 @@ fn create_update_request(
         payload,
         signature: TransactionSignature::NodeMain(signature),
     }
-}
-
-fn get_chain_id() -> Result<ChainId> {
-    let genesis = Genesis::load()?;
-    Ok(genesis.chain_id)
-}
-
-fn get_genesis_committee() -> Result<Vec<NodeInfo>> {
-    let genesis = Genesis::load()?;
-    Ok(genesis
-        .node_info
-        .iter()
-        .filter(|node| node.genesis_committee)
-        .map(NodeInfo::from)
-        .collect())
 }
 
 pub async fn query_node_info(

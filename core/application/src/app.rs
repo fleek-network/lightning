@@ -5,10 +5,12 @@ use std::time::Duration;
 use affair::{Executor, TokioSpawn};
 use anyhow::{anyhow, Result};
 use lightning_interfaces::prelude::*;
+use lightning_interfaces::types::{ChainId, NodeInfo};
 use tracing::{error, info};
 
 use crate::config::{Config, StorageConfig};
 use crate::env::{Env, UpdateWorker};
+use crate::genesis::Genesis;
 use crate::query_runner::QueryRunner;
 pub struct Application<C: Collection> {
     update_socket: Mutex<Option<ExecutionEngineSocket>>,
@@ -118,5 +120,22 @@ impl<C: Collection> ApplicationInterface<C> for Application<C> {
                 },
             }
         }
+    }
+
+    fn get_chain_id() -> Result<ChainId> {
+        let genesis = Genesis::load()?;
+
+        Ok(genesis.chain_id)
+    }
+
+    fn get_genesis_committee() -> Result<Vec<NodeInfo>> {
+        let genesis = Genesis::load()?;
+
+        Ok(genesis
+            .node_info
+            .iter()
+            .filter(|node| node.genesis_committee)
+            .map(NodeInfo::from)
+            .collect())
     }
 }
