@@ -6,10 +6,10 @@ use aya::programs::{Lsm, Xdp, XdpFlags};
 use aya::{include_bytes_aligned, Btf, Ebpf};
 use aya_log::EbpfLogger;
 use clap::Parser;
-use ebpf_service::map::SharedMap;
-use ebpf_service::server::Server;
-use ebpf_service::{ConfigSource, PathConfig};
 use lightning_ebpf_common::{File, FileRuleList, PacketFilter, PacketFilterParams};
+use lightning_ebpf_service::map::SharedMap;
+use lightning_ebpf_service::server::Server;
+use lightning_ebpf_service::{ConfigSource, PathConfig};
 use tokio::net::UnixListener;
 use tokio::signal;
 
@@ -43,11 +43,11 @@ async fn main() -> anyhow::Result<()> {
 
     #[cfg(debug_assertions)]
     let mut handle = Ebpf::load(include_bytes_aligned!(
-        "../../../ebpf/target/bpfel-unknown-none/debug/ebpf"
+        "../../ebpf/target/bpfel-unknown-none/debug/ebpf"
     ))?;
     #[cfg(not(debug_assertions))]
     let mut handle = Ebpf::load(include_bytes_aligned!(
-        "../../../ebpf/target/bpfel-unknown-none/release/ebpf"
+        "../../ebpf/target/bpfel-unknown-none/release/ebpf"
     ))?;
 
     if let Err(e) = EbpfLogger::init(&mut handle) {

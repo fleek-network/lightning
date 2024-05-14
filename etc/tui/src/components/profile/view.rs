@@ -1,6 +1,6 @@
 use color_eyre::eyre::Result;
-use ebpf_service::map::{FileRule, Profile};
-use ebpf_service::ConfigSource;
+use lightning_ebpf_service::map::{FileRule, Profile};
+use lightning_ebpf_service::ConfigSource;
 use log::error;
 use ratatui::prelude::{Color, Constraint, Modifier, Rect, Style, Text};
 use ratatui::widgets::{Cell, Row};

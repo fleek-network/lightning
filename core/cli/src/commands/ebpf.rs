@@ -93,16 +93,24 @@ pub fn build_bpf_program(target: Target, release: bool) -> Result<()> {
 }
 
 fn build_userspace_application(release: bool) -> Result<()> {
-    let mut args = vec!["build"];
+    let mut args = vec![
+        "build",
+        "--bin=control_application",
+        "--features=control",
+        "--features=server",
+    ];
 
     if release {
         args.push("--release")
     }
 
-    let status = Command::new("cargo").args(&args).status()?;
+    let status = Command::new("cargo")
+        .args(&args)
+        .current_dir("etc/ebpf/service")
+        .status()?;
 
     if !status.success() {
-        bail!("failed to build eBFP program");
+        bail!("failed to build control application");
     }
 
     Ok(())
@@ -113,7 +121,7 @@ pub fn run(target: Target, release: bool, iface: String) -> Result<()> {
     build_userspace_application(release)?;
 
     let mode = if release { "release" } else { "debug" };
-    let bin_path = format!("etc/ebpf/admin/target/{mode}/lightning_ebpf");
+    let bin_path = format!("etc/ebpf/service/target/{mode}/control_application");
 
     let path_config = PATH_CONFIG.get().expect("Static to be initialized");
     let xdp_args = format!("--iface={iface}");

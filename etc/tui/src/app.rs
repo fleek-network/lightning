@@ -1,6 +1,6 @@
 use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
-use ebpf_service::ConfigSource;
+use lightning_ebpf_service::ConfigSource;
 use ratatui::prelude::{Constraint, Direction, Layout, Rect};
 use tokio::sync::mpsc;
 

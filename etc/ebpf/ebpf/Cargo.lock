@@ -258,18 +258,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "acbf1af155f9b9ef647e42cdc158db4b64a1b61f743629225fde6f3e0be2a7c7"
 
 [[package]]
-name = "ebpf"
-version = "0.0.0"
-dependencies = [
- "aya-ebpf",
- "aya-log-ebpf",
- "aya-tool",
- "lightning-ebpf-common",
- "memoffset",
- "network-types",
-]
-
-[[package]]
 name = "either"
 version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -352,6 +340,18 @@ dependencies = [
 [[package]]
 name = "lightning-ebpf-common"
 version = "0.0.0"
+
+[[package]]
+name = "lightning-ebpf-programs"
+version = "0.0.0"
+dependencies = [
+ "aya-ebpf",
+ "aya-log-ebpf",
+ "aya-tool",
+ "lightning-ebpf-common",
+ "memoffset",
+ "network-types",
+]
 
 [[package]]
 name = "linux-raw-sys"

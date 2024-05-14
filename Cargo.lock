@@ -908,7 +908,7 @@ version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "00c055ee2d014ae5981ce1016374e8213682aa14d9bf40e48ab48b5f3ef20eaa"
 dependencies = [
- "heck",
+ "heck 0.4.1",
  "proc-macro2 1.0.74",
  "quote 1.0.35",
  "syn 2.0.46",
@@ -1773,9 +1773,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.4.12"
+version = "4.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dcfab8ba68f3668e89f6ff60f5b205cea56aa7b769451a59f34b8682f51c056d"
+checksum = "90bc066a67923782aa8515dbaea16946c5bcc5addbd668bb80af688e53e548a0"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -1783,14 +1783,14 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
-version = "4.4.12"
+version = "4.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb7fb5e4e979aec3be7791562fcba452f94ad85e954da024396433e0e25a79e9"
+checksum = "ae129e2e766ae0ec03484e609954119f123cc1fe650337e155d03b022f24f7b4"
 dependencies = [
  "anstream",
  "anstyle",
  "clap_lex",
- "strsim 0.10.0",
+ "strsim 0.11.1",
  "terminal_size",
  "unicase",
  "unicode-width",
@@ -1798,11 +1798,11 @@ dependencies = [
 
 [[package]]
 name = "clap_derive"
-version = "4.4.7"
+version = "4.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf9804afaaf59a91e75b022a30fb7229a7901f60c755489cc61c9b423b836442"
+checksum = "528131438037fd55894f62d6e9f068b8f45ac57ffa77517819645d10aed04f64"
 dependencies = [
- "heck",
+ "heck 0.5.0",
  "proc-macro2 1.0.74",
  "quote 1.0.35",
  "syn 2.0.46",
@@ -1810,9 +1810,9 @@ dependencies = [
 
 [[package]]
 name = "clap_lex"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "702fc72eb24e5a1e48ce58027a675bc24edd52096d5397d4aea7c6dd9eca0bd1"
+checksum = "98cc8fbded0c607b7ba9dd60cd98df59af97e84d24e49c8557331cfc26d301ce"
 
 [[package]]
 name = "clear_on_drop"
@@ -2262,7 +2262,7 @@ dependencies = [
  "anes",
  "cast",
  "ciborium",
- "clap 4.4.12",
+ "clap 4.5.4",
  "criterion-plot",
  "futures",
  "is-terminal",
@@ -3223,25 +3223,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "545b22097d44f8a9581187cdf93de7a71e4722bf51200cfaba810865b49a495d"
 
 [[package]]
-name = "ebpf-service"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "aya",
- "aya-log",
- "bytes",
- "libc",
- "lightning-ebpf-common",
- "log",
- "notify",
- "once_cell",
- "resolved-pathbuf",
- "serde",
- "serde_json",
- "tokio",
-]
-
-[[package]]
 name = "ecdsa"
 version = "0.16.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3356,7 +3337,7 @@ version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c9720bba047d567ffc8a3cba48bf19126600e249ab7f128e9233e6376976a116"
 dependencies = [
- "heck",
+ "heck 0.4.1",
  "proc-macro2 1.0.74",
  "quote 1.0.35",
  "syn 1.0.109",
@@ -5363,6 +5344,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
 
 [[package]]
+name = "heck"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
+
+[[package]]
 name = "hermit-abi"
 version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6110,7 +6097,7 @@ version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d94b7505034e2737e688e1153bf81e6f93ad296695c43958d6da2e4321f0a990"
 dependencies = [
- "heck",
+ "heck 0.4.1",
  "proc-macro-crate 2.0.0",
  "proc-macro2 1.0.74",
  "quote 1.0.35",
@@ -6624,10 +6611,9 @@ dependencies = [
  "anyhow",
  "aya",
  "aya-log",
- "clap 4.4.12",
+ "clap 4.5.4",
  "compile-time-run",
  "console-subscriber",
- "ebpf-service",
  "fleek-blake3",
  "fleek-crypto",
  "futures",
@@ -6637,6 +6623,7 @@ dependencies = [
  "lightning-blockstore-server",
  "lightning-broadcast",
  "lightning-consensus",
+ "lightning-ebpf-service",
  "lightning-final-bindings",
  "lightning-handshake",
  "lightning-interfaces",
@@ -6739,7 +6726,7 @@ name = "lightning-e2e"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "clap 4.4.12",
+ "clap 4.5.4",
  "fleek-blake3",
  "fleek-crypto",
  "futures",
@@ -6785,6 +6772,25 @@ name = "lightning-ebpf-common"
 version = "0.0.0"
 dependencies = [
  "aya",
+]
+
+[[package]]
+name = "lightning-ebpf-service"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "aya",
+ "aya-log",
+ "bytes",
+ "libc",
+ "lightning-ebpf-common",
+ "log",
+ "notify",
+ "once_cell",
+ "resolved-pathbuf",
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]
@@ -6894,7 +6900,7 @@ dependencies = [
  "bincode",
  "bytes",
  "cid 0.10.1",
- "clap 4.4.12",
+ "clap 4.5.4",
  "criterion",
  "dashmap",
  "derive_more",
@@ -7297,7 +7303,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "autometrics",
- "clap 4.4.12",
+ "clap 4.5.4",
  "ethers",
  "fleek-crypto",
  "futures",
@@ -7490,13 +7496,12 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "better-panic",
- "clap 4.4.12",
+ "clap 4.5.4",
  "color-eyre",
  "config",
  "crossterm 0.27.0",
  "derive_deref",
  "directories",
- "ebpf-service",
  "env_logger 0.11.1",
  "futures",
  "human-panic",
@@ -7506,6 +7511,7 @@ dependencies = [
  "json5",
  "lazy_static",
  "libc",
+ "lightning-ebpf-service",
  "log",
  "pretty_assertions",
  "ratatui",
@@ -10020,7 +10026,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "119533552c9a7ffacc21e099c24a0ac8bb19c2a2a3f363de84cd9b844feab270"
 dependencies = [
  "bytes",
- "heck",
+ "heck 0.4.1",
  "itertools 0.10.5",
  "lazy_static",
  "log",
@@ -11982,7 +11988,7 @@ version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "990079665f075b699031e9c08fd3ab99be5029b96f3b78dc0709e8f77e4efebf"
 dependencies = [
- "heck",
+ "heck 0.4.1",
  "proc-macro2 1.0.74",
  "quote 1.0.35",
  "syn 1.0.109",
@@ -12224,6 +12230,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
 
 [[package]]
+name = "strsim"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
+
+[[package]]
 name = "strum"
 version = "0.24.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12256,7 +12268,7 @@ version = "0.24.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e385be0d24f186b4ce2f9982191e7101bb737312ad61c1f2f984f34bcf85d59"
 dependencies = [
- "heck",
+ "heck 0.4.1",
  "proc-macro2 1.0.74",
  "quote 1.0.35",
  "rustversion",
@@ -12269,7 +12281,7 @@ version = "0.25.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23dc1fa9ac9c169a78ba62f0b841814b7abae11bdd047b9c58f893439e309ea0"
 dependencies = [
- "heck",
+ "heck 0.4.1",
  "proc-macro2 1.0.74",
  "quote 1.0.35",
  "rustversion",
@@ -12282,7 +12294,7 @@ version = "0.26.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c6cf59daf282c0a494ba14fd21610a0325f9f90ec9d1231dea26bcb1d696c946"
 dependencies = [
- "heck",
+ "heck 0.4.1",
  "proc-macro2 1.0.74",
  "quote 1.0.35",
  "rustversion",
@@ -14449,7 +14461,7 @@ dependencies = [
  "cc",
  "chrono",
  "cipher",
- "clap 4.4.12",
+ "clap 4.5.4",
  "clap_builder",
  "concurrent-queue",
  "core-foundation",

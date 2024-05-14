@@ -1,7 +1,7 @@
 use color_eyre::eyre::Result;
 use crossterm::event::KeyEvent;
-use ebpf_service::map;
-use ebpf_service::map::FileRule;
+use lightning_ebpf_service::map;
+use lightning_ebpf_service::map::FileRule;
 use ratatui::prelude::{Constraint, Direction, Layout, Rect};
 use ratatui::widgets::Clear;
 use tokio::sync::mpsc::UnboundedSender;

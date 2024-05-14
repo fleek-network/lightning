@@ -3,7 +3,7 @@ use std::path::Path;
 
 use anyhow::{Error, Result};
 use clap::{Args, Subcommand};
-use ebpf_service::{ConfigSource, PathConfig};
+use lightning_ebpf_service::{ConfigSource, PathConfig};
 use lightning_tui::app::App;
 use once_cell::sync::OnceCell;
 use resolved_pathbuf::ResolvedPathBuf;

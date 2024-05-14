@@ -27,11 +27,11 @@ async fn main() -> Result<(), anyhow::Error> {
 
     #[cfg(debug_assertions)]
     let mut handle = Ebpf::load(include_bytes_aligned!(
-        "../../../ebpf/target/bpfel-unknown-none/debug/ebpf"
+        "../../ebpf/target/bpfel-unknown-none/debug/ebpf"
     ))?;
     #[cfg(not(debug_assertions))]
     let mut handle = Ebpf::load(include_bytes_aligned!(
-        "../../../ebpf/target/bpfel-unknown-none/release/ebpf"
+        "../../ebpf/target/bpfel-unknown-none/release/ebpf"
     ))?;
 
     if let Err(e) = EbpfLogger::init(&mut handle) {

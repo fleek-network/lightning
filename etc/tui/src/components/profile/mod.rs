@@ -5,7 +5,7 @@ use std::collections::HashSet;
 
 use color_eyre::eyre::Result;
 use color_eyre::Report;
-use ebpf_service::{map, ConfigSource};
+use lightning_ebpf_service::{map, ConfigSource};
 use ratatui::prelude::Rect;
 use tokio::sync::mpsc::UnboundedSender;
 

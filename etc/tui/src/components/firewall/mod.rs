@@ -2,8 +2,8 @@ pub mod form;
 
 use color_eyre::eyre::Result;
 use color_eyre::Report;
-use ebpf_service::map::PacketFilterRule;
-use ebpf_service::ConfigSource;
+use lightning_ebpf_service::map::PacketFilterRule;
+use lightning_ebpf_service::ConfigSource;
 use ratatui::prelude::{Color, Constraint, Modifier, Rect, Style, Text};
 use ratatui::widgets::{Cell, Row};
 use tokio::sync::mpsc::UnboundedSender;

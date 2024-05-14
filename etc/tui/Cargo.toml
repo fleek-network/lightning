@@ -3,7 +3,7 @@ name = "lightning-tui"
 version = "0.0.0"
 edition = "2021"
 description = "tui for admin"
-authors = ["Miguel <miguel@fleek.xyz>"]
+authors = ["M. Meier <miguel@fleek.xyz>"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -15,7 +15,7 @@ config = "0.14.0"
 crossterm = { version = "0.27.0", features = ["serde", "event-stream"] }
 derive_deref = "1.1.1"
 directories = "5.0.1"
-ebpf-service = { path = "../service", default-features = false, features = ["client"] }
+lightning-ebpf-service = { path = "../ebpf/service", default-features = false, features = ["client"] }
 env_logger = "0.11"
 futures = "0.3.28"
 human-panic = "1.2.0"
@@ -28,7 +28,7 @@ libc = "0.2"
 log = "0.4.20"
 pretty_assertions = "1.4.0"
 ratatui = { version = "0.26.0", features = ["serde", "macros"] }
-resolved-pathbuf = { path = "../../../lib/resolved-pathbuf" }
+resolved-pathbuf = { path = "../../lib/resolved-pathbuf" }
 serde = { version = "1.0.188", features = ["derive"] }
 serde_json = "1.0.107"
 signal-hook = "0.3.17"
