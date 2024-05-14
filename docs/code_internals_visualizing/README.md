@@ -1,4 +1,4 @@
-# **GraphViz's Visualizations Generator**
+# **GraphViz Visualizations Generator**
 
 #### **GraphViz Visualizations Generator for the codebase and crates/modules.**
 
@@ -70,4 +70,4 @@ Graph for code internals inside modules of `lightning-service-executor` crate (p
 *Note:*
 
 The whole set of visualizations (exhaustive full set of code visualizations for `fdi` and `infusion` based branches of codebase, including visualizations for every crate/package and modules in `cargo` workspace, and visualizations using all
-available `GraphViz` layout algorithms) will remain in [`docs/graphs` branch in git history](https://github.com/fleek-network/lightning/tree/9c4c9cb1a2a99001e18b34fe989500ab33cb2198/docs/code_internals_visualizing) for any reference.
+available `GraphViz` layout algorithms) will remain in [`main` branch in git history](https://github.com/fleek-network/lightning/tree/5540c90a43c61c28770e180ac777c2da3f379c92/docs/code_internals_visualizing) for any reference.
