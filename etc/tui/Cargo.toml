@@ -18,7 +18,6 @@ directories = "5.0.1"
 lightning-ebpf-service = { path = "../ebpf/service", default-features = false, features = ["client"] }
 env_logger = "0.11"
 futures = "0.3.28"
-human-panic = "1.2.0"
 indexmap = { version = "2.2", features = ["serde"] }
 indoc = "2.0"
 ipnet = "2.9"
@@ -42,6 +41,3 @@ tracing-subscriber = { version = "0.3.17", features = ["env-filter", "serde"] }
 tui-textarea = "0.4"
 unicode-width = "0.1"
 
-# Todo: Move this build script to admin.
-[build-dependencies]
-vergen = { version = "8.2.6", features = [ "build", "git", "gitoxide", "cargo" ]}
