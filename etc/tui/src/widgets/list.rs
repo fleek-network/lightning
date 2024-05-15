@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+use anyhow::Result;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::prelude::{Modifier, Style};
 use ratatui::widgets::{Block, Borders, ListState};
@@ -105,7 +106,7 @@ where
         &mut self.list_state
     }
 
-    pub fn render(&mut self, f: &mut Frame<'_>, area: Rect) -> color_eyre::Result<()> {
+    pub fn render(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
         // Display profiles.
         let chunks = Layout::horizontal([Constraint::Percentage(100)]).split(area);
         let profiles = self

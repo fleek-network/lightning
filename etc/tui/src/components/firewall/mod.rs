@@ -1,7 +1,6 @@
 pub mod form;
 
-use color_eyre::eyre::Result;
-use color_eyre::Report;
+use anyhow::Result;
 use lightning_ebpf_service::map::PacketFilterRule;
 use lightning_ebpf_service::ConfigSource;
 use ratatui::prelude::{Color, Constraint, Modifier, Rect, Style, Text};
@@ -42,12 +41,7 @@ impl FireWall {
 
     pub async fn read_state_from_storage(&mut self) -> Result<()> {
         // If it's an error, there is no file and thus there is nothing to do.
-        if let Ok(filters) = self
-            .src
-            .read_packet_filters()
-            .await
-            .map_err(|e| Report::msg(e.to_string()))
-        {
+        if let Ok(filters) = self.src.read_packet_filters().await {
             self.table.load_records(filters);
         }
 

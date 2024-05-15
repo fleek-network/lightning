@@ -3,8 +3,7 @@ mod view;
 
 use std::collections::HashSet;
 
-use color_eyre::eyre::Result;
-use color_eyre::Report;
+use anyhow::Result;
 use lightning_ebpf_service::{map, ConfigSource};
 use ratatui::prelude::Rect;
 use tokio::sync::mpsc::UnboundedSender;
@@ -43,12 +42,7 @@ impl Profile {
 
     pub async fn get_profile_list_from_storage(&mut self) -> Result<()> {
         // If it's an error, there are no files and thus there is nothing to do.
-        if let Ok(profiles) = self
-            .src
-            .get_profiles()
-            .await
-            .map_err(|e| Report::msg(e.to_string()))
-        {
+        if let Ok(profiles) = self.src.get_profiles().await {
             self.list.load_records(profiles);
         }
         Ok(())
@@ -106,8 +100,7 @@ impl Profile {
         if let Some(selected) = self.list.get() {
             let profile = self
                 .src
-                .blocking_read_profile(selected.name.as_ref().and_then(|name| name.file_stem()))
-                .map_err(|e| Report::msg(e.to_string()))?;
+                .blocking_read_profile(selected.name.as_ref().and_then(|name| name.file_stem()))?;
             self.view.load_profile(profile);
         }
         Ok(())

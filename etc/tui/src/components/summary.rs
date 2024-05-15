@@ -1,4 +1,4 @@
-use color_eyre::eyre::Result;
+use anyhow::Result;
 use ratatui::layout::Rect;
 use ratatui::prelude::{Alignment, Color, Constraint, Layout, Style, Stylize, Text};
 use ratatui::widgets::{Block, BorderType, Borders, Cell, Paragraph, Row};

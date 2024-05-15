@@ -1,6 +1,6 @@
 use std::fmt;
 
-use color_eyre::eyre::Result;
+use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::prelude::{Alignment, Color, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Style, Stylize};

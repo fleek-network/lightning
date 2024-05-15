@@ -1,7 +1,7 @@
 use std::ops::{Deref, DerefMut};
 use std::time::Duration;
 
-use color_eyre::eyre::Result;
+use anyhow::Result;
 use crossterm::cursor;
 use crossterm::event::{
     DisableBracketedPaste,

@@ -1,4 +1,4 @@
-use color_eyre::eyre::Result;
+use anyhow::Result;
 use indoc::indoc;
 use ratatui::prelude::{Constraint, Layout, Rect};
 use ratatui::widgets::Paragraph;

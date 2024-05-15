@@ -1,4 +1,4 @@
-use color_eyre::eyre::Result;
+use anyhow::Result;
 use ratatui::prelude::{Rect, Style};
 use ratatui::style::Stylize;
 use ratatui::widgets::{Block, Borders, Tabs};

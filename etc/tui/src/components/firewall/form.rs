@@ -1,7 +1,6 @@
 use std::net::Ipv4Addr;
 
-use color_eyre::eyre::Result;
-use color_eyre::Report;
+use anyhow::{anyhow, bail, Result};
 use crossterm::event::KeyEvent;
 use ipnet::Ipv4Net;
 use lightning_ebpf_service::map::PacketFilterRule;
@@ -87,7 +86,7 @@ impl FirewallForm {
                 Err(_) => {
                     let ip_net = input
                         .parse::<Ipv4Net>()
-                        .map_err(|_| Report::msg("Invalid IP"))?;
+                        .map_err(|e| anyhow!("Invalid IP: {e:?}"))?;
                     (ip_net.network(), Some(ip_net.prefix_len() as u32))
                 },
             }
@@ -97,7 +96,7 @@ impl FirewallForm {
             .yank_text()
             .trim()
             .parse()
-            .map_err(|_| Report::msg("Invalid port"))?;
+            .map_err(|e| anyhow!("Invalid port: {e:?}"))?;
         let proto = match self.input_fields[2]
             .area
             .yank_text()
@@ -108,7 +107,7 @@ impl FirewallForm {
             "tcp" => PacketFilterRule::TCP,
             "udp" => PacketFilterRule::UDP,
             "any" => PacketFilterRule::ANY_PROTO,
-            _ => return Err(Report::msg("Invalid protocol")),
+            _ => bail!("Invalid protocol"),
         };
         let action = match self.input_fields[3]
             .area
@@ -119,7 +118,7 @@ impl FirewallForm {
         {
             "pass" => PacketFilterRule::PASS,
             "drop" => PacketFilterRule::DROP,
-            _ => return Err(Report::msg("Invalid action")),
+            _ => bail!("Invalid action"),
         };
         let rule = PacketFilterRule {
             prefix: prefix.unwrap_or(PacketFilterRule::DEFAULT_PREFIX),
