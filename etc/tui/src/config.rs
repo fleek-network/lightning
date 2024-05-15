@@ -471,7 +471,7 @@ mod tests {
             c.keybindings
                 .get(&Mode::Home)
                 .unwrap()
-                .get(&parse_key_sequence("<q>").unwrap_or_default())
+                .get(&parse_key_sequence("<ctrl-c>").unwrap_or_default())
                 .unwrap(),
             &Action::Quit
         );
