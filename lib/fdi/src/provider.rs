@@ -2,7 +2,6 @@ use std::any::Any;
 use std::cell::UnsafeCell;
 use std::collections::HashMap;
 use std::marker::PhantomData;
-use std::mem::MaybeUninit;
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -327,13 +326,10 @@ impl ProviderGuard {
 
 impl<T: 'static> RefMut<T> {
     #[inline]
-    pub fn downgrade(mut self) -> Ref<T> {
-        // SAFETY: Since we follow with mem::forget() it does not matter that we insert invalid
-        // (null) bytes in place. Since no destructor is going to be called.
-        #[allow(invalid_value)]
-        let entry = std::mem::replace(&mut self.entry, unsafe {
-            MaybeUninit::zeroed().assume_init()
-        });
+    pub fn downgrade(self) -> Ref<T> {
+        // SAFETY: Since we forget the value in the next line `drop` will not be called twice. So
+        // the internal state of the `Arc`s will stay valid.
+        let entry = unsafe { std::mem::transmute_copy::<MapEntry, MapEntry>(&self.entry) };
         std::mem::forget(self);
 
         // SAFETY: We own an exclusive lock right now. So it must be possible and safe to downgrade
