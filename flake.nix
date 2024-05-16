@@ -50,14 +50,16 @@
           );
 
           # Allow markdown and bin files for some `include!()` uses
-          markdownFilter = path: _type: builtins.match ".*md$" path != null;
-          binFilter = path: _type: builtins.match ".*bin$" path != null;
-          jsFilter = path: _type: builtins.match ".*js$" path != null;
+          markdownFilter = path: builtins.match ".*md$" path != null;
+          binFilter = path: builtins.match ".*bin$" path != null;
+          jsFilter = path: builtins.match ".*js$" path != null;
+          json5Filter = path: builtins.match ".*json5$" path != null;
           filter =
             path: type:
-            (markdownFilter path type)
-            || (binFilter path type)
-            || (jsFilter path type)
+            (markdownFilter path)
+            || (binFilter path)
+            || (jsFilter path)
+            || (json5Filter path)
             || (craneLib.filterCargoSources path type);
 
           src = lib.cleanSourceWith {
@@ -120,6 +122,10 @@
                 bzip2
                 lz4
                 onnxruntime
+
+                # ebpf deps needed at runtime for debug builds via `admin ebpf build`
+                rust-bindgen
+                bpf-linker
               ]
               ++ lib.optionals pkgs.stdenv.isDarwin [
                 # MacOS specific packages
@@ -234,7 +240,7 @@
           devShells.default = craneLib.devShell (
             commonVars
             // {
-              # Inherit inputs from checks.
+              # Inherit inputs from checks
               checks = self.checks.${system};
               packages = [ pkgs.rust-analyzer ];
             }
