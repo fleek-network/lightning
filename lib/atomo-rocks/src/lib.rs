@@ -187,6 +187,14 @@ impl RocksBackend {
 }
 
 impl StorageBackend for RocksBackend {
+    // _   0        1       2       3
+    //     k->v     k->v    a->b    c->d
+    //     k->v     k->v    a->b    c->d
+    //     k->v     k->v    a->b    c->d
+    //     k->v     k->v    a->b    c->d
+    //     k->v     k->v    a->b    c->d
+    //     k->v     k->v    a->b    c->d
+
     fn commit(&self, batch: atomo::batch::VerticalBatch) {
         let mut inner_batch = WriteBatch::default();
         for (table, batch) in self.columns.iter().zip(batch.into_raw().into_iter()) {
