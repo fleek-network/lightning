@@ -6080,6 +6080,7 @@ dependencies = [
  "resolved-pathbuf",
  "serde",
  "sui-protocol-config",
+ "tempdir",
  "tokio",
  "tonic 0.8.3",
  "tracing",
