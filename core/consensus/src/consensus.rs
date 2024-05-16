@@ -479,11 +479,13 @@ impl AutoImplSerde for PubSubMsg {}
 // garbage_collect_old_stores function.
 #[cfg(test)]
 mod test_garbage_collect {
+    use std::path::Path;
+
     use tempdir::TempDir;
 
     use super::*;
 
-    fn create_epoch_directory(path: &PathBuf, epoch: u64) {
+    fn create_epoch_directory(path: &Path, epoch: u64) {
         let mut path = path.to_path_buf();
         path.push(format!("{epoch}"));
         path.push("directory1");
