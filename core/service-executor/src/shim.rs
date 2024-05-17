@@ -95,7 +95,8 @@ impl<C: Collection> ServiceExecutor<C> {
 
 impl<C: Collection> BuildGraph for ServiceExecutor<C> {
     fn build_graph() -> fdi::DependencyGraph {
-        fdi::DependencyGraph::default().with(Self::init.on("start", Self::start.block_on()))
+        fdi::DependencyGraph::default()
+            .with(Self::init.with_event_handler("start", Self::start.wrap_with_block_on()))
     }
 }
 

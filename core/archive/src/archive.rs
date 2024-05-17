@@ -40,7 +40,7 @@ struct ArchiveInner<C: Collection> {
 impl<C: Collection> BuildGraph for Archive<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::new()
-            .with_infallible(Self::new.on("start", insertion_task::<C>.spawn()))
+            .with_infallible(Self::new.with_event_handler("start", insertion_task::<C>.wrap_with_spawn()))
     }
 }
 

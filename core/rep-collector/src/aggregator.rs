@@ -211,7 +211,7 @@ impl<C: Collection> ReputationAggregator<C> {
 
 impl<C: Collection> BuildGraph for ReputationAggregator<C> {
     fn build_graph() -> fdi::DependencyGraph {
-        fdi::DependencyGraph::new().with(Self::new.on("start", Self::start.bounded().spawn()))
+        fdi::DependencyGraph::new().with(Self::new.with_event_handler("start", Self::start.bounded().wrap_with_spawn()))
     }
 }
 

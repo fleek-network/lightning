@@ -9,7 +9,7 @@ pub trait MethodExt<P>: Sized + Method<P> {
     }
 
     #[inline(always)]
-    fn map<M, U>(self, transform: M) -> impl Method<P, Output = U>
+    fn map_method<M, U>(self, transform: M) -> impl Method<P, Output = U>
     where
         M: FnOnce(Self::Output) -> U,
         U: 'static,
@@ -18,7 +18,7 @@ pub trait MethodExt<P>: Sized + Method<P> {
     }
 
     #[inline(always)]
-    fn on<H, Y>(self, event: &'static str, handler: H) -> impl Method<P, Output = Self::Output>
+    fn with_event_handler<H, Y>(self, event: &'static str, handler: H) -> impl Method<P, Output = Self::Output>
     where
         H: Method<Y>,
     {
@@ -35,7 +35,7 @@ pub trait MethodExt<P>: Sized + Method<P> {
     }
 
     #[inline(always)]
-    fn block_on(self) -> impl Method<P, Output = <Self::Output as Future>::Output>
+    fn wrap_with_block_on(self) -> impl Method<P, Output = <Self::Output as Future>::Output>
     where
         Self: 'static + Method<P> + Sized,
         Self::Output: Future,
@@ -44,7 +44,7 @@ pub trait MethodExt<P>: Sized + Method<P> {
     }
 
     #[inline(always)]
-    fn spawn(self) -> impl Method<(), Output = ()>
+    fn wrap_with_spawn(self) -> impl Method<(), Output = ()>
     where
         Self: 'static + Method<P> + Sized,
         Self::Output: Future + Send + 'static,

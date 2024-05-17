@@ -55,7 +55,7 @@ impl Eventstore {
     where
         F: Method<P>,
     {
-        self.insert(event, DynMethod::new(handler.map(|_| ())))
+        self.insert(event, DynMethod::new(handler.map_method(|_| ())))
     }
 
     /// Trigger the event. This is used internally.

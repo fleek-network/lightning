@@ -161,7 +161,7 @@ impl<C: Collection> Syncronizer<C> {
 
 impl<C: Collection> fdi::BuildGraph for Syncronizer<C> {
     fn build_graph() -> fdi::DependencyGraph {
-        fdi::DependencyGraph::new().with(Self::init.on("start", Self::start))
+        fdi::DependencyGraph::new().with(Self::init.with_event_handler("start", Self::start))
     }
 }
 

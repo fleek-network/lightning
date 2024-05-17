@@ -251,6 +251,6 @@ impl<C: Collection> ConfigConsumer for Rpc<C> {
 
 impl<C: Collection> fdi::BuildGraph for Rpc<C> {
     fn build_graph() -> fdi::DependencyGraph {
-        fdi::DependencyGraph::default().with(Self::init.on("start", Self::start))
+        fdi::DependencyGraph::default().with(Self::init.with_event_handler("start", Self::start))
     }
 }

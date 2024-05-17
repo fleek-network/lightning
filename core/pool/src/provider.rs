@@ -149,7 +149,7 @@ where
 
 impl<C: Collection> BuildGraph for PoolProvider<C, QuinnMuxer> {
     fn build_graph() -> fdi::DependencyGraph {
-        fdi::DependencyGraph::new().with(Self::init.on("start", Self::start.spawn()))
+        fdi::DependencyGraph::new().with(Self::init.with_event_handler("start", Self::start.wrap_with_spawn()))
     }
 }
 

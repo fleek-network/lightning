@@ -169,7 +169,7 @@ impl DependencyGraph {
         self.touched = true;
         self.insert(
             Ty::of::<T>(),
-            DynMethod::new(f.map(|v| v.map(to_obj))),
+            DynMethod::new(f.map_method(|v| v.map(to_obj))),
             None,
         );
         self

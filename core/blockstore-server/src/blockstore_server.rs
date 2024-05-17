@@ -85,7 +85,7 @@ impl<C: Collection> BlockstoreServer<C> {
 
 impl<C: Collection> BuildGraph for BlockstoreServer<C> {
     fn build_graph() -> fdi::DependencyGraph {
-        fdi::DependencyGraph::default().with(Self::init.on("start", Self::start.spawn()))
+        fdi::DependencyGraph::default().with(Self::init.with_event_handler("start", Self::start.wrap_with_spawn()))
     }
 }
 

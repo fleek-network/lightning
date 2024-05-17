@@ -355,8 +355,8 @@ impl<C: Collection> BuildGraph for Consensus<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::new().with(
             Self::init
-                .on("_post", Self::post_init)
-                .on("start", Self::start),
+                .with_event_handler("_post", Self::post_init)
+                .with_event_handler("start", Self::start),
         )
     }
 }

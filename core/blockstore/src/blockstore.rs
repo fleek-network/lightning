@@ -52,7 +52,7 @@ impl<C: Collection> ConfigConsumer for Blockstore<C> {
 
 impl<C: Collection> BuildGraph for Blockstore<C> {
     fn build_graph() -> fdi::DependencyGraph {
-        fdi::DependencyGraph::new().with(Self::new.on(
+        fdi::DependencyGraph::new().with(Self::new.with_event_handler(
             "_post",
             |mut this: fdi::RefMut<Self>,
              fdi::Cloned(indexer): fdi::Cloned<C::IndexerInterface>| {
