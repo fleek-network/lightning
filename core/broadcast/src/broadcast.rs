@@ -44,7 +44,8 @@ impl<C: Collection> Broadcast<C> {
 
 impl<C: Collection> BuildGraph for Broadcast<C> {
     fn build_graph() -> fdi::DependencyGraph {
-        fdi::DependencyGraph::new().with_infallible(Self::new.with_event_handler("start", Self::start))
+        fdi::DependencyGraph::new()
+            .with_infallible(Self::new.with_event_handler("start", Self::start))
     }
 }
 

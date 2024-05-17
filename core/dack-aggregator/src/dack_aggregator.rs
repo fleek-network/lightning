@@ -53,7 +53,8 @@ impl<C: Collection> DeliveryAcknowledgmentAggregator<C> {
 
 impl<C: Collection> BuildGraph for DeliveryAcknowledgmentAggregator<C> {
     fn build_graph() -> fdi::DependencyGraph {
-        fdi::DependencyGraph::default().with(Self::init.with_event_handler("start", Self::start.wrap_with_spawn()))
+        fdi::DependencyGraph::default()
+            .with(Self::init.with_event_handler("start", Self::start.wrap_with_spawn()))
     }
 }
 

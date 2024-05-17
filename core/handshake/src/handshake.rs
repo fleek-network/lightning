@@ -110,7 +110,8 @@ impl<C: Collection> Handshake<C> {
 
 impl<C: Collection> BuildGraph for Handshake<C> {
     fn build_graph() -> fdi::DependencyGraph {
-        fdi::DependencyGraph::new().with_infallible(Self::new.with_event_handler("start", Self::start.wrap_with_spawn()))
+        fdi::DependencyGraph::new()
+            .with_infallible(Self::new.with_event_handler("start", Self::start.wrap_with_spawn()))
     }
 }
 

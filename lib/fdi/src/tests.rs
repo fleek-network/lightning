@@ -298,7 +298,11 @@ fn demo_captured() {
     let method_handler = (|a: Consume<A>| A::capture.bind(a.0)).wrap_with(|a| a);
 
     let graph = DependencyGraph::new()
-        .with((|| A(17)).to_infallible().with_event_handler("start", method_handler))
+        .with(
+            (|| A(17))
+                .to_infallible()
+                .with_event_handler("start", method_handler),
+        )
         .with_value(String::from("World"));
 
     let mut provider = Provider::default();
@@ -319,7 +323,11 @@ fn demo_consume() {
 
     let method_handler = consume(A::capture);
     let graph = DependencyGraph::new()
-        .with((|| A(17)).to_infallible().with_event_handler("start", method_handler))
+        .with(
+            (|| A(17))
+                .to_infallible()
+                .with_event_handler("start", method_handler),
+        )
         .with_value(String::from("World"));
 
     let mut provider = Provider::default();
@@ -339,7 +347,11 @@ fn demo_bounded() {
     }
 
     let graph = DependencyGraph::new()
-        .with((|| A(17)).to_infallible().with_event_handler("start", A::capture.bounded()))
+        .with(
+            (|| A(17))
+                .to_infallible()
+                .with_event_handler("start", A::capture.bounded()),
+        )
         .with_value(String::from("World"));
 
     let mut provider = Provider::default();

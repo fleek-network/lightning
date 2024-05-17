@@ -64,7 +64,8 @@ impl<C: Collection> PingerInterface<C> for Pinger<C> {}
 
 impl<C: Collection> BuildGraph for Pinger<C> {
     fn build_graph() -> fdi::DependencyGraph {
-        fdi::DependencyGraph::new().with(Self::new.with_event_handler("start", Self::start.wrap_with_spawn()))
+        fdi::DependencyGraph::new()
+            .with(Self::new.with_event_handler("start", Self::start.wrap_with_spawn()))
     }
 }
 

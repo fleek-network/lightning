@@ -18,7 +18,11 @@ pub trait MethodExt<P>: Sized + Method<P> {
     }
 
     #[inline(always)]
-    fn with_event_handler<H, Y>(self, event: &'static str, handler: H) -> impl Method<P, Output = Self::Output>
+    fn with_event_handler<H, Y>(
+        self,
+        event: &'static str,
+        handler: H,
+    ) -> impl Method<P, Output = Self::Output>
     where
         H: Method<Y>,
     {

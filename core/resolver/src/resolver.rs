@@ -70,7 +70,8 @@ impl<C: Collection> Resolver<C> {
 
 impl<C: Collection> BuildGraph for Resolver<C> {
     fn build_graph() -> fdi::DependencyGraph {
-        fdi::DependencyGraph::default().with(Self::init.with_event_handler("start", Self::start.wrap_with_spawn()))
+        fdi::DependencyGraph::default()
+            .with(Self::init.with_event_handler("start", Self::start.wrap_with_spawn()))
     }
 }
 
