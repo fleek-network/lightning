@@ -13,6 +13,7 @@ use narwhal_node::NodeStorage;
 use sui_protocol_config::{Chain, ProtocolConfig, ProtocolVersion};
 use tokio::sync::Mutex;
 use tokio::time::Instant;
+use tracing::{debug, error, trace, warn};
 
 use crate::validator::Validator;
 
@@ -114,7 +115,7 @@ impl NarwhalService {
     {
         let mut status = self.status.lock().await;
         if *status == Status::Running {
-            println!("NarwhalService is already running.");
+            error!("NarwhalService is already running.");
             return;
         }
 
@@ -122,7 +123,7 @@ impl NarwhalService {
         let execution_state = Arc::new(state);
 
         let epoch = self.committee.epoch();
-        println!("Starting NarwhalService for epoch {epoch}");
+        debug!("Starting NarwhalService for epoch {epoch}");
 
         // create the network client the primary and worker use to communicate
         let network_client =
@@ -130,7 +131,7 @@ impl NarwhalService {
 
         let mut running = false;
         for i in 0..MAX_RETRIES {
-            println!("Trying to start the Narwhal Primary...");
+            debug!("Trying to start the Narwhal Primary...");
             if i > 0 {
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             }
@@ -149,7 +150,7 @@ impl NarwhalService {
                 )
                 .await
             {
-                println!("Unable to start Narwhal Primary: {e:?}");
+                warn!("Unable to start Narwhal Primary: {e:?}");
             } else {
                 running = true;
                 break;
@@ -161,7 +162,7 @@ impl NarwhalService {
 
         let mut running = false;
         for i in 0..MAX_RETRIES {
-            println!("Trying to start the Narwhal Worker...");
+            debug!("Trying to start the Narwhal Worker...");
             if i > 0 {
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             }
@@ -180,7 +181,7 @@ impl NarwhalService {
                 )
                 .await
             {
-                println!("Unable to start Narwhal Worker: {e:?}");
+                warn!("Unable to start Narwhal Worker: {e:?}");
             } else {
                 running = true;
                 break;
@@ -198,18 +199,18 @@ impl NarwhalService {
     pub async fn shutdown(&self) {
         let mut status = self.status.lock().await;
         if *status == Status::Stopped {
-            println!("Narwhal shutdown was called but node is not running.");
+            error!("Narwhal shutdown was called but node is not running.");
             return;
         }
 
         let now = Instant::now();
         let epoch = self.committee.epoch();
-        println!("Shutting down Narwhal epoch {epoch:?}");
+        trace!("Shutting down Narwhal epoch {epoch:?}");
 
         self.worker_node.shutdown().await;
         self.primary.shutdown().await;
 
-        println!(
+        debug!(
             "Narwhal shutdown for epoch {:?} is complete - took {} seconds",
             epoch,
             now.elapsed().as_secs_f64()
