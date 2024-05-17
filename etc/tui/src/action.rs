@@ -26,4 +26,9 @@ pub enum Action {
     Edit,
     Select,
     Back,
+    PageUp,
+    PageDown,
+    Focus,
+    Toggle,
+    Hide,
 }

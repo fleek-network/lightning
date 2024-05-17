@@ -8,6 +8,7 @@ use crate::action::Action;
 use crate::components::firewall::form::FirewallForm;
 use crate::components::firewall::FireWall;
 use crate::components::home::Home;
+use crate::components::logger::Logger;
 use crate::components::navigator::Navigator;
 use crate::components::profile::Profile;
 use crate::components::prompt::Prompt;
@@ -34,6 +35,7 @@ pub struct App {
     pub firewall: FireWall,
     pub firewall_form: FirewallForm,
     pub profiles: Profile,
+    pub logger: Logger,
 }
 
 impl App {
@@ -42,6 +44,7 @@ impl App {
         let home = Home::new();
         let firewall = FireWall::new(src.clone());
         let firewall_form = FirewallForm::new();
+        let logger = Logger::new();
         let summary = Summary::new();
         let prompt = Prompt::new();
         let navigator = Navigator::new();
@@ -51,6 +54,7 @@ impl App {
             tick_rate,
             frame_rate,
             home,
+            logger,
             summary,
             prompt,
             navigator,
@@ -71,6 +75,7 @@ impl App {
             Mode::Firewall => self.firewall.update(action.clone())?,
             Mode::FirewallEdit => self.firewall.update(action.clone())?,
             Mode::FirewallForm => self.firewall.form().update(action.clone())?,
+            Mode::Logger => self.logger.update(action.clone())?,
             Mode::Profiles => self.profiles.update(action.clone())?,
             Mode::ProfilesEdit => self.profiles.update(action.clone())?,
             Mode::ProfileView => self.profiles.view().update(action.clone())?,
@@ -92,6 +97,7 @@ impl App {
             Mode::Firewall => self.firewall.handle_events(Some(event)),
             Mode::FirewallEdit => self.firewall.handle_events(Some(event)),
             Mode::FirewallForm => self.firewall.form().handle_events(Some(event)),
+            Mode::Logger => self.logger.handle_events(Some(event)),
             Mode::Profiles => self.profiles.handle_events(Some(event)),
             Mode::ProfilesEdit => self.profiles.handle_events(Some(event)),
             Mode::ProfileView => self.profiles.view().handle_events(Some(event)),
@@ -142,6 +148,9 @@ impl App {
             Mode::FirewallForm => {
                 self.firewall.form().draw(f, content[0])?;
             },
+            Mode::Logger => {
+                self.logger.draw(f, content[0])?;
+            },
             Mode::Profiles | Mode::ProfilesEdit => {
                 self.profiles.draw(f, content[0])?;
             },
@@ -160,6 +169,7 @@ impl App {
     }
 
     pub async fn run(&mut self) -> Result<()> {
+        log::debug!(target: "Main Tui App", "Running!");
         let (action_tx, mut action_rx) = mpsc::unbounded_channel();
 
         let mut tui = tui::Tui::new()?

@@ -10,6 +10,7 @@ pub enum Mode {
     Firewall,
     FirewallEdit,
     FirewallForm,
+    Logger,
     Profiles,
     ProfilesEdit,
     ProfileForm,
@@ -23,8 +24,9 @@ impl FromStr for Mode {
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         let mode = match value {
-            "Firewall" => Mode::Firewall,
             "Home" => Mode::Home,
+            "Firewall" => Mode::Firewall,
+            "Logger" => Mode::Logger,
             "Profiles" => Mode::Profiles,
             _ => return Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid mode")),
         };

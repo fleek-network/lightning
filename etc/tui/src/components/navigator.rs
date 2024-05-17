@@ -19,7 +19,7 @@ pub struct Navigator {
 
 impl Navigator {
     pub fn new() -> Self {
-        let tabs = vec!["Home", "Firewall", "Profiles"];
+        let tabs = vec!["Home", "Firewall", "Profiles", "Logger"];
         Self {
             tabs,
             command_tx: None,

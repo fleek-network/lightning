@@ -6919,6 +6919,7 @@ dependencies = [
  "strum 0.26.2",
  "tokio",
  "tokio-util 0.7.10",
+ "tui-logger",
  "tui-textarea",
  "unicode-width",
 ]
@@ -12706,6 +12707,20 @@ name = "ttf-parser"
 version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "375812fa44dab6df41c195cd2f7fecb488f6c09fbaafb62807488cefab642bff"
+
+[[package]]
+name = "tui-logger"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "115f9ceabfa07b739dc00baf0180cf5060731a2de66aa7fb47e22dc442aa05ca"
+dependencies = [
+ "chrono",
+ "fxhash",
+ "lazy_static",
+ "log",
+ "parking_lot",
+ "ratatui",
+]
 
 [[package]]
 name = "tui-textarea"
