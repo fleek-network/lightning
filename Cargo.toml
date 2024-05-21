@@ -18,6 +18,7 @@ exclude = [
     "etc/ebpf/common",
     "etc/ebpf/service",
     "etc/global-metrics",
+    "etc/slogger",
 ]
 
 

@@ -1,0 +1,14 @@
+[package]
+name = "slogger"
+version = "0.0.0"
+edition = "2021"
+description = "Library for sending/receiving log records over a socket"
+authors = ["M. Meier <miguel@fleek.xyz>"]
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bincode = "1.3"
+log = "0.4"
+simplelog = "0.12"
+serde = { version = "1.0", features = ["derive"] }
+#tokio = { version = "1.32", features = ["net"] }
