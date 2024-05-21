@@ -1,5 +1,6 @@
 use std::net::SocketAddr;
 use std::path::PathBuf;
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
@@ -8,10 +9,15 @@ use crate::transports;
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(default)]
 pub struct HandshakeConfig {
+    /// List of transports to enable
     #[serde(rename = "transport")]
     pub transports: Vec<TransportConfig>,
+    /// Shared tranport http address
     pub http_address: SocketAddr,
+    /// Optional http configuration
     pub https: Option<HttpsConfig>,
+    /// Timeout for disconnected sessions
+    pub timeout: Duration,
 }
 
 impl Default for HandshakeConfig {
@@ -25,6 +31,7 @@ impl Default for HandshakeConfig {
             ],
             http_address: ([0, 0, 0, 0], 4220).into(),
             https: None,
+            timeout: Duration::from_secs(1),
         }
     }
 }

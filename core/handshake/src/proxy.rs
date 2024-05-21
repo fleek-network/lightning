@@ -39,6 +39,7 @@ pub struct Proxy<P: ExecutorProviderInterface> {
     /// payload through the transport. And randomly inserting in some other frame in the middle of
     /// an active length delimited message before reaching the promised length breaks many things.
     queued_primary_response: VecDeque<ResponseFrame>,
+    timeout: Duration,
 }
 
 pub type IsPrimary = bool;
@@ -65,6 +66,7 @@ impl<P: ExecutorProviderInterface> Proxy<P> {
         socket: UnixStream,
         connection_rx: Receiver<(IsPrimary, TransportPair)>,
         context: Context<P>,
+        timeout: Duration,
     ) -> Self {
         Self {
             context,
@@ -76,6 +78,7 @@ impl<P: ExecutorProviderInterface> Proxy<P> {
             discard_bytes: false,
             is_primary_the_current_sender: false,
             queued_primary_response: VecDeque::new(),
+            timeout,
         }
     }
 
@@ -123,7 +126,7 @@ impl<P: ExecutorProviderInterface> Proxy<P> {
 
     #[inline]
     async fn run_with_no_connection(&mut self) -> State {
-        match tokio::time::timeout(Duration::from_secs(10), self.connection_rx.recv()).await {
+        match tokio::time::timeout(self.timeout, self.connection_rx.recv()).await {
             Ok(Ok((is_primary, pair))) => {
                 if is_primary {
                     State::OnlyPrimaryConnection(pair)
@@ -592,7 +595,11 @@ mod tests {
 
     async fn start_mock_node<P: ExecutorProviderInterface>(id: u16) -> Result<ShutdownController> {
         let shutdown = ShutdownController::default();
-        let context = Context::new(MockServiceProvider, shutdown.waiter());
+        let context = Context::new(
+            MockServiceProvider,
+            shutdown.waiter(),
+            Duration::from_secs(1),
+        );
         let (transport, _) =
             MockTransport::bind::<P>(shutdown.waiter(), MockTransportConfig { port: id }).await?;
         transport.spawn_listener_task(context);

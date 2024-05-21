@@ -50,7 +50,7 @@ impl<C: Collection> Handshake<C> {
         let config = config.get::<Self>();
         let provider = service_executor.get_provider();
         let pk = keystore.get_ed25519_pk();
-        let ctx = Context::new(provider, waiter);
+        let ctx = Context::new(provider, waiter, config.timeout);
         let handle = Handle::new();
 
         Self {
@@ -133,6 +133,7 @@ pub struct Context<P: ExecutorProviderInterface> {
     pub(crate) shutdown: ShutdownWaiter,
     connection_counter: Arc<AtomicU64>,
     connections: Arc<DashMap<u64, ConnectionEntry>>,
+    timeout: Duration,
 }
 
 struct ConnectionEntry {
@@ -146,12 +147,13 @@ struct ConnectionEntry {
 }
 
 impl<P: ExecutorProviderInterface> Context<P> {
-    pub fn new(provider: P, waiter: ShutdownWaiter) -> Self {
+    pub fn new(provider: P, waiter: ShutdownWaiter, timeout: Duration) -> Self {
         Self {
             provider,
             shutdown: waiter,
             connection_counter: AtomicU64::new(0).into(),
             connections: DashMap::new().into(),
+            timeout,
         }
     }
 
@@ -215,7 +217,7 @@ impl<P: ExecutorProviderInterface> Context<P> {
                     },
                 );
 
-                Proxy::new(connection_id, socket, rx, self.clone()).spawn(Some(
+                Proxy::new(connection_id, socket, rx, self.clone(), self.timeout).spawn(Some(
                     State::OnlyPrimaryConnection((sender, receiver).into()),
                 ));
             },
