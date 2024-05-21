@@ -8,6 +8,7 @@ lightning-interfaces = { path = "../interfaces" }
 fleek-ipld.workspace = true
 anyhow.workspace = true
 serde.workspace = true
+humantime-serde.workspace = true
 tokio-stream.workspace = true
 bytes.workspace = true
 cid.workspace = true

@@ -17,6 +17,7 @@ pub struct HandshakeConfig {
     /// Optional http configuration
     pub https: Option<HttpsConfig>,
     /// Timeout for disconnected sessions
+    #[serde(with = "humantime_serde")]
     pub timeout: Duration,
 }
 

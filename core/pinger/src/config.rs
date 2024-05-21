@@ -9,6 +9,7 @@ pub struct Config {
     // /// The number of times that we ping each peer per epoch.
     // pub num_pings_per_peer: u16,
     /// The interval for sending pings.
+    #[serde(with = "humantime_serde")]
     pub ping_interval: Duration,
 }
 

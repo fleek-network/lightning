@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct Config {
+    #[serde(with = "humantime_serde")]
     pub epoch_change_delta: Duration,
 }
 

@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Config {
+    #[serde(with = "humantime_serde")]
     pub max_idle_timeout: Duration,
     pub address: SocketAddr,
     pub http: Option<SocketAddr>,

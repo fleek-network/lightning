@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize)]
 pub struct Config {
     pub gateways: Vec<Gateway>,
+    #[serde(with = "humantime_serde")]
     pub gateway_timeout: Duration,
 }
 

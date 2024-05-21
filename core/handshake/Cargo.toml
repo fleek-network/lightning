@@ -12,6 +12,7 @@ fn-sdk = { path = "../../lib/sdk" }
 tracing.workspace = true
 anyhow.workspace = true
 serde.workspace = true
+humantime-serde.workspace = true
 fleek-crypto.workspace = true
 async-trait.workspace = true
 futures.workspace = true
