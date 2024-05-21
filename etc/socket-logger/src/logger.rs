@@ -32,7 +32,10 @@ impl Log for SocketLogger {
         match bincode::serialize(&Record::from(record)) {
             Ok(data) => {
                 let mut socket = self.socket.lock().unwrap();
-                let _ = socket.write_all(data.as_slice());
+                let mut framed = Vec::new();
+                framed.extend(data.len().to_le_bytes().as_slice());
+                framed.extend(data);
+                let _ = socket.write_all(framed.as_slice());
             },
             Err(e) => {
                 // This shouldn't happen and maybe we should use unwrap().

@@ -4,17 +4,17 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize)]
 pub struct Record {
-    metadata: Metadata,
-    args: String,
-    module_path: Option<String>,
-    file: Option<String>,
-    line: Option<u32>,
+    pub metadata: Metadata,
+    pub args: String,
+    pub module_path: Option<String>,
+    pub file: Option<String>,
+    pub line: Option<u32>,
 }
 
 #[derive(Deserialize, Serialize)]
 pub struct Metadata {
-    level: String,
-    target: String,
+    pub level: String,
+    pub target: String,
 }
 
 impl From<&log::Record<'_>> for Record {
@@ -31,4 +31,3 @@ impl From<&log::Record<'_>> for Record {
         }
     }
 }
-
