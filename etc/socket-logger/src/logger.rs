@@ -3,22 +3,72 @@ use std::os::unix::net::UnixStream;
 use std::sync::Mutex;
 
 use log::{error, Log, Metadata};
-use simplelog::{Config, LevelFilter, SharedLogger};
+use simplelog::{LevelFilter, SharedLogger};
 
+use crate::config::Config;
 use crate::schema::Record;
 
 pub struct SocketLogger {
-    config: Option<Config>,
+    config: Config,
     level: LevelFilter,
     socket: Mutex<UnixStream>,
+    simple_config: simplelog::Config,
 }
 
 impl SocketLogger {
     pub fn new(config: Config, level: LevelFilter, socket: UnixStream) -> Self {
         Self {
-            config: Some(config),
+            config: config,
             level,
             socket: Mutex::new(socket),
+            simple_config: simplelog::Config::default(),
+        }
+    }
+
+    fn should_skip(&self, record: &log::Record) -> bool {
+        if !self.config.filter_allow.is_empty() {
+            return !self
+                .config
+                .filter_allow
+                .iter()
+                .any(|filter| record.target().starts_with(filter.as_ref()));
+        }
+
+        if !self.config.filter_ignore.is_empty() {
+            return self
+                .config
+                .filter_ignore
+                .iter()
+                .any(|filter| record.target().starts_with(filter.as_ref()));
+        }
+
+        false
+    }
+
+    fn try_log(&self, record: &log::Record) {
+        if self.should_skip(record) {
+            return;
+        }
+
+        let mut record = Record::from(record);
+        let pid = std::process::id();
+        let tid = format!("{:?}", std::thread::current().id());
+        let tid = tid.replace("ThreadId(", "");
+        let tid = tid.replace(")", "");
+        record.metadata.target.push_str(format!("[{pid}][{tid}]").as_str());
+
+        match bincode::serialize(&record) {
+            Ok(data) => {
+                let mut socket = self.socket.lock().unwrap();
+                let mut framed = Vec::new();
+                framed.extend(data.len().to_le_bytes().as_slice());
+                framed.extend(data);
+                let _ = socket.write_all(framed.as_slice());
+            },
+            Err(e) => {
+                // This shouldn't happen and maybe we should use unwrap().
+                error!("failed to serialize record: {e}");
+            },
         }
     }
 }
@@ -30,19 +80,7 @@ impl Log for SocketLogger {
 
     fn log(&self, record: &log::Record) {
         if self.enabled(record.metadata()) {
-            match bincode::serialize(&Record::from(record)) {
-                Ok(data) => {
-                    let mut socket = self.socket.lock().unwrap();
-                    let mut framed = Vec::new();
-                    framed.extend(data.len().to_le_bytes().as_slice());
-                    framed.extend(data);
-                    let _ = socket.write_all(framed.as_slice());
-                },
-                Err(e) => {
-                    // This shouldn't happen and maybe we should use unwrap().
-                    error!("failed to serialize record: {e}");
-                },
-            }
+            self.try_log(record);
         }
     }
 
@@ -56,8 +94,8 @@ impl SharedLogger for SocketLogger {
         self.level
     }
 
-    fn config(&self) -> Option<&Config> {
-        self.config.as_ref()
+    fn config(&self) -> Option<&simplelog::Config> {
+        Some(&self.simple_config)
     }
 
     fn as_log(self: Box<Self>) -> Box<dyn Log> {
