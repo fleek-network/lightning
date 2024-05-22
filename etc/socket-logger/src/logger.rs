@@ -52,10 +52,7 @@ impl SocketLogger {
 
         let mut record = Record::from(record);
         let pid = std::process::id();
-        let tid = format!("{:?}", std::thread::current().id());
-        let tid = tid.replace("ThreadId(", "");
-        let tid = tid.replace(")", "");
-        record.metadata.target.push_str(format!("[{pid}][{tid}]").as_str());
+        record.metadata.target.push_str(format!("[{pid}]").as_str());
 
         match bincode::serialize(&record) {
             Ok(data) => {

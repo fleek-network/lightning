@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use directories::ProjectDirs;
 use lazy_static::lazy_static;
+#[cfg(feature = "logger")]
 use resolved_pathbuf::ResolvedPathBuf;
 
 lazy_static! {
@@ -14,6 +15,10 @@ lazy_static! {
         std::env::var(format!("{}_CONFIG", PROJECT_NAME.clone()))
             .ok()
             .map(PathBuf::from);
+}
+
+#[cfg(feature = "logger")]
+lazy_static! {
     pub static ref SOCKET_LOGGER_FOLDER: ResolvedPathBuf =
         "~/.lightning/socket-logger".try_into().unwrap();
 }

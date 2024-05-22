@@ -9,6 +9,7 @@ use crate::tui::{Event, Frame};
 
 pub mod firewall;
 pub mod home;
+#[cfg(feature = "logger")]
 pub mod logger;
 pub mod navigator;
 pub mod profile;

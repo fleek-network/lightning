@@ -1,9 +1,11 @@
 use anyhow::Result;
 use crossterm::event::KeyEvent;
 use lightning_ebpf_service::ConfigSource;
-use log::{debug, error};
+use log::debug;
 use ratatui::prelude::{Constraint, Direction, Layout, Rect};
+#[cfg(feature = "logger")]
 use socket_logger::Listener;
+#[cfg(feature = "logger")]
 use tokio::net::UnixListener;
 use tokio::sync::mpsc;
 
@@ -11,6 +13,7 @@ use crate::action::Action;
 use crate::components::firewall::form::FirewallForm;
 use crate::components::firewall::FireWall;
 use crate::components::home::Home;
+#[cfg(feature = "logger")]
 use crate::components::logger::Logger;
 use crate::components::navigator::Navigator;
 use crate::components::profile::Profile;
@@ -21,6 +24,7 @@ use crate::config::Config;
 use crate::mode::Mode;
 use crate::tui;
 use crate::tui::Frame;
+#[cfg(feature = "logger")]
 use crate::utils::SOCKET_LOGGER_FOLDER;
 
 pub struct App {
@@ -39,6 +43,7 @@ pub struct App {
     pub firewall: FireWall,
     pub firewall_form: FirewallForm,
     pub profiles: Profile,
+    #[cfg(feature = "logger")]
     pub logger: Logger,
 }
 
@@ -48,6 +53,7 @@ impl App {
         let home = Home::new();
         let firewall = FireWall::new(src.clone());
         let firewall_form = FirewallForm::new();
+        #[cfg(feature = "logger")]
         let logger = Logger::new();
         let summary = Summary::new();
         let prompt = Prompt::new();
@@ -58,6 +64,7 @@ impl App {
             tick_rate,
             frame_rate,
             home,
+            #[cfg(feature = "logger")]
             logger,
             summary,
             prompt,
@@ -79,13 +86,16 @@ impl App {
             Mode::Firewall => self.firewall.update(action.clone())?,
             Mode::FirewallEdit => self.firewall.update(action.clone())?,
             Mode::FirewallForm => self.firewall.form().update(action.clone())?,
-            Mode::Logger => self.logger.update(action.clone())?,
             Mode::Profiles => self.profiles.update(action.clone())?,
             Mode::ProfilesEdit => self.profiles.update(action.clone())?,
             Mode::ProfileView => self.profiles.view().update(action.clone())?,
             Mode::ProfileViewEdit => self.profiles.view().update(action.clone())?,
             Mode::ProfileForm => self.profiles.form().update(action.clone())?,
             Mode::ProfileRuleForm => self.profiles.view().rule_form().update(action.clone())?,
+            #[cfg(feature = "logger")]
+            Mode::Logger => self.logger.update(action.clone())?,
+            #[cfg(not(feature = "logger"))]
+            Mode::Logger => None,
         };
 
         if maybe_action.is_none() {
@@ -101,13 +111,16 @@ impl App {
             Mode::Firewall => self.firewall.handle_events(Some(event)),
             Mode::FirewallEdit => self.firewall.handle_events(Some(event)),
             Mode::FirewallForm => self.firewall.form().handle_events(Some(event)),
-            Mode::Logger => self.logger.handle_events(Some(event)),
             Mode::Profiles => self.profiles.handle_events(Some(event)),
             Mode::ProfilesEdit => self.profiles.handle_events(Some(event)),
             Mode::ProfileView => self.profiles.view().handle_events(Some(event)),
             Mode::ProfileViewEdit => self.profiles.view().handle_events(Some(event)),
             Mode::ProfileForm => self.profiles.form().handle_events(Some(event)),
             Mode::ProfileRuleForm => self.profiles.view().rule_form().handle_events(Some(event)),
+            #[cfg(feature = "logger")]
+            Mode::Logger => self.logger.handle_events(Some(event)),
+            #[cfg(not(feature = "logger"))]
+            Mode::Logger => Ok(None),
         }
     }
 
@@ -152,9 +165,6 @@ impl App {
             Mode::FirewallForm => {
                 self.firewall.form().draw(f, content[0])?;
             },
-            Mode::Logger => {
-                self.logger.draw(f, content[0])?;
-            },
             Mode::Profiles | Mode::ProfilesEdit => {
                 self.profiles.draw(f, content[0])?;
             },
@@ -167,6 +177,14 @@ impl App {
             Mode::ProfileRuleForm => {
                 self.profiles.view().rule_form().draw(f, content[0])?;
             },
+            #[cfg(feature = "logger")]
+            Mode::Logger => {
+                self.logger.draw(f, content[0])?;
+            },
+            #[cfg(not(feature = "logger"))]
+            Mode::Logger => {
+                self.home.draw(f, content[0])?;
+            },
         }
 
         Ok(())
@@ -175,20 +193,23 @@ impl App {
     pub async fn run(&mut self) -> Result<()> {
         debug!(target: "Main Tui App", "Running!");
 
-        if !SOCKET_LOGGER_FOLDER.as_path().try_exists()? {
-            tokio::fs::create_dir_all(SOCKET_LOGGER_FOLDER.as_path()).await?;
-        }
-
-        let mut bind_path = SOCKET_LOGGER_FOLDER.to_path_buf();
-        bind_path.push("ctrl");
-        let _ = tokio::fs::remove_file(bind_path.as_path()).await;
-        let socket = UnixListener::bind(bind_path).unwrap();
-
-        tokio::spawn(async move {
-            if let Err(e) = Listener::new(socket).run().await {
-                error!("error: {e:?}");
+        #[cfg(feature = "logger")]
+        {
+            if !SOCKET_LOGGER_FOLDER.as_path().try_exists()? {
+                tokio::fs::create_dir_all(SOCKET_LOGGER_FOLDER.as_path()).await?;
             }
-        });
+
+            let mut bind_path = SOCKET_LOGGER_FOLDER.to_path_buf();
+            bind_path.push("ctrl");
+            let _ = tokio::fs::remove_file(bind_path.as_path()).await;
+            let socket = UnixListener::bind(bind_path).unwrap();
+
+            tokio::spawn(async move {
+                if let Err(e) = Listener::new(socket).run().await {
+                    log::error!("error: {e:?}");
+                }
+            });
+        }
 
         let (action_tx, mut action_rx) = mpsc::unbounded_channel();
 

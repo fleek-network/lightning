@@ -8,6 +8,7 @@ use lightning_tui::app::App;
 use once_cell::sync::OnceCell;
 use resolved_pathbuf::ResolvedPathBuf;
 use tracing::debug;
+#[cfg(feature = "tui-dev")]
 use tracing::log::LevelFilter;
 
 #[cfg(feature = "ebpf")]
@@ -50,8 +51,11 @@ pub struct TuiCmd {
 }
 
 pub async fn exec(cmd: AdminSubCmd) -> Result<()> {
-    let _ = tui_logger::init_logger(LevelFilter::Trace);
-    tui_logger::set_default_level(LevelFilter::Trace);
+    #[cfg(feature = "tui-dev")]
+    {
+        let _ = tui_logger::init_logger(LevelFilter::Trace);
+        tui_logger::set_default_level(LevelFilter::Trace);
+    }
 
     let config = PathConfig::default();
 

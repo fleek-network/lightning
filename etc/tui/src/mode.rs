@@ -26,6 +26,7 @@ impl FromStr for Mode {
         let mode = match value {
             "Home" => Mode::Home,
             "Firewall" => Mode::Firewall,
+            #[cfg(feature = "logger")]
             "Logger" => Mode::Logger,
             "Profiles" => Mode::Profiles,
             _ => return Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid mode")),
