@@ -41,7 +41,7 @@ impl Connection {
     pub fn spawn(self) {
         tokio::spawn(async move {
             if let Err(e) = self.run().await {
-                eprintln!("unexpected error: {e:?}");
+                println!("unexpected error: {e:?}");
             }
         });
     }
@@ -95,10 +95,10 @@ impl Connection {
                         .as_slice()
                         .try_into()
                         .expect("Buffer length is hardcoded");
-                    frame_len = usize::from_be_bytes(bytes);
+                    frame_len = usize::from_le_bytes(bytes);
                     // We subtract here to pass entire buffer
                     // to the next loop.
-                    read_buf.resize(frame_len - 8, 0);
+                    read_buf.resize(frame_len, 0);
                     bytes_read = 0;
                 }
 

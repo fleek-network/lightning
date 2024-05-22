@@ -6050,6 +6050,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "tui-logger",
  "workspace-hack 0.1.0",
 ]
 
@@ -6853,11 +6854,14 @@ dependencies = [
  "rand 0.8.5",
  "rand_chacha",
  "rand_distr",
+ "resolved-pathbuf",
  "serde",
  "serde_json",
  "simplelog",
+ "socket-logger",
  "tokio",
  "tracing",
+ "tui-logger",
  "workspace-hack 0.1.0",
 ]
 
@@ -6913,9 +6917,11 @@ dependencies = [
  "lightning-ebpf-service",
  "log",
  "ratatui",
+ "resolved-pathbuf",
  "serde",
  "serde_json",
  "signal-hook",
+ "socket-logger",
  "strum 0.26.2",
  "tokio",
  "tokio-util 0.7.10",
@@ -11355,6 +11361,19 @@ name = "snap"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b6b67fb9a61334225b5b790716f609cd58395f895b3fe8b328786812a40bc3b"
+
+[[package]]
+name = "socket-logger"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "log",
+ "serde",
+ "simplelog",
+ "tokio",
+ "tui-logger",
+]
 
 [[package]]
 name = "socket2"

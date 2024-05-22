@@ -1,7 +1,10 @@
 use anyhow::Result;
 use crossterm::event::KeyEvent;
+use log::{debug, error};
 use lightning_ebpf_service::ConfigSource;
 use ratatui::prelude::{Constraint, Direction, Layout, Rect};
+use socket_logger::Listener;
+use tokio::net::UnixListener;
 use tokio::sync::mpsc;
 
 use crate::action::Action;
@@ -18,6 +21,7 @@ use crate::config::Config;
 use crate::mode::Mode;
 use crate::tui;
 use crate::tui::Frame;
+use crate::utils::SOCKET_LOGGER_FOLDER;
 
 pub struct App {
     pub config: Config,
@@ -169,7 +173,23 @@ impl App {
     }
 
     pub async fn run(&mut self) -> Result<()> {
-        log::debug!(target: "Main Tui App", "Running!");
+        debug!(target: "Main Tui App", "Running!");
+
+        if !SOCKET_LOGGER_FOLDER.as_path().try_exists()? {
+            tokio::fs::create_dir_all(SOCKET_LOGGER_FOLDER.as_path()).await?;
+        }
+
+        let mut bind_path = SOCKET_LOGGER_FOLDER.to_path_buf();
+        bind_path.push("ctrl");
+        let _ = tokio::fs::remove_file(bind_path.as_path()).await;
+        let socket = UnixListener::bind(bind_path).unwrap();
+
+        tokio::spawn(async move {
+            if let Err(e) = Listener::new(socket).run().await {
+                error!("error: {e:?}");
+            }
+        });
+
         let (action_tx, mut action_rx) = mpsc::unbounded_channel();
 
         let mut tui = tui::Tui::new()?

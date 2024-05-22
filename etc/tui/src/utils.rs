@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use directories::ProjectDirs;
 use lazy_static::lazy_static;
+use resolved_pathbuf::ResolvedPathBuf;
 
 lazy_static! {
     pub static ref PROJECT_NAME: String = env!("CARGO_CRATE_NAME").to_uppercase().to_string();
@@ -13,6 +14,8 @@ lazy_static! {
         std::env::var(format!("{}_CONFIG", PROJECT_NAME.clone()))
             .ok()
             .map(PathBuf::from);
+    pub static ref SOCKET_LOGGER_FOLDER: ResolvedPathBuf =
+        "~/.lightning/socket-logger".try_into().unwrap();
 }
 
 fn project_directory() -> Option<ProjectDirs> {
