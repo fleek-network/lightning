@@ -95,25 +95,22 @@ impl HttpSender {
     }
 
     #[inline(always)]
-    fn inner_send(&mut self, bytes: Bytes) {
-        if let Err(e) = self.body_tx.try_send(Ok(bytes)) {
+    async fn inner_send(&mut self, bytes: Bytes) {
+        if let Err(e) = self.body_tx.send(Ok(bytes)).await {
             warn!("payload dropped, failed to send to write loop: {e}");
         }
     }
 
-    fn send_with_http_override(&mut self, bytes: Bytes) {
+    async fn send_with_http_override(&mut self, bytes: Bytes) {
         if let Some(header_buffer) = self.header_buffer.as_mut() {
             header_buffer.extend(bytes);
             if self.current_write == 0 {
                 // always Some due to previous check
                 let payload = self.header_buffer.take().unwrap_or_default();
-
-                if let Err(e) = self.body_tx.try_send(Ok(payload.into())) {
-                    warn!("payload dropped, failed to send to write loop: {e}");
-                }
+                self.inner_send(payload.freeze()).await;
             }
-        } else if let Err(e) = self.body_tx.try_send(Ok(bytes)) {
-            warn!("payload dropped, failed to send to write loop: {e}");
+        } else {
+            self.inner_send(bytes).await
         }
     }
 
@@ -126,21 +123,21 @@ impl HttpSender {
 }
 
 impl TransportSender for HttpSender {
-    fn send_handshake_response(&mut self, _: HandshakeResponse) {
+    async fn send_handshake_response(&mut self, _: HandshakeResponse) {
         unimplemented!()
     }
 
-    fn send(&mut self, _: ResponseFrame) {
+    async fn send(&mut self, _: ResponseFrame) {
         unimplemented!()
     }
 
-    fn terminate(mut self, reason: TerminationReason) {
+    async fn terminate(mut self, reason: TerminationReason) {
         if let Some(reason_sender) = self.termination_tx.take() {
             let _ = reason_sender.send(reason);
         }
     }
 
-    fn start_write(&mut self, len: usize) {
+    async fn start_write(&mut self, len: usize) {
         // if the header buffer is gone it means we sent the headers already and are ready to stream
         // the body
         if self.header_buffer.is_none() || !self.service.supports_http_overrides() {
@@ -155,7 +152,7 @@ impl TransportSender for HttpSender {
         self.current_write = len;
     }
 
-    fn write(&mut self, buf: Bytes) -> anyhow::Result<usize> {
+    async fn write(&mut self, buf: Bytes) -> anyhow::Result<usize> {
         let len = buf.len();
 
         debug_assert!(self.current_write != 0);
@@ -164,9 +161,9 @@ impl TransportSender for HttpSender {
         self.current_write -= len;
 
         if self.service.supports_http_overrides() {
-            self.send_with_http_override(buf);
+            self.send_with_http_override(buf).await;
         } else {
-            self.inner_send(buf);
+            self.inner_send(buf).await;
         }
 
         Ok(len)
@@ -187,7 +184,6 @@ impl HttpReceiver {
     }
 }
 
-#[async_trait]
 impl TransportReceiver for HttpReceiver {
     fn detail(&mut self) -> TransportDetail {
         self.detail

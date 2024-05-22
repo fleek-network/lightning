@@ -13,7 +13,7 @@ use futures::StreamExt;
 use lightning_interfaces::prelude::*;
 use lightning_metrics::increment_counter;
 use tokio::sync::mpsc::{self, Receiver};
-use tracing::{error, info, warn};
+use tracing::{error, info};
 use wtransport::tls::Certificate;
 use wtransport::{Endpoint, SendStream, ServerConfig};
 
@@ -82,8 +82,6 @@ impl Transport for WebTransport {
 
     async fn accept(&mut self) -> Option<(HandshakeRequestFrame, Self::Sender, Self::Receiver)> {
         let (frame, (frame_writer, frame_reader)) = self.conn_rx.recv().await?;
-        let (data_tx, data_rx) = async_channel::unbounded();
-        tokio::spawn(connection::sender_loop(data_rx, frame_writer));
 
         increment_counter!(
             "handshake_webtransport_sessions",
@@ -93,7 +91,7 @@ impl Transport for WebTransport {
         Some((
             frame,
             WebTransportSender {
-                tx: data_tx,
+                writer: frame_writer,
                 current_write: 0,
             },
             WebTransportReceiver { rx: frame_reader },
@@ -102,25 +100,25 @@ impl Transport for WebTransport {
 }
 
 pub struct WebTransportSender {
-    tx: async_channel::Sender<Bytes>,
+    writer: SendStream,
     current_write: u32,
 }
 
 impl WebTransportSender {
     #[inline(always)]
-    fn send_inner(&mut self, bytes: Bytes) {
-        if let Err(e) = self.tx.try_send(bytes) {
-            warn!("payload dropped, failed to send to write loop: {e}");
+    async fn send_inner(&mut self, buf: &[u8]) {
+        if let Err(e) = self.writer.write_all(buf).await {
+            error!("failed to send data: {e:?}");
         }
     }
 }
 
 impl TransportSender for WebTransportSender {
-    fn send_handshake_response(&mut self, response: HandshakeResponse) {
-        self.send_inner(delimit_frame(response.encode()));
+    async fn send_handshake_response(&mut self, response: HandshakeResponse) {
+        self.send_inner(&delimit_frame(response.encode())).await;
     }
 
-    fn send(&mut self, frame: ResponseFrame) {
+    async fn send(&mut self, frame: ResponseFrame) {
         debug_assert!(
             !matches!(
                 frame,
@@ -129,10 +127,10 @@ impl TransportSender for WebTransportSender {
             "payloads should only be sent via start_write and write"
         );
 
-        self.send_inner(delimit_frame(frame.encode()));
+        self.send_inner(&delimit_frame(frame.encode())).await;
     }
 
-    fn start_write(&mut self, len: usize) {
+    async fn start_write(&mut self, len: usize) {
         let len = len as u32;
         debug_assert!(
             self.current_write == 0,
@@ -146,16 +144,16 @@ impl TransportSender for WebTransportSender {
         buffer.put_u32(len + 1);
         buffer.put_u8(RES_SERVICE_PAYLOAD_TAG);
         // write the delimiter and payload tag to the stream
-        self.send_inner(buffer.into());
+        self.send_inner(&buffer).await;
     }
 
-    fn write(&mut self, buf: Bytes) -> anyhow::Result<usize> {
+    async fn write(&mut self, buf: Bytes) -> anyhow::Result<usize> {
         let len = u32::try_from(buf.len())?;
         debug_assert!(self.current_write != 0);
         debug_assert!(self.current_write >= len);
 
         self.current_write -= len;
-        self.send_inner(buf);
+        self.send_inner(&buf).await;
         Ok(len as usize)
     }
 }
@@ -164,7 +162,6 @@ pub struct WebTransportReceiver {
     rx: FramedStreamRx,
 }
 
-#[async_trait]
 impl TransportReceiver for WebTransportReceiver {
     async fn recv(&mut self) -> Option<RequestFrame> {
         let data = match self.rx.next().await? {

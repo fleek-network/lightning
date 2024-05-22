@@ -127,7 +127,7 @@ fn spawn_handshake_task(
         let (reader, writer) = stream.into_split();
 
         // Send the frame and the new connection over the channel
-        tx.send((frame, TcpSender::spawn(writer), TcpReceiver::new(reader)))
+        tx.send((frame, TcpSender::new(writer), TcpReceiver::new(reader)))
             .await
             .ok();
     });
@@ -143,7 +143,7 @@ async fn spawn_write_driver(mut writer: OwnedWriteHalf, rx: async_channel::Recei
 }
 
 pub struct TcpSender {
-    sender: async_channel::Sender<Bytes>,
+    writer: OwnedWriteHalf,
     current_write: u32,
 }
 
@@ -151,30 +151,27 @@ impl TcpSender {
     /// Create the [`TcpSender`], additionally spawning a task to handle writing bytes to the
     /// stream.
     #[inline(always)]
-    pub fn spawn(writer: OwnedWriteHalf) -> Self {
-        let (sender, receiver) = async_channel::unbounded();
-        tokio::spawn(spawn_write_driver(writer, receiver));
-
+    pub fn new(writer: OwnedWriteHalf) -> Self {
         Self {
-            sender,
+            writer,
             current_write: 0,
         }
     }
 
     #[inline(always)]
-    fn send_inner(&mut self, bytes: Bytes) {
-        if let Err(e) = self.sender.try_send(bytes) {
-            warn!("payload dropped, failed to send to write loop: {e}");
+    async fn send_inner(&mut self, buf: &[u8]) {
+        if let Err(e) = self.writer.write_all(buf).await {
+            warn!("Dropping payload, failed to write to stream: {e}");
         }
     }
 }
 
 impl TransportSender for TcpSender {
-    fn send_handshake_response(&mut self, response: schema::HandshakeResponse) {
-        self.send_inner(delimit_frame(response.encode()));
+    async fn send_handshake_response(&mut self, response: schema::HandshakeResponse) {
+        self.send_inner(&delimit_frame(response.encode())).await;
     }
 
-    fn send(&mut self, frame: schema::ResponseFrame) {
+    async fn send(&mut self, frame: schema::ResponseFrame) {
         debug_assert!(
             !matches!(
                 frame,
@@ -185,10 +182,10 @@ impl TransportSender for TcpSender {
         );
 
         let bytes = delimit_frame(frame.encode());
-        self.send_inner(bytes);
+        self.send_inner(&bytes).await;
     }
 
-    fn start_write(&mut self, len: usize) {
+    async fn start_write(&mut self, len: usize) {
         let len = len as u32;
         debug_assert!(
             self.current_write == 0,
@@ -202,16 +199,16 @@ impl TransportSender for TcpSender {
         buffer.put_u32(len + 1);
         buffer.put_u8(RES_SERVICE_PAYLOAD_TAG);
         // write the delimiter and payload tag to the stream
-        self.send_inner(buffer.into());
+        self.send_inner(&buffer).await;
     }
 
-    fn write(&mut self, buf: Bytes) -> anyhow::Result<usize> {
+    async fn write(&mut self, buf: Bytes) -> anyhow::Result<usize> {
         let len = u32::try_from(buf.len())?;
         debug_assert!(self.current_write != 0);
         debug_assert!(self.current_write >= len);
 
         self.current_write -= len;
-        self.send_inner(buf);
+        self.send_inner(&buf).await;
         Ok(len as usize)
     }
 }
@@ -230,7 +227,6 @@ impl TcpReceiver {
     }
 }
 
-#[async_trait]
 impl TransportReceiver for TcpReceiver {
     /// Cancel Safety:
     /// This method is cancel safe, but could potentially allocate multiple times for the delimiter
@@ -324,7 +320,7 @@ mod tests {
             assert_eq!(REQ_FRAME, frame, "received incorrect request frame");
 
             // Send the response frame
-            sender.send_handshake_response(RES_FRAME);
+            sender.send_handshake_response(RES_FRAME).await;
 
             // Drop the connection
         }

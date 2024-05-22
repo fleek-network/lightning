@@ -115,7 +115,7 @@ pub struct MockTransportSender {
 }
 
 impl MockTransportSender {
-    fn send_inner(&mut self, bytes: Bytes) {
+    async fn send_inner(&mut self, bytes: Bytes) {
         self.tx
             .try_send(bytes)
             .expect("failed to send bytes over the mock connection")
@@ -123,28 +123,29 @@ impl MockTransportSender {
 }
 
 impl TransportSender for MockTransportSender {
-    fn send_handshake_response(&mut self, response: schema::HandshakeResponse) {
-        self.send_inner(response.encode());
+    async fn send_handshake_response(&mut self, response: schema::HandshakeResponse) {
+        self.send_inner(response.encode()).await;
     }
 
-    fn send(&mut self, frame: schema::ResponseFrame) {
-        self.send_inner(frame.encode());
+    async fn send(&mut self, frame: schema::ResponseFrame) {
+        self.send_inner(frame.encode()).await;
     }
 
-    fn start_write(&mut self, len: usize) {
+    async fn start_write(&mut self, len: usize) {
         debug_assert!(self.buffer.is_empty());
         self.buffer.reserve(len);
         self.current_write = len;
     }
 
-    fn write(&mut self, buf: Bytes) -> anyhow::Result<usize> {
+    async fn write(&mut self, buf: Bytes) -> anyhow::Result<usize> {
         let len = buf.len();
         debug_assert!(len <= self.current_write);
         self.buffer.put(buf);
         if self.buffer.len() >= self.current_write {
             let bytes = self.buffer.split_to(self.current_write).into();
             self.current_write = 0;
-            self.send(schema::ResponseFrame::ServicePayload { bytes });
+            self.send(schema::ResponseFrame::ServicePayload { bytes })
+                .await;
         }
         Ok(len)
     }
@@ -155,7 +156,6 @@ pub struct MockTransportReceiver {
     rx: async_channel::Receiver<Bytes>,
 }
 
-#[async_trait]
 impl TransportReceiver for MockTransportReceiver {
     async fn recv(&mut self) -> Option<schema::RequestFrame> {
         let bytes = self.rx.recv().await.ok()?;

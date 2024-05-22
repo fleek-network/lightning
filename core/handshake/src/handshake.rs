@@ -178,7 +178,7 @@ impl<P: ExecutorProviderInterface> Context<P> {
 
                 // Attempt to connect to the service, getting the unix socket.
                 let Some(mut socket) = self.provider.connect(service).await else {
-                    sender.terminate(TerminationReason::InvalidService);
+                    sender.terminate(TerminationReason::InvalidService).await;
                     warn!("failed to connect to service {service}");
                     return;
                 };
@@ -189,7 +189,7 @@ impl<P: ExecutorProviderInterface> Context<P> {
                 };
 
                 if let Err(e) = write_header(&header, &mut socket).await {
-                    sender.terminate(TerminationReason::ServiceTerminated);
+                    sender.terminate(TerminationReason::ServiceTerminated).await;
                     warn!("failed to write connection header to service {service}: {e}");
                     return;
                 }
@@ -226,12 +226,12 @@ impl<P: ExecutorProviderInterface> Context<P> {
                 let connection_id = u64::from_be_bytes(*arrayref::array_ref![access_token, 0, 8]);
 
                 let Some(connection) = self.connections.get(&connection_id) else {
-                    sender.terminate(TerminationReason::InvalidToken);
+                    sender.terminate(TerminationReason::InvalidToken).await;
                     return;
                 };
 
                 if connection.access_token != access_token {
-                    sender.terminate(TerminationReason::InvalidToken);
+                    sender.terminate(TerminationReason::InvalidToken).await;
                     return;
                 }
 
@@ -241,7 +241,7 @@ impl<P: ExecutorProviderInterface> Context<P> {
                         .expect("Failed to get current time")
                         .as_millis()
                 {
-                    sender.terminate(TerminationReason::InvalidToken);
+                    sender.terminate(TerminationReason::InvalidToken).await;
                     return;
                 }
 
@@ -255,7 +255,7 @@ impl<P: ExecutorProviderInterface> Context<P> {
                 retry: Some(id), ..
             } => {
                 let Some(connection) = self.connections.get(&id) else {
-                    sender.terminate(TerminationReason::InvalidToken);
+                    sender.terminate(TerminationReason::InvalidToken).await;
                     return;
                 };
 

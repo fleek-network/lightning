@@ -144,11 +144,11 @@ impl WebRtcSender {
 }
 
 impl TransportSender for WebRtcSender {
-    fn send_handshake_response(&mut self, frame: schema::HandshakeResponse) {
+    async fn send_handshake_response(&mut self, frame: schema::HandshakeResponse) {
         self.send_inner(&frame.encode());
     }
 
-    fn send(&mut self, frame: schema::ResponseFrame) {
+    async fn send(&mut self, frame: schema::ResponseFrame) {
         debug_assert!(
             !matches!(
                 frame,
@@ -162,7 +162,7 @@ impl TransportSender for WebRtcSender {
         self.send_inner(&frame.encode());
     }
 
-    fn start_write(&mut self, len: usize) {
+    async fn start_write(&mut self, len: usize) {
         debug_assert!(
             self.current_write == 0,
             "all bytes should be written before another call to start_write"
@@ -171,7 +171,7 @@ impl TransportSender for WebRtcSender {
     }
 
     // TODO: consider buffering up to the max payload size to send less chunks/extra bytes
-    fn write(&mut self, mut buf: Bytes) -> anyhow::Result<usize> {
+    async fn write(&mut self, mut buf: Bytes) -> anyhow::Result<usize> {
         debug_assert!(self.current_write >= buf.len());
 
         while !buf.is_empty() {
@@ -196,7 +196,6 @@ impl TransportSender for WebRtcSender {
 /// Receiver for a webrtc connection.
 pub struct WebRtcReceiver(Receiver<schema::RequestFrame>);
 
-#[async_trait]
 impl TransportReceiver for WebRtcReceiver {
     #[inline(always)]
     async fn recv(&mut self) -> Option<schema::RequestFrame> {

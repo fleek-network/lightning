@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use axum::Router;
 use bytes::{BufMut, Bytes, BytesMut};
 use fn_sdk::header::TransportDetail;
+use futures::Future;
 use lightning_interfaces::prelude::*;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -101,25 +102,30 @@ pub trait Transport: Sized + Send + Sync + 'static {
 //       for secondary connections are added
 pub trait TransportSender: Sized + Send + Sync + 'static {
     /// Send the initial handshake response to the client.
-    fn send_handshake_response(&mut self, response: schema::HandshakeResponse);
+    fn send_handshake_response(
+        &mut self,
+        response: schema::HandshakeResponse,
+    ) -> impl Future<Output = ()> + Send;
 
     /// Send a frame to the client.
-    fn send(&mut self, frame: schema::ResponseFrame);
+    fn send(&mut self, frame: schema::ResponseFrame) -> impl Future<Output = ()> + Send;
 
     /// Terminate the connection
-    fn terminate(mut self, reason: schema::TerminationReason) {
-        self.send(schema::ResponseFrame::Termination { reason })
+    fn terminate(mut self, reason: schema::TerminationReason) -> impl Future<Output = ()> + Send {
+        async move {
+            self.send(schema::ResponseFrame::Termination { reason })
+                .await
+        }
     }
 
     /// Declare a number of bytes to write as service payloads.
-    fn start_write(&mut self, len: usize);
+    fn start_write(&mut self, len: usize) -> impl Future<Output = ()> + Send;
 
     /// Write some bytes as service payloads. Must ALWAYS be called after
     /// [`TransportSender::start_write`].
-    fn write(&mut self, buf: Bytes) -> anyhow::Result<usize>;
+    fn write(&mut self, buf: Bytes) -> impl Future<Output = anyhow::Result<usize>> + Send;
 }
 
-#[async_trait]
 pub trait TransportReceiver: Send + Sync + 'static {
     /// Returns the transport detail from this connection which is then sent to the service on
     /// the hello frame.
@@ -129,7 +135,7 @@ pub trait TransportReceiver: Send + Sync + 'static {
 
     /// Receive a frame from the connection. Returns `None` when the connection
     /// is closed.
-    async fn recv(&mut self) -> Option<schema::RequestFrame>;
+    fn recv(&mut self) -> impl Future<Output = Option<schema::RequestFrame>> + Send;
 }
 
 pub async fn spawn_transport_by_config<P: ExecutorProviderInterface>(

@@ -2,7 +2,6 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use anyhow::Result;
-use bytes::Bytes;
 use fleek_crypto::{NodeSecretKey, SecretKey};
 use futures::StreamExt;
 use lightning_interfaces::ShutdownWaiter;
@@ -118,14 +117,6 @@ pub async fn handle_incoming_session(
                     error!("failed to decode frame: {e:?}");
                 },
             },
-        }
-    }
-}
-
-pub async fn sender_loop(data_rx: async_channel::Receiver<Bytes>, mut network_tx: SendStream) {
-    while let Ok(data) = data_rx.recv().await {
-        if let Err(e) = network_tx.write_all(&data).await {
-            error!("failed to send data: {e:?}");
         }
     }
 }

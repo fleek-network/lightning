@@ -179,7 +179,7 @@ impl<P: ExecutorProviderInterface> Proxy<P> {
                 res = receiver.recv() => {
                     match async_map(res, |r| self.handle_incoming(is_primary, r)).await {
                         Some(HandleRequestResult::Ok) if is_primary => {
-                            self.maybe_flush_primary_queue(true, &mut sender);
+                            self.maybe_flush_primary_queue(true, &mut sender).await;
                         },
                         Some(HandleRequestResult::Ok) => {},
                         Some(HandleRequestResult::TerminateConnection) => {
@@ -201,13 +201,13 @@ impl<P: ExecutorProviderInterface> Proxy<P> {
                         // the same connection mode. The client must have lost its connection.
                         // We terminate the current (old) connection with a `ConnectionInUse` error.
                         (true, true) => {
-                            sender.terminate(TerminationReason::ConnectionInUse);
+                            sender.terminate(TerminationReason::ConnectionInUse).await;
                             self.discard_bytes = true;
                             self.queued_primary_response.clear();
                             State::OnlyPrimaryConnection(pair)
                         },
                         (false, false) => {
-                            sender.terminate(TerminationReason::ConnectionInUse);
+                            sender.terminate(TerminationReason::ConnectionInUse).await;
                             self.discard_bytes = true;
                             State::OnlySecondaryConnection(pair)
                         }
@@ -255,12 +255,12 @@ impl<P: ExecutorProviderInterface> Proxy<P> {
                                 // This might be a window to flush some pending responses to the
                                 // primary.
                                 if is_primary {
-                                    self.maybe_flush_primary_queue(true, &mut sender);
+                                    self.maybe_flush_primary_queue(true, &mut sender).await;
                                 }
 
                                 let bytes = self.buffer.split_to(4);
                                 let len = u32::from_be_bytes(*array_ref![bytes, 0, 4]) as usize;
-                                sender.start_write(len);
+                                sender.start_write(len).await;
                                 self.current_write = len;
                                 continue 'inner; // to handle `len` == 0.
                             }
@@ -274,7 +274,7 @@ impl<P: ExecutorProviderInterface> Proxy<P> {
                                 continue 'inner;
                             }
 
-                            if sender.write(bytes.freeze()).is_err() {
+                            if sender.write(bytes.freeze()).await.is_err() {
                                 self.discard_bytes = true;
                                 self.queued_primary_response.clear();
                                 return State::NoConnection;
@@ -285,7 +285,7 @@ impl<P: ExecutorProviderInterface> Proxy<P> {
             }
         };
 
-        sender.terminate(reason);
+        sender.terminate(reason).await;
         State::Terminated
     }
 
@@ -312,7 +312,7 @@ impl<P: ExecutorProviderInterface> Proxy<P> {
                 res = p_receiver.recv() => {
                     match async_map(res, |r| self.handle_incoming(true, r)).await {
                         Some(HandleRequestResult::Ok) => {
-                            self.maybe_flush_primary_queue(false, &mut p_sender);
+                            self.maybe_flush_primary_queue(false, &mut p_sender).await;
                         },
                         Some(HandleRequestResult::TerminateConnection) => {
                             break 'outer TerminationReason::InternalError;
@@ -393,11 +393,11 @@ impl<P: ExecutorProviderInterface> Proxy<P> {
 
                                 // This might be a window to flush some pending responses to the
                                 // primary.
-                                self.maybe_flush_primary_queue(false, &mut p_sender);
+                                self.maybe_flush_primary_queue(false, &mut p_sender).await;
 
                                 let bytes = self.buffer.split_to(4);
                                 let len = u32::from_be_bytes(*array_ref![bytes, 0, 4]) as usize;
-                                s_sender.start_write(len);
+                                s_sender.start_write(len).await;
                                 self.current_write = len;
                                 continue 'inner; // to handle `len` == 0.
                             }
@@ -412,14 +412,14 @@ impl<P: ExecutorProviderInterface> Proxy<P> {
                             }
 
                             return if self.is_primary_the_current_sender {
-                                if p_sender.write(bytes.freeze()).is_ok() {
+                                if p_sender.write(bytes.freeze()).await.is_ok() {
                                     continue 'inner;
                                 }
                                 self.discard_bytes = true;
                                 self.queued_primary_response.clear();
                                 State::OnlySecondaryConnection((s_sender, s_receiver).into())
                             } else {
-                                if s_sender.write(bytes.freeze()).is_ok() {
+                                if s_sender.write(bytes.freeze()).await.is_ok() {
                                     continue 'inner;
                                 }
                                 self.discard_bytes = true;
@@ -431,8 +431,8 @@ impl<P: ExecutorProviderInterface> Proxy<P> {
             }
         };
 
-        s_sender.terminate(reason);
-        p_sender.terminate(reason);
+        s_sender.terminate(reason).await;
+        p_sender.terminate(reason).await;
         State::Terminated
     }
 
@@ -493,7 +493,7 @@ impl<P: ExecutorProviderInterface> Proxy<P> {
     }
 
     #[inline(always)]
-    fn maybe_flush_primary_queue<S: TransportSender>(
+    async fn maybe_flush_primary_queue<S: TransportSender>(
         &mut self,
         only_primary: bool,
         sender: &mut S,
@@ -505,7 +505,7 @@ impl<P: ExecutorProviderInterface> Proxy<P> {
         let is_primary_current_writer = only_primary || self.is_primary_the_current_sender;
         if !is_primary_current_writer || self.current_write == 0 || self.discard_bytes {
             while let Some(res) = self.queued_primary_response.pop_back() {
-                sender.send(res);
+                sender.send(res).await;
             }
         }
     }
