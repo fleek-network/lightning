@@ -53,6 +53,10 @@ impl SocketLogger {
         let mut record = Record::from(record);
         let mut id = String::new();
         if let Some(name) = std::thread::current().name() {
+            let name = name
+                .split("#")
+                .next()
+                .expect("Split returns at least one string");
             id.push_str(format!("[{name}]").as_str());
         } else {
             let pid = std::process::id();
