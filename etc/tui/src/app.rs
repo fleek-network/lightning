@@ -1,7 +1,7 @@
 use anyhow::Result;
 use crossterm::event::KeyEvent;
-use log::{debug, error};
 use lightning_ebpf_service::ConfigSource;
+use log::{debug, error};
 use ratatui::prelude::{Constraint, Direction, Layout, Rect};
 use socket_logger::Listener;
 use tokio::net::UnixListener;

@@ -31,4 +31,7 @@ pub enum Action {
     Focus,
     Toggle,
     Hide,
+    FilterLeft,
+    FilterRight,
+    Next,
 }

@@ -1,7 +1,8 @@
 #![allow(unused)]
 use anyhow::Result;
 use log::LevelFilter;
-use ratatui::prelude::{Color, Constraint, Layout, Rect, Style};
+use ratatui::prelude::{Color, Constraint, Layout, Modifier, Rect, Style, Widget};
+use ratatui::widgets::{Block, Borders, Tabs};
 use tokio::sync::mpsc::UnboundedSender;
 use tui_logger::{TuiLoggerLevelOutput, TuiLoggerSmartWidget, TuiWidgetEvent, TuiWidgetState};
 
@@ -35,6 +36,14 @@ impl Logger {
             config: Config::default(),
         }
     }
+
+    fn selected_state(&mut self) -> &mut TuiWidgetState {
+        &mut self.states[self.selected_tab]
+    }
+
+    fn next_tab(&mut self) {
+        self.selected_tab = (self.selected_tab + 1) % self.tab_names.len();
+    }
 }
 
 impl Component for Logger {
@@ -47,12 +56,12 @@ impl Component for Logger {
     }
 
     fn update(&mut self, action: Action) -> anyhow::Result<Option<Action>> {
-        let state = &mut self.states[0];
+        let state = self.selected_state();
         match action {
             Action::Up => state.transition(TuiWidgetEvent::UpKey),
             Action::Down => state.transition(TuiWidgetEvent::DownKey),
-            Action::NavLeft => state.transition(TuiWidgetEvent::LeftKey),
-            Action::NavRight => state.transition(TuiWidgetEvent::RightKey),
+            Action::FilterLeft => state.transition(TuiWidgetEvent::LeftKey),
+            Action::FilterRight => state.transition(TuiWidgetEvent::RightKey),
             Action::PageUp => state.transition(TuiWidgetEvent::PrevPageKey),
             Action::PageDown => state.transition(TuiWidgetEvent::NextPageKey),
             Action::Add => state.transition(TuiWidgetEvent::PlusKey),
@@ -60,6 +69,7 @@ impl Component for Logger {
             Action::Hide => state.transition(TuiWidgetEvent::HideKey),
             Action::Focus => state.transition(TuiWidgetEvent::FocusKey),
             Action::Toggle => state.transition(TuiWidgetEvent::SpaceKey),
+            Action::Next => self.next_tab(),
             _ => return Ok(None),
         }
 
@@ -67,7 +77,15 @@ impl Component for Logger {
     }
 
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
-        let chunk: [Rect; 1] = Layout::vertical([Constraint::Fill(1)]).areas(area);
+        let chunk: [Rect; 2] =
+            Layout::vertical([Constraint::Length(3), Constraint::Fill(1)]).areas(area);
+
+        let tabs = Tabs::new(self.tab_names.iter().cloned())
+            .block(Block::default().title("States").borders(Borders::ALL))
+            .highlight_style(Style::default().add_modifier(Modifier::REVERSED))
+            .select(self.selected_tab);
+
+        f.render_widget(tabs, chunk[0]);
 
         let logger = TuiLoggerSmartWidget::default()
             .style_error(Style::default().fg(Color::Red))
@@ -81,9 +99,11 @@ impl Component for Logger {
             .output_target(true)
             .output_file(true)
             .output_line(true)
-            .state(&self.states[0]);
+            .title_log("Logs")
+            .title_target("Targets")
+            .state(self.selected_state());
 
-        f.render_widget(logger, chunk[0]);
+        f.render_widget(logger, chunk[1]);
 
         Ok(())
     }

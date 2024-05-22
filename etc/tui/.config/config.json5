@@ -1,18 +1,18 @@
 {
   "keybindings": {
     "Home": {
-      "<shift-right>": "NavRight", // Move right to the next page.
+      "<right>": "NavRight", // Move right to the next page.
       "<Ctrl-c>": "Quit", // Quit the application.
-      "<Ctrl-z>": "Suspend", // Suspend the application.
+      "<Ctrl-z>": "Suspend" // Suspend the application.
     },
     "Firewall": {
       "<i>": "Edit", // Enter edit mode.
       "<up>": "Up", // Scroll up.
       "<down>": "Down", // Scroll down.
-      "<shift-left>": "NavLeft", // Move left to the next page.
-      "<shift-right>": "NavRight", // Move right to the next page.
+      "<left>": "NavLeft", // Move left to the next page.
+      "<right>": "NavRight", // Move right to the next page.
       "<Ctrl-c>": "Quit", // Quit the application.
-      "<Ctrl-z>": "Suspend", // Suspend the application.
+      "<Ctrl-z>": "Suspend" // Suspend the application.
     },
     "FirewallEdit": {
       "<esc>": "Cancel", // Cancel edit mode.
@@ -22,7 +22,7 @@
       "<up>": "Up", // Scroll up.
       "<down>": "Down", // Scroll down.
       "<Ctrl-c>": "Quit", // Quit the application.
-      "<Ctrl-z>": "Suspend", // Suspend the application.
+      "<Ctrl-z>": "Suspend" // Suspend the application.
     },
     "FirewallForm": {
       "<esc>": "Cancel", // Cancel and go back.
@@ -30,17 +30,17 @@
       "<up>": "Up", // Move up to the next field.
       "<down>": "Down", // Move down to the next field.
       "<Ctrl-c>": "Quit", // Quit the application.
-      "<Ctrl-z>": "Suspend", // Suspend the application.
+      "<Ctrl-z>": "Suspend" // Suspend the application.
     },
     "Profiles": {
       "<i>": "Edit", // Enter edit mode.
       "<Enter>": "Select", // Select profile to view.
       "<up>": "Up", // Scroll up.
       "<down>": "Down", // Scroll down.
-      "<shift-left>": "NavLeft", // Move left to the next page.
-      "<shift-right>": "NavRight", // Move right to the next page.
+      "<left>": "NavLeft", // Move left to the next page.
+      "<right>": "NavRight", // Move right to the next page.
       "<Ctrl-c>": "Quit", // Quit the application.
-      "<Ctrl-z>": "Suspend", // Suspend the application.
+      "<Ctrl-z>": "Suspend" // Suspend the application.
     },
     "ProfilesEdit": {
       "<esc>": "Cancel", // Scape edit mode.
@@ -50,17 +50,17 @@
       "<up>": "Up", // Scroll up.
       "<down>": "Down", // Scroll down.
       "<Ctrl-c>": "Quit", // Quit the application.
-      "<Ctrl-z>": "Suspend", // Suspend the application.
+      "<Ctrl-z>": "Suspend" // Suspend the application.
     },
     "ProfileView": {
       "<i>": "Edit", // Enter edit mode.
       "<b>": "Back", // Return back to the list of profiles.
       "<up>": "Up", // Scroll up.
       "<down>": "Down", // Scroll down.
-      "<shift-left>": "NavLeft", // Move left to the next page.
-      "<shift-right>": "NavRight", // Move right to the next page.
+      "<left>": "NavLeft", // Move left to the next page.
+      "<right>": "NavRight", // Move right to the next page.
       "<Ctrl-c>": "Quit", // Quit the application.
-      "<Ctrl-z>": "Suspend", // Suspend the application.
+      "<Ctrl-z>": "Suspend" // Suspend the application.
     },
     "ProfileViewEdit": {
       "<Ctrl-a>": "Add", // Open form to enter a new rule.
@@ -69,13 +69,13 @@
       "<Ctrl-s>": "Save", // Save changes.
       "<up>": "Up", // Scroll up.
       "<down>": "Down", // Scroll down.
-      "<Ctrl-c>": "Quit", // Quit the application.
+      "<Ctrl-c>": "Quit" // Quit the application.
     },
     "ProfileForm": {
       "<esc>": "Cancel", // Cancel and go back.
       "<Ctrl-a>": "Add", // Submit new profile.
       "<Ctrl-c>": "Quit", // Quit the application.
-      "<Ctrl-z>": "Suspend", // Suspend the application.
+      "<Ctrl-z>": "Suspend" // Suspend the application.
     },
     "ProfileRuleForm": {
       "<esc>": "Cancel", // Cancel and go back.
@@ -83,22 +83,24 @@
       "<up>": "Up", // Move up to the next field.
       "<down>": "Down", // Move down to the next field.
       "<Ctrl-c>": "Quit", // Quit the application.
-      "<Ctrl-z>": "Suspend", // Suspend the application.
+      "<Ctrl-z>": "Suspend" // Suspend the application.
     },
     "Logger": {
       "<up>": "Up",
       "<Down>": "Down",
-      "<left>": "NavLeft",
-      "<right>": "NavRight",
+      "<shift-left>": "FilterLeft",
+      "<shift-right>": "FilterRight",
       "<pageup>": "PageUp",
       "<pagedown>": "PageDown",
       "<f>": "Focus",
       "<esc>": "Cancel",
+      "<tab>": "Next",
       "<+>": "Add",
       "<->": "Remove",
       "<space>": "Toggle",
       "<ctrl-h>": "Hide",
       "<Ctrl-c>": "Quit", // Quit the application.
+      "<left>": "NavLeft", // Move left to the next page.
     }
   }
 }
