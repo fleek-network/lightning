@@ -131,12 +131,14 @@ impl TransportSender for HttpSender {
         unimplemented!()
     }
 
+    #[inline(always)]
     async fn terminate(mut self, reason: TerminationReason) {
         if let Some(reason_sender) = self.termination_tx.take() {
             let _ = reason_sender.send(reason);
         }
     }
 
+    #[inline(always)]
     async fn start_write(&mut self, len: usize) {
         // if the header buffer is gone it means we sent the headers already and are ready to stream
         // the body
@@ -152,6 +154,7 @@ impl TransportSender for HttpSender {
         self.current_write = len;
     }
 
+    #[inline(always)]
     async fn write(&mut self, buf: Bytes) -> anyhow::Result<usize> {
         let len = buf.len();
 
@@ -185,12 +188,14 @@ impl HttpReceiver {
 }
 
 impl TransportReceiver for HttpReceiver {
+    #[inline(always)]
     fn detail(&mut self) -> TransportDetail {
         self.detail
             .take()
             .expect("HTTP Transport detail already taken.")
     }
 
+    #[inline(always)]
     async fn recv(&mut self) -> Option<RequestFrame> {
         self.inner.recv().await.ok().flatten()
     }

@@ -84,6 +84,7 @@ impl Transport for TcpTransport {
     }
 }
 
+#[inline(always)]
 fn spawn_handshake_task(
     mut stream: TcpStream,
     tx: mpsc::Sender<(schema::HandshakeRequestFrame, TcpSender, TcpReceiver)>,
@@ -133,15 +134,6 @@ fn spawn_handshake_task(
     });
 }
 
-/// Driver loop to write outgoing bytes directly to the stream.
-async fn spawn_write_driver(mut writer: OwnedWriteHalf, rx: async_channel::Receiver<Bytes>) {
-    while let Ok(bytes) = rx.recv().await {
-        if let Err(e) = writer.write_all(&bytes).await {
-            warn!("Dropping payload, failed to write to stream: {e}");
-        };
-    }
-}
-
 pub struct TcpSender {
     writer: OwnedWriteHalf,
     current_write: u32,
@@ -167,10 +159,12 @@ impl TcpSender {
 }
 
 impl TransportSender for TcpSender {
+    #[inline(always)]
     async fn send_handshake_response(&mut self, response: schema::HandshakeResponse) {
         self.send_inner(&delimit_frame(response.encode())).await;
     }
 
+    #[inline(always)]
     async fn send(&mut self, frame: schema::ResponseFrame) {
         debug_assert!(
             !matches!(
@@ -185,6 +179,7 @@ impl TransportSender for TcpSender {
         self.send_inner(&bytes).await;
     }
 
+    #[inline(always)]
     async fn start_write(&mut self, len: usize) {
         let len = len as u32;
         debug_assert!(
@@ -202,6 +197,7 @@ impl TransportSender for TcpSender {
         self.send_inner(&buffer).await;
     }
 
+    #[inline(always)]
     async fn write(&mut self, buf: Bytes) -> anyhow::Result<usize> {
         let len = u32::try_from(buf.len())?;
         debug_assert!(self.current_write != 0);
@@ -219,6 +215,7 @@ pub struct TcpReceiver {
 }
 
 impl TcpReceiver {
+    #[inline(always)]
     pub fn new(reader: OwnedReadHalf) -> Self {
         Self {
             reader,
@@ -231,6 +228,7 @@ impl TransportReceiver for TcpReceiver {
     /// Cancel Safety:
     /// This method is cancel safe, but could potentially allocate multiple times for the delimiter
     /// if canceled.
+    #[inline(always)]
     async fn recv(&mut self) -> Option<schema::RequestFrame> {
         loop {
             if self.buffer.len() < 4 {

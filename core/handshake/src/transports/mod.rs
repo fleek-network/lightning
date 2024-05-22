@@ -129,6 +129,7 @@ pub trait TransportSender: Sized + Send + Sync + 'static {
 pub trait TransportReceiver: Send + Sync + 'static {
     /// Returns the transport detail from this connection which is then sent to the service on
     /// the hello frame.
+    #[inline(always)]
     fn detail(&mut self) -> TransportDetail {
         TransportDetail::Other
     }
@@ -177,9 +178,10 @@ pub async fn spawn_transport_by_config<P: ExecutorProviderInterface>(
 }
 
 /// Delimit a complete frame with a u32 length.
+#[inline(always)]
 pub fn delimit_frame(bytes: Bytes) -> Bytes {
     let mut buf = BytesMut::with_capacity(4 + bytes.len());
     buf.put_u32(bytes.len() as u32);
     buf.put(bytes);
-    buf.into()
+    buf.freeze()
 }

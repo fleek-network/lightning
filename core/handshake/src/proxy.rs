@@ -82,10 +82,12 @@ impl<P: ExecutorProviderInterface> Proxy<P> {
         }
     }
 
+    #[inline(always)]
     pub fn spawn(self, start: Option<State>) {
         tokio::spawn(self.run(start));
     }
 
+    #[inline(always)]
     pub async fn run(mut self, start: Option<State>) {
         // Run the main loop of the state each iteration of this loop switches between different
         // cases and implementations depending on the connections and their existence. And does

@@ -114,29 +114,31 @@ pub struct MockTransportSender {
     buffer: BytesMut,
 }
 
-impl MockTransportSender {
-    async fn send_inner(&mut self, bytes: Bytes) {
+impl TransportSender for MockTransportSender {
+    #[inline(always)]
+    async fn send_handshake_response(&mut self, response: schema::HandshakeResponse) {
         self.tx
-            .try_send(bytes)
+            .send(response.encode())
+            .await
             .expect("failed to send bytes over the mock connection")
     }
-}
 
-impl TransportSender for MockTransportSender {
-    async fn send_handshake_response(&mut self, response: schema::HandshakeResponse) {
-        self.send_inner(response.encode()).await;
-    }
-
+    #[inline(always)]
     async fn send(&mut self, frame: schema::ResponseFrame) {
-        self.send_inner(frame.encode()).await;
+        self.tx
+            .send(frame.encode())
+            .await
+            .expect("failed to send bytes over the mock connection")
     }
 
+    #[inline(always)]
     async fn start_write(&mut self, len: usize) {
         debug_assert!(self.buffer.is_empty());
         self.buffer.reserve(len);
         self.current_write = len;
     }
 
+    #[inline(always)]
     async fn write(&mut self, buf: Bytes) -> anyhow::Result<usize> {
         let len = buf.len();
         debug_assert!(len <= self.current_write);
@@ -157,6 +159,7 @@ pub struct MockTransportReceiver {
 }
 
 impl TransportReceiver for MockTransportReceiver {
+    #[inline(always)]
     async fn recv(&mut self) -> Option<schema::RequestFrame> {
         let bytes = self.rx.recv().await.ok()?;
         Some(schema::RequestFrame::decode(&bytes).expect("failed to decode request frame"))

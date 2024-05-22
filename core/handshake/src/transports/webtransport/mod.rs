@@ -81,7 +81,7 @@ impl Transport for WebTransport {
     }
 
     async fn accept(&mut self) -> Option<(HandshakeRequestFrame, Self::Sender, Self::Receiver)> {
-        let (frame, (frame_writer, frame_reader)) = self.conn_rx.recv().await?;
+        let (frame, (writer, frame_reader)) = self.conn_rx.recv().await?;
 
         increment_counter!(
             "handshake_webtransport_sessions",
@@ -91,7 +91,7 @@ impl Transport for WebTransport {
         Some((
             frame,
             WebTransportSender {
-                writer: frame_writer,
+                writer,
                 current_write: 0,
             },
             WebTransportReceiver { rx: frame_reader },
@@ -114,10 +114,12 @@ impl WebTransportSender {
 }
 
 impl TransportSender for WebTransportSender {
+    #[inline(always)]
     async fn send_handshake_response(&mut self, response: HandshakeResponse) {
         self.send_inner(&delimit_frame(response.encode())).await;
     }
 
+    #[inline(always)]
     async fn send(&mut self, frame: ResponseFrame) {
         debug_assert!(
             !matches!(
@@ -130,6 +132,7 @@ impl TransportSender for WebTransportSender {
         self.send_inner(&delimit_frame(frame.encode())).await;
     }
 
+    #[inline(always)]
     async fn start_write(&mut self, len: usize) {
         let len = len as u32;
         debug_assert!(
@@ -147,6 +150,7 @@ impl TransportSender for WebTransportSender {
         self.send_inner(&buffer).await;
     }
 
+    #[inline(always)]
     async fn write(&mut self, buf: Bytes) -> anyhow::Result<usize> {
         let len = u32::try_from(buf.len())?;
         debug_assert!(self.current_write != 0);
@@ -163,6 +167,7 @@ pub struct WebTransportReceiver {
 }
 
 impl TransportReceiver for WebTransportReceiver {
+    #[inline(always)]
     async fn recv(&mut self) -> Option<RequestFrame> {
         let data = match self.rx.next().await? {
             Ok(data) => data,

@@ -144,10 +144,12 @@ impl WebRtcSender {
 }
 
 impl TransportSender for WebRtcSender {
+    #[inline(always)]
     async fn send_handshake_response(&mut self, frame: schema::HandshakeResponse) {
         self.send_inner(&frame.encode());
     }
 
+    #[inline(always)]
     async fn send(&mut self, frame: schema::ResponseFrame) {
         debug_assert!(
             !matches!(
@@ -162,6 +164,7 @@ impl TransportSender for WebRtcSender {
         self.send_inner(&frame.encode());
     }
 
+    #[inline(always)]
     async fn start_write(&mut self, len: usize) {
         debug_assert!(
             self.current_write == 0,
@@ -171,6 +174,7 @@ impl TransportSender for WebRtcSender {
     }
 
     // TODO: consider buffering up to the max payload size to send less chunks/extra bytes
+    #[inline(always)]
     async fn write(&mut self, mut buf: Bytes) -> anyhow::Result<usize> {
         debug_assert!(self.current_write >= buf.len());
 
