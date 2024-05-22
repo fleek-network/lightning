@@ -51,8 +51,14 @@ impl SocketLogger {
         }
 
         let mut record = Record::from(record);
-        let pid = std::process::id();
-        record.metadata.target.push_str(format!("[{pid}]").as_str());
+        let mut id = String::new();
+        if let Some(name) = std::thread::current().name() {
+            id.push_str(format!("[{name}]").as_str());
+        } else {
+            let pid = std::process::id();
+            id.push_str(format!("[{pid}]").as_str());
+        }
+        record.metadata.target.push_str(id.as_str());
 
         match bincode::serialize(&record) {
             Ok(data) => {
