@@ -127,7 +127,7 @@ impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
             1001 => {
                 crate::test_services::io_stress::main();
             },
-            _ => eprintln!("Service {id} not found."),
+            _ => error!("Service {id} not found."),
         }
     }
 }
