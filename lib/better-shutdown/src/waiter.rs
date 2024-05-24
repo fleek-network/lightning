@@ -138,6 +138,15 @@ impl ShutdownWaiter {
     {
         self.fold_until_shutdown((), |_| task()).await
     }
+
+    /// Trigger the shutdown for all other waiters. This should be used with care and only used in
+    /// situations where a crucial process with a waiter has an unrecoverable error and needs to
+    /// alert other waiters
+    #[doc(hidden)]
+    pub fn trigger_shutdown(&self) {
+        tracing::info!("Sending the shutdown signal from a permit.");
+        self.inner.trigger_shutdown()
+    }
 }
 
 impl From<ShutdownWaiter> for OwnedShutdownSignal {
