@@ -11370,7 +11370,6 @@ dependencies = [
  "bincode",
  "log",
  "serde",
- "simplelog",
  "tokio",
  "tui-logger",
 ]

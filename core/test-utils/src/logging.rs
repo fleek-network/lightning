@@ -9,7 +9,6 @@ use simplelog::{
     ColorChoice,
     CombinedLogger,
     ConfigBuilder,
-    SharedLogger,
     TermLogger,
     TerminalMode,
     ThreadLogMode,
@@ -17,6 +16,7 @@ use simplelog::{
     WriteLogger,
 };
 use socket_logger::SocketLogger;
+use tracing::log;
 use tracing::log::LevelFilter;
 
 pub fn setup() {
@@ -34,7 +34,7 @@ pub fn setup() {
         Err(_) => Some(LevelFilter::Off),
     };
 
-    let shared: Vec<Box<dyn SharedLogger>> = match log_filter {
+    match log_filter {
         None => {
             let path = ResolvedPathBuf::try_from("~/.lightning/socket-logger/ctrl").unwrap();
             let socket = UnixStream::connect(path).unwrap();
@@ -43,11 +43,12 @@ pub fn setup() {
                 .ignore("anemo")
                 .allow("lightning")
                 .build();
-            vec![Box::new(SocketLogger::new(
+            log::set_max_level(LevelFilter::Trace);
+            let _ = log::set_boxed_logger(Box::new(SocketLogger::new(
                 config,
                 LevelFilter::Trace,
                 socket,
-            ))]
+            )));
         },
         Some(log_filter) => {
             let config = ConfigBuilder::new()
@@ -66,7 +67,9 @@ pub fn setup() {
                 "lightning-test-epoch-change-committee-{}.log",
                 date.format("%Y-%m-%d-%H:%M:%S")
             ));
-            vec![
+            // We swollow the result here because another e2e test might have already initialized
+            // the logger.
+            let _ = CombinedLogger::init(vec![
                 TermLogger::new(
                     log_filter,
                     config.clone(),
@@ -74,11 +77,7 @@ pub fn setup() {
                     ColorChoice::Auto,
                 ),
                 WriteLogger::new(LevelFilter::Trace, config, File::create(log_file).unwrap()),
-            ]
+            ]);
         },
     };
-
-    // We swollow the result here because another e2e test might have already initialized the
-    // logger.
-    let _ = CombinedLogger::init(shared);
 }

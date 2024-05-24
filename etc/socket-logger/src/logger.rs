@@ -2,8 +2,7 @@ use std::io::Write;
 use std::os::unix::net::UnixStream;
 use std::sync::Mutex;
 
-use log::{error, Log, Metadata};
-use simplelog::{LevelFilter, SharedLogger};
+use log::{error, LevelFilter, Log, Metadata};
 
 use crate::config::Config;
 use crate::schema::Record;
@@ -12,7 +11,6 @@ pub struct SocketLogger {
     config: Config,
     level: LevelFilter,
     socket: Mutex<UnixStream>,
-    simple_config: simplelog::Config,
 }
 
 impl SocketLogger {
@@ -21,7 +19,6 @@ impl SocketLogger {
             config: config,
             level,
             socket: Mutex::new(socket),
-            simple_config: simplelog::Config::default(),
         }
     }
 
@@ -93,19 +90,5 @@ impl Log for SocketLogger {
 
     fn flush(&self) {
         let _ = self.socket.lock().unwrap().flush();
-    }
-}
-
-impl SharedLogger for SocketLogger {
-    fn level(&self) -> LevelFilter {
-        self.level
-    }
-
-    fn config(&self) -> Option<&simplelog::Config> {
-        Some(&self.simple_config)
-    }
-
-    fn as_log(self: Box<Self>) -> Box<dyn Log> {
-        Box::new(self)
     }
 }

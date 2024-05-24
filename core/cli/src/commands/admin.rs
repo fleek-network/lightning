@@ -48,15 +48,18 @@ pub struct TuiCmd {
         default_value_t = 4.0
     )]
     pub frame_rate: f64,
+
+    #[arg(
+        short,
+        long,
+        value_name = "INTEGER",
+        help = "Size of the logger's buffer. New incoming log records are dropped when the buffer is full",
+        default_value_t = 50000
+    )]
+    pub logger_buffer: usize,
 }
 
 pub async fn exec(cmd: AdminSubCmd) -> Result<()> {
-    #[cfg(feature = "tui-dev")]
-    {
-        let _ = tui_logger::init_logger(LevelFilter::Trace);
-        tui_logger::set_default_level(LevelFilter::Trace);
-    }
-
     let config = PathConfig::default();
 
     if !Path::new(config.tmp_dir.as_path()).try_exists()? {
@@ -92,6 +95,14 @@ pub async fn exec(cmd: AdminSubCmd) -> Result<()> {
 }
 
 pub async fn tui(cmd: TuiCmd) -> Result<()> {
+    #[cfg(feature = "tui-dev")]
+    {
+        let _ = tui_logger::init_logger(LevelFilter::Trace);
+        tui_logger::set_default_level(LevelFilter::Trace);
+        tui_logger::set_hot_buffer_depth(cmd.logger_buffer);
+        tui_logger::move_events();
+    }
+
     let mut app = App::new(
         cmd.tick_rate,
         cmd.frame_rate,
