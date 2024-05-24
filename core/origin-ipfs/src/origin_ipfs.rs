@@ -156,11 +156,7 @@ impl<C: Collection> IPFSOrigin<C> {
     pub async fn fetch(&self, uri: &[u8]) -> Result<Blake3Hash> {
         let requested_cid = Cid::try_from(uri).with_context(|| "Failed to parse uri into cid")?;
         for gateway in self.gateways.iter() {
-            let url = Uri::builder()
-                .scheme(gateway.protocol.as_str())
-                .authority(gateway.authority.as_str())
-                .path_and_query(format!("/ipfs/{requested_cid}"))
-                .build()?;
+            let url: Uri = gateway.build_request(requested_cid).parse()?;
 
             let req = Request::builder()
                 .uri(url)

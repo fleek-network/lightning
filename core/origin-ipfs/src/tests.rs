@@ -18,7 +18,7 @@ use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_test_utils::server::spawn_server;
 
-use crate::config::{Config, Gateway, Protocol};
+use crate::config::{Config, Gateway, Protocol, RequestFormat};
 use crate::IPFSOrigin;
 
 partial!(TestBinding {
@@ -170,6 +170,7 @@ async fn test_origin_dag_pb() {
         config.gateways = vec![Gateway {
             protocol: Protocol::Http,
             authority: "127.0.0.1:30100".to_string(),
+            request_format: RequestFormat::CidLast,
         }];
         let ipfs_origin =
             IPFSOrigin::<TestBinding>::new(config, state.blockstore().clone()).unwrap();
@@ -210,6 +211,7 @@ async fn test_origin_bbb_dag_pb() {
         config.gateways = vec![Gateway {
             protocol: Protocol::Http,
             authority: "127.0.0.1:30200".to_string(),
+            request_format: RequestFormat::CidLast,
         }];
         let ipfs_origin =
             IPFSOrigin::<TestBinding>::new(config, state.blockstore().clone()).unwrap();
@@ -250,6 +252,7 @@ async fn test_origin_raw() {
         config.gateways = vec![Gateway {
             protocol: Protocol::Http,
             authority: "127.0.0.1:30201".to_string(),
+            request_format: RequestFormat::CidLast,
         }];
         let ipfs_origin =
             IPFSOrigin::<TestBinding>::new(config, state.blockstore().clone()).unwrap();
@@ -290,6 +293,7 @@ async fn test_origin_bbb_dag_pb_and_raw() {
         config.gateways = vec![Gateway {
             protocol: Protocol::Http,
             authority: "127.0.0.1:30202".to_string(),
+            request_format: RequestFormat::CidLast,
         }];
         let ipfs_origin =
             IPFSOrigin::<TestBinding>::new(config, state.blockstore().clone()).unwrap();

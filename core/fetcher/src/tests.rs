@@ -21,7 +21,7 @@ use lightning_interfaces::types::{
 };
 use lightning_notifier::Notifier;
 use lightning_origin_demuxer::{Config as DemuxerOriginConfig, OriginDemuxer};
-use lightning_origin_ipfs::config::{Gateway, Protocol};
+use lightning_origin_ipfs::config::{Gateway, Protocol, RequestFormat};
 use lightning_origin_ipfs::Config as IPFSOriginConfig;
 use lightning_pool::{Config as PoolConfig, PoolProvider};
 use lightning_rep_collector::aggregator::ReputationAggregator;
@@ -142,6 +142,7 @@ async fn get_fetchers(
                                         "127.0.0.1:{}",
                                         gateway_port_offset + i as u16
                                     ),
+                                    request_format: RequestFormat::CidLast,
                                 }],
                                 gateway_timeout: Duration::from_millis(5000),
                             },
