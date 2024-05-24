@@ -313,36 +313,41 @@ impl<C: Collection> Consensus<C> {
             .take()
             .expect("Consensus was tried to start before initialization");
 
-        task::spawn(async move {
-            let edge_node = epoch_state.spawn_edge_consensus(reconfigure_notify.clone());
-            epoch_state.start_current_epoch().await;
+        let panic_waiter = waiter.clone();
+        spawn!(
+            async move {
+                let edge_node = epoch_state.spawn_edge_consensus(reconfigure_notify.clone());
+                epoch_state.start_current_epoch().await;
 
-            let shutdown_future = waiter.wait_for_shutdown();
-            pin!(shutdown_future);
+                let shutdown_future = waiter.wait_for_shutdown();
+                pin!(shutdown_future);
 
-            loop {
-                let reconfigure_future = reconfigure_notify.notified();
+                loop {
+                    let reconfigure_future = reconfigure_notify.notified();
 
-                select! {
-                    biased;
-                    _ = &mut shutdown_future => {
-                        if let Some(consensus) = epoch_state.consensus.take() {
-                            consensus.shutdown().await;
+                    select! {
+                        biased;
+                        _ = &mut shutdown_future => {
+                            if let Some(consensus) = epoch_state.consensus.take() {
+                                consensus.shutdown().await;
+                            }
+                            edge_node.shutdown().await;
+                            epoch_state.shutdown();
+                            break
                         }
-                        edge_node.shutdown().await;
-                        epoch_state.shutdown();
-                        break
-                    }
-                    _ = reconfigure_future => {
-                        epoch_state.move_to_next_epoch().await;
-                        continue
+                        _ = reconfigure_future => {
+                            epoch_state.move_to_next_epoch().await;
+                            continue
+                        }
                     }
                 }
-            }
 
-            // Notify the epoch state that it is time to shutdown.
-            shutdown_notify_epoch_state.notify_waiters();
-        });
+                // Notify the epoch state that it is time to shutdown.
+                shutdown_notify_epoch_state.notify_waiters();
+            },
+            "CONSENSUS",
+            crucial(panic_waiter)
+        );
     }
 }
 

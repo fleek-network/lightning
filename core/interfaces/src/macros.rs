@@ -132,8 +132,30 @@ macro_rules! partial {
     };
 }
 
+/// A macro to spawn tokio tasks in the binary
+/// takes the future you want to spawn as the first argument, a name for the tasks as the second
+/// argument  If the task being spawned is crucial to the binary pass a shutdown waiter to it as an
+/// optional third argument to ensure the node shutdowns if it panics
+#[macro_export]
+macro_rules! spawn {
+    ($future:expr, $name:expr, crucial($waiter:expr)) => {
+        tokio::task::Builder::new().name(concat!($name,"#WAITER")).spawn(async move{
+            let handle = tokio::task::Builder::new().name($name).spawn($future).expect("Tokio task created outside of tokio runtime");
+
+            if let Err(e) = handle.await {
+                tracing::error!("Crucial task:{} had a panic: {:?} \n Signaling to shutdown the rest of the node",$name, e);
+                $crate::ShutdownWaiter::trigger_shutdown(&$waiter);
+            }
+        }).expect("Tokio task created outside of tokio runtime")
+    };
+    ($future:expr, $name:expr) => {
+        tokio::task::Builder::new().name($name).spawn($future).expect("Tokio task created outside of tokio runtime");
+    };
+}
+
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
     partial!(BlanketCollection {});
 
     // This test only has to be compiled in order to be considered passing.
@@ -141,5 +163,38 @@ mod tests {
     fn test_partial_no_missing_member() {
         fn expect_collection<C: crate::Collection>() {}
         expect_collection::<BlanketCollection>();
+    }
+
+    #[test]
+    fn test_spawn_macro_panic_shutdown() {
+        // Ensure that a spawned task using our macro signals a shutdown when it panics
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                let shutdown_controller = crate::ShutdownController::new(false);
+                let waiter = shutdown_controller.waiter();
+                let panic_waiter = shutdown_controller.waiter();
+
+                // Spawn a thread using the spawn macro that panics after 20ms
+                spawn!(
+                    async move {
+                        tokio::time::sleep(Duration::from_millis(20)).await;
+                        panic!();
+                    },
+                    "TEST",
+                    crucial(panic_waiter)
+                );
+
+                // If the thread that panics doesnt trigger a shutdown afer it panics, fail the test
+                if let Err(e) =
+                    tokio::time::timeout(Duration::from_millis(100), waiter.wait_for_shutdown())
+                        .await
+                {
+                    println!("{e}");
+                    panic!("Failed to signal a shutdown when spawn thread panicked");
+                }
+            });
     }
 }
