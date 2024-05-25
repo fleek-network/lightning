@@ -193,6 +193,8 @@ impl App {
     pub async fn run(&mut self) -> Result<()> {
         debug!(target: "Main Tui App", "Running!");
 
+        let (action_tx, mut action_rx) = mpsc::unbounded_channel();
+
         #[cfg(feature = "logger")]
         {
             if !SOCKET_LOGGER_FOLDER.as_path().try_exists()? {
@@ -202,16 +204,15 @@ impl App {
             let mut bind_path = SOCKET_LOGGER_FOLDER.to_path_buf();
             bind_path.push("ctrl");
             let _ = tokio::fs::remove_file(bind_path.as_path()).await;
-            let socket = UnixListener::bind(bind_path).unwrap();
+            let listener = UnixListener::bind(bind_path)?;
 
+            let action_tx_clone = action_tx.clone();
             tokio::spawn(async move {
-                if let Err(e) = Listener::new(socket).run().await {
-                    log::error!("error: {e:?}");
+                if let Err(e) = Listener::new(listener).run().await {
+                    let _ = action_tx_clone.send(Action::Error(e.to_string()));
                 }
             });
         }
-
-        let (action_tx, mut action_rx) = mpsc::unbounded_channel();
 
         let mut tui = tui::Tui::new()?
             .tick_rate(self.tick_rate)
