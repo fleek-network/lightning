@@ -534,9 +534,14 @@ impl<C: Collection> Context<LightningBackend<C>> {
     where
         Self: Send,
     {
-        tokio::spawn(async move {
-            self.run(waiter).await;
-        });
+        let panic_waiter = waiter.clone();
+        spawn!(
+            async move {
+                self.run(waiter).await;
+            },
+            "BROADCAST",
+            crucial(panic_waiter)
+        );
     }
 }
 
