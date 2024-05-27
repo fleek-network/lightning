@@ -91,7 +91,7 @@ pub async fn exec(cmd: AdminSubCmd) -> Result<()> {
 
     match cmd {
         AdminSubCmd::Tui(cmd) => tui(cmd).await,
-        #[cfg(feature = "ebpf")]
+        #[cfg(target_os = "linux")]
         AdminSubCmd::Ebpf(cmd) => ebpf::exec(cmd),
     }
 }
