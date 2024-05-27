@@ -11,9 +11,9 @@ use tracing::debug;
 #[cfg(feature = "tui-dev")]
 use tracing::log::LevelFilter;
 
-#[cfg(feature = "ebpf")]
+#[cfg(target_os = "linux")]
 use crate::commands::ebpf;
-#[cfg(feature = "ebpf")]
+#[cfg(target_os = "linux")]
 use crate::commands::ebpf::EbpfCmd;
 
 pub static BIND_PATH: OnceCell<ResolvedPathBuf> = OnceCell::new();
@@ -23,7 +23,7 @@ pub static PATH_CONFIG: OnceCell<PathConfig> = OnceCell::new();
 pub enum AdminSubCmd {
     /// Start the Admin TUI.
     Tui(TuiCmd),
-    #[cfg(feature = "ebpf")]
+    #[cfg(target_os = "linux")]
     #[clap(subcommand)]
     /// Start the eBPF Control Application.
     Ebpf(EbpfCmd),
@@ -74,6 +74,8 @@ pub async fn exec(cmd: AdminSubCmd) -> Result<()> {
         File::create(config.packet_filter.as_path())?;
     }
 
+    // Todo: maybe we could allow users to configure these values via CLI
+    // and remove these globals?
     PATH_CONFIG.set(config).expect("Not to be initialized yet");
     BIND_PATH
         .set(

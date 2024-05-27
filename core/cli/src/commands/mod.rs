@@ -1,6 +1,6 @@
 pub mod admin;
 pub mod dev;
-#[cfg(feature = "ebpf")]
+#[cfg(target_os = "linux")]
 pub mod ebpf;
 pub mod keys;
 pub mod opt;
