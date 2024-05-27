@@ -85,8 +85,10 @@ impl<C: Collection> BlockstoreServer<C> {
 
 impl<C: Collection> BuildGraph for BlockstoreServer<C> {
     fn build_graph() -> fdi::DependencyGraph {
-        fdi::DependencyGraph::default()
-            .with(Self::init.with_event_handler("start", Self::start.wrap_with_spawn()))
+        fdi::DependencyGraph::default().with(Self::init.with_event_handler(
+            "start",
+            Self::start.wrap_with_spawn_named("BLOCKSTORE-SERVER"),
+        ))
     }
 }
 
@@ -165,7 +167,7 @@ impl<C: Collection> BlockstoreServerInner<C> {
                                                     Some("Counter for number of blockstore requests handled by this node")
                                                 );
                                             },
-                                            "BLOCKSTORE-SERVER: HANDLE-REQUEST"
+                                            "BLOCKSTORE-SERVER: handle request"
                                         );
                                     } else {
                                         self.num_responses.fetch_sub(1, Ordering::Release);

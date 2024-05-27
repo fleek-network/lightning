@@ -64,8 +64,9 @@ impl<C: Collection> PingerInterface<C> for Pinger<C> {}
 
 impl<C: Collection> BuildGraph for Pinger<C> {
     fn build_graph() -> fdi::DependencyGraph {
-        fdi::DependencyGraph::new()
-            .with(Self::new.with_event_handler("start", Self::start.wrap_with_spawn()))
+        fdi::DependencyGraph::new().with(
+            Self::new.with_event_handler("start", Self::start.wrap_with_spawn_named("PINGER")),
+        )
     }
 }
 
@@ -203,12 +204,13 @@ impl<C: Collection> PingerInner<C> {
                         } else {
                             pending_req.insert((peer_index, id), Instant::now());
                             let tx = timeout_tx.clone();
-                            tokio::spawn(async move {
+                            spawn!(async move {
                                 tokio::time::sleep(TIMEOUT).await;
                                 // We ignore the sending error because it can happen that the
                                 // pinger is shutdown while there are still pending timeout tasks.
                                 let _ = tx.send((peer_index, id)).await;
-                            });
+                            },
+                            "PINGER: request timeout");
                         }
                     }
                 }

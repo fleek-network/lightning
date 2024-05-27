@@ -93,13 +93,19 @@ impl<C: Collection> Handshake<C> {
             if let Some(https) = this.config.https.clone() {
                 let https_router = router.clone();
                 let handle = run.handle.clone();
-                tokio::spawn(async move { spawn_https_server(https_router, https, handle).await });
+                spawn!(
+                    async move { spawn_https_server(https_router, https, handle).await },
+                    "HANDSHAKE: start optional http server"
+                );
             }
 
             // Start HTTP server.
             let waiter2 = waiter.clone();
             let http_addr = this.config.http_address;
-            tokio::spawn(async move { spawn_http_server(http_addr, router, waiter2).await });
+            spawn!(
+                async move { spawn_http_server(http_addr, router, waiter2).await },
+                "HANDSHAKE: start http server"
+            );
 
             // Shutdown the handle.
             waiter.wait_for_shutdown().await;
@@ -110,8 +116,9 @@ impl<C: Collection> Handshake<C> {
 
 impl<C: Collection> BuildGraph for Handshake<C> {
     fn build_graph() -> fdi::DependencyGraph {
-        fdi::DependencyGraph::new()
-            .with_infallible(Self::new.with_event_handler("start", Self::start.wrap_with_spawn()))
+        fdi::DependencyGraph::new().with_infallible(
+            Self::new.with_event_handler("start", Self::start.wrap_with_spawn_named("HANDSHAKE")),
+        )
     }
 }
 

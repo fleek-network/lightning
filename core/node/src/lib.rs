@@ -82,6 +82,7 @@ impl<C: Collection> ContainedNode<C> {
     pub fn spawn(&self) -> JoinHandle<Result<()>> {
         let provider = self.provider.clone();
 
+        let waiter = self.shutdown.waiter();
         self.runtime.as_ref().unwrap().spawn_blocking(move || {
             let graph = C::build_graph();
             let mut provider = provider.get_local_provider();
@@ -89,8 +90,10 @@ impl<C: Collection> ContainedNode<C> {
             // Set tokio as the spawner of fdi async works.
             provider
                 .get_mut::<fdi::Executor>()
-                .set_spawn_cb(|fut, _name| {
-                    tokio::spawn(fut);
+                .set_spawn_cb(move |fut, name| {
+                    let name = name.expect("Name must be provided");
+                    let waiter = waiter.clone();
+                    spawn!(fut, &name, crucial(waiter));
                 });
 
             // Init all of the components and dependencies.

@@ -152,7 +152,12 @@ impl<C: Collection> BuildGraph for MockConsensus<C> {
             .with_infallible(|config: fdi::Ref<C::ConfigProviderInterface>| {
                 MockConsensusGroup::new(config.get::<Self>())
             })
-            .with_infallible(Self::new.with_event_handler("start", Self::start.wrap_with_spawn()))
+            .with_infallible(
+                Self::new.with_event_handler(
+                    "start",
+                    Self::start.wrap_with_spawn_named("MOCK-CONSENSUS"),
+                ),
+            )
     }
 }
 

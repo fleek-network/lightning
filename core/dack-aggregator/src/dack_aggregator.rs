@@ -53,8 +53,10 @@ impl<C: Collection> DeliveryAcknowledgmentAggregator<C> {
 
 impl<C: Collection> BuildGraph for DeliveryAcknowledgmentAggregator<C> {
     fn build_graph() -> fdi::DependencyGraph {
-        fdi::DependencyGraph::default()
-            .with(Self::init.with_event_handler("start", Self::start.wrap_with_spawn()))
+        fdi::DependencyGraph::default().with(Self::init.with_event_handler(
+            "start",
+            Self::start.wrap_with_spawn_named("DACK_AGGREGATOR"),
+        ))
     }
 }
 
@@ -151,14 +153,15 @@ impl AggregatorInner {
                             metadata: metadata.remove(&service_id),
                         };
                         let submit_tx = self.submit_tx.clone();
-                        tokio::spawn(async move {
+                        spawn!(async move {
                             if let Err(e) = submit_tx
                                 .run(update)
                                 .await
                             {
                                 error!("Failed to submit DACK to signer: {e:?}");
                             }
-                        });
+                        },
+                        "DACK_AGGREGATOR: submit tx");
                     }
 
                     increment_counter_by!(
