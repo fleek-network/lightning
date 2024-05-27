@@ -1,6 +1,6 @@
-use std::cell::UnsafeCell;
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::Mutex;
 use std::task::{Poll, Waker};
 
 use triomphe::Arc;
@@ -15,7 +15,7 @@ struct RequestFutureState {
 }
 
 #[derive(Clone, Default)]
-struct StateContainer(Arc<UnsafeCell<RequestFutureState>>);
+struct StateContainer(Arc<Mutex<RequestFutureState>>);
 
 impl StateContainer {
     #[inline(always)]
@@ -26,11 +26,6 @@ impl StateContainer {
     #[inline(always)]
     pub fn from_raw(raw: RequestCtx) -> Self {
         unsafe { Self(Arc::from_raw(raw.0 as *const _)) }
-    }
-
-    #[inline(always)]
-    pub fn as_mut(&self) -> *mut RequestFutureState {
-        self.0.get()
     }
 }
 
@@ -46,7 +41,8 @@ impl Future for RequestFuture {
 
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         let self_ref = Pin::into_ref(self);
-        let state = unsafe { &mut *self_ref.state.as_mut() };
+        let mut state = self_ref.state.0.lock().expect("Poisoned future lock");
+
         if let Some(response) = state.response.take() {
             Poll::Ready(response)
         } else {
@@ -67,11 +63,11 @@ pub(crate) fn create_future() -> (RequestCtx, RequestFuture) {
 #[inline(always)]
 pub(crate) fn future_callback(ctx: RequestCtx, response: Response) {
     let state = StateContainer::from_raw(ctx);
-    let state_mut = unsafe { &mut *state.as_mut() };
-    assert!(!state_mut.responded_to, "already responded to future.");
-    state_mut.response = Some(response);
-    state_mut.responded_to = true;
-    if let Some(w) = state_mut.waker.take() {
+    let mut state = state.0.lock().expect("Poisoned future lock");
+    assert!(!state.responded_to, "already responded to future.");
+    state.response = Some(response);
+    state.responded_to = true;
+    if let Some(w) = state.waker.take() {
         w.wake();
     }
 }
