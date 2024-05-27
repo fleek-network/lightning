@@ -53,7 +53,17 @@ pub trait MethodExt<P>: Sized + Method<P> {
         Self: 'static + Method<P> + Sized,
         Self::Output: Future + Send + 'static,
     {
-        self.wrap_with(|fut| move |e: &Executor| e.spawn(fut))
+        self.wrap_with(|fut| move |e: &Executor| e.spawn(fut, None))
+    }
+
+    #[inline(always)]
+    fn wrap_with_spawn_named(self, name: impl Into<String>) -> impl Method<(), Output = ()>
+    where
+        Self: 'static + Method<P> + Sized,
+        Self::Output: Future + Send + 'static,
+    {
+        let name = name.into();
+        self.wrap_with(|fut| move |e: &Executor| e.spawn(fut, Some(name)))
     }
 }
 

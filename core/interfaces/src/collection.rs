@@ -54,7 +54,7 @@ impl<C: Collection> Node<C> {
 
     pub fn init_with_provider(mut provider: Provider) -> Result<Self> {
         let mut exec = provider.get_mut::<fdi::Executor>();
-        exec.set_spawn_cb(|fut| {
+        exec.set_spawn_cb(|fut, _name| {
             tokio::spawn(fut);
         });
 

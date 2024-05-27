@@ -87,9 +87,11 @@ impl<C: Collection> ContainedNode<C> {
             let mut provider = provider.get_local_provider();
 
             // Set tokio as the spawner of fdi async works.
-            provider.get_mut::<fdi::Executor>().set_spawn_cb(|fut| {
-                tokio::spawn(fut);
-            });
+            provider
+                .get_mut::<fdi::Executor>()
+                .set_spawn_cb(|fut, _name| {
+                    tokio::spawn(fut);
+                });
 
             // Init all of the components and dependencies.
             graph.init_all(&mut provider)?;
