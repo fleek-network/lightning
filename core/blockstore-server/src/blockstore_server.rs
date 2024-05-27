@@ -79,8 +79,7 @@ impl<C: Collection> BlockstoreServer<C> {
             .take()
             .expect("start should never be called twice");
         drop(this);
-        let panic_waiter = waiter.clone();
-        waiter.run_until_shutdown(inner.start(panic_waiter)).await;
+        waiter.run_until_shutdown(inner.start()).await;
     }
 }
 
@@ -126,7 +125,7 @@ impl<C: Collection> BlockstoreServerInner<C> {
         }
     }
 
-    pub async fn start(mut self, waiter: ShutdownWaiter) {
+    pub async fn start(mut self) {
         let mut pending_requests: HashMap<
             PeerRequest,
             broadcast::Sender<Result<(), PeerRequestError>>,
@@ -138,7 +137,6 @@ impl<C: Collection> BlockstoreServerInner<C> {
         tasks.spawn(futures::future::pending());
 
         loop {
-            let panic_waiter = waiter.clone();
             tokio::select! {
                 req = self.pool_responder.get_next_request() => {
                     match req {
@@ -167,8 +165,7 @@ impl<C: Collection> BlockstoreServerInner<C> {
                                                     Some("Counter for number of blockstore requests handled by this node")
                                                 );
                                             },
-                                            "BLOCKSTORE-SERVER: HANDLE-REQUEST",
-                                            crucial(panic_waiter)
+                                            "BLOCKSTORE-SERVER: HANDLE-REQUEST"
                                         );
                                     } else {
                                         self.num_responses.fetch_sub(1, Ordering::Release);
