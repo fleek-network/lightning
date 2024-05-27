@@ -58,6 +58,7 @@ impl<C: Collection> Context<C> {
                         pointer: lightning_interfaces::types::ImmutablePointer {
                             origin: match origin {
                                 0 => lightning_interfaces::types::OriginProvider::IPFS,
+                                1 => lightning_interfaces::types::OriginProvider::HTTP,
                                 _ => unreachable!(),
                             },
                             uri: Vec::from(&uri),

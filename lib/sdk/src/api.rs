@@ -6,6 +6,7 @@ use crate::ipc_types::{Request, StaticVec};
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Origin {
     IPFS,
+    HTTP,
 }
 
 /// Returns the balance of a client with the following public key.

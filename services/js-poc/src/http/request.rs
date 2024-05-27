@@ -17,6 +17,7 @@ pub fn extract(
     let origin = match segments.next()? {
         "blake3" => Origin::Blake3,
         "ipfs" => Origin::Ipfs,
+        "http" => Origin::Http,
         _ => Origin::Unknown,
     };
     let uri = segments.next()?.to_string();

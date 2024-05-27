@@ -129,13 +129,17 @@ async fn handle_request(
                 return Err(anyhow!("failed to fetch file"));
             }
         },
-        Origin::Ipfs => {
-            match fn_sdk::api::fetch_from_origin(
-                origin.into(),
-                Cid::try_from(uri).context("invalid ipfs cid")?.to_bytes(),
-            )
-            .await
-            {
+        Origin::Ipfs | Origin::Http => {
+            let uri = match origin {
+                Origin::Ipfs => Cid::try_from(uri).context("Invalid IPFS CID")?.to_bytes(),
+                Origin::Http => urlencoding::decode(&uri)
+                    .context("Invalid URL encoding")?
+                    .to_string()
+                    .into(),
+                _ => unreachable!(),
+            };
+
+            match fn_sdk::api::fetch_from_origin(origin.into(), uri).await {
                 Some(hash) => hash,
                 None => {
                     respond_with_error(connection, b"Failed to fetch from origin", 400).await?;

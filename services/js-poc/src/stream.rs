@@ -22,11 +22,12 @@ pub struct Request {
     pub param: Option<serde_json::Value>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Eq, PartialEq)]
 #[repr(u8)]
 pub enum Origin {
     Blake3,
     Ipfs,
+    Http,
     Unknown,
 }
 
@@ -35,6 +36,7 @@ impl From<Origin> for ApiOrigin {
     fn from(val: Origin) -> Self {
         match val {
             Origin::Ipfs => ApiOrigin::IPFS,
+            Origin::Http => ApiOrigin::HTTP,
             _ => unreachable!(),
         }
     }
