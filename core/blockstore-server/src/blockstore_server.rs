@@ -79,7 +79,8 @@ impl<C: Collection> BlockstoreServer<C> {
             .take()
             .expect("start should never be called twice");
         drop(this);
-        waiter.run_until_shutdown(inner.start()).await;
+        let panic_waiter = waiter.clone();
+        waiter.run_until_shutdown(inner.start(panic_waiter)).await;
     }
 }
 
@@ -125,7 +126,7 @@ impl<C: Collection> BlockstoreServerInner<C> {
         }
     }
 
-    pub async fn start(mut self) {
+    pub async fn start(mut self, waiter: ShutdownWaiter) {
         let mut pending_requests: HashMap<
             PeerRequest,
             broadcast::Sender<Result<(), PeerRequestError>>,
@@ -137,6 +138,7 @@ impl<C: Collection> BlockstoreServerInner<C> {
         tasks.spawn(futures::future::pending());
 
         loop {
+            let panic_waiter = waiter.clone();
             tokio::select! {
                 req = self.pool_responder.get_next_request() => {
                     match req {
@@ -149,21 +151,25 @@ impl<C: Collection> BlockstoreServerInner<C> {
                                         let blockstore = self.blockstore.clone();
                                         let num_responses = self.num_responses.clone();
                                         let rep_reporter = self.rep_reporter.clone();
-                                        tokio::spawn(async move {
-                                            handle_request::<C>(
-                                                req_header.peer,
-                                                request,
-                                                blockstore,
-                                                responder,
-                                                num_responses,
-                                                rep_reporter,
-                                            ).await;
+                                        spawn!(
+                                            async move {
+                                                handle_request::<C>(
+                                                    req_header.peer,
+                                                    request,
+                                                    blockstore,
+                                                    responder,
+                                                    num_responses,
+                                                    rep_reporter,
+                                                ).await;
 
-                                            increment_counter!(
-                                                "blockstore_server_handle_request",
-                                                Some("Counter for number of blockstore requests handled by this node")
-                                            );
-                                        });
+                                                increment_counter!(
+                                                    "blockstore_server_handle_request",
+                                                    Some("Counter for number of blockstore requests handled by this node")
+                                                );
+                                            },
+                                            "BLOCKSTORE-SERVER: HANDLE-REQUEST",
+                                            crucial(panic_waiter)
+                                        );
                                     } else {
                                         self.num_responses.fetch_sub(1, Ordering::Release);
                                         responder.reject(RejectReason::TooManyRequests);
