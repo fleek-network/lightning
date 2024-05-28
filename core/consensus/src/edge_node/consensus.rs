@@ -35,15 +35,18 @@ impl EdgeConsensus {
     ) -> Self {
         let shutdown_notify = Arc::new(Notify::new());
 
-        let handle = tokio::spawn(message_receiver_worker(
-            pub_sub,
-            shutdown_notify.clone(),
-            execution,
-            query_runner,
-            node_public_key,
-            rx_narwhal_batches,
-            reconfigure_notify,
-        ));
+        let handle = spawn!(
+            message_receiver_worker(
+                pub_sub,
+                shutdown_notify.clone(),
+                execution,
+                query_runner,
+                node_public_key,
+                rx_narwhal_batches,
+                reconfigure_notify,
+            ),
+            "CONSENSUS: message receiver worker"
+        );
 
         Self {
             handle,
@@ -371,10 +374,13 @@ fn set_parcel_timer(
     pending_timeouts: &mut HashSet<Digest>,
 ) {
     if !pending_timeouts.contains(&digest) && pending_timeouts.len() < MAX_PENDING_TIMEOUTS {
-        tokio::spawn(async move {
-            tokio::time::sleep(timeout).await;
-            let _ = timeout_tx.send(digest).await;
-        });
+        spawn!(
+            async move {
+                tokio::time::sleep(timeout).await;
+                let _ = timeout_tx.send(digest).await;
+            },
+            "CONSENSUS: parcel timer"
+        );
         pending_timeouts.insert(digest);
     }
 }
