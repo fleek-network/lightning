@@ -95,15 +95,18 @@ impl<C: Collection> PoolProvider<C, QuinnMuxer> {
 
         if let Some(http_server_address) = config.http {
             let shutdown = shutdown.clone();
-            tokio::spawn(async move {
-                http::spawn_http_server(
-                    http_server_address,
-                    shutdown.clone(),
-                    event_tx,
-                    endpoint_task_tx,
-                )
-                .await
-            });
+            spawn!(
+                async move {
+                    http::spawn_http_server(
+                        http_server_address,
+                        shutdown.clone(),
+                        event_tx,
+                        endpoint_task_tx,
+                    )
+                    .await
+                },
+                "POOL: spawn http server"
+            );
         }
 
         endpoint.spawn(shutdown.clone());
@@ -196,37 +199,43 @@ impl EventHandlerInterface for EventHandler {
     ) {
         let request_tx = self.request_tx.clone();
         let service_scope = self.service_scope;
-        tokio::spawn(async move {
-            if request_tx
-                .send(Event::Broadcast {
-                    service_scope,
-                    message,
-                    param: Param::Filter(Box::new(filter)),
-                })
-                .await
-                .is_err()
-            {
-                tracing::error!("failed to send to broadcast service");
-            }
-        });
+        spawn!(
+            async move {
+                if request_tx
+                    .send(Event::Broadcast {
+                        service_scope,
+                        message,
+                        param: Param::Filter(Box::new(filter)),
+                    })
+                    .await
+                    .is_err()
+                {
+                    tracing::error!("failed to send to broadcast service");
+                }
+            },
+            "POOL: send to all"
+        );
     }
 
     fn send_to_one(&self, index: NodeIndex, message: Bytes) {
         let request_tx = self.request_tx.clone();
         let service_scope = self.service_scope;
-        tokio::spawn(async move {
-            if request_tx
-                .send(Event::Broadcast {
-                    service_scope,
-                    message,
-                    param: Param::Index(index),
-                })
-                .await
-                .is_err()
-            {
-                tracing::error!("failed to send to broadcast service");
-            }
-        });
+        spawn!(
+            async move {
+                if request_tx
+                    .send(Event::Broadcast {
+                        service_scope,
+                        message,
+                        param: Param::Index(index),
+                    })
+                    .await
+                    .is_err()
+                {
+                    tracing::error!("failed to send to broadcast service");
+                }
+            },
+            "POOL: send to one"
+        );
     }
 
     // This method is cancel-safe.
@@ -351,10 +360,13 @@ impl RequestInterface for Request {
     fn reject(self, reason: RejectReason) {
         let mut us = self;
         let header: Vec<u8> = vec![Status::Failed(reason).into()];
-        tokio::spawn(async move {
-            let channel = us.channel.as_mut().expect("Channel taken on drop");
-            let _ = channel.send(header.into()).await;
-        });
+        spawn!(
+            async move {
+                let channel = us.channel.as_mut().expect("Channel taken on drop");
+                let _ = channel.send(header.into()).await;
+            },
+            "POOL: reject request"
+        );
     }
 
     async fn send(&mut self, frame: Bytes) -> io::Result<()> {
@@ -375,9 +387,12 @@ impl Drop for Request {
         // Close the channel gracefully.
         // This will close the underlying QUIC stream gracefully.
         let mut channel = self.channel.take().expect("Channel taken on drop");
-        tokio::spawn(async move {
-            let _ = channel.close().await;
-        });
+        spawn!(
+            async move {
+                let _ = channel.close().await;
+            },
+            "POOL: drop request"
+        );
     }
 }
 

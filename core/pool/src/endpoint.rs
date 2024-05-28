@@ -116,39 +116,42 @@ where
             entry.insert(cancel.clone());
             let index = info.index;
 
-            let handle = tokio::spawn(async move {
-                if let Some(delay) = delay {
-                    tokio::select! {
-                        biased;
-                    _ = cancel.cancelled() => return AsyncTaskResult::ConnectionFailed {
-                            remote: Some(index),
-                            error: anyhow::anyhow!("dial was cancelled")
-                    },
-                    _ = tokio::time::sleep(delay) => (),
+            let handle = spawn!(
+                async move {
+                    if let Some(delay) = delay {
+                        tokio::select! {
+                            biased;
+                        _ = cancel.cancelled() => return AsyncTaskResult::ConnectionFailed {
+                                remote: Some(index),
+                                error: anyhow::anyhow!("dial was cancelled")
+                        },
+                        _ = tokio::time::sleep(delay) => (),
+                        }
                     }
-                }
 
-                let connect = || async { muxer.connect(info, "lightning-node").await?.await };
-                let connection = tokio::select! {
-                    biased;
-                    _ = cancel.cancelled() => return AsyncTaskResult::ConnectionFailed {
+                    let connect = || async { muxer.connect(info, "lightning-node").await?.await };
+                    let connection = tokio::select! {
+                        biased;
+                        _ = cancel.cancelled() => return AsyncTaskResult::ConnectionFailed {
+                                remote: Some(index),
+                                error: anyhow::anyhow!("dial was cancelled")
+                        },
+                        connection = connect() => connection,
+                    };
+
+                    match connection {
+                        Ok(conn) => AsyncTaskResult::ConnectionSuccess {
+                            incoming: false,
+                            conn,
+                        },
+                        Err(e) => AsyncTaskResult::ConnectionFailed {
                             remote: Some(index),
-                            error: anyhow::anyhow!("dial was cancelled")
-                    },
-                    connection = connect() => connection,
-                };
-
-                match connection {
-                    Ok(conn) => AsyncTaskResult::ConnectionSuccess {
-                        incoming: false,
-                        conn,
-                    },
-                    Err(e) => AsyncTaskResult::ConnectionFailed {
-                        remote: Some(index),
-                        error: e.into(),
-                    },
-                }
-            });
+                            error: e.into(),
+                        },
+                    }
+                },
+                "POOL: enqueue dial task"
+            );
 
             self.update_dial_info(node_index, delay);
 
@@ -301,10 +304,13 @@ where
 
     #[inline]
     pub fn schedule_timeout(&mut self) {
-        self.ongoing_async_tasks.push(tokio::spawn(async move {
-            tokio::time::sleep(CONN_GRACE_PERIOD).await;
-            AsyncTaskResult::Timeout
-        }));
+        self.ongoing_async_tasks.push(spawn!(
+            async move {
+                tokio::time::sleep(CONN_GRACE_PERIOD).await;
+                AsyncTaskResult::Timeout
+            },
+            "POOL: schedule timeout"
+        ));
     }
 
     fn handle_update(
@@ -409,15 +415,18 @@ where
         let (request_tx, request_rx) = mpsc::channel(1024);
         let connection_id = connection.connection_id();
         let ctx = Context::new(connection, remote, request_rx, self.event_queue.clone());
-        self.ongoing_async_tasks.push(tokio::spawn(async move {
-            if let Err(e) = connection::connection_loop(ctx).await {
-                tracing::info!("task for connection with {remote:?} exited with error: {e:?}");
-            }
-            AsyncTaskResult::ConnectionFinished {
-                remote,
-                connection_id,
-            }
-        }));
+        self.ongoing_async_tasks.push(spawn!(
+            async move {
+                if let Err(e) = connection::connection_loop(ctx).await {
+                    tracing::info!("task for connection with {remote:?} exited with error: {e:?}");
+                }
+                AsyncTaskResult::ConnectionFinished {
+                    remote,
+                    connection_id,
+                }
+            },
+            "POOL: spawn connection task"
+        ));
 
         request_tx
     }
@@ -526,22 +535,26 @@ where
     where
         F: Future<Output = AsyncTaskResult<M::Connection>> + Send + 'static,
     {
-        self.ongoing_async_tasks.push(tokio::spawn(fut));
+        self.ongoing_async_tasks
+            .push(spawn!(fut, "POOL: spawn task"));
     }
 
     fn handle_accept(&mut self, connecting: M::Connecting) {
-        self.ongoing_async_tasks.push(tokio::spawn(async move {
-            match connecting.await {
-                Ok(conn) => AsyncTaskResult::ConnectionSuccess {
-                    incoming: true,
-                    conn,
-                },
-                Err(e) => AsyncTaskResult::ConnectionFailed {
-                    remote: None,
-                    error: e.into(),
-                },
-            }
-        }));
+        self.ongoing_async_tasks.push(spawn!(
+            async move {
+                match connecting.await {
+                    Ok(conn) => AsyncTaskResult::ConnectionSuccess {
+                        incoming: true,
+                        conn,
+                    },
+                    Err(e) => AsyncTaskResult::ConnectionFailed {
+                        remote: None,
+                        error: e.into(),
+                    },
+                }
+            },
+            "POOL: handle accept"
+        ));
     }
 
     fn handle_stats_request(&mut self, respond: oneshot::Sender<EndpointInfo>) {
@@ -558,62 +571,65 @@ where
 
         let ongoing_async_tasks = self.ongoing_async_tasks.len();
 
-        self.ongoing_async_tasks.push(tokio::spawn(async move {
-            let mut result = HashMap::new();
-            for (peer, handle) in connections {
-                let request_queue_cap = handle.capacity();
-                let request_queue_max_cap = handle.max_capacity();
-                let (tx, rx) = oneshot::channel();
-                if handle
-                    .send(connection::Request::Stats { respond: tx })
-                    .await
-                    .is_err()
-                {
-                    continue;
+        self.ongoing_async_tasks.push(spawn!(
+            async move {
+                let mut result = HashMap::new();
+                for (peer, handle) in connections {
+                    let request_queue_cap = handle.capacity();
+                    let request_queue_max_cap = handle.max_capacity();
+                    let (tx, rx) = oneshot::channel();
+                    if handle
+                        .send(connection::Request::Stats { respond: tx })
+                        .await
+                        .is_err()
+                    {
+                        continue;
+                    }
+                    if let Ok(stats) = rx.await {
+                        result.insert(
+                            peer,
+                            vec![TransportConnectionInfo {
+                                request_queue_cap,
+                                request_queue_max_cap,
+                                redundant: false,
+                                stats,
+                            }],
+                        );
+                    }
                 }
-                if let Ok(stats) = rx.await {
-                    result.insert(
-                        peer,
-                        vec![TransportConnectionInfo {
-                            request_queue_cap,
-                            request_queue_max_cap,
-                            redundant: false,
-                            stats,
-                        }],
-                    );
-                }
-            }
 
-            for (peer, handle) in redundant_connections {
-                let request_queue_cap = handle.capacity();
-                let request_queue_max_cap = handle.max_capacity();
-                let (tx, rx) = oneshot::channel();
-                if handle
-                    .send(connection::Request::Stats { respond: tx })
-                    .await
-                    .is_err()
-                {
-                    continue;
+                for (peer, handle) in redundant_connections {
+                    let request_queue_cap = handle.capacity();
+                    let request_queue_max_cap = handle.max_capacity();
+                    let (tx, rx) = oneshot::channel();
+                    if handle
+                        .send(connection::Request::Stats { respond: tx })
+                        .await
+                        .is_err()
+                    {
+                        continue;
+                    }
+                    if let Ok(stats) = rx.await {
+                        result
+                            .entry(peer)
+                            .or_default()
+                            .push(TransportConnectionInfo {
+                                request_queue_cap,
+                                request_queue_max_cap,
+                                redundant: true,
+                                stats,
+                            })
+                    }
                 }
-                if let Ok(stats) = rx.await {
-                    result
-                        .entry(peer)
-                        .or_default()
-                        .push(TransportConnectionInfo {
-                            request_queue_cap,
-                            request_queue_max_cap,
-                            redundant: true,
-                            stats,
-                        })
-                }
-            }
 
-            let _ = respond.send(EndpointInfo {
-                ongoing_async_tasks,
-                connections: result,
-            });
-            AsyncTaskResult::GenericTaskEnded
-        }));
+                let _ = respond.send(EndpointInfo {
+                    ongoing_async_tasks,
+                    connections: result,
+                });
+                AsyncTaskResult::GenericTaskEnded
+            },
+            "POOL: handle stats request"
+        ));
     }
 
     fn handle_task(&mut self, task: EndpointTask) -> anyhow::Result<()> {
@@ -744,51 +760,54 @@ where
     }
 
     pub fn spawn(mut self, shutdown: ShutdownWaiter) {
-        tokio::spawn(async move {
-            shutdown.run_until_shutdown(self.run()).await;
+        spawn!(
+            async move {
+                shutdown.run_until_shutdown(self.run()).await;
 
-            for (_, handle) in self.pool.iter() {
-                let _ = handle
-                    .service_request_tx
-                    .clone()
-                    .send(connection::Request::Close)
-                    .await;
-            }
+                for (_, handle) in self.pool.iter() {
+                    let _ = handle
+                        .service_request_tx
+                        .clone()
+                        .send(connection::Request::Close)
+                        .await;
+                }
 
-            for (_, handle) in self.redundant_pool.iter() {
-                let _ = handle
-                    .service_request_tx
-                    .clone()
-                    .send(connection::Request::Close)
-                    .await;
-            }
-            self.pending_task.clear();
-            self.connection_buffer.clear();
+                for (_, handle) in self.redundant_pool.iter() {
+                    let _ = handle
+                        .service_request_tx
+                        .clone()
+                        .send(connection::Request::Close)
+                        .await;
+                }
+                self.pending_task.clear();
+                self.connection_buffer.clear();
 
-            // Cancel pending connection dials before shutting down
-            let nodes: Vec<NodeIndex> = self.pending_dial.keys().copied().collect();
-            for node in &nodes {
-                self.cancel_dial(node);
-            }
+                // Cancel pending connection dials before shutting down
+                let nodes: Vec<NodeIndex> = self.pending_dial.keys().copied().collect();
+                for node in &nodes {
+                    self.cancel_dial(node);
+                }
 
-            // Todo: maybe pass a cancel token to connection loop to make this shutdown faster.
-            // Let's wait for connections to drop.
-            while let Ok(Some(_)) =
-                tokio::time::timeout(Duration::from_secs(5), self.ongoing_async_tasks.next()).await
-            {
-            }
+                // Todo: maybe pass a cancel token to connection loop to make this shutdown faster.
+                // Let's wait for connections to drop.
+                while let Ok(Some(_)) =
+                    tokio::time::timeout(Duration::from_secs(5), self.ongoing_async_tasks.next())
+                        .await
+                {}
 
-            for task in self.ongoing_async_tasks.iter() {
-                task.abort();
-            }
-            self.ongoing_async_tasks.clear();
+                for task in self.ongoing_async_tasks.iter() {
+                    task.abort();
+                }
+                self.ongoing_async_tasks.clear();
 
-            // We drop the muxer to unbind the address. If the spawn is called after shutdown
-            // has already happened the muxer might not be set yet.
-            if let Some(muxer) = self.muxer.take() {
-                muxer.close().await;
-            }
-        });
+                // We drop the muxer to unbind the address. If the spawn is called after shutdown
+                // has already happened the muxer might not be set yet.
+                if let Some(muxer) = self.muxer.take() {
+                    muxer.close().await;
+                }
+            },
+            "POOL: spawn"
+        );
     }
 }
 

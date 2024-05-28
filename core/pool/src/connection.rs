@@ -4,7 +4,7 @@ use anyhow::Result;
 use bytes::{Buf, Bytes};
 use futures::{SinkExt, StreamExt};
 use lightning_interfaces::types::NodeIndex;
-use lightning_interfaces::{RequestHeader, ServiceScope};
+use lightning_interfaces::{spawn, RequestHeader, ServiceScope};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot;
@@ -57,7 +57,7 @@ pub async fn connection_loop<C: ConnectionInterface>(mut ctx: Context<C>) -> Res
                 };
                 let connection_event_tx = ctx.connection_event_tx.clone();
                 let peer = ctx.peer;
-                tokio::spawn(async move {
+                spawn!(async move {
                     if let Err(e) =
                         handle_incoming_bi_stream::<C>(
                             peer,
@@ -69,7 +69,7 @@ pub async fn connection_loop<C: ConnectionInterface>(mut ctx: Context<C>) -> Res
                             "failed to handle incoming bi-stream with peer with index {peer}: {e:?}"
                         );
                     }
-                });
+                }, "POOL: handle incoming bi stream");
             }
             accept_result = connection.accept_uni_stream() => {
                 let stream_rx = match accept_result {
@@ -80,7 +80,7 @@ pub async fn connection_loop<C: ConnectionInterface>(mut ctx: Context<C>) -> Res
                 };
                 let connection_event_tx = ctx.connection_event_tx.clone();
                 let peer = ctx.peer;
-                tokio::spawn(async move {
+                spawn!(async move {
                     if let Err(e) =
                         handle_incoming_uni_stream::<C>(
                             peer,
@@ -92,7 +92,7 @@ pub async fn connection_loop<C: ConnectionInterface>(mut ctx: Context<C>) -> Res
                             "failed to handle incoming uni-stream from peer with index {peer}: {e:?}"
                         );
                     }
-                });
+                }, "POOL: handle incoming uni stream");
             }
             request = ctx.service_request_rx.recv() => {
                 match request {
@@ -101,20 +101,20 @@ pub async fn connection_loop<C: ConnectionInterface>(mut ctx: Context<C>) -> Res
                         // We need to create a new stream on the connection.
                         let connection = ctx.connection.clone();
                         let peer = ctx.peer;
-                        tokio::spawn(async move{
+                        spawn!(async move{
                             if let Err(e) = send_message(connection, message).await {
                                 tracing::error!(
                                     "failed to send message to peer with index {peer}: {e:?}"
                                 );
                             }
-                        });
+                        }, "POOL: send message");
                     },
                     Some(Request::SendReqResp { service, request, respond }) => {
                         tracing::trace!("handling new outgoing request");
                         // We need to create a new stream on the connection for the channel.
                         let connection = ctx.connection.clone();
                         let peer = ctx.peer;
-                        tokio::spawn(async move {
+                        spawn!(async move {
                             if let Err(e) = send_request(
                                 connection,
                                 service,
@@ -125,7 +125,7 @@ pub async fn connection_loop<C: ConnectionInterface>(mut ctx: Context<C>) -> Res
                                     "there was an error when sending request to {peer}: {e:?}"
                                 );
                             }
-                        });
+                        }, "POOL: send request");
                     }
                     Some(Request::Stats { respond }) => {
                         tracing::debug!("handling new stats request");

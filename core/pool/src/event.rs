@@ -175,7 +175,8 @@ where
         F: Future<Output = anyhow::Result<()>> + Send + 'static,
     {
         // Todo: add a limit.
-        self.ongoing_async_tasks.push(tokio::spawn(fut));
+        self.ongoing_async_tasks
+            .push(spawn!(fut, "POOL: spawn task"));
     }
 
     #[inline]
@@ -238,41 +239,46 @@ where
         let endpoint_queue_max_cap = self.endpoint_queue.max_capacity();
         let endpoint_queue = self.endpoint_queue.clone();
         let mut connection_info = self.handler.connections();
-        self.ongoing_async_tasks.push(tokio::spawn(async move {
-            let mut connections = HashMap::new();
+        self.ongoing_async_tasks.push(spawn!(
+            async move {
+                let mut connections = HashMap::new();
 
-            let (tx, rx) = oneshot::channel();
-            if endpoint_queue
-                .send(EndpointTask::Stats { respond: tx })
-                .await
-                .is_ok()
-            {
-                let (mut actual_connections, ongoing_async_tasks) = rx
+                let (tx, rx) = oneshot::channel();
+                if endpoint_queue
+                    .send(EndpointTask::Stats { respond: tx })
                     .await
-                    .map(|info| (info.connections, info.ongoing_async_tasks))
-                    .unwrap_or_default();
-                for (index, info) in connection_info.iter_mut() {
-                    let connection_info = ConnectionInfo {
-                        from_topology: info.from_topology,
-                        pinned: info.pinned,
-                        peer: Some(info.node_info.clone()),
-                        actual_connections: actual_connections.remove(index).unwrap_or_default(),
-                    };
-                    connections.insert(*index, connection_info);
+                    .is_ok()
+                {
+                    let (mut actual_connections, ongoing_async_tasks) = rx
+                        .await
+                        .map(|info| (info.connections, info.ongoing_async_tasks))
+                        .unwrap_or_default();
+                    for (index, info) in connection_info.iter_mut() {
+                        let connection_info = ConnectionInfo {
+                            from_topology: info.from_topology,
+                            pinned: info.pinned,
+                            peer: Some(info.node_info.clone()),
+                            actual_connections: actual_connections
+                                .remove(index)
+                                .unwrap_or_default(),
+                        };
+                        connections.insert(*index, connection_info);
+                    }
+
+                    let _ = respond.send(Ok(EventReceiverInfo {
+                        connections,
+                        endpoint_queue_cap,
+                        endpoint_queue_max_cap,
+                        ongoing_endpoint_async_tasks: ongoing_async_tasks,
+                    }));
+                } else {
+                    let _ = respond.send(Err(anyhow::anyhow!("failed to get stats")));
                 }
 
-                let _ = respond.send(Ok(EventReceiverInfo {
-                    connections,
-                    endpoint_queue_cap,
-                    endpoint_queue_max_cap,
-                    ongoing_endpoint_async_tasks: ongoing_async_tasks,
-                }));
-            } else {
-                let _ = respond.send(Err(anyhow::anyhow!("failed to get stats")));
-            }
-
-            Ok(())
-        }));
+                Ok(())
+            },
+            "POOL: get stats"
+        ));
     }
 
     #[inline]
@@ -402,16 +408,19 @@ where
     }
 
     pub fn spawn(mut self, shutdown: ShutdownWaiter) {
-        tokio::spawn(async move {
-            shutdown.run_until_shutdown(self.run()).await;
+        spawn!(
+            async move {
+                shutdown.run_until_shutdown(self.run()).await;
 
-            self.handler.clear_state();
-            for task in self.ongoing_async_tasks.iter() {
-                task.abort();
-            }
-            self.ongoing_async_tasks.clear();
-            while !matches!(self.event_queue.try_recv(), Err(TryRecvError::Empty)) {}
-        });
+                self.handler.clear_state();
+                for task in self.ongoing_async_tasks.iter() {
+                    task.abort();
+                }
+                self.ongoing_async_tasks.clear();
+                while !matches!(self.event_queue.try_recv(), Err(TryRecvError::Empty)) {}
+            },
+            "POOL: spawn"
+        );
     }
 
     pub async fn run(&mut self) {
