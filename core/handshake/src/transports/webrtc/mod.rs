@@ -84,7 +84,10 @@ impl Transport for WebRtcTransport {
 
         // Spawn the IO loop
         let notify = Arc::new(Notify::new());
-        tokio::spawn(driver.run(waiter, notify.clone()));
+        spawn!(
+            driver.run(waiter, notify.clone()),
+            "HANDSHAKE: webrtc io loop"
+        );
 
         // A bounded channel is used to provide some back pressure for incoming client handshakes.
         let (conn_tx, conn_rx) = channel(1024);

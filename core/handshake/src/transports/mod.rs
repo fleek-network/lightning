@@ -82,19 +82,22 @@ pub trait Transport: Sized + Send + Sync + 'static {
     where
         (Self::Sender, Self::Receiver): Into<TransportPair>,
     {
-        tokio::spawn(async move {
-            loop {
-                tokio::select! {
-                    res = self.accept() => match res {
-                        // Connection established with a handshake frame
-                        Some((req, tx, rx)) => ctx.handle_new_connection(req, tx, rx).await,
-                        // The transport listener has closed
-                        None => break,
-                    },
-                    _ = ctx.shutdown.wait_for_shutdown() => break,
+        spawn!(
+            async move {
+                loop {
+                    tokio::select! {
+                        res = self.accept() => match res {
+                            // Connection established with a handshake frame
+                            Some((req, tx, rx)) => ctx.handle_new_connection(req, tx, rx).await,
+                            // The transport listener has closed
+                            None => break,
+                        },
+                        _ = ctx.shutdown.wait_for_shutdown() => break,
+                    }
                 }
-            }
-        });
+            },
+            "HANDSHAKE: accept connections"
+        );
     }
 }
 

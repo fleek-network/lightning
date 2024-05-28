@@ -5,7 +5,7 @@ use arrayref::array_ref;
 use async_channel::Receiver;
 use bytes::BytesMut;
 use lightning_interfaces::schema::handshake::{ResponseFrame, TerminationReason};
-use lightning_interfaces::ExecutorProviderInterface;
+use lightning_interfaces::{spawn, ExecutorProviderInterface};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::UnixStream;
 
@@ -84,7 +84,7 @@ impl<P: ExecutorProviderInterface> Proxy<P> {
 
     #[inline(always)]
     pub fn spawn(self, start: Option<State>) {
-        tokio::spawn(self.run(start));
+        spawn!(self.run(start), "HANDSHAKE: proxy spawn");
     }
 
     #[inline(always)]
@@ -565,20 +565,23 @@ mod tests {
 
     impl MockServiceProvider {
         fn echo_service(mut stream: UnixStream) {
-            tokio::spawn(async move {
-                read_header(&mut stream)
-                    .await
-                    .expect("Could not read hello frame.");
+            spawn!(
+                async move {
+                    read_header(&mut stream)
+                        .await
+                        .expect("Could not read hello frame.");
 
-                let mut framed =
-                    Framed::new(stream, tokio_util::codec::LengthDelimitedCodec::new());
+                    let mut framed =
+                        Framed::new(stream, tokio_util::codec::LengthDelimitedCodec::new());
 
-                while let Some(Ok(bytes)) = framed.next().await {
-                    if framed.send(bytes.into()).await.is_err() {
-                        return;
+                    while let Some(Ok(bytes)) = framed.next().await {
+                        if framed.send(bytes.into()).await.is_err() {
+                            return;
+                        }
                     }
-                }
-            });
+                },
+                "HANDSHAKE: echo service"
+            );
         }
     }
 

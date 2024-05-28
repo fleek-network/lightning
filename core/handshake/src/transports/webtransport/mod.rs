@@ -70,7 +70,10 @@ impl Transport for WebTransport {
             transport_config: config,
             shutdown,
         };
-        tokio::spawn(connection::main_loop(ctx));
+        spawn!(
+            connection::main_loop(ctx),
+            "HANDSHAKE: webtransport main loop"
+        );
 
         Ok((
             Self {

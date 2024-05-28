@@ -4,7 +4,7 @@ use std::time::Duration;
 use anyhow::Result;
 use fleek_crypto::{NodeSecretKey, SecretKey};
 use futures::StreamExt;
-use lightning_interfaces::ShutdownWaiter;
+use lightning_interfaces::{spawn, ShutdownWaiter};
 use tokio::sync::mpsc::Sender;
 use tokio_util::codec::{FramedRead, LengthDelimitedCodec};
 use tracing::{error, info};
@@ -38,11 +38,11 @@ pub async fn main_loop(ctx: Context) {
         tokio::select! {
             incoming = ctx.endpoint.accept() => {
                 let accept_tx = ctx.accept_tx.clone();
-                tokio::spawn(async move  {
+                spawn!(async move  {
                     if let Err(e) = handle_incoming_session(incoming, accept_tx).await {
                         error!("failed to handle incoming WebTransport session: {e:?}");
                     }
-                });
+                }, "HANDSHAKE: handle incoming webtransport session");
             }
             _ = timer.tick() => {
                 match webtransport::create_cert_hash_and_server_config(
@@ -103,15 +103,18 @@ pub async fn handle_incoming_session(
             Some(Ok(bytes)) => match HandshakeRequestFrame::decode(&bytes) {
                 Ok(frame) => {
                     let accept_tx_clone = accept_tx.clone();
-                    tokio::spawn(async move {
-                        if accept_tx_clone
-                            .send((frame, (stream_tx, reader)))
-                            .await
-                            .is_err()
-                        {
-                            error!("failed to send new WebTransport bi-directional stream")
-                        }
-                    });
+                    spawn!(
+                        async move {
+                            if accept_tx_clone
+                                .send((frame, (stream_tx, reader)))
+                                .await
+                                .is_err()
+                            {
+                                error!("failed to send new WebTransport bi-directional stream")
+                            }
+                        },
+                        "HANDSHAKE: webtransport accept"
+                    );
                 },
                 Err(e) => {
                     error!("failed to decode frame: {e:?}");

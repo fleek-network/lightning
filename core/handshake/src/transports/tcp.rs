@@ -51,20 +51,23 @@ impl Transport for TcpTransport {
         let (tx, rx) = mpsc::channel(256);
 
         // Spawn the main loop accepting connections until shutdown
-        tokio::spawn(async move {
-            loop {
-                // Accept a new stream from the listener
-                tokio::select! {
-                    res = listener.accept() => {
-                        match res {
-                            Ok((stream, _)) => spawn_handshake_task(stream, tx.clone()),
-                            _ => break,
-                        }
-                    },
-                    _ = shutdown.wait_for_shutdown() => break,
+        spawn!(
+            async move {
+                loop {
+                    // Accept a new stream from the listener
+                    tokio::select! {
+                        res = listener.accept() => {
+                            match res {
+                                Ok((stream, _)) => spawn_handshake_task(stream, tx.clone()),
+                                _ => break,
+                            }
+                        },
+                        _ = shutdown.wait_for_shutdown() => break,
+                    }
                 }
-            }
-        });
+            },
+            "HANDSHAKE: tcp accept connections"
+        );
 
         Ok((Self { rx }, None))
     }
@@ -89,49 +92,52 @@ fn spawn_handshake_task(
     mut stream: TcpStream,
     tx: mpsc::Sender<(schema::HandshakeRequestFrame, TcpSender, TcpReceiver)>,
 ) {
-    tokio::spawn(async move {
-        let mut buf = BytesMut::with_capacity(4);
+    spawn!(
+        async move {
+            let mut buf = BytesMut::with_capacity(4);
 
-        // Read until we have enough for the length delimiter
-        while buf.len() < 4 {
-            match stream.read_buf(&mut buf).await {
-                Ok(0) => return,
-                Err(_) => return,
-                Ok(_) => {},
+            // Read until we have enough for the length delimiter
+            while buf.len() < 4 {
+                match stream.read_buf(&mut buf).await {
+                    Ok(0) => return,
+                    Err(_) => return,
+                    Ok(_) => {},
+                }
             }
-        }
 
-        // Parse the length delimiter
-        // TODO: Do better, there are only 3 different handshake request variants/sizes
-        let len = u32::from_be_bytes(*array_ref!(buf, 0, 4)) as usize;
-        if len > 157 || len == 0 {
-            trace!("dropping connection, handshake request delimiter is >157 or 0");
-            return;
-        }
-        buf.reserve(len);
-        buf.advance(4);
-
-        // Read until we have enough for the handshake frame
-        while buf.len() < len {
-            match stream.read_buf(&mut buf).await {
-                Ok(0) => return,
-                Err(_) => return,
-                Ok(_) => {},
+            // Parse the length delimiter
+            // TODO: Do better, there are only 3 different handshake request variants/sizes
+            let len = u32::from_be_bytes(*array_ref!(buf, 0, 4)) as usize;
+            if len > 157 || len == 0 {
+                trace!("dropping connection, handshake request delimiter is >157 or 0");
+                return;
             }
-        }
+            buf.reserve(len);
+            buf.advance(4);
 
-        // Parse the handshake frame
-        let Ok(frame) = schema::HandshakeRequestFrame::decode(&buf) else {
-            return;
-        };
+            // Read until we have enough for the handshake frame
+            while buf.len() < len {
+                match stream.read_buf(&mut buf).await {
+                    Ok(0) => return,
+                    Err(_) => return,
+                    Ok(_) => {},
+                }
+            }
 
-        let (reader, writer) = stream.into_split();
+            // Parse the handshake frame
+            let Ok(frame) = schema::HandshakeRequestFrame::decode(&buf) else {
+                return;
+            };
 
-        // Send the frame and the new connection over the channel
-        tx.send((frame, TcpSender::new(writer), TcpReceiver::new(reader)))
-            .await
-            .ok();
-    });
+            let (reader, writer) = stream.into_split();
+
+            // Send the frame and the new connection over the channel
+            tx.send((frame, TcpSender::new(writer), TcpReceiver::new(reader)))
+                .await
+                .ok();
+        },
+        "HANDSHAKE: spawn handshake task"
+    );
 }
 
 pub struct TcpSender {
