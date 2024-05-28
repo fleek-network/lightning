@@ -1,5 +1,4 @@
-//! A simple tokio-based library to spawn a worker and communicate with it, the worker
-//! can be spawned on a dedicated thread or as a tokio task.
+//! A simple tokio-based library to spawn a worker and communicate with it.
 //!
 //! ```
 //! use affair::*;
