@@ -54,6 +54,21 @@ pub trait Worker: Send + 'static {
         tokio::spawn(run_non_blocking(rx, self));
         Socket { sender: tx }
     }
+
+    /// Spawn the current worker with a custom task spawner.
+    fn spawn_with_spawner<S, Out>(self, spawner: S) -> (Out, Socket<Self::Request, Self::Response>)
+    where
+        Self: Sized,
+        S: FnOnce(BoxFuture<()>) -> Out,
+    {
+        let (tx, rx) = mpsc::channel(64);
+        let future = run_non_blocking(rx, self);
+        let out = spawner(Box::pin(async move {
+            future.await;
+        }));
+        let socket = Socket { sender: tx };
+        (out, socket)
+    }
 }
 
 /// An awaiting worker that processes requests and returns a response.
@@ -75,6 +90,21 @@ pub trait AsyncWorker: Send + 'static {
         let (tx, rx) = mpsc::channel(64);
         tokio::spawn(run_non_blocking_async(rx, self));
         Socket { sender: tx }
+    }
+
+    /// Spawn the current worker with a custom task spawner.
+    fn spawn_with_spawner<S, Out>(self, spawner: S) -> (Out, Socket<Self::Request, Self::Response>)
+    where
+        Self: Sized,
+        S: FnOnce(BoxFuture<()>) -> Out,
+    {
+        let (tx, rx) = mpsc::channel(64);
+        let future = run_non_blocking_async(rx, self);
+        let out = spawner(Box::pin(async move {
+            future.await;
+        }));
+        let socket = Socket { sender: tx };
+        (out, socket)
     }
 }
 
@@ -99,6 +129,20 @@ pub trait AsyncWorkerUnordered: Send + Sync + 'static {
             run_unordered_async(rx, &self).await;
         });
         Socket { sender: tx }
+    }
+
+    /// Spawn the current worker with a custom task spawner.
+    fn spawn_with_spawner<S, Out>(self, spawner: S) -> (Out, Socket<Self::Request, Self::Response>)
+    where
+        Self: Sized,
+        S: FnOnce(BoxFuture<()>) -> Out,
+    {
+        let (tx, rx) = mpsc::channel(64);
+        let out = spawner(Box::pin(async move {
+            run_unordered_async(rx, &self).await;
+        }));
+        let socket = Socket { sender: tx };
+        (out, socket)
     }
 }
 
