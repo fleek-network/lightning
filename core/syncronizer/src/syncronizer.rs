@@ -91,7 +91,12 @@ impl<C: Collection> Syncronizer<C> {
         let State::Initialized(mut inner) = state else {
             panic!("Syncronizer can only be started once");
         };
-        tokio::spawn(async move { shutdown.run_until_shutdown(inner.run(tx)).await });
+        let panic_waiter = shutdown.clone();
+        spawn!(
+            async move { shutdown.run_until_shutdown(inner.run(tx)).await },
+            "SYNCRONIZER",
+            crucial(panic_waiter)
+        );
     }
 
     fn prelude(
