@@ -43,11 +43,11 @@ async fn main() -> anyhow::Result<()> {
 
     #[cfg(debug_assertions)]
     let mut handle = Ebpf::load(include_bytes_aligned!(
-        "../../ebpf/target/bpfel-unknown-none/debug/ebpf"
+        "../../ebpf/target/bpfel-unknown-none/debug/lightning-ebpf-programs"
     ))?;
     #[cfg(not(debug_assertions))]
     let mut handle = Ebpf::load(include_bytes_aligned!(
-        "../../ebpf/target/bpfel-unknown-none/release/ebpf"
+        "../../ebpf/target/bpfel-unknown-none/release/lightning-ebpf-programs"
     ))?;
 
     if let Err(e) = EbpfLogger::init(&mut handle) {
