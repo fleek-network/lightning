@@ -184,16 +184,24 @@ impl<C: Collection> Rpc<C> {
         let addr = self.config.addr();
         let server = hyper::Server::bind(&addr).serve(make_service);
 
-        tokio::spawn(async move {
-            let graceful = server.with_graceful_shutdown(async move { stop.shutdown().await });
-            graceful.await.expect("Rpc Server to start");
-        });
+        let panic_waiter = shutdown.clone();
+        spawn!(
+            async move {
+                let graceful = server.with_graceful_shutdown(async move { stop.shutdown().await });
+                graceful.await.expect("Rpc Server to start");
+            },
+            "RPC",
+            crucial(panic_waiter)
+        );
 
-        tokio::spawn(async move {
-            shutdown.wait_for_shutdown().await;
-            server_handle.stop().unwrap();
-            server_handle.stopped().await;
-        });
+        spawn!(
+            async move {
+                shutdown.wait_for_shutdown().await;
+                server_handle.stop().unwrap();
+                server_handle.stopped().await;
+            },
+            "RPC: shutdown waiter"
+        );
     }
 
     fn create_modules_from_config(
