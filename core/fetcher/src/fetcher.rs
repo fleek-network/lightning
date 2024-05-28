@@ -44,9 +44,12 @@ impl<C: Collection> Fetcher<C> {
             resolver.clone(),
         );
 
-        tokio::spawn(async move {
-            waiter.run_until_shutdown(origin_fetcher.start()).await;
-        });
+        spawn!(
+            async move {
+                waiter.run_until_shutdown(origin_fetcher.start()).await;
+            },
+            "FETCHER: shutdown waiter"
+        );
 
         let worker = FetcherWorker::<C> {
             origin_tx,

@@ -78,12 +78,10 @@ impl<C: Collection> NotifierInterface<C> for Notifier<C> {
             self.notify.epoch_changed.subscribe(),
             self.waiter.wait_for_shutdown_owned(),
         );
-        tokio::spawn(before_epoch_change(
-            sender,
-            self.query_runner.clone(),
-            duration,
-            epoch_changed,
-        ));
+        spawn!(
+            before_epoch_change(sender, self.query_runner.clone(), duration, epoch_changed,),
+            "NOTIFIER: subscribe before epoch change"
+        );
         BroadcastSub(rx, self.waiter.wait_for_shutdown_owned())
     }
 }

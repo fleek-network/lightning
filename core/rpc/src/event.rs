@@ -1,3 +1,4 @@
+use lightning_interfaces::spawn;
 use lightning_interfaces::types::Event;
 use tokio::sync::{broadcast, mpsc};
 
@@ -19,10 +20,13 @@ impl EventDistributor {
             broadcast_tx: broadcast_tx.clone(),
         };
 
-        tokio::spawn(async move {
-            Self::forward(&mut event_rx, &broadcast_tx).await;
-            tracing::info!("consensous dropped the tx");
-        });
+        spawn!(
+            async move {
+                Self::forward(&mut event_rx, &broadcast_tx).await;
+                tracing::info!("consensous dropped the tx");
+            },
+            "RPC: forward"
+        );
 
         this
     }

@@ -104,9 +104,12 @@ impl<C: Collection> Signer<C> {
         guard.init_state(chain_id, nonce, secondary_nonce);
         drop(guard);
 
-        tokio::spawn(async move {
-            new_block_task(node_index, worker, subscriber, query_runner).await;
-        });
+        spawn!(
+            async move {
+                new_block_task(node_index, worker, subscriber, query_runner).await;
+            },
+            "SIGNER: new block task"
+        );
     }
 }
 
