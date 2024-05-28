@@ -28,16 +28,11 @@
 //! ```
 
 use std::fmt::Display;
-use std::sync::{Arc, Weak};
 
-use crossbeam::sync::ShardedLock;
 use futures::future::BoxFuture;
 use futures::stream::FuturesUnordered;
 use futures::{Future, StreamExt};
 use tokio::sync::{mpsc, oneshot};
-
-pub type Observer<Res> = Box<dyn Fn(&Res) + Send + Sync>;
-type Observers<Res> = ShardedLock<Vec<Observer<Res>>>;
 
 /// A non-awaiting worker that processes requests and returns a response.
 pub trait Worker: Send + 'static {
@@ -80,7 +75,6 @@ pub trait AsyncWorkerUnordered: Send + Sync + 'static {
 /// requests to a worker and wait for the response.
 pub struct Socket<Req, Res> {
     sender: mpsc::Sender<Task<Req, Res>>,
-    observers: Arc<Observers<Res>>,
 }
 
 /// Implementing [`Clone`] by hand because `#[derive(Clone)]` sucks for generics.
@@ -88,7 +82,6 @@ impl<Req, Res> Clone for Socket<Req, Res> {
     fn clone(&self) -> Self {
         Self {
             sender: self.sender.clone(),
-            observers: self.observers.clone(),
         }
     }
 }
@@ -96,7 +89,6 @@ impl<Req, Res> Clone for Socket<Req, Res> {
 /// A weak reference to a [`Socket`] that does not keep the worker alive.
 pub struct WeakSocket<Req, Res> {
     sender: mpsc::WeakSender<Task<Req, Res>>,
-    observers: Weak<Observers<Res>>,
 }
 
 /// Implementing [`Clone`] by hand because `#[derive(Clone)]` sucks for generics.
@@ -104,7 +96,6 @@ impl<Req, Res> Clone for WeakSocket<Req, Res> {
     fn clone(&self) -> Self {
         Self {
             sender: self.sender.clone(),
-            observers: self.observers.clone(),
         }
     }
 }
@@ -163,7 +154,6 @@ pub struct Task<Req, Res> {
     /// Access to this field will be deprecated.
     pub request: Req,
     respond: Option<oneshot::Sender<Res>>,
-    observers: Option<Arc<Observers<Res>>>,
 }
 
 impl<Req, Res> Task<Req, Res> {
@@ -174,20 +164,12 @@ impl<Req, Res> Task<Req, Res> {
         Task {
             request: (),
             respond: self.respond.take(),
-            observers: self.observers.take(),
         }
     }
 
     /// Respond to this task with the provided response.
     #[inline(always)]
     pub fn respond(self, response: Res) {
-        if let Some(observers) = self.observers {
-            let guard = observers.read().expect("Unexpected poisioned lock.");
-            for cb in guard.iter() {
-                (*cb)(&response);
-            }
-        }
-
         if let Some(tx) = self.respond {
             let _ = tx.send(response);
         }
@@ -225,19 +207,13 @@ impl Executor for TokioSpawn {
     fn spawn<H: Worker>(handler: H) -> Socket<H::Request, H::Response> {
         let (tx, rx) = mpsc::channel(64);
         tokio::spawn(run_non_blocking(rx, handler));
-        Socket {
-            sender: tx,
-            observers: Default::default(),
-        }
+        Socket { sender: tx }
     }
 
     fn spawn_async<H: AsyncWorker>(handler: H) -> Socket<H::Request, H::Response> {
         let (tx, rx) = mpsc::channel(64);
         tokio::spawn(run_non_blocking_async(rx, handler));
-        Socket {
-            sender: tx,
-            observers: Default::default(),
-        }
+        Socket { sender: tx }
     }
 
     fn spawn_async_unordered<H: AsyncWorkerUnordered>(
@@ -247,10 +223,7 @@ impl Executor for TokioSpawn {
         tokio::spawn(async move {
             run_unordered_async(rx, &handler).await;
         });
-        Socket {
-            sender: tx,
-            observers: Default::default(),
-        }
+        Socket { sender: tx }
     }
 }
 
@@ -318,10 +291,7 @@ impl<Req, Res> Socket<Req, Res> {
     /// caller.
     pub fn raw_bounded(bound: usize) -> (Self, mpsc::Receiver<Task<Req, Res>>) {
         let (tx, rx) = mpsc::channel(bound);
-        let socket = Socket {
-            sender: tx,
-            observers: Default::default(),
-        };
+        let socket = Socket { sender: tx };
         (socket, rx)
     }
 
@@ -330,7 +300,6 @@ impl<Req, Res> Socket<Req, Res> {
     pub fn downgrade(&self) -> WeakSocket<Req, Res> {
         WeakSocket {
             sender: self.sender.downgrade(),
-            observers: Arc::downgrade(&self.observers),
         }
     }
 
@@ -339,9 +308,6 @@ impl<Req, Res> Socket<Req, Res> {
         let event = Task {
             request,
             respond: None,
-            // Since we do not want to wait for the response delegate the making calls to
-            // observers to the worker thread.
-            observers: Some(self.observers.clone()),
         };
 
         self.sender
@@ -357,7 +323,6 @@ impl<Req, Res> Socket<Req, Res> {
         let event = Task {
             request,
             respond: Some(tx),
-            observers: None,
         };
 
         self.sender
@@ -367,22 +332,7 @@ impl<Req, Res> Socket<Req, Res> {
 
         let result = rx.await.map_err(|_| RunError::FailedToGetResponse)?;
 
-        // TODO(qti3e): Optimize this hot path. Currently it has a 3% performance degradation.
-        let guard = self.observers.read().expect("Unexpected poisioned lock.");
-        for cb in guard.iter() {
-            (*cb)(&result);
-        }
-
         Ok(result)
-    }
-
-    /// Inject an observer that can view the responses and on them.
-    pub fn inject<F>(&self, observer: F)
-    where
-        F: Fn(&Res) + Send + Sync + 'static,
-    {
-        let mut guard = self.observers.write().expect("Unexpected posioned lock.");
-        guard.push(Box::new(observer));
     }
 }
 
@@ -390,10 +340,7 @@ impl<Req, Res> WeakSocket<Req, Res> {
     /// Upgrade this weak socket into a [`Socket`], returns [`None`] if the socket is already
     /// dropped.
     pub fn upgrade(&self) -> Option<Socket<Req, Res>> {
-        self.sender
-            .upgrade()
-            .zip(self.observers.upgrade())
-            .map(|(sender, observers)| Socket { sender, observers })
+        self.sender.upgrade().map(|sender| Socket { sender })
     }
 }
 
@@ -402,7 +349,6 @@ impl<Req, Res> Unpin for WeakSocket<Req, Res> {}
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Mutex;
     use std::time::Duration;
 
     use super::*;
@@ -430,30 +376,6 @@ mod tests {
             self.current += req;
             self.current
         }
-    }
-
-    #[tokio::test]
-    async fn inject_should_work() {
-        static TAPE: Mutex<Vec<u64>> = Mutex::new(Vec::new());
-
-        fn observer(value: &u64) {
-            TAPE.lock().unwrap().push(*value);
-        }
-
-        let socket = TokioSpawn::spawn(CounterWorker::default());
-        let socket2 = socket.downgrade().upgrade().unwrap();
-        socket2.inject(observer);
-
-        assert_eq!(socket.run(10).await.unwrap(), 10);
-        assert_eq!(TAPE.lock().unwrap().as_ref(), vec![10]);
-
-        assert_eq!(socket.run(3).await.unwrap(), 13);
-        assert_eq!(TAPE.lock().unwrap().as_ref(), vec![10, 13]);
-
-        socket.enqueue(5).await.unwrap();
-
-        assert_eq!(socket.run(2).await.unwrap(), 20);
-        assert_eq!(TAPE.lock().unwrap().as_ref(), vec![10, 13, 18, 20]);
     }
 
     #[tokio::test]
