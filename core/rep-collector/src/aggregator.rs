@@ -99,15 +99,13 @@ impl<C: Collection> ReputationAggregator<C> {
         if !measurements.is_empty() {
             if measurements.len() <= MAX_MEASUREMENTS_PER_TX {
                 let submit_tx = self.submit_tx.clone();
-                tokio::spawn(async move {
-                    info!("Submitting reputation measurements");
-                    if let Err(e) = submit_tx
-                        .run(UpdateMethod::SubmitReputationMeasurements { measurements })
-                        .await
-                    {
-                        error!("Submitting reputation measurements failed: {e:?}");
-                    }
-                });
+                info!("Submitting reputation measurements");
+                if let Err(e) = submit_tx
+                    .enqueue(UpdateMethod::SubmitReputationMeasurements { measurements })
+                    .await
+                {
+                    error!("Submitting reputation measurements failed: {e:?}");
+                }
             } else {
                 // Number of measurements exceeds maximum, we have to split the transaction into
                 // two.
@@ -278,10 +276,13 @@ impl MyReputationReporter {
 
     fn send_message(&self, message: ReportMessage) {
         let tx = self.tx.clone();
-        tokio::spawn(async move {
-            // failure here means we're shutting down.
-            let _ = tx.send(message).await;
-        });
+        spawn!(
+            async move {
+                // failure here means we're shutting down.
+                let _ = tx.send(message).await;
+            },
+            "REP-AGGREGATOR: send message"
+        );
     }
 }
 
