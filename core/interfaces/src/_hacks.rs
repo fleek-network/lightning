@@ -1,7 +1,7 @@
 use std::any::type_name;
 use std::marker::PhantomData;
 
-use affair::{AsyncWorkerUnordered, Executor, Socket, TokioSpawn};
+use affair::{AsyncWorkerUnordered, Socket};
 use fdi::BuildGraph;
 
 use crate::{Collection, ConfigConsumer, ConfigProviderInterface};
@@ -80,5 +80,5 @@ where
             futures::future::pending()
         }
     }
-    TokioSpawn::spawn_async_unordered(Worker::<Req, Res>(PhantomData))
+    Worker::<Req, Res>(PhantomData).spawn()
 }

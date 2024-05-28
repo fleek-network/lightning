@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use affair::{AsyncWorkerUnordered, Executor, TokioSpawn};
+use affair::AsyncWorkerUnordered;
 use anyhow::{anyhow, Context, Result};
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
@@ -58,7 +58,7 @@ impl<C: Collection> Fetcher<C> {
             resolver,
         };
 
-        let socket = TokioSpawn::spawn_async_unordered(worker);
+        let socket = worker.spawn();
 
         Ok(Self {
             socket,

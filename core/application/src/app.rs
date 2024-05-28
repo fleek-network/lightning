@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 use std::sync::Mutex;
 use std::time::Duration;
 
-use affair::{Executor, TokioSpawn};
+use affair::AsyncWorker;
 use anyhow::{anyhow, Result};
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{ChainId, NodeInfo};
@@ -38,12 +38,12 @@ impl<C: Collection> Application<C> {
             info!("State already exists. Not loading genesis.");
         }
 
+        let query_runner = env.query_runner();
+        let update_socket = UpdateWorker::<C>::new(env, blockstore.clone()).spawn();
+
         Ok(Self {
-            query_runner: env.query_runner(),
-            update_socket: Mutex::new(Some(TokioSpawn::spawn_async(UpdateWorker::<C>::new(
-                env,
-                blockstore.clone(),
-            )))),
+            query_runner,
+            update_socket: Mutex::new(Some(update_socket)),
             collection: PhantomData,
         })
     }

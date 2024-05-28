@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use affair::{Executor, TokioSpawn};
+use affair::AsyncWorker;
 use lightning_interfaces::prelude::*;
 
 use crate::config::ForwarderConfig;
@@ -28,7 +28,7 @@ impl<C: Collection> BuildGraph for Forwarder<C> {
             |keystore: &C::KeystoreInterface, app: &C::ApplicationInterface| {
                 let consensus_key = keystore.get_bls_pk();
                 let query_runner = app.sync_query();
-                let socket = TokioSpawn::spawn_async(Worker::new(consensus_key, query_runner));
+                let socket = Worker::new(consensus_key, query_runner).spawn();
 
                 Self {
                     socket,

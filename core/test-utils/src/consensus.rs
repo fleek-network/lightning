@@ -8,7 +8,7 @@ use std::collections::HashSet;
 use std::marker::PhantomData;
 use std::time::Duration;
 
-use affair::{AsyncWorkerUnordered, Executor, TokioSpawn};
+use affair::AsyncWorkerUnordered;
 use fdi::Cloned;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Block, TransactionRequest};
@@ -82,7 +82,7 @@ impl<C: Collection> MockForwarder<C> {
             }
         }
         Self {
-            socket: TokioSpawn::spawn_async_unordered(ProxyWorker(sender)),
+            socket: ProxyWorker(sender).spawn(),
             c: PhantomData,
         }
     }

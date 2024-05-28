@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
-use affair::{AsyncWorker, Executor, Socket, TokioSpawn};
+use affair::{AsyncWorker, Socket};
 use fleek_crypto::{NodePublicKey, NodeSecretKey, SecretKey, TransactionSender};
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
@@ -79,7 +79,7 @@ impl<C: Collection> Signer<C> {
             state: Arc::new(Mutex::new(state)),
         };
 
-        let socket = TokioSpawn::spawn_async(worker.clone());
+        let socket = worker.clone().spawn();
 
         Self {
             socket,

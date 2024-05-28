@@ -20,7 +20,7 @@
 //!
 //! #[tokio::main(flavor = "current_thread")]
 //! async fn main() {
-//!     let socket = TokioSpawn::spawn(CounterWorker::default());
+//!     let socket = CounterWorker::default().spawn();
 //!     assert_eq!(socket.run(10).await.unwrap(), 10);
 //!     assert_eq!(socket.run(3).await.unwrap(), 13);
 //! }

@@ -5,7 +5,7 @@ mod tests;
 
 use std::marker::PhantomData;
 
-use affair::{Executor, TokioSpawn};
+use affair::AsyncWorkerUnordered;
 use demuxer::Demuxer;
 use lightning_interfaces::prelude::*;
 
@@ -28,7 +28,7 @@ impl<C: Collection> OriginDemuxer<C> {
     ) -> anyhow::Result<Self> {
         let config = config.get::<Self>();
         let demuxer = Demuxer::<C>::new(config, blockstore.clone())?;
-        let socket = TokioSpawn::spawn_async_unordered(demuxer);
+        let socket = demuxer.spawn();
         Ok(Self {
             socket,
             _collection: PhantomData,
