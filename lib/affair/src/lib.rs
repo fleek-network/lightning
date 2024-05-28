@@ -21,7 +21,7 @@
 //!
 //! #[tokio::main(flavor = "current_thread")]
 //! async fn main() {
-//!     let socket = DedicatedThread::spawn(CounterWorker::default());
+//!     let socket = TokioSpawn::spawn(CounterWorker::default());
 //!     assert_eq!(socket.run(10).await.unwrap(), 10);
 //!     assert_eq!(socket.run(3).await.unwrap(), 13);
 //! }
@@ -217,39 +217,9 @@ impl<Req, Res> Task<Req, Res> {
     }
 }
 
-/// An executor that provides the worker with its dedicated std::thread.
-#[derive(Clone, Copy, Debug)]
-pub struct DedicatedThread;
-
 /// An executor that runs the worker as a tokio task.
 #[derive(Clone, Copy, Debug)]
 pub struct TokioSpawn;
-
-impl Executor for DedicatedThread {
-    fn spawn<H: Worker>(handler: H) -> Socket<H::Request, H::Response> {
-        let (tx, rx) = mpsc::channel(64);
-        std::thread::spawn(|| run_blocking(rx, handler));
-        Socket {
-            sender: tx,
-            observers: Default::default(),
-        }
-    }
-
-    fn spawn_async<H: AsyncWorker>(handler: H) -> Socket<H::Request, H::Response> {
-        let (tx, rx) = mpsc::channel(64);
-        std::thread::spawn(|| run_blocking_async(rx, handler));
-        Socket {
-            sender: tx,
-            observers: Default::default(),
-        }
-    }
-
-    fn spawn_async_unordered<H: AsyncWorkerUnordered>(
-        _handler: H,
-    ) -> Socket<H::Request, H::Response> {
-        unimplemented!()
-    }
-}
 
 impl Executor for TokioSpawn {
     fn spawn<H: Worker>(handler: H) -> Socket<H::Request, H::Response> {
@@ -281,24 +251,6 @@ impl Executor for TokioSpawn {
             sender: tx,
             observers: Default::default(),
         }
-    }
-}
-
-fn run_blocking<Req, Res, H: Worker<Request = Req, Response = Res>>(
-    mut rx: mpsc::Receiver<Task<Req, Res>>,
-    mut handler: H,
-) {
-    while let Some(event) = rx.blocking_recv() {
-        event.handle(|req| handler.handle(req));
-    }
-}
-
-fn run_blocking_async<Req, Res, H: AsyncWorker<Request = Req, Response = Res>>(
-    mut rx: mpsc::Receiver<Task<Req, Res>>,
-    mut handler: H,
-) {
-    while let Some(event) = rx.blocking_recv() {
-        event.handle(|req| futures::executor::block_on(handler.handle(req)));
     }
 }
 
@@ -478,28 +430,6 @@ mod tests {
             self.current += req;
             self.current
         }
-    }
-
-    #[tokio::test]
-    async fn test_dedicated_thread() {
-        let socket = DedicatedThread::spawn(CounterWorker::default());
-        assert_eq!(socket.run(10).await.unwrap(), 10);
-        assert_eq!(socket.run(3).await.unwrap(), 13);
-
-        let socket = DedicatedThread::spawn_async(CounterWorker::default());
-        assert_eq!(socket.run(10).await.unwrap(), 10);
-        assert_eq!(socket.run(3).await.unwrap(), 13);
-    }
-
-    #[tokio::test]
-    async fn test_tokio_spawn() {
-        let socket = TokioSpawn::spawn(CounterWorker::default());
-        assert_eq!(socket.run(10).await.unwrap(), 10);
-        assert_eq!(socket.run(3).await.unwrap(), 13);
-
-        let socket = DedicatedThread::spawn_async(CounterWorker::default());
-        assert_eq!(socket.run(10).await.unwrap(), 10);
-        assert_eq!(socket.run(3).await.unwrap(), 13);
     }
 
     #[tokio::test]

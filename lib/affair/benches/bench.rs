@@ -1,4 +1,4 @@
-use affair::{AsyncWorker, DedicatedThread, Executor, Socket, TokioSpawn, Worker};
+use affair::{AsyncWorker, Executor, Socket, TokioSpawn, Worker};
 use criterion::measurement::Measurement;
 use criterion::*;
 
@@ -13,12 +13,6 @@ fn bench(c: &mut Criterion) {
     });
     bench_socket(&mut g, "tokio-async", || {
         TokioSpawn::spawn_async(CounterWorker::default())
-    });
-    bench_socket(&mut g, "thread", || {
-        DedicatedThread::spawn(CounterWorker::default())
-    });
-    bench_socket(&mut g, "thread-async", || {
-        DedicatedThread::spawn_async(CounterWorker::default())
     });
 
     g.finish();
