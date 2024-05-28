@@ -1,4 +1,4 @@
-use affair::{AsyncWorker, Executor, Socket, TokioSpawn, Worker};
+use affair::{AsyncWorker, Socket, Worker};
 use criterion::measurement::Measurement;
 use criterion::*;
 
@@ -8,11 +8,10 @@ fn bench(c: &mut Criterion) {
     let mut g = c.benchmark_group("Affair Worker");
     g.sample_size(20);
 
-    bench_socket(&mut g, "tokio", || {
-        TokioSpawn::spawn(CounterWorker::default())
-    });
+    bench_socket(&mut g, "tokio", || Worker::spawn(CounterWorker::default()));
+
     bench_socket(&mut g, "tokio-async", || {
-        TokioSpawn::spawn_async(CounterWorker::default())
+        AsyncWorker::spawn(CounterWorker::default())
     });
 
     g.finish();

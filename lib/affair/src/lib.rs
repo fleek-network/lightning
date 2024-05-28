@@ -44,6 +44,16 @@ pub trait Worker: Send + 'static {
     /// Implement your custom handler for this. If you need this to be an async function
     /// consider using [`AsyncWorker`] instead.
     fn handle(&mut self, req: Self::Request) -> Self::Response;
+
+    /// Spawn the given current worker on a tokio task.
+    fn spawn(self) -> Socket<Self::Request, Self::Response>
+    where
+        Self: Sized,
+    {
+        let (tx, rx) = mpsc::channel(64);
+        tokio::spawn(run_non_blocking(rx, self));
+        Socket { sender: tx }
+    }
 }
 
 /// An awaiting worker that processes requests and returns a response.
@@ -56,6 +66,16 @@ pub trait AsyncWorker: Send + 'static {
 
     /// Implement your custom handler for this async worker and enjoy using `await`.
     fn handle(&mut self, req: Self::Request) -> impl Future<Output = Self::Response> + Send;
+
+    /// Spawn the given current worker on a tokio task.
+    fn spawn(self) -> Socket<Self::Request, Self::Response>
+    where
+        Self: Sized,
+    {
+        let (tx, rx) = mpsc::channel(64);
+        tokio::spawn(run_non_blocking_async(rx, self));
+        Socket { sender: tx }
+    }
 }
 
 /// An awaiting worker that processes requests and returns a response in an unordered way.
@@ -68,6 +88,18 @@ pub trait AsyncWorkerUnordered: Send + Sync + 'static {
 
     /// Implement your custom handler for this async worker and enjoy using `await`.
     fn handle(&self, req: Self::Request) -> impl Future<Output = Self::Response> + Send;
+
+    /// Spawn the given current worker on a tokio task.
+    fn spawn(self) -> Socket<Self::Request, Self::Response>
+    where
+        Self: Sized,
+    {
+        let (tx, rx) = mpsc::channel(64);
+        tokio::spawn(async move {
+            run_unordered_async(rx, &self).await;
+        });
+        Socket { sender: tx }
+    }
 }
 
 /// A socket that can be used to communicate with a worker, you can use a socket to send
@@ -122,32 +154,6 @@ impl<Req> Display for RunError<Req> {
     }
 }
 
-/// An execution engine that handles spawning a [`Worker`].
-pub trait Executor {
-    /// Spawn a [`Worker`] and returns a [`Socket`] which can be used to send requests to the
-    /// spawned worker.
-    ///
-    /// The worker is stopped when all of the references to [`Socket`] are dropped, if you want a
-    /// socket that does not keep the worker alive consider using a [`WeakSocket`].
-    fn spawn<H: Worker>(handler: H) -> Socket<H::Request, H::Response>;
-
-    /// Spawn a [`AsyncWorker`] and returns a [`Socket`] which can be used to send requests to the
-    /// spawned worker.
-    ///
-    /// The worker is stopped when all of the references to [`Socket`] are dropped, if you want a
-    /// socket that does not keep the worker alive consider using a [`WeakSocket`].
-    fn spawn_async<H: AsyncWorker>(handler: H) -> Socket<H::Request, H::Response>;
-
-    /// Spawn a [`AsyncWorker`] and returns a [`Socket`] which can be used to send requests to the
-    /// spawned worker.
-    ///
-    /// The worker is stopped when all of the references to [`Socket`] are dropped, if you want a
-    /// socket that does not keep the worker alive consider using a [`WeakSocket`].
-    fn spawn_async_unordered<H: AsyncWorkerUnordered>(
-        handler: H,
-    ) -> Socket<H::Request, H::Response>;
-}
-
 pub struct Task<Req, Res> {
     /// The raw request. Please consider using one of the `handle` functions instead.
     /// Access to this field will be deprecated.
@@ -195,34 +201,6 @@ impl<Req, Res> Task<Req, Res> {
         let responder = self.split_to_responder();
         let response = handler(self.request).await;
         responder.respond(response);
-    }
-}
-
-/// An executor that runs the worker as a tokio task.
-#[derive(Clone, Copy, Debug)]
-pub struct TokioSpawn;
-
-impl Executor for TokioSpawn {
-    fn spawn<H: Worker>(handler: H) -> Socket<H::Request, H::Response> {
-        let (tx, rx) = mpsc::channel(64);
-        tokio::spawn(run_non_blocking(rx, handler));
-        Socket { sender: tx }
-    }
-
-    fn spawn_async<H: AsyncWorker>(handler: H) -> Socket<H::Request, H::Response> {
-        let (tx, rx) = mpsc::channel(64);
-        tokio::spawn(run_non_blocking_async(rx, handler));
-        Socket { sender: tx }
-    }
-
-    fn spawn_async_unordered<H: AsyncWorkerUnordered>(
-        handler: H,
-    ) -> Socket<H::Request, H::Response> {
-        let (tx, rx) = mpsc::channel(64);
-        tokio::spawn(async move {
-            run_unordered_async(rx, &handler).await;
-        });
-        Socket { sender: tx }
     }
 }
 
@@ -395,7 +373,7 @@ mod tests {
             }
         }
 
-        let socket = TokioSpawn::spawn_async_unordered(Worker::default());
+        let socket = Worker::default().spawn();
         let res = socket.run(0).await;
         assert_eq!(res.unwrap(), 0);
         let res = socket.run(1).await;
