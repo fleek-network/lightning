@@ -163,14 +163,17 @@ pub async fn spawn_service<C: Collection>(
         });
     }
 
-    tokio::spawn(async move {
-        let waiter2 = waiter.clone();
-        waiter
-            .run_until_shutdown(async move {
-                run_ctrl_loop(&ipc_dir, cx, cmd_permit, waiter2).await;
-            })
-            .await;
-    });
+    spawn!(
+        async move {
+            let waiter2 = waiter.clone();
+            waiter
+                .run_until_shutdown(async move {
+                    run_ctrl_loop(&ipc_dir, cx, cmd_permit, waiter2).await;
+                })
+                .await;
+        },
+        "SERVICE-EXECUTOR: shutdown waiter"
+    );
 
     ServiceHandle {}
 }
@@ -195,15 +198,18 @@ async fn run_ctrl_loop<C: Collection>(
         // spawn a new task to handle the stream
         let ctx = ctx.clone();
         let waiter = waiter.clone();
-        tokio::spawn(async move {
-            waiter
-                .run_until_shutdown(async move {
-                    if let Err(e) = handle_stream(stream, ctx).await {
-                        tracing::error!("Error while handling the unix stream: {e:?}");
-                    }
-                })
-                .await
-        });
+        spawn!(
+            async move {
+                waiter
+                    .run_until_shutdown(async move {
+                        if let Err(e) = handle_stream(stream, ctx).await {
+                            tracing::error!("Error while handling the unix stream: {e:?}");
+                        }
+                    })
+                    .await
+            },
+            "SERVICE-EXECUTOR: ctrl loop"
+        );
     }
 }
 
@@ -338,9 +344,12 @@ async fn handle_stream<C: Collection>(
                 } else {
                     // Only enqueue the request. We don't need to send the response back.
                     let ctx = ctx.clone();
-                    tokio::spawn(async move {
-                        ctx.run(request.request).await;
-                    });
+                    spawn!(
+                        async move {
+                            ctx.run(request.request).await;
+                        },
+                        "SERVICE-EXECUTOR: run request"
+                    );
                 }
             }
         }
