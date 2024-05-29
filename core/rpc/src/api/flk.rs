@@ -182,6 +182,9 @@ pub trait FleekApi {
     #[method(name = "get_last_epoch_hash")]
     async fn get_last_epoch_hash(&self) -> RpcResult<([u8; 32], Epoch)>;
 
+    #[method(name = "get_sub_dag_index")]
+    async fn get_sub_dag_index(&self) -> RpcResult<(u64, Epoch)>;
+
     #[method(name = "send_txn")]
     async fn send_txn(&self, tx: TransactionRequest) -> RpcResult<()>;
 

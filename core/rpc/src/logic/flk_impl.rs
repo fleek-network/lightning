@@ -379,6 +379,14 @@ impl<C: Collection> FleekApiServer for FleekApi<C> {
         ))
     }
 
+    async fn get_sub_dag_index(&self) -> RpcResult<(u64, Epoch)> {
+        let sub_dag_index = match self.data.query_runner.get_metadata(&Metadata::SubDagIndex) {
+            Some(Value::SubDagIndex(index)) => index,
+            _ => 0,
+        };
+        Ok((sub_dag_index, self.data.query_runner.get_epoch_info().epoch))
+    }
+
     async fn send_txn(&self, tx: TransactionRequest) -> RpcResult<()> {
         Ok(self
             .data
