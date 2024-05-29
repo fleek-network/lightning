@@ -39,7 +39,7 @@ const query_client_bandwidth_balance = async (account) => {
  * @property {Uint8Array} proof - Blake3 proof of the content
  * @property {number} length - Number of blocks in the content
  */
-export class ContentHandle {
+class ContentHandle {
   proof;
   length;
 
@@ -54,12 +54,21 @@ export class ContentHandle {
     this.length = ((num_hashes + 1) >> 1) | 0;
   }
 
-  read(id) {
-    return ops.read_block(this.proof, id);
+  /**
+    * Read a given block index from the blockstore
+    * @param {number} idx - Index of block to read
+    * @returns {Promise<Uint8Array>}
+    */
+  read(idx) {
+    return ops.read_block(this.proof, idx);
   }
 }
 
+/**
+  * Fleek API namespace
+  */
 export const Fleek = {
+  ContentHandle,
   fetch_blake3,
   load_content,
   query_client_flk_balance,
