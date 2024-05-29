@@ -176,12 +176,13 @@ impl<Q: SyncQueryRunnerInterface, NE: Emitter> ExecutionState for Execution<Q, N
         let current_epoch = self.query_runner.get_current_epoch();
 
         let sub_dag_index = consensus_output.sub_dag.sub_dag_index;
-        println!("subdag index: {sub_dag_index}");
+
         let batch_payload: Vec<Vec<u8>> = consensus_output
             .batches
             .into_iter()
             .filter_map(|(cert, batch)| {
-                // Skip over the ones that have a different epoch. Shouldnt ever happen
+                // Skip over the ones that have a different epoch. Shouldnt ever happen besides an
+                // edge case towards the end of an epoch
                 if cert.epoch() != current_epoch {
                     error!("we recieved a consensus cert from an epoch we are not on");
                     None
