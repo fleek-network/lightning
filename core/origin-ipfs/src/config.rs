@@ -63,10 +63,18 @@ impl Gateway {
     pub fn build_request(&self, cid: Cid) -> String {
         match self.request_format {
             RequestFormat::CidFirst => {
-                format!("{}://{cid}.{}", self.protocol.as_str(), self.authority)
+                format!(
+                    "{}://{cid}.{}?format=car",
+                    self.protocol.as_str(),
+                    self.authority
+                )
             },
             RequestFormat::CidLast => {
-                format!("{}://{}/ipfs/{cid}", self.protocol.as_str(), self.authority)
+                format!(
+                    "{}://{}/ipfs/{cid}?format=car",
+                    self.protocol.as_str(),
+                    self.authority
+                )
             },
         }
     }
