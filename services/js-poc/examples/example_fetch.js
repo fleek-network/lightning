@@ -39,15 +39,15 @@ const bbb_hash = new Uint8Array([
 export const main = async () => {
   console.log("Hello world from javascript!");
 
-  if (await Fleek.fetch_blake3(bbb_hash)) {
+  if (await Fleek.fetchBlake3(bbb_hash)) {
     console.log("Content fetched");
 
-    const handle = await Fleek.load_content(bbb_hash);
+    const handle = await Fleek.loadContent(bbb_hash);
     console.log(`Loaded content handle with ${handle.length} blocks`);
 
     let total = 0;
     for (let i = 0; i < handle.length; i++) {
-      const block = await handle.read(0);
+      const block = await handle.readBlock(0);
       console.log(`Read block ${i}: ${block.length}`);
       total += block.length;
     }

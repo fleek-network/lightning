@@ -5,13 +5,13 @@ const { ops } = core;
  * @param {Uint8Array} hash - Blake3 hash of content to fetch
  * @returns {Promise<bool>} True if the fetch was successful
  */
-const fetch_blake3 = async (hash) => await ops.fetch_blake3(hash);
+const fetchBlake3 = async (hash) => await ops.fetch_blake3(hash);
 
 /** Load a blockstore handle to some blake3 content
  * @param {Uint8Array} hash - Blake3 hash of the content
  * @returns {Promise<ContentHandle>}
  */
-const load_content = async (hash) => {
+const loadContent = async (hash) => {
   const proof = await ops.load_content(hash);
   return new ContentHandle(proof);
 };
@@ -20,7 +20,7 @@ const load_content = async (hash) => {
  * @param {Uint8Array} account - The balance to check
  * @returns {Promise<BigInt>} BigInt of the balance
  */
-const query_client_flk_balance = async (account) => {
+const queryClientFlkBalance = async (account) => {
   const balance = await ops.query_client_flk_balance(account);
   return BigInt(balance, 10);
 };
@@ -29,7 +29,7 @@ const query_client_flk_balance = async (account) => {
  * @param {Uint8Array} account - The balance to check
  * @returns {Promise<BigInt>} BigInt of the balance
  */
-const query_client_bandwidth_balance = async (account) => {
+const queryClientBandwidthBalance = async (account) => {
   const balance = await ops.query_client_bandwidth_balance(account);
   return BigInt(balance, 10);
 };
@@ -59,7 +59,7 @@ class ContentHandle {
     * @param {number} idx - Index of block to read
     * @returns {Promise<Uint8Array>}
     */
-  read(idx) {
+  readBlock(idx) {
     return ops.read_block(this.proof, idx);
   }
 }
@@ -69,8 +69,8 @@ class ContentHandle {
   */
 export const Fleek = {
   ContentHandle,
-  fetch_blake3,
-  load_content,
-  query_client_flk_balance,
-  query_client_bandwidth_balance,
+  fetchBlake3,
+  loadContent,
+  queryClientFlkBalance,
+  queryClientBandwidthBalance,
 };
