@@ -676,8 +676,9 @@ impl<const P: usize> TranscriptBuilderInput for HpUfixedWrapper<P> {
 
 #[cfg(test)]
 mod tests {
-    use ethers::types::U256;
-    use fleek_crypto::AccountOwnerSignature;
+    use ethers::core::k256::sha2::digest::Update;
+    use ethers::types::{transaction, U256};
+    use fleek_crypto::{AccountOwnerSignature, NodeSignature};
 
     use super::*;
 
@@ -759,5 +760,29 @@ mod tests {
         };
         let tx_2 = TransactionRequest::UpdateRequest(update_2);
         assert_eq!(tx_2.chain_id(), chain_id_2)
+    }
+
+    #[test]
+    fn test_block_to_bytes_from_bytes() {
+        let txn = TransactionRequest::UpdateRequest(UpdateRequest {
+            signature: TransactionSignature::NodeMain(NodeSignature([9; 64])),
+            payload: UpdatePayload {
+                sender: TransactionSender::NodeMain(NodePublicKey([9; 32])),
+                nonce: 0,
+                secondary_nonce: 0,
+                method: UpdateMethod::ChangeEpoch { epoch: 0 },
+                chain_id: 69,
+            },
+        });
+        let block = Block {
+            digest: [2; 32],
+            sub_dag_index: 0,
+            transactions: vec![txn.clone(), txn.clone(), txn.clone()],
+        };
+
+        let block_bytes = <Vec<u8>>::try_from(&block).unwrap();
+        let new_block = <Block>::try_from(block_bytes).unwrap();
+
+        assert_eq!(block, new_block);
     }
 }
