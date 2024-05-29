@@ -676,8 +676,7 @@ impl<const P: usize> TranscriptBuilderInput for HpUfixedWrapper<P> {
 
 #[cfg(test)]
 mod tests {
-    use ethers::core::k256::sha2::digest::Update;
-    use ethers::types::{transaction, U256};
+    use ethers::types::U256;
     use fleek_crypto::{AccountOwnerSignature, NodeSignature};
 
     use super::*;
