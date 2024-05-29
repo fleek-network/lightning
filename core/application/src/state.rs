@@ -855,9 +855,6 @@ impl<B: Backend> State<B> {
 
             self.metadata
                 .set(Metadata::Epoch, Value::Epoch(current_epoch));
-            // epoch is changing so a new committee starts and subdag starts back at 0
-            self.metadata
-                .set(Metadata::SubDagIndex, Value::SubDagIndex(0));
             TransactionResponse::Success(ExecutionData::EpochChange)
         } else {
             self.committee_info.set(current_epoch, current_committee);
@@ -1076,6 +1073,10 @@ impl<B: Backend> State<B> {
             .set(Metadata::LastBlockHash, Value::Hash(block_hash));
         self.metadata
             .set(Metadata::SubDagIndex, Value::SubDagIndex(sub_dag_index));
+        self.metadata.set(
+            Metadata::BlockNumber,
+            Value::BlockNumber(self.get_block_number() + 1),
+        );
     }
 
     fn add_service(

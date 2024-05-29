@@ -144,8 +144,8 @@ impl Env<UpdatePerm> {
             };
             let app = State::new(backend);
             let last_block_hash = app.get_block_hash();
-            // increment the block_number
-            let block_number = app.increment_block_number();
+
+            let block_number = app.get_block_number() + 1;
 
             // Create block response
             let mut response = BlockExecutionResponse {
@@ -192,8 +192,15 @@ impl Env<UpdatePerm> {
                 */
                 response.txn_receipts.push(receipt);
             }
+
+            // if epoch changed a new committee starts and subdag starts back at 0
+            let new_sub_dag_index = if response.change_epoch {
+                0
+            } else {
+                block.sub_dag_index
+            };
             // Set the last executed block hash and sub dag index
-            app.set_last_block(block.digest, block.sub_dag_index);
+            app.set_last_block(block.digest, new_sub_dag_index);
 
             // Return the response
             response
