@@ -89,9 +89,12 @@ impl From<EthersTransactionWrapper> for EthersTransaction {
 /// block.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Block {
-    pub transactions: Vec<TransactionRequest>,
-    // Digest of the narwhal certificate that included this
+    /// Digest of the narwhal certificate that included this
     pub digest: [u8; 32],
+    /// The narwhal subdag index that included these transactions
+    pub sub_dag_index: u64,
+    /// List of transactions to be executed in this block
+    pub transactions: Vec<TransactionRequest>,
 }
 
 /// An update transaction, sent from users to the consensus to migrate the application
@@ -234,9 +237,14 @@ impl TryFrom<&Block> for Vec<u8> {
 
     fn try_from(value: &Block) -> Result<Self, Self::Error> {
         let mut bytes = Vec::new();
+        // First 32 bytes are digest
         bytes.extend_from_slice(&value.digest);
+        // Next 8 bytes are the subdag index
+        bytes.extend_from_slice(&value.sub_dag_index.to_le_bytes());
+        // Next 8 bytes are the number of transactions that are following
         let num_txns = value.transactions.len() as u64;
         bytes.extend_from_slice(&num_txns.to_le_bytes());
+        // the rest of the bytes are the transactions
         for tx in &value.transactions {
             // TODO(matthias): would be good to serialize to borrowed bytes here instead
             let tx_bytes: Vec<u8> = tx.try_into()?;
@@ -253,9 +261,14 @@ impl TryFrom<Vec<u8>> for Block {
 
     fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
         let digest: [u8; 32] = value.get(0..32).context("Out of bounds")?.try_into()?;
-        let num_txns_bytes: [u8; 8] = value.get(32..40).context("Out of bounds")?.try_into()?;
+
+        let sub_dag_bytes = value.get(32..40).context("Out of bounds")?.try_into()?;
+        let sub_dag_index = u64::from_le_bytes(sub_dag_bytes);
+
+        let num_txns_bytes: [u8; 8] = value.get(40..48).context("Out of bounds")?.try_into()?;
         let num_txns = u64::from_le_bytes(num_txns_bytes);
-        let mut pointer = 40;
+
+        let mut pointer = 48;
         let mut transactions = Vec::with_capacity(num_txns as usize);
         for _ in 0..num_txns {
             let tx_len_bytes: [u8; 8] = value
@@ -273,8 +286,9 @@ impl TryFrom<Vec<u8>> for Block {
             pointer += tx_len;
         }
         Ok(Block {
-            transactions,
             digest,
+            sub_dag_index,
+            transactions,
         })
     }
 }

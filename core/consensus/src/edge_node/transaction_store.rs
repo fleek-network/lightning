@@ -178,14 +178,18 @@ impl<T: BroadcastEventInterface<PubSubMsg>> TransactionStore<T> {
         while let Some(parcel) = self.get_parcel(&last_digest) {
             parcel_chain.push(last_digest);
 
-            txn_chain.push_front((parcel.inner.transactions.clone(), last_digest));
+            txn_chain.push_front((
+                parcel.inner.transactions.clone(),
+                parcel.inner.sub_dag_index,
+                last_digest,
+            ));
 
             if parcel.inner.last_executed == head {
                 let mut epoch_changed = false;
 
                 // We connected the chain now execute all the transactions
-                for (batch, digest) in txn_chain {
-                    if execution.submit_batch(batch, digest).await {
+                for (batch, sub_dag_index, digest) in txn_chain {
+                    if execution.submit_batch(batch, digest, sub_dag_index).await {
                         epoch_changed = true;
                     }
                 }

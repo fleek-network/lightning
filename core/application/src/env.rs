@@ -192,8 +192,8 @@ impl Env<UpdatePerm> {
                 */
                 response.txn_receipts.push(receipt);
             }
-            // Set the last executed block hash
-            app.set_last_block(block.digest);
+            // Set the last executed block hash and sub dag index
+            app.set_last_block(block.digest, block.sub_dag_index);
 
             // Return the response
             response

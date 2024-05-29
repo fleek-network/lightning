@@ -40,6 +40,7 @@ fn generate_random_parcel(
         transactions,
         last_executed: last_executed.unwrap_or([0; 32]),
         epoch: 1,
+        sub_dag_index: 0,
     }
 }
 

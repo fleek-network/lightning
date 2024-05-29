@@ -9,7 +9,7 @@ use lightning_interfaces::ExecutionEngineSocket;
 use lightning_utils::application::QueryRunnerExt;
 use narwhal_crypto::DefaultHashFunction;
 use narwhal_executor::ExecutionState;
-use narwhal_types::{BatchAPI, BatchDigest, ConsensusOutput, Transaction};
+use narwhal_types::{Batch, BatchDigest, ConsensusOutput, Transaction};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, Notify};
 use tracing::{error, info};
@@ -21,6 +21,7 @@ pub struct AuthenticStampedParcel {
     pub transactions: Vec<Transaction>,
     pub last_executed: Digest,
     pub epoch: Epoch,
+    pub sub_dag_index: u64,
 }
 
 impl ToDigest for AuthenticStampedParcel {
@@ -88,19 +89,32 @@ impl<Q: SyncQueryRunnerInterface, NE: Emitter> Execution<Q, NE> {
     }
 
     // Returns true if the epoch changed
-    pub(crate) async fn submit_batch(&self, payload: Vec<Transaction>, digest: Digest) -> bool {
+    pub(crate) async fn submit_batch(
+        &self,
+        payload: Vec<Transaction>,
+        digest: Digest,
+        sub_dag_index: u64,
+    ) -> bool {
         let transactions = payload
             .into_iter()
-            .filter_map(|txn| TransactionRequest::try_from(txn.as_ref()).ok())
+            .filter_map(|txn| {
+                // Filter out transactions that wont serialize or have already been executed
+                if let Ok(txn) = TransactionRequest::try_from(txn.as_ref()) {
+                    if !self.query_runner.has_executed_digest(txn.hash()) {
+                        Some(txn)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
             .collect::<Vec<_>>();
 
-        if transactions.is_empty() {
-            return false;
-        }
-
         let block = Block {
-            transactions,
             digest,
+            sub_dag_index,
+            transactions,
         };
 
         let archive_block = block.clone();
@@ -159,62 +173,67 @@ impl<Q: SyncQueryRunnerInterface, NE: Emitter> Execution<Q, NE> {
 #[async_trait]
 impl<Q: SyncQueryRunnerInterface, NE: Emitter> ExecutionState for Execution<Q, NE> {
     async fn handle_consensus_output(&self, consensus_output: ConsensusOutput) {
-        for (cert, batches) in consensus_output.batches {
-            let current_epoch = self.query_runner.get_current_epoch();
-            if cert.epoch() != current_epoch {
-                // If the certificate epoch does not match the current epoch in the application
-                // state do not execute this transaction, This could only happen in
-                // certain race conditions at the end of an epoch and we need this to ensure all
-                // nodes execute the same transactions
-                continue;
-            }
+        let current_epoch = self.query_runner.get_current_epoch();
 
-            if !batches.is_empty() {
-                let mut batch_payload =
-                    Vec::with_capacity(batches.iter().fold(0, |acc, batch| acc + batch.size()));
-
-                for batch in batches {
-                    for tx_bytes in batch.transactions() {
-                        if let Ok(tx) = TransactionRequest::try_from(tx_bytes.as_ref()) {
-                            if !self.query_runner.has_executed_digest(tx.hash()) {
-                                batch_payload.push(tx_bytes.to_owned());
-                            }
-                        }
-                    }
+        let sub_dag_index = consensus_output.sub_dag.sub_dag_index;
+        println!("subdag index: {sub_dag_index}");
+        let batch_payload: Vec<Vec<u8>> = consensus_output
+            .batches
+            .into_iter()
+            .filter_map(|(cert, batch)| {
+                // Skip over the ones that have a different epoch. Shouldnt ever happen
+                if cert.epoch() != current_epoch {
+                    error!("we recieved a consensus cert from an epoch we are not on");
+                    None
+                } else {
+                    // Map the batch to just the transactions
+                    Some(
+                        batch
+                            .into_iter()
+                            .flat_map(|batch| match batch {
+                                // work around because batch.transactions() would require clone
+                                Batch::V1(btch) => btch.transactions,
+                                Batch::V2(btch) => btch.transactions,
+                            })
+                            .collect::<Vec<Vec<u8>>>(),
+                    )
                 }
+            })
+            .flatten()
+            .collect();
 
-                if batch_payload.is_empty() {
-                    continue;
-                }
+        if batch_payload.is_empty() {
+            return;
+        }
+        // We have batches in the payload send them over broadcast along with an attestion
+        // of them
+        let last_executed = self.query_runner.get_last_block();
+        let parcel = AuthenticStampedParcel {
+            transactions: batch_payload.clone(),
+            last_executed,
+            epoch: current_epoch,
+            sub_dag_index,
+        };
 
-                // We have batches in the payload send them over broadcast along with an attestion
-                // of them
-                let last_executed = self.query_runner.get_last_block();
-                let parcel = AuthenticStampedParcel {
-                    transactions: batch_payload.clone(),
-                    last_executed,
-                    epoch: current_epoch,
-                };
+        let epoch_changed = self
+            .submit_batch(batch_payload, parcel.to_digest(), sub_dag_index)
+            .await;
 
-                let epoch_changed = self.submit_batch(batch_payload, parcel.to_digest()).await;
+        if let Err(e) = self.tx_narwhal_batches.send((parcel, epoch_changed)).await {
+            // This shouldn't ever happen. But if it does there is no critical tasks
+            // happening on the other end of this that would require a
+            // panic
+            error!("Narwhal failed to send batch payload to edge consensus: {e:?}");
+        }
 
-                if let Err(e) = self.tx_narwhal_batches.send((parcel, epoch_changed)).await {
-                    // This shouldn't ever happen. But if it does there is no critical tasks
-                    // happening on the other end of this that would require a
-                    // panic
-                    error!("Narwhal failed to send batch payload to edge consensus: {e:?}");
-                }
-
-                // Submit the batches to application layer and if the epoch changed reset last
-                // executed
-                if epoch_changed {
-                    self.reconfigure_notify.notify_waiters();
-                }
-            }
+        // Submit the batches to application layer and if the epoch changed reset last
+        // executed
+        if epoch_changed {
+            self.reconfigure_notify.notify_waiters();
         }
     }
 
     async fn last_executed_sub_dag_index(&self) -> u64 {
-        0
+        self.query_runner.get_sub_dag_index()
     }
 }

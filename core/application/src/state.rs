@@ -1067,9 +1067,11 @@ impl<B: Backend> State<B> {
     }
 
     // This function should only be called in the `run` method on `Env`.
-    pub fn set_last_block(&self, block_hash: [u8; 32]) {
+    pub fn set_last_block(&self, block_hash: [u8; 32], sub_dag_index: u64) {
         self.metadata
             .set(Metadata::LastBlockHash, Value::Hash(block_hash));
+        self.metadata
+            .set(Metadata::SubDagIndex, Value::SubDagIndex(sub_dag_index));
     }
 
     fn add_service(
@@ -1867,6 +1869,15 @@ impl<B: Backend> State<B> {
         } else {
             // unreachable set at genesis
             [0; 32]
+        }
+    }
+
+    /// Gets subdag index, returns 0 if not set in state table
+    pub fn get_sub_dag_index(&self) -> u64 {
+        if let Some(Value::SubDagIndex(value)) = self.metadata.get(&Metadata::SubDagIndex) {
+            value
+        } else {
+            0
         }
     }
 

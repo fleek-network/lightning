@@ -94,6 +94,7 @@ pub enum Metadata {
     LastEpochHash,
     LastBlockHash,
     GenesisCommittee,
+    SubDagIndex,
 }
 
 /// The Value enum is a data type used to represent values in a key-value pair for a metadata table
@@ -108,6 +109,7 @@ pub enum Value {
     NextNodeIndex(u32),
     Hash([u8; 32]),
     GenesisCommittee(Vec<NodeIndex>),
+    SubDagIndex(u64),
 }
 
 impl Value {
