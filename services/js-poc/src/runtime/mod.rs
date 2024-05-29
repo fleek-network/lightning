@@ -11,7 +11,7 @@ use deno_console::deno_console;
 use deno_core::serde_v8::{self, Serializable};
 use deno_core::url::Url;
 use deno_core::v8::{self, CreateParams, Global, Value};
-use deno_core::{JsRuntime, PollEventLoopOptions, RuntimeOptions};
+use deno_core::{JsRuntime, ModuleSpecifier, PollEventLoopOptions, RuntimeOptions};
 use deno_crypto::deno_crypto;
 use deno_url::deno_url;
 use deno_webgpu::deno_webgpu;
@@ -152,19 +152,13 @@ impl Runtime {
     /// Execute javascript source on the runtime
     pub async fn exec(
         &mut self,
-        url: Url,
-        source: String,
+        specifier: &ModuleSpecifier,
         param: Option<serde_json::Value>,
     ) -> anyhow::Result<Option<Global<Value>>> {
-        let id = self
-            .deno
-            .load_main_es_module_from_code(&url, source)
-            .await?;
-
+        let id = self.deno.load_main_es_module(specifier).await?;
         self.deno
             .run_event_loop(PollEventLoopOptions::default())
             .await?;
-
         self.deno.mod_evaluate(id).await?;
 
         {

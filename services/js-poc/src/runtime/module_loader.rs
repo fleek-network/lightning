@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context};
+use anyhow::{anyhow, bail, Context};
 use arrayref::array_ref;
 use cid::Cid;
 use deno_core::url::Host;
@@ -109,6 +109,10 @@ impl ModuleLoader for FleekModuleLoader {
                 let hash = *array_ref![bytes, 0, 32];
                 let specifier = module_specifier.clone();
                 ModuleLoadResponse::Async(Box::pin(async move {
+                    if !fn_sdk::api::fetch_blake3(hash).await {
+                        bail!("Failed to fetch {specifier}")
+                    }
+
                     let handle = ContentHandle::load(&hash).await?;
                     let source = handle.read_to_end().await?.into_boxed_slice();
 
@@ -132,7 +136,7 @@ impl ModuleLoader for FleekModuleLoader {
                 ModuleLoadResponse::Async(Box::pin(async move {
                     let hash = fetch_from_origin(fn_sdk::api::Origin::IPFS, cid.to_bytes())
                         .await
-                        .context("Failed to fetch ipfs module from origin")?;
+                        .with_context(|| format!("Failed to fetch {specifier} from origin"))?;
 
                     let handle = ContentHandle::load(&hash).await?;
                     let bytes = handle.read_to_end().await?;
@@ -164,7 +168,7 @@ impl ModuleLoader for FleekModuleLoader {
                         specifier.to_string(),
                     )
                     .await
-                    .context("failed to fetch http module from origin")?;
+                    .with_context(|| format!("Failed to fetch {specifier} from origin"))?;
 
                     let handle = ContentHandle::load(&hash).await?;
                     let bytes = handle.read_to_end().await?;

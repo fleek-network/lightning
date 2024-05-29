@@ -1,9 +1,6 @@
-use anyhow::{anyhow, bail, Context};
-use arrayref::array_ref;
-use cid::Cid;
-use deno_core::url::Url;
+use anyhow::{bail, Context};
 use deno_core::v8::{Global, IsolateHandle, Value};
-use deno_core::{serde_v8, v8, JsRuntime};
+use deno_core::{serde_v8, v8, JsRuntime, ModuleSpecifier};
 use fn_sdk::connection::Connection;
 use fn_sdk::header::TransportDetail;
 use fn_sdk::http_util::{respond, respond_with_error, respond_with_http_response};
@@ -77,6 +74,7 @@ async fn handle_connection(
             .read_payload()
             .await
             .context("Could not read body.")?;
+
         let TransportDetail::HttpRequest {
             method,
             ref url,
@@ -85,13 +83,21 @@ async fn handle_connection(
         else {
             unreachable!()
         };
+
         let request = http::request::extract(url, header, method, body.to_vec())
             .context("failed to parse request")?;
-        handle_request(&mut connection, &tx, request).await?;
+
+        if let Err(e) = handle_request(&mut connection, &tx, request).await {
+            respond_with_error(&mut connection, format!("{e:?}").as_bytes(), 400).await?;
+            return Err(e);
+        }
     } else {
         while let Some(payload) = connection.read_payload().await {
             let request: Request = serde_json::from_slice(&payload)?;
-            handle_request(&mut connection, &tx, request).await?;
+            if let Err(e) = handle_request(&mut connection, &tx, request).await {
+                respond_with_error(&mut connection, e.to_string().as_bytes(), 400).await?;
+                return Err(e);
+            };
         }
     }
 
@@ -109,105 +115,42 @@ async fn handle_request(
         path,
         param,
     } = request;
-
-    // Fetch content from origin
-    let hash = match origin {
-        Origin::Blake3 => {
-            let hash = hex::decode(uri).context("failed to decode blake3 hash")?;
-
-            if hash.len() != 32 {
-                respond_with_error(connection, b"Invalid blake3 hash length", 400).await?;
-                return Err(anyhow!("invalid blake3 hash length"));
-            }
-
-            let hash = *array_ref![hash, 0, 32];
-
-            if fn_sdk::api::fetch_blake3(hash).await {
-                hash
-            } else {
-                respond_with_error(connection, b"Failed to fetch blake3 content", 400).await?;
-                return Err(anyhow!("failed to fetch file"));
-            }
-        },
-        Origin::Ipfs | Origin::Http => {
-            let uri = match origin {
-                Origin::Ipfs => Cid::try_from(uri).context("Invalid IPFS CID")?.to_bytes(),
-                Origin::Http => urlencoding::decode(&uri)
-                    .context("Invalid URL encoding")?
-                    .to_string()
-                    .into(),
-                _ => unreachable!(),
-            };
-
-            match fn_sdk::api::fetch_from_origin(origin.into(), uri).await {
-                Some(hash) => hash,
-                None => {
-                    respond_with_error(connection, b"Failed to fetch from origin", 400).await?;
-                    return Err(anyhow!("failed to fetch from origin"));
-                },
-            }
-        },
-        o => {
-            let err = anyhow!("unknown origin: {o:?}");
-            respond_with_error(connection, err.to_string().as_bytes(), 400).await?;
-            return Err(err);
-        },
-    };
-
-    let mut location = Url::parse(&format!("blake3://{}", hex::encode(hash)))
-        .context("failed to create base url")?;
-    if let Some(path) = path {
-        location = location.join(&path).context("invalid path string")?;
+    if uri.is_empty() {
+        bail!("Empty origin uri");
     }
 
-    // Read and parse the source from the blockstore
-    let source_bytes = fn_sdk::blockstore::ContentHandle::load(&hash)
-        .await
-        .context("failed to get handle for source from blockstore")?
-        .read_to_end()
-        .await
-        .context("failed to read source from blockstore")?;
-    let source = String::from_utf8(source_bytes).context("failed to parse source as utf8")?;
+    let module_url = match origin {
+        Origin::Blake3 => format!("blake3://{uri}"),
+        Origin::Ipfs => format!("ipfs://{uri}"),
+        Origin::Http => uri,
+        Origin::Unknown => todo!(),
+    }
+    .parse::<ModuleSpecifier>()
+    .context("Invalid origin URI")?;
+
+    let mut location = module_url.clone();
+    if let Some(path) = path {
+        location = location.join(&path).context("Invalid path string")?;
+    }
 
     // Create runtime and execute the source
-    let mut runtime = match Runtime::new(location.clone()) {
-        Ok(runtime) => runtime,
-        Err(e) => {
-            respond_with_error(connection, e.to_string().as_bytes(), 400).await?;
-            return Err(e).context("failed to initialize runtime");
-        },
-    };
-
+    let mut runtime = Runtime::new(location.clone()).context("Failed to initialize runtime")?;
     tx.send(runtime.deno.v8_isolate().thread_safe_handle())
         .context("Failed to send the IsolateHandle to main thread.")?;
 
-    let res = match runtime.exec(location, source, param).await {
-        Ok(Some(res)) => res,
-        Ok(None) => {
-            respond_with_error(connection, b"no response available", 400).await?;
-            bail!("no response available");
-        },
-        Err(e) => {
-            respond_with_error(connection, e.to_string().as_bytes(), 400).await?;
-            return Err(e).context("failed to run javascript");
+    let res = match runtime.exec(&module_url, param).await? {
+        Some(res) => res,
+        None => {
+            bail!("No response available");
         },
     };
 
     // Resolve async if applicable
     // TODO: figure out why `deno.resolve` doesn't drive async functions
     #[allow(deprecated)]
-    let res = match tokio::time::timeout(params::REQ_TIMEOUT, runtime.deno.resolve_value(res)).await
-    {
-        Ok(Ok(res)) => res,
-        Ok(Err(e)) => {
-            respond_with_error(connection, e.to_string().as_bytes(), 400).await?;
-            return Err(e).context("failed to resolve output");
-        },
-        Err(e) => {
-            respond_with_error(connection, b"Request timeout", 400).await?;
-            return Err(e).context("execution timeout");
-        },
-    };
+    let res = tokio::time::timeout(params::REQ_TIMEOUT, runtime.deno.resolve_value(res))
+        .await
+        .context("Execution timeout")??;
 
     parse_and_respond(connection, &mut runtime, res).await?;
 
@@ -230,7 +173,7 @@ async fn parse_and_respond(
         // If the return type is a U8 array, send the raw data directly to the client
         let bytes = match deno_core::_ops::to_v8_slice_any(local) {
             Ok(slice) => slice.to_vec(),
-            Err(e) => return Err(anyhow!("failed to parse bytes: {e}")),
+            Err(e) => bail!("failed to parse bytes: {e}"),
         };
         respond(connection, &bytes).await?;
     } else if local.is_string() {
