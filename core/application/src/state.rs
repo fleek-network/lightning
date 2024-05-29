@@ -850,10 +850,14 @@ impl<B: Backend> State<B> {
             // increment epoch
             current_epoch += 1;
 
+            // Set the new committee, epoch, and reset sub dag index
             self.committee_info.set(current_epoch, new_committee);
 
             self.metadata
                 .set(Metadata::Epoch, Value::Epoch(current_epoch));
+            // epoch is changing so a new committee starts and subdag starts back at 0
+            self.metadata
+                .set(Metadata::SubDagIndex, Value::SubDagIndex(0));
             TransactionResponse::Success(ExecutionData::EpochChange)
         } else {
             self.committee_info.set(current_epoch, current_committee);
