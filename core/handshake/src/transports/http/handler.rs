@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use axum::body::Body;
 use axum::extract::{OriginalUri, Path, Query};
-use axum::http::{HeaderMap, Method, StatusCode, Uri};
+use axum::http::{HeaderMap, Method, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Extension;
 use bytes::Bytes;
@@ -23,7 +23,7 @@ pub async fn handler<P: ExecutorProviderInterface>(
     method: Method,
     headers: HeaderMap,
     OriginalUri(uri): OriginalUri,
-    Path((service_id, path)): Path<(String, String)>,
+    Path((service_id, _)): Path<(String, String)>,
     Query(params): Query<HashMap<String, String>>,
     Extension(provider): Extension<Context<P>>,
     payload: Bytes,
@@ -55,12 +55,18 @@ pub async fn handler<P: ExecutorProviderInterface>(
     let (body_tx, body_rx) = async_channel::bounded(16);
     let (termination_tx, termination_rx) = oneshot::channel();
 
+    // Create the url sent to the service
+    let path = uri.path().split('/').skip(3).collect::<Vec<_>>().join("/");
+    let mut url = Url::parse("http://fleek/").unwrap();
+    url.set_path(&path);
+    url.set_query(uri.query());
+
     let sender = HttpSender::new(service_id, frame_tx, body_tx, termination_tx);
     let receiver = HttpReceiver::new(
         frame_rx,
         TransportDetail::HttpRequest {
             method,
-            url: extract_url(&path, uri),
+            url,
             header: headers
                 .into_iter()
                 .filter_map(|(name, val)| {
@@ -140,12 +146,4 @@ pub async fn handler<P: ExecutorProviderInterface>(
 #[inline(always)]
 fn bad_request<T: AsRef<str> + Display>(msg: T) -> (StatusCode, String) {
     (StatusCode::BAD_REQUEST, msg.to_string())
-}
-
-#[inline(always)]
-fn extract_url(path: &str, uri: Uri) -> Url {
-    let mut result = Url::parse("http://fleek/").unwrap();
-    result.set_path(path);
-    result.set_query(uri.query());
-    result
 }
