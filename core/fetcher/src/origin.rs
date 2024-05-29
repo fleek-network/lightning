@@ -1,7 +1,7 @@
 use std::collections::{HashMap, VecDeque};
 
 use lightning_interfaces::prelude::*;
-use lightning_interfaces::types::{Blake3Hash, ImmutablePointer, OriginProvider};
+use lightning_interfaces::types::{Blake3Hash, ImmutablePointer};
 use lightning_interfaces::OriginProviderSocket;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::task::JoinSet;
@@ -99,13 +99,10 @@ impl<C: Collection> OriginFetcher<C> {
     async fn spawn(&mut self, pointer: ImmutablePointer) {
         let origin_socket = self.origin_socket.clone();
         self.tasks.spawn(async move {
-            match &pointer.origin {
-                OriginProvider::IPFS => match origin_socket.run(pointer.clone()).await {
-                    Ok(Ok(hash)) => Ok(SuccessResponse { pointer, hash }),
-                    Ok(Err(_)) => Err(ErrorResponse::OriginFetchError(pointer.uri)),
-                    Err(_) => Err(ErrorResponse::OriginSocketError),
-                },
-                _ => unreachable!(),
+            match origin_socket.run(pointer.clone()).await {
+                Ok(Ok(hash)) => Ok(SuccessResponse { pointer, hash }),
+                Ok(Err(_)) => Err(ErrorResponse::OriginFetchError(pointer.uri)),
+                Err(_) => Err(ErrorResponse::OriginSocketError),
             }
         });
     }
