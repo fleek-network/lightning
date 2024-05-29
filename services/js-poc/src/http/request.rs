@@ -20,7 +20,11 @@ pub fn extract(
         "http" => Origin::Http,
         _ => Origin::Unknown,
     };
-    let uri = segments.next()?.to_string();
+    let mut uri = segments.next()?.to_string();
+
+    if origin == Origin::Http {
+        uri = urlencoding::decode(&uri).ok()?.to_string();
+    }
 
     let mut path = String::new();
     for s in segments {

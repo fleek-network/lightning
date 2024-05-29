@@ -18,6 +18,7 @@ use deno_webgpu::deno_webgpu;
 use deno_webidl::deno_webidl;
 use extensions::fleek;
 
+use self::module_loader::FleekModuleLoader;
 use self::tape::{Punch, Tape};
 use crate::params::{FETCH_BLACKLIST, HEAP_INIT, HEAP_LIMIT};
 
@@ -113,7 +114,7 @@ impl Runtime {
             startup_snapshot: Some(SNAPSHOT),
             op_metrics_factory_fn: Some(tape.op_metrics_factory_fn()),
             create_params: Some(CreateParams::default().heap_limits(HEAP_INIT, HEAP_LIMIT)),
-            module_loader: Some(Rc::new(module_loader::node_modules())),
+            module_loader: Some(Rc::new(FleekModuleLoader::new())),
             ..Default::default()
         });
 
