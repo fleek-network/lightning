@@ -224,9 +224,17 @@ impl<P: ExecutorProviderInterface> Context<P> {
                     },
                 );
 
-                Proxy::new(connection_id, socket, rx, self.clone(), self.timeout).spawn(Some(
-                    State::OnlyPrimaryConnection((sender, receiver).into()),
-                ));
+                Proxy::new(
+                    connection_id,
+                    service,
+                    socket,
+                    rx,
+                    self.clone(),
+                    self.timeout,
+                )
+                .spawn(Some(State::OnlyPrimaryConnection(
+                    (sender, receiver).into(),
+                )));
             },
             // Join request to an existing connection
             HandshakeRequestFrame::JoinRequest { access_token } => {
