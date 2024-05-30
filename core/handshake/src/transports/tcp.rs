@@ -78,10 +78,22 @@ impl Transport for TcpTransport {
     ) -> Option<(schema::HandshakeRequestFrame, Self::Sender, Self::Receiver)> {
         let res = self.rx.recv().await?;
 
-        increment_counter!(
-            "handshake_tcp_sessions",
-            Some("Counter for number of handshake sessions accepted over tcp")
-        );
+        match res.0 {
+            schema::HandshakeRequestFrame::Handshake { service, .. } => {
+                let service_id = service.to_string();
+                increment_counter!(
+                    "handshake_tcp_sessions",
+                    Some("Counter for number of handshake sessions accepted over tcp"),
+                    "service_id" => service_id.as_str()
+                );
+            },
+            schema::HandshakeRequestFrame::JoinRequest { .. } => {
+                increment_counter!(
+                    "handshake_join_tcp_sessions",
+                    Some("Counter for number of handshake sessions accepted over tcp")
+                );
+            },
+        };
 
         Some(res)
     }

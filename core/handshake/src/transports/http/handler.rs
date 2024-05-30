@@ -91,10 +91,14 @@ pub async fn handler<P: ExecutorProviderInterface>(
         )
     })?;
 
-    increment_counter!(
-        "handshake_http_sessions",
-        Some("Counter for number of handshake sessions accepted over http")
-    );
+    {
+        let service_id = format!("{}", service_id as usize);
+        increment_counter!(
+            "handshake_http_sessions",
+            Some("Counter for number of handshake sessions accepted over http"),
+            "service_id" => service_id.as_str()
+        );
+    }
 
     provider
         .handle_new_connection(handshake_frame, sender, receiver)
