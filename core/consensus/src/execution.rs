@@ -235,6 +235,9 @@ impl<Q: SyncQueryRunnerInterface, NE: Emitter> ExecutionState for Execution<Q, N
     }
 
     async fn last_executed_sub_dag_index(&self) -> u64 {
-        self.query_runner.get_sub_dag_index()
+        // Note we add one here because of an off by 1 error in Narwhal codebase
+        // if we actually return the last sub dag index that we exectuted during a restart that is
+        // going to be the sub dag index they send us after a restart and we will re-execute it
+        self.query_runner.get_sub_dag_index() + 1
     }
 }
