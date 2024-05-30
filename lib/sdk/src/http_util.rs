@@ -126,7 +126,7 @@ mod tests {
         };
         let response = "Hello".as_bytes();
 
-        respond(&mut connection, &response).await.unwrap();
+        respond(&mut connection, response).await.unwrap();
         connection.shutdown().await.unwrap();
 
         let mut received_data = Vec::new();
@@ -157,7 +157,7 @@ mod tests {
         };
         let response = "Hello".as_bytes();
 
-        respond(&mut connection, &response).await.unwrap();
+        respond(&mut connection, response).await.unwrap();
         connection.shutdown().await.unwrap();
 
         let mut received_data = Vec::new();
