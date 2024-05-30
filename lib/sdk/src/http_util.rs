@@ -65,7 +65,9 @@ pub async fn respond_with_http_response(
 /// Respond with some bytes, setting default headers if the connection is http.
 #[inline(always)]
 pub async fn respond(connection: &mut Connection, response: &[u8]) -> anyhow::Result<()> {
-    respond_only_default_headers(connection).await?;
+    if connection.is_http_request() {
+        respond_only_default_headers(connection).await?;
+    }
 
     // Send the body back now
     connection
@@ -91,4 +93,82 @@ pub async fn respond_only_default_headers(connection: &mut Connection) -> anyhow
         .context("failed to send error headers")?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use tempdir::TempDir;
+    use tokio::io::AsyncReadExt;
+    use tokio::net::{UnixListener, UnixStream};
+    use url::Url;
+
+    use super::*;
+    use crate::connection::Connection;
+    use crate::header::{ConnectionHeader, HttpMethod, TransportDetail};
+
+    #[tokio::test]
+    async fn respond_using_http_connection() {
+        let temp_dir = TempDir::new("test").unwrap();
+        let socket_path = temp_dir.path().join("socket");
+        let listener = UnixListener::bind(&socket_path).unwrap();
+        let sender_stream = UnixStream::connect(&socket_path).await.unwrap();
+        let (mut receiver_stream, _) = listener.accept().await.unwrap();
+        let mut connection = Connection {
+            stream: sender_stream,
+            header: ConnectionHeader {
+                transport_detail: TransportDetail::HttpRequest {
+                    method: HttpMethod::GET,
+                    url: Url::parse("http://localhost").unwrap(),
+                    header: Default::default(),
+                },
+                pk: None,
+            },
+        };
+        let response = "Hello".as_bytes();
+
+        respond(&mut connection, &response).await.unwrap();
+        connection.shutdown().await.unwrap();
+
+        let mut received_data = Vec::new();
+        receiver_stream
+            .read_to_end(&mut received_data)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            String::from_utf8(received_data).unwrap(),
+            "\0\0\0\u{1e}{\"headers\":null,\"status\":null}\0\0\0\u{5}Hello"
+        );
+    }
+
+    #[tokio::test]
+    async fn respond_using_non_http_connection() {
+        let temp_dir = TempDir::new("test").unwrap();
+        let socket_path = temp_dir.path().join("socket");
+        let listener = UnixListener::bind(&socket_path).unwrap();
+        let sender_stream = UnixStream::connect(&socket_path).await.unwrap();
+        let (mut receiver_stream, _) = listener.accept().await.unwrap();
+        let mut connection = Connection {
+            stream: sender_stream,
+            header: ConnectionHeader {
+                transport_detail: TransportDetail::Other,
+                pk: None,
+            },
+        };
+        let response = "Hello".as_bytes();
+
+        respond(&mut connection, &response).await.unwrap();
+        connection.shutdown().await.unwrap();
+
+        let mut received_data = Vec::new();
+        receiver_stream
+            .read_to_end(&mut received_data)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            String::from_utf8(received_data).unwrap(),
+            "\0\0\0\u{5}Hello"
+        );
+    }
 }

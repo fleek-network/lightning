@@ -4109,6 +4109,7 @@ dependencies = [
  "serde",
  "serde_cbor",
  "serde_json",
+ "tempdir",
  "thiserror",
  "tokio",
  "tracing",

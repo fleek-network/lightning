@@ -135,6 +135,11 @@ impl Connection {
     pub fn is_anonymous(&self) -> bool {
         self.header.pk.is_none()
     }
+
+    /// Shutdown the connection stream.
+    pub async fn shutdown(&mut self) -> std::io::Result<()> {
+        self.stream.shutdown().await
+    }
 }
 
 impl AsyncWrite for Connection {
