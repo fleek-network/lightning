@@ -1752,12 +1752,14 @@ impl<B: Backend> State<B> {
                 let index = self.pub_key_to_index.get(&node).unwrap();
                 let mut node_info = self.node_info.get(&index).unwrap();
                 node_info.nonce += 1;
+                node_info.secondary_nonce += 1;
                 self.node_info.set(index, node_info);
             },
             TransactionSender::NodeConsensus(node) => {
                 let index = self.consensus_key_to_index.get(&node).unwrap();
                 let mut node_info = self.node_info.get(&index).unwrap();
                 node_info.nonce += 1;
+                node_info.secondary_nonce += 1;
                 self.node_info.set(index, node_info);
             },
             TransactionSender::AccountOwner(account) => {
