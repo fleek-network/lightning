@@ -265,6 +265,7 @@ impl<B: Backend> State<B> {
             UpdateMethod::UpdateContentRegistry { updates } => {
                 self.update_content_registry(txn.payload.sender, updates)
             },
+            UpdateMethod::IncrementNonce {} => TransactionResponse::Success(ExecutionData::None),
         };
 
         #[cfg(debug_assertions)]

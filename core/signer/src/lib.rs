@@ -212,35 +212,50 @@ impl SignerState {
                 self.next_nonce = self.base_nonce + 1;
                 // Resend all transactions in the buffer.
 
-                self.pending_transactions.retain_mut(|tx| {
-                    if let TransactionResponse::Revert(_) =
-                        query_runner.simulate_txn(tx.update_request.clone().into())
+                for tx in self.pending_transactions.iter_mut() {
+                    if matches!(
+                        query_runner.simulate_txn(tx.update_request.clone().into()),
+                        TransactionResponse::Revert(_)
+                    ) || tx.tries >= MAX_RETRIES
                     {
-                        // If transaction reverts, don't retry.
-                        false
-                    } else if tx.tries < MAX_RETRIES {
-                        if tx.update_request.payload.nonce != self.next_nonce {
-                            tx.update_request.payload.nonce = self.next_nonce;
-                            tx.update_request.payload.secondary_nonce = self.next_secondary_nonce;
+                        // If transaction reverts or we reached the maximum number of retries, don't
+                        // retry again.
+                        // To prevent invalidating the nonces of the following pending transactions,
+                        // we have to increment the nonce on the application state.
+                        let method = UpdateMethod::IncrementNonce {};
+                        let update_payload = UpdatePayload {
+                            sender: TransactionSender::NodeMain(self.node_public_key),
+                            method,
+                            nonce: self.next_nonce,
+                            secondary_nonce: self.next_secondary_nonce,
+                            chain_id: self.chain_id.unwrap(),
+                        };
+                        let digest = update_payload.to_digest();
+                        let signature = self.node_secret_key.sign(&digest);
+                        let update_request = UpdateRequest {
+                            signature: signature.into(),
+                            payload: update_payload,
+                        };
+                        tx.update_request = update_request;
+                    } else if tx.update_request.payload.nonce != self.next_nonce {
+                        // Note: with the change to using the increment nonce txn, this check
+                        // should not be necessary anymore.
+                        tx.update_request.payload.nonce = self.next_nonce;
+                        tx.update_request.payload.secondary_nonce = self.next_secondary_nonce;
 
-                            let digest = tx.update_request.payload.to_digest();
-                            let signature = self.node_secret_key.sign(&digest);
-                            tx.update_request.signature = signature.into();
-                        }
-
-                        // Update timestamp to resending time.
-                        tx.timestamp = SystemTime::now();
-                        if self.base_timestamp.is_none() {
-                            self.base_timestamp = Some(tx.timestamp);
-                        }
-
-                        self.next_nonce += 1;
-                        self.next_secondary_nonce += 1;
-                        true
-                    } else {
-                        false
+                        let digest = tx.update_request.payload.to_digest();
+                        let signature = self.node_secret_key.sign(&digest);
+                        tx.update_request.signature = signature.into();
                     }
-                });
+                    // Update timestamp to resending time.
+                    tx.timestamp = SystemTime::now();
+                    if self.base_timestamp.is_none() {
+                        self.base_timestamp = Some(tx.timestamp);
+                    }
+
+                    self.next_nonce += 1;
+                    self.next_secondary_nonce += 1;
+                }
 
                 for pending_tx in self.pending_transactions.iter_mut() {
                     if let Err(e) = self
