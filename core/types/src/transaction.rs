@@ -300,8 +300,6 @@ pub struct UpdatePayload {
     pub sender: TransactionSender,
     /// The counter or nonce of this request.
     pub nonce: u64,
-    /// The secondary nonce.
-    pub secondary_nonce: u128,
     /// The transition function (and parameters) for this update request.
     pub method: UpdateMethod,
     /// The chain ID.
@@ -440,7 +438,6 @@ impl ToDigest for UpdatePayload {
     fn transcript(&self) -> TranscriptBuilder {
         let mut transcript_builder = TranscriptBuilder::empty(FN_TXN_PAYLOAD_DOMAIN)
             .with("nonce", &self.nonce)
-            .with("secondary_nonce", &self.secondary_nonce)
             .with("chain_id", &self.chain_id);
 
         match &self.sender {
@@ -715,7 +712,6 @@ mod tests {
         let payload = UpdatePayload {
             sender: TransactionSender::AccountOwner(EthAddress([0; 20])),
             nonce: 0,
-            secondary_nonce: 0,
             method: update_method,
             chain_id: CHAIN_ID,
         };
@@ -741,7 +737,6 @@ mod tests {
         let payload_1 = UpdatePayload {
             sender: TransactionSender::AccountOwner(EthAddress([0; 20])),
             nonce: 0,
-            secondary_nonce: 0,
             method: update_method,
             chain_id: chain_id_1,
         };
@@ -773,7 +768,6 @@ mod tests {
             payload: UpdatePayload {
                 sender: TransactionSender::NodeMain(NodePublicKey([9; 32])),
                 nonce: 0,
-                secondary_nonce: 0,
                 method: UpdateMethod::ChangeEpoch { epoch: 0 },
                 chain_id: 69,
             },

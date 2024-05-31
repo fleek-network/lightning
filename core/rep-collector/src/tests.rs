@@ -512,7 +512,6 @@ async fn test_reputation_calculation_and_query() {
         let payload = UpdatePayload {
             sender: node.get_ed25519_pk().into(),
             nonce,
-            secondary_nonce: nonce as u128,
             method,
             chain_id,
         };

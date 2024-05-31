@@ -14,7 +14,6 @@ pub fn get_update_transactions(num_txns: usize) -> Vec<UpdateRequest> {
             let payload = UpdatePayload {
                 sender,
                 nonce: 0,
-                secondary_nonce: 1,
                 method,
                 chain_id: 1337,
             };

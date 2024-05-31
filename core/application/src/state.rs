@@ -620,7 +620,6 @@ impl<B: Backend> State<B> {
                         ports,
                         participation: Participation::False,
                         nonce: 0,
-                        secondary_nonce: 0,
                     };
                     self.create_node(node);
                 } else {
@@ -1615,9 +1614,7 @@ impl<B: Backend> State<B> {
             TransactionSender::NodeMain(node) => {
                 if let Some(index) = self.pub_key_to_index.get(&node) {
                     if let Some(info) = self.node_info.get(&index) {
-                        if txn.payload.nonce != info.nonce + 1
-                            || txn.payload.secondary_nonce <= info.secondary_nonce
-                        {
+                        if txn.payload.nonce != info.nonce + 1 {
                             return Err(ExecutionError::InvalidNonce);
                         }
                     } else {
@@ -1630,9 +1627,7 @@ impl<B: Backend> State<B> {
             TransactionSender::NodeConsensus(node) => {
                 if let Some(index) = self.consensus_key_to_index.get(&node) {
                     if let Some(info) = self.node_info.get(&index) {
-                        if txn.payload.nonce != info.nonce + 1
-                            || txn.payload.secondary_nonce <= info.secondary_nonce
-                        {
+                        if txn.payload.nonce != info.nonce + 1 {
                             return Err(ExecutionError::InvalidNonce);
                         }
                     }
@@ -1753,14 +1748,12 @@ impl<B: Backend> State<B> {
                 let index = self.pub_key_to_index.get(&node).unwrap();
                 let mut node_info = self.node_info.get(&index).unwrap();
                 node_info.nonce += 1;
-                node_info.secondary_nonce += 1;
                 self.node_info.set(index, node_info);
             },
             TransactionSender::NodeConsensus(node) => {
                 let index = self.consensus_key_to_index.get(&node).unwrap();
                 let mut node_info = self.node_info.get(&index).unwrap();
                 node_info.nonce += 1;
-                node_info.secondary_nonce += 1;
                 self.node_info.set(index, node_info);
             },
             TransactionSender::AccountOwner(account) => {

@@ -51,7 +51,6 @@ struct SignerState {
     chain_id: Option<u32>,
     base_nonce: u64,
     next_nonce: u64,
-    next_secondary_nonce: u128,
     base_timestamp: Option<SystemTime>,
     pending_transactions: VecDeque<PendingTransaction>,
 }
@@ -70,7 +69,6 @@ impl<C: Collection> Signer<C> {
             chain_id: None,
             base_nonce: 0,
             next_nonce: 0,
-            next_secondary_nonce: 0,
             base_timestamp: None,
             pending_transactions: VecDeque::new(),
         };
@@ -100,8 +98,8 @@ impl<C: Collection> Signer<C> {
         let mut guard = worker.state.lock().await;
         let mut node_index = LazyNodeIndex::new(guard.node_public_key);
         let chain_id = query_runner.get_chain_id();
-        let (nonce, secondary_nonce) = node_index.query_nonce(&query_runner);
-        guard.init_state(chain_id, nonce, secondary_nonce);
+        let nonce = node_index.query_nonce(&query_runner);
+        guard.init_state(chain_id, nonce);
         drop(guard);
 
         spawn!(
@@ -127,10 +125,9 @@ impl<C: Collection> SignerInterface<C> for Signer<C> {
 }
 
 impl SignerState {
-    fn init_state(&mut self, chain_id: u32, base_nonce: u64, secondary_nonce: u128) {
+    fn init_state(&mut self, chain_id: u32, base_nonce: u64) {
         self.base_nonce = base_nonce;
         self.next_nonce = base_nonce + 1;
-        self.next_secondary_nonce = secondary_nonce + 1;
         self.chain_id = Some(chain_id);
     }
 
@@ -140,7 +137,6 @@ impl SignerState {
             sender: TransactionSender::NodeMain(self.node_public_key),
             method,
             nonce: assigned_nonce,
-            secondary_nonce: self.next_secondary_nonce,
             chain_id: self.chain_id.unwrap(),
         };
 
@@ -163,9 +159,6 @@ impl SignerState {
         // Optimistically increment nonce
         self.next_nonce += 1;
 
-        // Always increment secondary nonce
-        self.next_secondary_nonce += 1;
-
         let timestamp = SystemTime::now();
         self.pending_transactions.push_back(PendingTransaction {
             update_request,
@@ -181,19 +174,13 @@ impl SignerState {
         assigned_nonce
     }
 
-    async fn sync_with_application<Q>(
-        &mut self,
-        application_nonce: u64,
-        secondary_nonce: u128,
-        query_runner: &Q,
-    ) where
+    async fn sync_with_application<Q>(&mut self, application_nonce: u64, query_runner: &Q)
+    where
         Q: SyncQueryRunnerInterface,
     {
         // All transactions in range [base_nonce, application_nonce] have
         // been ordered, so we can remove them from `pending_transactions`.
         self.base_nonce = application_nonce;
-        // If the next secondary nonce is now greater than our next sec nonce, we update it.
-        self.next_secondary_nonce = self.next_secondary_nonce.max(secondary_nonce + 1);
 
         while !self.pending_transactions.is_empty()
             && self.pending_transactions[0].update_request.payload.nonce <= application_nonce
@@ -227,7 +214,6 @@ impl SignerState {
                             sender: TransactionSender::NodeMain(self.node_public_key),
                             method,
                             nonce: self.next_nonce,
-                            secondary_nonce: self.next_secondary_nonce,
                             chain_id: self.chain_id.unwrap(),
                         };
                         let digest = update_payload.to_digest();
@@ -241,7 +227,6 @@ impl SignerState {
                         // Note: with the change to using the increment nonce txn, this check
                         // should not be necessary anymore.
                         tx.update_request.payload.nonce = self.next_nonce;
-                        tx.update_request.payload.secondary_nonce = self.next_secondary_nonce;
 
                         let digest = tx.update_request.payload.to_digest();
                         let signature = self.node_secret_key.sign(&digest);
@@ -254,7 +239,6 @@ impl SignerState {
                     }
 
                     self.next_nonce += 1;
-                    self.next_secondary_nonce += 1;
                 }
 
                 for pending_tx in self.pending_transactions.iter_mut() {
@@ -283,7 +267,7 @@ impl LazyNodeIndex {
     }
 
     /// Query the application layer for the last nonce and returns it.
-    fn query_nonce<Q>(&mut self, query_runner: &Q) -> (u64, u128)
+    fn query_nonce<Q>(&mut self, query_runner: &Q) -> u64
     where
         Q: SyncQueryRunnerInterface,
     {
@@ -292,10 +276,8 @@ impl LazyNodeIndex {
         }
 
         self.node_index
-            .and_then(|node_index| {
-                query_runner.get_node_info(&node_index, |n| (n.nonce, n.secondary_nonce))
-            })
-            .unwrap_or((0, 0))
+            .and_then(|node_index| query_runner.get_node_info(&node_index, |n| n.nonce))
+            .unwrap_or(0)
     }
 }
 
@@ -331,12 +313,10 @@ async fn new_block_task<Q: SyncQueryRunnerInterface>(
     query_runner: Q,
 ) {
     while let Some(_notification) = subscriber.last().await {
-        let (nonce, secondary_nonce) = node_index.query_nonce(&query_runner);
+        let nonce = node_index.query_nonce(&query_runner);
         // TODO(qti3e): Get the lock only if we have to. Timeout should get sep from block.
         // Right now we are relying on the existence of new blocks to handle timeout.
         let mut guard = worker.state.lock().await;
-        guard
-            .sync_with_application(nonce, secondary_nonce, &query_runner)
-            .await;
+        guard.sync_with_application(nonce, &query_runner).await;
     }
 }
