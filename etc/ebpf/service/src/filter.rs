@@ -8,43 +8,31 @@ use crate::frame::{IpcServiceFrame, Pf, PACKET_FILTER_SERVICE};
 use crate::utils::write;
 
 /// Client to update dynamic list of packet filter rules.
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct PacketFilter {
-    inner: Option<UnixStream>,
+    inner: UnixStream,
 }
 
 impl PacketFilter {
-    pub fn new() -> Self {
-        PacketFilter::default()
+    pub fn new(&mut self, stream: UnixStream) -> Self {
+        Self { inner: stream }
     }
 
-    // Todo: remove this method.
-    pub fn init(&mut self, stream: UnixStream) {
-        self.inner = Some(stream);
-    }
-
-    pub async fn connect(&mut self) -> io::Result<()> {
-        let sock = self.inner.as_ref().expect("To be initialized");
+    pub async fn connect(&self) -> io::Result<()> {
         let service = PACKET_FILTER_SERVICE.to_le_bytes();
-        write(sock, Bytes::from(service.to_vec())).await
+        write(&self.inner, Bytes::from(service.to_vec())).await
     }
 
     pub async fn add(&self, addr: SocketAddrV4) -> io::Result<()> {
-        if let Some(stream) = &self.inner {
-            let frame = IpcServiceFrame::Pf(Pf { op: Pf::ADD, addr });
-            write(stream, frame.serialize_len_delimit()).await?;
-        }
-        Ok(())
+        let frame = IpcServiceFrame::Pf(Pf { op: Pf::ADD, addr });
+        write(&self.inner, frame.serialize_len_delimit()).await
     }
 
     pub async fn remove(&self, addr: SocketAddrV4) -> io::Result<()> {
-        if let Some(stream) = &self.inner {
-            let frame = IpcServiceFrame::Pf(Pf {
-                op: Pf::REMOVE,
-                addr,
-            });
-            write(stream, frame.serialize_len_delimit()).await?;
-        }
-        Ok(())
+        let frame = IpcServiceFrame::Pf(Pf {
+            op: Pf::REMOVE,
+            addr,
+        });
+        write(&self.inner, frame.serialize_len_delimit()).await
     }
 }

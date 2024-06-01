@@ -148,23 +148,23 @@ impl FileRule {
         let mut result = String::new();
 
         if self.operations & Self::OPEN_MASK == Self::OPEN_MASK {
-            result.push_str("o");
+            result.push('o');
         }
 
         if self.operations & Self::READ_MASK == Self::READ_MASK {
-            result.push_str("r");
+            result.push('r');
         }
 
         if self.operations & Self::WRITE_MASK == Self::WRITE_MASK {
-            result.push_str("w");
+            result.push('w');
         }
 
         if self.operations & Self::EXEC_MASK == Self::EXEC_MASK {
-            result.push_str("x");
+            result.push('x');
         }
 
         if result.is_empty() {
-            result.push_str("-");
+            result.push('-');
         }
 
         result

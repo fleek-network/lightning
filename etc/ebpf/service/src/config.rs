@@ -143,7 +143,7 @@ impl ConfigSource {
 
             let mut tmp_path = PathBuf::new();
             tmp_path.push(self.paths.tmp_dir.as_path());
-            tmp_path.push(&fname);
+            tmp_path.push(fname);
 
             let mut tmp = fs::File::create(tmp_path.as_path()).await?;
             let bytes = serde_json::to_string(&profile)?;
@@ -152,7 +152,7 @@ impl ConfigSource {
 
             let mut dst = PathBuf::new();
             dst.push(self.paths.profiles_dir.as_path());
-            dst.push(&fname);
+            dst.push(fname);
 
             fs::rename(tmp_path, dst).await?;
         }

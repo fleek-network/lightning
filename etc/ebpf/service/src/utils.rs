@@ -18,7 +18,7 @@ pub async fn write(socket: &UnixStream, bytes: Bytes) -> io::Result<()> {
                     break 'write;
                 },
                 Err(e) => {
-                    return Err(e.into());
+                    return Err(e);
                 },
             }
         }
@@ -31,6 +31,8 @@ pub async fn read(socket: &UnixStream) -> io::Result<Option<Bytes>> {
     let mut frame_len = 0;
     loop {
         socket.ready(Interest::READABLE).await?;
+        // Todo: address this.
+        #[allow(clippy::never_loop)]
         'read: loop {
             while frame_len == 0 && bytes_read < 8 {
                 match socket.try_read(&mut read_buf[bytes_read..]) {
@@ -45,7 +47,7 @@ pub async fn read(socket: &UnixStream) -> io::Result<Option<Bytes>> {
                         break 'read;
                     },
                     Err(e) => {
-                        return Err(e.into());
+                        return Err(e);
                     },
                 }
             }
@@ -75,7 +77,7 @@ pub async fn read(socket: &UnixStream) -> io::Result<Option<Bytes>> {
                         break 'read;
                     },
                     Err(e) => {
-                        return Err(e.into());
+                        return Err(e);
                     },
                 }
             }
