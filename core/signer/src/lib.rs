@@ -223,14 +223,11 @@ impl SignerState {
                             payload: update_payload,
                         };
                         tx.update_request = update_request;
-                    } else if tx.update_request.payload.nonce != self.next_nonce {
-                        // Note: with the change to using the increment nonce txn, this check
-                        // should not be necessary anymore.
-                        tx.update_request.payload.nonce = self.next_nonce;
-
-                        let digest = tx.update_request.payload.to_digest();
-                        let signature = self.node_secret_key.sign(&digest);
-                        tx.update_request.signature = signature.into();
+                    } else {
+                        // Since we just replace transactions that we don't resend with an
+                        // increment nonce transaction, we don't have to update the nonce of the
+                        // transactions we try to resend.
+                        assert_eq!(tx.update_request.payload.nonce, self.next_nonce);
                     }
                     // Update timestamp to resending time.
                     tx.timestamp = SystemTime::now();
