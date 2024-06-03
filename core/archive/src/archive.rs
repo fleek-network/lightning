@@ -13,6 +13,7 @@ use lightning_interfaces::types::{
 use resolved_pathbuf::ResolvedPathBuf;
 use rocksdb::{Options, DB};
 use tokio::pin;
+use tracing::{trace, info, error};
 
 use crate::config::Config;
 
@@ -32,9 +33,9 @@ pub struct Archive<C: Collection> {
 
 struct ArchiveInner<C: Collection> {
     db: DB,
-    blockstore: c!(C::BlockstoreInterface),
-    /// Handles the rocks db storage for each epoch
+    /// Handles the Rocks DB storage for each epoch
     historical_state_dir: ResolvedPathBuf,
+    blockstore: c!(C::BlockstoreInterface),
 }
 
 impl<C: Collection> BuildGraph for Archive<C> {
@@ -137,7 +138,7 @@ impl<C: Collection> ArchiveInterface<C> for Archive<C> {
     async fn get_historical_epoch_state(
         &self,
         epoch: u64,
-    ) -> Option<c![C::ApplicationInterface::SyncExecutor]> {
+    ) -> Option<c!(C::ApplicationInterface::SyncExecutor)> {
         self.inner
             .as_ref()
             .and_then(|inner| inner.get_historical_query_runner(epoch).ok())
@@ -171,7 +172,7 @@ impl<C: Collection> ArchiveInner<C> {
         epoch: u64,
     ) -> Result<c!(C::ApplicationInterface::SyncExecutor)> {
         let path = self.historical_state_dir.join(epoch.to_string());
-        tracing::trace!(target: "archive", "Getting historical epoch state from {:?}", path);
+        trace!(target: "archive", "Getting historical epoch state from {:?}", path);
         let db = <c!(C::ApplicationInterface::SyncExecutor)>::atomo_from_path(path)?;
         let query_runner = <c!(C::ApplicationInterface::SyncExecutor)>::new(db);
         Ok(query_runner)
@@ -246,7 +247,7 @@ impl<C: Collection> ArchiveInner<C> {
 
         // read the checkpoint from the blockstore, at this point application/env::run() has already
         // written this to the blockstore
-        tracing::trace!(target: "archive", "Reading checkpoint from blockstore for epoch {}", epoch);
+        trace!(target: "archive", "Reading checkpoint from blockstore for epoch {}", epoch);
         let checkpoint = match self.blockstore.read_all_to_vec(&hash).await {
             Some(checkpoint) => checkpoint,
             None => {
@@ -263,7 +264,7 @@ impl<C: Collection> ArchiveInner<C> {
             &checkpoint,
         )?;
 
-        // we dont actullay need to do anything with the query runner, so we ignore it explicity
+        // we don't actually need to do anything with the query runner, so we ignore it explicitly
         let _ = <c!(C::ApplicationInterface::SyncExecutor)>::new(db);
 
         Ok(())

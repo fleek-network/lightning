@@ -3,11 +3,11 @@ name = "lightning-archive"
 version = "0.0.0"
 edition = "2021"
 
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 lightning-interfaces = { path = "../interfaces" }
+lightning-application = { path = "../application"}
 affair.workspace = true
 anyhow.workspace = true
 resolved-pathbuf.workspace = true
@@ -20,7 +20,7 @@ rocksdb = "0.21"
 atomo-rocks.workspace = true
 atomo.workspace = true
 workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }
-
+quick_cache.workspace = true
 
 [dev-dependencies]
 lightning-blockstore = { path = "../blockstore" }

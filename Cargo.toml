@@ -65,6 +65,7 @@ rkyv = { version = "0.7.44", features = [
     "alloc",
 ] }
 triomphe = "0.1"
+quick_cache = "0.5.1"
 
 # Our libraries
 lightning-types = { path = "core/types" }
