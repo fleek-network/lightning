@@ -80,6 +80,7 @@ pub fn build_bpf_program(target: Target, release: bool) -> Result<()> {
     }
 
     let status = Command::new("cargo")
+        .env("RUSTFLAGS", "-C debuginfo=2 -C link-arg=--btf")
         .current_dir(&dir)
         .env_remove("RUSTUP_TOOLCHAIN")
         .args(&args)
