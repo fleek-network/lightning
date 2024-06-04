@@ -157,7 +157,9 @@ ReqRes! {
     // todo!(n) find out how to remove this,
     // for some reasons adding these directly into the macro invocation doesn't work
     meta: #[derive(IsVariant, Archive, Serialize, Deserialize, PartialEq, Eq, Debug, Clone, Copy)],
-    meta: #[archive(check_bytes)]
+    meta: #[archive(check_bytes)],
+    // TODO: use a variable sized buffer type
+    meta: #[allow(clippy::large_enum_variant)]
     endmeta,
     /// Query a client's bandwidth balance.
     QueryClientBandwidth {
