@@ -188,9 +188,5 @@ async fn file_from_path(path: &PathBuf) -> anyhow::Result<File> {
     let file = fs::File::open(path.as_path()).await?;
     let metadata = file.metadata().await?;
     let inode = metadata.ino();
-    let dev = metadata.dev();
-    Ok(File {
-        inode,
-        dev: dev.try_into()?,
-    })
+    Ok(File::new(inode))
 }

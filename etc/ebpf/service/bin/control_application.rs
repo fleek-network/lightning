@@ -72,10 +72,10 @@ async fn main() -> anyhow::Result<()> {
         _file_open_prog = Some(prog);
     }
 
+    let file_open_allow: HashMap<_, File, FileRuleList> =
+        HashMap::try_from(handle.take_map("FILE_RULES").unwrap())?;
     let packet_filters: HashMap<_, PacketFilter, PacketFilterParams> =
         HashMap::try_from(handle.take_map("PACKET_FILTERS").unwrap())?;
-    let file_open_allow: HashMap<_, File, FileRuleList> =
-        HashMap::try_from(handle.take_map("FILE_RULES").unwrap()).unwrap();
 
     let path_config = PathConfig {
         tmp_dir: opt.tmp,

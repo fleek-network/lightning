@@ -88,6 +88,7 @@ impl Server {
         watcher.watch(self.config_src.profiles_path(), RecursiveMode::NonRecursive)?;
 
         self.shared_state.update_packet_filters().await?;
+        self.shared_state.update_all_file_rules().await?;
 
         loop {
             tokio::select! {

@@ -1,7 +1,7 @@
 #![no_std]
 
 pub const MAX_DEVICES: usize = 2;
-pub const MAX_FILE_RULES: usize = 10;
+pub const MAX_FILE_RULES: usize = 5;
 pub const ALLOW_FILE_RULE: i32 = 0;
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
@@ -61,7 +61,7 @@ pub struct SubnetFilterParams {
 #[cfg(feature = "userspace")]
 unsafe impl aya::Pod for SubnetFilterParams {}
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub struct FileRuleList {
     /// The files that are being protected.
@@ -71,13 +71,13 @@ pub struct FileRuleList {
 #[cfg(feature = "userspace")]
 unsafe impl aya::Pod for FileRuleList {}
 
-#[derive(Clone, Copy, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 #[repr(C)]
 pub struct File {
     /// Inode ID of the file.
     pub inode: u64,
     /// The device this file is located on.
-    pub dev: u32,
+    pub dev: u64,
 }
 
 impl File {

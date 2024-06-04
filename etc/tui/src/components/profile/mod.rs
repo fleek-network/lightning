@@ -85,6 +85,7 @@ impl Profile {
             .expect("Component always has a sender");
         let storage = self.src.clone();
         tokio::spawn(async move {
+            // Todo: do better.
             if let Err(e) = storage.delete_profiles(remove).await {
                 let _ = command_tx.send(Action::Error(e.to_string()));
             }

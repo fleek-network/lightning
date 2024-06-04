@@ -15,31 +15,35 @@ unsafe fn try_file_open(ctx: LsmContext) -> Result<i32, c_long> {
     let ctx_file: *const vmlinux::file = ctx.arg(0);
     let inode = aya_ebpf::helpers::bpf_probe_read_kernel(access::file_inode(ctx_file))?;
     let inode_n = aya_ebpf::helpers::bpf_probe_read_kernel(access::inode_i_ino(inode))?;
-
-    info!(&ctx, "file_open attempt on {}", inode_n);
-
     verify_permission(&ctx, inode_n)
 }
 
 unsafe fn verify_permission(ctx: &LsmContext, target_inode: u64) -> Result<i32, c_long> {
     let task_inode = get_inode_from_current_task()?;
-
-    // Todo: let's put this log behind a flag as it's for debugging.
-    let pid = aya_ebpf::helpers::bpf_get_current_pid_tgid();
-    info!(
-        ctx,
-        "Process {} running bin {} attempting to open file", pid, task_inode
-    );
-
     if let Some(rule_list) = maps::FILE_RULES.get(&File::new(task_inode)) {
-        if let Some(rule) = rule_list
+        info!(
+            ctx,
+            "file_open attempt on {} by {}", target_inode, task_inode
+        );
+
+        // Todo: let's put this log behind a flag as it's for debugging.
+        let pid = aya_ebpf::helpers::bpf_get_current_pid_tgid();
+        info!(
+            ctx,
+            "Process {} running bin {} attempting to open file", pid, task_inode
+        );
+
+        // Todo: use masking to check if operation is allowed.
+        if let Some(_rule) = rule_list
             .rules
             .iter()
             .find(|rule| rule.inode == target_inode)
         {
-            return Ok(rule.allow);
+            return Ok(0);
+        } else {
+            // Todo: Send event about access that was not accounted for.
+            return Ok(-1);
         }
-        // Todo: Send event about access that was not accounted for.
     }
 
     Ok(0)

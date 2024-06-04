@@ -219,7 +219,7 @@ impl RuleForm {
         let _permissions = self.input_fields[1].area.yank_text();
         self.buf.replace(FileRule {
             file: self.input_fields[0].area.yank_text().trim().try_into()?,
-            operations: FileRule::NO_OPERATION,
+            operations: FileRule::OPEN_MASK,
         });
 
         Ok(())
