@@ -84,7 +84,7 @@ impl ProfileView {
         let records = self.table.records().cloned().collect::<Vec<_>>();
         let mut profile = self
             .profile
-            .take()
+            .clone()
             .expect("The view should laways have a profile to view");
         // Update profile with the new rules.
         profile.file_rules = records;
@@ -145,7 +145,13 @@ impl Component for ProfileView {
                 self.table.scroll_down();
                 Ok(Some(Action::Render))
             },
-            Action::NavLeft | Action::NavRight => {
+            Action::NavLeft => {
+                self.clear();
+                Ok(None)
+            },
+            Action::NavRight => {
+                // Todo: update this after making a "wrapping" navigator or the big refactor.
+                #[cfg(feature = "logger")]
                 self.clear();
                 Ok(None)
             },
