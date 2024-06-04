@@ -215,11 +215,23 @@ impl RuleForm {
             field.area.cut();
         }
 
-        // Todo: get operations from permissions.
-        let _permissions = self.input_fields[1].area.yank_text();
+        let perm_input = self.input_fields[1].area.yank_text().trim().to_lowercase();
+        let mut permissions = FileRule::NO_OPERATION;
+        for op in perm_input.chars() {
+            if op == FileRule::OPEN_SYMBOL {
+                permissions |= FileRule::OPEN_MASK;
+            }
+            if op == FileRule::READ_SYMBOL {
+                permissions |= FileRule::READ_MASK;
+            }
+            if op == FileRule::WRITE_SYMBOL {
+                permissions |= FileRule::WRITE_MASK;
+            }
+        }
+
         self.buf.replace(FileRule {
             file: self.input_fields[0].area.yank_text().trim().try_into()?,
-            operations: FileRule::OPEN_MASK,
+            permissions,
         });
 
         Ok(())

@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::anyhow;
+use log::error;
 use once_cell::sync::Lazy;
 use resolved_pathbuf::ResolvedPathBuf;
 use tokio::fs;
@@ -126,7 +127,9 @@ impl ConfigSource {
             dst.push(self.paths.profiles_dir.as_path());
             dst.push(fname.as_path());
 
-            fs::remove_file(dst).await.unwrap();
+            if let Err(e) = fs::remove_file(&dst).await {
+                error!("failed to remove {}: {e}", dst.display())
+            }
         }
         Ok(())
     }

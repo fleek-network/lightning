@@ -2,9 +2,12 @@ use aya_ebpf::cty::c_long;
 use aya_ebpf::macros::lsm;
 use aya_ebpf::programs::LsmContext;
 use aya_log_ebpf::info;
-use lightning_ebpf_common::File;
+use lightning_ebpf_common::{File, FileRule};
 
 use crate::{access, maps, vmlinux};
+
+pub const ALLOW: i32 = 0;
+pub const DENY: i32 = -1;
 
 #[lsm(hook = "file_open")]
 pub fn file_open(ctx: LsmContext) -> i32 {
@@ -33,20 +36,21 @@ unsafe fn verify_permission(ctx: &LsmContext, target_inode: u64) -> Result<i32, 
             "Process {} running bin {} attempting to open file", pid, task_inode
         );
 
-        // Todo: use masking to check if operation is allowed.
-        if let Some(_rule) = rule_list
+        if rule_list
             .rules
             .iter()
             .find(|rule| rule.inode == target_inode)
+            .map(|rule| rule.permissions & FileRule::OPEN_MASK > 0)
+            .unwrap_or(false)
         {
-            return Ok(0);
+            return Ok(ALLOW);
         } else {
             // Todo: Send event about access that was not accounted for.
-            return Ok(-1);
+            return Ok(DENY);
         }
     }
 
-    Ok(0)
+    Ok(ALLOW)
 }
 
 /// Get the inode number of the current process's binary file.

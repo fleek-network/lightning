@@ -2,7 +2,6 @@
 
 pub const MAX_DEVICES: usize = 2;
 pub const MAX_FILE_RULES: usize = 5;
-pub const ALLOW_FILE_RULE: i32 = 0;
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
 #[repr(C)]
@@ -97,10 +96,10 @@ unsafe impl aya::Pod for File {}
 pub struct FileRule {
     /// The file in question.
     pub inode: u64,
-    /// Flag set to false=-1 if the operation
-    /// in question is not allowed for these files,
-    /// otherwise set to true=0.
-    pub allow: i32,
+    /// Permissions.
+    ///
+    /// Allowed operations have their corresponding bit set.
+    pub permissions: u32,
 }
 
 #[cfg(feature = "userspace")]
@@ -110,7 +109,15 @@ impl Default for FileRule {
     fn default() -> Self {
         Self {
             inode: 0,
-            allow: -1,
+            permissions: Self::NO_OPERATION,
         }
     }
+}
+
+impl FileRule {
+    pub const NO_OPERATION: u32 = 0x00;
+    pub const OPEN_MASK: u32 = 0x01 << 0;
+    pub const READ_MASK: u32 = 0x01 << 1;
+    pub const WRITE_MASK: u32 = 0x01 << 2;
+    pub const EXEC_MASK: u32 = 0x01 << 3;
 }

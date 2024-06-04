@@ -133,33 +133,38 @@ impl Display for Profile {
 pub struct FileRule {
     /// Path of the file.
     pub file: ResolvedPathBuf,
-    /// Allowed operations.
-    pub operations: u8,
+    /// Permissions.
+    ///
+    /// Operations are masked.
+    pub permissions: u32,
 }
 
 impl FileRule {
-    pub const NO_OPERATION: u8 = 0x00;
-    pub const OPEN_MASK: u8 = 0x01 << 0;
-    pub const READ_MASK: u8 = 0x01 << 1;
-    pub const WRITE_MASK: u8 = 0x01 << 2;
-    pub const EXEC_MASK: u8 = 0x01 << 3;
+    pub const NO_OPERATION: u32 = lightning_ebpf_common::FileRule::NO_OPERATION;
+    pub const OPEN_MASK: u32 = lightning_ebpf_common::FileRule::OPEN_MASK;
+    pub const READ_MASK: u32 = lightning_ebpf_common::FileRule::READ_MASK;
+    pub const WRITE_MASK: u32 = lightning_ebpf_common::FileRule::WRITE_MASK;
+    pub const EXEC_MASK: u32 = lightning_ebpf_common::FileRule::EXEC_MASK;
+    pub const OPEN_SYMBOL: char = 'o';
+    pub const READ_SYMBOL: char = 'r';
+    pub const WRITE_SYMBOL: char = 'w';
 
     pub fn permissions(&self) -> String {
         let mut result = String::new();
 
-        if self.operations & Self::OPEN_MASK == Self::OPEN_MASK {
+        if self.permissions & Self::OPEN_MASK == Self::OPEN_MASK {
             result.push('o');
         }
 
-        if self.operations & Self::READ_MASK == Self::READ_MASK {
+        if self.permissions & Self::READ_MASK == Self::READ_MASK {
             result.push('r');
         }
 
-        if self.operations & Self::WRITE_MASK == Self::WRITE_MASK {
+        if self.permissions & Self::WRITE_MASK == Self::WRITE_MASK {
             result.push('w');
         }
 
-        if self.operations & Self::EXEC_MASK == Self::EXEC_MASK {
+        if self.permissions & Self::EXEC_MASK == Self::EXEC_MASK {
             result.push('x');
         }
 

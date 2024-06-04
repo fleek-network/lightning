@@ -5,19 +5,12 @@ use std::sync::Arc;
 
 use anyhow::bail;
 use aya::maps::{HashMap, MapData};
-use lightning_ebpf_common::{
-    File,
-    FileRuleList,
-    PacketFilter,
-    PacketFilterParams,
-    ALLOW_FILE_RULE,
-    MAX_FILE_RULES,
-};
+use lightning_ebpf_common::{File, FileRuleList, PacketFilter, PacketFilterParams, MAX_FILE_RULES};
 use tokio::fs;
 use tokio::sync::Mutex;
 
 use crate::config::{ConfigSource, GLOBAL_PROFILE};
-use crate::map::{FileRule, PacketFilterRule};
+use crate::map::PacketFilterRule;
 
 #[derive(Clone)]
 pub struct SharedMap {
@@ -114,19 +107,16 @@ impl SharedMap {
             let mut file_open_rules =
                 vec![lightning_ebpf_common::FileRule::default(); MAX_FILE_RULES];
             for (i, rule) in profile.file_rules.iter().enumerate() {
-                // Todo: check for other types of accesses.
-                if rule.operations == FileRule::OPEN_MASK {
-                    let file = file_from_path(&rule.file).await?;
-                    if exec.dev != file.dev {
-                        // Protecting files in more than one device is not supported yet.
-                        bail!("executable file device and file device do not match");
-                    }
-                    if i >= MAX_FILE_RULES {
-                        bail!("path maximum {MAX_FILE_RULES} execeeded");
-                    }
-                    file_open_rules[i].inode = file.inode;
-                    file_open_rules[i].allow = ALLOW_FILE_RULE;
+                let file = file_from_path(&rule.file).await?;
+                if exec.dev != file.dev {
+                    // Protecting files in more than one device is not supported yet.
+                    bail!("executable file device and file device do not match");
                 }
+                if i >= MAX_FILE_RULES {
+                    bail!("path maximum {MAX_FILE_RULES} execeeded");
+                }
+                file_open_rules[i].inode = file.inode;
+                file_open_rules[i].permissions = rule.permissions;
             }
 
             let rules: [lightning_ebpf_common::FileRule; MAX_FILE_RULES] =
@@ -159,19 +149,16 @@ impl SharedMap {
         let exec = file_from_path(profile.name.as_ref().unwrap_or(&GLOBAL_PROFILE)).await?;
         let mut file_open_rules = vec![lightning_ebpf_common::FileRule::default(); MAX_FILE_RULES];
         for (i, rule) in profile.file_rules.iter().enumerate() {
-            // Todo: check for other types of accesses.
-            if rule.operations == FileRule::OPEN_MASK {
-                let file = file_from_path(&rule.file).await?;
-                if exec.dev != file.dev {
-                    // Protecting files in more than one device is not supported yet.
-                    bail!("executable file device and file device do not match");
-                }
-                if i >= MAX_FILE_RULES {
-                    bail!("path maximum {MAX_FILE_RULES} execeeded");
-                }
-                file_open_rules[i].inode = file.inode;
-                file_open_rules[i].allow = ALLOW_FILE_RULE;
+            let file = file_from_path(&rule.file).await?;
+            if exec.dev != file.dev {
+                // Protecting files in more than one device is not supported yet.
+                bail!("executable file device and file device do not match");
             }
+            if i >= MAX_FILE_RULES {
+                bail!("path maximum {MAX_FILE_RULES} execeeded");
+            }
+            file_open_rules[i].inode = file.inode;
+            file_open_rules[i].permissions = rule.permissions;
         }
 
         let rules: [lightning_ebpf_common::FileRule; MAX_FILE_RULES] =
