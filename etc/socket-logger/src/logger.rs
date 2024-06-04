@@ -16,7 +16,7 @@ pub struct SocketLogger {
 impl SocketLogger {
     pub fn new(config: Config, level: LevelFilter, socket: UnixStream) -> Self {
         Self {
-            config: config,
+            config,
             level,
             socket: Mutex::new(socket),
         }
@@ -51,7 +51,7 @@ impl SocketLogger {
         let mut id = String::new();
         if let Some(name) = std::thread::current().name() {
             let name = name
-                .split("#")
+                .split('#')
                 .next()
                 .expect("Split returns at least one string");
             id.push_str(format!("[{name}]").as_str());

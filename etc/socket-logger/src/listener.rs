@@ -1,7 +1,7 @@
 use std::io;
 use std::sync::Arc;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use tokio::io::Interest;
 use tokio::net::{UnixListener, UnixStream};
 use tui_logger::Drain;
@@ -51,7 +51,13 @@ impl Connection {
             let record = bincode::deserialize::<Record>(data.as_slice())?;
             self.drain.log(
                 &log::RecordBuilder::new()
-                    .level(record.metadata.level.parse()?)
+                    .level(
+                        record
+                            .metadata
+                            .level
+                            .parse()
+                            .map_err(|e| anyhow!("failed to parse level: {e}"))?,
+                    )
                     .target(record.metadata.target.as_str())
                     .module_path(record.module_path.as_deref())
                     .file(record.file.as_deref())

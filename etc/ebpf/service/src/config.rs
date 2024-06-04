@@ -125,7 +125,12 @@ impl ConfigSource {
             let fname = profile.as_ref().unwrap_or(&GLOBAL_PROFILE);
             let mut dst = PathBuf::new();
             dst.push(self.paths.profiles_dir.as_path());
-            dst.push(fname.as_path());
+            dst.push(
+                fname
+                    .as_path()
+                    .file_stem()
+                    .ok_or(anyhow!("invalid binary file name"))?,
+            );
 
             if let Err(e) = fs::remove_file(&dst).await {
                 error!("failed to remove {}: {e}", dst.display())
