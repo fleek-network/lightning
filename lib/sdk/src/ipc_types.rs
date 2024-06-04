@@ -178,7 +178,11 @@ ReqRes! {
     FetchFromOrigin {
         origin: u8,
         /// The encoded URI.
-        uri: StaticVec<256>,
+        // TODO: Use a variable sized buffer here.
+        //       For some reason Vec<u8> and rkyv::util::AlignedVec
+        //       cause trait bound mismatches when using it in the
+        //       WriteSerializer.
+        uri: StaticVec<1024>,
         =>
         /// Returns the hash of the content on successful fetch.
         hash: Option<[u8; 32]>,
