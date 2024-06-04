@@ -80,6 +80,16 @@ pub struct File {
     pub dev: u32,
 }
 
+impl File {
+    pub fn new(inode: u64) -> Self {
+        Self {
+            inode,
+            // Todo: This is not supported yet.
+            dev: 0,
+        }
+    }
+}
+
 #[cfg(feature = "userspace")]
 unsafe impl aya::Pod for File {}
 
