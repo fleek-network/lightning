@@ -7,7 +7,7 @@ use std::time::Duration;
 use fast_sri::IntegrityMetadata;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Blake3Hash, CompressionAlgorithm};
-use reqwest::{Client, Url};
+use reqwest::{Client, ClientBuilder, Url};
 
 pub use crate::config::Config;
 
@@ -27,7 +27,10 @@ impl<C: Collection> Clone for HttpOrigin<C> {
 
 impl<C: Collection> HttpOrigin<C> {
     pub fn new(_: Config, blockstore: C::BlockstoreInterface) -> anyhow::Result<Self> {
-        let client = Client::new();
+        let client = ClientBuilder::new()
+            .use_rustls_tls()
+            .build()
+            .expect("Unable to make reqwest https client in http origin");
         Ok(Self { client, blockstore })
     }
 
@@ -36,7 +39,7 @@ impl<C: Collection> HttpOrigin<C> {
         let resp = self
             .client
             .get(url)
-            .timeout(Duration::from_millis(500))
+            .timeout(Duration::from_millis(1000))
             .send()
             .await?;
         let mut data: Vec<u8> = resp.bytes().await?.into();
