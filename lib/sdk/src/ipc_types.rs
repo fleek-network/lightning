@@ -159,6 +159,7 @@ ReqRes! {
     meta: #[derive(IsVariant, Archive, Serialize, Deserialize, PartialEq, Eq, Debug, Clone, Copy)],
     meta: #[archive(check_bytes)],
     // TODO: use a variable sized buffer type
+    meta: #[archive_attr(allow(clippy::large_enum_variant))],
     meta: #[allow(clippy::large_enum_variant)]
     endmeta,
     /// Query a client's bandwidth balance.
