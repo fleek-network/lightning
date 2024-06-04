@@ -14,6 +14,12 @@ use resolved_pathbuf::ResolvedPathBuf;
 use rocksdb::{Options, DB};
 use tokio::pin;
 use tracing::{trace, info, error};
+use quick_cache::{sync::{Cache as SyncCache, DefaultLifecycle}, OptionsBuilder, UnitWeighter, DefaultHashBuilder};
+use atomo::{Atomo,QueryPerm};
+// use atomo::StorageBackend;
+// use lightning_application::storage::AtomoStorage;
+// use lightning_application::query_runner::QueryRunner;
+// use lightning_interfaces::SyncQueryRunnerInterface;
 
 use crate::config::Config;
 
@@ -33,6 +39,10 @@ pub struct Archive<C: Collection> {
 
 struct ArchiveInner<C: Collection> {
     db: DB,
+    /// Handles the cache for Rocks DB instances for each requested epoch (from RPC)
+    db_cache: SyncCache<u64, Atomo<QueryPerm, <c!(C::ApplicationInterface::SyncExecutor)>::Backend>>,
+    /// Handles the cache for QueryRunner lookup instances for each requested epoch (from RPC)
+    qr_cache: SyncCache<u64, c!(C::ApplicationInterface::SyncExecutor)>,
     /// Handles the Rocks DB storage for each epoch
     historical_state_dir: ResolvedPathBuf,
     blockstore: c!(C::BlockstoreInterface),
