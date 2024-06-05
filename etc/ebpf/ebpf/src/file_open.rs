@@ -11,28 +11,26 @@ pub const DENY: i32 = -1;
 
 #[lsm(hook = "file_open")]
 pub fn file_open(ctx: LsmContext) -> i32 {
-    unsafe { try_file_open(ctx).unwrap_or_else(|_| 0) }
+    unsafe { try_file_open(ctx).unwrap_or_else(|_| ALLOW) }
 }
 
 unsafe fn try_file_open(ctx: LsmContext) -> Result<i32, c_long> {
-    let ctx_file: *const vmlinux::file = ctx.arg(0);
-    let inode = aya_ebpf::helpers::bpf_probe_read_kernel(access::file_inode(ctx_file))?;
-    let inode_n = aya_ebpf::helpers::bpf_probe_read_kernel(access::inode_i_ino(inode))?;
-    verify_permission(&ctx, inode_n)
-}
-
-unsafe fn verify_permission(ctx: &LsmContext, target_inode: u64) -> Result<i32, c_long> {
+    let target_inode = {
+        let file: *const vmlinux::file = ctx.arg(0);
+        let inode = aya_ebpf::helpers::bpf_probe_read_kernel(access::file_inode(file))?;
+        aya_ebpf::helpers::bpf_probe_read_kernel(access::inode_i_ino(inode))?
+    };
     let task_inode = get_inode_from_current_task()?;
     if let Some(rule_list) = maps::FILE_RULES.get(&File::new(task_inode)) {
         info!(
-            ctx,
+            &ctx,
             "file_open attempt on {} by {}", target_inode, task_inode
         );
 
         // Todo: let's put this log behind a flag as it's for debugging.
         let pid = aya_ebpf::helpers::bpf_get_current_pid_tgid();
         info!(
-            ctx,
+            &ctx,
             "Process {} running bin {} attempting to open file", pid, task_inode
         );
 

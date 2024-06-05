@@ -1,7 +1,7 @@
 #![no_std]
 
 pub const MAX_DEVICES: usize = 2;
-pub const MAX_FILE_RULES: usize = 5;
+pub const MAX_FILE_RULES: usize = 20;
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
 #[repr(C)]
