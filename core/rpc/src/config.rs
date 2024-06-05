@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
-    addr: SocketAddr,
-    rpc_selection: RPCSelection,
+    pub addr: SocketAddr,
+    pub rpc_selection: RPCSelection,
 }
 
 impl Config {
@@ -13,15 +13,6 @@ impl Config {
         Self {
             addr,
             rpc_selection,
-        }
-    }
-
-    pub fn default_with_port_and_addr(addr: String, port: u16) -> Self {
-        Self {
-            addr: format!("{}:{}", addr, port)
-                .parse()
-                .expect("RPC Socket Addr to parse"),
-            rpc_selection: Default::default(),
         }
     }
 

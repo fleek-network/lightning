@@ -1,3 +1,4 @@
+use std::net::SocketAddr;
 use std::path::PathBuf;
 
 use clap::{arg, ArgAction, Parser, Subcommand, ValueEnum};
@@ -59,6 +60,12 @@ pub enum Command {
         /// Whether to not apply gensis block during initialization. The default is to apply it.
         #[clap(long)]
         no_apply_genesis: bool,
+        /// Set RPC listen address in the generated configuration file.
+        #[clap(long)]
+        rpc_address: Option<SocketAddr>,
+        /// Set handshake HTTP listen address in the generated configuration file.
+        #[clap(long)]
+        handshake_http_address: Option<SocketAddr>,
     },
     /// Key management utilities.
     #[command(subcommand)]

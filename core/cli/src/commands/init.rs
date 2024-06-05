@@ -1,9 +1,14 @@
+use std::net::SocketAddr;
+
 use anyhow::{anyhow, Context, Result};
 use lightning_application::app::Application;
 use lightning_application::config::Config as AppConfig;
 use lightning_application::network::Network;
 use lightning_final_bindings::FinalTypes;
+use lightning_handshake::config::HandshakeConfig;
+use lightning_handshake::handshake::Handshake;
 use lightning_interfaces::prelude::*;
+use lightning_rpc::{Config as RpcConfig, Rpc};
 use lightning_utils::config::TomlConfigProvider;
 use resolved_pathbuf::ResolvedPathBuf;
 use tracing::info;
@@ -13,6 +18,8 @@ pub async fn exec<C>(
     network: Network,
     no_generate_keys: bool,
     no_apply_genesis: bool,
+    rpc_address: Option<SocketAddr>,
+    handshake_http_address: Option<SocketAddr>,
 ) -> Result<()>
 where
     C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>,
@@ -34,6 +41,22 @@ where
         network: Some(network),
         ..Default::default()
     });
+
+    // Update RPC address in the configuration if given.
+    if let Some(addr) = rpc_address {
+        config.inject::<Rpc<FinalTypes>>(RpcConfig {
+            addr,
+            ..Default::default()
+        });
+    }
+
+    // Update handshake HTTP address in the configuration if given.
+    if let Some(addr) = handshake_http_address {
+        config.inject::<Handshake<FinalTypes>>(HandshakeConfig {
+            http_address: addr,
+            ..Default::default()
+        });
+    }
 
     // Write the configuration file.
     config.write(&config_path)?;

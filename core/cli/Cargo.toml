@@ -8,6 +8,8 @@ default-run = "lightning-node"
 
 [dependencies]
 lightning-application = { path = "../application" }
+lightning-rpc = { path = "../rpc" }
+lightning-handshake = { path = "../handshake" }
 lightning-ebpf-service = { path = "../../etc/ebpf/service" }
 lightning-interfaces = { path = "../interfaces" }
 lightning-node = { path = "../node" }
@@ -41,7 +43,6 @@ serial_test = "3.0.0"
 lightning-syncronizer = { path = "../syncronizer" }
 lightning-broadcast = { path = "../broadcast" }
 lightning-consensus = { path = "../consensus" }
-lightning-handshake = { path = "../handshake" }
 lightning-service-executor = { path = "../service-executor" }
 lightning-pool = { path = "../pool" }
 lightning-rep-collector = { path = "../rep-collector" }
@@ -52,7 +53,6 @@ lightning-blockstore-server = { path = "../blockstore-server" }
 lightning-resolver = { path = "../resolver" }
 lightning-archive = { path = "../archive" }
 lightning-pinger = { path = "../pinger" }
-lightning-rpc = { path = "../rpc" }
 fleek-blake3 = "1.5"
 assert_cmd = "2.0.14"
 tempdir.workspace = true
