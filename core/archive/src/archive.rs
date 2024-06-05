@@ -85,7 +85,35 @@ impl<C: Collection> Archive<C> {
                 .expect("Failed to create historical dir");
         }
 
-        let inner = ArchiveInner::<C>::new(db, historical_state_dir, blockstore.clone());
+        let db_cache = SyncCache::<u64, Atomo<QueryPerm, <c!(C::ApplicationInterface::SyncExecutor)>::Backend>>::with_options(
+            OptionsBuilder::new()
+                .estimated_items_capacity(10000)
+                .weight_capacity(10000)
+                .build()
+                .map_err(|error| {
+                    error!(target: "archive", "Error while initializing cache for DB descriptors: {:?}", error)
+                })
+                .expect("Couldn't allocate enough memory for DB cache items - try to raise the system limits for memory allocation per process"),
+            UnitWeighter,
+            DefaultHashBuilder::default(),
+            DefaultLifecycle::default(),
+        );
+
+        let qr_cache = SyncCache::<u64, c!(C::ApplicationInterface::SyncExecutor)>::with_options(
+            OptionsBuilder::new()
+                .estimated_items_capacity(10000)
+                .weight_capacity(10000)
+                .build()
+                .map_err(|error| {
+                    error!(target: "archive", "Error while initializing cache for QueryRunner instances: {:?}", error)
+                })
+                .expect("Couldn't allocate enough memory for QueryRunner cache items - try to raise the system limits for memory allocation per process"),
+            UnitWeighter,
+            DefaultHashBuilder::default(),
+            DefaultLifecycle::default(),
+        );
+
+        let inner = ArchiveInner::<C>::new(db, db_cache, qr_cache, historical_state_dir, blockstore.clone());
 
         Self {
             inner: Some(Arc::new(inner)),
@@ -167,11 +195,15 @@ impl<C: Collection> Clone for Archive<C> {
 impl<C: Collection> ArchiveInner<C> {
     fn new(
         db: DB,
+        db_cache: SyncCache<u64, Atomo<QueryPerm, <c!(C::ApplicationInterface::SyncExecutor)>::Backend>>,
+        qr_cache: SyncCache<u64, c!(C::ApplicationInterface::SyncExecutor)>,
         historical_state_dir: ResolvedPathBuf,
         blockstore: c!(C::BlockstoreInterface),
     ) -> Self {
         Self {
             db,
+            db_cache,
+            qr_cache,
             historical_state_dir,
             blockstore,
         }
