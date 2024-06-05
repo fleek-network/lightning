@@ -18,7 +18,7 @@ async fn print_default<C: Collection>() -> Result<()> {
 }
 
 async fn print<C: Collection>(config_path: ResolvedPathBuf) -> Result<()> {
-    let config = TomlConfigProvider::<C>::load_or_write_config(config_path).await?;
+    let config = TomlConfigProvider::<C>::load(config_path)?;
     println!("{}", config.serialize_config());
     Ok(())
 }

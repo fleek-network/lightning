@@ -3,10 +3,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::{env, fs};
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use lazy_static::lazy_static;
 use lightning_interfaces::prelude::*;
-use resolved_pathbuf::ResolvedPathBuf;
 use toml::{Table, Value};
 use tracing::debug;
 
@@ -46,33 +45,43 @@ impl<C: Collection> Default for TomlConfigProvider<C> {
 }
 
 impl<C: Collection> TomlConfigProvider<C> {
+    pub fn new() -> Self {
+        Self {
+            table: Table::new().into(),
+            collection: PhantomData,
+        }
+    }
+
     pub fn inject<T: ConfigConsumer>(&self, config: T::Config) {
         let mut table = self.table.lock().expect("Failed to acquire lock");
         table.insert(T::KEY.to_owned(), Value::try_from(&config).unwrap());
     }
 
-    fn open<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
+    pub fn load<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
         let path = path.as_ref();
 
-        let table = if path.exists() {
-            let content = fs::read_to_string(path).with_context(|| {
-                format!(
-                    "IO: Could not load the configuration file '{}'.",
-                    path.to_string_lossy()
-                )
-            })?;
+        if !path.exists() {
+            return Err(anyhow!(
+                "The configuration file '{}' does not exist. Run the `init` command to create it.",
+                path.to_string_lossy()
+            ));
+        }
 
-            toml::from_str::<Table>(&content).with_context(|| {
+        let content = fs::read_to_string(path).with_context(|| {
+            format!(
+                "IO: Could not load the configuration file '{}'.",
+                path.to_string_lossy()
+            )
+        })?;
+
+        let table = toml::from_str::<Table>(&content)
+            .with_context(|| {
                 format!(
                     "Could not parse the configuration file '{}' as toml.",
                     path.to_string_lossy()
                 )
             })?
-        } else {
-            // If the file doesn't exist, use defaults for everything.
-            Table::new()
-        }
-        .into();
+            .into();
 
         Ok(Self {
             table,
@@ -80,19 +89,13 @@ impl<C: Collection> TomlConfigProvider<C> {
         })
     }
 
-    pub async fn load_or_write_config(
-        config_path: ResolvedPathBuf,
-    ) -> Result<TomlConfigProvider<C>> {
-        let config = Self::open(&config_path)?;
-        <C as Collection>::capture_configs(&config);
-
-        if !config_path.exists() {
-            std::fs::write(&config_path, config.serialize_config()).with_context(|| {
-                format!("Could not write to file: {}", config_path.to_str().unwrap())
-            })?;
-        }
-
-        Ok(config)
+    pub fn write<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+        fs::write(&path, self.serialize_config()).with_context(|| {
+            format!(
+                "Could not write the configuration file: {}",
+                path.as_ref().to_string_lossy()
+            )
+        })
     }
 
     pub fn into_inner(&self) -> Table {
@@ -125,6 +128,6 @@ impl<C: Collection> ConfigProviderInterface<C> for TomlConfigProvider<C> {
 
 impl<C: Collection> BuildGraph for TomlConfigProvider<C> {
     fn build_graph() -> fdi::DependencyGraph {
-        fdi::DependencyGraph::new().with(|| Self::open("./config.toml"))
+        fdi::DependencyGraph::new().with(|| Self::load("./config.toml"))
     }
 }

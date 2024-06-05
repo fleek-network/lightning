@@ -16,21 +16,10 @@ where
     C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>,
 {
     match cmd {
-        DevSubCmd::InitOnly => init::<C>(config_path).await,
         DevSubCmd::DepGraph => dep_graph::<C>().await,
         DevSubCmd::Store { input } => store(input).await,
         DevSubCmd::Fetch { remote, hash } => fetch::<C>(config_path, hash, remote).await,
     }
-}
-
-async fn init<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>>(
-    config_path: ResolvedPathBuf,
-) -> Result<()> {
-    let config = TomlConfigProvider::<C>::load_or_write_config(config_path).await?;
-    Node::<C>::init(config)
-        .map_err(|e| anyhow::anyhow!("Node Initialization failed: {e:?}"))
-        .context("Could not start the node.")?;
-    Ok(())
 }
 
 async fn dep_graph<C: Collection>() -> Result<()> {
@@ -98,7 +87,7 @@ async fn fetch<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>>(
     };
     let hash_string = fleek_blake3::Hash::from(hash).to_string();
 
-    let config = TomlConfigProvider::<C>::load_or_write_config(config_path).await?;
+    let config = TomlConfigProvider::<C>::load(config_path)?;
     let mut node = Node::<C>::init(config)
         .map_err(|e| anyhow::anyhow!("Node Initialization failed: {e:?}"))
         .context("Could not start the node.")?;

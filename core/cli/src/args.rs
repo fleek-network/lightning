@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
-use clap::{arg, ArgAction, Parser, Subcommand};
+use clap::{arg, ArgAction, Parser, Subcommand, ValueEnum};
+use lightning_application::network::Network;
 use lightning_utils::config::LIGHTNING_HOME_DIR;
 
 use crate::commands::admin::AdminSubCmd;
@@ -28,10 +29,37 @@ pub struct Args {
     pub cmd: Command,
 }
 
+#[derive(ValueEnum, Debug, Clone)]
+pub enum NetworkArg {
+    LocalnetExample,
+    TestnetStable,
+}
+
+impl From<NetworkArg> for Network {
+    fn from(network: NetworkArg) -> Self {
+        match network {
+            NetworkArg::LocalnetExample => Network::LocalnetExample,
+            NetworkArg::TestnetStable => Network::TestnetStable,
+        }
+    }
+}
+
 #[derive(Subcommand)]
 pub enum Command {
     /// Run the full node.
     Run,
+    /// Initialize the node configuration and genesis block.
+    Init {
+        /// The built-in network genesis configuration to use.
+        #[clap(value_enum, long, short)]
+        network: NetworkArg,
+        /// Whether to not generate keys during initialization. The default is to generate keys.
+        #[clap(long)]
+        no_generate_keys: bool,
+        /// Whether to not apply gensis block during initialization. The default is to apply it.
+        #[clap(long)]
+        no_apply_genesis: bool,
+    },
     /// Key management utilities.
     #[command(subcommand)]
     Keys(KeySubCmd),
@@ -54,8 +82,6 @@ pub enum Command {
 
 #[derive(Subcommand, Clone)]
 pub enum DevSubCmd {
-    /// Initialize every service without starting the node.
-    InitOnly,
     /// Dump the mermaid dependency graph of services.
     DepGraph,
     /// Store the provided files to the blockstore.

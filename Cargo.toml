@@ -37,13 +37,9 @@ ethers = "2.0.10"
 num-bigint = "0.4.0"
 base64 = "0.21"
 bytes = "1.4"
-bigdecimal = "0.3.1"
 futures = "0.3"
-futures-util = "0.3"
-jsonrpc-v2 = { version = "0.11.0", features = ["easy-errors"] }
 lru = "0.10.0"
 multihash = "0.19"
-quinn = "0.10"
 rand = { version = "0.8.5", features = ["small_rng"] }
 reqwest = "0.11.18"
 serde = { version = "1.0", features = ["derive"] }
@@ -61,7 +57,6 @@ zeroize = "1.6"
 scc = "1.8.1"
 num-traits = "0.2.15"
 num-derive = "0.3.3"
-dirs = "5.0.1"
 lazy_static = "1.4.0"
 schemars = "0.8.1"
 rkyv = { version = "0.7.44", features = [
@@ -82,7 +77,6 @@ atomo-rocks = { path = "lib/atomo-rocks" }
 fleek-crypto = { path = "lib/fleek-crypto" }
 fleek-ipld = { path = "lib/fleek-ipld" }
 hp-fixed = { path = "lib/hp-fixed" }
-blake3-tree = { path = "lib/blake3-tree" }
 ink-quill = { path = "lib/ink-quill" }
 resolved-pathbuf = { path = "lib/resolved-pathbuf" }
 panic-report = { path = "lib/panic-report" }

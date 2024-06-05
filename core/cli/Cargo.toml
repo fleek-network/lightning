@@ -7,6 +7,7 @@ default-run = "lightning-node"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+lightning-application = { path = "../application" }
 lightning-ebpf-service = { path = "../../etc/ebpf/service" }
 lightning-interfaces = { path = "../interfaces" }
 lightning-node = { path = "../node" }
@@ -37,7 +38,6 @@ workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }
 
 [dev-dependencies]
 serial_test = "3.0.0"
-lightning-application = { path = "../application" }
 lightning-syncronizer = { path = "../syncronizer" }
 lightning-broadcast = { path = "../broadcast" }
 lightning-consensus = { path = "../consensus" }
@@ -54,6 +54,8 @@ lightning-archive = { path = "../archive" }
 lightning-pinger = { path = "../pinger" }
 lightning-rpc = { path = "../rpc" }
 fleek-blake3 = "1.5"
+assert_cmd = "2.0.14"
+tempdir.workspace = true
 
 [features]
 default = []
@@ -62,7 +64,9 @@ services = ["lightning-final-bindings/services"]
 dev = ["lightning-tui/logger", "tui-logger"]
 
 [target.'cfg(linux)'.dependencies]
-aya = { git = "https://github.com/aya-rs/aya", rev = "e5d107d", features = ["async_tokio"], optional = true }
+aya = { git = "https://github.com/aya-rs/aya", rev = "e5d107d", features = [
+    "async_tokio",
+], optional = true }
 aya-log = { git = "https://github.com/aya-rs/aya", rev = "e5d107d", optional = true }
 
 [[bin]]

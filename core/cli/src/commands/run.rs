@@ -17,7 +17,7 @@ where
     let shutdown_controller = ShutdownController::default();
     shutdown_controller.install_handlers();
 
-    let config = TomlConfigProvider::<C>::load_or_write_config(config_path).await?;
+    let config = TomlConfigProvider::<C>::load(config_path)?;
     let app_config = config.get::<<C as Collection>::ApplicationInterface>();
 
     let provider = MultiThreadedProvider::default();
