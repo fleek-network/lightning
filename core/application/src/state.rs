@@ -70,13 +70,6 @@ use rand::SeedableRng;
 
 use crate::table::{Backend, TableRef};
 
-/// Minimum number of reported measurements that have to be available for a node.
-/// If less measurements have been reported, no reputation score will be computed in that epoch.
-#[cfg(all(not(test), not(debug_assertions)))]
-const MIN_NUM_MEASUREMENTS: usize = 10;
-#[cfg(any(test, debug_assertions))]
-const MIN_NUM_MEASUREMENTS: usize = 2;
-
 /// Reported measurements are weighted by the reputation score of the reporting node.
 /// If there is no reputation score for the reporting node, we use a quantile from the array
 /// of all reputation scores.
@@ -875,10 +868,15 @@ impl<B: Backend> State<B> {
         )
         .unwrap_or(15);
 
+        let min_num_measurements = self
+            .parameters
+            .get(&ProtocolParams::MinNumMeasurements)
+            .unwrap() as usize;
+
         let mut map = HashMap::new();
         for node in self.rep_measurements.keys() {
             if let Some(reported_measurements) = self.rep_measurements.get(&node) {
-                if reported_measurements.len() >= MIN_NUM_MEASUREMENTS {
+                if reported_measurements.len() >= min_num_measurements {
                     // Only compute reputation score for node if enough measurements have been
                     // reported
                     let weighted_measurements = reported_measurements

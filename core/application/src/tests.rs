@@ -514,6 +514,7 @@ fn test_genesis() -> Genesis {
         max_lock_time: 1460,
         // Set to 1 million for testing, to be determined when initial allocations are set
         supply_at_genesis: 1000000,
+        min_num_measurements: 2,
         protocol_fund_address: protocol_address,
         governance_address: protocol_address,
         node_info: genesis_nodes,

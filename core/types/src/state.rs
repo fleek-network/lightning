@@ -180,6 +180,9 @@ pub enum ProtocolParams {
     MaxBoost = 10,
     /// The max amount of time tokens can be locked
     MaxStakeLockTime = 11,
+    /// Minimum number of reported measurements that have to be available for a node. If less
+    /// measurements have been reported, no reputation score will be computed in that epoch.
+    MinNumMeasurements = 12,
 }
 
 #[rustfmt::skip]

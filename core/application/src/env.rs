@@ -256,10 +256,21 @@ impl Env<UpdatePerm> {
         self.inner.run(|ctx| {
             let mut metadata_table = ctx.get_table::<Metadata, Value>("metadata");
 
+            let genesis = config.genesis()?;
+
             if metadata_table.get(Metadata::Epoch).is_some() {
+
+                // Backfill newly added protocol parameters from the genesis configuration.
+                let mut param_table = ctx.get_table::<ProtocolParams, u128>("parameter");
+                if param_table.get(ProtocolParams::MinNumMeasurements).is_none() {
+                    param_table.insert(
+                        ProtocolParams::MinNumMeasurements,
+                        genesis.min_num_measurements as u128
+                    );
+                }
+
                 return Ok(false);
             }
-            let genesis = config.genesis()?;
 
             let mut node_table = ctx.get_table::<NodeIndex, NodeInfo>("node");
             let mut account_table = ctx.get_table::<EthAddress, AccountInfo>("account");
@@ -335,6 +346,10 @@ impl Env<UpdatePerm> {
             param_table.insert(
                 ProtocolParams::NodeCount,
                 genesis.node_count as u128
+            );
+            param_table.insert(
+                ProtocolParams::MinNumMeasurements,
+                genesis.min_num_measurements as u128
             );
 
             let epoch_end: u64 = genesis.epoch_time + genesis.epoch_start;
@@ -484,5 +499,44 @@ impl<C: Collection> WorkerTrait for UpdateWorker<C> {
     type Response = BlockExecutionResponse;
     async fn handle(&mut self, req: Self::Request) -> Self::Response {
         self.env.run(req, || self.blockstore.put(None)).await
+    }
+}
+
+#[cfg(test)]
+mod env_tests {
+    use super::*;
+
+    #[test]
+    fn test_apply_genesis_block_backfills_when_missing() {
+        let config = Config::test();
+        let mut env = Env::new(&config, None).unwrap();
+
+        assert!(env.apply_genesis_block(&config).unwrap());
+
+        env.inner.run(|ctx| {
+            let mut param_table = ctx.get_table::<ProtocolParams, u128>("parameter");
+            assert!(
+                param_table
+                    .get(ProtocolParams::MinNumMeasurements)
+                    .is_some(),
+            );
+            param_table.remove(ProtocolParams::MinNumMeasurements);
+            assert!(
+                param_table
+                    .get(ProtocolParams::MinNumMeasurements)
+                    .is_none(),
+            );
+        });
+
+        assert!(!env.apply_genesis_block(&config).unwrap());
+
+        env.inner.run(|ctx| {
+            let param_table = ctx.get_table::<ProtocolParams, u128>("parameter");
+            assert!(
+                param_table
+                    .get(ProtocolParams::MinNumMeasurements)
+                    .is_some(),
+            );
+        });
     }
 }
