@@ -52,66 +52,69 @@ async fn test_build_latency_matrix() {
     let node_consensus_public_key2 = node_consensus_secret_key2.to_pk();
 
     // Init application service and store node info in application state.
-    let mut genesis = Genesis::default();
-    genesis.node_info = vec![
-        GenesisNode::new(
-            our_owner_public_key.into(),
-            our_public_key,
-            "127.0.0.1".parse().unwrap(),
-            our_consensus_public_key,
-            "127.0.0.1".parse().unwrap(),
-            our_public_key,
-            NodePorts {
-                primary: 48000,
-                worker: 48101,
-                mempool: 48102,
-                rpc: 48103,
-                pool: 48104,
-                pinger: 48106,
-                handshake: Default::default(),
-            },
-            None,
-            true,
-        ),
-        GenesisNode::new(
-            node_owner_public_key1.into(),
-            node_public_key1,
-            "127.0.0.1".parse().unwrap(),
-            node_consensus_public_key1,
-            "127.0.0.1".parse().unwrap(),
-            node_public_key1,
-            NodePorts {
-                primary: 38000,
-                worker: 38101,
-                mempool: 38102,
-                rpc: 38103,
-                pool: 38104,
-                pinger: 38106,
-                handshake: Default::default(),
-            },
-            None,
-            true,
-        ),
-        GenesisNode::new(
-            node_owner_public_key2.into(),
-            node_public_key2,
-            "127.0.0.1".parse().unwrap(),
-            node_consensus_public_key2,
-            "127.0.0.1".parse().unwrap(),
-            node_public_key2,
-            NodePorts {
-                primary: 38000,
-                worker: 38101,
-                mempool: 38102,
-                rpc: 38103,
-                pool: 38104,
-                pinger: 38106,
-                handshake: Default::default(),
-            },
-            None,
-            true,
-        ),
-    ];
+    let mut genesis = Genesis {
+        node_info: vec![
+            GenesisNode::new(
+                our_owner_public_key.into(),
+                our_public_key,
+                "127.0.0.1".parse().unwrap(),
+                our_consensus_public_key,
+                "127.0.0.1".parse().unwrap(),
+                our_public_key,
+                NodePorts {
+                    primary: 48000,
+                    worker: 48101,
+                    mempool: 48102,
+                    rpc: 48103,
+                    pool: 48104,
+                    pinger: 48106,
+                    handshake: Default::default(),
+                },
+                None,
+                true,
+            ),
+            GenesisNode::new(
+                node_owner_public_key1.into(),
+                node_public_key1,
+                "127.0.0.1".parse().unwrap(),
+                node_consensus_public_key1,
+                "127.0.0.1".parse().unwrap(),
+                node_public_key1,
+                NodePorts {
+                    primary: 38000,
+                    worker: 38101,
+                    mempool: 38102,
+                    rpc: 38103,
+                    pool: 38104,
+                    pinger: 38106,
+                    handshake: Default::default(),
+                },
+                None,
+                true,
+            ),
+            GenesisNode::new(
+                node_owner_public_key2.into(),
+                node_public_key2,
+                "127.0.0.1".parse().unwrap(),
+                node_consensus_public_key2,
+                "127.0.0.1".parse().unwrap(),
+                node_public_key2,
+                NodePorts {
+                    primary: 38000,
+                    worker: 38101,
+                    mempool: 38102,
+                    rpc: 38103,
+                    pool: 38104,
+                    pinger: 38106,
+                    handshake: Default::default(),
+                },
+                None,
+                true,
+            ),
+        ],
+
+        ..Default::default()
+    };
 
     let mut latencies = Vec::new();
     let (node_lhs, node_rhs) = if our_public_key < node_public_key1 {

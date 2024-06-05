@@ -76,32 +76,36 @@ async fn get_fetchers(
         .collect::<Vec<_>>();
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
-    let mut genesis = Genesis::default();
-    genesis.node_info = keystores
-        .iter()
-        .enumerate()
-        .map(|(i, keystore)| {
-            GenesisNode::new(
-                owner_public_key.into(),
-                keystore.get_ed25519_pk(),
-                "127.0.0.1".parse().unwrap(),
-                keystore.get_bls_pk(),
-                "127.0.0.1".parse().unwrap(),
-                keystore.get_ed25519_pk(),
-                NodePorts {
-                    primary: 48000_u16,
-                    worker: 48101_u16,
-                    mempool: 48202_u16,
-                    rpc: 48300_u16,
-                    pool: pool_port_offset + i as u16,
-                    pinger: 48600_u16,
-                    handshake: Default::default(),
-                },
-                None,
-                true,
-            )
-        })
-        .collect();
+
+    let genesis = Genesis {
+        node_info: keystores
+            .iter()
+            .enumerate()
+            .map(|(i, keystore)| {
+                GenesisNode::new(
+                    owner_public_key.into(),
+                    keystore.get_ed25519_pk(),
+                    "127.0.0.1".parse().unwrap(),
+                    keystore.get_bls_pk(),
+                    "127.0.0.1".parse().unwrap(),
+                    keystore.get_ed25519_pk(),
+                    NodePorts {
+                        primary: 48000_u16,
+                        worker: 48101_u16,
+                        mempool: 48202_u16,
+                        rpc: 48300_u16,
+                        pool: pool_port_offset + i as u16,
+                        pinger: 48600_u16,
+                        handshake: Default::default(),
+                    },
+                    None,
+                    true,
+                )
+            })
+            .collect(),
+
+        ..Default::default()
+    };
 
     let peers = keystores
         .into_iter()

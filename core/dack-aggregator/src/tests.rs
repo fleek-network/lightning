@@ -37,42 +37,46 @@ async fn init_aggregator(path: PathBuf) -> Node<TestBinding> {
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
 
-    let mut genesis = Genesis::default();
-    genesis.node_info = vec![GenesisNode::new(
-        owner_public_key.into(),
-        node_public_key,
-        "127.0.0.1".parse().unwrap(),
-        consensus_public_key,
-        "127.0.0.1".parse().unwrap(),
-        node_public_key,
-        NodePorts {
-            primary: 48000,
-            worker: 48101,
-            mempool: 48102,
-            rpc: 48103,
-            pool: 48104,
-            pinger: 48106,
-            handshake: Default::default(),
-        },
-        None,
-        true,
-    )];
-    genesis.service = vec![GenesisService {
-        id: 0,
-        owner: owner_public_key.into(),
-        commodity_type: types::CommodityTypes::Bandwidth,
-    }];
-    genesis.commodity_prices = vec![GenesisPrices {
-        commodity: types::CommodityTypes::Bandwidth,
-        price: 0.1,
-    }];
+    let genesis = Genesis {
+        epoch_start: SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64,
+        epoch_time: 4000, // millis
 
-    let epoch_start = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap()
-        .as_millis() as u64;
-    genesis.epoch_start = epoch_start;
-    genesis.epoch_time = 4000; // millis
+        node_info: vec![GenesisNode::new(
+            owner_public_key.into(),
+            node_public_key,
+            "127.0.0.1".parse().unwrap(),
+            consensus_public_key,
+            "127.0.0.1".parse().unwrap(),
+            node_public_key,
+            NodePorts {
+                primary: 48000,
+                worker: 48101,
+                mempool: 48102,
+                rpc: 48103,
+                pool: 48104,
+                pinger: 48106,
+                handshake: Default::default(),
+            },
+            None,
+            true,
+        )],
+
+        service: vec![GenesisService {
+            id: 0,
+            owner: owner_public_key.into(),
+            commodity_type: types::CommodityTypes::Bandwidth,
+        }],
+
+        commodity_prices: vec![GenesisPrices {
+            commodity: types::CommodityTypes::Bandwidth,
+            price: 0.1,
+        }],
+
+        ..Default::default()
+    };
 
     Node::<TestBinding>::init_with_provider(
         fdi::Provider::default()
