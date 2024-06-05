@@ -6,7 +6,7 @@ use std::time::Duration;
 use blake3_tree::ProofBuf;
 use fleek_crypto::{AccountOwnerSecretKey, NodePublicKey, SecretKey};
 use lightning_application::app::Application;
-use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
+use lightning_application::config::Config as AppConfig;
 use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_blockstore::blockstore::{Blockstore, BLOCK_SIZE};
 use lightning_blockstore::config::Config as BlockstoreConfig;
@@ -76,7 +76,7 @@ async fn get_peers(
     num_peers: usize,
 ) -> (Vec<Peer<TestBinding>>, PathBuf) {
     let mut keystores = Vec::new();
-    let mut genesis = Genesis::load().unwrap();
+    let mut genesis = Genesis::default();
     let path = std::env::temp_dir()
         .join("blockstore-server-test")
         .join(test_name);
@@ -123,11 +123,7 @@ async fn get_peers(
                     JsonConfigProvider::default()
                         .with::<Application<TestBinding>>(AppConfig {
                             genesis: Some(genesis.clone()),
-                            mode: Mode::Test,
-                            testnet: false,
-                            storage: StorageConfig::InMemory,
-                            db_path: None,
-                            db_options: None,
+                            ..AppConfig::test()
                         })
                         .with::<PoolProvider<TestBinding>>(PoolConfig {
                             max_idle_timeout: Duration::from_secs(5),

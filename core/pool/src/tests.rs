@@ -9,7 +9,7 @@ use bytes::Bytes;
 use fleek_crypto::{AccountOwnerSecretKey, NodePublicKey, SecretKey};
 use futures::StreamExt;
 use lightning_application::app::Application;
-use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
+use lightning_application::config::Config as AppConfig;
 use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_application::query_runner::QueryRunner;
 use lightning_interfaces::prelude::*;
@@ -77,7 +77,7 @@ async fn get_pools(
     state_server_address_port: Option<u16>,
 ) -> (Vec<Peer>, AppConfig, PathBuffWrapper) {
     let mut keystores = Vec::new();
-    let mut genesis = Genesis::load().unwrap();
+    let mut genesis = Genesis::default();
     let path = std::env::temp_dir()
         .join("lightning-pool-test")
         .join(test_name);
@@ -120,11 +120,7 @@ async fn get_pools(
 
     let app_config = AppConfig {
         genesis: Some(genesis),
-        mode: Mode::Test,
-        testnet: false,
-        storage: StorageConfig::InMemory,
-        db_path: None,
-        db_options: None,
+        ..AppConfig::test()
     };
 
     // Create peers.

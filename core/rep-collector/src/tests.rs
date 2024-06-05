@@ -3,7 +3,7 @@ use std::time::{Duration, SystemTime};
 
 use fleek_crypto::{AccountOwnerSecretKey, ConsensusSecretKey, NodeSecretKey, SecretKey};
 use lightning_application::app::Application;
-use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
+use lightning_application::config::Config as AppConfig;
 use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_application::query_runner::QueryRunner;
 use lightning_interfaces::prelude::*;
@@ -85,7 +85,7 @@ async fn test_query() {
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
 
-    let mut genesis = Genesis::load().unwrap();
+    let mut genesis = Genesis::default();
 
     genesis.node_info.push(GenesisNode::new(
         owner_public_key.into(),
@@ -113,11 +113,7 @@ async fn test_query() {
                 JsonConfigProvider::default()
                     .with::<Application<TestBinding>>(AppConfig {
                         genesis: Some(genesis),
-                        mode: Mode::Test,
-                        testnet: false,
-                        storage: StorageConfig::InMemory,
-                        db_path: None,
-                        db_options: None,
+                        ..AppConfig::test()
                     })
                     .with::<MockConsensus<TestBinding>>(ConsensusConfig {
                         min_ordering_time: 0,
@@ -190,7 +186,7 @@ async fn test_submit_measurements() {
     let peer_consensus_secret_key = ConsensusSecretKey::generate();
     let peer_consensus_public_key = peer_consensus_secret_key.to_pk();
 
-    let mut genesis = Genesis::load().unwrap();
+    let mut genesis = Genesis::default();
 
     genesis.node_info.push(GenesisNode::new(
         owner_public_key.into(),
@@ -245,11 +241,7 @@ async fn test_submit_measurements() {
                 JsonConfigProvider::default()
                     .with::<Application<TestBinding>>(AppConfig {
                         genesis: Some(genesis),
-                        mode: Mode::Test,
-                        testnet: false,
-                        storage: StorageConfig::InMemory,
-                        db_path: None,
-                        db_options: None,
+                        ..AppConfig::test()
                     })
                     .with::<MockConsensus<TestBinding>>(ConsensusConfig {
                         min_ordering_time: 0,
@@ -328,7 +320,7 @@ async fn test_reputation_calculation_and_query() {
         (keystore2.get_bls_sk(), keystore2.get_ed25519_sk());
 
     let (committee, mut keystores) = get_genesis_committee(4);
-    let mut genesis = Genesis::load().unwrap();
+    let mut genesis = Genesis::default();
     let chain_id = genesis.chain_id;
 
     genesis.node_info = committee;
@@ -406,11 +398,7 @@ async fn test_reputation_calculation_and_query() {
                 JsonConfigProvider::default()
                     .with::<Application<TestBinding>>(AppConfig {
                         genesis: Some(genesis.clone()),
-                        mode: Mode::Test,
-                        testnet: false,
-                        storage: StorageConfig::InMemory,
-                        db_path: None,
-                        db_options: None,
+                        ..AppConfig::test()
                     })
                     .with::<ReputationAggregator<TestBinding>>(Config {
                         reporter_buffer_size: 1,
@@ -434,11 +422,7 @@ async fn test_reputation_calculation_and_query() {
                 JsonConfigProvider::default()
                     .with::<Application<TestBinding>>(AppConfig {
                         genesis: Some(genesis),
-                        mode: Mode::Test,
-                        testnet: false,
-                        storage: StorageConfig::InMemory,
-                        db_path: None,
-                        db_options: None,
+                        ..AppConfig::test()
                     })
                     .with::<ReputationAggregator<TestBinding>>(Config {
                         reporter_buffer_size: 1,

@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 use std::path::Path;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
 use affair::AsyncWorker as WorkerTrait;
 use anyhow::{Context, Result};
@@ -37,8 +37,8 @@ use lightning_interfaces::types::{
 use lightning_metrics::increment_counter;
 use tracing::warn;
 
-use crate::config::{Config, Mode, StorageConfig};
-use crate::genesis::{Genesis, GenesisPrices};
+use crate::config::{Config, StorageConfig};
+use crate::genesis::GenesisPrices;
 use crate::query_runner::QueryRunner;
 use crate::state::State;
 use crate::storage::{AtomoStorage, AtomoStorageBuilder};
@@ -252,29 +252,14 @@ impl Env<UpdatePerm> {
     /// This function will panic if the genesis file cannot be decoded into the correct types
     /// Will return true if database was empty and genesis needed to be loaded or false if there was
     /// already state loaded and it didn't load genesis
-    pub fn genesis(&mut self, config: &Config) -> bool {
+    pub fn apply_genesis_block(&mut self, config: &Config) -> Result<bool> {
         self.inner.run(|ctx| {
             let mut metadata_table = ctx.get_table::<Metadata, Value>("metadata");
 
             if metadata_table.get(Metadata::Epoch).is_some() {
-                return false;
+                return Ok(false);
             }
-            let mut genesis = Genesis::load().unwrap();
-
-            match &config.mode {
-                Mode::Dev => {
-                    genesis.epoch_start = SystemTime::now()
-                        .duration_since(SystemTime::UNIX_EPOCH)
-                        .unwrap()
-                        .as_millis() as u64
-                },
-                Mode::Test => {
-                    if let Some(config_genesis) = &config.genesis {
-                        genesis = config_genesis.clone();
-                    }
-                },
-                Mode::Prod => (),
-            }
+            let genesis = config.genesis()?;
 
             let mut node_table = ctx.get_table::<NodeIndex, NodeInfo>("node");
             let mut account_table = ctx.get_table::<EthAddress, AccountInfo>("account");
@@ -460,7 +445,7 @@ impl Env<UpdatePerm> {
             }
 
         metadata_table.insert(Metadata::Epoch, Value::Epoch(0));
-        true
+        Ok(true)
         })
     }
 

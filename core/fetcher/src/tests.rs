@@ -4,7 +4,7 @@ use std::time::Duration;
 use cid::Cid;
 use fleek_crypto::{AccountOwnerSecretKey, SecretKey};
 use lightning_application::app::Application;
-use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
+use lightning_application::config::Config as AppConfig;
 use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
@@ -76,7 +76,7 @@ async fn get_fetchers(
         .collect::<Vec<_>>();
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
-    let mut genesis = Genesis::load().unwrap();
+    let mut genesis = Genesis::default();
     genesis.node_info = keystores
         .iter()
         .enumerate()
@@ -112,11 +112,7 @@ async fn get_fetchers(
                     JsonConfigProvider::default()
                         .with::<Application<TestBinding>>(AppConfig {
                             genesis: Some(genesis.clone()),
-                            mode: Mode::Test,
-                            testnet: false,
-                            storage: StorageConfig::InMemory,
-                            db_path: None,
-                            db_options: None,
+                            ..AppConfig::test()
                         })
                         .with::<PoolProvider<TestBinding>>(PoolConfig {
                             max_idle_timeout: Duration::from_secs(5),

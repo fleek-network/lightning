@@ -90,10 +90,10 @@ pub trait ApplicationInterface<C: Collection>:
     ) -> Result<()>;
 
     /// Used to get the chain id from the genesis file instead of state
-    fn get_chain_id() -> Result<ChainId>;
+    fn get_chain_id(config: &Self::Config) -> Result<ChainId>;
 
     /// Returns the committee from the geneis of the network
-    fn get_genesis_committee() -> Result<Vec<NodeInfo>>;
+    fn get_genesis_committee(config: &Self::Config) -> Result<Vec<NodeInfo>>;
 }
 
 #[interfaces_proc::blank]

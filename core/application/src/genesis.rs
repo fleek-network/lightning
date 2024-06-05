@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::net::IpAddr;
 
-use anyhow::{Context, Result};
 use fleek_crypto::{ClientPublicKey, ConsensusPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::types::{
@@ -16,7 +15,7 @@ use lightning_interfaces::types::{
 };
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct Genesis {
     pub chain_id: u32,
     pub epoch_start: u64,
@@ -86,19 +85,6 @@ pub struct GenesisLatency {
     pub node_public_key_lhs: NodePublicKey,
     pub node_public_key_rhs: NodePublicKey,
     pub latency_in_millis: u64,
-}
-
-impl Genesis {
-    /// Load the genesis file.
-    pub fn load() -> Result<Genesis> {
-        let raw = include_str!("../genesis.toml");
-        toml::from_str(raw).context("Failed to parse genesis file")
-    }
-}
-
-#[test]
-fn test() {
-    Genesis::load().unwrap();
 }
 
 impl From<&GenesisNode> for NodeInfo {

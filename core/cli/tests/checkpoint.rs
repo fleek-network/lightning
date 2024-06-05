@@ -49,6 +49,7 @@ fn build_config(
     let config = TomlConfigProvider::<FinalTypes>::default();
 
     config.inject::<Application<FinalTypes>>(AppConfig {
+        network: None,
         mode: Mode::Prod,
         genesis: Some(genesis),
         testnet: false,
@@ -161,7 +162,14 @@ async fn node_checkpointing() -> Result<()> {
     let consensus_public_key = consensus_secret_key.to_pk();
     let owner_public_key = AccountOwnerSecretKey::generate().to_pk();
 
-    let mut genesis = Genesis::load().unwrap();
+    let mut genesis = Genesis {
+        committee_size: 10,
+        node_count: 100,
+        min_stake: 1000,
+
+        ..Genesis::default()
+    };
+
     let node_ports = NodePorts {
         primary: 30100,
         worker: 30101,
@@ -192,6 +200,7 @@ async fn node_checkpointing() -> Result<()> {
 
     // We first have to build the app db in order to obtain a valid checkpoint.
     let app_config_temp = AppConfig {
+        network: None,
         mode: Mode::Prod,
         genesis: Some(genesis.clone()),
         testnet: false,
@@ -200,7 +209,7 @@ async fn node_checkpointing() -> Result<()> {
         db_options: None,
     };
     let mut env = Env::new(&app_config_temp, None)?;
-    env.genesis(&app_config_temp);
+    env.apply_genesis_block(&app_config_temp)?;
 
     let storage = env.inner.get_storage_backend_unsafe();
     let checkpoint = storage.serialize().unwrap();

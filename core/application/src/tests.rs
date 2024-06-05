@@ -58,7 +58,7 @@ use lightning_utils::application::QueryRunnerExt;
 use rand::seq::SliceRandom;
 
 use crate::app::Application;
-use crate::config::{Config, Mode, StorageConfig};
+use crate::config::Config;
 use crate::genesis::{Genesis, GenesisAccount, GenesisNode, GenesisPrices, GenesisService};
 use crate::query_runner::QueryRunner;
 
@@ -554,12 +554,8 @@ fn test_genesis() -> Genesis {
 /// Initialize application state with provided or default configuration.
 fn init_app(config: Option<Config>) -> (ExecutionEngineSocket, QueryRunner) {
     let config = config.or(Some(Config {
-        genesis: None,
-        mode: Mode::Dev,
-        testnet: false,
-        storage: StorageConfig::InMemory,
-        db_path: None,
-        db_options: None,
+        genesis: Some(test_genesis()),
+        ..Config::test()
     }));
     do_init_app(config.unwrap())
 }
@@ -632,11 +628,7 @@ fn init_app_with_params(
     }
     let config = Config {
         genesis: Some(genesis),
-        mode: Mode::Test,
-        testnet: false,
-        storage: StorageConfig::InMemory,
-        db_path: None,
-        db_options: None,
+        ..Config::test()
     };
 
     init_app(Some(config))
@@ -646,11 +638,7 @@ fn init_app_with_params(
 fn test_config(genesis: Genesis) -> Config {
     Config {
         genesis: Some(genesis),
-        mode: Mode::Test,
-        testnet: false,
-        storage: StorageConfig::InMemory,
-        db_path: None,
-        db_options: None,
+        ..Config::test()
     }
 }
 

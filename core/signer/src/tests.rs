@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use fleek_crypto::{AccountOwnerSecretKey, SecretKey};
 use lightning_application::app::Application;
-use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
+use lightning_application::config::Config as AppConfig;
 use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{NodePorts, UpdateMethod};
@@ -29,7 +29,7 @@ fn build_node(transactions_to_lose: &[u32]) -> Node<TestBinding> {
     let (consensus_secret_key, node_secret_key) =
         (keystore.get_bls_sk(), keystore.get_ed25519_sk());
 
-    let mut genesis = Genesis::load().unwrap();
+    let mut genesis = Genesis::default();
     let node_public_key = node_secret_key.to_pk();
     let consensus_public_key = consensus_secret_key.to_pk();
     let owner_secret_key = AccountOwnerSecretKey::generate();
@@ -60,11 +60,7 @@ fn build_node(transactions_to_lose: &[u32]) -> Node<TestBinding> {
             JsonConfigProvider::default()
                 .with::<Application<TestBinding>>(AppConfig {
                     genesis: Some(genesis),
-                    mode: Mode::Test,
-                    testnet: false,
-                    storage: StorageConfig::InMemory,
-                    db_path: None,
-                    db_options: None,
+                    ..AppConfig::test()
                 })
                 .with::<MockConsensus<TestBinding>>(ConsensusConfig {
                     min_ordering_time: 0,

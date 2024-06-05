@@ -4,7 +4,7 @@ use std::time::{Duration, SystemTime};
 
 use fleek_crypto::{AccountOwnerSecretKey, ConsensusSecretKey, NodeSecretKey, SecretKey};
 use lightning_application::app::Application;
-use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
+use lightning_application::config::Config as AppConfig;
 use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
@@ -71,7 +71,7 @@ async fn create_app_state(test_name: String) -> AppState {
     let peer_consensus_secret_key = ConsensusSecretKey::generate();
     let peer_consensus_public_key = peer_consensus_secret_key.to_pk();
 
-    let mut genesis = Genesis::load().unwrap();
+    let mut genesis = Genesis::default();
 
     genesis.node_info.push(GenesisNode::new(
         owner_public_key.into(),
@@ -131,11 +131,7 @@ async fn create_app_state(test_name: String) -> AppState {
                     })
                     .with::<Application<TestBinding>>(AppConfig {
                         genesis: Some(genesis),
-                        mode: Mode::Test,
-                        testnet: false,
-                        storage: StorageConfig::InMemory,
-                        db_path: None,
-                        db_options: None,
+                        ..AppConfig::test()
                     })
                     .with::<MockConsensus<TestBinding>>(ConsensusConfig {
                         min_ordering_time: 0,

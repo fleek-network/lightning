@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use fleek_crypto::{AccountOwnerSecretKey, SecretKey};
 use lightning_application::app::Application;
-use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
+use lightning_application::config::Config as AppConfig;
 use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_broadcast::Broadcast;
 use lightning_interfaces::prelude::*;
@@ -39,7 +39,7 @@ async fn test_start_shutdown() {
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
 
-    let mut genesis = Genesis::load().unwrap();
+    let mut genesis = Genesis::default();
 
     genesis.node_info.push(GenesisNode::new(
         owner_public_key.into(),
@@ -72,11 +72,7 @@ async fn test_start_shutdown() {
                 JsonConfigProvider::default()
                     .with::<Application<TestBinding>>(AppConfig {
                         genesis: Some(genesis),
-                        mode: Mode::Test,
-                        testnet: false,
-                        storage: StorageConfig::InMemory,
-                        db_path: None,
-                        db_options: None,
+                        ..AppConfig::test()
                     })
                     .with::<Resolver<TestBinding>>(Config {
                         store_path: path.clone().try_into().unwrap(),

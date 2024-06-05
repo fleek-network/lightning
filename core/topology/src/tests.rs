@@ -8,7 +8,7 @@ use fleek_crypto::{
     SecretKey,
 };
 use lightning_application::app::Application;
-use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
+use lightning_application::config::Config as AppConfig;
 use lightning_application::genesis::{Genesis, GenesisLatency, GenesisNode};
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{NodePorts, Participation};
@@ -52,7 +52,7 @@ async fn test_build_latency_matrix() {
     let node_consensus_public_key2 = node_consensus_secret_key2.to_pk();
 
     // Init application service and store node info in application state.
-    let mut genesis = Genesis::load().unwrap();
+    let mut genesis = Genesis::default();
     genesis.node_info = vec![
         GenesisNode::new(
             our_owner_public_key.into(),
@@ -151,11 +151,7 @@ async fn test_build_latency_matrix() {
     let mut node = Node::<TestBinding>::init_with_provider(fdi::Provider::default().with(
         JsonConfigProvider::default().with::<Application<TestBinding>>(AppConfig {
             genesis: Some(genesis),
-            mode: Mode::Test,
-            testnet: false,
-            storage: StorageConfig::InMemory,
-            db_path: None,
-            db_options: None,
+            ..AppConfig::test()
         }),
     ))
     .expect("failed to init node");
@@ -199,17 +195,11 @@ async fn test_build_latency_matrix() {
 
 #[tokio::test]
 async fn test_receive_connections() {
-    let mut node = Node::<TestBinding>::init_with_provider(fdi::Provider::default().with(
-        JsonConfigProvider::default().with::<Application<TestBinding>>(AppConfig {
-            genesis: None,
-            mode: Mode::Test,
-            testnet: false,
-            storage: StorageConfig::InMemory,
-            db_path: None,
-            db_options: None,
-        }),
-    ))
-    .unwrap();
+    let mut node =
+        Node::<TestBinding>::init_with_provider(fdi::Provider::default().with(
+            JsonConfigProvider::default().with::<Application<TestBinding>>(AppConfig::test()),
+        ))
+        .unwrap();
 
     let mut topology_rx = node.provider.get::<Topology<TestBinding>>().get_receiver();
 

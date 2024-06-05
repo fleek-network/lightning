@@ -260,7 +260,25 @@ impl SwarmBuilder {
 
         // Load the default genesis. Clear the committee and node info and overwrite
         // the provided values from config.
-        let mut genesis = Genesis::load().unwrap();
+        let mut genesis = Genesis {
+            node_info: Vec::with_capacity(num_nodes),
+            epoch_start: self.epoch_start.unwrap_or(1684276288383),
+            epoch_time: self.epoch_time.unwrap_or(120000),
+            committee_size: self.committee_size.unwrap_or(4),
+            node_count: self.node_count_param.unwrap_or(4),
+
+            min_stake: 1000,
+            eligibility_time: 1,
+            lock_time: 5,
+            node_share: 80,
+            service_builder_share: 20,
+            max_inflation: 10,
+            max_boost: 4,
+            max_lock_time: 1460,
+            supply_at_genesis: 1000000,
+
+            ..Default::default()
+        };
 
         genesis.node_info = Vec::with_capacity(num_nodes);
         genesis.epoch_start = self.epoch_start.unwrap_or(genesis.epoch_start);
@@ -359,6 +377,7 @@ impl SwarmBuilder {
                 StorageConfig::InMemory
             };
             config.inject::<Application<FinalTypes>>(AppConfig {
+                network: None,
                 mode: Mode::Test,
                 genesis: Some(genesis.clone()),
                 testnet: false,

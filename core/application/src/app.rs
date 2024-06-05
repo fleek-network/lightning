@@ -10,7 +10,6 @@ use tracing::{error, info};
 
 use crate::config::{Config, StorageConfig};
 use crate::env::{Env, UpdateWorker};
-use crate::genesis::Genesis;
 use crate::query_runner::QueryRunner;
 pub struct Application<C: Collection> {
     update_socket: Mutex<Option<ExecutionEngineSocket>>,
@@ -34,8 +33,10 @@ impl<C: Collection> Application<C> {
 
         let mut env = Env::new(&config, None).expect("Failed to initialize environment.");
 
-        if !env.genesis(&config) {
-            info!("State already exists. Not loading genesis.");
+        if env.apply_genesis_block(&config)? {
+            info!("Genesis block loaded into application state.");
+        } else {
+            info!("Genesis block already exists exist in application state.");
         }
 
         let query_runner = env.query_runner();
@@ -122,16 +123,13 @@ impl<C: Collection> ApplicationInterface<C> for Application<C> {
         }
     }
 
-    fn get_chain_id() -> Result<ChainId> {
-        let genesis = Genesis::load()?;
-
-        Ok(genesis.chain_id)
+    fn get_chain_id(config: &Config) -> Result<ChainId> {
+        Ok(config.genesis()?.chain_id)
     }
 
-    fn get_genesis_committee() -> Result<Vec<NodeInfo>> {
-        let genesis = Genesis::load()?;
-
-        Ok(genesis
+    fn get_genesis_committee(config: &Config) -> Result<Vec<NodeInfo>> {
+        Ok(config
+            .genesis()?
             .node_info
             .iter()
             .filter(|node| node.genesis_committee)

@@ -4,8 +4,8 @@ use std::time::{Duration, SystemTime};
 
 use fleek_crypto::{AccountOwnerSecretKey, SecretKey};
 use lightning_application::app::Application;
-use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
-use lightning_application::genesis::{Genesis, GenesisNode};
+use lightning_application::config::Config as AppConfig;
+use lightning_application::genesis::{Genesis, GenesisNode, GenesisPrices, GenesisService};
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{DeliveryAcknowledgment, DeliveryAcknowledgmentProof, NodePorts};
 use lightning_notifier::Notifier;
@@ -37,7 +37,7 @@ async fn init_aggregator(path: PathBuf) -> Node<TestBinding> {
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
 
-    let mut genesis = Genesis::load().unwrap();
+    let mut genesis = Genesis::default();
     genesis.node_info = vec![GenesisNode::new(
         owner_public_key.into(),
         node_public_key,
@@ -57,6 +57,15 @@ async fn init_aggregator(path: PathBuf) -> Node<TestBinding> {
         None,
         true,
     )];
+    genesis.service = vec![GenesisService {
+        id: 0,
+        owner: owner_public_key.into(),
+        commodity_type: types::CommodityTypes::Bandwidth,
+    }];
+    genesis.commodity_prices = vec![GenesisPrices {
+        commodity: types::CommodityTypes::Bandwidth,
+        price: 0.1,
+    }];
 
     let epoch_start = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
@@ -71,11 +80,7 @@ async fn init_aggregator(path: PathBuf) -> Node<TestBinding> {
                 JsonConfigProvider::default()
                     .with::<Application<TestBinding>>(AppConfig {
                         genesis: Some(genesis),
-                        mode: Mode::Test,
-                        testnet: false,
-                        storage: StorageConfig::InMemory,
-                        db_path: None,
-                        db_options: None,
+                        ..AppConfig::test()
                     })
                     .with::<MockConsensus<TestBinding>>(ConsensusConfig {
                         min_ordering_time: 0,

@@ -4,7 +4,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use fleek_crypto::{AccountOwnerSecretKey, NodeSecretKey, NodeSignature, SecretKey};
 use lightning_application::app::Application;
-use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
+use lightning_application::config::Config as AppConfig;
 use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::schema::broadcast::{Frame, Message};
@@ -51,7 +51,7 @@ async fn get_broadcasts(
     port_offset: u16,
     num_peers: usize,
 ) -> (Vec<Peer>, PathBuf) {
-    let mut genesis = Genesis::load().unwrap();
+    let mut genesis = Genesis::default();
     let path = std::env::temp_dir()
         .join("lightning-broadcast-test")
         .join(test_name);
@@ -94,11 +94,7 @@ async fn get_broadcasts(
 
     let app_config = AppConfig {
         genesis: Some(genesis),
-        mode: Mode::Test,
-        testnet: false,
-        storage: StorageConfig::InMemory,
-        db_path: None,
-        db_options: None,
+        ..AppConfig::test()
     };
 
     // Create peers.
