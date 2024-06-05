@@ -1,4 +1,4 @@
-![bannergithub](https://github.com/fleek-network/lightning/assets/73345016/43696987-31df-418d-8eba-2ded59d483e0)
+![Fleek-Network-Lightning-GitHub-Banner](https://github.com/fleek-network/lightning/assets/55561695/9d58244f-5148-414b-923a-9c452e4d5088)
 
 Lightning is the open-source Rust implementation of Fleek Network.
 
