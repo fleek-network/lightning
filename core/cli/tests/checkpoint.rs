@@ -215,7 +215,6 @@ async fn node_checkpointing() -> Result<()> {
         .map_err(|e| anyhow::anyhow!("Node Initialization failed: {e:?}"))
         .context("Could not start the node.")?;
 
-    println!("HERE");
     node.start().await;
 
     let shutdown_future = shutdown_controller.wait_for_shutdown();
@@ -228,7 +227,6 @@ async fn node_checkpointing() -> Result<()> {
         tokio::select! {
             _ = &mut shutdown_future => break,
             _ = interval.tick() => {
-                println!("HERE 2");
 
                 // wait for node to start
                 tokio::time::sleep(Duration::from_secs(30)).await;
