@@ -2,12 +2,13 @@ use aya_ebpf::cty::c_long;
 use aya_ebpf::macros::lsm;
 use aya_ebpf::programs::LsmContext;
 use aya_log_ebpf::info;
-use lightning_ebpf_common::{File, FileRule};
+use lightning_ebpf_common::{File, FileRule, MAX_FILE_RULES};
 
 use crate::{access, maps, vmlinux};
 
 pub const ALLOW: i32 = 0;
 pub const DENY: i32 = -1;
+pub const MAX_PARENT_SEARCH_DEPTH: u8 = 2;
 
 #[lsm(hook = "file_open")]
 pub fn file_open(ctx: LsmContext) -> i32 {
@@ -15,12 +16,14 @@ pub fn file_open(ctx: LsmContext) -> i32 {
 }
 
 unsafe fn try_file_open(ctx: LsmContext) -> Result<i32, c_long> {
+    let target_file: *const vmlinux::file = ctx.arg(0);
+
     let target_inode = {
-        let file: *const vmlinux::file = ctx.arg(0);
-        let inode = aya_ebpf::helpers::bpf_probe_read_kernel(access::file_inode(file))?;
+        let inode = aya_ebpf::helpers::bpf_probe_read_kernel(access::file_inode(target_file))?;
         aya_ebpf::helpers::bpf_probe_read_kernel(access::inode_i_ino(inode))?
     };
     let task_inode = get_inode_from_current_task()?;
+
     if let Some(rule_list) = maps::FILE_RULES.get(&File::new(task_inode)) {
         info!(
             &ctx,
@@ -40,6 +43,7 @@ unsafe fn try_file_open(ctx: LsmContext) -> Result<i32, c_long> {
             .find(|rule| rule.inode == target_inode)
             .map(|rule| rule.permissions & FileRule::OPEN_MASK > 0)
             .unwrap_or(false)
+            || verify_parent(target_file, &rule_list.rules, FileRule::OPEN_MASK)?
         {
             return Ok(ALLOW);
         } else {
@@ -49,6 +53,45 @@ unsafe fn try_file_open(ctx: LsmContext) -> Result<i32, c_long> {
     }
 
     Ok(ALLOW)
+}
+
+/// Returns true if there is a matching rule for
+/// one of the target file's parents, and false otherwise.
+unsafe fn verify_parent(
+    file: *const vmlinux::file,
+    rules: &[FileRule; MAX_FILE_RULES],
+    mask: u32,
+) -> Result<bool, c_long> {
+    let dentry = aya_ebpf::helpers::bpf_probe_read_kernel(access::file_dentry(file))?;
+    let mut next_parent_dentry =
+        aya_ebpf::helpers::bpf_probe_read_kernel(access::dentry_d_parent(dentry))?;
+
+    for _ in 0..MAX_PARENT_SEARCH_DEPTH {
+        if next_parent_dentry.is_null() {
+            break;
+        }
+
+        let parent_inode = {
+            let inode = aya_ebpf::helpers::bpf_probe_read_kernel(access::dentry_d_inode(
+                next_parent_dentry,
+            ))?;
+            aya_ebpf::helpers::bpf_probe_read_kernel(access::inode_i_ino(inode))?
+        };
+
+        if rules
+            .iter()
+            .find(|rule| rule.inode == parent_inode)
+            .map(|rule| rule.permissions & mask > 0)
+            .unwrap_or(false)
+        {
+            return Ok(true);
+        }
+
+        next_parent_dentry =
+            aya_ebpf::helpers::bpf_probe_read_kernel(access::dentry_d_parent(next_parent_dentry))?;
+    }
+
+    Ok(false)
 }
 
 /// Get the inode number of the current process's binary file.

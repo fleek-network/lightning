@@ -19,10 +19,10 @@ extern "C" {
     pub fn task_struct_mm(target: *const task_struct) -> *const *const mm_struct;
     pub fn cred_gid_val(target: *const cred) -> c_uint;
     pub fn cred_uid_val(target: *const cred) -> c_uint;
-    pub fn dentry_i_ino(target: *const dentry) -> c_ulong;
+    pub fn dentry_d_inode(target: *const dentry) -> *const *const inode;
+    pub fn dentry_d_parent(target: *const dentry) -> *const *const dentry;
     pub fn file_inode(target: *const file) -> *const *const inode;
-    pub fn file_f_path_dentry_inode(target: *const file) -> c_ulong;
-    pub fn file_dentry(target: *const file) -> *const dentry;
+    pub fn file_dentry(target: *const file) -> *const *const dentry;
     pub fn inode_i_ino(inode: *const inode) -> *const c_ulong;
     pub fn inode_i_sb(inode: *const inode) -> *const *const super_block;
     pub fn linux_binprm_argc(task: *const linux_binprm) -> c_int;

@@ -20,16 +20,16 @@ struct inode ** file_inode(struct file *target) {
 	return __builtin_preserve_access_index(&target->f_inode);
 }
 
-uint64_t file_f_path_dentry_inode(struct file *target) {
-	return __builtin_preserve_access_index(target->f_path.dentry->d_inode->i_ino);
+struct dentry ** file_dentry(struct file *target) {
+	return __builtin_preserve_access_index(&target->f_path.dentry);
 }
 
-struct dentry* file_dentry(struct file *target) {
-	return __builtin_preserve_access_index(target->f_path.dentry->d_parent);
+struct dentry ** dentry_d_parent(struct dentry *target) {
+	return __builtin_preserve_access_index(&target->d_parent);
 }
 
-uint64_t dentry_i_ino(struct dentry *target) {
-	return __builtin_preserve_access_index(target->d_inode->i_ino);
+struct inode ** dentry_d_inode(struct dentry *target) {
+	return __builtin_preserve_access_index(&target->d_inode);
 }
 
 uint64_t * inode_i_ino(struct inode *target) {
