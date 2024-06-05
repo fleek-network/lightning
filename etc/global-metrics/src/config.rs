@@ -1,5 +1,7 @@
 use std::env;
 
+use lightning_utils::config::LIGHTNING_HOME_DIR;
+
 #[derive(Clone)]
 pub struct Config {
     pub maxmind_db_path: String,
@@ -13,7 +15,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             maxmind_db_path: env::var("MAXMIND_DB_PATH")
-                .unwrap_or("~/.lightning/data/maxminddb_city".to_string()),
+                .unwrap_or(LIGHTNING_HOME_DIR.join("data/maxminddb_city").to_string()),
             tracker_port: env::var("TRACKER_PORT")
                 .unwrap_or("4000".to_string())
                 .parse()

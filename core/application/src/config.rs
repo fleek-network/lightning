@@ -1,3 +1,4 @@
+use lightning_utils::config::LIGHTNING_HOME_DIR;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
 
@@ -42,7 +43,8 @@ impl Default for Config {
             testnet: true,
             storage: StorageConfig::RocksDb,
             db_path: Some(
-                "~/.lightning/data/app_db"
+                LIGHTNING_HOME_DIR
+                    .join("data/app_db")
                     .try_into()
                     .expect("Failed to resolve path"),
             ),

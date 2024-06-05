@@ -3,10 +3,12 @@ mod model;
 mod serialize;
 
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::PathBuf;
 
 use anyhow::bail;
 use bytes::Bytes;
+use lazy_static::lazy_static;
+use lightning_utils::config::LIGHTNING_HOME_DIR;
 use ort::{TensorElementType, ValueType};
 
 use crate::opts::{BorshVector, Encoding};
@@ -16,7 +18,10 @@ use crate::runtime::model::Info;
 // Ideally we want every node to run onnx with runtime extensions.
 // It might be worthwhile to use a custom build of onnx
 // with statically-linked extensions.
-const ORT_EXTENSIONS_LIB_PATH: &str = "~/.lightning/onnx/libortextensions.dylib";
+lazy_static! {
+    static ref ORT_EXTENSIONS_LIB_PATH: PathBuf =
+        LIGHTNING_HOME_DIR.join("onnx/libortextensions.dylib");
+}
 
 pub struct Session {
     /// The Onnx Runtime Session.
@@ -28,8 +33,9 @@ pub struct Session {
 impl Session {
     pub fn new(model: Bytes, encoding: Encoding) -> anyhow::Result<Self> {
         let mut builder = ort::Session::builder()?;
-        if Path::new(ORT_EXTENSIONS_LIB_PATH).exists() {
-            builder = builder.with_custom_ops_lib(ORT_EXTENSIONS_LIB_PATH)?
+        if ORT_EXTENSIONS_LIB_PATH.exists() {
+            builder =
+                builder.with_custom_ops_lib(ORT_EXTENSIONS_LIB_PATH.to_string_lossy().as_ref())?
         }
         Ok(Self {
             onnx: builder.with_model_from_memory(model.as_ref())?,

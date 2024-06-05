@@ -12,7 +12,9 @@ config = "0.14"
 crossterm = { version = "0.27", features = ["serde", "event-stream"] }
 derive_deref = "1.1"
 directories = "5.0"
-lightning-ebpf-service = { path = "../ebpf/service", default-features = false, features = ["client"] }
+lightning-ebpf-service = { path = "../ebpf/service", default-features = false, features = [
+    "client",
+] }
 futures = "0.3"
 indexmap = { version = "2.2", features = ["serde"] }
 indoc = "2.0"
@@ -32,6 +34,7 @@ tokio-util = "0.7"
 tui-logger = { version = "0.11", optional = true }
 tui-textarea = "0.4"
 unicode-width = "0.1"
+lightning-utils = { path = "../../core/utils" }
 
 [dev-dependencies]
 pretty_assertions = "1.4"

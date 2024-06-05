@@ -1,3 +1,4 @@
+use lightning_utils::config::LIGHTNING_HOME_DIR;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
 
@@ -13,7 +14,8 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             is_archive: false,
-            store_path: "~/.lightning/data/archiver"
+            store_path: LIGHTNING_HOME_DIR
+                .join("data/archiver")
                 .try_into()
                 .expect("Failed to resolve path"),
         }

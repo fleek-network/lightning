@@ -1,6 +1,7 @@
 use std::io;
 
 use bytes::Bytes;
+use lightning_utils::config::LIGHTNING_HOME_DIR;
 use resolved_pathbuf::ResolvedPathBuf;
 use tokio::net::UnixStream;
 
@@ -13,7 +14,7 @@ pub struct Subscriber {
 
 impl Subscriber {
     pub async fn subscribe(topic: u32) -> io::Result<Self> {
-        let path = ResolvedPathBuf::try_from("~/.lightning/ebpf")?;
+        let path = ResolvedPathBuf::try_from(LIGHTNING_HOME_DIR.join("ebpf"))?;
         let sock = UnixStream::connect(path.as_path()).await?;
         utils::write(&sock, Bytes::from(topic.to_le_bytes().to_vec())).await?;
         Ok(Self { socket: sock })

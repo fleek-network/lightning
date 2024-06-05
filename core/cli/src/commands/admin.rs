@@ -5,6 +5,7 @@ use anyhow::{Error, Result};
 use clap::{Args, Subcommand};
 use lightning_ebpf_service::{ConfigSource, PathConfig};
 use lightning_tui::app::App;
+use lightning_utils::config::LIGHTNING_HOME_DIR;
 use once_cell::sync::OnceCell;
 use resolved_pathbuf::ResolvedPathBuf;
 use tracing::debug;
@@ -79,7 +80,9 @@ pub async fn exec(cmd: AdminSubCmd) -> Result<()> {
     PATH_CONFIG.set(config).expect("Not to be initialized yet");
     BIND_PATH
         .set(
-            ResolvedPathBuf::try_from("~/.lightning/ebpf/ctrl")
+            LIGHTNING_HOME_DIR
+                .join("ebpf/ctrl")
+                .try_into()
                 .expect("Path resolution not to fail"),
         )
         .expect("Not to be initialized yet");

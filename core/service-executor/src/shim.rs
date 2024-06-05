@@ -4,6 +4,8 @@ use std::path::PathBuf;
 use fxhash::FxHashSet;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::ServiceId;
+use lightning_test_utils::config::LIGHTNING_TEST_HOME_DIR;
+use lightning_utils::config::LIGHTNING_HOME_DIR;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
 use tokio::net::UnixStream;
@@ -33,7 +35,8 @@ impl Default for ServiceExecutorConfig {
     fn default() -> Self {
         Self {
             services: [0, 1].into_iter().collect(),
-            ipc_path: "~/.lightning/ipc"
+            ipc_path: LIGHTNING_HOME_DIR
+                .join("ipc")
                 .try_into()
                 .expect("Failed to resolve path"),
         }
@@ -44,7 +47,8 @@ impl ServiceExecutorConfig {
     pub fn test_default() -> Self {
         Self {
             services: Default::default(),
-            ipc_path: "~/.lightning-test/ipc"
+            ipc_path: LIGHTNING_TEST_HOME_DIR
+                .join("ipc")
                 .try_into()
                 .expect("Failed to resolve path"),
         }

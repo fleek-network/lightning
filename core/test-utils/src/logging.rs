@@ -4,6 +4,7 @@ use std::os::unix::net::UnixStream;
 use std::str::FromStr;
 
 use chrono::Local;
+use lightning_utils::config::LIGHTNING_HOME_DIR;
 use resolved_pathbuf::ResolvedPathBuf;
 use simplelog::{
     ColorChoice,
@@ -36,7 +37,8 @@ pub fn setup() {
 
     match log_filter {
         None => {
-            let path = ResolvedPathBuf::try_from("~/.lightning/socket-logger/ctrl").unwrap();
+            let path =
+                ResolvedPathBuf::try_from(LIGHTNING_HOME_DIR.join("socket-logger/ctrl")).unwrap();
             let socket = UnixStream::connect(path).unwrap();
             let config = socket_logger::Builder::new()
                 .ignore("narwhal_consensus::bullshark")

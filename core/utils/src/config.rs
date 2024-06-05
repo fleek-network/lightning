@@ -1,13 +1,20 @@
-use std::fs;
 use std::marker::PhantomData;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+use std::{env, fs};
 
 use anyhow::{Context, Result};
+use lazy_static::lazy_static;
 use lightning_interfaces::prelude::*;
 use resolved_pathbuf::ResolvedPathBuf;
 use toml::{Table, Value};
 use tracing::debug;
+
+lazy_static! {
+    pub static ref LIGHTNING_HOME_DIR: PathBuf = env::var("LIGHTNING_HOME")
+        .unwrap_or("~/.lightning".to_string())
+        .into();
+}
 
 /// The implementation of a configuration loader that uses the `toml` backend.
 pub struct TomlConfigProvider<C: Collection> {

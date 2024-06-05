@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use clap::{arg, ArgAction, Parser, Subcommand};
+use lightning_utils::config::LIGHTNING_HOME_DIR;
 
 use crate::commands::admin::AdminSubCmd;
 
@@ -8,7 +9,7 @@ use crate::commands::admin::AdminSubCmd;
 #[command(about, version = crate::VERSION)]
 pub struct Args {
     /// Path to the toml configuration file
-    #[arg(short, long, global = true, default_value_t = String::from("~/.lightning/config.toml") )]
+    #[arg(short, long, global = true, default_value_t = String::from(LIGHTNING_HOME_DIR.join("config.toml").to_string_lossy().as_ref()) )]
     pub config: String,
     /// Determines that we should be using the mock consensus backend.
     #[arg(long, global = true, default_value_t = false)]

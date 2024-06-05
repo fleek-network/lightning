@@ -1,3 +1,4 @@
+use lightning_utils::config::LIGHTNING_HOME_DIR;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
 
@@ -10,7 +11,8 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            store_path: "~/.lightning/data/narwhal_store"
+            store_path: LIGHTNING_HOME_DIR
+                .join("data/narwhal_store")
                 .try_into()
                 .expect("Failed to resolve path"),
         }

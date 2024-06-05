@@ -1,3 +1,4 @@
+pub mod config;
 pub mod consensus;
 pub mod defer;
 pub mod json_config;

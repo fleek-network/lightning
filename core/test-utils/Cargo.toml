@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 fdi = { path = "../../lib/fdi" }
 lightning-interfaces = { path = "../interfaces" }
+lightning-utils = { path = "../utils" }
 fleek-crypto.workspace = true
 affair.workspace = true
 axum.workspace = true
@@ -30,3 +31,4 @@ rand_chacha = "0.3"
 resolved-pathbuf = { path = "../../lib/resolved-pathbuf" }
 tui-logger = "0.11"
 workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }
+lazy_static.workspace = true

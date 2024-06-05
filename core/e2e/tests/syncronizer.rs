@@ -6,6 +6,7 @@ use fleek_blake3 as blake3;
 use lightning_e2e::swarm::Swarm;
 use lightning_e2e::utils::rpc;
 use lightning_interfaces::prelude::*;
+use lightning_test_utils::config::LIGHTNING_TEST_HOME_DIR;
 use lightning_test_utils::logging;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde_json::json;
@@ -22,7 +23,8 @@ async fn e2e_syncronize_state() -> Result<()> {
         .unwrap()
         .as_millis() as u64;
 
-    let path = ResolvedPathBuf::try_from("~/.lightning-test/e2e/syncronize-state").unwrap();
+    let path =
+        ResolvedPathBuf::try_from(LIGHTNING_TEST_HOME_DIR.join("e2e/syncronize-state")).unwrap();
     if path.exists() {
         fs::remove_dir_all(&path).expect("Failed to clean up swarm directory before test.");
     }

@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use lightning_utils::config::LIGHTNING_HOME_DIR;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
 
@@ -15,7 +16,8 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             submit_interval: Duration::from_secs(10),
-            db_path: "~/.lightning/data/dack_aggregator"
+            db_path: LIGHTNING_HOME_DIR
+                .join("data/dack_aggregator")
                 .try_into()
                 .expect("Failed to resolve path"),
         }

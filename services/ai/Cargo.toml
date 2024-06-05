@@ -6,7 +6,7 @@ edition.workspace = true
 [dependencies]
 anyhow.workspace = true
 base64.workspace = true
-borsh = { version = "1.3"}
+borsh = { version = "1.3" }
 bytes = { version = "1.5", features = ["serde"] }
 derive_more = "0.99"
 fn-sdk = { path = "../../lib/sdk" }
@@ -18,10 +18,12 @@ safetensors-ndarray = { path = "../../lib/safetensors-ndarray" }
 serde.workspace = true
 serde_json.workspace = true
 tracing.workspace = true
-tracing-subscriber = { version = "0.3", features = [ "env-filter" ] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tokio.workspace = true
-url ="2.5.0"
+url = "2.5.0"
 workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }
+lightning-utils = { path = "../../core/utils" }
+lazy_static.workspace = true
 
 [[bin]]
 name = "fn-service-2"

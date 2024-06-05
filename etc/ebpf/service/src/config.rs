@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::anyhow;
+use lightning_utils::config::LIGHTNING_HOME_DIR;
 use log::error;
 use once_cell::sync::Lazy;
 use resolved_pathbuf::ResolvedPathBuf;
@@ -12,10 +13,11 @@ use tokio::io::AsyncWriteExt;
 
 use crate::map::{PacketFilterRule, Profile};
 
-const TMP_DIR: &str = "~/.lightning/ebpf/tmp";
-const PROFILES_DIR: &str = "~/.lightning/ebpf/profiles";
+static TMP_DIR: Lazy<PathBuf> = Lazy::new(|| LIGHTNING_HOME_DIR.join("ebpf/tmp"));
+static PROFILES_DIR: Lazy<PathBuf> = Lazy::new(|| LIGHTNING_HOME_DIR.join("ebpf/profiles"));
 const PACKET_FILTER_CONFIG: &str = "filters.json";
-const PACKET_FILTER_CONFIG_PATH: &str = "~/.lightning/ebpf/filters.json";
+static PACKET_FILTER_CONFIG_PATH: Lazy<PathBuf> =
+    Lazy::new(|| LIGHTNING_HOME_DIR.join("ebpf/filters.json"));
 pub static GLOBAL_PROFILE: Lazy<PathBuf> = Lazy::new(|| PathBuf::from("global".to_string()));
 
 /// Configuration source.
@@ -178,13 +180,13 @@ pub struct PathConfig {
 impl Default for PathConfig {
     fn default() -> Self {
         Self {
-            tmp_dir: ResolvedPathBuf::try_from(TMP_DIR)
+            tmp_dir: ResolvedPathBuf::try_from(TMP_DIR.to_path_buf())
                 .expect("Hardcoded path")
                 .to_path_buf(),
-            packet_filter: ResolvedPathBuf::try_from(PACKET_FILTER_CONFIG_PATH)
+            packet_filter: ResolvedPathBuf::try_from(PACKET_FILTER_CONFIG_PATH.to_path_buf())
                 .expect("Hardcoded path")
                 .to_path_buf(),
-            profiles_dir: ResolvedPathBuf::try_from(PROFILES_DIR)
+            profiles_dir: ResolvedPathBuf::try_from(PROFILES_DIR.to_path_buf())
                 .expect("Hardcoded path")
                 .to_path_buf(),
         }

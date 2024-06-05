@@ -1,4 +1,5 @@
 use fleek_crypto::{ConsensusSecretKey, NodeSecretKey, SecretKey};
+use lightning_utils::config::LIGHTNING_HOME_DIR;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
 
@@ -12,10 +13,12 @@ pub struct KeystoreConfig {
 impl Default for KeystoreConfig {
     fn default() -> Self {
         Self {
-            node_key_path: "~/.lightning/keystore/node.pem"
+            node_key_path: LIGHTNING_HOME_DIR
+                .join("keystore/node.pem")
                 .try_into()
                 .expect("Failed to resolve path."),
-            consensus_key_path: "~/.lightning/keystore/consensus.pem"
+            consensus_key_path: LIGHTNING_HOME_DIR
+                .join("keystore/consensus.pem")
                 .try_into()
                 .expect("Failed to resolve path."),
         }

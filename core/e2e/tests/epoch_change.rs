@@ -8,6 +8,7 @@ use hp_fixed::unsigned::HpUfixed;
 use lightning_e2e::swarm::{Swarm, SwarmNode};
 use lightning_e2e::utils::rpc;
 use lightning_interfaces::types::Staking;
+use lightning_test_utils::config::LIGHTNING_TEST_HOME_DIR;
 use lightning_test_utils::logging;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde_json::json;
@@ -24,7 +25,9 @@ async fn e2e_epoch_change_all_nodes_on_committee() -> Result<()> {
         .unwrap()
         .as_millis() as u64;
 
-    let path = ResolvedPathBuf::try_from("~/.lightning-test/e2e/epoch-change-committee").unwrap();
+    let path =
+        ResolvedPathBuf::try_from(LIGHTNING_TEST_HOME_DIR.join("e2e/epoch-change-committee"))
+            .unwrap();
     if path.exists() {
         fs::remove_dir_all(&path).expect("Failed to clean up swarm directory before test.");
     }
@@ -93,7 +96,9 @@ async fn e2e_epoch_change_with_edge_node() -> Result<()> {
         .unwrap()
         .as_millis() as u64;
 
-    let path = ResolvedPathBuf::try_from("~/.lightning-test/e2e/epoch-change-edge-node").unwrap();
+    let path =
+        ResolvedPathBuf::try_from(LIGHTNING_TEST_HOME_DIR.join("e2e/epoch-change-edge-node"))
+            .unwrap();
     if path.exists() {
         fs::remove_dir_all(&path).expect("Failed to clean up swarm directory before test.");
     }
@@ -163,7 +168,8 @@ async fn e2e_committee_change() -> Result<()> {
         .unwrap()
         .as_millis() as u64;
 
-    let path = ResolvedPathBuf::try_from("~/.lightning-test/e2e/committee-change").unwrap();
+    let path =
+        ResolvedPathBuf::try_from(LIGHTNING_TEST_HOME_DIR.join("e2e/committee-change")).unwrap();
     if path.exists() {
         fs::remove_dir_all(&path).expect("Failed to clean up swarm directory before test.");
     }
@@ -206,7 +212,8 @@ async fn e2e_test_staking_auction() -> Result<()> {
         .unwrap()
         .as_millis() as u64;
 
-    let path = ResolvedPathBuf::try_from("~/.lightning-test/e2e/staking-auction").unwrap();
+    let path =
+        ResolvedPathBuf::try_from(LIGHTNING_TEST_HOME_DIR.join("e2e/staking-auction")).unwrap();
     if path.exists() {
         fs::remove_dir_all(&path).expect("Failed to clean up swarm directory before test.");
     }
