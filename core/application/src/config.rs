@@ -8,22 +8,23 @@ use serde::{Deserialize, Serialize};
 use crate::genesis::Genesis;
 use crate::network::Network;
 
-#[derive(Clone, Serialize, Deserialize, Default)]
-pub enum Mode {
-    #[default]
-    Dev,
-    Test,
-    Prod,
-}
-
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Config {
     pub network: Option<Network>,
     pub genesis: Option<Genesis>,
-    pub mode: Mode,
     pub storage: StorageConfig,
     pub db_path: Option<ResolvedPathBuf>,
     pub db_options: Option<ResolvedPathBuf>,
+
+    // Development options.
+    // Should not be used in production, and will likely break your node if you do.
+    pub dev: Option<DevConfig>,
+}
+
+#[derive(Clone, Serialize, Deserialize, Default)]
+pub struct DevConfig {
+    // Whether to update the genesis epoch start to the current time when starting the node.
+    pub update_epoch_start_to_now: bool,
 }
 
 impl Config {
@@ -31,10 +32,10 @@ impl Config {
         Self {
             network: None,
             genesis: Some(Genesis::default()),
-            mode: Mode::Test,
             storage: StorageConfig::InMemory,
             db_path: None,
             db_options: None,
+            dev: None,
         }
     }
 
@@ -49,11 +50,13 @@ impl Config {
                 None => Err(anyhow!("Missing network in config")),
             },
         }?;
-        if let Mode::Dev = self.mode {
-            genesis.epoch_start = SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as u64
+        if let Some(dev) = &self.dev {
+            if dev.update_epoch_start_to_now {
+                genesis.epoch_start = SystemTime::now()
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis() as u64
+            }
         }
         Ok(genesis)
     }
@@ -64,7 +67,6 @@ impl Default for Config {
         Self {
             network: Some(Network::LocalnetExample),
             genesis: None,
-            mode: Mode::Dev,
             storage: StorageConfig::RocksDb,
             db_path: Some(
                 LIGHTNING_HOME_DIR
@@ -73,6 +75,11 @@ impl Default for Config {
                     .expect("Failed to resolve path"),
             ),
             db_options: None,
+
+            // Note that the config default to being for development.
+            dev: Some(DevConfig {
+                update_epoch_start_to_now: true,
+            }),
         }
     }
 }

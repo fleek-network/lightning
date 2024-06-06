@@ -6,7 +6,7 @@ use anyhow::{Context, Result};
 use fleek_blake3 as blake3;
 use fleek_crypto::{AccountOwnerSecretKey, ConsensusSecretKey, NodeSecretKey, SecretKey};
 use lightning_application::app::Application;
-use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
+use lightning_application::config::{Config as AppConfig, StorageConfig};
 use lightning_application::env::Env;
 use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_archive::archive::Archive;
@@ -50,11 +50,11 @@ fn build_config(
 
     config.inject::<Application<FinalTypes>>(AppConfig {
         network: None,
-        mode: Mode::Prod,
         genesis: Some(genesis),
         storage: StorageConfig::RocksDb,
         db_path: Some(path.join("data/app_db").try_into().unwrap()),
         db_options: None,
+        dev: None,
     });
 
     config.inject::<Resolver<FinalTypes>>(ResolverConfig {
@@ -200,11 +200,11 @@ async fn node_checkpointing() -> Result<()> {
     // We first have to build the app db in order to obtain a valid checkpoint.
     let app_config_temp = AppConfig {
         network: None,
-        mode: Mode::Prod,
         genesis: Some(genesis.clone()),
         storage: StorageConfig::RocksDb,
         db_path: Some(path.join("data/app_db_temp").try_into().unwrap()),
         db_options: None,
+        dev: None,
     };
     let mut env = Env::new(&app_config_temp, None)?;
     env.apply_genesis_block(&app_config_temp)?;

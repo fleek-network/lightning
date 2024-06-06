@@ -13,7 +13,7 @@ use fleek_crypto::{
 use futures::future::try_join_all;
 use hp_fixed::unsigned::HpUfixed;
 use lightning_application::app::Application;
-use lightning_application::config::{Config as AppConfig, Mode, StorageConfig};
+use lightning_application::config::{Config as AppConfig, StorageConfig};
 use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_archive::archive::Archive;
 use lightning_archive::config::Config as ArchiveConfig;
@@ -378,11 +378,11 @@ impl SwarmBuilder {
             };
             config.inject::<Application<FinalTypes>>(AppConfig {
                 network: None,
-                mode: Mode::Test,
                 genesis: Some(genesis.clone()),
                 storage,
                 db_path: Some(root.join("data/app_db").try_into().unwrap()),
                 db_options: None,
+                dev: None,
             });
 
             let node = ContainerizedNode::new(config, owner_sk, index, is_committee, stake);
