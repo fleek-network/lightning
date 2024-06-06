@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Cargo Format
-        run: cargo fmt --check
+        run: scripts/lint-fmt
 
   clippy:
     name: Clippy
@@ -40,9 +40,5 @@ jobs:
             target/
           key: custom-rust-clippy-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: custom-rust-clippy-
-      - name: Cargo Clippy 
-        run: cargo clippy --all-features --all-targets --timings -- -Dclippy::all -Dwarnings
-      - name: Upload Timings
-        uses: actions/upload-artifact@v3
-        with:
-          path: target/cargo-timings/cargo-timing.html
+      - name: Cargo Clippy
+        run: scripts/lint-clippy
