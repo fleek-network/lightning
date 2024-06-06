@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 
+use fastcrypto::encoding::Encoding;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::Epoch;
@@ -196,6 +197,11 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                                 &mut pending_timeouts,
                             );
                             info!("Received requested parcel with digest: {parcel_digest:?}");
+
+                            increment_counter!(
+                                "consensus_missing_parcel_received",
+                                Some("Number of missing parcels successfully received from other nodes")
+                            );
                         }
 
                         if !on_committee {
@@ -317,9 +323,20 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                             if let Some(msg_digest) = parcel.message_digest {
                                 let filter = HashSet::from([msg.originator()]);
                                 pub_sub.repropagate(msg_digest, Some(filter)).await;
-                                info!("Respond to request for missing parcel with digest: {digest:?}");
-                            }
+                                info!("Responded to request for missing parcel with digest: {digest:?}");
+                                increment_counter!(
+                                    "consensus_missing_parcel_sent",
+                                    Some("Number of missing parcels served to other nodes"),
+                                );
+
+                                return;
+                            };
                         }
+
+                        increment_counter!(
+                            "consensus_missing_parcel_ignored",
+                            Some("Number of parcel requests that were ignored due to not finding it in the transaction store"),
+                        );
                     }
                 }
 
