@@ -20,9 +20,9 @@ governance_address = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
 
 [[node_info]]
 owner = "0x959807B8D94B324A74117956731F09E2893aCd72"
-primary_public_key = "Dsy7EwRzKdXsD4A6m2dTuSK4aHxmrEJPfoSE4hsfePYq"
-consensus_public_key = "xSpZNhZYE1JS1TBVgjWgUQLM2q2YCBYWGrB6LhYBcebAtZMNuKNQdvasc831ThiTTXLFK9EhEWHwhdXZfo3cFbprnUbnnjW8iGQjg7CLX73yYJr769maPLJs4X4Mx14Cxsi"
-worker_public_key = "Dsy7EwRzKdXsD4A6m2dTuSK4aHxmrEJPfoSE4hsfePYq"
+primary_public_key = "F5tV4PLSzx1Lt4mYBe13aYQ8hsLMTCfjgY2pLr82AumH"
+consensus_public_key = "u76G7q22Qc5nRC5Fi6dzbNE7FQxqRKEtTS9qjDftWFwhBKmoozGLv8wFiFmGnYDFMEKyYxozWRdM3wgjs1Na3fvxDARxi9CSNJUZJfPXC2WUu3uLnUw96jPBRp7rtHEzS5H"
+worker_public_key = "F5tV4PLSzx1Lt4mYBe13aYQ8hsLMTCfjgY2pLr82AumH"
 primary_domain = "127.0.0.1"
 worker_domain = "127.0.0.1"
 ports.primary = 14310
