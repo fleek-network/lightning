@@ -15,9 +15,10 @@ use tracing::info;
 
 pub async fn exec<C>(
     config_path: ResolvedPathBuf,
-    network: Network,
+    network: Option<Network>,
     no_generate_keys: bool,
     no_apply_genesis: bool,
+    dev: bool,
     rpc_address: Option<SocketAddr>,
     handshake_http_address: Option<SocketAddr>,
 ) -> Result<()>
@@ -36,11 +37,22 @@ where
     let config = TomlConfigProvider::<C>::new();
     <C as Collection>::capture_configs(&config);
 
+    // Validate that either network or dev are set, and assign network if dev is set.
+    if !dev && network.is_none() {
+        return Err(anyhow!(
+            "Either --network or --dev must be provided. See --help for details."
+        ));
+    }
+
     // Set network field in the configuration.
-    config.inject::<Application<FinalTypes>>(AppConfig {
-        network: Some(network),
-        ..Default::default()
-    });
+    let mut app_config = AppConfig::default();
+    if dev {
+        app_config.network = Some(Network::LocalnetExample);
+        app_config.dev = Some(Default::default());
+    } else {
+        app_config.network = network;
+    }
+    config.inject::<Application<FinalTypes>>(app_config);
 
     // Update RPC address in the configuration if given.
     if let Some(addr) = rpc_address {

@@ -51,9 +51,14 @@ pub enum Command {
     Run,
     /// Initialize the node configuration and genesis block.
     Init {
-        /// The built-in network genesis configuration to use.
+        /// The built-in network genesis configuration to use. If dev is set, this is not
+        /// required and will default to the local dev genesis configuration.
         #[clap(value_enum, long, short)]
-        network: NetworkArg,
+        network: Option<NetworkArg>,
+        /// Whether to start the node with dev configuration. If set, the network will default to
+        /// the local dev genesis configuration, and the dev configuration will be applied.
+        #[clap(long)]
+        dev: bool,
         /// Whether to not generate keys during initialization. The default is to generate keys.
         #[clap(long)]
         no_generate_keys: bool,

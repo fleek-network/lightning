@@ -49,14 +49,16 @@ impl Cli {
                 network,
                 no_generate_keys,
                 no_apply_genesis,
+                dev,
                 rpc_address,
                 handshake_http_address,
             } => {
                 init::exec::<C>(
                     config_path,
-                    network.into(),
+                    network.map(Into::into),
                     no_generate_keys,
                     no_apply_genesis,
+                    dev,
                     rpc_address,
                     handshake_http_address,
                 )

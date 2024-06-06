@@ -21,10 +21,18 @@ pub struct Config {
     pub dev: Option<DevConfig>,
 }
 
-#[derive(Clone, Serialize, Deserialize, Default)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct DevConfig {
     // Whether to update the genesis epoch start to the current time when starting the node.
     pub update_epoch_start_to_now: bool,
+}
+
+impl Default for DevConfig {
+    fn default() -> Self {
+        Self {
+            update_epoch_start_to_now: true,
+        }
+    }
 }
 
 impl Config {
@@ -75,11 +83,7 @@ impl Default for Config {
                     .expect("Failed to resolve path"),
             ),
             db_options: None,
-
-            // Note that the config default to being for development.
-            dev: Some(DevConfig {
-                update_epoch_start_to_now: true,
-            }),
+            dev: None,
         }
     }
 }
