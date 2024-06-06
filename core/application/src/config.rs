@@ -21,7 +21,6 @@ pub struct Config {
     pub network: Option<Network>,
     pub genesis: Option<Genesis>,
     pub mode: Mode,
-    pub testnet: bool,
     pub storage: StorageConfig,
     pub db_path: Option<ResolvedPathBuf>,
     pub db_options: Option<ResolvedPathBuf>,
@@ -33,7 +32,6 @@ impl Config {
             network: None,
             genesis: Some(Genesis::default()),
             mode: Mode::Test,
-            testnet: false,
             storage: StorageConfig::InMemory,
             db_path: None,
             db_options: None,
@@ -67,7 +65,6 @@ impl Default for Config {
             network: Some(Network::LocalnetExample),
             genesis: None,
             mode: Mode::Dev,
-            testnet: true,
             storage: StorageConfig::RocksDb,
             db_path: Some(
                 LIGHTNING_HOME_DIR

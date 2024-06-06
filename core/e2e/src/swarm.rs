@@ -380,7 +380,6 @@ impl SwarmBuilder {
                 network: None,
                 mode: Mode::Test,
                 genesis: Some(genesis.clone()),
-                testnet: false,
                 storage,
                 db_path: Some(root.join("data/app_db").try_into().unwrap()),
                 db_options: None,
