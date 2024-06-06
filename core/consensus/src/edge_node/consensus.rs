@@ -2,7 +2,6 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 
-use fastcrypto::encoding::Encoding;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::Epoch;
