@@ -215,9 +215,23 @@ impl<C: Collection> ArchiveInner<C> {
     ) -> Result<c!(C::ApplicationInterface::SyncExecutor)> {
         let path = self.historical_state_dir.join(epoch.to_string());
         trace!(target: "archive", "Getting historical epoch state from {:?}", path);
-        let db = <c!(C::ApplicationInterface::SyncExecutor)>::atomo_from_path(path)?;
-        let query_runner = <c!(C::ApplicationInterface::SyncExecutor)>::new(db);
-        Ok(query_runner)
+        let db =
+            self
+            .db_cache
+            .get_or_insert_with(&epoch, || {
+                <c!(C::ApplicationInterface::SyncExecutor)>::atomo_from_path(path)
+            })?;
+        // let db = <c!(C::ApplicationInterface::SyncExecutor)>::atomo_from_path(path)?;
+        info!(target: "archive", "Number of DB cached instances (for epochs) are {:?} with total weight of {:?}", self.db_cache.len(), self.db_cache.capacity());
+        let query_runner =
+            self
+            .qr_cache
+            .get_or_insert_with(&epoch, || {
+                Ok(<c!(C::ApplicationInterface::SyncExecutor)>::new(db))
+        });
+        // let query_runner = <c!(C::ApplicationInterface::SyncExecutor)>::new(db);
+        info!(target: "archive", "Number of QueryRunner cached instances (for epochs) are {:?} with total weight of {:?}", self.qr_cache.len(), self.qr_cache.capacity());
+        query_runner
     }
 
     fn get_block_by_hash(&self, blk_hash: &[u8; 32]) -> Result<Option<BlockInfo>> {
