@@ -3,6 +3,7 @@ use std::time::Duration;
 use ethers::types::BlockNumber;
 use lightning_application::app::Application;
 use lightning_application::config::Config as AppConfig;
+use lightning_application::genesis::Genesis;
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_interfaces::prelude::*;
@@ -13,10 +14,9 @@ use lightning_test_utils::consensus::{
     MockConsensus,
     MockForwarder,
 };
-use lightning_test_utils::defer::Deferred;
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::transaction::get_update_transactions;
-use resolved_pathbuf::ResolvedPathBuf;
+use tempfile::tempdir;
 
 use crate::archive::Archive;
 use crate::config::Config as ArchiveConfig;
@@ -32,31 +32,20 @@ partial!(TestBinding {
 });
 
 async fn get_node() -> Node<TestBinding> {
-    let path = std::env::temp_dir().join(std::thread::current().name().unwrap());
-
-    if path.exists() {
-        std::fs::remove_dir_all(&path).unwrap();
-    }
-
-    let path = ResolvedPathBuf::try_from(path).unwrap();
+    let temp_dir = tempdir().unwrap();
+    let genesis_path = Genesis::default()
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
 
     let node = Node::<TestBinding>::init(
         JsonConfigProvider::default()
-            .with::<Application<TestBinding>>(AppConfig::test())
+            .with::<Application<TestBinding>>(AppConfig::test(genesis_path))
             .with::<Archive<TestBinding>>(ArchiveConfig {
                 is_archive: true,
-                store_path: {
-                    let mut p = path.clone();
-                    p.push("archive");
-                    p
-                },
+                store_path: temp_dir.path().join("archive").try_into().unwrap(),
             })
             .with::<Blockstore<TestBinding>>(BlockstoreConfig {
-                root: {
-                    let mut p = path.clone();
-                    p.push("store");
-                    p
-                },
+                root: temp_dir.path().join("blockstore").try_into().unwrap(),
             })
             .with::<MockConsensus<TestBinding>>(MockConsensusConfig {
                 min_ordering_time: 0,
@@ -67,8 +56,6 @@ async fn get_node() -> Node<TestBinding> {
             }),
     )
     .unwrap();
-
-    node.provider.insert(Deferred::remove_dir_all(path));
 
     node.start().await;
 

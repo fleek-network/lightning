@@ -28,3 +28,4 @@ lightning-blockstore = { path = "../blockstore" }
 lightning-application = { path = "../application", features = ["test"] }
 lightning-notifier = { path = "../notifier" }
 lightning-test-utils = { path = "../test-utils" }
+tempfile.workspace = true

@@ -22,3 +22,4 @@ lightning-indexer = { path = "../indexer" }
 lightning-signer = { path = "../signer" }
 lightning-test-utils = { path = "../test-utils" }
 cid.workspace = true
+tempfile.workspace = true

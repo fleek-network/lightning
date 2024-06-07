@@ -14,7 +14,7 @@ consumer_rebate = 0
 max_boost = 4
 max_lock_time = 1460                                                 # 1460 days(epoch) meaning 4 years
 supply_at_genesis = 1000000                                          # set to 1 million for testing, to be determined when initial allocations are set
-min_num_measurements = 10
+min_num_measurements = 2
 protocol_fund_address = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
 governance_address = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
 

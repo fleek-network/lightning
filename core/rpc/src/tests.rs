@@ -14,7 +14,7 @@ use hp_fixed::unsigned::HpUfixed;
 use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
 use lightning_application::app::Application;
 use lightning_application::config::Config as AppConfig;
-use lightning_application::genesis::{Genesis, GenesisAccount, GenesisNode};
+use lightning_application::genesis::{Genesis, GenesisAccount, GenesisNode, GenesisNodeServed};
 use lightning_application::query_runner::QueryRunner;
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
@@ -46,6 +46,7 @@ use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_utils::application::QueryRunnerExt;
 use lightning_utils::rpc as utils;
 use reqwest::Client;
+use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tempfile::{tempdir, TempDir};
@@ -96,13 +97,8 @@ impl TestNode {
     }
 }
 
-async fn init_rpc(temp_dir: &TempDir, genesis: Option<Genesis>, rpc_port: u16) -> TestNode {
-    let app_config = genesis
-        .map(|gen| AppConfig {
-            genesis: Some(gen),
-            ..AppConfig::test()
-        })
-        .unwrap_or(AppConfig::test());
+async fn init_rpc(temp_dir: &TempDir, genesis_path: ResolvedPathBuf, rpc_port: u16) -> TestNode {
+    let app_config = AppConfig::test(genesis_path);
 
     let node = Node::<TestBinding>::init_with_provider(
         fdi::Provider::default().with(
@@ -169,10 +165,13 @@ fn client(url: SocketAddr) -> HttpClient {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_ping() -> Result<()> {
-    let temp_dir = tempdir()?;
+    let temp_dir = tempdir().unwrap();
+    let genesis_path = Genesis::default()
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
 
     let port = 30000;
-    let node = init_rpc(&temp_dir, None, port).await;
+    let node = init_rpc(&temp_dir, genesis_path, port).await;
 
     wait_for_server_start(port).await?;
 
@@ -216,8 +215,12 @@ async fn test_rpc_get_flk_balance() -> Result<()> {
         bandwidth_balance: 0,
     });
 
+    let genesis_path = genesis
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
+
     let port = 30001;
-    let node = init_rpc(&temp_dir, Some(genesis), port).await;
+    let node = init_rpc(&temp_dir, genesis_path, port).await;
 
     wait_for_server_start(port).await?;
 
@@ -277,8 +280,12 @@ async fn test_rpc_get_reputation() -> Result<()> {
     genesis_node.reputation = Some(46);
     genesis.node_info.push(genesis_node);
 
+    let genesis_path = genesis
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
+
     let port = 30002;
-    let node = init_rpc(&temp_dir, Some(genesis), port).await;
+    let node = init_rpc(&temp_dir, genesis_path, port).await;
 
     wait_for_server_start(port).await?;
 
@@ -345,8 +352,12 @@ async fn test_rpc_get_staked() -> Result<()> {
     );
     genesis.node_info.push(node_info);
 
+    let genesis_path = genesis
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
+
     let port = 30003;
-    let node = init_rpc(&temp_dir, Some(genesis), port).await;
+    let node = init_rpc(&temp_dir, genesis_path, port).await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -388,8 +399,12 @@ async fn test_rpc_get_stables_balance() -> Result<()> {
         bandwidth_balance: 0,
     });
 
+    let genesis_path = genesis
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
+
     let port = 30004;
-    let node = init_rpc(&temp_dir, Some(genesis), port).await;
+    let node = init_rpc(&temp_dir, genesis_path, port).await;
 
     wait_for_server_start(port).await?;
 
@@ -457,8 +472,12 @@ async fn test_rpc_get_stake_locked_until() -> Result<()> {
 
     genesis.node_info.push(node_info);
 
+    let genesis_path = genesis
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
+
     let port = 30005;
-    let node = init_rpc(&temp_dir, Some(genesis), port).await;
+    let node = init_rpc(&temp_dir, genesis_path, port).await;
 
     wait_for_server_start(port).await?;
 
@@ -525,8 +544,12 @@ async fn test_rpc_get_locked_time() -> Result<()> {
     );
     genesis.node_info.push(node_info);
 
+    let genesis_path = genesis
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
+
     let port = 30006;
-    let node = init_rpc(&temp_dir, Some(genesis), port).await;
+    let node = init_rpc(&temp_dir, genesis_path, port).await;
 
     wait_for_server_start(port).await?;
 
@@ -593,8 +616,12 @@ async fn test_rpc_get_locked() -> Result<()> {
     );
     genesis.node_info.push(node_info);
 
+    let genesis_path = genesis
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
+
     let port = 30007;
-    let node = init_rpc(&temp_dir, Some(genesis), port).await;
+    let node = init_rpc(&temp_dir, genesis_path, port).await;
 
     wait_for_server_start(port).await?;
 
@@ -626,8 +653,12 @@ async fn test_rpc_get_bandwidth_balance() -> Result<()> {
         bandwidth_balance: 10_000,
     });
 
+    let genesis_path = genesis
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
+
     let port = 30008;
-    let node = init_rpc(&temp_dir, Some(genesis), port).await;
+    let node = init_rpc(&temp_dir, genesis_path, port).await;
 
     wait_for_server_start(port).await?;
 
@@ -694,8 +725,12 @@ async fn test_rpc_get_node_info() -> Result<()> {
     );
     genesis.node_info.push(node_info.clone());
 
+    let genesis_path = genesis
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
+
     let port = 30009;
-    let node = init_rpc(&temp_dir, Some(genesis), port).await;
+    let node = init_rpc(&temp_dir, genesis_path, port).await;
 
     wait_for_server_start(port).await?;
 
@@ -722,10 +757,13 @@ async fn test_rpc_get_node_info() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_staking_amount() -> Result<()> {
-    let temp_dir = tempdir()?;
+    let temp_dir = tempdir().unwrap();
+    let genesis_path = Genesis::default()
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
 
     let port = 30010;
-    let node = init_rpc(&temp_dir, None, port).await;
+    let node = init_rpc(&temp_dir, genesis_path, port).await;
 
     wait_for_server_start(port).await?;
 
@@ -752,10 +790,13 @@ async fn test_rpc_get_staking_amount() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_committee_members() -> Result<()> {
-    let temp_dir = tempdir()?;
+    let temp_dir = tempdir().unwrap();
+    let genesis_path = Genesis::default()
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
 
     let port = 30011;
-    let node = init_rpc(&temp_dir, None, port).await;
+    let node = init_rpc(&temp_dir, genesis_path, port).await;
 
     wait_for_server_start(port).await?;
 
@@ -782,10 +823,13 @@ async fn test_rpc_get_committee_members() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_epoch() -> Result<()> {
-    let temp_dir = tempdir()?;
+    let temp_dir = tempdir().unwrap();
+    let genesis_path = Genesis::default()
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
 
     let port = 30012;
-    let node = init_rpc(&temp_dir, None, port).await;
+    let node = init_rpc(&temp_dir, genesis_path, port).await;
 
     wait_for_server_start(port).await?;
 
@@ -812,10 +856,13 @@ async fn test_rpc_get_epoch() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_epoch_info() -> Result<()> {
-    let temp_dir = tempdir()?;
+    let temp_dir = tempdir().unwrap();
+    let genesis_path = Genesis::default()
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
 
     let port = 30013;
-    let node = init_rpc(&temp_dir, None, port).await;
+    let node = init_rpc(&temp_dir, genesis_path, port).await;
 
     wait_for_server_start(port).await?;
 
@@ -842,10 +889,13 @@ async fn test_rpc_get_epoch_info() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_total_supply() -> Result<()> {
-    let temp_dir = tempdir()?;
+    let temp_dir = tempdir().unwrap();
+    let genesis_path = Genesis::default()
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
 
     let port = 30014;
-    let node = init_rpc(&temp_dir, None, port).await;
+    let node = init_rpc(&temp_dir, genesis_path, port).await;
 
     wait_for_server_start(port).await?;
 
@@ -878,10 +928,13 @@ async fn test_rpc_get_total_supply() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_year_start_supply() -> Result<()> {
-    let temp_dir = tempdir()?;
+    let temp_dir = tempdir().unwrap();
+    let genesis_path = Genesis::default()
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
 
     let port = 30015;
-    let node = init_rpc(&temp_dir, None, port).await;
+    let node = init_rpc(&temp_dir, genesis_path, port).await;
 
     wait_for_server_start(port).await?;
 
@@ -914,10 +967,13 @@ async fn test_rpc_get_year_start_supply() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_protocol_fund_address() -> Result<()> {
-    let temp_dir = tempdir()?;
+    let temp_dir = tempdir().unwrap();
+    let genesis_path = Genesis::default()
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
 
     let port = 30016;
-    let node = init_rpc(&temp_dir, None, port).await;
+    let node = init_rpc(&temp_dir, genesis_path, port).await;
 
     wait_for_server_start(port).await?;
 
@@ -953,10 +1009,13 @@ async fn test_rpc_get_protocol_fund_address() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_protocol_params() -> Result<()> {
-    let temp_dir = tempdir()?;
+    let temp_dir = tempdir().unwrap();
+    let genesis_path = Genesis::default()
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
 
     let port = 30017;
-    let node = init_rpc(&temp_dir, None, port).await;
+    let node = init_rpc(&temp_dir, genesis_path, port).await;
 
     wait_for_server_start(port).await?;
 
@@ -996,10 +1055,14 @@ async fn test_rpc_get_total_served() -> Result<()> {
         served: vec![1000],
         reward_pool: 1_000_u32.into(),
     };
-    genesis.total_served.insert(0, total_served.clone());
+    genesis.total_served.insert(0, total_served.clone().into());
+
+    let genesis_path = genesis
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
 
     let port = 30018;
-    let node = init_rpc(&temp_dir, Some(genesis), port).await;
+    let node = init_rpc(&temp_dir, genesis_path, port).await;
 
     wait_for_server_start(port).await?;
 
@@ -1056,14 +1119,18 @@ async fn test_rpc_get_node_served() -> Result<()> {
         None,
         true,
     );
-    genesis_node.current_epoch_served = Some(NodeServed {
+    genesis_node.current_epoch_served = Some(GenesisNodeServed {
         served: vec![1000],
         ..Default::default()
     });
     genesis.node_info.push(genesis_node);
 
+    let genesis_path = genesis
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
+
     let port = 30019;
-    let node = init_rpc(&temp_dir, Some(genesis), port).await;
+    let node = init_rpc(&temp_dir, genesis_path, port).await;
 
     wait_for_server_start(port).await?;
 
@@ -1130,8 +1197,12 @@ async fn test_rpc_is_valid_node() -> Result<()> {
     );
     genesis.node_info.push(node_info);
 
+    let genesis_path = genesis
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
+
     let port = 30020;
-    let node = init_rpc(&temp_dir, Some(genesis), port).await;
+    let node = init_rpc(&temp_dir, genesis_path, port).await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -1205,8 +1276,12 @@ async fn test_rpc_get_node_registry() -> Result<()> {
             },
         );
 
+    let genesis_path = genesis
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
+
     let port = 30021;
-    let node = init_rpc(&temp_dir, Some(genesis), port).await;
+    let node = init_rpc(&temp_dir, genesis_path, port).await;
 
     wait_for_server_start(port).await?;
 
@@ -1249,10 +1324,13 @@ async fn test_rpc_get_node_registry() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_admin_rpc_store() -> Result<()> {
-    let temp_dir = tempdir()?;
+    let temp_dir = tempdir().unwrap();
+    let genesis_path = Genesis::default()
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
 
     let port = 30022;
-    let node = init_rpc(&temp_dir, None, port).await;
+    let node = init_rpc(&temp_dir, genesis_path, port).await;
 
     wait_for_server_start(port).await?;
 
@@ -1302,8 +1380,12 @@ async fn test_rpc_events() -> Result<()> {
         bandwidth_balance: 0,
     });
 
+    let genesis_path = genesis
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
+
     let port = 30023;
-    let node = init_rpc(&temp_dir, Some(genesis), port).await;
+    let node = init_rpc(&temp_dir, genesis_path, port).await;
 
     wait_for_server_start(port).await?;
 

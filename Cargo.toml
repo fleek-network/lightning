@@ -47,7 +47,6 @@ serde-big-array = "0.5.1"
 serde_json = "1.0.96"
 humantime-serde = "1.1.1"
 thiserror = "1.0"
-tempdir = "0.3"
 parking_lot = "0.12.1"
 tokio = { version = "1.28", features = ["full", "tracing"] }
 tokio-stream = "0.1"
@@ -68,6 +67,7 @@ rkyv = { version = "0.7.44", features = [
     "alloc",
 ] }
 triomphe = "0.1"
+tempfile = "3.10.1"
 
 # Our libraries
 lightning-types = { path = "core/types" }

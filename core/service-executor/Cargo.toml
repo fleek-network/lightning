@@ -51,3 +51,4 @@ lightning-signer = { path = "../signer" }
 lightning-application = { path = "../application", features = ["test"] }
 lightning-notifier = { path = "../notifier" }
 serial_test = "3.0"
+tempfile.workspace = true

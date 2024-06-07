@@ -486,7 +486,7 @@ impl AutoImplSerde for PubSubMsg {}
 mod test_garbage_collect {
     use std::path::Path;
 
-    use tempdir::TempDir;
+    use tempfile::tempdir;
 
     use super::*;
 
@@ -505,7 +505,7 @@ mod test_garbage_collect {
 
     #[test]
     fn with_0_epochs_2_retention() {
-        let temp_dir = TempDir::new("test").unwrap();
+        let temp_dir = tempdir().unwrap();
         let store_path = temp_dir.into_path().to_path_buf();
 
         garbage_collect_old_stores(&0, &store_path.to_path_buf(), 2);
@@ -515,7 +515,7 @@ mod test_garbage_collect {
 
     #[test]
     fn with_1_epoch_2_retention() {
-        let temp_dir = TempDir::new("test").unwrap();
+        let temp_dir = tempdir().unwrap();
         let store_path = temp_dir.into_path();
         create_epoch_directory(&store_path, 0);
 
@@ -527,7 +527,7 @@ mod test_garbage_collect {
 
     #[test]
     fn with_2_epochs_2_retention() {
-        let temp_dir = TempDir::new("test").unwrap();
+        let temp_dir = tempdir().unwrap();
         let store_path = temp_dir.into_path();
         create_epoch_directory(&store_path, 0);
         create_epoch_directory(&store_path, 1);
@@ -541,7 +541,7 @@ mod test_garbage_collect {
 
     #[test]
     fn with_3_epochs_2_retention() {
-        let temp_dir = TempDir::new("test").unwrap();
+        let temp_dir = tempdir().unwrap();
         let store_path = temp_dir.into_path();
         create_epoch_directory(&store_path, 0);
         create_epoch_directory(&store_path, 1);
@@ -559,7 +559,7 @@ mod test_garbage_collect {
     fn with_10_epochs_2_retention() {
         // Create a fake store directory and fill it with 10 directories to simulate 10 epoch
         // directories
-        let temp_dir = TempDir::new("test").unwrap();
+        let temp_dir = tempdir().unwrap();
         let store_path = temp_dir.into_path();
         for i in 0..=10 {
             create_epoch_directory(&store_path, i);

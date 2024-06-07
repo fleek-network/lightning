@@ -1,5 +1,4 @@
 use std::net::SocketAddr;
-use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use fleek_crypto::{AccountOwnerSecretKey, NodeSecretKey, NodeSignature, SecretKey};
@@ -16,6 +15,7 @@ use lightning_signer::Signer;
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_topology::Topology;
+use tempfile::{tempdir, TempDir};
 use tokio::sync::oneshot;
 
 use crate::Broadcast;
@@ -46,18 +46,9 @@ impl Peer {
     }
 }
 
-async fn get_broadcasts(
-    test_name: &str,
-    port_offset: u16,
-    num_peers: usize,
-) -> (Vec<Peer>, PathBuf) {
+async fn get_broadcasts(temp_dir: &TempDir, port_offset: u16, num_peers: usize) -> Vec<Peer> {
     let mut genesis = Genesis::default();
-    let path = std::env::temp_dir()
-        .join("lightning-broadcast-test")
-        .join(test_name);
-    if path.exists() {
-        std::fs::remove_dir_all(&path).unwrap();
-    }
+
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
 
@@ -92,10 +83,9 @@ async fn get_broadcasts(
         ));
     }
 
-    let app_config = AppConfig {
-        genesis: Some(genesis),
-        ..AppConfig::test()
-    };
+    let genesis_path = genesis
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
 
     // Create peers.
     let mut peers = Vec::new();
@@ -103,11 +93,11 @@ async fn get_broadcasts(
         let address: SocketAddr = format!("0.0.0.0:{}", port_offset + i as u16)
             .parse()
             .unwrap();
-        let peer = create_peer(app_config.clone(), keystore, address).await;
+        let peer = create_peer(AppConfig::test(genesis_path.clone()), keystore, address).await;
         peers.push(peer);
     }
 
-    (peers, path)
+    peers
 }
 
 async fn create_peer(
@@ -142,8 +132,10 @@ async fn create_peer(
 async fn test_send() {
     lightning_test_utils::logging::setup();
 
+    let temp_dir = tempdir().unwrap();
+
     // Initialize three broadcasts
-    let (peers, path) = get_broadcasts("send", 28000, 3).await;
+    let peers = get_broadcasts(&temp_dir, 28000, 3).await;
     let query_runner = peers[0].sync_query();
 
     for peer in &peers {
@@ -210,8 +202,5 @@ async fn test_send() {
     // Clean up
     for mut peer in peers {
         peer.inner.shutdown().await;
-    }
-    if path.exists() {
-        std::fs::remove_dir_all(&path).unwrap();
     }
 }

@@ -56,8 +56,7 @@ lightning-pinger = { path = "../pinger" }
 lightning-dack-aggregator = { path = "../dack-aggregator" }
 fleek-blake3 = "1.5"
 assert_cmd = "2.0.14"
-tempdir.workspace = true
-tempfile = "3.10.1"
+tempfile.workspace = true
 
 [features]
 default = []

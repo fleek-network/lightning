@@ -1,5 +1,4 @@
 use std::collections::HashSet;
-use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 
 use fleek_crypto::{AccountOwnerSecretKey, SecretKey};
@@ -14,6 +13,7 @@ use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus, 
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_utils::application::QueryRunnerExt;
+use tempfile::{tempdir, TempDir};
 
 use crate::{Config, DeliveryAcknowledgmentAggregator};
 
@@ -28,7 +28,7 @@ partial!(TestBinding {
     DeliveryAcknowledgmentAggregatorInterface = DeliveryAcknowledgmentAggregator<Self>;
 });
 
-async fn init_aggregator(path: PathBuf) -> Node<TestBinding> {
+async fn init_aggregator(temp_dir: &TempDir) -> Node<TestBinding> {
     let keystore = EphemeralKeystore::<TestBinding>::default();
     let (consensus_secret_key, node_secret_key) =
         (keystore.get_bls_sk(), keystore.get_ed25519_sk());
@@ -78,14 +78,15 @@ async fn init_aggregator(path: PathBuf) -> Node<TestBinding> {
         ..Default::default()
     };
 
+    let genesis_path = genesis
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
+
     Node::<TestBinding>::init_with_provider(
         fdi::Provider::default()
             .with(
                 JsonConfigProvider::default()
-                    .with::<Application<TestBinding>>(AppConfig {
-                        genesis: Some(genesis),
-                        ..AppConfig::test()
-                    })
+                    .with::<Application<TestBinding>>(AppConfig::test(genesis_path))
                     .with::<MockConsensus<TestBinding>>(ConsensusConfig {
                         min_ordering_time: 0,
                         max_ordering_time: 1,
@@ -95,7 +96,7 @@ async fn init_aggregator(path: PathBuf) -> Node<TestBinding> {
                     })
                     .with::<DeliveryAcknowledgmentAggregator<TestBinding>>(Config {
                         submit_interval: Duration::from_secs(1),
-                        db_path: path.try_into().unwrap(),
+                        db_path: temp_dir.path().join("db").try_into().unwrap(),
                     }),
             )
             .with(keystore),
@@ -105,32 +106,20 @@ async fn init_aggregator(path: PathBuf) -> Node<TestBinding> {
 
 #[tokio::test]
 async fn test_shutdown_and_start_again() {
-    let path = std::env::temp_dir().join("lightning-test-dack-aggregator-shutdown");
+    let temp_dir = tempdir().unwrap();
 
-    if path.exists() {
-        std::fs::remove_file(&path).unwrap();
-    }
-
-    let mut node = init_aggregator(path.clone()).await;
+    let mut node = init_aggregator(&temp_dir).await;
 
     node.start().await;
     tokio::time::sleep(Duration::from_secs(2)).await;
     node.shutdown().await;
-
-    if path.exists() {
-        std::fs::remove_file(path).unwrap();
-    }
 }
 
 #[tokio::test]
 async fn test_submit_dack() {
-    let path = std::env::temp_dir().join("lightning-test-dack-aggregator-submit");
+    let temp_dir = tempdir().unwrap();
 
-    if path.exists() {
-        std::fs::remove_file(&path).unwrap();
-    }
-
-    let mut node = init_aggregator(path.clone()).await;
+    let mut node = init_aggregator(&temp_dir).await;
     node.start().await;
     tokio::time::sleep(Duration::from_secs(1)).await;
 
@@ -161,8 +150,4 @@ async fn test_submit_dack() {
     assert_eq!(total_served.served[service_id as usize], commodity);
 
     node.shutdown().await;
-
-    if path.exists() {
-        std::fs::remove_file(path).unwrap();
-    }
 }

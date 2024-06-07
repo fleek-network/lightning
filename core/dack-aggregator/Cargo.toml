@@ -25,3 +25,4 @@ lightning-signer = { path = "../signer" }
 lightning-application = { path = "../application", features = ["test"] }
 lightning-notifier = { path = "../notifier" }
 fleek-crypto.workspace = true
+tempfile.workspace = true

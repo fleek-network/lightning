@@ -1,6 +1,5 @@
 use std::borrow::Cow;
 use std::collections::VecDeque;
-use std::path::PathBuf;
 use std::time::Duration;
 
 use blake3_tree::ProofBuf;
@@ -25,6 +24,7 @@ use lightning_signer::Signer;
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_topology::Topology;
+use tempfile::{tempdir, TempDir};
 
 use super::BlockstoreServer;
 use crate::blockstore_server::Frame;
@@ -71,18 +71,12 @@ impl<C: Collection> Peer<C> {
 }
 
 async fn get_peers(
-    test_name: &str,
+    temp_dir: &TempDir,
     port_offset: u16,
     num_peers: usize,
-) -> (Vec<Peer<TestBinding>>, PathBuf) {
+) -> Vec<Peer<TestBinding>> {
     let mut keystores = Vec::new();
     let mut genesis = Genesis::default();
-    let path = std::env::temp_dir()
-        .join("blockstore-server-test")
-        .join(test_name);
-    if path.exists() {
-        std::fs::remove_dir_all(&path).unwrap();
-    }
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
 
@@ -114,6 +108,10 @@ async fn get_peers(
         ));
     }
 
+    let genesis_path = genesis
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
+
     let mut peers = Vec::new();
     for (i, keystore) in keystores.into_iter().enumerate() {
         let node_public_key = keystore.get_ed25519_pk();
@@ -121,10 +119,7 @@ async fn get_peers(
             lightning_interfaces::fdi::Provider::default()
                 .with(
                     JsonConfigProvider::default()
-                        .with::<Application<TestBinding>>(AppConfig {
-                            genesis: Some(genesis.clone()),
-                            ..AppConfig::test()
-                        })
+                        .with::<Application<TestBinding>>(AppConfig::test(genesis_path.clone()))
                         .with::<PoolProvider<TestBinding>>(PoolConfig {
                             max_idle_timeout: Duration::from_secs(5),
                             address: format!("0.0.0.0:{}", port_offset + i as u16)
@@ -133,7 +128,11 @@ async fn get_peers(
                             ..Default::default()
                         })
                         .with::<Blockstore<TestBinding>>(BlockstoreConfig {
-                            root: path.join(format!("node{i}/blockstore")).try_into().unwrap(),
+                            root: temp_dir
+                                .path()
+                                .join(format!("node{i}/blockstore"))
+                                .try_into()
+                                .unwrap(),
                         })
                         .with::<BlockstoreServer<TestBinding>>(Config {
                             max_conc_req: 10,
@@ -150,13 +149,14 @@ async fn get_peers(
         };
         peers.push(peer);
     }
-    (peers, path)
+    peers
 }
 
 /// Temporary sanity check on the flow
 #[tokio::test]
 async fn test_stream_verified_content() {
-    let (peers, path) = get_peers("stream_verified_content", 49200, 2).await;
+    let temp_dir = tempdir().unwrap();
+    let peers = get_peers(&temp_dir, 49200, 2).await;
 
     let content = create_content();
 
@@ -212,16 +212,12 @@ async fn test_stream_verified_content() {
     let content1 = peers[0].blockstore().read_all_to_vec(&root_hash).await;
     let content2 = peers[1].blockstore().read_all_to_vec(&root_hash).await;
     assert_eq!(content1, content2);
-
-    // Clean up test
-    if path.exists() {
-        std::fs::remove_dir_all(path).unwrap();
-    }
 }
 
 #[tokio::test]
 async fn test_send_and_receive() {
-    let (peers, path) = get_peers("send_and_receive", 49200, 2).await;
+    let temp_dir = tempdir().unwrap();
+    let peers = get_peers(&temp_dir, 49200, 2).await;
     let query_runner = peers[0].app().sync_query();
     for peer in &peers {
         peer.inner.start().await;
@@ -260,10 +256,5 @@ async fn test_send_and_receive() {
     for mut peer in peers {
         peer.inner.shutdown().await;
         drop(peer);
-    }
-
-    // Clean up test
-    if path.exists() {
-        std::fs::remove_dir_all(path).unwrap();
     }
 }

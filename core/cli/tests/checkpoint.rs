@@ -38,6 +38,7 @@ use lightning_syncronizer::config::Config as SyncronizerConfig;
 use lightning_syncronizer::syncronizer::Syncronizer;
 use lightning_utils::config::TomlConfigProvider;
 use lightning_utils::shutdown::ShutdownController;
+use resolved_pathbuf::ResolvedPathBuf;
 use serial_test::serial;
 use tempfile::{tempdir, TempDir};
 use tokio::pin;
@@ -46,7 +47,7 @@ const NUM_RESTARTS: u16 = 3;
 
 fn build_config(
     temp_dir: &TempDir,
-    genesis: Genesis,
+    genesis_path: ResolvedPathBuf,
     keystore_config: KeystoreConfig,
     ports: NodePorts,
 ) -> TomlConfigProvider<FinalTypes> {
@@ -56,7 +57,7 @@ fn build_config(
 
     config.inject::<Application<FinalTypes>>(AppConfig {
         network: None,
-        genesis: Some(genesis),
+        genesis_path: Some(genesis_path),
         storage: StorageConfig::RocksDb,
         db_path: Some(path.join("data/app_db").try_into().unwrap()),
         db_options: None,
@@ -209,10 +210,14 @@ async fn node_checkpointing() -> Result<()> {
 
     genesis.node_info.push(genesis_node);
 
+    let genesis_path = genesis
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
+
     // We first have to build the app db in order to obtain a valid checkpoint.
     let app_config_temp = AppConfig {
         network: None,
-        genesis: Some(genesis.clone()),
+        genesis_path: Some(genesis_path.clone()),
         storage: StorageConfig::RocksDb,
         db_path: Some(temp_dir.path().join("data/app_db_temp").try_into().unwrap()),
         db_options: None,
@@ -227,7 +232,7 @@ async fn node_checkpointing() -> Result<()> {
     std::mem::drop(env);
 
     // Now that we have a checkpoint, we initialize the node.
-    let config = build_config(&temp_dir, genesis, signer_config, node_ports);
+    let config = build_config(&temp_dir, genesis_path, signer_config, node_ports);
     let app_config = config.get::<<FinalTypes as Collection>::ApplicationInterface>();
 
     let mut node = Node::<FinalTypes>::init(config.clone())

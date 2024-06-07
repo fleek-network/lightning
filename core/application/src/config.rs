@@ -11,7 +11,7 @@ use crate::network::Network;
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Config {
     pub network: Option<Network>,
-    pub genesis: Option<Genesis>,
+    pub genesis_path: Option<ResolvedPathBuf>,
     pub storage: StorageConfig,
     pub db_path: Option<ResolvedPathBuf>,
     pub db_options: Option<ResolvedPathBuf>,
@@ -36,10 +36,10 @@ impl Default for DevConfig {
 }
 
 impl Config {
-    pub fn test() -> Self {
+    pub fn test(genesis_path: ResolvedPathBuf) -> Self {
         Self {
             network: None,
-            genesis: Some(Genesis::default()),
+            genesis_path: Some(genesis_path),
             storage: StorageConfig::InMemory,
             db_path: None,
             db_options: None,
@@ -49,12 +49,14 @@ impl Config {
 
     pub fn genesis(&self) -> Result<Genesis> {
         let mut genesis = match &self.network {
-            Some(network) => match &self.genesis {
-                Some(_genesis) => Err(anyhow!("Cannot specify both network and genesis in config")),
+            Some(network) => match &self.genesis_path {
+                Some(_genesis_path) => Err(anyhow!(
+                    "Cannot specify both network and genesis_path in config"
+                )),
                 None => network.genesis(),
             },
-            None => match &self.genesis {
-                Some(genesis) => Ok(genesis.clone()),
+            None => match &self.genesis_path {
+                Some(genesis_path) => Ok(Genesis::load_from_file(genesis_path.clone())?),
                 None => Err(anyhow!("Missing network in config")),
             },
         }?;
@@ -73,8 +75,8 @@ impl Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            network: Some(Network::LocalnetExample),
-            genesis: None,
+            network: None,
+            genesis_path: None,
             storage: StorageConfig::RocksDb,
             db_path: Some(
                 LIGHTNING_HOME_DIR
@@ -96,13 +98,15 @@ pub enum StorageConfig {
 
 #[cfg(test)]
 mod config_tests {
+    use tempfile::tempdir;
+
     use super::*;
 
     #[test]
     fn genesis_with_network_without_genesis() {
         let config = Config {
             network: Some(Network::LocalnetExample),
-            genesis: None,
+            genesis_path: None,
             ..Config::default()
         };
         assert!(config.genesis().is_ok());
@@ -110,9 +114,13 @@ mod config_tests {
 
     #[test]
     fn genesis_without_network_with_genesis() {
+        let temp_dir = tempdir().unwrap();
+        let genesis_path = Genesis::default()
+            .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+            .unwrap();
         let config = Config {
             network: None,
-            genesis: Some(Genesis::default()),
+            genesis_path: Some(genesis_path),
             ..Config::default()
         };
         assert!(config.genesis().is_ok());
@@ -122,7 +130,7 @@ mod config_tests {
     fn genesis_missing_network_and_genesis() {
         let config = Config {
             network: None,
-            genesis: None,
+            genesis_path: None,
             ..Config::default()
         };
         assert!(config.genesis().is_err());
@@ -130,9 +138,13 @@ mod config_tests {
 
     #[test]
     fn genesis_with_network_and_genesis() {
+        let temp_dir = tempdir().unwrap();
+        let genesis_path = Genesis::default()
+            .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+            .unwrap();
         let config = Config {
             network: Some(Network::LocalnetExample),
-            genesis: Some(Genesis::default()),
+            genesis_path: Some(genesis_path),
             ..Config::default()
         };
         assert!(config.genesis().is_err());

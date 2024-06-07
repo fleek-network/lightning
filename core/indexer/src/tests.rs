@@ -13,6 +13,7 @@ use lightning_signer::Signer;
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus, MockForwarder};
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
+use tempfile::tempdir;
 
 use crate::Indexer;
 
@@ -29,6 +30,8 @@ partial!(TestBinding {
 
 #[tokio::test]
 async fn test_submission() {
+    let temp_dir = tempdir().unwrap();
+
     // Given: some state.
     let keystore = EphemeralKeystore::<TestBinding>::default();
     let (consensus_secret_key, node_secret_key) =
@@ -93,14 +96,15 @@ async fn test_submission() {
     genesis.epoch_start = epoch_start;
     genesis.epoch_time = 4000; // millis
 
+    let genesis_path = genesis
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
+
     let mut node = Node::<TestBinding>::init_with_provider(
         fdi::Provider::default()
             .with(
                 JsonConfigProvider::default()
-                    .with::<Application<TestBinding>>(AppConfig {
-                        genesis: Some(genesis),
-                        ..AppConfig::test()
-                    })
+                    .with::<Application<TestBinding>>(AppConfig::test(genesis_path))
                     .with::<MockConsensus<TestBinding>>(ConsensusConfig {
                         min_ordering_time: 0,
                         max_ordering_time: 1,

@@ -276,6 +276,7 @@ impl SwarmBuilder {
             max_boost: 4,
             max_lock_time: 1460,
             supply_at_genesis: 1000000,
+            min_num_measurements: 2,
 
             ..Default::default()
         };
@@ -364,6 +365,9 @@ impl SwarmBuilder {
             index += 1;
         }
 
+        // Write genesis config to the directory.
+        let genesis_path = genesis.write_to_dir(directory.clone()).unwrap();
+
         // Now that we have built the configuration of all nodes and also have compiled the
         // proper genesis config. We can inject the genesis config.
         let mut nodes = HashMap::new();
@@ -378,7 +382,7 @@ impl SwarmBuilder {
             };
             config.inject::<Application<FinalTypes>>(AppConfig {
                 network: None,
-                genesis: Some(genesis.clone()),
+                genesis_path: Some(genesis_path.clone()),
                 storage,
                 db_path: Some(root.join("data/app_db").try_into().unwrap()),
                 db_options: None,

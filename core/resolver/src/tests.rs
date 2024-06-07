@@ -13,6 +13,7 @@ use lightning_rep_collector::ReputationAggregator;
 use lightning_signer::Signer;
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
+use tempfile::tempdir;
 
 use crate::config::Config;
 use crate::resolver::Resolver;
@@ -61,21 +62,18 @@ async fn test_start_shutdown() {
         true,
     ));
 
-    let path = std::env::temp_dir().join("resolver-test");
-    if path.exists() {
-        std::fs::remove_dir_all(&path).expect("Failed to clean up directory before test");
-    }
+    let temp_dir = tempdir().unwrap();
+    let genesis_path = genesis
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
 
     let mut node = Node::<TestBinding>::init_with_provider(
         fdi::Provider::default()
             .with(
                 JsonConfigProvider::default()
-                    .with::<Application<TestBinding>>(AppConfig {
-                        genesis: Some(genesis),
-                        ..AppConfig::test()
-                    })
+                    .with::<Application<TestBinding>>(AppConfig::test(genesis_path))
                     .with::<Resolver<TestBinding>>(Config {
-                        store_path: path.clone().try_into().unwrap(),
+                        store_path: temp_dir.path().join("store").clone().try_into().unwrap(),
                     }),
             )
             .with(keystore),
@@ -86,8 +84,4 @@ async fn test_start_shutdown() {
     node.start().await;
     tokio::time::sleep(Duration::from_secs(2)).await;
     node.shutdown().await;
-
-    if path.exists() {
-        std::fs::remove_dir_all(&path).expect("Failed to clean up directory after test");
-    }
 }

@@ -1,5 +1,4 @@
 use std::collections::HashSet;
-use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 
 use cid::Cid;
@@ -17,6 +16,7 @@ use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus, 
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_test_utils::server::spawn_server;
+use tempfile::{tempdir, TempDir};
 
 use crate::config::{Config, Gateway, Protocol, RequestFormat};
 use crate::IPFSOrigin;
@@ -34,7 +34,6 @@ partial!(TestBinding {
 
 struct AppState {
     node: Node<TestBinding>,
-    temp_dir_path: PathBuf,
 }
 
 impl AppState {
@@ -43,17 +42,9 @@ impl AppState {
     }
 }
 
-impl Drop for AppState {
-    fn drop(&mut self) {
-        if self.temp_dir_path.exists() {
-            std::fs::remove_dir_all(self.temp_dir_path.as_path()).unwrap();
-        }
-    }
-}
-
 // Todo: This is the same one used in blockstore, indexer and possbily others
 // so it might be useful to create a test factory.
-async fn create_app_state(test_name: String) -> AppState {
+async fn create_app_state(temp_dir: &TempDir) -> AppState {
     let keystore = EphemeralKeystore::<TestBinding>::default();
     let (consensus_secret_key, node_secret_key) =
         (keystore.get_bls_sk(), keystore.get_ed25519_sk());
@@ -117,19 +108,23 @@ async fn create_app_state(test_name: String) -> AppState {
     genesis.epoch_start = epoch_start;
     genesis.epoch_time = 4000; // millis
 
-    let path = std::env::temp_dir().join(test_name);
+    let genesis_path = genesis
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
 
     let node = Node::<TestBinding>::init_with_provider(
         fdi::Provider::default()
             .with(
                 JsonConfigProvider::default()
                     .with::<Blockstore<TestBinding>>(BlockstoreConfig {
-                        root: path.clone().try_into().unwrap(),
+                        root: temp_dir
+                            .path()
+                            .join("blockstore")
+                            .clone()
+                            .try_into()
+                            .unwrap(),
                     })
-                    .with::<Application<TestBinding>>(AppConfig {
-                        genesis: Some(genesis),
-                        ..AppConfig::test()
-                    })
+                    .with::<Application<TestBinding>>(AppConfig::test(genesis_path))
                     .with::<MockConsensus<TestBinding>>(ConsensusConfig {
                         min_ordering_time: 0,
                         max_ordering_time: 1,
@@ -144,10 +139,7 @@ async fn create_app_state(test_name: String) -> AppState {
 
     node.start().await;
 
-    AppState {
-        node,
-        temp_dir_path: path,
-    }
+    AppState { node }
 }
 
 #[tokio::test]
@@ -160,7 +152,8 @@ async fn test_origin_dag_pb() {
     )
     .unwrap();
 
-    let mut state = create_app_state("test-origin-dag-pb".to_string()).await;
+    let temp_dir = tempdir().unwrap();
+    let mut state = create_app_state(&temp_dir).await;
 
     let req_fut = async move {
         config.gateways = vec![Gateway {
@@ -201,7 +194,8 @@ async fn test_origin_bbb_dag_pb() {
     )
     .unwrap();
 
-    let mut state = create_app_state("test-origin-bbb-dag-pb".to_string()).await;
+    let temp_dir = tempdir().unwrap();
+    let mut state = create_app_state(&temp_dir).await;
 
     let req_fut = async move {
         config.gateways = vec![Gateway {
@@ -242,7 +236,8 @@ async fn test_origin_raw() {
     )
     .unwrap();
 
-    let mut state = create_app_state("test-origin-raw".to_string()).await;
+    let temp_dir = tempdir().unwrap();
+    let mut state = create_app_state(&temp_dir).await;
 
     let req_fut = async move {
         config.gateways = vec![Gateway {
@@ -283,7 +278,8 @@ async fn test_origin_bbb_dag_pb_and_raw() {
     )
     .unwrap();
 
-    let state = create_app_state("test-origin-bbb-dag-pb-and-raw".to_string()).await;
+    let temp_dir = tempdir().unwrap();
+    let state = create_app_state(&temp_dir).await;
 
     let req_fut = async move {
         config.gateways = vec![Gateway {

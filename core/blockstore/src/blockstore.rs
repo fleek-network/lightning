@@ -16,7 +16,6 @@ use lightning_interfaces::ContentChunk;
 use parking_lot::RwLock;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
-use tempdir::TempDir;
 use tokio::fs;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;

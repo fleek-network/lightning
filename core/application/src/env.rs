@@ -376,7 +376,7 @@ impl Env<UpdatePerm> {
                 );
                 // add genesis current epoch served if there
                 if let Some(served) = node.current_epoch_served {
-                    current_epoch_served_table.insert(node_index, served);
+                    current_epoch_served_table.insert(node_index, NodeServed::from(served));
                 }
                 // add genesis reputation if there
                 if let Some(rep) = node.reputation {
@@ -440,7 +440,7 @@ impl Env<UpdatePerm> {
 
             // add total served
             for (epoch, total_served) in genesis.total_served {
-                total_served_table.insert(epoch, total_served);
+                total_served_table.insert(epoch, TotalServed::from(total_served));
             }
 
             // add latencies
@@ -504,11 +504,18 @@ impl<C: Collection> WorkerTrait for UpdateWorker<C> {
 
 #[cfg(test)]
 mod env_tests {
+    use tempfile::tempdir;
+
     use super::*;
+    use crate::genesis::Genesis;
 
     #[test]
     fn test_apply_genesis_block_backfills_when_missing() {
-        let config = Config::test();
+        let temp_dir = tempdir().unwrap();
+        let genesis_path = Genesis::default()
+            .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+            .unwrap();
+        let config = Config::test(genesis_path);
         let mut env = Env::new(&config, None).unwrap();
 
         assert!(env.apply_genesis_block(&config).unwrap());

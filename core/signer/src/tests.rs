@@ -11,6 +11,7 @@ use lightning_notifier::Notifier;
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus, MockForwarder};
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
+use tempfile::{tempdir, TempDir};
 
 use crate::Signer;
 
@@ -24,7 +25,7 @@ partial!(TestBinding {
     NotifierInterface = Notifier<Self>;
 });
 
-fn build_node(transactions_to_lose: &[u32]) -> Node<TestBinding> {
+fn build_node(temp_dir: &TempDir, transactions_to_lose: &[u32]) -> Node<TestBinding> {
     let keystore = EphemeralKeystore::<TestBinding>::default();
     let (consensus_secret_key, node_secret_key) =
         (keystore.get_bls_sk(), keystore.get_ed25519_sk());
@@ -55,13 +56,14 @@ fn build_node(transactions_to_lose: &[u32]) -> Node<TestBinding> {
         true,
     ));
 
+    let genesis_path = genesis
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
+
     Node::<TestBinding>::init_with_provider(
         fdi::Provider::default().with(keystore).with(
             JsonConfigProvider::default()
-                .with::<Application<TestBinding>>(AppConfig {
-                    genesis: Some(genesis),
-                    ..AppConfig::test()
-                })
+                .with::<Application<TestBinding>>(AppConfig::test(genesis_path))
                 .with::<MockConsensus<TestBinding>>(ConsensusConfig {
                     min_ordering_time: 0,
                     max_ordering_time: 1,
@@ -85,7 +87,8 @@ fn get_our_nonce<C: Collection>(node: &Node<C>) -> u64 {
 
 #[tokio::test]
 async fn test_send_two_txs_in_a_row() {
-    let node = build_node(&[]);
+    let temp_dir = tempdir().unwrap();
+    let node = build_node(&temp_dir, &[]);
     node.start().await;
 
     let signer_socket = node.provider.get::<Signer<TestBinding>>().get_socket();
@@ -109,7 +112,8 @@ async fn test_send_two_txs_in_a_row() {
 
 #[tokio::test]
 async fn test_retry_send() {
-    let node = build_node(&[2]);
+    let temp_dir = tempdir().unwrap();
+    let node = build_node(&temp_dir, &[2]);
     node.start().await;
 
     let signer_socket = node.provider.get::<Signer<TestBinding>>().get_socket();

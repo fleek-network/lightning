@@ -1,7 +1,6 @@
 use std::collections::HashSet;
 use std::io;
 use std::net::{IpAddr, SocketAddr};
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -21,6 +20,7 @@ use lightning_signer::Signer;
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_topology::Topology;
+use tempfile::{tempdir, TempDir};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
 
@@ -60,30 +60,15 @@ impl Peer {
     }
 }
 
-struct PathBuffWrapper(PathBuf);
-
-impl Drop for PathBuffWrapper {
-    fn drop(&mut self) {
-        if self.0.exists() {
-            std::fs::remove_dir_all(&self.0).unwrap();
-        }
-    }
-}
-
 async fn get_pools(
-    test_name: &str,
+    temp_dir: &TempDir,
     port_offset: u16,
     num_peers: usize,
     state_server_address_port: Option<u16>,
-) -> (Vec<Peer>, AppConfig, PathBuffWrapper) {
+) -> (Vec<Peer>, AppConfig) {
     let mut keystores = Vec::new();
     let mut genesis = Genesis::default();
-    let path = std::env::temp_dir()
-        .join("lightning-pool-test")
-        .join(test_name);
-    if path.exists() {
-        std::fs::remove_dir_all(&path).unwrap();
-    }
+
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
 
@@ -118,10 +103,10 @@ async fn get_pools(
         ));
     }
 
-    let app_config = AppConfig {
-        genesis: Some(genesis),
-        ..AppConfig::test()
-    };
+    let genesis_path = genesis
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
+    let app_config = AppConfig::test(genesis_path);
 
     // Create peers.
     let mut peers = Vec::new();
@@ -139,7 +124,7 @@ async fn get_pools(
         peers.push(peer);
     }
 
-    (peers, app_config, PathBuffWrapper(path))
+    (peers, app_config)
 }
 
 // Create a peer that is not in state.
@@ -224,7 +209,8 @@ fn event_receiver(peer: &Peer) -> (EventReceiver<TestBinding>, EventReceiverTest
 #[tokio::test(flavor = "multi_thread")]
 async fn test_send_to_one() {
     // Given: two peers.
-    let (peers, _, path) = get_pools("send_to_one", 48000, 2, None).await;
+    let temp_dir = tempdir().unwrap();
+    let (peers, _) = get_pools(&temp_dir, 48000, 2, None).await;
     let query_runner = peers[0].app().sync_query();
 
     let node_index1 = query_runner
@@ -261,14 +247,14 @@ async fn test_send_to_one() {
     for mut peer in peers {
         peer.inner.shutdown().await;
     }
-    drop(path);
 }
 
 #[tokio::test]
 async fn test_send_to_all() {
     // Given: a list of peers that are in state and some that are not.
     let port_offset = 49000;
-    let (peers, app, path) = get_pools("send_to_all", port_offset, 4, None).await;
+    let temp_dir = tempdir().unwrap();
+    let (peers, app) = get_pools(&temp_dir, port_offset, 4, None).await;
     let mut unknown_peer = create_unknown_peer(
         app,
         format!("0.0.0.0:{}", port_offset + peers.len() as u16)
@@ -327,13 +313,13 @@ async fn test_send_to_all() {
         peer.inner.shutdown().await;
     }
     unknown_peer.inner.shutdown().await;
-    drop(path);
 }
 
 #[tokio::test]
 async fn test_open_req_res() {
     // Given: two peers.
-    let (peers, _, path) = get_pools("open_req_res", 50000, 2, None).await;
+    let temp_dir = tempdir().unwrap();
+    let (peers, _) = get_pools(&temp_dir, 50000, 2, None).await;
     let query_runner = peers[0].app().sync_query();
 
     let node_index1 = query_runner
@@ -395,13 +381,13 @@ async fn test_open_req_res() {
     for mut peer in peers {
         peer.inner.shutdown().await;
     }
-    drop(path);
 }
 
 #[tokio::test]
 async fn test_open_req_res_unknown_peer() {
     // Give: a peer.
-    let (mut peers, _, path) = get_pools("test_open_req_res_unknown_peer", 55000, 1, None).await;
+    let temp_dir = tempdir().unwrap();
+    let (mut peers, _) = get_pools(&temp_dir, 55000, 1, None).await;
     let (requester1, _responder1) = peers[0].pool().open_req_res(ServiceScope::BlockstoreServer);
     peers[0].inner.start().await;
 
@@ -420,13 +406,13 @@ async fn test_open_req_res_unknown_peer() {
 
     // Clean up.
     peers[0].inner.shutdown().await;
-    drop(path);
 }
 
 #[tokio::test]
 async fn test_log_pool_get_index() {
     // We never bind.
-    let (peers, _, _path) = get_pools("test_log_pool_get_index", 8000, 2, None).await;
+    let temp_dir = tempdir().unwrap();
+    let (peers, _) = get_pools(&temp_dir, 8000, 2, None).await;
     let (event_receiver, _) = event_receiver(&peers[0]);
     assert_eq!(event_receiver.handler.get_index(), peers[0].node_index);
 }
@@ -435,7 +421,8 @@ async fn test_log_pool_get_index() {
 async fn test_log_pool_update_connections() {
     // Given: a network of 4 nodes.
     // We never bind.
-    let (peers, _, path) = get_pools("test_log_pool_update_connections", 8000, 4, None).await;
+    let temp_dir = tempdir().unwrap();
+    let (peers, _) = get_pools(&temp_dir, 8000, 4, None).await;
     let (mut event_receiver, _state) = event_receiver(&peers[0]);
 
     // When: we tell first node to connect to all the peers.
@@ -530,7 +517,6 @@ async fn test_log_pool_update_connections() {
         .copied()
         .collect::<HashSet<_>>();
     assert!(connections.is_empty());
-    drop(path);
 }
 
 #[tokio::test]
@@ -613,11 +599,10 @@ async fn test_log_pool_pinning_peers_from_topology() {
 #[tokio::test]
 async fn test_log_pool_pinning_peers_outside_topology_cluster() {
     // Given: a network of 2 nodes.
-    let (peers, _, path) = get_pools(
-        "test_log_pool_pinning_peers_outside_topology_cluster",
-        8000, // We never bind.
-        2,
-        None,
+    let temp_dir = tempdir().unwrap();
+    let (peers, _) = get_pools(
+        &temp_dir, 8000, // We never bind.
+        2, None,
     )
     .await;
     let (mut event_receiver, _state) = event_receiver(&peers[0]);
@@ -658,17 +643,15 @@ async fn test_log_pool_pinning_peers_outside_topology_cluster() {
         .copied()
         .collect::<HashSet<_>>();
     assert!(connections.is_empty());
-    drop(path);
 }
 
 #[tokio::test]
 async fn test_log_pool_only_broadcast_to_peers_in_topology_cluster() {
     // Given: a network of 4 nodes.
-    let (peers, _, path) = get_pools(
-        "test_log_pool_only_broadcast_to_peers_in_topology_cluster",
-        8000, // We never bind.
-        4,
-        None,
+    let temp_dir = tempdir().unwrap();
+    let (peers, _) = get_pools(
+        &temp_dir, 8000, // We never bind.
+        4, None,
     )
     .await;
     let (mut event_receiver, mut state) = event_receiver(&peers[0]);
@@ -726,17 +709,15 @@ async fn test_log_pool_only_broadcast_to_peers_in_topology_cluster() {
             panic!("invalid value expected a broadcast task")
         },
     }
-    drop(path);
 }
 
 #[tokio::test]
 async fn test_log_pool_only_broadcast_to_one_peer() {
     // Given: a network of 4 nodes.
-    let (peers, _, path) = get_pools(
-        "test_log_pool_only_broadcast_to_one_peer",
-        8000, // We never bind.
-        4,
-        None,
+    let temp_dir = tempdir().unwrap();
+    let (peers, _) = get_pools(
+        &temp_dir, 8000, // We never bind.
+        4, None,
     )
     .await;
 
@@ -804,13 +785,13 @@ async fn test_log_pool_only_broadcast_to_one_peer() {
             .await
             .is_err()
     );
-    drop(path);
 }
 
 #[tokio::test]
 async fn test_start_shutdown() {
     // Given: two peers.
-    let (peers, _, path) = get_pools("start_shutdown", 60000, 2, Some(60010)).await;
+    let temp_dir = tempdir().unwrap();
+    let (peers, _) = get_pools(&temp_dir, 60000, 2, Some(60010)).await;
 
     // Given: we start the peers.
     for peer in &peers {
@@ -821,5 +802,4 @@ async fn test_start_shutdown() {
     for mut peer in peers {
         peer.inner.shutdown().await;
     }
-    drop(path);
 }

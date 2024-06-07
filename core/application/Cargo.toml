@@ -32,12 +32,14 @@ hp-fixed.workspace = true
 atomo-rocks.workspace = true
 resolved-pathbuf.workspace = true
 workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }
+serde_with = "3.8.1"
 
 
 [dev-dependencies]
 lightning-test-utils = { path = "../test-utils" }
 tokio.workspace = true
 rand.workspace = true
+tempfile.workspace = true
 
 [features]
 test = []

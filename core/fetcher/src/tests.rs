@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 use std::time::Duration;
 
 use cid::Cid;
@@ -34,6 +33,7 @@ use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_test_utils::server::spawn_server;
 use lightning_topology::Topology;
+use tempfile::{tempdir, TempDir};
 use tokio::sync::oneshot;
 
 use crate::config::Config;
@@ -59,18 +59,11 @@ partial!(TestBinding {
 });
 
 async fn get_fetchers(
-    test_name: &str,
+    temp_dir: &TempDir,
     pool_port_offset: u16,
     gateway_port_offset: u16,
     num_peers: usize,
-) -> (Vec<Node<TestBinding>>, PathBuf) {
-    let path = std::env::temp_dir()
-        .join("lightning-fetcher-test")
-        .join(test_name);
-    if path.exists() {
-        std::fs::remove_dir_all(&path).unwrap();
-    }
-
+) -> Vec<Node<TestBinding>> {
     let keystores = (0..num_peers)
         .map(|_| EphemeralKeystore::<TestBinding>::default())
         .collect::<Vec<_>>();
@@ -107,6 +100,10 @@ async fn get_fetchers(
         ..Default::default()
     };
 
+    let genesis_path = genesis
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
+
     let peers = keystores
         .into_iter()
         .enumerate()
@@ -114,10 +111,7 @@ async fn get_fetchers(
             Node::<TestBinding>::init_with_provider(
                 fdi::Provider::default().with(keystore).with(
                     JsonConfigProvider::default()
-                        .with::<Application<TestBinding>>(AppConfig {
-                            genesis: Some(genesis.clone()),
-                            ..AppConfig::test()
-                        })
+                        .with::<Application<TestBinding>>(AppConfig::test(genesis_path.clone()))
                         .with::<PoolProvider<TestBinding>>(PoolConfig {
                             max_idle_timeout: Duration::from_secs(5),
                             address: format!("0.0.0.0:{}", pool_port_offset + i as u16)
@@ -129,10 +123,18 @@ async fn get_fetchers(
                             reporter_buffer_size: 1,
                         })
                         .with::<Resolver<TestBinding>>(ResolverConfig {
-                            store_path: path.join(format!("node-{i}/resolver")).try_into().unwrap(),
+                            store_path: temp_dir
+                                .path()
+                                .join(format!("node-{i}/resolver"))
+                                .try_into()
+                                .unwrap(),
                         })
                         .with::<Blockstore<TestBinding>>(BlockstoreConfig {
-                            root: path.join(format!("node-{i}/store")).try_into().unwrap(),
+                            root: temp_dir
+                                .path()
+                                .join(format!("node-{i}/store"))
+                                .try_into()
+                                .unwrap(),
                         })
                         .with::<OriginDemuxer<TestBinding>>(DemuxerOriginConfig {
                             ipfs: IPFSOriginConfig {
@@ -157,12 +159,13 @@ async fn get_fetchers(
         })
         .collect();
 
-    (peers, path)
+    peers
 }
 
 #[tokio::test]
 async fn test_simple_origin_fetch() {
-    let (peers, path) = get_fetchers("lightning-test-simple-origin-fetch", 30101, 40101, 1).await;
+    let temp_dir = tempdir().unwrap();
+    let peers = get_fetchers(&temp_dir, 30101, 40101, 1).await;
 
     let req_cid =
         Cid::try_from("bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi").unwrap();
@@ -199,15 +202,12 @@ async fn test_simple_origin_fetch() {
     for mut peer in peers {
         peer.shutdown().await;
     }
-
-    if path.exists() {
-        std::fs::remove_dir_all(&path).unwrap();
-    }
 }
 
 #[tokio::test]
 async fn test_fetch_from_peer() {
-    let (mut peers, path) = get_fetchers("lightning-test-fetch-from-peer", 30301, 40301, 2).await;
+    let temp_dir = tempdir().unwrap();
+    let mut peers = get_fetchers(&temp_dir, 30301, 40301, 2).await;
     let mut peer1 = peers.pop().unwrap();
     let mut peer2 = peers.pop().unwrap();
     let blockstore1 = peer1.provider.get::<Blockstore<TestBinding>>().clone();
@@ -263,8 +263,4 @@ async fn test_fetch_from_peer() {
 
     peer1.shutdown().await;
     peer2.shutdown().await;
-
-    if path.exists() {
-        std::fs::remove_dir_all(&path).unwrap();
-    }
 }

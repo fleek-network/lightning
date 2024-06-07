@@ -1,5 +1,4 @@
 use std::collections::HashSet;
-use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 
 use fleek_crypto::{AccountOwnerSecretKey, ConsensusSecretKey, NodeSecretKey, SecretKey};
@@ -16,6 +15,7 @@ use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus, 
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_test_utils::server;
+use tempfile::{tempdir, TempDir};
 
 use crate::{get_url_and_sri, HttpOrigin};
 
@@ -32,7 +32,6 @@ partial!(TestBinding {
 
 struct AppState {
     node: Node<TestBinding>,
-    temp_dir_path: PathBuf,
 }
 
 impl AppState {
@@ -41,17 +40,9 @@ impl AppState {
     }
 }
 
-impl Drop for AppState {
-    fn drop(&mut self) {
-        if self.temp_dir_path.exists() {
-            std::fs::remove_dir_all(self.temp_dir_path.as_path()).unwrap();
-        }
-    }
-}
-
 // Todo: This is the same one used in blockstore, indexer and possbily others
 // so it might be useful to create a test factory.
-async fn create_app_state(test_name: String) -> AppState {
+async fn create_app_state(temp_dir: &TempDir) -> AppState {
     let keystore = EphemeralKeystore::<TestBinding>::default();
     let (consensus_secret_key, node_secret_key) =
         (keystore.get_bls_sk(), keystore.get_ed25519_sk());
@@ -115,19 +106,23 @@ async fn create_app_state(test_name: String) -> AppState {
     genesis.epoch_start = epoch_start;
     genesis.epoch_time = 4000; // millis
 
-    let path = std::env::temp_dir().join(test_name);
+    let genesis_path = genesis
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
 
     let node = Node::<TestBinding>::init_with_provider(
         fdi::Provider::default()
             .with(
                 JsonConfigProvider::default()
                     .with::<Blockstore<TestBinding>>(BlockstoreConfig {
-                        root: path.clone().try_into().unwrap(),
+                        root: temp_dir
+                            .path()
+                            .join("blockstore")
+                            .clone()
+                            .try_into()
+                            .unwrap(),
                     })
-                    .with::<Application<TestBinding>>(AppConfig {
-                        genesis: Some(genesis),
-                        ..AppConfig::test()
-                    })
+                    .with::<Application<TestBinding>>(AppConfig::test(genesis_path))
                     .with::<MockConsensus<TestBinding>>(ConsensusConfig {
                         min_ordering_time: 0,
                         max_ordering_time: 1,
@@ -142,10 +137,7 @@ async fn create_app_state(test_name: String) -> AppState {
 
     node.start().await;
 
-    AppState {
-        node,
-        temp_dir_path: path,
-    }
+    AppState { node }
 }
 
 #[tokio::test]
@@ -156,7 +148,8 @@ async fn test_http_origin() {
     // Given: an identifier for some resource.
     let url = "http://127.0.0.1:30233/bar/index.ts".to_string();
     // Given: an origin.
-    let mut state = create_app_state("test_http_origin".to_string()).await;
+    let temp_dir = tempdir().unwrap();
+    let mut state = create_app_state(&temp_dir).await;
     let origin =
         HttpOrigin::<TestBinding>::new(Default::default(), state.blockstore().clone()).unwrap();
 
@@ -184,7 +177,8 @@ async fn test_http_origin_with_integrity_check() {
     // Given: an identifier for some resource.
     let url = "http://127.0.0.1:30400/bar/index.ts#integrity=sha256-61z/GbpXJljbPypnYd2389IVCTbzU/taXTCVOUR67is=".to_string();
     // Given: an origin.
-    let mut state = create_app_state("test_http_origin_with_integrity_check".to_string()).await;
+    let temp_dir = tempdir().unwrap();
+    let mut state = create_app_state(&temp_dir).await;
     let origin =
         HttpOrigin::<TestBinding>::new(Default::default(), state.blockstore().clone()).unwrap();
 
@@ -209,8 +203,8 @@ async fn test_http_origin_with_integrity_check_invalid_hash() {
     // Given: an identifier for some resource with an invalid digest.
     let url = "http://127.0.0.1:30401/bar/index.ts#integrity=sha256-23lFzBrGtqXuPufwrMw+G3hWOwdtehDz/izclz/3gVw=".to_string();
     // Given: an origin.
-    let mut state =
-        create_app_state("test_http_origin_with_integrity_check_invalid_hash".to_string()).await;
+    let temp_dir = tempdir().unwrap();
+    let mut state = create_app_state(&temp_dir).await;
     let origin =
         HttpOrigin::<TestBinding>::new(Default::default(), state.blockstore().clone()).unwrap();
 

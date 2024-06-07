@@ -56,6 +56,7 @@ use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::{random, reputation};
 use lightning_utils::application::QueryRunnerExt;
 use rand::seq::SliceRandom;
+use tempfile::{tempdir, TempDir};
 
 use crate::app::Application;
 use crate::config::Config;
@@ -553,11 +554,13 @@ fn test_genesis() -> Genesis {
 }
 
 /// Initialize application state with provided or default configuration.
-fn init_app(config: Option<Config>) -> (ExecutionEngineSocket, QueryRunner) {
-    let config = config.or(Some(Config {
-        genesis: Some(test_genesis()),
-        ..Config::test()
-    }));
+fn init_app(temp_dir: &TempDir, config: Option<Config>) -> (ExecutionEngineSocket, QueryRunner) {
+    let config = config.or_else(|| {
+        let genesis_path = test_genesis()
+            .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+            .unwrap();
+        Some(Config::test(genesis_path))
+    });
     do_init_app(config.unwrap())
 }
 
@@ -574,19 +577,32 @@ fn do_init_app(config: Config) -> (ExecutionEngineSocket, QueryRunner) {
 }
 
 /// Initialize application with provided committee.
-fn test_init_app(committee: Vec<GenesisNode>) -> (ExecutionEngineSocket, QueryRunner) {
+fn test_init_app(
+    temp_dir: &TempDir,
+    committee: Vec<GenesisNode>,
+) -> (ExecutionEngineSocket, QueryRunner) {
     let mut genesis = test_genesis();
     genesis.node_info = committee;
-    init_app(Some(test_config(genesis)))
+    let genesis_path = genesis
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
+    init_app(temp_dir, Some(Config::test(genesis_path)))
 }
 
 /// Initialize application with provided genesis.
-fn init_app_with_genesis(genesis: &Genesis) -> (ExecutionEngineSocket, QueryRunner) {
-    init_app(Some(test_config(genesis.clone())))
+fn init_app_with_genesis(
+    temp_dir: &TempDir,
+    genesis: &Genesis,
+) -> (ExecutionEngineSocket, QueryRunner) {
+    let genesis_path = genesis
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
+    init_app(temp_dir, Some(Config::test(genesis_path)))
 }
 
 /// Initialize application with provided parameters.
 fn init_app_with_params(
+    temp_dir: &TempDir,
     params: Params,
     committee: Option<Vec<GenesisNode>>,
 ) -> (ExecutionEngineSocket, QueryRunner) {
@@ -627,20 +643,12 @@ fn init_app_with_params(
     if let Some(supply_at_genesis) = params.supply_at_genesis {
         genesis.supply_at_genesis = supply_at_genesis;
     }
-    let config = Config {
-        genesis: Some(genesis),
-        ..Config::test()
-    };
 
-    init_app(Some(config))
-}
+    let genesis_path = genesis
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
 
-/// Prepare test Config based on provided genesis.
-fn test_config(genesis: Genesis) -> Config {
-    Config {
-        genesis: Some(genesis),
-        ..Config::test()
-    }
+    init_app(temp_dir, Some(Config::test(genesis_path)))
 }
 
 /// Prepare test Reputation Measurements based on provided `uptime`.
@@ -1223,8 +1231,10 @@ fn content_registry(query_runner: &QueryRunner, node: &NodeIndex) -> Vec<Blake3H
 
 #[tokio::test]
 async fn test_genesis_configuration() {
+    let temp_dir = tempdir().unwrap();
+
     // Init application + get the query and update socket
-    let (_, query_runner) = init_app(None);
+    let (_, query_runner) = init_app(&temp_dir, None);
     // Get the genesis parameters plus the initial committee
     let genesis = test_genesis();
     let genesis_committee = genesis.node_info;
@@ -1238,10 +1248,12 @@ async fn test_genesis_configuration() {
 
 #[tokio::test]
 async fn test_epoch_change() {
+    let temp_dir = tempdir().unwrap();
+
     // Create a genesis committee and seed the application state with it.
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, query_runner) = test_init_app(committee);
+    let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
     let required_signals = calculate_required_signals(committee_size);
 
     let epoch = 0;
@@ -1272,9 +1284,11 @@ async fn test_epoch_change() {
 
 #[tokio::test]
 async fn test_change_epoch_reverts_account_key() {
+    let temp_dir = tempdir().unwrap();
+
     let committee_size = 4;
     let (committee, _keystore) = create_genesis_committee(committee_size);
-    let (update_socket, _query_runner) = test_init_app(committee);
+    let (update_socket, _query_runner) = test_init_app(&temp_dir, committee);
 
     // Account Secret Key
     let secret_key = AccountOwnerSecretKey::generate();
@@ -1287,10 +1301,12 @@ async fn test_change_epoch_reverts_account_key() {
 
 #[tokio::test]
 async fn test_change_epoch_reverts_node_does_not_exist() {
+    let temp_dir = tempdir().unwrap();
+
     // Create a genesis committee and seed the application state with it.
     let committee_size = 4;
     let (committee, _keystore) = create_genesis_committee(committee_size);
-    let (update_socket, _query_runner) = test_init_app(committee);
+    let (update_socket, _query_runner) = test_init_app(&temp_dir, committee);
 
     // Unknown Node Key (without Stake)
     let node_secret_key = NodeSecretKey::generate();
@@ -1302,10 +1318,12 @@ async fn test_change_epoch_reverts_node_does_not_exist() {
 
 #[tokio::test]
 async fn test_change_epoch_reverts_insufficient_stake() {
+    let temp_dir = tempdir().unwrap();
+
     // Create a genesis committee and seed the application state with it.
     let committee_size = 4;
     let (committee, _keystore) = create_genesis_committee(committee_size);
-    let (update_socket, query_runner) = test_init_app(committee);
+    let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     // New Node key
@@ -1331,10 +1349,12 @@ async fn test_change_epoch_reverts_insufficient_stake() {
 
 #[tokio::test]
 async fn test_epoch_change_reverts_epoch_already_changed() {
+    let temp_dir = tempdir().unwrap();
+
     // Create a genesis committee and seed the application state with it.
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, query_runner) = test_init_app(committee);
+    let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
 
     // call epoch change
     simple_epoch_change!(&update_socket, &keystore, &query_runner, 0);
@@ -1347,10 +1367,12 @@ async fn test_epoch_change_reverts_epoch_already_changed() {
 
 #[tokio::test]
 async fn test_epoch_change_reverts_epoch_has_not_started() {
+    let temp_dir = tempdir().unwrap();
+
     // Create a genesis committee and seed the application state with it.
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, _query_runner) = test_init_app(committee);
+    let (update_socket, _query_runner) = test_init_app(&temp_dir, committee);
 
     let change_epoch = UpdateMethod::ChangeEpoch { epoch: 1 };
     let update = prepare_update_request_node(change_epoch, &keystore[0].node_secret_key, 1);
@@ -1359,10 +1381,12 @@ async fn test_epoch_change_reverts_epoch_has_not_started() {
 
 #[tokio::test]
 async fn test_epoch_change_reverts_not_committee_member() {
+    let temp_dir = tempdir().unwrap();
+
     // Create a genesis committee and seed the application state with it.
     let committee_size = 4;
     let (committee, _keystore) = create_genesis_committee(committee_size);
-    let (update_socket, query_runner) = test_init_app(committee);
+    let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     // New Node key
@@ -1387,10 +1411,12 @@ async fn test_epoch_change_reverts_not_committee_member() {
 
 #[tokio::test]
 async fn test_epoch_change_reverts_already_signaled() {
+    let temp_dir = tempdir().unwrap();
+
     // Create a genesis committee and seed the application state with it.
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, _query_runner) = test_init_app(committee);
+    let (update_socket, _query_runner) = test_init_app(&temp_dir, committee);
 
     let change_epoch = UpdateMethod::ChangeEpoch { epoch: 0 };
     let update = prepare_update_request_node(change_epoch.clone(), &keystore[0].node_secret_key, 1);
@@ -1403,9 +1429,11 @@ async fn test_epoch_change_reverts_already_signaled() {
 
 #[tokio::test]
 async fn test_submit_rep_measurements() {
+    let temp_dir = tempdir().unwrap();
+
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, query_runner) = test_init_app(committee);
+    let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
     let mut rng = random::get_seedable_rng();
 
     let mut map = BTreeMap::new();
@@ -1433,9 +1461,11 @@ async fn test_submit_rep_measurements() {
 
 #[tokio::test]
 async fn test_submit_rep_measurements_too_many_times() {
+    let temp_dir = tempdir().unwrap();
+
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, query_runner) = test_init_app(committee);
+    let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
 
     let mut rng = random::get_seedable_rng();
 
@@ -1474,9 +1504,11 @@ async fn test_submit_rep_measurements_too_many_times() {
 
 #[tokio::test]
 async fn test_rep_scores() {
+    let temp_dir = tempdir().unwrap();
+
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, query_runner) = test_init_app(committee);
+    let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
     let required_signals = calculate_required_signals(committee_size);
 
     let mut rng = random::get_seedable_rng();
@@ -1529,11 +1561,13 @@ async fn test_rep_scores() {
 
 #[tokio::test]
 async fn test_uptime_participation() {
+    let temp_dir = tempdir().unwrap();
+
     let committee_size = 4;
     let (mut committee, keystore) = create_genesis_committee(committee_size);
     committee[0].reputation = Some(40);
     committee[1].reputation = Some(80);
-    let (update_socket, query_runner) = test_init_app(committee);
+    let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
 
     let required_signals = calculate_required_signals(committee_size);
 
@@ -1622,9 +1656,11 @@ async fn test_uptime_participation() {
 
 #[tokio::test]
 async fn test_stake() {
+    let temp_dir = tempdir().unwrap();
+
     let committee_size = 4;
     let (committee, _keystore) = create_genesis_committee(committee_size);
-    let (update_socket, query_runner) = test_init_app(committee);
+    let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let peer_pub_key = NodeSecretKey::generate().to_pk();
@@ -1705,7 +1741,9 @@ async fn test_stake() {
 
 #[tokio::test]
 async fn test_stake_lock() {
-    let (update_socket, query_runner) = init_app(None);
+    let temp_dir = tempdir().unwrap();
+
+    let (update_socket, query_runner) = init_app(&temp_dir, None);
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let node_pub_key = NodeSecretKey::generate().to_pk();
@@ -1742,9 +1780,11 @@ async fn test_stake_lock() {
 
 #[tokio::test]
 async fn test_pod_without_proof() {
+    let temp_dir = tempdir().unwrap();
+
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, query_runner) = test_init_app(committee);
+    let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
 
     let bandwidth_commodity = 1000;
     let compute_commodity = 2000;
@@ -1779,9 +1819,11 @@ async fn test_pod_without_proof() {
 
 #[tokio::test]
 async fn test_submit_pod_reverts_account_key() {
+    let temp_dir = tempdir().unwrap();
+
     let committee_size = 4;
     let (committee, _keystore) = create_genesis_committee(committee_size);
-    let (update_socket, _query_runner) = test_init_app(committee);
+    let (update_socket, _query_runner) = test_init_app(&temp_dir, committee);
 
     // Account Secret Key
     let secret_key = AccountOwnerSecretKey::generate();
@@ -1797,10 +1839,12 @@ async fn test_submit_pod_reverts_account_key() {
 
 #[tokio::test]
 async fn test_submit_pod_reverts_node_does_not_exist() {
+    let temp_dir = tempdir().unwrap();
+
     // Create a genesis committee and seed the application state with it.
     let committee_size = 4;
     let (committee, _keystore) = create_genesis_committee(committee_size);
-    let (update_socket, _query_runner) = test_init_app(committee);
+    let (update_socket, _query_runner) = test_init_app(&temp_dir, committee);
 
     // Unknown Node Key (without Stake)
     let node_secret_key = NodeSecretKey::generate();
@@ -1816,10 +1860,12 @@ async fn test_submit_pod_reverts_node_does_not_exist() {
 
 #[tokio::test]
 async fn test_submit_pod_reverts_insufficient_stake() {
+    let temp_dir = tempdir().unwrap();
+
     // Create a genesis committee and seed the application state with it.
     let committee_size = 4;
     let (committee, _keystore) = create_genesis_committee(committee_size);
-    let (update_socket, query_runner) = test_init_app(committee);
+    let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     // New Node key
@@ -1850,9 +1896,11 @@ async fn test_submit_pod_reverts_insufficient_stake() {
 
 #[tokio::test]
 async fn test_submit_pod_reverts_invalid_service_id() {
+    let temp_dir = tempdir().unwrap();
+
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, _query_runner) = test_init_app(committee);
+    let (update_socket, _query_runner) = test_init_app(&temp_dir, committee);
 
     let update = prepare_pod_request(2000, 1069, &keystore[0].node_secret_key, 1);
 
@@ -1862,7 +1910,9 @@ async fn test_submit_pod_reverts_invalid_service_id() {
 
 #[tokio::test]
 async fn test_is_valid_node() {
-    let (update_socket, query_runner) = init_app(None);
+    let temp_dir = tempdir().unwrap();
+
+    let (update_socket, query_runner) = init_app(&temp_dir, None);
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let node_pub_key = NodeSecretKey::generate().to_pk();
@@ -1901,13 +1951,15 @@ async fn test_is_valid_node() {
 
 #[tokio::test]
 async fn test_change_protocol_params() {
+    let temp_dir = tempdir().unwrap();
+
     let governance_secret_key = AccountOwnerSecretKey::generate();
     let governance_public_key = governance_secret_key.to_pk();
 
     let mut genesis = test_genesis();
     genesis.governance_address = governance_public_key.into();
 
-    let (update_socket, query_runner) = init_app_with_genesis(&genesis);
+    let (update_socket, query_runner) = init_app_with_genesis(&temp_dir, &genesis);
 
     let param = ProtocolParams::LockTime;
     let new_value = 5;
@@ -1937,9 +1989,11 @@ async fn test_change_protocol_params() {
 
 #[tokio::test]
 async fn test_change_protocol_params_reverts_not_account_key() {
+    let temp_dir = tempdir().unwrap();
+
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, query_runner) = test_init_app(committee);
+    let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
 
     let param = ProtocolParams::LockTime;
     let initial_value = query_runner.get_protocol_param(&param).unwrap();
@@ -1974,9 +2028,11 @@ async fn test_change_protocol_params_reverts_not_account_key() {
 
 #[tokio::test]
 async fn test_simulate_txn() {
+    let temp_dir = tempdir().unwrap();
+
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, query_runner) = test_init_app(committee);
+    let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
 
     // Submit a ChangeEpoch transaction that will revert (EpochHasNotStarted) and ensure that the
     // `simulate_txn` method of the query runner returns the same response as the update runner.
@@ -2006,6 +2062,8 @@ async fn test_simulate_txn() {
 
 #[tokio::test]
 async fn test_distribute_rewards() {
+    let temp_dir = tempdir().unwrap();
+
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
 
@@ -2016,6 +2074,7 @@ async fn test_distribute_rewards() {
     let boost = 4;
     let supply_at_genesis = 1_000_000;
     let (update_socket, query_runner) = init_app_with_params(
+        &temp_dir,
         Params {
             epoch_time: None,
             max_inflation: Some(max_inflation),
@@ -2162,9 +2221,11 @@ async fn test_distribute_rewards() {
 
 #[tokio::test]
 async fn test_get_node_registry() {
+    let temp_dir = tempdir().unwrap();
+
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, query_runner) = test_init_app(committee);
+    let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
 
     let owner_secret_key1 = AccountOwnerSecretKey::generate();
     let node_secret_key1 = NodeSecretKey::generate();
@@ -2262,6 +2323,8 @@ async fn test_get_node_registry() {
 
 #[tokio::test]
 async fn test_supply_across_epoch() {
+    let temp_dir = tempdir().unwrap();
+
     let committee_size = 4;
     let (mut committee, mut keystore) = create_genesis_committee(committee_size);
 
@@ -2273,6 +2336,7 @@ async fn test_supply_across_epoch() {
     let boost = 4;
     let supply_at_genesis = 1000000;
     let (update_socket, query_runner) = init_app_with_params(
+        &temp_dir,
         Params {
             epoch_time: Some(epoch_time),
             max_inflation: Some(max_inflation),
@@ -2385,7 +2449,9 @@ async fn test_supply_across_epoch() {
 
 #[tokio::test]
 async fn test_revert_self_transfer() {
-    let (update_socket, query_runner) = init_app(None);
+    let temp_dir = tempdir().unwrap();
+
+    let (update_socket, query_runner) = init_app(&temp_dir, None);
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner: EthAddress = owner_secret_key.to_pk().into();
@@ -2405,9 +2471,11 @@ async fn test_revert_self_transfer() {
 
 #[tokio::test]
 async fn test_revert_transfer_not_account_key() {
+    let temp_dir = tempdir().unwrap();
+
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, query_runner) = test_init_app(committee);
+    let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
     let recipient: EthAddress = AccountOwnerSecretKey::generate().to_pk().into();
 
     let amount: HpUfixed<18> = 10_u64.into();
@@ -2445,7 +2513,9 @@ async fn test_revert_transfer_not_account_key() {
 
 #[tokio::test]
 async fn test_revert_transfer_when_insufficient_balance() {
-    let (update_socket, query_runner) = init_app(None);
+    let temp_dir = tempdir().unwrap();
+
+    let (update_socket, query_runner) = init_app(&temp_dir, None);
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let recipient: EthAddress = AccountOwnerSecretKey::generate().to_pk().into();
@@ -2466,7 +2536,9 @@ async fn test_revert_transfer_when_insufficient_balance() {
 
 #[tokio::test]
 async fn test_transfer_works_properly() {
-    let (update_socket, query_runner) = init_app(None);
+    let temp_dir = tempdir().unwrap();
+
+    let (update_socket, query_runner) = init_app(&temp_dir, None);
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner: EthAddress = owner_secret_key.to_pk().into();
@@ -2499,7 +2571,9 @@ async fn test_transfer_works_properly() {
 
 #[tokio::test]
 async fn test_deposit_flk_works_properly() {
-    let (update_socket, query_runner) = init_app(None);
+    let temp_dir = tempdir().unwrap();
+
+    let (update_socket, query_runner) = init_app(&temp_dir, None);
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner: EthAddress = owner_secret_key.to_pk().into();
@@ -2523,9 +2597,11 @@ async fn test_deposit_flk_works_properly() {
 
 #[tokio::test]
 async fn test_revert_deposit_not_account_key() {
+    let temp_dir = tempdir().unwrap();
+
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, _query_runner) = test_init_app(committee);
+    let (update_socket, _query_runner) = test_init_app(&temp_dir, committee);
 
     let amount: HpUfixed<18> = 10_u64.into();
     let deposit = UpdateMethod::Deposit {
@@ -2555,7 +2631,9 @@ async fn test_revert_deposit_not_account_key() {
 
 #[tokio::test]
 async fn test_deposit_usdc_works_properly() {
-    let (update_socket, query_runner) = init_app(None);
+    let temp_dir = tempdir().unwrap();
+
+    let (update_socket, query_runner) = init_app(&temp_dir, None);
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner: EthAddress = owner_secret_key.to_pk().into();
@@ -2578,10 +2656,12 @@ async fn test_deposit_usdc_works_properly() {
 
 #[tokio::test]
 async fn test_opt_in_reverts_account_key() {
+    let temp_dir = tempdir().unwrap();
+
     // Create a genesis committee and seed the application state with it.
     let committee_size = 4;
     let (committee, _keystore) = create_genesis_committee(committee_size);
-    let (update_socket, _query_runner) = test_init_app(committee);
+    let (update_socket, _query_runner) = test_init_app(&temp_dir, committee);
 
     // Account Secret Key
     let secret_key = AccountOwnerSecretKey::generate();
@@ -2592,10 +2672,12 @@ async fn test_opt_in_reverts_account_key() {
 
 #[tokio::test]
 async fn test_opt_in_reverts_node_does_not_exist() {
+    let temp_dir = tempdir().unwrap();
+
     // Create a genesis committee and seed the application state with it.
     let committee_size = 4;
     let (committee, _keystore) = create_genesis_committee(committee_size);
-    let (update_socket, _query_runner) = test_init_app(committee);
+    let (update_socket, _query_runner) = test_init_app(&temp_dir, committee);
 
     // Unknown Node Key (without Stake)
     let node_secret_key = NodeSecretKey::generate();
@@ -2606,10 +2688,12 @@ async fn test_opt_in_reverts_node_does_not_exist() {
 
 #[tokio::test]
 async fn test_opt_in_reverts_insufficient_stake() {
+    let temp_dir = tempdir().unwrap();
+
     // Create a genesis committee and seed the application state with it.
     let committee_size = 4;
     let (committee, _keystore) = create_genesis_committee(committee_size);
-    let (update_socket, query_runner) = test_init_app(committee);
+    let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     // New Node key
@@ -2639,10 +2723,12 @@ async fn test_opt_in_reverts_insufficient_stake() {
 
 #[tokio::test]
 async fn test_opt_in_works() {
+    let temp_dir = tempdir().unwrap();
+
     // Create a genesis committee and seed the application state with it.
     let committee_size = 4;
     let (committee, _keystore) = create_genesis_committee(committee_size);
-    let (update_socket, query_runner) = test_init_app(committee);
+    let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     // New Node
@@ -2677,10 +2763,12 @@ async fn test_opt_in_works() {
 
 #[tokio::test]
 async fn test_opt_out_reverts_account_key() {
+    let temp_dir = tempdir().unwrap();
+
     // Create a genesis committee and seed the application state with it.
     let committee_size = 4;
     let (committee, _keystore) = create_genesis_committee(committee_size);
-    let (update_socket, _query_runner) = test_init_app(committee);
+    let (update_socket, _query_runner) = test_init_app(&temp_dir, committee);
 
     // Account Secret Key
     let secret_key = AccountOwnerSecretKey::generate();
@@ -2691,10 +2779,12 @@ async fn test_opt_out_reverts_account_key() {
 
 #[tokio::test]
 async fn test_opt_out_reverts_node_does_not_exist() {
+    let temp_dir = tempdir().unwrap();
+
     // Create a genesis committee and seed the application state with it.
     let committee_size = 4;
     let (committee, _keystore) = create_genesis_committee(committee_size);
-    let (update_socket, _query_runner) = test_init_app(committee);
+    let (update_socket, _query_runner) = test_init_app(&temp_dir, committee);
 
     // Unknown Node Key (without Stake)
     let node_secret_key = NodeSecretKey::generate();
@@ -2705,10 +2795,12 @@ async fn test_opt_out_reverts_node_does_not_exist() {
 
 #[tokio::test]
 async fn test_opt_out_reverts_insufficient_stake() {
+    let temp_dir = tempdir().unwrap();
+
     // Create a genesis committee and seed the application state with it.
     let committee_size = 4;
     let (committee, _keystore) = create_genesis_committee(committee_size);
-    let (update_socket, query_runner) = test_init_app(committee);
+    let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     // New Node key
@@ -2738,10 +2830,12 @@ async fn test_opt_out_reverts_insufficient_stake() {
 
 #[tokio::test]
 async fn test_opt_out_works() {
+    let temp_dir = tempdir().unwrap();
+
     // Create a genesis committee and seed the application state with it.
     let committee_size = 4;
     let (committee, _keystore) = create_genesis_committee(committee_size);
-    let (update_socket, query_runner) = test_init_app(committee);
+    let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     // New Node
@@ -2776,9 +2870,11 @@ async fn test_opt_out_works() {
 
 #[tokio::test]
 async fn test_revert_stake_not_account_key() {
+    let temp_dir = tempdir().unwrap();
+
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, _query_runner) = test_init_app(committee);
+    let (update_socket, _query_runner) = test_init_app(&temp_dir, committee);
 
     let amount: HpUfixed<18> = 1000_u64.into();
 
@@ -2813,9 +2909,11 @@ async fn test_revert_stake_not_account_key() {
 
 #[tokio::test]
 async fn test_revert_stake_insufficient_balance() {
+    let temp_dir = tempdir().unwrap();
+
     let committee_size = 4;
     let (committee, _keystore) = create_genesis_committee(committee_size);
-    let (update_socket, query_runner) = test_init_app(committee);
+    let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let address: EthAddress = owner_secret_key.to_pk().into();
@@ -2850,9 +2948,11 @@ async fn test_revert_stake_insufficient_balance() {
 
 #[tokio::test]
 async fn test_revert_stake_consensus_key_already_indexed() {
+    let temp_dir = tempdir().unwrap();
+
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, query_runner) = test_init_app(committee);
+    let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let address: EthAddress = owner_secret_key.to_pk().into();
@@ -2891,9 +2991,11 @@ async fn test_revert_stake_consensus_key_already_indexed() {
 
 #[tokio::test]
 async fn test_stake_works() {
+    let temp_dir = tempdir().unwrap();
+
     let committee_size = 4;
     let (committee, _keystore) = create_genesis_committee(committee_size);
-    let (update_socket, query_runner) = test_init_app(committee);
+    let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let address: EthAddress = owner_secret_key.to_pk().into();
@@ -2963,9 +3065,11 @@ async fn test_stake_works() {
 
 #[tokio::test]
 async fn test_stake_lock_reverts_not_account_key() {
+    let temp_dir = tempdir().unwrap();
+
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, _query_runner) = test_init_app(committee);
+    let (update_socket, _query_runner) = test_init_app(&temp_dir, committee);
 
     let stake_lock = UpdateMethod::StakeLock {
         node: NodeSecretKey::generate().to_pk(),
@@ -2994,7 +3098,9 @@ async fn test_stake_lock_reverts_not_account_key() {
 
 #[tokio::test]
 async fn test_stake_lock_reverts_node_does_not_exist() {
-    let (update_socket, _query_runner) = init_app(None);
+    let temp_dir = tempdir().unwrap();
+
+    let (update_socket, _query_runner) = init_app(&temp_dir, None);
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let node_pub_key = NodeSecretKey::generate().to_pk();
@@ -3010,7 +3116,9 @@ async fn test_stake_lock_reverts_node_does_not_exist() {
 
 #[tokio::test]
 async fn test_stake_lock_reverts_not_node_owner() {
-    let (update_socket, query_runner) = init_app(None);
+    let temp_dir = tempdir().unwrap();
+
+    let (update_socket, query_runner) = init_app(&temp_dir, None);
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let node_pub_key = NodeSecretKey::generate().to_pk();
@@ -3040,7 +3148,9 @@ async fn test_stake_lock_reverts_not_node_owner() {
 
 #[tokio::test]
 async fn test_stake_lock_reverts_insufficient_stake() {
-    let (update_socket, query_runner) = init_app(None);
+    let temp_dir = tempdir().unwrap();
+
+    let (update_socket, query_runner) = init_app(&temp_dir, None);
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let node_pub_key = NodeSecretKey::generate().to_pk();
@@ -3069,7 +3179,9 @@ async fn test_stake_lock_reverts_insufficient_stake() {
 
 #[tokio::test]
 async fn test_stake_lock_reverts_lock_exceeded_max_stake_lock_time() {
-    let (update_socket, query_runner) = init_app(None);
+    let temp_dir = tempdir().unwrap();
+
+    let (update_socket, query_runner) = init_app(&temp_dir, None);
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let node_pub_key = NodeSecretKey::generate().to_pk();
@@ -3099,9 +3211,11 @@ async fn test_stake_lock_reverts_lock_exceeded_max_stake_lock_time() {
 
 #[tokio::test]
 async fn test_unstake_reverts_not_account_key() {
+    let temp_dir = tempdir().unwrap();
+
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, _query_runner) = test_init_app(committee);
+    let (update_socket, _query_runner) = test_init_app(&temp_dir, committee);
 
     let unstake = UpdateMethod::Unstake {
         amount: 100u64.into(),
@@ -3129,7 +3243,9 @@ async fn test_unstake_reverts_not_account_key() {
 
 #[tokio::test]
 async fn test_unstake_reverts_node_does_not_exist() {
-    let (update_socket, _query_runner) = init_app(None);
+    let temp_dir = tempdir().unwrap();
+
+    let (update_socket, _query_runner) = init_app(&temp_dir, None);
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let node_pub_key = NodeSecretKey::generate().to_pk();
@@ -3140,7 +3256,9 @@ async fn test_unstake_reverts_node_does_not_exist() {
 
 #[tokio::test]
 async fn test_unstake_reverts_insufficient_balance() {
-    let (update_socket, query_runner) = init_app(None);
+    let temp_dir = tempdir().unwrap();
+
+    let (update_socket, query_runner) = init_app(&temp_dir, None);
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let node_pub_key = NodeSecretKey::generate().to_pk();
@@ -3169,9 +3287,11 @@ async fn test_unstake_reverts_insufficient_balance() {
 
 #[tokio::test]
 async fn test_withdraw_unstaked_reverts_not_account_key() {
+    let temp_dir = tempdir().unwrap();
+
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, _query_runner) = test_init_app(committee);
+    let (update_socket, _query_runner) = test_init_app(&temp_dir, committee);
 
     let withdraw_unstaked = UpdateMethod::WithdrawUnstaked {
         node: NodeSecretKey::generate().to_pk(),
@@ -3201,7 +3321,9 @@ async fn test_withdraw_unstaked_reverts_not_account_key() {
 
 #[tokio::test]
 async fn test_withdraw_unstaked_reverts_node_does_not_exist() {
-    let (update_socket, _query_runner) = init_app(None);
+    let temp_dir = tempdir().unwrap();
+
+    let (update_socket, _query_runner) = init_app(&temp_dir, None);
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let node_pub_key = NodeSecretKey::generate().to_pk();
@@ -3212,7 +3334,9 @@ async fn test_withdraw_unstaked_reverts_node_does_not_exist() {
 
 #[tokio::test]
 async fn test_withdraw_unstaked_reverts_not_node_owner() {
-    let (update_socket, query_runner) = init_app(None);
+    let temp_dir = tempdir().unwrap();
+
+    let (update_socket, query_runner) = init_app(&temp_dir, None);
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let node_pub_key = NodeSecretKey::generate().to_pk();
@@ -3245,7 +3369,9 @@ async fn test_withdraw_unstaked_reverts_not_node_owner() {
 
 #[tokio::test]
 async fn test_withdraw_unstaked_reverts_no_locked_tokens() {
-    let (update_socket, query_runner) = init_app(None);
+    let temp_dir = tempdir().unwrap();
+
+    let (update_socket, query_runner) = init_app(&temp_dir, None);
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let node_pub_key = NodeSecretKey::generate().to_pk();
@@ -3274,9 +3400,11 @@ async fn test_withdraw_unstaked_reverts_no_locked_tokens() {
 
 #[tokio::test]
 async fn test_withdraw_unstaked_works_properly() {
+    let temp_dir = tempdir().unwrap();
+
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, query_runner) = test_init_app(committee);
+    let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner: EthAddress = owner_secret_key.to_pk().into();
@@ -3330,10 +3458,12 @@ async fn test_withdraw_unstaked_works_properly() {
 
 #[tokio::test]
 async fn test_submit_reputation_measurements_reverts_account_key() {
+    let temp_dir = tempdir().unwrap();
+
     // Create a genesis committee and seed the application state with it.
     let committee_size = 4;
     let (committee, _keystore) = create_genesis_committee(committee_size);
-    let (update_socket, _query_runner) = test_init_app(committee);
+    let (update_socket, _query_runner) = test_init_app(&temp_dir, committee);
 
     // Account Secret Key
     let secret_key = AccountOwnerSecretKey::generate();
@@ -3346,9 +3476,11 @@ async fn test_submit_reputation_measurements_reverts_account_key() {
 
 #[tokio::test]
 async fn test_submit_reputation_measurements_reverts_node_does_not_exist() {
+    let temp_dir = tempdir().unwrap();
+
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, query_runner) = test_init_app(committee);
+    let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
     let mut rng = random::get_seedable_rng();
 
     let mut measurements = BTreeMap::new();
@@ -3370,9 +3502,11 @@ async fn test_submit_reputation_measurements_reverts_node_does_not_exist() {
 
 #[tokio::test]
 async fn test_submit_reputation_measurements_reverts_insufficient_stake() {
+    let temp_dir = tempdir().unwrap();
+
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, query_runner) = test_init_app(committee);
+    let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
     let mut rng = random::get_seedable_rng();
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
@@ -3410,9 +3544,11 @@ async fn test_submit_reputation_measurements_reverts_insufficient_stake() {
 
 #[tokio::test]
 async fn test_submit_reputation_measurements_too_many_measurements() {
+    let temp_dir = tempdir().unwrap();
+
     let committee_size = 4;
     let (committee, _keystore) = create_genesis_committee(committee_size);
-    let (update_socket, query_runner) = test_init_app(committee);
+    let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
     let mut rng = random::get_seedable_rng();
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
@@ -3448,10 +3584,12 @@ async fn test_submit_reputation_measurements_too_many_measurements() {
 
 #[tokio::test]
 async fn test_submit_content_registry_update() {
+    let temp_dir = tempdir().unwrap();
+
     // Given: committee and setup.
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, query_runner) = test_init_app(committee);
+    let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
 
     // When: each node sends an update to register some content.
     let mut expected_records = Vec::new();
@@ -3499,10 +3637,12 @@ async fn test_submit_content_registry_update() {
 
 #[tokio::test]
 async fn test_submit_content_registry_update_multiple_providers_per_cid() {
+    let temp_dir = tempdir().unwrap();
+
     // Given: committee and setup.
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, query_runner) = test_init_app(committee);
+    let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
 
     // Given: a cid.
     let cid = [69u8; 32];
@@ -3555,10 +3695,12 @@ async fn test_submit_content_registry_update_multiple_providers_per_cid() {
 
 #[tokio::test]
 async fn test_submit_content_registry_update_mix_of_add_and_remove_updates() {
+    let temp_dir = tempdir().unwrap();
+
     // Given: committee and setup.
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, query_runner) = test_init_app(committee);
+    let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
 
     // Given: multiple cids.
     let mut cids = Vec::new();
@@ -3627,10 +3769,12 @@ async fn test_submit_content_registry_update_mix_of_add_and_remove_updates() {
 
 #[tokio::test]
 async fn test_submit_content_registry_update_too_many_updates_in_transaction() {
+    let temp_dir = tempdir().unwrap();
+
     // Given: committee and setup.
     let committee_size = 2;
     let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, _) = test_init_app(committee);
+    let (update_socket, _) = test_init_app(&temp_dir, committee);
 
     // Given: a big list of updates.
     let cid = [69u8; 32];
@@ -3648,10 +3792,12 @@ async fn test_submit_content_registry_update_too_many_updates_in_transaction() {
 
 #[tokio::test]
 async fn test_submit_content_registry_update_multiple_cids_per_provider() {
+    let temp_dir = tempdir().unwrap();
+
     // Given: committee and setup.
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, query_runner) = test_init_app(committee);
+    let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
 
     // Given: multiple cids that some nodes will provide.
     let mut cids = Vec::new();
@@ -3729,10 +3875,12 @@ async fn test_submit_content_registry_update_multiple_cids_per_provider() {
 
 #[tokio::test]
 async fn test_submit_content_registry_update_multiple_updates_for_cid_in_same_transaction() {
+    let temp_dir = tempdir().unwrap();
+
     // Given: committee and setup.
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, _) = test_init_app(committee);
+    let (update_socket, _) = test_init_app(&temp_dir, committee);
 
     // Given: a cid.
     let cid = [0u8; 32];
@@ -3769,10 +3917,12 @@ async fn test_submit_content_registry_update_multiple_updates_for_cid_in_same_tr
 
 #[tokio::test]
 async fn test_submit_content_registry_update_multiple_updates_for_cid_in_diff_transactions() {
+    let temp_dir = tempdir().unwrap();
+
     // Given: committee and setup.
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, _) = test_init_app(committee);
+    let (update_socket, _) = test_init_app(&temp_dir, committee);
 
     // Given: a cid.
     let cid = [0u8; 32];
@@ -3791,10 +3941,12 @@ async fn test_submit_content_registry_update_multiple_updates_for_cid_in_diff_tr
 
 #[tokio::test]
 async fn test_submit_content_registry_update_remove_unknown_cid() {
+    let temp_dir = tempdir().unwrap();
+
     // Given: committee and setup.
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, _) = test_init_app(committee);
+    let (update_socket, _) = test_init_app(&temp_dir, committee);
 
     // Given: a cid.
     let cid = [0u8; 32];
@@ -3829,10 +3981,12 @@ async fn test_submit_content_registry_update_remove_unknown_cid() {
 
 #[tokio::test]
 async fn test_submit_content_registry_update_remove_unknown_cid_empty_registry() {
+    let temp_dir = tempdir().unwrap();
+
     // Given: committee and setup.
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, _) = test_init_app(committee);
+    let (update_socket, _) = test_init_app(&temp_dir, committee);
 
     // Given: some cid that is not in the registry and the node is not providing any content.
     let updates = vec![ContentUpdate {
@@ -3853,10 +4007,12 @@ async fn test_submit_content_registry_update_remove_unknown_cid_empty_registry()
 
 #[tokio::test]
 async fn test_invalid_chain_id() {
+    let temp_dir = tempdir().unwrap();
+
     let chain_id = CHAIN_ID + 1;
     let committee_size = 4;
     let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, _query_runner) = test_init_app(committee);
+    let (update_socket, _query_runner) = test_init_app(&temp_dir, committee);
 
     // Submit a OptIn transaction that will revert (InvalidChainID).
 

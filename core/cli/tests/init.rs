@@ -3,11 +3,11 @@ mod init_tests {
     use std::{fs, str};
 
     use assert_cmd::Command;
-    use tempdir::TempDir;
+    use tempfile::tempdir;
 
     #[test]
     fn missing_network_and_dev() {
-        let temp_dir = TempDir::new("test").unwrap();
+        let temp_dir = tempdir().unwrap();
         let mut cmd = Command::cargo_bin("lightning-node").unwrap();
         cmd.arg("init");
         cmd.env("LIGHTNING_HOME", temp_dir.path());
@@ -26,7 +26,7 @@ mod init_tests {
 
     #[test]
     fn empty_network() {
-        let temp_dir = TempDir::new("test").unwrap();
+        let temp_dir = tempdir().unwrap();
         let mut cmd = Command::cargo_bin("lightning-node").unwrap();
         cmd.arg("init").arg("--network");
         cmd.env("LIGHTNING_HOME", temp_dir.path());
@@ -45,7 +45,7 @@ mod init_tests {
 
     #[test]
     fn with_network_no_args() {
-        let temp_dir = TempDir::new("test").unwrap();
+        let temp_dir = tempdir().unwrap();
         let mut cmd = Command::cargo_bin("lightning-node").unwrap();
         cmd.arg("init").arg("--network").arg("localnet-example");
         cmd.env("LIGHTNING_HOME", temp_dir.path());
@@ -90,7 +90,7 @@ mod init_tests {
 
     #[test]
     fn with_network_and_no_generate_keys() {
-        let temp_dir = TempDir::new("test").unwrap();
+        let temp_dir = tempdir().unwrap();
         let mut cmd = Command::cargo_bin("lightning-node").unwrap();
         cmd.arg("init")
             .arg("--network")
@@ -140,7 +140,7 @@ mod init_tests {
 
     #[test]
     fn with_dev_and_no_network() {
-        let temp_dir = TempDir::new("test").unwrap();
+        let temp_dir = tempdir().unwrap();
         let mut cmd = Command::cargo_bin("lightning-node").unwrap();
         cmd.arg("init").arg("--dev");
         cmd.env("LIGHTNING_HOME", temp_dir.path());
@@ -175,7 +175,7 @@ mod init_tests {
 
     #[test]
     fn with_dev_and_network() {
-        let temp_dir = TempDir::new("test").unwrap();
+        let temp_dir = tempdir().unwrap();
         let mut cmd = Command::cargo_bin("lightning-node").unwrap();
         cmd.arg("init")
             .arg("--network")

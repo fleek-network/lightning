@@ -50,4 +50,4 @@ fastcrypto = { git = "https://github.com/MystenLabs/fastcrypto", rev = "c961a015
 workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }
 
 [dev-dependencies]
-tempdir.workspace = true
+tempfile.workspace = true

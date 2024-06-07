@@ -20,6 +20,7 @@ use lightning_test_utils::consensus::{
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_utils::application::QueryRunnerExt;
+use tempfile::tempdir;
 
 use crate::aggregator::ReputationAggregator;
 use crate::config::Config;
@@ -107,14 +108,16 @@ async fn test_query() {
         true,
     ));
 
+    let temp_dir = tempdir().unwrap();
+    let genesis_path = genesis
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
+
     let mut node = Node::<TestBinding>::init_with_provider(
         fdi::Provider::default()
             .with(
                 JsonConfigProvider::default()
-                    .with::<Application<TestBinding>>(AppConfig {
-                        genesis: Some(genesis),
-                        ..AppConfig::test()
-                    })
+                    .with::<Application<TestBinding>>(AppConfig::test(genesis_path))
                     .with::<MockConsensus<TestBinding>>(ConsensusConfig {
                         min_ordering_time: 0,
                         max_ordering_time: 1,
@@ -235,14 +238,16 @@ async fn test_submit_measurements() {
     genesis.epoch_start = epoch_start;
     genesis.epoch_time = 4000; // millis
 
+    let temp_dir = tempdir().unwrap();
+    let genesis_path = genesis
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
+
     let mut node = Node::<TestBinding>::init_with_provider(
         fdi::Provider::default()
             .with(
                 JsonConfigProvider::default()
-                    .with::<Application<TestBinding>>(AppConfig {
-                        genesis: Some(genesis),
-                        ..AppConfig::test()
-                    })
+                    .with::<Application<TestBinding>>(AppConfig::test(genesis_path))
                     .with::<MockConsensus<TestBinding>>(ConsensusConfig {
                         min_ordering_time: 0,
                         max_ordering_time: 1,
@@ -392,14 +397,16 @@ async fn test_reputation_calculation_and_query() {
     genesis.epoch_start = epoch_start;
     genesis.epoch_time = 4000; // millis
 
+    let temp_dir = tempdir().unwrap();
+    let genesis_path = genesis
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
+
     let mut node1 = Node::<TestBinding>::init_with_provider(
         fdi::Provider::default()
             .with(
                 JsonConfigProvider::default()
-                    .with::<Application<TestBinding>>(AppConfig {
-                        genesis: Some(genesis.clone()),
-                        ..AppConfig::test()
-                    })
+                    .with::<Application<TestBinding>>(AppConfig::test(genesis_path.clone()))
                     .with::<ReputationAggregator<TestBinding>>(Config {
                         reporter_buffer_size: 1,
                     }),
@@ -420,10 +427,7 @@ async fn test_reputation_calculation_and_query() {
         fdi::Provider::default()
             .with(
                 JsonConfigProvider::default()
-                    .with::<Application<TestBinding>>(AppConfig {
-                        genesis: Some(genesis),
-                        ..AppConfig::test()
-                    })
+                    .with::<Application<TestBinding>>(AppConfig::test(genesis_path))
                     .with::<ReputationAggregator<TestBinding>>(Config {
                         reporter_buffer_size: 1,
                     }),

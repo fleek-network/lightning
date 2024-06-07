@@ -16,6 +16,7 @@ use lightning_notifier::Notifier;
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_utils::application::QueryRunnerExt;
+use tempfile::tempdir;
 
 use crate::core::build_latency_matrix;
 use crate::Topology;
@@ -151,12 +152,17 @@ async fn test_build_latency_matrix() {
     });
     genesis.latencies = Some(latencies);
 
-    let mut node = Node::<TestBinding>::init_with_provider(fdi::Provider::default().with(
-        JsonConfigProvider::default().with::<Application<TestBinding>>(AppConfig {
-            genesis: Some(genesis),
-            ..AppConfig::test()
-        }),
-    ))
+    let temp_dir = tempdir().unwrap();
+    let genesis_path = genesis
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
+
+    let mut node = Node::<TestBinding>::init_with_provider(
+        fdi::Provider::default().with(
+            JsonConfigProvider::default()
+                .with::<Application<TestBinding>>(AppConfig::test(genesis_path)),
+        ),
+    )
     .expect("failed to init node");
     node.start().await;
 
@@ -198,11 +204,17 @@ async fn test_build_latency_matrix() {
 
 #[tokio::test]
 async fn test_receive_connections() {
-    let mut node =
-        Node::<TestBinding>::init_with_provider(fdi::Provider::default().with(
-            JsonConfigProvider::default().with::<Application<TestBinding>>(AppConfig::test()),
-        ))
+    let temp_dir = tempdir().unwrap();
+    let genesis_path = Genesis::default()
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
         .unwrap();
+    let mut node = Node::<TestBinding>::init_with_provider(
+        fdi::Provider::default().with(
+            JsonConfigProvider::default()
+                .with::<Application<TestBinding>>(AppConfig::test(genesis_path)),
+        ),
+    )
+    .unwrap();
 
     let mut topology_rx = node.provider.get::<Topology<TestBinding>>().get_receiver();
 

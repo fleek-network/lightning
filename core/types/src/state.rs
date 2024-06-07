@@ -51,7 +51,7 @@ pub struct TotalServed {
 pub type ServiceRevenue = HpUfixed<6>;
 
 /// This is commodity served by each of the commodity types
-type CommodityServed = Vec<u128>;
+pub type CommodityServed = Vec<u128>;
 
 /// This is commodities served by different services in Fleek Network.
 /// C-like enums used here to future proof for state, if we add more commodity types

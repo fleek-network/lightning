@@ -97,7 +97,7 @@ pub async fn respond_only_default_headers(connection: &mut Connection) -> anyhow
 
 #[cfg(test)]
 mod tests {
-    use tempdir::TempDir;
+    use tempfile::tempdir;
     use tokio::io::AsyncReadExt;
     use tokio::net::{UnixListener, UnixStream};
     use url::Url;
@@ -108,7 +108,7 @@ mod tests {
 
     #[tokio::test]
     async fn respond_using_http_connection() {
-        let temp_dir = TempDir::new("test").unwrap();
+        let temp_dir = tempdir().unwrap();
         let socket_path = temp_dir.path().join("socket");
         let listener = UnixListener::bind(&socket_path).unwrap();
         let sender_stream = UnixStream::connect(&socket_path).await.unwrap();
@@ -143,7 +143,7 @@ mod tests {
 
     #[tokio::test]
     async fn respond_using_non_http_connection() {
-        let temp_dir = TempDir::new("test").unwrap();
+        let temp_dir = tempdir().unwrap();
         let socket_path = temp_dir.path().join("socket");
         let listener = UnixListener::bind(&socket_path).unwrap();
         let sender_stream = UnixStream::connect(&socket_path).await.unwrap();
