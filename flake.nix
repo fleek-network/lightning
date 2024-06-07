@@ -53,13 +53,15 @@
           markdownFilter = path: builtins.match ".*md$" path != null;
           binFilter = path: builtins.match ".*bin$" path != null;
           jsFilter = path: builtins.match ".*js$" path != null;
-          json5Filter = path: builtins.match ".*json5$" path != null;
+          jsonFilter = path: builtins.match ".*json*$" path != null;
+          lockFilter = path: builtins.match ".*lock$" path != null;
           filter =
             path: type:
             (markdownFilter path)
             || (binFilter path)
             || (jsFilter path)
-            || (json5Filter path)
+            || (jsonFilter path)
+            || (lockFilter path)
             || (craneLib.filterCargoSources path type);
 
           src = lib.cleanSourceWith {
