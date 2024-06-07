@@ -53,7 +53,7 @@
           markdownFilter = path: builtins.match ".*md$" path != null;
           binFilter = path: builtins.match ".*bin$" path != null;
           jsFilter = path: builtins.match ".*js$" path != null;
-          jsonFilter = path: builtins.match ".*json*$" path != null;
+          jsonFilter = path: builtins.match ".*json5?$" path != null;
           lockFilter = path: builtins.match ".*lock$" path != null;
           filter =
             path: type:
