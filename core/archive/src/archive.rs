@@ -15,7 +15,7 @@ use rocksdb::{Options, DB};
 use tokio::pin;
 use tracing::{trace, info, error};
 use quick_cache::{sync::{Cache as SyncCache, DefaultLifecycle}, OptionsBuilder, UnitWeighter, DefaultHashBuilder};
-use atomo::{Atomo,QueryPerm};
+// use atomo::{Atomo,QueryPerm};
 // use atomo::StorageBackend;
 // use lightning_application::storage::AtomoStorage;
 // use lightning_application::query_runner::QueryRunner;
@@ -40,7 +40,7 @@ pub struct Archive<C: Collection> {
 struct ArchiveInner<C: Collection> {
     db: DB,
     /// Handles the cache for Rocks DB instances for each requested epoch (from RPC)
-    db_cache: SyncCache<u64, Atomo<QueryPerm, <c!(C::ApplicationInterface::SyncExecutor)>::Backend>>,
+//    db_cache: SyncCache<u64, Atomo<QueryPerm, <c!(C::ApplicationInterface::SyncExecutor)>::Backend>>,
     /// Handles the cache for QueryRunner lookup instances for each requested epoch (from RPC)
     qr_cache: SyncCache<u64, c!(C::ApplicationInterface::SyncExecutor)>,
     /// Handles the Rocks DB storage for each epoch
@@ -85,7 +85,7 @@ impl<C: Collection> Archive<C> {
                 .expect("Failed to create historical dir");
         }
 
-        let db_cache = SyncCache::<u64, Atomo<QueryPerm, <c!(C::ApplicationInterface::SyncExecutor)>::Backend>>::with_options(
+/*        let db_cache = SyncCache::<u64, Atomo<QueryPerm, <c!(C::ApplicationInterface::SyncExecutor)>::Backend>>::with_options(
             OptionsBuilder::new()
                 .estimated_items_capacity(10000)
                 .weight_capacity(10000)
@@ -98,7 +98,7 @@ impl<C: Collection> Archive<C> {
             DefaultHashBuilder::default(),
             DefaultLifecycle::default(),
         );
-
+*/
         let qr_cache = SyncCache::<u64, c!(C::ApplicationInterface::SyncExecutor)>::with_options(
             OptionsBuilder::new()
                 .estimated_items_capacity(10000)
@@ -113,7 +113,7 @@ impl<C: Collection> Archive<C> {
             DefaultLifecycle::default(),
         );
 
-        let inner = ArchiveInner::<C>::new(db, db_cache, qr_cache, historical_state_dir, blockstore.clone());
+        let inner = ArchiveInner::<C>::new(db, qr_cache, historical_state_dir, blockstore.clone());
 
         Self {
             inner: Some(Arc::new(inner)),
@@ -195,14 +195,14 @@ impl<C: Collection> Clone for Archive<C> {
 impl<C: Collection> ArchiveInner<C> {
     fn new(
         db: DB,
-        db_cache: SyncCache<u64, Atomo<QueryPerm, <c!(C::ApplicationInterface::SyncExecutor)>::Backend>>,
+//        db_cache: SyncCache<u64, Atomo<QueryPerm, <c!(C::ApplicationInterface::SyncExecutor)>::Backend>>,
         qr_cache: SyncCache<u64, c!(C::ApplicationInterface::SyncExecutor)>,
         historical_state_dir: ResolvedPathBuf,
         blockstore: c!(C::BlockstoreInterface),
     ) -> Self {
         Self {
             db,
-            db_cache,
+//            db_cache,
             qr_cache,
             historical_state_dir,
             blockstore,
@@ -215,14 +215,15 @@ impl<C: Collection> ArchiveInner<C> {
     ) -> Result<c!(C::ApplicationInterface::SyncExecutor)> {
         let path = self.historical_state_dir.join(epoch.to_string());
         trace!(target: "archive", "Getting historical epoch state from {:?}", path);
-        let db =
+  /*      let db =
             self
             .db_cache
             .get_or_insert_with(&epoch, || {
                 <c!(C::ApplicationInterface::SyncExecutor)>::atomo_from_path(path)
             })?;
-        // let db = <c!(C::ApplicationInterface::SyncExecutor)>::atomo_from_path(path)?;
-        info!(target: "archive", "Number of DB cached instances (for epochs) are {:?} with total weight of {:?}", self.db_cache.len(), self.db_cache.capacity());
+*/
+        let db = <c!(C::ApplicationInterface::SyncExecutor)>::atomo_from_path(path)?;
+//        info!(target: "archive", "Number of DB cached instances (for epochs) are {:?} with total weight of {:?}", self.db_cache.len(), self.db_cache.capacity());
         let query_runner =
             self
             .qr_cache
