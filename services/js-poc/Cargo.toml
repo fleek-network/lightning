@@ -37,6 +37,10 @@ workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }
 lightning-schema = { path = "../../core/schema" }
 
 [build-dependencies]
+serde.workspace = true
+serde_json.workspace = true
+base64 = "0.22"
+hex = "0.4"
 deno_core = "0.272"
 deno_webidl = "0.146"
 deno_console = "0.146"

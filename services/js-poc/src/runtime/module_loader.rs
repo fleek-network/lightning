@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+use std::sync::OnceLock;
+
 use anyhow::{anyhow, bail, Context};
 use arrayref::array_ref;
 use cid::Cid;
@@ -10,41 +13,17 @@ use deno_core::{
     ModuleSpecifier,
     ModuleType,
     RequestedModuleType,
-    StaticModuleLoader,
 };
 use fn_sdk::api::fetch_from_origin;
 use fn_sdk::blockstore::ContentHandle;
 
-pub struct FleekModuleLoader {
-    static_modules: StaticModuleLoader,
-}
+static IMPORTS: OnceLock<HashMap<ModuleSpecifier, ModuleSpecifier>> = OnceLock::new();
+
+pub struct FleekModuleLoader {}
 
 impl FleekModuleLoader {
     pub fn new() -> Self {
-        Self {
-            static_modules: StaticModuleLoader::new(vec![
-                (
-                    ModuleSpecifier::parse("node:crypto").unwrap(),
-                    include_str!("js/node_crypto.js"),
-                ),
-                (
-                    ModuleSpecifier::parse("node:zlib").unwrap(),
-                    include_str!("js/node_zlib.js"),
-                ),
-                (
-                    ModuleSpecifier::parse("node:https").unwrap(),
-                    include_str!("js/node_https.js"),
-                ),
-                (
-                    ModuleSpecifier::parse("node:stream").unwrap(),
-                    include_str!("js/node_stream.js"),
-                ),
-                (
-                    ModuleSpecifier::parse("node:path").unwrap(),
-                    include_str!("js/node_path.js"),
-                ),
-            ]),
-        }
+        Self {}
     }
 }
 
@@ -55,16 +34,34 @@ impl ModuleLoader for FleekModuleLoader {
         referrer: &str,
         _kind: deno_core::ResolutionKind,
     ) -> Result<ModuleSpecifier, anyhow::Error> {
-        Ok(deno_core::resolve_import(specifier, referrer)?)
+        let mut import = deno_core::resolve_import(specifier, referrer)?;
+
+        if let Some(mapped) = IMPORTS
+            .get_or_init(|| {
+                serde_json::from_str(include_str!(concat!(env!("OUT_DIR"), "/importmap.json")))
+                    .unwrap()
+            })
+            .get(&import)
+        {
+            import = mapped.clone();
+        }
+
+        println!("RESOLVE specifier: {specifier:?} - referrer: {referrer:?} - import: {import:?}");
+        Ok(import)
     }
 
     fn load(
         &self,
         module_specifier: &ModuleSpecifier,
         maybe_referrer: Option<&ModuleSpecifier>,
-        is_dyn_import: bool,
+        _is_dyn_import: bool,
         requested_module_type: RequestedModuleType,
     ) -> ModuleLoadResponse {
+        println!(
+            "LOAD specifier: {module_specifier} maybe_referrer {}",
+            maybe_referrer.map(|m| m.as_str()).unwrap_or("none")
+        );
+
         let module_type = match requested_module_type {
             RequestedModuleType::None => ModuleType::JavaScript,
             RequestedModuleType::Json => ModuleType::Json,
@@ -77,17 +74,7 @@ impl ModuleLoader for FleekModuleLoader {
             },
         };
 
-        // Try loading static modules first
-        if let ModuleLoadResponse::Sync(Ok(res)) = self.static_modules.load(
-            module_specifier,
-            maybe_referrer,
-            is_dyn_import,
-            requested_module_type,
-        ) {
-            return ModuleLoadResponse::Sync(Ok(res));
-        }
-
-        // If not found, try to load from an origin
+        let module_specifier = module_specifier.clone();
         match module_specifier.scheme() {
             "blake3" => {
                 let Some(Host::Domain(host)) = module_specifier.host() else {
@@ -107,10 +94,9 @@ impl ModuleLoader for FleekModuleLoader {
                 }
 
                 let hash = *array_ref![bytes, 0, 32];
-                let specifier = module_specifier.clone();
                 ModuleLoadResponse::Async(Box::pin(async move {
                     if !fn_sdk::api::fetch_blake3(hash).await {
-                        bail!("Failed to fetch {specifier}")
+                        bail!("Failed to fetch {module_specifier}")
                     }
 
                     let handle = ContentHandle::load(&hash).await?;
@@ -119,7 +105,7 @@ impl ModuleLoader for FleekModuleLoader {
                     Ok(ModuleSource::new(
                         module_type,
                         deno_core::ModuleSourceCode::Bytes(source.into()),
-                        &specifier,
+                        &module_specifier,
                         None,
                     ))
                 }))
@@ -132,11 +118,12 @@ impl ModuleLoader for FleekModuleLoader {
                     return ModuleLoadResponse::Sync(Err(anyhow!("Invalid ipfs cid")));
                 };
 
-                let specifier = module_specifier.clone();
                 ModuleLoadResponse::Async(Box::pin(async move {
                     let hash = fetch_from_origin(fn_sdk::api::Origin::IPFS, cid.to_bytes())
                         .await
-                        .with_context(|| format!("Failed to fetch {specifier} from origin"))?;
+                        .with_context(|| {
+                            format!("Failed to fetch {module_specifier} from origin")
+                        })?;
 
                     let handle = ContentHandle::load(&hash).await?;
                     let bytes = handle.read_to_end().await?;
@@ -144,7 +131,7 @@ impl ModuleLoader for FleekModuleLoader {
                     let module = ModuleSource::new(
                         module_type,
                         ModuleSourceCode::Bytes(bytes.into_boxed_slice().into()),
-                        &specifier,
+                        &module_specifier,
                         None,
                     );
                     Ok(module)
@@ -161,14 +148,13 @@ impl ModuleLoader for FleekModuleLoader {
                     )));
                 }
 
-                let specifier = module_specifier.clone();
                 ModuleLoadResponse::Async(Box::pin(async move {
                     let hash = fn_sdk::api::fetch_from_origin(
                         fn_sdk::api::Origin::HTTP,
-                        specifier.to_string(),
+                        module_specifier.to_string(),
                     )
                     .await
-                    .with_context(|| format!("Failed to fetch {specifier} from origin"))?;
+                    .with_context(|| format!("Failed to fetch {module_specifier} from origin"))?;
 
                     let handle = ContentHandle::load(&hash).await?;
                     let bytes = handle.read_to_end().await?;
@@ -176,7 +162,7 @@ impl ModuleLoader for FleekModuleLoader {
                     let module = ModuleSource::new(
                         module_type,
                         ModuleSourceCode::Bytes(bytes.into_boxed_slice().into()),
-                        &specifier,
+                        &module_specifier,
                         None,
                     );
                     Ok(module)

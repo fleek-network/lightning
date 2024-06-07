@@ -1,8 +1,10 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use ::deno_fetch::{deno_fetch, FetchPermissions};
 use ::deno_net::{deno_net, NetPermissions};
 use ::deno_web::{deno_web, TimersPermission};
+use base64::Engine;
 use deno_canvas::deno_canvas;
 use deno_console::deno_console;
 use deno_core::extension;
@@ -10,6 +12,7 @@ use deno_crypto::deno_crypto;
 use deno_url::deno_url;
 use deno_webgpu::deno_webgpu;
 use deno_webidl::deno_webidl;
+use serde::Deserialize;
 
 extension!(
     fleek,
@@ -80,6 +83,22 @@ impl NetPermissions for Permissions {
     }
 }
 
+#[derive(Deserialize)]
+struct DenoJson {
+    imports: HashMap<String, String>,
+}
+
+#[derive(Deserialize)]
+struct DenoLock {
+    remote: HashMap<String, String>,
+}
+
+fn create_integrity_url(import: &str, hex_sha256: &str) -> String {
+    let deno_hash = hex::decode(hex_sha256).unwrap();
+    let sri = base64::engine::general_purpose::STANDARD.encode(deno_hash);
+    format!("{import}#integrity=sha256-{sri}")
+}
+
 fn main() {
     let extensions = vec![
         deno_webidl::init_ops_and_esm(),
@@ -112,10 +131,45 @@ fn main() {
         println!("cargo::rerun-if-changed={}", file.display())
     }
 
+    let out = std::env::var("OUT_DIR").unwrap();
+
     // Write snapshot to output dir
-    std::fs::write(
-        format!("{}/snapshot.bin", std::env::var("OUT_DIR").unwrap()),
-        snapshot.output,
+    std::fs::write(format!("{out}/snapshot.bin"), snapshot.output)
+        .expect("failed to write snapshot");
+
+    // Read polyfill config and lock
+    let config: DenoJson = serde_json::from_reader(
+        std::fs::File::open("./polyfill/deno.json").expect("failed to read deno.json"),
     )
-    .expect("failed to write snapshot");
+    .expect("failed to parse deno.json");
+    let mut lock: DenoLock = serde_json::from_reader(
+        std::fs::File::open("./polyfill/deno.lock").expect("failed to read deno.lock"),
+    )
+    .expect("failed to parse deno.lock");
+
+    // Rebuild if polyfills change
+    println!("cargo::rerun-if-changed=./polyfill/deno.json");
+    println!("cargo::rerun-if-changed=./polyfill/deno.lock");
+
+    let mut map = HashMap::new();
+
+    // Insert our top level mappings and take them from the remote sri map
+    for (k, v) in config.imports {
+        println!("{k}, {v}");
+        let complete = create_integrity_url(&v, &lock.remote.remove(&v).unwrap());
+        map.insert(k, complete.clone());
+        map.insert(v, complete.clone());
+    }
+
+    // Insert the remaining remote sri mappings
+    for (k, v) in lock.remote {
+        let complete = create_integrity_url(&k, &v);
+        map.insert(k, complete);
+    }
+
+    std::fs::write(
+        format!("{out}/importmap.json"),
+        serde_json::to_string_pretty(&map).unwrap(),
+    )
+    .expect("failed to write importmap.json");
 }

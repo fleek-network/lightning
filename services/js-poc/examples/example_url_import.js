@@ -1,6 +1,9 @@
 // Library import from ipfs
 import * as Blake3 from 'ipfs://bafkreidlknwg33twrtlm5tagbpdyhkovouzkpkp2sfpp4n2i6o4jiclq5i';
 
+// node:path polyfill
+import path from 'node:path';
+
 // json import using subresource integrity
 import data from
   'https://rickandmortyapi.com/api/character/781#integrity=sha256-tZfoN2TwZclgq4/eBDLAcrZGjor0JN8iI92XdRNKcyg=' with
@@ -13,12 +16,13 @@ function encodeHex(buffer) {
 export async function main() {
   // Download the image from the data, and hash it with blake3.js
   // (I know, it's silly, but it's just an example)
-
-  console.log(data);
-
   const url = data.image;
-  const image = await (await fetch(url)).arrayBuffer();
+
+  const image = await fetch(url).then((res) => res.arrayBuffer());
   const hash = Blake3.hash(new Uint8Array(image));
 
-  return `url: ${url}\nblake3 hash: ${encodeHex(hash)}`;
+  // use a node polyfill to do something
+  const basename = path.basename(url);
+
+  return `url: ${url}\nbasename: ${basename}\nblake3 hash: ${encodeHex(hash)}`;
 }
