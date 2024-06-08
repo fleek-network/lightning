@@ -17,11 +17,6 @@ use tokio::pin;
 use tracing::{trace, info, error};
 use quick_cache::{sync::{Cache as SyncCache, DefaultLifecycle}, OptionsBuilder, UnitWeighter, DefaultHashBuilder};
 use atomo::{Atomo,QueryPerm};
-// use atomo::StorageBackend;
-// use lightning_application::storage::AtomoStorage;
-// use lightning_application::query_runner::QueryRunner;
-use lightning_interfaces::SyncQueryRunnerInterface;
-use lightning_interfaces::ApplicationInterface;
 
 use crate::config::Config;
 
