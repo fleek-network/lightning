@@ -7,7 +7,8 @@ use std::time::{Duration, SystemTime};
 use derive_more::{From, IsVariant, TryInto};
 use fleek_crypto::{ConsensusPublicKey, NodePublicKey, SecretKey};
 use lightning_interfaces::prelude::*;
-use lightning_interfaces::types::{Epoch, EpochInfo, Event, Topic, UpdateMethod};
+use lightning_interfaces::types::{Epoch, EpochInfo, Topic, UpdateMethod};
+use lightning_interfaces::Events;
 use lightning_utils::application::QueryRunnerExt;
 use mysten_metrics::RegistryService;
 use mysten_network::Multiaddr;
@@ -282,7 +283,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
         self.execution_state.shutdown();
     }
 
-    fn set_event_tx(&mut self, tx: tokio::sync::mpsc::Sender<Vec<Event>>) {
+    fn set_event_tx(&mut self, tx: Events) {
         self.execution_state.set_event_tx(tx);
     }
 

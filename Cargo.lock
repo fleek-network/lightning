@@ -6264,6 +6264,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "lightning-firewall"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum 0.6.20",
+ "hyper 0.14.28",
+ "lightning-types",
+ "serde",
+ "thiserror",
+ "tokio",
+ "tower",
+ "tracing",
+]
+
+[[package]]
 name = "lightning-forwarder"
 version = "0.0.0"
 dependencies = [
@@ -6725,6 +6740,7 @@ dependencies = [
  "lightning-blockstore",
  "lightning-blockstore-server",
  "lightning-fetcher",
+ "lightning-firewall",
  "lightning-indexer",
  "lightning-interfaces",
  "lightning-notifier",

@@ -440,24 +440,25 @@ impl<C: Collection> FleekApiServer for FleekApi<C> {
     ) -> SubscriptionResult {
         let sink = pending.accept().await?;
 
-        let mut rx = self.data.event_handler.register_listener();
+        let mut rx = self.data.events.subscribe();
 
-        while let Ok(event) = rx.recv().await {
-            if let Some(ref typee) = event_type {
-                if &event.event_type() != typee {
-                    continue;
+        while let Ok(events) = rx.recv().await {
+            for event in events {
+                if let Some(ref typee) = event_type {
+                    if &event.event_type() != typee {
+                        continue;
+                    }
                 }
-            }
+                tracing::trace!(?event, "sending event to subscriber");
 
-            tracing::trace!(?event, "sending event to subscriber");
-
-            if sink
-                .send(SubscriptionMessage::from_json(&event)?)
-                .await
-                .is_err()
-            {
-                tracing::trace!("flk subscription closed");
-                break;
+                if sink
+                    .send(SubscriptionMessage::from_json(&event)?)
+                    .await
+                    .is_err()
+                {
+                    tracing::trace!("flk subscription closed");
+                    break;
+                }
             }
         }
 
