@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use jsonrpsee::core::RpcResult;
+use lightning_firewall::{CommandCenter, FirewallCommand};
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Blake3Hash, CompressionAlgorithm};
 
@@ -35,5 +36,37 @@ impl<C: Collection> AdminApiServer for AdminApi<C> {
             .map_err(|e| RPCError::custom(format!("failed to finalize put: {e}")))?;
 
         Ok(hash)
+    }
+
+    /// Queue a firewall command to be executed, doesnt wait for a resposne
+    async fn queue_firewall_command(&self, name: &str, command: FirewallCommand) -> RpcResult<()> {
+        let tx = CommandCenter::global()
+            .sender(name)
+            .ok_or_else(|| RPCError::custom("firewall not found".to_string()))?;
+
+        command
+            .send(&tx)
+            .await
+            .map_err(|e| RPCError::custom(e.to_string()))?;
+
+        Ok(())
+    }
+
+    /// Queue a firewall command to be executed, waits for a response
+    async fn queue_firewall_command_and_wait_for_success(
+        &self,
+        name: &str,
+        command: FirewallCommand,
+    ) -> RpcResult<()> {
+        let tx = CommandCenter::global()
+            .sender(name)
+            .ok_or_else(|| RPCError::custom("firewall not found".to_string()))?;
+
+        command
+            .send_and_wait(&tx)
+            .await
+            .map_err(|e| RPCError::custom(e.to_string()))?;
+
+        Ok(())
     }
 }

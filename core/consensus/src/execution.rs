@@ -4,8 +4,8 @@ use async_trait::async_trait;
 use fastcrypto::hash::HashFunction;
 use fleek_blake3 as blake3;
 use lightning_interfaces::prelude::*;
-use lightning_interfaces::types::{Block, Epoch, Event, Metadata, NodeIndex, TransactionRequest};
-use lightning_interfaces::ExecutionEngineSocket;
+use lightning_interfaces::types::{Block, Epoch, Metadata, NodeIndex, TransactionRequest};
+use lightning_interfaces::{Events, ExecutionEngineSocket};
 use lightning_utils::application::QueryRunnerExt;
 use narwhal_crypto::DefaultHashFunction;
 use narwhal_executor::ExecutionState;
@@ -67,7 +67,7 @@ pub struct Execution<Q: SyncQueryRunnerInterface, NE: Emitter> {
     /// Notifications emitter
     notifier: NE,
     /// Send the event to the RPC
-    event_tx: OnceLock<mpsc::Sender<Vec<Event>>>,
+    event_tx: OnceLock<Events>,
 }
 
 impl<Q: SyncQueryRunnerInterface, NE: Emitter> Execution<Q, NE> {
@@ -124,20 +124,13 @@ impl<Q: SyncQueryRunnerInterface, NE: Emitter> Execution<Q, NE> {
         info!("Consensus submitted new block to application");
 
         match self.event_tx.get() {
-            Some(tx) => {
-                if let Err(e) = tx
-                    .send(
-                        response
-                            .txn_receipts
-                            .iter()
-                            .filter_map(|r| r.event.clone())
-                            .collect(),
-                    )
-                    .await
-                {
-                    error!("We could not send a message to the RPC: {e}");
-                }
-            },
+            Some(tx) => tx.send(
+                response
+                    .txn_receipts
+                    .iter()
+                    .filter_map(|r| r.event.clone())
+                    .collect(),
+            ),
             None => {
                 error!("Once Cell not initialized, this is a bug");
             },
@@ -165,7 +158,7 @@ impl<Q: SyncQueryRunnerInterface, NE: Emitter> Execution<Q, NE> {
         self.executor.downgrade();
     }
 
-    pub fn set_event_tx(&self, tx: mpsc::Sender<Vec<Event>>) {
+    pub fn set_event_tx(&self, tx: Events) {
         self.event_tx.set(tx).unwrap();
     }
 }

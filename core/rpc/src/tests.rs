@@ -1404,10 +1404,7 @@ async fn test_rpc_events() -> Result<()> {
         HpUfixed::<18>::from(10_u16),
     );
 
-    sender
-        .send(vec![event.clone()])
-        .await
-        .expect("can send event");
+    sender.send(vec![event.clone()]);
 
     assert_eq!(sub.next().await.expect("An event from the sub")?, event);
 

@@ -1,21 +1,18 @@
 use std::sync::Arc;
 
 use fleek_crypto::{ConsensusPublicKey, NodePublicKey};
-use hyper::server::conn::AddrStream;
-use hyper::service::{make_service_fn, service_fn};
 use jsonrpsee::server::{stop_channel, Server as JSONRPCServer};
 use jsonrpsee::{Methods, RpcModule};
+use lightning_firewall::Firewall;
 use lightning_interfaces::prelude::*;
-use lightning_interfaces::types::Event;
-use lightning_interfaces::{FetcherSocket, MempoolSocket};
+use lightning_interfaces::{Events, FetcherSocket, MempoolSocket};
 use reqwest::StatusCode;
-use tower::Service;
+use tokio::sync::OnceCell;
 
 use crate::api::AdminApiServer;
 pub use crate::api::{EthApiServer, FleekApiServer, NetApiServer};
 pub use crate::config::Config;
 use crate::error::RPCError;
-use crate::event::EventDistributor;
 use crate::logic::AdminApi;
 pub use crate::logic::{EthApi, FleekApi, NetApi};
 
@@ -23,12 +20,16 @@ pub mod api;
 pub mod api_types;
 pub mod config;
 pub mod error;
-pub mod event;
 mod logic;
 
+mod server;
 #[cfg(test)]
 mod tests;
 
+/// Cache the config so we dont need to clone per connection
+pub static CONFIG: OnceCell<config::Config> = OnceCell::const_new();
+
+/// The data shared with every request the rpc methods.
 pub(crate) struct Data<C: Collection> {
     pub query_runner: c!(C::ApplicationInterface::SyncExecutor),
     pub mempool_socket: MempoolSocket,
@@ -37,7 +38,7 @@ pub(crate) struct Data<C: Collection> {
     pub node_public_key: NodePublicKey,
     pub consensus_public_key: ConsensusPublicKey,
     pub archive: C::ArchiveInterface,
-    pub event_handler: EventDistributor,
+    pub events: Events,
 }
 
 impl<C: Collection> Data<C> {
@@ -66,11 +67,11 @@ pub struct Rpc<C: Collection> {
     data: Arc<Data<C>>,
 }
 
-async fn health() -> &'static str {
+pub async fn health() -> &'static str {
     "OK"
 }
 
-async fn metrics() -> (StatusCode, String) {
+pub async fn metrics() -> (StatusCode, String) {
     match autometrics::prometheus_exporter::encode_to_string() {
         Ok(metrics) => (StatusCode::OK, metrics),
         Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
@@ -89,6 +90,9 @@ impl<C: Collection> Rpc<C> {
         fdi::Cloned(query_runner): fdi::Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
     ) -> anyhow::Result<Self> {
         let config = config.get::<Self>();
+        // this should only get ran once
+        let _ = CONFIG.set(config.clone());
+
         let data: Arc<Data<C>> = Arc::new(Data {
             query_runner,
             mempool_socket: forwarder.mempool_socket(),
@@ -97,7 +101,10 @@ impl<C: Collection> Rpc<C> {
             node_public_key: keystore.get_ed25519_pk(),
             consensus_public_key: keystore.get_bls_pk(),
             archive,
-            event_handler: EventDistributor::spawn(),
+            events: {
+                let (tx, _) = tokio::sync::broadcast::channel(8);
+                tx.into()
+            },
         });
         let module = Self::create_modules_from_config(&config, data.clone())?;
         let admin_module = Self::create_admin_module_from_config(&config, data.clone())?;
@@ -112,77 +119,24 @@ impl<C: Collection> Rpc<C> {
 
     fn start(&self, shutdown: fdi::Cloned<ShutdownWaiter>) {
         let (stop, server_handle) = stop_channel();
-        let json_rpc_service = JSONRPCServer::builder()
-            .to_service_builder()
-            .build(Methods::from(self.module.clone()), stop.clone());
 
-        let admin_json_rpc_service = JSONRPCServer::builder()
-            .to_service_builder()
-            .build(Methods::from(self.admin_module.clone()), stop.clone());
+        let disallowed = self.config.disallowed_methods.as_ref().map(|s| s.as_ref());
+        let json_rpc_service = JSONRPCServer::builder().to_service_builder().build(
+            filter_methods(self.module.clone(), disallowed),
+            stop.clone(),
+        );
 
-        let make_service = make_service_fn(move |addr_stream: &AddrStream| {
-            let json_rpc_service = json_rpc_service.clone();
-            let admin_json_rpc_service = admin_json_rpc_service.clone();
+        let admin_json_rpc_service = JSONRPCServer::builder().to_service_builder().build(
+            filter_methods(self.admin_module.clone(), disallowed),
+            stop.clone(),
+        );
 
-            // Although it is kind of odd to set up a server in this manner,
-            // this is safe from spoofing attacks as long as we're using TCP.
-            // It would be better to add auth to these endpoints or add
-            // another server on loopback for internal services.
-            // Todo: improve admin service.
-            let is_local = addr_stream.remote_addr().ip().is_loopback();
-
-            async move {
-                Ok::<_, hyper::Error>(service_fn(move |req: hyper::Request<hyper::Body>| {
-                    let mut json_rpc_service = json_rpc_service.clone();
-                    let mut admin_json_rpc_service = admin_json_rpc_service.clone();
-
-                    async move {
-                        let path = req.uri().path().to_string().to_ascii_lowercase();
-                        let method = req.method();
-
-                        match path.as_str() {
-                            "/health" => {
-                                let res = health().await;
-
-                                hyper::Response::builder()
-                                    .status(StatusCode::OK)
-                                    .body(hyper::Body::from(res))
-                            },
-                            "/metrics" => {
-                                let (status, res) = metrics().await;
-
-                                hyper::Response::builder()
-                                    .status(status)
-                                    .body(hyper::Body::from(res))
-                            },
-                            "/admin" => {
-                                if is_local && method == hyper::Method::POST {
-                                    match admin_json_rpc_service.call(req).await {
-                                        Ok(res) => Ok(res),
-                                        Err(err) => hyper::Response::builder()
-                                            .status(StatusCode::INTERNAL_SERVER_ERROR)
-                                            .body(hyper::Body::from(err.to_string())),
-                                    }
-                                } else {
-                                    hyper::Response::builder()
-                                        .status(StatusCode::NOT_FOUND)
-                                        .body(hyper::Body::empty())
-                                }
-                            },
-                            _ => match json_rpc_service.call(req).await {
-                                Ok(res) => Ok(res),
-                                Err(err) => hyper::Response::builder()
-                                    .status(StatusCode::INTERNAL_SERVER_ERROR)
-                                    .body(hyper::Body::from(err.to_string())),
-                            },
-                        }
-                    }
-                }))
-            }
-        });
+        let rpc_server = server::RpcService::new(json_rpc_service, admin_json_rpc_service);
+        let rpc_server =
+            Firewall::new("rpc", None, Default::default(), Default::default()).service(rpc_server);
 
         let addr = self.config.addr();
-        let server = hyper::Server::bind(&addr).serve(make_service);
+        let server = hyper::Server::bind(&addr).serve(rpc_server);
 
         let panic_waiter = shutdown.clone();
         spawn!(
@@ -235,19 +189,21 @@ impl<C: Collection> Rpc<C> {
         data: Arc<Data<C>>,
     ) -> anyhow::Result<RpcModule<()>> {
         let mut final_module = RpcModule::new(());
+
         if config
             .rpc_selection()
             .any(|module| matches!(module, config::RPCModules::Admin))
         {
             final_module.merge(AdminApi::new(data.clone()).into_rpc())?;
         }
+
         Ok(final_module)
     }
 }
 
 impl<C: Collection> RpcInterface<C> for Rpc<C> {
-    fn event_tx(&self) -> tokio::sync::mpsc::Sender<Vec<Event>> {
-        self.data.event_handler.sender()
+    fn event_tx(&self) -> Events {
+        self.data.events.clone()
     }
 }
 
@@ -261,4 +217,42 @@ impl<C: Collection> fdi::BuildGraph for Rpc<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::default().with(Self::init.with_event_handler("start", Self::start))
     }
+}
+
+/// Panics if any of the disallowed methods are not valid methods.
+fn filter_methods(
+    into_methods: impl Into<Methods>,
+    disallowed: Option<impl AsRef<[String]>>,
+) -> Methods {
+    let methods: Methods = into_methods.into();
+    if disallowed.is_none() {
+        return methods;
+    }
+
+    let disallowed = disallowed.unwrap();
+
+    let mut filtered = Methods::new();
+    let method_names: Vec<&_> = methods.method_names().collect();
+
+    // Check if the disallowed methods are valid methods
+    for method in disallowed.as_ref() {
+        if !method_names.contains(&method.as_ref()) {
+            panic!(
+                "Disallowed method {} is not a valid method, check your config settings",
+                method
+            );
+        }
+    }
+
+    // Check if the methods are disallowed
+    let disallowed: Vec<_> = disallowed.as_ref().iter().map(|s| s.as_str()).collect();
+    for method in method_names {
+        if !disallowed.contains(&method) {
+            // this should work because we know the method is valid already and filtered
+            // is emtpy
+            let _ = filtered.verify_and_insert(method, methods.method(method).unwrap().clone());
+        }
+    }
+
+    filtered
 }
