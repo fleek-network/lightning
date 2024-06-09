@@ -1,0 +1,30 @@
+name: Nix
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - flake.nix
+      - .github/workflows/nix.yml
+
+jobs:
+  develop:
+    name: Develop (${{ matrix.name }})
+    strategy:
+      matrix:
+        include:
+          - name: Linux
+            runner: ubuntu-latest
+          - name: MacOS
+            runner: macos-latest
+      fail-fast: false
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Install nix
+        uses: cachix/install-nix-action@v27
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Nix develop
+        run: nix develop --accept-flake-config --command echo "Nix environment setup successfully"
