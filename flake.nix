@@ -77,7 +77,10 @@
             pkgs.fetchurl {
               name = "librusty_v8-${v8_version}";
               url = "https://github.com/denoland/rusty_v8/releases/download/v${v8_version}/librusty_v8_release_${arch}.a.gz";
-              sha256 = { x86_64-linux = "XxX3x3LBiJK768gvzIsV7aKm6Yn5dLS3LINdDOUjDGU="; }."${system}";
+              sha256 = {
+                x86_64-linux = "XxX3x3LBiJK768gvzIsV7aKm6Yn5dLS3LINdDOUjDGU=";
+                aarch64-darwin = "5cdd8914bf11b3d8724eab95c7a6eb8d6d791f9e26855207ab391d132f6c9aa3";
+              }."${system}";
               postFetch = ''
                 mv $out src.gz
                 ${pkgs.gzip} -d src.gz
@@ -132,6 +135,7 @@
               ++ lib.optionals pkgs.stdenv.isDarwin [
                 # MacOS specific packages
                 pkgs.libiconv
+                pkgs.darwin.apple_sdk.frameworks.QuartzCore
               ];
           } // commonVars;
 
@@ -154,7 +158,10 @@
             # Enable mold linker
             CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER = "${pkgs.clang}/bin/clang";
             CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER = "${pkgs.clang}/bin/clang";
-            RUSTFLAGS = "--cfg tokio_unstable -Clink-arg=-fuse-ld=${pkgs.mold-wrapped}/bin/mold";
+
+            # NOTE: mold is not fully supported on macOS yet, so we just use the default linker there.
+            # The error you would get looks like: mold: fatal: unknown command line option: -dynamic; -dynamic is a macOS linker's option. mold does not support macOS.
+            RUSTFLAGS = "--cfg tokio_unstable" + lib.optionalString (!pkgs.stdenv.isDarwin) " -Clink-arg=-fuse-ld=${pkgs.mold-wrapped}/bin/mold";
           };
 
           # Build *just* the cargo dependencies, so we can reuse all of that
