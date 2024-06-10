@@ -102,7 +102,7 @@ impl RateLimiting {
             RateLimiting::WithGlobal { global, per } => {
                 *global = rules;
 
-                // remove all ips that global rules previously applied to them
+                // remove all old global rules
                 per.retain(|_, v| v.first().map_or(false, |f| !f.is_global));
             },
         }
@@ -131,6 +131,7 @@ impl RateLimiting {
                         std::mem::take(per)
                             .into_iter()
                             .filter_map(|(k, v)| {
+                                // take the user rules if theyre are not global
                                 if v.first().map_or(false, |policy| !policy.is_global) {
                                     return Some((k, v.into_iter().map(IsGlobal::take).collect()));
                                 }
@@ -263,22 +264,12 @@ impl RateLimitingPolicy {
             max_requests,
             last_request: std::time::Instant::now(),
             slope: {
-                // interpolate a line through (0, max_requests) -> (period, 0)
+                // slope of line through (0, max_requests) -> (period, 0)
                 let m = max_requests as f64 / period.as_millis() as f64;
                 -m
             },
             y_intercept: 0.0,
         }
-    }
-
-    pub fn update(&mut self, period: &Period, max_requests: u64) {
-        self.max_requests = max_requests;
-
-        self.slope = {
-            // interpolate a line through (0, max_requests) -> (period, 0)
-            let m = max_requests as f64 / period.as_millis() as f64;
-            -m
-        };
     }
 
     /// Check (and increment the counter) if a request is allowed
@@ -348,25 +339,21 @@ pub struct IsGlobal<T> {
 }
 
 impl<T> IsGlobal<T> {
-    pub fn yes(value: T) -> Self {
+    fn yes(value: T) -> Self {
         Self {
             is_global: true,
             value,
         }
     }
 
-    pub fn no(value: T) -> Self {
+    fn no(value: T) -> Self {
         Self {
             is_global: false,
             value,
         }
     }
 
-    pub fn is_global(&self) -> bool {
-        self.is_global
-    }
-
-    pub fn take(self) -> T {
+    fn take(self) -> T {
         self.value
     }
 }

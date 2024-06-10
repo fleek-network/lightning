@@ -4,7 +4,6 @@ pub mod rate_limiting;
 pub mod service;
 
 use std::net::IpAddr;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 pub use commands::{CommandCenter, FireWallRequest, FirewallCommand};
@@ -41,34 +40,25 @@ pub struct Firewall {
     /// Unfortunatly we need to use a tokio [`Mutex`] here because we need to be able to
     /// lock the firewall in a spawn, and ['std::sync::MutexGuard'] is not [`Send`]
     inner: Arc<Mutex<Inner>>,
-    connections: Arc<AtomicUsize>,
 }
 
 impl Clone for Firewall {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
-            connections: self.connections.clone(),
         }
     }
 }
 
 impl Firewall {
-    pub fn new(
-        name: &'static str,
-        max_connections: Option<usize>,
-        policy: ConnectionPolicy,
-        rate_limiting: RateLimiting,
-    ) -> Self {
+    pub fn new(name: &'static str, policy: ConnectionPolicy, rate_limiting: RateLimiting) -> Self {
         let (command_tx, command_rx) = mpsc::channel(100);
         commands::CommandCenter::global().register(name, command_tx);
 
-        let inner = Inner::new(name, max_connections, policy, rate_limiting);
-        let connections = inner.connections.clone();
+        let inner = Inner::new(name, policy, rate_limiting);
 
         let this = Self {
             inner: Arc::new(Mutex::new(inner)),
-            connections,
         };
 
         tokio::spawn(this.clone().update_loop(command_rx));
@@ -88,12 +78,6 @@ impl Firewall {
     pub fn service<S: Clone>(self, inner: S) -> service::Firewalled<S> {
         service::Firewalled::new(self, inner)
     }
-
-    /// Warning! Every check should have a corresponding release_connection call
-    /// This function can panic if used incorrectly
-    pub fn release_connection(&self) {
-        self.connections.fetch_sub(1, Ordering::AcqRel);
-    }
 }
 
 impl Firewall {
@@ -107,11 +91,6 @@ impl Firewall {
             let mut this = self.inner.lock().await;
 
             let res = match command {
-                commands::FirewallCommand::MaxConnections(max) => {
-                    this.set_max_connections(max);
-
-                    Ok(())
-                },
                 commands::FirewallCommand::SetGlobalPolicy(rules) => {
                     this.rate_limiting.set_global_policy(rules)
                 },
@@ -143,20 +122,13 @@ impl Firewall {
 #[derive(Debug)]
 pub(crate) struct Inner {
     name: &'static str,
-    max_connections: Option<usize>,
-    connections: Arc<AtomicUsize>,
     policy: ConnectionPolicy,
     rate_limiting: RateLimiting,
 }
 
 /// Admin functionality for the firewall
 impl Inner {
-    pub fn new(
-        name: &'static str,
-        max_connections: Option<usize>,
-        policy: ConnectionPolicy,
-        rate_limiting: RateLimiting,
-    ) -> Self {
+    pub fn new(name: &'static str, policy: ConnectionPolicy, rate_limiting: RateLimiting) -> Self {
         if rate_limiting.policy_type() == RateLimitingMode::Per
             && policy.mode() != ConnectionPolicyMode::Whitelist
         {
@@ -169,45 +141,15 @@ impl Inner {
 
         Self {
             name,
-            max_connections,
-            connections: Arc::new(AtomicUsize::new(0)),
             policy,
             rate_limiting,
-        }
-    }
-
-    pub fn set_max_connections(&mut self, max_connections: usize) {
-        if max_connections == 0 {
-            self.max_connections = None;
-        } else {
-            self.max_connections = Some(max_connections);
         }
     }
 }
 
 impl Inner {
-    /// Warning! Every check should have a corresponding release_connection call
-    /// to avoid leaking connections
     #[tracing::instrument(skip(self), fields(name = %self.name))]
     pub fn check(&mut self, ip: IpAddr) -> Result<(), FirewallError> {
-        loop {
-            let current = self.connections.load(Ordering::Acquire);
-
-            if let Some(max) = self.max_connections {
-                if current >= max {
-                    return Err(FirewallError::ConnectionLimitExceeded);
-                }
-            }
-
-            if self
-                .connections
-                .compare_exchange_weak(current, current + 1, Ordering::AcqRel, Ordering::Acquire)
-                .is_ok()
-            {
-                break;
-            }
-        }
-
         // Always check the policy first
         // someone shouldnt need ratelimiting if theyre not even
         // allowed to connect
@@ -221,11 +163,9 @@ impl Inner {
 impl From<FirewallConfig> for Firewall {
     fn from(config: FirewallConfig) -> Self {
         let inner: Inner = config.into();
-        let connections = inner.connections.clone();
 
         Self {
             inner: Arc::new(Mutex::new(inner)),
-            connections,
         }
     }
 }
@@ -234,7 +174,6 @@ impl From<FirewallConfig> for Inner {
     fn from(config: FirewallConfig) -> Self {
         let FirewallConfig {
             name,
-            max_connections,
             connection_policy,
             rate_limiting,
         } = config;
@@ -251,6 +190,6 @@ impl From<FirewallConfig> for Inner {
             RateLimitingConfig::Global { rules } => RateLimiting::global(rules),
         };
 
-        Self::new(name, max_connections, policy, rate)
+        Self::new(name, policy, rate)
     }
 }
