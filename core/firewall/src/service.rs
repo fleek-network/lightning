@@ -23,8 +23,6 @@ impl<S> Firewalled<S> {
 }
 
 pub struct ConnectedService<S> {
-    /// Only needed so we can tell the firewall we dropped a connection
-    connection: Arc<AtomicUsize>,
     /// The actual service
     svc: S,
 }
@@ -55,7 +53,6 @@ where
 
         MakeSvcFuture {
             svc: Some(self.svc.clone()),
-            connections: self.firewall.connections.clone(),
             ip,
             fut: Box::pin({
                 let firewall = self.firewall.clone();
@@ -68,7 +65,6 @@ where
 
 pub struct MakeSvcFuture<S, Fut> {
     svc: Option<S>,
-    connections: Arc<AtomicUsize>,
     ip: std::net::IpAddr,
     fut: Fut,
 }
@@ -88,7 +84,6 @@ where
 
         if this.ip.is_loopback() {
             return std::task::Poll::Ready(Ok(ConnectedService {
-                connection: this.connections.clone(),
                 svc: this.svc.take().expect("svc to be present"),
             }));
         }
@@ -98,7 +93,6 @@ where
         match ready!(pinned.poll(_cx)) {
             Ok(()) => {
                 return std::task::Poll::Ready(Ok(ConnectedService {
-                    connection: this.connections.clone(),
                     svc: this.svc.take().expect("svc to be present"),
                 }));
             },
@@ -127,12 +121,6 @@ where
 
     fn call(&mut self, req: Req) -> Self::Future {
         self.svc.call(req)
-    }
-}
-
-impl<S> Drop for ConnectedService<S> {
-    fn drop(&mut self) {
-        self.connection.fetch_sub(1, Ordering::AcqRel);
     }
 }
 

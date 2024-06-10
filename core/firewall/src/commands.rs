@@ -67,7 +67,6 @@ impl FireWallRequest {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum FirewallCommand {
-    MaxConnections(usize),
     SetGlobalPolicy(Vec<RateLimitingRule>),
     SetPolicyForIp(IpAddr, Vec<RateLimitingRule>),
     ChangeRateLimitingPolicyType(RateLimitingMode),

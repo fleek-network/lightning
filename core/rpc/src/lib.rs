@@ -133,7 +133,7 @@ impl<C: Collection> Rpc<C> {
 
         let rpc_server = server::RpcService::new(json_rpc_service, admin_json_rpc_service);
         let rpc_server =
-            Firewall::new("rpc", None, Default::default(), Default::default()).service(rpc_server);
+            Firewall::new("rpc", Default::default(), Default::default()).service(rpc_server);
 
         let addr = self.config.addr();
         let server = hyper::Server::bind(&addr).serve(rpc_server);
