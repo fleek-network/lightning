@@ -66,6 +66,27 @@ impl Firewall {
         this
     }
 
+    pub fn from_config(name: &'static str, config: FirewallConfig) -> Self {
+        let FirewallConfig {
+            connection_policy,
+            rate_limiting,
+        } = config;
+
+        let policy = match connection_policy {
+            ConnectionPolicyConfig::All => ConnectionPolicy::All,
+            ConnectionPolicyConfig::Whitelist { members } => ConnectionPolicy::whitelist(members),
+            ConnectionPolicyConfig::Blacklist { members } => ConnectionPolicy::blacklist(members),
+        };
+
+        let rate = match rate_limiting {
+            RateLimitingConfig::None => RateLimiting::none(),
+            RateLimitingConfig::Per => RateLimiting::per(),
+            RateLimitingConfig::Global { rules } => RateLimiting::global(rules),
+        };
+
+        Self::new(name, policy, rate)
+    }
+
     pub async fn check(&self, ip: IpAddr) -> Result<(), FirewallError> {
         let mut firewall = self.inner.lock().await;
 
@@ -157,39 +178,5 @@ impl Inner {
         self.rate_limiting.check(ip)?;
 
         Ok(())
-    }
-}
-
-impl From<FirewallConfig> for Firewall {
-    fn from(config: FirewallConfig) -> Self {
-        let inner: Inner = config.into();
-
-        Self {
-            inner: Arc::new(Mutex::new(inner)),
-        }
-    }
-}
-
-impl From<FirewallConfig> for Inner {
-    fn from(config: FirewallConfig) -> Self {
-        let FirewallConfig {
-            name,
-            connection_policy,
-            rate_limiting,
-        } = config;
-
-        let policy = match connection_policy {
-            ConnectionPolicyConfig::All => ConnectionPolicy::All,
-            ConnectionPolicyConfig::Whitelist { members } => ConnectionPolicy::whitelist(members),
-            ConnectionPolicyConfig::Blacklist { members } => ConnectionPolicy::blacklist(members),
-        };
-
-        let rate = match rate_limiting {
-            RateLimitingConfig::None => RateLimiting::none(),
-            RateLimitingConfig::Per => RateLimiting::per(),
-            RateLimitingConfig::Global { rules } => RateLimiting::global(rules),
-        };
-
-        Self::new(name, policy, rate)
     }
 }

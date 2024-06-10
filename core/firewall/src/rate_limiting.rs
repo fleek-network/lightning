@@ -195,18 +195,14 @@ impl RateLimiting {
             RateLimiting::Per(policy) => {
                 if let Some(policy) = policy.get_mut(&ip) {
                     for p in policy.iter_mut() {
-                        if let Err(e) = p.check() {
-                            return Err(e);
-                        }
+                        p.check()?
                     }
                 }
             },
             RateLimiting::WithGlobal { global, per } => {
                 if let Some(policy) = per.get_mut(&ip) {
                     for p in policy.iter_mut() {
-                        if let Err(e) = p.check() {
-                            return Err(e);
-                        }
+                        p.check()?
                     }
 
                     // return early since we have per policy setup
@@ -221,9 +217,7 @@ impl RateLimiting {
                     .collect();
 
                 for p in policies.iter_mut() {
-                    if let Err(e) = p.check() {
-                        return Err(e);
-                    }
+                    p.check()?
                 }
 
                 per.insert(ip, policies);

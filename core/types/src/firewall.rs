@@ -4,20 +4,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FirewallConfig {
-    pub name: &'static str,
     pub connection_policy: ConnectionPolicyConfig,
     pub rate_limiting: RateLimitingConfig,
-}
-
-// todo: maybe more strict defaults?
-impl Default for FirewallConfig {
-    fn default() -> Self {
-        Self {
-            name: "default",
-            connection_policy: ConnectionPolicyConfig::All,
-            rate_limiting: RateLimitingConfig::None,
-        }
-    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
