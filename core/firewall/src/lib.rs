@@ -5,13 +5,13 @@ pub mod service;
 
 use std::net::IpAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 pub use commands::{CommandCenter, FireWallRequest, FirewallCommand};
 use lightning_types::{ConnectionPolicyConfig, FirewallConfig, RateLimitingConfig};
 use policy::{ConnectionPolicy, ConnectionPolicyMode};
 use rate_limiting::{RateLimiting, RateLimitingMode};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Mutex};
 
 #[derive(Debug, thiserror::Error)]
 pub enum AdminError {
@@ -37,23 +37,22 @@ pub enum FirewallError {
 ///
 /// This firewall can easily wrap any [`tower::Service`] and will automatically apply the firewall
 /// rules see [`Firewall::service`] for more information
-///
-/// This firewall can also be used more generally in shared context
-/// see [`Firewall::shared`] for more information
-///
-/// Note: A firewall is only updated on the *next* call to it, this means there could be some
-/// backpressure on updates if the updater doesnt interact with firewall in between
-#[derive(Debug)]
 pub struct Firewall {
-    name: &'static str,
-    command_rx: mpsc::Receiver<commands::FireWallRequest>,
-    max_connections: Option<usize>,
+    /// Unfortunatly we need to use a tokio [`Mutex`] here because we need to be able to
+    /// lock the firewall in a spawn, and ['std::sync::MutexGuard'] is not [`Send`]
+    inner: Arc<Mutex<Inner>>,
     connections: Arc<AtomicUsize>,
-    policy: ConnectionPolicy,
-    rate_limiting: RateLimiting,
 }
 
-/// Admin functionality for the firewall
+impl Clone for Firewall {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            connections: self.connections.clone(),
+        }
+    }
+}
+
 impl Firewall {
     pub fn new(
         name: &'static str,
@@ -62,7 +61,102 @@ impl Firewall {
         rate_limiting: RateLimiting,
     ) -> Self {
         let (command_tx, command_rx) = mpsc::channel(100);
+        commands::CommandCenter::global().register(name, command_tx);
 
+        let inner = Inner::new(name, max_connections, policy, rate_limiting);
+        let connections = inner.connections.clone();
+
+        let this = Self {
+            inner: Arc::new(Mutex::new(inner)),
+            connections,
+        };
+
+        tokio::spawn(this.clone().update_loop(command_rx));
+
+        this
+    }
+
+    pub async fn check(&self, ip: IpAddr) -> Result<(), FirewallError> {
+        let mut firewall = self.inner.lock().await;
+
+        firewall.check(ip)
+    }
+
+    /// Wrap a service with this firewall
+    ///
+    /// See [`service::FirewalledServer`] for more information
+    pub fn service<S: Clone>(self, inner: S) -> service::Firewalled<S> {
+        service::Firewalled::new(self, inner)
+    }
+
+    /// Warning! Every check should have a corresponding release_connection call
+    /// This function can panic if used incorrectly
+    pub fn release_connection(&self) {
+        self.connections.fetch_sub(1, Ordering::AcqRel);
+    }
+}
+
+impl Firewall {
+    /// Updates come from the admin RPC server and are sent to individual firewalls
+    /// to update their settings.
+    ///
+    /// This function will never block
+    async fn update_loop(self, mut rx: mpsc::Receiver<commands::FireWallRequest>) {
+        while let Some(request) = rx.recv().await {
+            let (command, sender) = request.parts();
+            let mut this = self.inner.lock().await;
+
+            let res = match command {
+                commands::FirewallCommand::MaxConnections(max) => {
+                    this.set_max_connections(max);
+
+                    Ok(())
+                },
+                commands::FirewallCommand::SetGlobalPolicy(rules) => {
+                    this.rate_limiting.set_global_policy(rules)
+                },
+                commands::FirewallCommand::SetPolicyForIp(ip, rules) => {
+                    this.rate_limiting.set_policy(ip, rules)
+                },
+                commands::FirewallCommand::ChangeRateLimitingPolicyType(policy) => {
+                    this.rate_limiting.set_policy_type(policy);
+
+                    Ok(())
+                },
+                commands::FirewallCommand::ToggleBlacklist(ip) => this.policy.toggle_blacklist(ip),
+                commands::FirewallCommand::ToggleWhitelist(ip) => this.policy.toggle_whitelist(ip),
+            };
+
+            match res {
+                Ok(_) => {
+                    let _ = sender.send(Ok(()));
+                },
+                Err(e) => {
+                    tracing::error!("Error updating firewall: {:?}", e);
+                    let _ = sender.send(Err(e));
+                },
+            };
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct Inner {
+    name: &'static str,
+    max_connections: Option<usize>,
+    connections: Arc<AtomicUsize>,
+    policy: ConnectionPolicy,
+    rate_limiting: RateLimiting,
+}
+
+/// Admin functionality for the firewall
+impl Inner {
+    pub fn new(
+        name: &'static str,
+        max_connections: Option<usize>,
+        policy: ConnectionPolicy,
+        rate_limiting: RateLimiting,
+    ) -> Self {
         if rate_limiting.policy_type() == RateLimitingMode::Per
             && policy.mode() != ConnectionPolicyMode::Whitelist
         {
@@ -73,11 +167,8 @@ impl Firewall {
             );
         }
 
-        commands::CommandCenter::global().register(name, command_tx);
-
         Self {
             name,
-            command_rx,
             max_connections,
             connections: Arc::new(AtomicUsize::new(0)),
             policy,
@@ -92,41 +183,13 @@ impl Firewall {
             self.max_connections = Some(max_connections);
         }
     }
-
-    /// Wrap a service with this firewall
-    ///
-    /// See [`service::FirewalledServer`] for more information
-    pub fn service<S: Clone>(self, inner: S) -> service::Firewalled<S> {
-        service::Firewalled::new(self, inner)
-    }
-
-    /// Create a shareable instance of a firewall
-    ///
-    /// This is not really the intended use but its useful for the handshake where we expose TCP and
-    /// other transports that arent modeled as services
-    pub fn shared(self) -> SharedFirewall {
-        SharedFirewall {
-            firewall: Arc::new(Mutex::new(self)),
-        }
-    }
 }
 
-impl Firewall {
-    /// Gets a lock that automatically releases the connection when dropped
-    ///
-    /// its up to the user to ensure that the lock is dropped when the connection is actually done
-    pub fn lock(&self) -> FirewallLock {
-        FirewallLock {
-            connections: self.connections.clone(),
-        }
-    }
-
+impl Inner {
     /// Warning! Every check should have a corresponding release_connection call
     /// to avoid leaking connections
     #[tracing::instrument(skip(self), fields(name = %self.name))]
     pub fn check(&mut self, ip: IpAddr) -> Result<(), FirewallError> {
-        self.check_for_updates();
-
         loop {
             let current = self.connections.load(Ordering::Acquire);
 
@@ -153,90 +216,21 @@ impl Firewall {
 
         Ok(())
     }
-
-    /// Warning! Every check should have a corresponding release_connection call
-    /// This function can panic if used incorrectly
-    pub fn release_connection(&self) {
-        self.connections.fetch_sub(1, Ordering::AcqRel);
-    }
-}
-
-impl Firewall {
-    /// Updates come from the admin RPC server and are sent to individual firewalls
-    /// to update their settings.
-    ///
-    /// This function will never block
-    fn check_for_updates(&mut self) {
-        while let Ok(request) = self.command_rx.try_recv() {
-            let (command, sender) = request.parts();
-
-            let res = match command {
-                commands::FirewallCommand::MaxConnections(max) => {
-                    self.set_max_connections(max);
-
-                    Ok(())
-                },
-                commands::FirewallCommand::SetGlobalPolicy(rules) => {
-                    self.rate_limiting.set_global_policy(rules)
-                },
-                commands::FirewallCommand::SetPolicyForIp(ip, rules) => {
-                    self.rate_limiting.set_policy(ip, rules)
-                },
-                commands::FirewallCommand::ChangeRateLimitingPolicyType(policy) => {
-                    self.rate_limiting.set_policy_type(policy);
-
-                    Ok(())
-                },
-                commands::FirewallCommand::ToggleBlacklist(ip) => self.policy.toggle_blacklist(ip),
-                commands::FirewallCommand::ToggleWhitelist(ip) => self.policy.toggle_whitelist(ip),
-            };
-
-            match res {
-                Ok(_) => {
-                    let _ = sender.send(Ok(()));
-                },
-                Err(e) => {
-                    tracing::error!("Error updating firewall: {:?}", e);
-                    let _ = sender.send(Err(e));
-                },
-            };
-        }
-    }
-}
-
-/// A shared firewall that internally uses a blocking mutex to coordinate access
-///
-/// This is fine in async conexts because worst case were just doing a few hashmap loopkups under
-/// the lock
-pub struct SharedFirewall {
-    firewall: Arc<Mutex<Firewall>>,
-}
-
-impl Clone for SharedFirewall {
-    fn clone(&self) -> Self {
-        Self {
-            firewall: self.firewall.clone(),
-        }
-    }
-}
-
-impl SharedFirewall {
-    pub fn check(&self, ip: IpAddr) -> Result<(), FirewallError> {
-        self.firewall.lock().unwrap().check(ip)
-    }
-}
-
-pub struct FirewallLock {
-    connections: Arc<AtomicUsize>,
-}
-
-impl Drop for FirewallLock {
-    fn drop(&mut self) {
-        self.connections.fetch_sub(1, Ordering::AcqRel);
-    }
 }
 
 impl From<FirewallConfig> for Firewall {
+    fn from(config: FirewallConfig) -> Self {
+        let inner: Inner = config.into();
+        let connections = inner.connections.clone();
+
+        Self {
+            inner: Arc::new(Mutex::new(inner)),
+            connections,
+        }
+    }
+}
+
+impl From<FirewallConfig> for Inner {
     fn from(config: FirewallConfig) -> Self {
         let FirewallConfig {
             name,

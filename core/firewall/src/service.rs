@@ -1,6 +1,11 @@
+use std::pin::Pin;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::task::ready;
+
 use tower::Service;
 
-use crate::{Firewall, FirewallError, FirewallLock};
+use crate::{Firewall, FirewallError};
 
 /// A wrapper around a serivce that implements MakeService
 /// for various types that we can extract an ip address from.
@@ -8,31 +13,35 @@ use crate::{Firewall, FirewallError, FirewallLock};
 /// types is easy just implement [`IntoIpAddr`] for the type
 pub struct Firewalled<S> {
     firewall: Firewall,
-    inner: S,
+    svc: S,
 }
 
 impl<S> Firewalled<S> {
-    pub fn new(firewall: Firewall, inner: S) -> Self {
-        Self { firewall, inner }
+    pub fn new(firewall: Firewall, svc: S) -> Self {
+        Self { firewall, svc }
     }
 }
 
 pub struct ConnectedService<S> {
     /// Only needed so we can tell the firewall we dropped a connection
-    _lock: FirewallLock,
+    connection: Arc<AtomicUsize>,
     /// The actual service
-    inner: S,
+    svc: S,
 }
 
 /// Auto implements make service for all types T: IntoIpAddr when S: Service
 impl<T, S> Service<T> for Firewalled<S>
 where
-    S: Clone,
+    S: Unpin + Clone,
     T: IntoIpAddr,
 {
     type Response = ConnectedService<S>;
     type Error = FirewallError;
-    type Future = std::future::Ready<Result<ConnectedService<S>, Self::Error>>;
+    type Future = MakeSvcFuture<
+        S,
+        // todo can we make this not dynamic?
+        Pin<Box<dyn std::future::Future<Output = Result<(), FirewallError>> + Send>>,
+    >;
 
     fn poll_ready(
         &mut self,
@@ -42,16 +51,61 @@ where
     }
 
     fn call(&mut self, req: T) -> Self::Future {
-        std::future::ready({
-            // we dont need any protections for the loopback address
-            if req.ip_addr().is_loopback() {
-                Ok(ConnectedService::from(self))
-            } else {
-                self.firewall
-                    .check(req.ip_addr())
-                    .map(|_| ConnectedService::from(self))
-            }
-        })
+        let ip = req.ip_addr();
+
+        MakeSvcFuture {
+            svc: Some(self.svc.clone()),
+            connections: self.firewall.connections.clone(),
+            ip,
+            fut: Box::pin({
+                let firewall = self.firewall.clone();
+
+                async move { firewall.check(ip).await }
+            }),
+        }
+    }
+}
+
+pub struct MakeSvcFuture<S, Fut> {
+    svc: Option<S>,
+    connections: Arc<AtomicUsize>,
+    ip: std::net::IpAddr,
+    fut: Fut,
+}
+
+impl<S, Fut> std::future::Future for MakeSvcFuture<S, Fut>
+where
+    S: Clone + Unpin,
+    Fut: std::future::Future<Output = Result<(), FirewallError>> + Unpin,
+{
+    type Output = Result<ConnectedService<S>, FirewallError>;
+
+    fn poll(
+        self: std::pin::Pin<&mut Self>,
+        _cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        let this = self.get_mut();
+
+        if this.ip.is_loopback() {
+            return std::task::Poll::Ready(Ok(ConnectedService {
+                connection: this.connections.clone(),
+                svc: this.svc.take().expect("svc to be present"),
+            }));
+        }
+
+        let pinned = std::pin::Pin::new(&mut this.fut);
+
+        match ready!(pinned.poll(_cx)) {
+            Ok(()) => {
+                return std::task::Poll::Ready(Ok(ConnectedService {
+                    connection: this.connections.clone(),
+                    svc: this.svc.take().expect("svc to be present"),
+                }));
+            },
+            Err(e) => {
+                return std::task::Poll::Ready(Err(e));
+            },
+        }
     }
 }
 
@@ -68,20 +122,17 @@ where
         &mut self,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(cx)
+        self.svc.poll_ready(cx)
     }
 
     fn call(&mut self, req: Req) -> Self::Future {
-        self.inner.call(req)
+        self.svc.call(req)
     }
 }
 
-impl<S: Clone> From<&mut Firewalled<S>> for ConnectedService<S> {
-    fn from(firewalled: &mut Firewalled<S>) -> Self {
-        Self {
-            _lock: firewalled.firewall.lock(),
-            inner: firewalled.inner.clone(),
-        }
+impl<S> Drop for ConnectedService<S> {
+    fn drop(&mut self) {
+        self.connection.fetch_sub(1, Ordering::AcqRel);
     }
 }
 
