@@ -1,6 +1,4 @@
 use std::pin::Pin;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
 use std::task::ready;
 
 use tower::Service;
@@ -91,14 +89,10 @@ where
         let pinned = std::pin::Pin::new(&mut this.fut);
 
         match ready!(pinned.poll(_cx)) {
-            Ok(()) => {
-                return std::task::Poll::Ready(Ok(ConnectedService {
-                    svc: this.svc.take().expect("svc to be present"),
-                }));
-            },
-            Err(e) => {
-                return std::task::Poll::Ready(Err(e));
-            },
+            Ok(()) => std::task::Poll::Ready(Ok(ConnectedService {
+                svc: this.svc.take().expect("svc to be present"),
+            })),
+            Err(e) => std::task::Poll::Ready(Err(e)),
         }
     }
 }

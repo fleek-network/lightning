@@ -25,6 +25,7 @@ triomphe.workspace = true
 # Our libraries
 lightning-schema = { path = "../schema/" }
 lightning-types.workspace = true
+lightning-firewall = { path = "../firewall" }
 affair.workspace = true
 atomo.workspace = true
 atomo-rocks.workspace = true

@@ -6395,6 +6395,7 @@ dependencies = [
  "hp-fixed",
  "ink-quill",
  "interfaces-proc",
+ "lightning-firewall",
  "lightning-schema",
  "lightning-types",
  "schemars",
