@@ -909,7 +909,9 @@ mod tests {
     fn test_report_ping() {
         let mut manager = MeasurementManager::new();
         let peer = 0;
-        manager.report_ping(peer, false);
+        for _ in 0..MIN_NUM_PINGS {
+            manager.report_ping(peer, false);
+        }
         assert_eq!(
             manager.peers.get(&peer).unwrap().pings.get(),
             Some(HpFixed::from(0))
@@ -917,17 +919,35 @@ mod tests {
         manager.report_ping(peer, true);
         assert_eq!(
             manager.peers.get(&peer).unwrap().pings.get(),
-            Some(HpFixed::from(50))
+            // MIN_NUM_PINGS is defined differently based on cfg(debug_assertions), and tests in
+            // garnix CI are run with release mode, so we support both cases.
+            match MIN_NUM_PINGS {
+                1 => Some(HpFixed::from(50)),
+                3 => Some(HpFixed::from(25)),
+                _ => panic!("MIN_NUM_PINGS is different than expected"),
+            }
         );
         manager.report_ping(peer, true);
         assert_eq!(
             manager.peers.get(&peer).unwrap().pings.get(),
-            Some(HpFixed::from(66.66666666666666))
+            // MIN_NUM_PINGS is defined differently based on cfg(debug_assertions), and tests in
+            // garnix CI are run with release mode, so we support both cases.
+            match MIN_NUM_PINGS {
+                1 => Some(HpFixed::from(66.66666666666666)),
+                3 => Some(HpFixed::from(40)),
+                _ => panic!("MIN_NUM_PINGS is different than expected"),
+            }
         );
         manager.report_ping(peer, false);
         assert_eq!(
             manager.peers.get(&peer).unwrap().pings.get(),
-            Some(HpFixed::from(50))
+            // MIN_NUM_PINGS is defined differently based on cfg(debug_assertions), and tests in
+            // garnix CI are run with release mode, so we support both cases.
+            match MIN_NUM_PINGS {
+                1 => Some(HpFixed::from(50)),
+                3 => Some(HpFixed::from(33.33333333333333)),
+                _ => panic!("MIN_NUM_PINGS is different than expected"),
+            }
         );
     }
 
