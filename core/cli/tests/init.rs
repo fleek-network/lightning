@@ -52,8 +52,16 @@ mod init_tests {
 
         let output = cmd.output().unwrap();
 
-        assert!(output.status.success());
-        assert!(output.stderr.is_empty());
+        assert!(
+            output.status.success(),
+            "{}",
+            str::from_utf8(&output.stderr).unwrap()
+        );
+        assert!(
+            output.stderr.is_empty(),
+            "{}",
+            str::from_utf8(&output.stderr).unwrap()
+        );
 
         let config_path = temp_dir.path().join("config.toml");
         assert!(str::from_utf8(&output.stdout).unwrap().contains(&format!(
@@ -95,8 +103,16 @@ mod init_tests {
 
         let output = cmd.output().unwrap();
 
-        assert!(output.status.success());
-        assert!(output.stderr.is_empty());
+        assert!(
+            output.status.success(),
+            "{}",
+            str::from_utf8(&output.stderr).unwrap()
+        );
+        assert!(
+            output.stderr.is_empty(),
+            "{}",
+            str::from_utf8(&output.stderr).unwrap()
+        );
 
         let config_path = temp_dir.path().join("config.toml");
         assert!(str::from_utf8(&output.stdout).unwrap().contains(&format!(
@@ -136,8 +152,16 @@ mod init_tests {
 
         let output = cmd.output().unwrap();
 
-        assert!(output.status.success());
-        assert!(output.stderr.is_empty());
+        assert!(
+            output.status.success(),
+            "{}",
+            str::from_utf8(&output.stderr).unwrap()
+        );
+        assert!(
+            output.stderr.is_empty(),
+            "{}",
+            str::from_utf8(&output.stderr).unwrap()
+        );
 
         let config_path = temp_dir.path().join("config.toml");
         assert!(str::from_utf8(&output.stdout).unwrap().contains(&format!(
@@ -172,8 +196,16 @@ mod init_tests {
 
         let output = cmd.output().unwrap();
 
-        assert!(output.status.success());
-        assert!(output.stderr.is_empty());
+        assert!(
+            output.status.success(),
+            "{}",
+            str::from_utf8(&output.stderr).unwrap()
+        );
+        assert!(
+            output.stderr.is_empty(),
+            "{}",
+            str::from_utf8(&output.stderr).unwrap()
+        );
 
         let config_path = temp_dir.path().join("config.toml");
         assert!(str::from_utf8(&output.stdout).unwrap().contains(&format!(
@@ -200,8 +232,16 @@ mod init_tests {
 
         let output = cmd.output().unwrap();
 
-        assert!(output.status.success());
-        assert!(output.stderr.is_empty());
+        assert!(
+            output.status.success(),
+            "{}",
+            str::from_utf8(&output.stderr).unwrap()
+        );
+        assert!(
+            output.stderr.is_empty(),
+            "{}",
+            str::from_utf8(&output.stderr).unwrap()
+        );
 
         let config_path = temp_dir.path().join("config.toml");
         assert!(str::from_utf8(&output.stdout).unwrap().contains(&format!(
