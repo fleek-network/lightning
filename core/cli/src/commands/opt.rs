@@ -311,9 +311,14 @@ pub async fn send_txn(
     epochs.sort_by(|(a, _), (b, _)| a.epoch.partial_cmp(&b.epoch).unwrap());
     let rpc_address = epochs.pop().unwrap().1;
 
-    rpc_request::<()>(rpc_client, rpc_address, send_transaction(update_request))
-        .await
-        .map(|_| ())
+    rpc_request::<()>(
+        rpc_client,
+        rpc_address,
+        send_transaction(update_request),
+        None,
+    )
+    .await
+    .map(|_| ())
 }
 
 pub async fn query_genesis_committee<T: DeserializeOwned>(
@@ -326,7 +331,7 @@ pub async fn query_genesis_committee<T: DeserializeOwned>(
         let req_clone = req.clone();
         let fut = async move {
             let address = format!("http://{}:{}/rpc/v0", node.domain, node.ports.rpc);
-            match rpc_request::<T>(rpc_client, address.clone(), req_clone).await {
+            match rpc_request::<T>(rpc_client, address.clone(), req_clone, None).await {
                 Ok(res) => Some((res, address)),
                 Err(_) => None,
             }

@@ -8,6 +8,16 @@ pub struct FirewallConfig {
     pub rate_limiting: RateLimitingConfig,
 }
 
+// todo stricter defaults?
+impl Default for FirewallConfig {
+    fn default() -> Self {
+        Self {
+            connection_policy: ConnectionPolicyConfig::All,
+            rate_limiting: RateLimitingConfig::None,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum ConnectionPolicyConfig {
     All,

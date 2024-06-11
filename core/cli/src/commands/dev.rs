@@ -47,6 +47,7 @@ async fn store(input: Vec<PathBuf>) -> Result<()> {
                 &client,
                 format!("http://127.0.0.1:{}/admin", ports.rpc),
                 request,
+                None,
             )
             .await?;
 

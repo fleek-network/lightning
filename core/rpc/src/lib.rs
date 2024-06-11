@@ -1,4 +1,6 @@
-use std::sync::Arc;
+use std::fs::read_to_string;
+use std::sync::atomic::AtomicUsize;
+use std::sync::{Arc, OnceLock};
 
 use fleek_crypto::{ConsensusPublicKey, NodePublicKey};
 use jsonrpsee::server::{stop_channel, Server as JSONRPCServer};
@@ -6,8 +8,10 @@ use jsonrpsee::{Methods, RpcModule};
 use lightning_firewall::Firewall;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::{Events, FetcherSocket, MempoolSocket};
+use lightning_utils::config::LIGHTNING_HOME_DIR;
+use rand::{RngCore, SeedableRng};
 use reqwest::StatusCode;
-use tokio::sync::OnceCell;
+use resolved_pathbuf::ResolvedPathBuf;
 
 use crate::api::AdminApiServer;
 pub use crate::api::{EthApiServer, FleekApiServer, NetApiServer};
@@ -26,8 +30,9 @@ mod server;
 #[cfg(test)]
 mod tests;
 
-/// Cache the config so we dont need to clone per connection
-pub static CONFIG: OnceCell<config::Config> = OnceCell::const_new();
+pub static HMAC_SECRET: OnceLock<[u8; 32]> = OnceLock::new();
+pub static HMAC_NONCE: AtomicUsize = AtomicUsize::new(0);
+pub static HMAC_SALT: &[u8] = b"lightning-hmac-salt";
 
 /// The data shared with every request the rpc methods.
 pub(crate) struct Data<C: Collection> {
@@ -65,6 +70,7 @@ pub struct Rpc<C: Collection> {
     /// RPC module for admin methods.
     admin_module: RpcModule<()>,
     data: Arc<Data<C>>,
+    firewall: Firewall,
 }
 
 pub async fn health() -> &'static str {
@@ -81,7 +87,7 @@ pub async fn metrics() -> (StatusCode, String) {
 impl<C: Collection> Rpc<C> {
     /// Initialize the RPC-server, with the given parameters.
     fn init(
-        config: &C::ConfigProviderInterface,
+        config_provider: &C::ConfigProviderInterface,
         forwarder: &C::ForwarderInterface,
         blockstore: &C::BlockstoreInterface,
         fetcher: &C::FetcherInterface,
@@ -89,9 +95,57 @@ impl<C: Collection> Rpc<C> {
         fdi::Cloned(archive): fdi::Cloned<c!(C::ArchiveInterface)>,
         fdi::Cloned(query_runner): fdi::Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
     ) -> anyhow::Result<Self> {
-        let config = config.get::<Self>();
-        // this should only get ran once
-        let _ = CONFIG.set(config.clone());
+        let config = config_provider.get::<Self>();
+
+        if let Some(ref secret) = config.hmac_secret {
+            let secret_hex = read_to_string(secret)?;
+            let secret_bytes = hex::decode(secret_hex.trim())?;
+            assert!(
+                secret_bytes.len() == 32,
+                "HMAC secret must be hex encoded and 32 bytes"
+            );
+
+            let mut secret = [0_u8; 32];
+            secret.copy_from_slice(&secret_bytes);
+
+            HMAC_SECRET.set(secret).unwrap();
+        } else {
+            // This really shouldnt happen afaik except for testing, but will leave it in the
+            // regular path just in case
+            if !HMAC_SECRET.get().is_some() {
+                let parent = ResolvedPathBuf::try_from(LIGHTNING_HOME_DIR.clone())?;
+                let secret_path = parent.join("hmac_secret.hex");
+
+                let secret_bytes = if secret_path.is_file() {
+                    let secret_hex = read_to_string(&secret_path)?;
+                    let secret_bytes = hex::decode(secret_hex.trim())?;
+                    assert!(
+                        secret_bytes.len() == 32,
+                        "HMAC secret must be hex encoded and 32 bytes"
+                    );
+
+                    let mut secret = [0_u8; 32];
+                    secret.copy_from_slice(&secret_bytes);
+
+                    secret
+                } else {
+                    let mut dest = [0u8; 32];
+                    rand::rngs::StdRng::from_entropy().fill_bytes(&mut dest);
+
+                    let secret_hex = hex::encode(dest);
+                    std::fs::File::create(&secret_path)?;
+                    std::fs::write(&secret_path, secret_hex)?;
+
+                    dest
+                };
+
+                HMAC_SECRET.set(secret_bytes).unwrap();
+
+                tracing::info!("Generated HMAC secret: {:?}", secret_path);
+            } else {
+                tracing::warn!("HMAC secret already set, ignoring new secret");
+            }
+        }
 
         let data: Arc<Data<C>> = Arc::new(Data {
             query_runner,
@@ -114,6 +168,7 @@ impl<C: Collection> Rpc<C> {
             module,
             admin_module,
             data,
+            firewall: config_provider.firewall::<Self>(),
         })
     }
 
@@ -132,8 +187,7 @@ impl<C: Collection> Rpc<C> {
         );
 
         let rpc_server = server::RpcService::new(json_rpc_service, admin_json_rpc_service);
-        let rpc_server =
-            Firewall::new("rpc", Default::default(), Default::default()).service(rpc_server);
+        let rpc_server = self.firewall.clone().service(rpc_server);
 
         let addr = self.config.addr();
         let server = hyper::Server::bind(&addr).serve(rpc_server);

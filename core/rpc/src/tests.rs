@@ -23,7 +23,6 @@ use lightning_fetcher::fetcher::Fetcher;
 use lightning_indexer::Indexer;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
-    Blake3Hash,
     EpochInfo,
     Event,
     Metadata,
@@ -44,7 +43,7 @@ use lightning_signer::Signer;
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_utils::application::QueryRunnerExt;
-use lightning_utils::rpc as utils;
+use lightning_utils::rpc::{self as utils, RpcAdminHeaders};
 use reqwest::Client;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
@@ -53,6 +52,7 @@ use tempfile::{tempdir, TempDir};
 
 use crate::api::FleekApiClient;
 use crate::config::Config as RpcConfig;
+use crate::server::create_hmac;
 use crate::Rpc;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -236,6 +236,7 @@ async fn test_rpc_get_flk_balance() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
+        None
     )
     .await?;
     assert_eq!(HpUfixed::<18>::from(1_000_u32), response.result);
@@ -301,6 +302,7 @@ async fn test_rpc_get_reputation() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
+        None
     )
     .await?;
     assert_eq!(Some(46), response.result);
@@ -372,6 +374,7 @@ async fn test_rpc_get_staked() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
+        None
     )
     .await?;
     assert_eq!(HpUfixed::<18>::from(1_000_u32), response.result);
@@ -420,6 +423,7 @@ async fn test_rpc_get_stables_balance() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
+        None
     )
     .await?;
     assert_eq!(HpUfixed::<6>::from(2_00_u32), response.result);
@@ -493,6 +497,7 @@ async fn test_rpc_get_stake_locked_until() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
+        None
     )
     .await?;
     assert_eq!(365, response.result);
@@ -565,6 +570,7 @@ async fn test_rpc_get_locked_time() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
+        None
     )
     .await?;
     assert_eq!(2, response.result);
@@ -674,6 +680,7 @@ async fn test_rpc_get_bandwidth_balance() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
+        None
     )
     .await?;
     assert_eq!(10_000, response.result);
@@ -746,6 +753,7 @@ async fn test_rpc_get_node_info() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
+        None
     )
     .await?;
     assert_eq!(Some(NodeInfo::from(&node_info)), response.result);
@@ -779,6 +787,7 @@ async fn test_rpc_get_staking_amount() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
+        None
     )
     .await?;
     assert_eq!(node.query_runner().get_staking_amount(), response.result);
@@ -812,6 +821,7 @@ async fn test_rpc_get_committee_members() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
+        None
     )
     .await?;
     assert_eq!(node.query_runner().get_committee_members(), response.result);
@@ -845,6 +855,7 @@ async fn test_rpc_get_epoch() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
+        None
     )
     .await?;
     assert_eq!(node.query_runner().get_current_epoch(), response.result);
@@ -878,6 +889,7 @@ async fn test_rpc_get_epoch_info() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
+        None
     )
     .await?;
     assert_eq!(node.query_runner().get_epoch_info(), response.result);
@@ -911,6 +923,7 @@ async fn test_rpc_get_total_supply() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
+        None
     )
     .await?;
 
@@ -950,6 +963,7 @@ async fn test_rpc_get_year_start_supply() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
+        None
     )
     .await?;
 
@@ -989,6 +1003,7 @@ async fn test_rpc_get_protocol_fund_address() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
+        None
     )
     .await?;
 
@@ -1033,6 +1048,7 @@ async fn test_rpc_get_protocol_params() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
+        None
     )
     .await?;
     assert_eq!(
@@ -1078,6 +1094,7 @@ async fn test_rpc_get_total_served() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
+        None
     )
     .await?;
     assert_eq!(total_served, response.result);
@@ -1146,6 +1163,7 @@ async fn test_rpc_get_node_served() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
+        None
     )
     .await?;
     assert_eq!(vec![1000], response.result.served);
@@ -1217,6 +1235,7 @@ async fn test_rpc_is_valid_node() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
+        None
     )
     .await?;
     assert!(response.result);
@@ -1297,6 +1316,7 @@ async fn test_rpc_get_node_registry() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
+        None
     )
     .await?;
     assert_eq!(response.result.len(), committee_size + 1);
@@ -1313,6 +1333,7 @@ async fn test_rpc_get_node_registry() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
+        None
     )
     .await?;
     assert!(response.result.contains(&NodeInfo::from(&node_info)));
@@ -1322,42 +1343,120 @@ async fn test_rpc_get_node_registry() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test(flavor = "multi_thread")]
-async fn test_admin_rpc_store() -> Result<()> {
+async fn test_admin_seq() -> Result<()> {
     let temp_dir = tempdir().unwrap();
     let genesis_path = Genesis::default()
         .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
         .unwrap();
 
-    let port = 30022;
+    let port = 30023;
     let node = init_rpc(&temp_dir, genesis_path, port).await;
 
     wait_for_server_start(port).await?;
 
+    test_admin_rpc_hmac(port, &node).await?;
+    test_admin_rpc_store(port, &node).await?;
+
+    node.shutdown().await;
+
+    println!("test complete");
+
+    Ok(())
+}
+
+async fn test_admin_rpc_store(port: u16, node: &TestNode) -> Result<()> {
     let req = json!({
         "jsonrpc": "2.0",
-        "method": "admin_store",
-        "params": { "path": "../test-utils/files/index.ts" },
+        "method": "admin_test",
         "id": 1,
     });
 
+    let unix_time = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    let admin_headers = RpcAdminHeaders {
+        hmac: create_hmac(unix_time, 10)?,
+        nonce: 10,
+        timestamp: unix_time,
+    };
+
     let client = Client::new();
-    let response = utils::rpc_request::<Blake3Hash>(
+    let res = utils::rpc_request::<String>(
         &client,
         format!("http://127.0.0.1:{port}/admin"),
         req.to_string(),
+        Some(admin_headers),
     )
-    .await?;
+    .await;
 
-    let expected_content: Vec<u8> = std::fs::read("../test-utils/files/index.ts").unwrap();
-    let stored_content = node
-        .blockstore()
-        .read_all_to_vec(&response.result)
-        .await
-        .unwrap();
-    assert_eq!(expected_content, stored_content);
+    assert!(res.is_ok());
 
-    node.shutdown().await;
+    Ok(())
+}
+
+async fn test_admin_rpc_hmac(port: u16, node: &TestNode) -> Result<()> {
+    for i in 0..10 {
+        let req = json!({
+            "jsonrpc": "2.0",
+            "method": "admin_test",
+            "id": 1,
+        });
+
+        let unix_time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        let admin_headers = RpcAdminHeaders {
+            hmac: create_hmac(unix_time, i)?,
+            nonce: i,
+            timestamp: unix_time,
+        };
+
+        let client = Client::new();
+        let response = utils::rpc_request::<String>(
+            &client,
+            format!("http://127.0.0.1:{port}/admin"),
+            req.to_string(),
+            Some(admin_headers),
+        )
+        .await;
+
+        if response.is_err() {
+            panic!("res: {:?}", response.err());
+        }
+    }
+
+    let req = json!({
+        "jsonrpc": "2.0",
+        "method": "admin_test",
+        "id": 1,
+    });
+
+    let unix_time = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    // pass bad nonce
+    let admin_headers = RpcAdminHeaders {
+        hmac: create_hmac(unix_time, 0)?,
+        nonce: 0,
+        timestamp: unix_time,
+    };
+
+    let client = Client::new();
+    let response = utils::rpc_request::<String>(
+        &client,
+        format!("http://127.0.0.1:{port}/admin"),
+        req.to_string(),
+        Some(admin_headers),
+    )
+    .await;
+
+    assert!(response.is_err());
 
     Ok(())
 }

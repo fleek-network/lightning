@@ -1,11 +1,14 @@
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::atomic::Ordering;
 use std::task::{Context, Poll};
 
+use hmac::{Hmac, Mac};
 use hyper::{Body, Request, Response};
+use sha2::Sha256;
 use tower::Service as TowerService;
 
-use crate::{health, metrics};
+use crate::{health, metrics, HMAC_NONCE, HMAC_SALT};
 
 type BoxedError = Box<dyn std::error::Error + Sync + Send + 'static>;
 
@@ -106,9 +109,45 @@ impl<MainModule, AdminModule> RpcService<MainModule, AdminModule> {
 
                 Box::pin(fut)
             },
+            "/admin/nonce" => Box::pin(async move {
+                hyper::Response::builder()
+                    .status(hyper::StatusCode::OK)
+                    .body(hyper::Body::from(
+                        crate::HMAC_NONCE.load(Ordering::Acquire).to_string(),
+                    ))
+                    .map_err(|e| e.into())
+            }),
             "/admin" => {
                 if method == hyper::Method::POST {
-                    // todo auth (hmac)
+                    match (
+                        req.headers().get("X-Lightning-HMAC"),
+                        req.headers().get("X-Lightning-Timestamp"),
+                        req.headers().get("X-Lightning-Nonce"),
+                    ) {
+                        (Some(hmac), Some(ts), Some(nonce)) => {
+                            match (hmac.to_str(), ts.to_str(), nonce.to_str()) {
+                                (Ok(hmac), Ok(ts), Ok(nonce)) => match verify_hmac(hmac, ts, nonce)
+                                {
+                                    Ok(_) => (),
+                                    Err(err) => {
+                                        return Box::pin(async move {
+                                            hyper::Response::builder()
+                                                .status(hyper::StatusCode::UNAUTHORIZED)
+                                                .body(hyper::Body::from(err.to_string()))
+                                                .map_err(|e| e.into())
+                                        });
+                                    },
+                                },
+                                _ => {
+                                    return bad_request(
+                                        "Invalid HMAC/Timestamp/Nonce charecters, couldnt serialize",
+                                    );
+                                },
+                            }
+                        },
+                        _ => return bad_request("Missing HMAC/Timestamp/Nonce"),
+                    };
+
                     self.admin_server.call(req)
                 } else {
                     Box::pin(async move {
@@ -156,5 +195,67 @@ where
 
     fn call(&mut self, req: Request<Body>) -> Self::Future {
         self.route(req)
+    }
+}
+
+fn bad_request(
+    b: impl Into<String>,
+) -> Pin<Box<dyn Future<Output = Result<Response<Body>, BoxedError>> + Send>> {
+    let b = b.into();
+
+    Box::pin(async move {
+        hyper::Response::builder()
+            .status(hyper::StatusCode::BAD_REQUEST)
+            .body(hyper::Body::from(b))
+            .map_err(|e| e.into())
+    })
+}
+
+pub fn create_hmac(ts: u64, nonce: usize) -> anyhow::Result<String> {
+    let mut mac =
+        Hmac::<Sha256>::new_from_slice(&super::HMAC_SECRET.get().expect("loaded hmac secret")[..])?;
+    mac.update(HMAC_SALT);
+    mac.update(ts.to_string().as_bytes());
+    mac.update(nonce.to_string().as_bytes());
+
+    let result = mac.finalize().into_bytes();
+    Ok(hex::encode(result))
+}
+
+fn verify_hmac(hmac: &str, ts: &str, nonce: &str) -> Result<(), BoxedError> {
+    if hmac.trim_start_matches("0x").len() != 64 {
+        return Err("HMAC is not 32 bytes".into());
+    }
+
+    let u64_ts = ts.parse::<u64>()?;
+    let usize_nonce = nonce.parse::<usize>()?;
+
+    let sys = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(Box::new)?
+        .as_secs();
+
+    if sys - 5 > u64_ts {
+        return Err("Timestamp is too far in the past".into());
+    }
+
+    if u64_ts > sys {
+        return Err("Timestamp is too far in the future".into());
+    }
+
+    let correct_hmac = create_hmac(u64_ts, usize_nonce)?;
+
+    if hmac != correct_hmac {
+        return Err("Bad HMAC".into());
+    }
+
+    match HMAC_NONCE.compare_exchange(
+        usize_nonce,
+        usize_nonce + 1,
+        Ordering::AcqRel,
+        Ordering::Acquire,
+    ) {
+        Ok(_) => Ok(()),
+        Err(n) => Err(format!("Nonce is not valid, expected {}, got {}", n, usize_nonce).into()),
     }
 }

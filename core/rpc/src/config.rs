@@ -1,30 +1,38 @@
-use std::net::{IpAddr, SocketAddr};
+use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::sync::Arc;
 
+use lightning_types::FirewallConfig;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     pub addr: SocketAddr,
     pub rpc_selection: RPCSelection,
-    pub max_connections: Option<usize>,
-    pub blacklist: Option<Arc<Vec<IpAddr>>>,
     pub disallowed_methods: Option<Arc<Vec<String>>>,
+    pub firewall: lightning_types::FirewallConfig,
+    pub hmac_secret: Option<PathBuf>,
+}
+
+impl Into<FirewallConfig> for Config {
+    fn into(self) -> FirewallConfig {
+        self.firewall
+    }
 }
 
 impl Config {
     pub fn new(
         addr: SocketAddr,
         rpc_selection: RPCSelection,
-        max_connections: Option<usize>,
-        blacklist: Option<Vec<IpAddr>>,
         disallowed_methods: Option<Vec<String>>,
+        firewall: lightning_types::FirewallConfig,
+        hmac_secret: Option<PathBuf>,
     ) -> Self {
         Self {
+            hmac_secret,
+            firewall,
             addr,
             rpc_selection,
-            max_connections,
-            blacklist: blacklist.map(Arc::new),
             disallowed_methods: disallowed_methods.map(Arc::new),
         }
     }
@@ -59,11 +67,11 @@ impl Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            hmac_secret: None,
             addr: "0.0.0.0:4230".parse().expect("RPC Socket Addr to parse"),
             rpc_selection: Default::default(),
-            max_connections: None,
-            blacklist: None,
             disallowed_methods: None,
+            firewall: Default::default(),
         }
     }
 }
