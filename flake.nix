@@ -106,6 +106,7 @@
             buildInputs =
               with pkgs;
               [
+                cacert # needed for nextests
                 libclang
                 fontconfig
                 freetype
