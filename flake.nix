@@ -49,14 +49,7 @@
             }
           );
 
-          src = lib.cleanSourceWith {
-            filter =
-              path: type:
-              # Enable some non-rust files needed to compile
-              (builtins.match ".*(bin|json5?|js|lock|md|pem)$" path != null)
-              || (craneLib.filterCargoSources path type);
-            src = craneLib.path ./.;
-          };
+          src = craneLib.path ./.;
 
           librusty_v8 = (
             let
