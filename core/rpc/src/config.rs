@@ -14,9 +14,9 @@ pub struct Config {
     pub hmac_secret: Option<PathBuf>,
 }
 
-impl Into<FirewallConfig> for Config {
-    fn into(self) -> FirewallConfig {
-        self.firewall
+impl From<Config> for FirewallConfig {
+    fn from(config: Config) -> FirewallConfig {
+        config.firewall
     }
 }
 

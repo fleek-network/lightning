@@ -236,7 +236,7 @@ async fn test_rpc_get_flk_balance() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
-        None
+        None,
     )
     .await?;
     assert_eq!(HpUfixed::<18>::from(1_000_u32), response.result);
@@ -302,7 +302,7 @@ async fn test_rpc_get_reputation() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
-        None
+        None,
     )
     .await?;
     assert_eq!(Some(46), response.result);
@@ -374,7 +374,7 @@ async fn test_rpc_get_staked() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
-        None
+        None,
     )
     .await?;
     assert_eq!(HpUfixed::<18>::from(1_000_u32), response.result);
@@ -423,7 +423,7 @@ async fn test_rpc_get_stables_balance() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
-        None
+        None,
     )
     .await?;
     assert_eq!(HpUfixed::<6>::from(2_00_u32), response.result);
@@ -497,7 +497,7 @@ async fn test_rpc_get_stake_locked_until() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
-        None
+        None,
     )
     .await?;
     assert_eq!(365, response.result);
@@ -570,7 +570,7 @@ async fn test_rpc_get_locked_time() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
-        None
+        None,
     )
     .await?;
     assert_eq!(2, response.result);
@@ -680,7 +680,7 @@ async fn test_rpc_get_bandwidth_balance() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
-        None
+        None,
     )
     .await?;
     assert_eq!(10_000, response.result);
@@ -753,7 +753,7 @@ async fn test_rpc_get_node_info() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
-        None
+        None,
     )
     .await?;
     assert_eq!(Some(NodeInfo::from(&node_info)), response.result);
@@ -787,7 +787,7 @@ async fn test_rpc_get_staking_amount() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
-        None
+        None,
     )
     .await?;
     assert_eq!(node.query_runner().get_staking_amount(), response.result);
@@ -821,7 +821,7 @@ async fn test_rpc_get_committee_members() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
-        None
+        None,
     )
     .await?;
     assert_eq!(node.query_runner().get_committee_members(), response.result);
@@ -855,7 +855,7 @@ async fn test_rpc_get_epoch() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
-        None
+        None,
     )
     .await?;
     assert_eq!(node.query_runner().get_current_epoch(), response.result);
@@ -889,7 +889,7 @@ async fn test_rpc_get_epoch_info() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
-        None
+        None,
     )
     .await?;
     assert_eq!(node.query_runner().get_epoch_info(), response.result);
@@ -923,7 +923,7 @@ async fn test_rpc_get_total_supply() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
-        None
+        None,
     )
     .await?;
 
@@ -963,7 +963,7 @@ async fn test_rpc_get_year_start_supply() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
-        None
+        None,
     )
     .await?;
 
@@ -1003,7 +1003,7 @@ async fn test_rpc_get_protocol_fund_address() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
-        None
+        None,
     )
     .await?;
 
@@ -1048,7 +1048,7 @@ async fn test_rpc_get_protocol_params() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
-        None
+        None,
     )
     .await?;
     assert_eq!(
@@ -1094,7 +1094,7 @@ async fn test_rpc_get_total_served() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
-        None
+        None,
     )
     .await?;
     assert_eq!(total_served, response.result);
@@ -1163,7 +1163,7 @@ async fn test_rpc_get_node_served() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
-        None
+        None,
     )
     .await?;
     assert_eq!(vec![1000], response.result.served);
@@ -1235,7 +1235,7 @@ async fn test_rpc_is_valid_node() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
-        None
+        None,
     )
     .await?;
     assert!(response.result);
@@ -1316,7 +1316,7 @@ async fn test_rpc_get_node_registry() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
-        None
+        None,
     )
     .await?;
     assert_eq!(response.result.len(), committee_size + 1);
@@ -1333,7 +1333,7 @@ async fn test_rpc_get_node_registry() -> Result<()> {
         &client,
         format!("http://127.0.0.1:{port}/rpc/v0"),
         req.to_string(),
-        None
+        None,
     )
     .await?;
     assert!(response.result.contains(&NodeInfo::from(&node_info)));

@@ -82,7 +82,7 @@ where
 
         if this.ip.is_loopback() {
             return std::task::Poll::Ready(Ok(ConnectedService {
-                svc: this.svc.take().expect("svc to be present"),
+                svc: this.svc.take().expect("firewall svc to be present"),
             }));
         }
 
@@ -90,7 +90,7 @@ where
 
         match ready!(pinned.poll(_cx)) {
             Ok(()) => std::task::Poll::Ready(Ok(ConnectedService {
-                svc: this.svc.take().expect("svc to be present"),
+                svc: this.svc.take().expect("firewall svc to be present"),
             })),
             Err(e) => std::task::Poll::Ready(Err(e)),
         }
