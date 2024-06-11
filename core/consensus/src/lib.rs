@@ -5,4 +5,5 @@ pub mod execution;
 pub mod narwhal;
 #[cfg(test)]
 mod tests;
+pub mod transaction_manager;
 pub mod validator;

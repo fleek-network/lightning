@@ -27,7 +27,7 @@ pub struct TransactionStore<T: BroadcastEventInterface<PubSubMsg>> {
     deviation_tbe: Duration,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Parcel {
     pub inner: AuthenticStampedParcel,
     // The originator of this parcel.
@@ -212,7 +212,10 @@ impl<T: BroadcastEventInterface<PubSubMsg>> TransactionStore<T> {
         for digest in parcel_chain {
             self.pending.insert(digest);
         }
-        Err(NotExecuted::MissingParcel(last_digest))
+        Err(NotExecuted::MissingParcel {
+            digest: last_digest,
+            timeout: self.get_timeout(),
+        })
     }
 
     // This method should be called whenever we execute a parcel.
@@ -236,6 +239,6 @@ impl<T: BroadcastEventInterface<PubSubMsg>> TransactionStore<T> {
 
 #[derive(Debug)]
 pub enum NotExecuted {
-    MissingParcel(Digest),
+    MissingParcel { digest: Digest, timeout: Duration },
     MissingAttestations(Digest),
 }

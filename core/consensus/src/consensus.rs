@@ -24,15 +24,17 @@ use tracing::{error, info};
 use typed_store::DBMetrics;
 
 use crate::config::Config;
-use crate::edge_node::consensus::EdgeConsensus;
+use crate::edge_node::EdgeConsensus;
 use crate::execution::{AuthenticStampedParcel, CommitteeAttestation, Digest, Execution};
 use crate::narwhal::{NarwhalArgs, NarwhalService};
+use crate::transaction_manager::{TransactionStoreManager, TxnStoreCmd};
 
 pub struct Consensus<C: Collection> {
     /// Inner state of the consensus
     #[allow(clippy::type_complexity)]
     epoch_state: Option<
         EpochState<
+            C,
             c![C::ApplicationInterface::SyncExecutor],
             c![C::BroadcastInterface::PubSub<PubSubMsg>],
             c![C::NotifierInterface::Emitter],
@@ -46,7 +48,12 @@ pub struct Consensus<C: Collection> {
 }
 
 /// This struct contains mutable state only for the current epoch.
-struct EpochState<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter> {
+struct EpochState<
+    C: Collection,
+    Q: SyncQueryRunnerInterface,
+    P: PubSub<PubSubMsg> + 'static,
+    NE: Emitter,
+> {
     /// The node public key of the node.
     node_public_key: NodePublicKey,
     /// The consensus public key of the node.
@@ -68,15 +75,21 @@ struct EpochState<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, N
     txn_socket: SubmitTxSocket,
     /// Interface for sending messages through the gossip layer
     pub_sub: P,
+    /// Notifier
+    notifier: C::NotifierInterface,
     /// Narhwal sends payloads ready for broadcast to this receiver
     rx_narwhal_batches: Option<mpsc::Receiver<(AuthenticStampedParcel, bool)>>,
+    /// Send commands to the transaction store manager
+    txn_mgr_cmd_tx: mpsc::Sender<TxnStoreCmd<P::Event>>,
+    /// Transaction store manager command receiver. Only parked here until the worker is spawned.
+    txn_mgr_cmd_rx: Option<mpsc::Receiver<TxnStoreCmd<P::Event>>>,
     /// To notify when consensus is shutting down.
     shutdown_notify: Arc<Notify>,
 }
 
 #[allow(clippy::too_many_arguments)]
-impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
-    EpochState<Q, P, NE>
+impl<C: Collection, Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
+    EpochState<C, Q, P, NE>
 {
     fn new(
         node_public_key: NodePublicKey,
@@ -87,7 +100,10 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
         execution_state: Arc<Execution<Q, NE>>,
         txn_socket: SubmitTxSocket,
         pub_sub: P,
+        notifier: C::NotifierInterface,
         rx_narwhal_batches: mpsc::Receiver<(AuthenticStampedParcel, bool)>,
+        txn_mgr_cmd_tx: mpsc::Sender<TxnStoreCmd<P::Event>>,
+        txn_mgr_cmd_rx: mpsc::Receiver<TxnStoreCmd<P::Event>>,
         shutdown_notify: Arc<Notify>,
     ) -> Self {
         Self {
@@ -100,25 +116,41 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
             execution_state,
             txn_socket,
             pub_sub,
+            notifier,
             rx_narwhal_batches: Some(rx_narwhal_batches),
+            txn_mgr_cmd_tx,
+            txn_mgr_cmd_rx: Some(txn_mgr_cmd_rx),
             shutdown_notify,
         }
     }
 
     fn spawn_edge_consensus(&mut self, reconfigure_notify: Arc<Notify>) -> EdgeConsensus {
-        EdgeConsensus::spawn(
+        EdgeConsensus::spawn::<C, P, Q, NE>(
             self.pub_sub.clone(),
-            self.execution_state.clone(),
             self.query_runner.clone(),
             self.narwhal_args
                 .primary_network_keypair
                 .public()
                 .to_owned()
                 .into(),
+            self.txn_mgr_cmd_tx.clone(),
+            self.notifier.clone(),
+            reconfigure_notify,
+        )
+    }
+
+    fn spawn_transaction_manager(&mut self) -> TransactionStoreManager {
+        TransactionStoreManager::spawn::<P, Q, NE>(
+            self.txn_mgr_cmd_rx
+                .take()
+                .expect("Transaction store manager command rx is missing"),
+            self.execution_state.clone(),
+            self.query_runner.clone(),
             self.rx_narwhal_batches
                 .take()
                 .expect("rx_narwhal_batches missing from EpochState"),
-            reconfigure_notify,
+            self.pub_sub.clone(),
+            self.node_public_key,
         )
     }
 
@@ -316,6 +348,7 @@ impl<C: Collection> Consensus<C> {
         let panic_waiter = waiter.clone();
         spawn!(
             async move {
+                let txn_manager = epoch_state.spawn_transaction_manager();
                 let edge_node = epoch_state.spawn_edge_consensus(reconfigure_notify.clone());
                 epoch_state.start_current_epoch().await;
 
@@ -332,6 +365,7 @@ impl<C: Collection> Consensus<C> {
                                 consensus.shutdown().await;
                             }
                             edge_node.shutdown().await;
+                            txn_manager.shutdown().await;
                             epoch_state.shutdown();
                             break
                         }
@@ -405,6 +439,7 @@ impl<C: Collection> Consensus<C> {
         // Todo(dalton): Figure out better default channel size
         let (tx_narwhal_batches, rx_narwhal_batches) = mpsc::channel(1000);
 
+        let (txn_mgr_cmd_tx, txn_mgr_cmd_rx) = mpsc::channel(1000);
         let execution_state = Arc::new(Execution::new(
             executor,
             reconfigure_notify.clone(),
@@ -424,7 +459,10 @@ impl<C: Collection> Consensus<C> {
             execution_state,
             signer.get_socket(),
             pubsub,
+            notifier.clone(),
             rx_narwhal_batches,
+            txn_mgr_cmd_tx,
+            txn_mgr_cmd_rx,
             shutdown_notify_epoch_state.clone(),
         );
 

@@ -5,8 +5,8 @@ use rand::Rng;
 use sui_protocol_config::{Chain, ProtocolConfig, ProtocolVersion};
 
 use crate::consensus::PubSubMsg;
-use crate::edge_node::ring_buffer::RingBuffer;
 use crate::execution::{AuthenticStampedParcel, Digest};
+use crate::transaction_manager::ring_buffer::RingBuffer;
 
 fn generate_random_tx(length: usize) -> Transaction {
     let mut rng = rand::thread_rng();
