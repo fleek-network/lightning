@@ -17,6 +17,7 @@ use lightning_application::config::Config as AppConfig;
 use lightning_application::genesis::{Genesis, GenesisAccount, GenesisNode};
 use lightning_application::query_runner::QueryRunner;
 use lightning_blockstore::blockstore::Blockstore;
+use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_blockstore_server::BlockstoreServer;
 use lightning_fetcher::fetcher::Fetcher;
 use lightning_indexer::Indexer;
@@ -47,6 +48,7 @@ use lightning_utils::rpc as utils;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use tempfile::{tempdir, TempDir};
 
 use crate::api::FleekApiClient;
 use crate::config::Config as RpcConfig;
@@ -94,7 +96,7 @@ impl TestNode {
     }
 }
 
-async fn init_rpc(genesis: Option<Genesis>, rpc_port: u16) -> TestNode {
+async fn init_rpc(temp_dir: &TempDir, genesis: Option<Genesis>, rpc_port: u16) -> TestNode {
     let app_config = genesis
         .map(|gen| AppConfig {
             genesis: Some(gen),
@@ -106,7 +108,10 @@ async fn init_rpc(genesis: Option<Genesis>, rpc_port: u16) -> TestNode {
         fdi::Provider::default().with(
             JsonConfigProvider::default()
                 .with::<Rpc<TestBinding>>(RpcConfig::default_with_port(rpc_port))
-                .with::<Application<TestBinding>>(app_config),
+                .with::<Application<TestBinding>>(app_config)
+                .with::<Blockstore<TestBinding>>(BlockstoreConfig {
+                    root: temp_dir.path().join("blockstore").try_into().unwrap(),
+                }),
         ),
     )
     .expect("failed to initialize node");
@@ -164,8 +169,10 @@ fn client(url: SocketAddr) -> HttpClient {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_ping() -> Result<()> {
+    let temp_dir = tempdir()?;
+
     let port = 30000;
-    let node = init_rpc(None, port).await;
+    let node = init_rpc(&temp_dir, None, port).await;
 
     wait_for_server_start(port).await?;
 
@@ -193,6 +200,8 @@ async fn test_rpc_ping() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_flk_balance() -> Result<()> {
+    let temp_dir = tempdir()?;
+
     // Create keys
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
@@ -208,7 +217,7 @@ async fn test_rpc_get_flk_balance() -> Result<()> {
     });
 
     let port = 30001;
-    let node = init_rpc(Some(genesis), port).await;
+    let node = init_rpc(&temp_dir, Some(genesis), port).await;
 
     wait_for_server_start(port).await?;
 
@@ -234,6 +243,8 @@ async fn test_rpc_get_flk_balance() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_reputation() -> Result<()> {
+    let temp_dir = tempdir()?;
+
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
     let node_secret_key = NodeSecretKey::generate();
@@ -267,7 +278,7 @@ async fn test_rpc_get_reputation() -> Result<()> {
     genesis.node_info.push(genesis_node);
 
     let port = 30002;
-    let node = init_rpc(Some(genesis), port).await;
+    let node = init_rpc(&temp_dir, Some(genesis), port).await;
 
     wait_for_server_start(port).await?;
 
@@ -294,6 +305,8 @@ async fn test_rpc_get_reputation() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_staked() -> Result<()> {
+    let temp_dir = tempdir()?;
+
     // Create keys
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
@@ -333,7 +346,7 @@ async fn test_rpc_get_staked() -> Result<()> {
     genesis.node_info.push(node_info);
 
     let port = 30003;
-    let node = init_rpc(Some(genesis), port).await;
+    let node = init_rpc(&temp_dir, Some(genesis), port).await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -359,6 +372,8 @@ async fn test_rpc_get_staked() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_stables_balance() -> Result<()> {
+    let temp_dir = tempdir()?;
+
     // Create keys
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
@@ -374,7 +389,7 @@ async fn test_rpc_get_stables_balance() -> Result<()> {
     });
 
     let port = 30004;
-    let node = init_rpc(Some(genesis), port).await;
+    let node = init_rpc(&temp_dir, Some(genesis), port).await;
 
     wait_for_server_start(port).await?;
 
@@ -401,6 +416,8 @@ async fn test_rpc_get_stables_balance() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_stake_locked_until() -> Result<()> {
+    let temp_dir = tempdir()?;
+
     // Create keys
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
@@ -441,7 +458,7 @@ async fn test_rpc_get_stake_locked_until() -> Result<()> {
     genesis.node_info.push(node_info);
 
     let port = 30005;
-    let node = init_rpc(Some(genesis), port).await;
+    let node = init_rpc(&temp_dir, Some(genesis), port).await;
 
     wait_for_server_start(port).await?;
 
@@ -468,6 +485,8 @@ async fn test_rpc_get_stake_locked_until() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_locked_time() -> Result<()> {
+    let temp_dir = tempdir()?;
+
     // Create keys
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
@@ -507,7 +526,7 @@ async fn test_rpc_get_locked_time() -> Result<()> {
     genesis.node_info.push(node_info);
 
     let port = 30006;
-    let node = init_rpc(Some(genesis), port).await;
+    let node = init_rpc(&temp_dir, Some(genesis), port).await;
 
     wait_for_server_start(port).await?;
 
@@ -534,6 +553,8 @@ async fn test_rpc_get_locked_time() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_locked() -> Result<()> {
+    let temp_dir = tempdir()?;
+
     // Create keys
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
@@ -573,7 +594,7 @@ async fn test_rpc_get_locked() -> Result<()> {
     genesis.node_info.push(node_info);
 
     let port = 30007;
-    let node = init_rpc(Some(genesis), port).await;
+    let node = init_rpc(&temp_dir, Some(genesis), port).await;
 
     wait_for_server_start(port).await?;
 
@@ -589,6 +610,8 @@ async fn test_rpc_get_locked() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_bandwidth_balance() -> Result<()> {
+    let temp_dir = tempdir()?;
+
     // Create keys
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
@@ -604,7 +627,7 @@ async fn test_rpc_get_bandwidth_balance() -> Result<()> {
     });
 
     let port = 30008;
-    let node = init_rpc(Some(genesis), port).await;
+    let node = init_rpc(&temp_dir, Some(genesis), port).await;
 
     wait_for_server_start(port).await?;
 
@@ -631,6 +654,8 @@ async fn test_rpc_get_bandwidth_balance() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_node_info() -> Result<()> {
+    let temp_dir = tempdir()?;
+
     // Create keys
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
@@ -670,7 +695,7 @@ async fn test_rpc_get_node_info() -> Result<()> {
     genesis.node_info.push(node_info.clone());
 
     let port = 30009;
-    let node = init_rpc(Some(genesis), port).await;
+    let node = init_rpc(&temp_dir, Some(genesis), port).await;
 
     wait_for_server_start(port).await?;
 
@@ -697,8 +722,10 @@ async fn test_rpc_get_node_info() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_staking_amount() -> Result<()> {
+    let temp_dir = tempdir()?;
+
     let port = 30010;
-    let node = init_rpc(None, port).await;
+    let node = init_rpc(&temp_dir, None, port).await;
 
     wait_for_server_start(port).await?;
 
@@ -725,8 +752,10 @@ async fn test_rpc_get_staking_amount() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_committee_members() -> Result<()> {
+    let temp_dir = tempdir()?;
+
     let port = 30011;
-    let node = init_rpc(None, port).await;
+    let node = init_rpc(&temp_dir, None, port).await;
 
     wait_for_server_start(port).await?;
 
@@ -753,8 +782,10 @@ async fn test_rpc_get_committee_members() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_epoch() -> Result<()> {
+    let temp_dir = tempdir()?;
+
     let port = 30012;
-    let node = init_rpc(None, port).await;
+    let node = init_rpc(&temp_dir, None, port).await;
 
     wait_for_server_start(port).await?;
 
@@ -781,8 +812,10 @@ async fn test_rpc_get_epoch() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_epoch_info() -> Result<()> {
+    let temp_dir = tempdir()?;
+
     let port = 30013;
-    let node = init_rpc(None, port).await;
+    let node = init_rpc(&temp_dir, None, port).await;
 
     wait_for_server_start(port).await?;
 
@@ -809,8 +842,10 @@ async fn test_rpc_get_epoch_info() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_total_supply() -> Result<()> {
+    let temp_dir = tempdir()?;
+
     let port = 30014;
-    let node = init_rpc(None, port).await;
+    let node = init_rpc(&temp_dir, None, port).await;
 
     wait_for_server_start(port).await?;
 
@@ -843,8 +878,10 @@ async fn test_rpc_get_total_supply() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_year_start_supply() -> Result<()> {
+    let temp_dir = tempdir()?;
+
     let port = 30015;
-    let node = init_rpc(None, port).await;
+    let node = init_rpc(&temp_dir, None, port).await;
 
     wait_for_server_start(port).await?;
 
@@ -877,8 +914,10 @@ async fn test_rpc_get_year_start_supply() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_protocol_fund_address() -> Result<()> {
+    let temp_dir = tempdir()?;
+
     let port = 30016;
-    let node = init_rpc(None, port).await;
+    let node = init_rpc(&temp_dir, None, port).await;
 
     wait_for_server_start(port).await?;
 
@@ -914,8 +953,10 @@ async fn test_rpc_get_protocol_fund_address() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_protocol_params() -> Result<()> {
+    let temp_dir = tempdir()?;
+
     let port = 30017;
-    let node = init_rpc(None, port).await;
+    let node = init_rpc(&temp_dir, None, port).await;
 
     wait_for_server_start(port).await?;
 
@@ -947,6 +988,8 @@ async fn test_rpc_get_protocol_params() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_total_served() -> Result<()> {
+    let temp_dir = tempdir()?;
+
     // Init application service and store total served in application state.
     let mut genesis = Genesis::default();
     let total_served = TotalServed {
@@ -956,7 +999,7 @@ async fn test_rpc_get_total_served() -> Result<()> {
     genesis.total_served.insert(0, total_served.clone());
 
     let port = 30018;
-    let node = init_rpc(Some(genesis), port).await;
+    let node = init_rpc(&temp_dir, Some(genesis), port).await;
 
     wait_for_server_start(port).await?;
 
@@ -983,6 +1026,8 @@ async fn test_rpc_get_total_served() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_node_served() -> Result<()> {
+    let temp_dir = tempdir()?;
+
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
     let node_secret_key = NodeSecretKey::generate();
@@ -1018,7 +1063,7 @@ async fn test_rpc_get_node_served() -> Result<()> {
     genesis.node_info.push(genesis_node);
 
     let port = 30019;
-    let node = init_rpc(Some(genesis), port).await;
+    let node = init_rpc(&temp_dir, Some(genesis), port).await;
 
     wait_for_server_start(port).await?;
 
@@ -1045,6 +1090,8 @@ async fn test_rpc_get_node_served() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_is_valid_node() -> Result<()> {
+    let temp_dir = tempdir()?;
+
     // Create keys
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
@@ -1084,7 +1131,7 @@ async fn test_rpc_is_valid_node() -> Result<()> {
     genesis.node_info.push(node_info);
 
     let port = 30020;
-    let node = init_rpc(Some(genesis), port).await;
+    let node = init_rpc(&temp_dir, Some(genesis), port).await;
     wait_for_server_start(port).await?;
 
     let req = json!({
@@ -1110,6 +1157,8 @@ async fn test_rpc_is_valid_node() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_node_registry() -> Result<()> {
+    let temp_dir = tempdir()?;
+
     // Create keys
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
@@ -1157,7 +1206,7 @@ async fn test_rpc_get_node_registry() -> Result<()> {
         );
 
     let port = 30021;
-    let node = init_rpc(Some(genesis), port).await;
+    let node = init_rpc(&temp_dir, Some(genesis), port).await;
 
     wait_for_server_start(port).await?;
 
@@ -1200,8 +1249,10 @@ async fn test_rpc_get_node_registry() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_admin_rpc_store() -> Result<()> {
+    let temp_dir = tempdir()?;
+
     let port = 30022;
-    let node = init_rpc(None, port).await;
+    let node = init_rpc(&temp_dir, None, port).await;
 
     wait_for_server_start(port).await?;
 
@@ -1236,6 +1287,8 @@ async fn test_admin_rpc_store() -> Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 // #[traced_test]
 async fn test_rpc_events() -> Result<()> {
+    let temp_dir = tempdir()?;
+
     // Create keys
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
@@ -1250,7 +1303,7 @@ async fn test_rpc_events() -> Result<()> {
     });
 
     let port = 30023;
-    let node = init_rpc(Some(genesis), port).await;
+    let node = init_rpc(&temp_dir, Some(genesis), port).await;
 
     wait_for_server_start(port).await?;
 

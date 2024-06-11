@@ -55,3 +55,4 @@ lightning-notifier = { path = "../notifier" }
 lightning-pool = { path = "../pool" }
 lightning-topology = { path = "../topology" }
 lightning-rep-collector = { path = "../rep-collector" }
+tempfile = "3.10.1"
