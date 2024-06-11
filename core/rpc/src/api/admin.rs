@@ -19,4 +19,7 @@ pub trait AdminApi {
         name: &str,
         command: FirewallCommand,
     ) -> RpcResult<()>;
+
+    #[method(name = "test")]
+    async fn test(&self) -> RpcResult<String>;
 }

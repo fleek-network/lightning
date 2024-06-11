@@ -69,4 +69,8 @@ impl<C: Collection> AdminApiServer for AdminApi<C> {
 
         Ok(())
     }
+
+    async fn test(&self) -> RpcResult<String> {
+        Ok("help".to_string())
+    }
 }
