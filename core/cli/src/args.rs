@@ -62,9 +62,6 @@ pub enum Command {
         /// Whether to not generate keys during initialization. The default is to generate keys.
         #[clap(long)]
         no_generate_keys: bool,
-        /// Whether to not apply gensis block during initialization. The default is to apply it.
-        #[clap(long)]
-        no_apply_genesis: bool,
         /// Set RPC listen address in the generated configuration file.
         #[clap(long)]
         rpc_address: Option<SocketAddr>,

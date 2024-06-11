@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use lightning_application::app::Application;
 use lightning_application::config::Config as AppConfig;
 use lightning_application::network::Network;
@@ -17,7 +17,6 @@ pub async fn exec<C>(
     config_path: ResolvedPathBuf,
     network: Option<Network>,
     no_generate_keys: bool,
-    no_apply_genesis: bool,
     dev: bool,
     rpc_address: Option<SocketAddr>,
     handshake_http_address: Option<SocketAddr>,
@@ -81,15 +80,6 @@ where
     if !no_generate_keys {
         let keystore_config = config.get::<C::KeystoreInterface>();
         C::KeystoreInterface::generate_keys(keystore_config, true)?;
-    }
-
-    // Execute genesis if requested.
-    if no_generate_keys {
-        info!(
-            "Not loading genesis block, since keys were not generated. It will be loaded when starting the node after you generate or import keys."
-        );
-    } else if !no_apply_genesis {
-        Node::<C>::init(config).context("Failed to execute genesis")?;
     }
 
     Ok(())

@@ -48,7 +48,6 @@ impl Cli {
             Command::Init {
                 network,
                 no_generate_keys,
-                no_apply_genesis,
                 dev,
                 rpc_address,
                 handshake_http_address,
@@ -57,7 +56,6 @@ impl Cli {
                     config_path,
                     network.map(Into::into),
                     no_generate_keys,
-                    no_apply_genesis,
                     dev,
                     rpc_address,
                     handshake_http_address,
