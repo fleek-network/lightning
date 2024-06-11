@@ -31,6 +31,34 @@ where
     }
 }
 
+pub trait ServiceMarker
+where
+    Self: Send + 'static,
+    Self: TowerService<
+            Request<Body>,
+            Response = Response<Body>,
+            Error = BoxedError,
+            Future = Pin<Box<dyn Future<Output = Result<Response<Body>, BoxedError>> + Send>>,
+        > + Send
+        + Clone
+        + Unpin,
+{
+}
+
+impl<X> ServiceMarker for X
+where
+    X: Send + 'static,
+    X: TowerService<
+            Request<Body>,
+            Response = Response<Body>,
+            Error = BoxedError,
+            Future = Pin<Box<dyn Future<Output = Result<Response<Body>, BoxedError>> + Send>>,
+        > + Send
+        + Clone
+        + Unpin,
+{
+}
+
 impl<MainModule, AdminModule> RpcService<MainModule, AdminModule> {
     pub fn new(main_server: MainModule, admin_server: AdminModule) -> Self {
         Self {
@@ -50,22 +78,8 @@ impl<MainModule, AdminModule> RpcService<MainModule, AdminModule> {
     ) -> Pin<Box<dyn Future<Output = Result<Response<Body>, BoxedError>> + Send>>
     where
         Self: Send + 'static,
-        MainModule: TowerService<
-                Request<Body>,
-                Response = Response<Body>,
-                Error = BoxedError,
-                Future = Pin<Box<dyn Future<Output = Result<Response<Body>, BoxedError>> + Send>>,
-            > + Send
-            + Clone
-            + Unpin,
-        AdminModule: TowerService<
-                Request<Body>,
-                Response = Response<Body>,
-                Error = BoxedError,
-                Future = Pin<Box<dyn Future<Output = Result<Response<Body>, BoxedError>> + Send>>,
-            > + Send
-            + Clone
-            + Unpin,
+        MainModule: ServiceMarker,
+        AdminModule: ServiceMarker,
         <MainModule as TowerService<Request<Body>>>::Future: Send,
         <AdminModule as TowerService<Request<Body>>>::Future: Send,
     {
@@ -166,22 +180,8 @@ impl<MainModule, AdminModule> RpcService<MainModule, AdminModule> {
 impl<MainModule, AdminModule> TowerService<Request<Body>> for RpcService<MainModule, AdminModule>
 where
     Self: Send + 'static,
-    MainModule: TowerService<
-            Request<Body>,
-            Response = Response<Body>,
-            Error = BoxedError,
-            Future = Pin<Box<dyn Future<Output = Result<Response<Body>, BoxedError>> + Send>>,
-        > + Send
-        + Clone
-        + Unpin,
-    AdminModule: TowerService<
-            Request<Body>,
-            Response = Response<Body>,
-            Error = BoxedError,
-            Future = Pin<Box<dyn Future<Output = Result<Response<Body>, BoxedError>> + Send>>,
-        > + Send
-        + Clone
-        + Unpin,
+    MainModule: ServiceMarker,
+    AdminModule: ServiceMarker,
     <MainModule as TowerService<Request<Body>>>::Future: Send,
     <AdminModule as TowerService<Request<Body>>>::Future: Send,
 {

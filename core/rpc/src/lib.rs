@@ -30,9 +30,51 @@ mod server;
 #[cfg(test)]
 mod tests;
 
-pub static HMAC_SECRET: OnceLock<[u8; 32]> = OnceLock::new();
+static HMAC_SECRET: OnceLock<[u8; 32]> = OnceLock::new();
 pub static HMAC_NONCE: AtomicUsize = AtomicUsize::new(0);
 pub static HMAC_SALT: &[u8] = b"lightning-hmac-salt";
+
+/// Tries to read the hmac secret from the default FS location
+/// or it will generate one and write it to disk
+pub fn hmac_secret() -> anyhow::Result<&'static [u8; 32]> {
+    match HMAC_SECRET.get() {
+        Some(secret) => Ok(secret),
+        None => {
+            let parent = ResolvedPathBuf::try_from(LIGHTNING_HOME_DIR.clone())?;
+            let secret_path = parent.join("hmac_secret.hex");
+
+            let secret_bytes = if secret_path.is_file() {
+                tracing::info!("Reading HMAC secret from file");
+
+                let secret_hex = read_to_string(&secret_path)?;
+                let secret_bytes = hex::decode(secret_hex.trim())?;
+                assert!(
+                    secret_bytes.len() == 32,
+                    "HMAC secret must be hex encoded and 32 bytes"
+                );
+
+                let mut secret = [0_u8; 32];
+                secret.copy_from_slice(&secret_bytes);
+
+                secret
+            } else {
+                tracing::info!("Generating new HMAC secret");
+
+                let mut dest = [0u8; 32];
+                rand::rngs::StdRng::from_entropy().fill_bytes(&mut dest);
+
+                let secret_hex = hex::encode(dest);
+                std::fs::File::create(&secret_path)?;
+                std::fs::write(&secret_path, secret_hex)?;
+
+                dest
+            };
+
+            HMAC_SECRET.set(secret_bytes).unwrap();
+            Ok(HMAC_SECRET.get().unwrap())
+        },
+    }
+}
 
 /// The data shared with every request the rpc methods.
 pub(crate) struct Data<C: Collection> {
@@ -110,41 +152,7 @@ impl<C: Collection> Rpc<C> {
 
             HMAC_SECRET.set(secret).unwrap();
         } else {
-            // This really shouldnt happen afaik except for testing, but will leave it in the
-            // regular path just in case
-            if !HMAC_SECRET.get().is_some() {
-                let parent = ResolvedPathBuf::try_from(LIGHTNING_HOME_DIR.clone())?;
-                let secret_path = parent.join("hmac_secret.hex");
-
-                let secret_bytes = if secret_path.is_file() {
-                    let secret_hex = read_to_string(&secret_path)?;
-                    let secret_bytes = hex::decode(secret_hex.trim())?;
-                    assert!(
-                        secret_bytes.len() == 32,
-                        "HMAC secret must be hex encoded and 32 bytes"
-                    );
-
-                    let mut secret = [0_u8; 32];
-                    secret.copy_from_slice(&secret_bytes);
-
-                    secret
-                } else {
-                    let mut dest = [0u8; 32];
-                    rand::rngs::StdRng::from_entropy().fill_bytes(&mut dest);
-
-                    let secret_hex = hex::encode(dest);
-                    std::fs::File::create(&secret_path)?;
-                    std::fs::write(&secret_path, secret_hex)?;
-
-                    dest
-                };
-
-                HMAC_SECRET.set(secret_bytes).unwrap();
-
-                tracing::info!("Generated HMAC secret: {:?}", secret_path);
-            } else {
-                tracing::warn!("HMAC secret already set, ignoring new secret");
-            }
+            let _ = hmac_secret();
         }
 
         let data: Arc<Data<C>> = Arc::new(Data {
