@@ -4,6 +4,8 @@ use std::sync::OnceLock;
 use anyhow::{anyhow, bail, Context};
 use arrayref::array_ref;
 use cid::Cid;
+use deno_core::futures::stream::FuturesUnordered;
+use deno_core::futures::StreamExt;
 use deno_core::url::Host;
 use deno_core::{
     ModuleLoadResponse,
@@ -16,6 +18,8 @@ use deno_core::{
 };
 use fn_sdk::api::fetch_from_origin;
 use fn_sdk::blockstore::ContentHandle;
+use tokio::sync::Semaphore;
+use tracing::{debug, trace, warn};
 
 static IMPORTS: OnceLock<HashMap<ModuleSpecifier, ModuleSpecifier>> = OnceLock::new();
 
@@ -38,15 +42,38 @@ impl ModuleLoader for FleekModuleLoader {
 
         if let Some(mapped) = IMPORTS
             .get_or_init(|| {
-                serde_json::from_str(include_str!(concat!(env!("OUT_DIR"), "/importmap.json")))
-                    .unwrap()
+                let map: HashMap<ModuleSpecifier, ModuleSpecifier> =
+                    serde_json::from_str(include_str!(concat!(env!("OUT_DIR"), "/importmap.json")))
+                        .unwrap();
+
+                // Spawn a task to prefetch the imports
+                let to_fetch = map.clone();
+                tokio::spawn(async move {
+                    // Limit number of concurrent requests
+                    let semaphore = Semaphore::new(16);
+                    if to_fetch
+                        .values()
+                        .map(|uri| async {
+                            let _ = semaphore.acquire().await.ok()?;
+                            fetch_from_origin(fn_sdk::api::Origin::HTTP, uri.as_str()).await
+                        })
+                        .collect::<FuturesUnordered<_>>()
+                        .any(|res| async move { res.is_none() })
+                        .await
+                    {
+                        warn!("Failed to prefetch runtime imports");
+                    } else {
+                        debug!("Prefetched runtime imports successfully")
+                    }
+                });
+
+                map
             })
             .get(&import)
         {
             import = mapped.clone();
         }
 
-        println!("RESOLVE specifier: {specifier:?} - referrer: {referrer:?} - import: {import:?}");
         Ok(import)
     }
 
@@ -57,7 +84,7 @@ impl ModuleLoader for FleekModuleLoader {
         _is_dyn_import: bool,
         requested_module_type: RequestedModuleType,
     ) -> ModuleLoadResponse {
-        println!(
+        trace!(
             "LOAD specifier: {module_specifier} maybe_referrer {}",
             maybe_referrer.map(|m| m.as_str()).unwrap_or("none")
         );
@@ -151,7 +178,7 @@ impl ModuleLoader for FleekModuleLoader {
                 ModuleLoadResponse::Async(Box::pin(async move {
                     let hash = fn_sdk::api::fetch_from_origin(
                         fn_sdk::api::Origin::HTTP,
-                        module_specifier.to_string(),
+                        module_specifier.as_str(),
                     )
                     .await
                     .with_context(|| format!("Failed to fetch {module_specifier} from origin"))?;
