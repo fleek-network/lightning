@@ -327,6 +327,8 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                                     "consensus_missing_parcel_sent",
                                     Some("Number of missing parcels served to other nodes"),
                                 );
+
+                                continue;
                             };
                         }
 
