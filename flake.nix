@@ -53,7 +53,7 @@
             filter =
               path: type:
               # Enable some non-rust files needed to compile
-              (builtins.match ".*(bin|json5?|js|lock|md)$" path != null)
+              (builtins.match ".*(bin|json5?|js|lock|md|pem)$" path != null)
               || (craneLib.filterCargoSources path type);
             src = craneLib.path ./.;
           };
