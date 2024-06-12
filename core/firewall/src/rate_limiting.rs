@@ -285,17 +285,18 @@ impl RateLimitingPolicy {
         // is this the first request
         if self.y_intercept == 0.0 {
             self.y_intercept = 1.0;
+            self.last_request = std::time::Instant::now();
 
             return 1;
         }
 
         // recover the x_intercept
         // this should almost always be in range as its a function of period and total recieved
-        // requests
+        // requests and max requests requests
         let x_intercept = -self.y_intercept / self.slope;
 
         // has it hit 0?
-        if elapsed.as_millis() > x_intercept.floor() as u128 {
+        if elapsed.as_millis() >= x_intercept.floor() as u128 {
             self.y_intercept = 1.0;
             self.last_request = std::time::Instant::now();
 

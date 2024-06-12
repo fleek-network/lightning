@@ -25,7 +25,7 @@ pub struct ConnectedService<S> {
     svc: S,
 }
 
-/// Auto implements make service for all types T: IntoIpAddr when S: Service
+/// Auto implements [`tower::MakeService``] for all types T: IntoIpAddr when S: Service
 impl<T, S> Service<T> for Firewalled<S>
 where
     S: Unpin + Clone,

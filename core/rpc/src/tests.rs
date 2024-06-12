@@ -1364,7 +1364,7 @@ async fn test_admin_seq() -> Result<()> {
     Ok(())
 }
 
-async fn test_admin_rpc_store(port: u16, node: &TestNode) -> Result<()> {
+async fn test_admin_rpc_store(port: u16, _node: &TestNode) -> Result<()> {
     let req = json!({
         "jsonrpc": "2.0",
         "method": "admin_test",
@@ -1396,7 +1396,7 @@ async fn test_admin_rpc_store(port: u16, node: &TestNode) -> Result<()> {
     Ok(())
 }
 
-async fn test_admin_rpc_hmac(port: u16, node: &TestNode) -> Result<()> {
+async fn test_admin_rpc_hmac(port: u16, _node: &TestNode) -> Result<()> {
     for i in 0..10 {
         let req = json!({
             "jsonrpc": "2.0",
