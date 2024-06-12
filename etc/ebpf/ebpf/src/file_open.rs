@@ -48,7 +48,9 @@ unsafe fn try_file_open(ctx: LsmContext) -> Result<i32, i32> {
             task: task_inode,
         };
         if let Some(cached_rule) = maps::FILE_CACHE.get(&cache_key) {
-            if cmp_slices(path, cached_rule.path.as_slice(), MAX_PATH_LEN) {
+            if cmp_slices(path, cached_rule.path.as_slice(), MAX_PATH_LEN)
+                && cached_rule.permissions & FileRule::OPEN_MASK > 0
+            {
                 return Ok(ALLOW);
             }
             // If we get here, it means that the file's inode number
