@@ -2,7 +2,15 @@ use core::ffi::c_char;
 
 use aya_ebpf::macros::lsm;
 use aya_ebpf::programs::LsmContext;
-use lightning_ebpf_common::{Buffer, File, FileRule, Profile, MAX_FILE_RULES, MAX_PATH_LEN, FileCacheKey};
+use lightning_ebpf_common::{
+    Buffer,
+    File,
+    FileCacheKey,
+    FileRule,
+    Profile,
+    MAX_FILE_RULES,
+    MAX_PATH_LEN,
+};
 
 use crate::{access, maps, vmlinux};
 
@@ -35,10 +43,12 @@ unsafe fn try_file_open(ctx: LsmContext) -> Result<i32, i32> {
         };
 
         // Check the cache first.
-        let cache_key = &FileCacheKey { target: target_inode, task: task_inode };
+        let cache_key = &FileCacheKey {
+            target: target_inode,
+            task: task_inode,
+        };
         if let Some(cached_rule) = maps::FILE_CACHE.get(&cache_key) {
             if cmp_slices(path, cached_rule.path.as_slice(), MAX_PATH_LEN) {
-                aya_log_ebpf::info!(&ctx, "cache hit");
                 return Ok(ALLOW);
             }
             // If we get here, it means that the file's inode number
@@ -46,12 +56,9 @@ unsafe fn try_file_open(ctx: LsmContext) -> Result<i32, i32> {
         }
 
         // Go through the rules in this profile and try to find a match.
-        if let Some(rule) = find_match(path, profile)? {
-            if maps::FILE_CACHE.insert(cache_key, rule, 0).is_err() {
-                aya_log_ebpf::error!(&ctx, "failed to cache");
-            }
-            aya_log_ebpf::info!(&ctx, "success");
-            return Ok(ALLOW)
+        if let Some(rule) = find_match(profile, path, FileRule::OPEN_MASK)? {
+            let _ = maps::FILE_CACHE.insert(cache_key, rule, 0);
+            return Ok(ALLOW);
         }
 
         return Ok(DENY);
@@ -60,12 +67,13 @@ unsafe fn try_file_open(ctx: LsmContext) -> Result<i32, i32> {
     Ok(ALLOW)
 }
 
-unsafe fn read_path(file: *const vmlinux::file, buf: &mut [u8]) -> Result<i32, i32> {
+/// Read the file's path into dst.
+unsafe fn read_path(file: *const vmlinux::file, dst: &mut [u8]) -> Result<i32, i32> {
     let btf_path = access::file_f_path(file);
     if aya_ebpf::helpers::bpf_d_path(
         btf_path as *mut _,
-        buf.as_mut_ptr() as *mut c_char,
-        buf.len() as u32,
+        dst.as_mut_ptr() as *mut c_char,
+        dst.len() as u32,
     ) < 0
     {
         // It's possible that the buffer did not have enough capacity.
@@ -74,12 +82,16 @@ unsafe fn read_path(file: *const vmlinux::file, buf: &mut [u8]) -> Result<i32, i
     Ok(ALLOW)
 }
 
-/// Tries to find a rule that matches the target path.
-fn find_match<'a>(target_path: &[u8], profile: &'a Profile) -> Result<Option<&'a FileRule>, i32> {
+/// Tries to find a rule that matches the target path and mask.
+fn find_match<'a>(
+    profile: &'a Profile,
+    target_path: &[u8],
+    mask: u32,
+) -> Result<Option<&'a FileRule>, i32> {
     for i in 0..MAX_FILE_RULES {
         let rule = profile.rules.get(i).ok_or(DENY)?;
 
-        if rule.permissions & FileRule::OPEN_MASK == 0 {
+        if rule.permissions & mask == 0 {
             continue;
         }
 
