@@ -2,7 +2,7 @@ use core::ffi::c_char;
 
 use aya_ebpf::macros::lsm;
 use aya_ebpf::programs::LsmContext;
-use lightning_ebpf_common::{File, Profile, MAX_FILE_RULES};
+use lightning_ebpf_common::{Buffer, File, FileRule, Profile, MAX_FILE_RULES};
 
 use crate::{access, maps, vmlinux};
 
@@ -28,9 +28,10 @@ unsafe fn try_file_open(ctx: LsmContext) -> Result<i32, i32> {
                 .map_err(|_| DENY)?
         };
 
-        // Todo: Move this buffer into a map so we can deal with pointer
-        // and remove this from the stack.
-        let mut path = [0u8; 64];
+        let mut buf = maps::BUFFERS
+            .get_ptr_mut(&Buffer::OPEN_FILE_BUFFER)
+            .ok_or(DENY)?;
+        let path = buf.as_mut().ok_or(DENY)?.buffer.as_mut();
         let btf_path = access::file_f_path(file);
         if aya_ebpf::helpers::bpf_d_path(
             btf_path as *mut _,
@@ -43,22 +44,28 @@ unsafe fn try_file_open(ctx: LsmContext) -> Result<i32, i32> {
             return Err(DENY);
         }
 
-        return verify_access(&ctx, path.as_slice(), profile);
+        return verify_access(&ctx, path, profile);
     }
 
     Ok(ALLOW)
 }
 
-fn verify_access(_ctx: &LsmContext, target_path: &[u8], profile: &Profile) -> Result<i32, i32> {
+fn verify_access(ctx: &LsmContext, target_path: &[u8], profile: &Profile) -> Result<i32, i32> {
     for i in 0..MAX_FILE_RULES {
         let rule = profile.rules.get(i).ok_or(-1)?;
+
+        if rule.permissions & FileRule::OPEN_MASK == 0 {
+            continue;
+        }
+
         let full_path = read_bytes(64i64, rule.path.as_slice())?;
-        let mut found = true;
         for j in 0..64 {
             if full_path[j] != target_path[j] {
-                found = false;
+                break;
             }
-            if target_path[j] == 0 && found {
+
+            if target_path[j] == 0 {
+                aya_log_ebpf::debug!(ctx, "path matched one of our rules");
                 return Ok(ALLOW);
             }
         }

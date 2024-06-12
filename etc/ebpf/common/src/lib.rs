@@ -122,3 +122,23 @@ impl FileRule {
     pub const WRITE_MASK: u32 = 0x01 << 2;
     pub const EXEC_MASK: u32 = 0x01 << 3;
 }
+
+#[derive(Clone, Copy)]
+pub struct Buffer {
+    pub buffer: [u8; MAX_PATH_LEN],
+}
+
+impl Default for Buffer {
+    fn default() -> Self {
+        Self {
+            buffer: [0u8; MAX_PATH_LEN],
+        }
+    }
+}
+
+impl Buffer {
+    pub const OPEN_FILE_BUFFER: u32 = 0;
+}
+
+#[cfg(feature = "userspace")]
+unsafe impl aya::Pod for Buffer {}
