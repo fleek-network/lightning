@@ -14,7 +14,7 @@ use tokio::task::JoinHandle;
 use tracing::{error, info};
 
 use crate::consensus::PubSubMsg;
-use crate::execution::Digest;
+use crate::execution::{AuthenticStampedParcel, CommitteeAttestation, Digest};
 use crate::transaction_manager::{NotExecuted, TxnStoreCmd};
 
 const MAX_PENDING_TIMEOUTS: usize = 100;
@@ -136,174 +136,22 @@ async fn message_receiver_worker<
                     on_committee = committee.contains(&our_index);
                 }
             }
-            Some(mut msg) = pub_sub.recv_event() => {
-                match msg.take().unwrap() {
-                    PubSubMsg::Transactions(parcel) => {
-                        let epoch = query_runner.get_current_epoch();
-                        let originator = msg.originator();
-                        let is_committee = committee.contains(&originator);
-                        if !is_valid_message(is_committee, parcel.epoch, epoch) {
-                            msg.mark_invalid_sender();
-                            continue;
-                        }
-
-                        let msg_digest = msg.get_digest();
-                        let parcel_digest = parcel.to_digest();
-                        let from_next_epoch = parcel.epoch == epoch + 1;
-                        let last_executed = parcel.last_executed;
-
-                        let mut event = None;
-                        if pending_requests.remove(&parcel_digest).is_none() && !from_next_epoch {
-                            // We only want to propagate parcels that we did not request and that
-                            // are not from the next epoch.
-                            msg.propagate();
-                        } else {
-                            event = Some(msg);
-                        }
-
-                        if from_next_epoch {
-                            // if the parcel is from the next epoch, we optimistically
-                            // store it and check if it's from a validator once we change epochs.
-
-                            // Note: this unwrap is safe. If `from_next_epoch=true`, then `event`
-                            // will always be `Some`. Unfortunately, the borrow checker cannot
-                            // figure this out on its own if we use `msg` directly here.
-
-                            // TODO(matthias): panic here or only log the error?
-                            txn_mgr_cmd_tx.send(TxnStoreCmd::StorePendingParcel{
-                                parcel,
-                                originator,
-                                message_digest: msg_digest,
-                                event: event.unwrap()
-                            }).await.expect("Failed to send pending parcel to txn store");
-                        } else {
-                            // only propagate normal parcels, not parcels we requested, and not
-                            // parcels that we optimistically accept from the next epoch
-                            txn_mgr_cmd_tx.send(TxnStoreCmd::StoreParcel{
-                                parcel,
-                                originator,
-                                message_digest: Some(msg_digest),
-                            }).await.expect("Failed to send parcel to txn store");
-                        }
-
-                        // Check if we requested this parcel
-                        if pending_requests.remove(&parcel_digest).is_some() {
-                            // This is a parcel that we specifically requested, so
-                            // we have to set a timeout for the previous parcel, because
-                            // swallow the Err return in the loop of `try_execute`.
-                            set_parcel_timer(
-                                last_executed,
-                                //txn_store.get_timeout(),
-                                PARCEL_TIMEOUT,
-                                timeout_tx.clone(),
-                                &mut pending_timeouts,
-                            );
-                            info!("Received requested parcel with digest: {parcel_digest:?}");
-
-                            increment_counter!(
-                                "consensus_missing_parcel_received",
-                                Some("Number of missing parcels successfully received from other nodes")
-                            );
-                        }
-
-                        if !on_committee {
-                            info!("Received transaction parcel from gossip as an edge node");
-
-                            try_execute::<P, Q>(
-                                parcel_digest,
-                                &mut quorom_threshold,
-                                &mut committee,
-                                &mut our_index,
-                                &mut on_committee,
-                                &node_public_key,
-                                &txn_mgr_cmd_tx,
-                                &mut pending_timeouts,
-                                &query_runner,
-                                &timeout_tx,
-                                &reconfigure_notify,
-                            ).await;
-                        }
-                    },
-                    PubSubMsg::Attestation(att) => {
-                        let originator = msg.originator();
-
-                        let epoch = query_runner.get_current_epoch();
-                        let is_committee = committee.contains(&originator);
-                        if originator != att.node_index
-                            || !is_valid_message(is_committee, att.epoch, epoch) {
-                            msg.mark_invalid_sender();
-                            continue;
-                        }
-
-                        let from_next_epoch = att.epoch == epoch + 1;
-                        let mut event = None;
-                        if !from_next_epoch {
-                            msg.propagate();
-                        } else {
-                            event = Some(msg);
-                        }
-
-                        if !on_committee {
-                            info!("Received parcel attestation from gossip as an edge node");
-
-                            if from_next_epoch {
-                                // if the attestation is from the next epoch, we optimistically
-                                // store it and check if it's from a validator once we change epochs
-                                // Note: this unwrap is safe. If `from_next_epoch=true`, then `event`
-                                // will always be `Some`. Unfortunately, the borrow checker cannot
-                                // figure this out on its own if we use `msg` directly here.
-                                txn_mgr_cmd_tx.send(TxnStoreCmd::StorePendingAttestation{
-                                    digest: att.digest,
-                                    node_index: att.node_index,
-                                    event: event.unwrap(),
-                                }).await.expect("Failed to send pending attestation to txn store");
-                            } else {
-                                txn_mgr_cmd_tx.send(TxnStoreCmd::StoreAttestation{
-                                    digest: att.digest,
-                                    node_index: att.node_index,
-                                }).await.expect("Failed to send attestation to txn store");
-                            }
-
-                            try_execute::<P, Q>(
-                                att.digest,
-                                &mut quorom_threshold,
-                                &mut committee,
-                                &mut our_index,
-                                &mut on_committee,
-                                &node_public_key,
-                                &txn_mgr_cmd_tx,
-                                &mut pending_timeouts,
-                                &query_runner,
-                                &timeout_tx,
-                                &reconfigure_notify,
-                            ).await;
-
-                        }
-                    }
-                    PubSubMsg::RequestTransactions(digest) => {
-                        let (response_tx, response_rx) = oneshot::channel();
-                        txn_mgr_cmd_tx.send(TxnStoreCmd::GetParcelMessageDigest {
-                            digest,
-                            response: response_tx
-                        }).await.expect("Failed to send get parcel msg digest command");
-                        let parcel_msg_digest = response_rx.await.expect("Failed to receive response from get parcel msg digest command");
-                        if let Some(msg_digest) = parcel_msg_digest {
-                            let filter = HashSet::from([msg.originator()]);
-                            pub_sub.repropagate(msg_digest, Some(filter)).await;
-                            info!("Responded to request for missing parcel with digest: {digest:?}");
-                            increment_counter!(
-                                "consensus_missing_parcel_sent",
-                                Some("Number of missing parcels served to other nodes"),
-                            );
-                        } else {
-                            increment_counter!(
-                                "consensus_missing_parcel_ignored",
-                                Some("Number of parcel requests that were ignored due to not finding it in the transaction store"),
-                            );
-                        }
-                    }
-                }
-
+            Some(msg) = pub_sub.recv_event() => {
+                handle_pubsub_event::<P, Q>(
+                    msg,
+                    &mut quorom_threshold,
+                    &mut committee,
+                    &mut our_index,
+                    &mut on_committee,
+                    &node_public_key,
+                    &txn_mgr_cmd_tx,
+                    &mut pending_timeouts,
+                    &mut pending_requests,
+                    &query_runner,
+                    &pub_sub,
+                    &timeout_tx,
+                    &reconfigure_notify,
+                ).await;
             },
             digest = timeout_rx.recv() => {
                 // Timeout for a missing parcel. If we still haven't received the parcel, we send a
@@ -332,6 +180,275 @@ async fn message_receiver_worker<
                 }
             }
         }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn handle_pubsub_event<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface>(
+    mut msg: P::Event,
+    quorom_threshold: &mut usize,
+    committee: &mut Vec<NodeIndex>,
+    our_index: &mut NodeIndex,
+    on_committee: &mut bool,
+    node_public_key: &NodePublicKey,
+    txn_mgr_cmd_tx: &mpsc::Sender<TxnStoreCmd<P::Event>>,
+    pending_timeouts: &mut HashSet<Digest>,
+    pending_requests: &mut Cache<Digest, ()>,
+    query_runner: &Q,
+    pub_sub: &P,
+    timeout_tx: &mpsc::Sender<Digest>,
+    reconfigure_notify: &Arc<Notify>,
+) {
+    match msg.take().unwrap() {
+        PubSubMsg::Transactions(parcel) => {
+            handle_parcel::<P, Q>(
+                msg,
+                parcel,
+                quorom_threshold,
+                committee,
+                our_index,
+                on_committee,
+                node_public_key,
+                txn_mgr_cmd_tx,
+                pending_timeouts,
+                pending_requests,
+                query_runner,
+                timeout_tx,
+                reconfigure_notify,
+            )
+            .await;
+        },
+        PubSubMsg::Attestation(att) => {
+            handle_attestation::<P, Q>(
+                msg,
+                att,
+                quorom_threshold,
+                committee,
+                our_index,
+                on_committee,
+                node_public_key,
+                txn_mgr_cmd_tx,
+                pending_timeouts,
+                query_runner,
+                timeout_tx,
+                reconfigure_notify,
+            )
+            .await;
+        },
+        PubSubMsg::RequestTransactions(digest) => {
+            let (response_tx, response_rx) = oneshot::channel();
+            txn_mgr_cmd_tx
+                .send(TxnStoreCmd::GetParcelMessageDigest {
+                    digest,
+                    response: response_tx,
+                })
+                .await
+                .expect("Failed to send get parcel msg digest command");
+            let parcel_msg_digest = response_rx
+                .await
+                .expect("Failed to receive response from get parcel msg digest command");
+            if let Some(msg_digest) = parcel_msg_digest {
+                let filter = HashSet::from([msg.originator()]);
+                pub_sub.repropagate(msg_digest, Some(filter)).await;
+                info!("Responded to request for missing parcel with digest: {digest:?}");
+                increment_counter!(
+                    "consensus_missing_parcel_sent",
+                    Some("Number of missing parcels served to other nodes"),
+                );
+            } else {
+                increment_counter!(
+                    "consensus_missing_parcel_ignored",
+                    Some(
+                        "Number of parcel requests that were ignored due to not finding it in the transaction store"
+                    ),
+                );
+            }
+        },
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn handle_parcel<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface>(
+    msg: P::Event,
+    parcel: AuthenticStampedParcel,
+    quorom_threshold: &mut usize,
+    committee: &mut Vec<NodeIndex>,
+    our_index: &mut NodeIndex,
+    on_committee: &mut bool,
+    node_public_key: &NodePublicKey,
+    txn_mgr_cmd_tx: &mpsc::Sender<TxnStoreCmd<P::Event>>,
+    pending_timeouts: &mut HashSet<Digest>,
+    pending_requests: &mut Cache<Digest, ()>,
+    query_runner: &Q,
+    timeout_tx: &mpsc::Sender<Digest>,
+    reconfigure_notify: &Arc<Notify>,
+) {
+    let epoch = query_runner.get_current_epoch();
+    let originator = msg.originator();
+    let is_committee = committee.contains(&originator);
+    if !is_valid_message(is_committee, parcel.epoch, epoch) {
+        msg.mark_invalid_sender();
+        return;
+    }
+
+    let msg_digest = msg.get_digest();
+    let parcel_digest = parcel.to_digest();
+    let from_next_epoch = parcel.epoch == epoch + 1;
+    let last_executed = parcel.last_executed;
+
+    let mut event = None;
+    if pending_requests.remove(&parcel_digest).is_none() && !from_next_epoch {
+        // We only want to propagate parcels that we did not request and that
+        // are not from the next epoch.
+        msg.propagate();
+    } else {
+        event = Some(msg);
+    }
+
+    if from_next_epoch {
+        // if the parcel is from the next epoch, we optimistically
+        // store it and check if it's from a validator once we change epochs.
+
+        // Note: this unwrap is safe. If `from_next_epoch=true`, then `event`
+        // will always be `Some`. Unfortunately, the borrow checker cannot
+        // figure this out on its own if we use `msg` directly here.
+
+        // TODO(matthias): panic here or only log the error?
+        txn_mgr_cmd_tx
+            .send(TxnStoreCmd::StorePendingParcel {
+                parcel,
+                originator,
+                message_digest: msg_digest,
+                event: event.unwrap(),
+            })
+            .await
+            .expect("Failed to send pending parcel to txn store");
+    } else {
+        // only propagate normal parcels, not parcels we requested, and not
+        // parcels that we optimistically accept from the next epoch
+        txn_mgr_cmd_tx
+            .send(TxnStoreCmd::StoreParcel {
+                parcel,
+                originator,
+                message_digest: Some(msg_digest),
+            })
+            .await
+            .expect("Failed to send parcel to txn store");
+    }
+
+    // Check if we requested this parcel
+    if pending_requests.remove(&parcel_digest).is_some() {
+        // This is a parcel that we specifically requested, so
+        // we have to set a timeout for the previous parcel, because
+        // swallow the Err return in the loop of `try_execute`.
+        set_parcel_timer(
+            last_executed,
+            //txn_store.get_timeout(),
+            PARCEL_TIMEOUT,
+            timeout_tx.clone(),
+            pending_timeouts,
+        );
+        info!("Received requested parcel with digest: {parcel_digest:?}");
+
+        increment_counter!(
+            "consensus_missing_parcel_received",
+            Some("Number of missing parcels successfully received from other nodes")
+        );
+    }
+
+    if !*on_committee {
+        info!("Received transaction parcel from gossip as an edge node");
+
+        try_execute::<P, Q>(
+            parcel_digest,
+            quorom_threshold,
+            committee,
+            our_index,
+            on_committee,
+            node_public_key,
+            txn_mgr_cmd_tx,
+            pending_timeouts,
+            query_runner,
+            timeout_tx,
+            reconfigure_notify,
+        )
+        .await;
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn handle_attestation<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface>(
+    msg: P::Event,
+    att: CommitteeAttestation,
+    quorom_threshold: &mut usize,
+    committee: &mut Vec<NodeIndex>,
+    our_index: &mut NodeIndex,
+    on_committee: &mut bool,
+    node_public_key: &NodePublicKey,
+    txn_mgr_cmd_tx: &mpsc::Sender<TxnStoreCmd<P::Event>>,
+    pending_timeouts: &mut HashSet<Digest>,
+    query_runner: &Q,
+    timeout_tx: &mpsc::Sender<Digest>,
+    reconfigure_notify: &Arc<Notify>,
+) {
+    let originator = msg.originator();
+
+    let epoch = query_runner.get_current_epoch();
+    let is_committee = committee.contains(&originator);
+    if originator != att.node_index || !is_valid_message(is_committee, att.epoch, epoch) {
+        msg.mark_invalid_sender();
+        return;
+    }
+
+    let from_next_epoch = att.epoch == epoch + 1;
+    let mut event = None;
+    if !from_next_epoch {
+        msg.propagate();
+    } else {
+        event = Some(msg);
+    }
+
+    if !*on_committee {
+        info!("Received parcel attestation from gossip as an edge node");
+
+        if from_next_epoch {
+            // if the attestation is from the next epoch, we optimistically
+            // store it and check if it's from a validator once we change epochs
+            // Note: this unwrap is safe. If `from_next_epoch=true`, then `event`
+            // will always be `Some`. Unfortunately, the borrow checker cannot
+            // figure this out on its own if we use `msg` directly here.
+            txn_mgr_cmd_tx
+                .send(TxnStoreCmd::StorePendingAttestation {
+                    digest: att.digest,
+                    node_index: att.node_index,
+                    event: event.unwrap(),
+                })
+                .await
+                .expect("Failed to send pending attestation to txn store");
+        } else {
+            txn_mgr_cmd_tx
+                .send(TxnStoreCmd::StoreAttestation {
+                    digest: att.digest,
+                    node_index: att.node_index,
+                })
+                .await
+                .expect("Failed to send attestation to txn store");
+        }
+
+        try_execute::<P, Q>(
+            att.digest,
+            quorom_threshold,
+            committee,
+            our_index,
+            on_committee,
+            node_public_key,
+            txn_mgr_cmd_tx,
+            pending_timeouts,
+            query_runner,
+            timeout_tx,
+            reconfigure_notify,
+        )
+        .await;
     }
 }
 
