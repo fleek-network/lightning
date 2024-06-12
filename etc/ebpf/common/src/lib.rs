@@ -2,6 +2,7 @@
 
 pub const MAX_DEVICES: usize = 2;
 pub const MAX_FILE_RULES: usize = 20;
+pub const MAX_PATH_LEN: usize = 1024;
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
 #[repr(C)]
@@ -62,13 +63,13 @@ unsafe impl aya::Pod for SubnetFilterParams {}
 
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
-pub struct FileRuleList {
+pub struct Profile {
     /// The files that are being protected.
     pub rules: [FileRule; MAX_FILE_RULES],
 }
 
 #[cfg(feature = "userspace")]
-unsafe impl aya::Pod for FileRuleList {}
+unsafe impl aya::Pod for Profile {}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 #[repr(C)]
@@ -94,12 +95,12 @@ unsafe impl aya::Pod for File {}
 
 #[derive(Clone, Copy, Debug)]
 pub struct FileRule {
-    /// The file in question.
-    pub inode: u64,
-    /// Permissions.
+    /// The operations that are permitted.
     ///
     /// Allowed operations have their corresponding bit set.
     pub permissions: u32,
+    /// The file's path.
+    pub path: [u8; MAX_PATH_LEN],
 }
 
 #[cfg(feature = "userspace")]
@@ -108,7 +109,7 @@ unsafe impl aya::Pod for FileRule {}
 impl Default for FileRule {
     fn default() -> Self {
         Self {
-            inode: 0,
+            path: [0u8; MAX_PATH_LEN],
             permissions: Self::NO_OPERATION,
         }
     }

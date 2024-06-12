@@ -5,7 +5,15 @@ use std::sync::Arc;
 
 use anyhow::bail;
 use aya::maps::{HashMap, MapData};
-use lightning_ebpf_common::{File, FileRuleList, PacketFilter, PacketFilterParams, MAX_FILE_RULES};
+use lightning_ebpf_common::{
+    File,
+    PacketFilter,
+    PacketFilterParams,
+    Profile,
+    MAX_FILE_RULES,
+    MAX_PATH_LEN,
+};
+use log::debug;
 use tokio::fs;
 use tokio::sync::Mutex;
 
@@ -15,14 +23,14 @@ use crate::map::PacketFilterRule;
 #[derive(Clone)]
 pub struct SharedMap {
     packet_filters: Arc<Mutex<HashMap<MapData, PacketFilter, PacketFilterParams>>>,
-    file_open_rules: Arc<Mutex<HashMap<MapData, File, FileRuleList>>>,
+    file_open_rules: Arc<Mutex<HashMap<MapData, File, Profile>>>,
     config_src: ConfigSource,
 }
 
 impl SharedMap {
     pub fn new(
         packet_filters: HashMap<MapData, PacketFilter, PacketFilterParams>,
-        file_open_rules: HashMap<MapData, File, FileRuleList>,
+        file_open_rules: HashMap<MapData, File, Profile>,
         config_src: ConfigSource,
     ) -> Self {
         Self {
@@ -103,25 +111,34 @@ impl SharedMap {
 
         let mut new = std::collections::HashMap::new();
         for profile in profiles {
-            let exec = file_from_path(profile.name.as_ref().unwrap_or(&GLOBAL_PROFILE)).await?;
-            let mut file_open_rules =
-                vec![lightning_ebpf_common::FileRule::default(); MAX_FILE_RULES];
+            let exec_path = profile.name.as_ref().unwrap_or(&GLOBAL_PROFILE);
+            let exec = file_from_path(exec_path).await?;
+            let mut rules = vec![lightning_ebpf_common::FileRule::default(); MAX_FILE_RULES];
             for (i, rule) in profile.file_rules.iter().enumerate() {
                 let file = file_from_path(&rule.file).await?;
                 if exec.dev != file.dev {
                     // Protecting files in more than one device is not supported yet.
                     bail!("executable file device and file device do not match");
                 }
+
                 if i >= MAX_FILE_RULES {
                     bail!("path maximum {MAX_FILE_RULES} execeeded");
                 }
-                file_open_rules[i].inode = file.inode;
-                file_open_rules[i].permissions = rule.permissions;
+
+                let mut vector = vec![0u8; MAX_PATH_LEN];
+                let path = rule.file.as_path().display().to_string();
+
+                debug!("path {path} for profile {}", exec_path.display());
+
+                vector[..path.len()].copy_from_slice(path.as_bytes());
+
+                rules[i].path = vector.try_into().expect("Size is hardcoded");
+                rules[i].permissions = rule.permissions;
             }
 
             let rules: [lightning_ebpf_common::FileRule; MAX_FILE_RULES] =
-                file_open_rules.try_into().expect("Vec len is hardcoded");
-            new.insert(exec, FileRuleList { rules });
+                rules.try_into().expect("Vec len is hardcoded");
+            new.insert(exec, Profile { rules });
         }
 
         let mut maps = self.file_open_rules.lock().await;
@@ -146,7 +163,8 @@ impl SharedMap {
 
     pub async fn update_file_rules(&self, path: PathBuf) -> anyhow::Result<()> {
         let profile = self.config_src.read_profile(Some(path.as_os_str())).await?;
-        let exec = file_from_path(profile.name.as_ref().unwrap_or(&GLOBAL_PROFILE)).await?;
+        let exec_path = profile.name.as_ref().unwrap_or(&GLOBAL_PROFILE);
+        let exec = file_from_path(exec_path).await?;
         let mut file_open_rules = vec![lightning_ebpf_common::FileRule::default(); MAX_FILE_RULES];
         for (i, rule) in profile.file_rules.iter().enumerate() {
             let file = file_from_path(&rule.file).await?;
@@ -155,9 +173,16 @@ impl SharedMap {
                 bail!("executable file device and file device do not match");
             }
             if i >= MAX_FILE_RULES {
-                bail!("path maximum {MAX_FILE_RULES} execeeded");
+                bail!("path maximum {MAX_FILE_RULES} exceeded");
             }
-            file_open_rules[i].inode = file.inode;
+
+            let mut vector = vec![0u8; MAX_PATH_LEN];
+            let path = rule.file.as_path().display().to_string();
+            vector[..path.len()].copy_from_slice(path.as_bytes());
+
+            debug!("path {path} for profile {}", exec_path.display());
+
+            file_open_rules[i].path = vector.try_into().expect("Size is hardcoded");
             file_open_rules[i].permissions = rule.permissions;
         }
 
@@ -165,7 +190,7 @@ impl SharedMap {
             file_open_rules.try_into().expect("Vec len is hardcoded");
 
         let mut maps = self.file_open_rules.lock().await;
-        maps.insert(&exec, FileRuleList { rules }, 0)?;
+        maps.insert(&exec, Profile { rules }, 0)?;
 
         Ok(())
     }

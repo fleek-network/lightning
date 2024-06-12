@@ -6,7 +6,7 @@ use aya::programs::{Lsm, Xdp, XdpFlags};
 use aya::{include_bytes_aligned, Btf, Ebpf};
 use aya_log::EbpfLogger;
 use clap::Parser;
-use lightning_ebpf_common::{File, FileRuleList, PacketFilter, PacketFilterParams};
+use lightning_ebpf_common::{File, PacketFilter, PacketFilterParams, Profile};
 use lightning_ebpf_service::map::SharedMap;
 use lightning_ebpf_service::server::Server;
 use lightning_ebpf_service::{ConfigSource, PathConfig};
@@ -72,8 +72,8 @@ async fn main() -> anyhow::Result<()> {
         _file_open_prog = Some(prog);
     }
 
-    let file_open_allow: HashMap<_, File, FileRuleList> =
-        HashMap::try_from(handle.take_map("FILE_RULES").unwrap())?;
+    let file_open_allow: HashMap<_, File, Profile> =
+        HashMap::try_from(handle.take_map("PROFILES").unwrap())?;
     let packet_filters: HashMap<_, PacketFilter, PacketFilterParams> =
         HashMap::try_from(handle.take_map("PACKET_FILTERS").unwrap())?;
 

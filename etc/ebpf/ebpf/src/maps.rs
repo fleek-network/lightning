@@ -1,12 +1,6 @@
 use aya_ebpf::macros::map;
 use aya_ebpf::maps::{HashMap, LpmTrie};
-use lightning_ebpf_common::{
-    File,
-    FileRuleList,
-    PacketFilter,
-    PacketFilterParams,
-    SubnetFilterParams,
-};
+use lightning_ebpf_common::{File, PacketFilter, PacketFilterParams, Profile, SubnetFilterParams};
 
 #[map]
 pub static PACKET_FILTERS: HashMap<PacketFilter, PacketFilterParams> =
@@ -15,5 +9,4 @@ pub static PACKET_FILTERS: HashMap<PacketFilter, PacketFilterParams> =
 pub static SUBNET_FILTER: LpmTrie<u32, SubnetFilterParams> =
     LpmTrie::<u32, SubnetFilterParams>::with_max_entries(1024, 0);
 #[map]
-pub static FILE_RULES: HashMap<File, FileRuleList> =
-    HashMap::<File, FileRuleList>::with_max_entries(1024, 0);
+pub static PROFILES: HashMap<File, Profile> = HashMap::<File, Profile>::with_max_entries(1024, 0);
