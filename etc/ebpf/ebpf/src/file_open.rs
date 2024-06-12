@@ -2,7 +2,7 @@ use core::ffi::c_char;
 
 use aya_ebpf::macros::lsm;
 use aya_ebpf::programs::LsmContext;
-use lightning_ebpf_common::{Buffer, File, FileRule, Profile, MAX_FILE_RULES};
+use lightning_ebpf_common::{Buffer, File, FileRule, Profile, MAX_FILE_RULES, MAX_PATH_LEN, FileCacheKey};
 
 use crate::{access, maps, vmlinux};
 
@@ -15,73 +15,81 @@ pub fn file_open(ctx: LsmContext) -> i32 {
 }
 
 unsafe fn try_file_open(ctx: LsmContext) -> Result<i32, i32> {
+    let file: *const vmlinux::file = ctx.arg(0);
     let task_inode = get_inode_from_current_task().map_err(|_| ALLOW)?;
 
     if let Some(profile) = maps::PROFILES.get(&File::new(task_inode)) {
-        let file: *const vmlinux::file = ctx.arg(0);
+        // Get the path for the target file.
+        let buf = maps::BUFFERS
+            .get_ptr_mut(&Buffer::OPEN_FILE_BUFFER)
+            .ok_or(DENY)?;
+        let path = buf.as_mut().ok_or(DENY)?.buffer.as_mut();
+        read_path(file, path)?;
 
-        // Todo: add cache.
-        let _inode = {
+        // Get the inode of the target file.
+        let target_inode = {
             let inode = aya_ebpf::helpers::bpf_probe_read_kernel(access::file_inode(file))
                 .map_err(|_| DENY)?;
             aya_ebpf::helpers::bpf_probe_read_kernel(access::inode_i_ino(inode))
                 .map_err(|_| DENY)?
         };
 
-        let mut buf = maps::BUFFERS
-            .get_ptr_mut(&Buffer::OPEN_FILE_BUFFER)
-            .ok_or(DENY)?;
-        let path = buf.as_mut().ok_or(DENY)?.buffer.as_mut();
-        let btf_path = access::file_f_path(file);
-        if aya_ebpf::helpers::bpf_d_path(
-            btf_path as *mut _,
-            path.as_mut_ptr() as *mut c_char,
-            path.len() as u32,
-        ) < 0
-        {
-            // It's possible that the buffer did not have enough capacity.
-            // Todo: send event?
-            return Err(DENY);
+        // Check the cache first.
+        let cache_key = &FileCacheKey { target: target_inode, task: task_inode };
+        if let Some(cached_rule) = maps::FILE_CACHE.get(&cache_key) {
+            if cmp_slices(path, cached_rule.path.as_slice(), MAX_PATH_LEN) {
+                aya_log_ebpf::info!(&ctx, "cache hit");
+                return Ok(ALLOW);
+            }
+            // If we get here, it means that the file's inode number
+            // has been assigned to a different file.
         }
 
-        return verify_access(&ctx, path, profile);
+        // Go through the rules in this profile and try to find a match.
+        if let Some(rule) = find_match(path, profile)? {
+            if maps::FILE_CACHE.insert(cache_key, rule, 0).is_err() {
+                aya_log_ebpf::error!(&ctx, "failed to cache");
+            }
+            aya_log_ebpf::info!(&ctx, "success");
+            return Ok(ALLOW)
+        }
+
+        return Ok(DENY);
     }
 
     Ok(ALLOW)
 }
 
-fn verify_access(ctx: &LsmContext, target_path: &[u8], profile: &Profile) -> Result<i32, i32> {
+unsafe fn read_path(file: *const vmlinux::file, buf: &mut [u8]) -> Result<i32, i32> {
+    let btf_path = access::file_f_path(file);
+    if aya_ebpf::helpers::bpf_d_path(
+        btf_path as *mut _,
+        buf.as_mut_ptr() as *mut c_char,
+        buf.len() as u32,
+    ) < 0
+    {
+        // It's possible that the buffer did not have enough capacity.
+        return Err(DENY);
+    }
+    Ok(ALLOW)
+}
+
+/// Tries to find a rule that matches the target path.
+fn find_match<'a>(target_path: &[u8], profile: &'a Profile) -> Result<Option<&'a FileRule>, i32> {
     for i in 0..MAX_FILE_RULES {
-        let rule = profile.rules.get(i).ok_or(-1)?;
+        let rule = profile.rules.get(i).ok_or(DENY)?;
 
         if rule.permissions & FileRule::OPEN_MASK == 0 {
             continue;
         }
 
-        let full_path = read_bytes(64i64, rule.path.as_slice())?;
-        for j in 0..64 {
-            if full_path[j] != target_path[j] {
-                break;
-            }
-
-            if target_path[j] == 0 {
-                aya_log_ebpf::debug!(ctx, "path matched one of our rules");
-                return Ok(ALLOW);
-            }
+        let full_path = rule.path.as_slice();
+        if cmp_slices(target_path, full_path, MAX_PATH_LEN) {
+            return Ok(Some(rule));
         }
     }
 
-    Ok(DENY)
-}
-
-/// Performs slicing with proper bound checks.
-fn read_bytes(len: i64, dest: &[u8]) -> Result<&[u8], i32> {
-    if !aya_ebpf::check_bounds_signed(len, 0, dest.len() as i64) {
-        return Err(DENY);
-    }
-
-    let len = usize::try_from(len).map_err(|_| DENY)?;
-    dest.get(..len).ok_or(-1)
+    Ok(None)
 }
 
 /// Get the inode number of the current process's binary file.
@@ -91,4 +99,19 @@ unsafe fn get_inode_from_current_task() -> Result<u64, i64> {
     let file = aya_ebpf::helpers::bpf_probe_read_kernel(access::mm_exe_file(mm))?;
     let f_inode = aya_ebpf::helpers::bpf_probe_read_kernel(access::file_inode(file))?;
     aya_ebpf::helpers::bpf_probe_read_kernel(access::inode_i_ino(f_inode))
+}
+
+// The eBPF verifier may reject this code
+// if `size` is not equal to the len of both parameters.
+fn cmp_slices(a: &[u8], b: &[u8], size: usize) -> bool {
+    for j in 0..size {
+        if a[j] != b[j] {
+            break;
+        }
+
+        if a[j] == 0 {
+            return true;
+        }
+    }
+    false
 }

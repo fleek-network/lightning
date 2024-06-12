@@ -142,3 +142,9 @@ impl Buffer {
 
 #[cfg(feature = "userspace")]
 unsafe impl aya::Pod for Buffer {}
+
+#[derive(Clone, Copy)]
+pub struct FileCacheKey {
+    pub task: u64,
+    pub target: u64,
+}
