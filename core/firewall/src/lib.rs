@@ -88,12 +88,12 @@ impl Firewall {
     }
 
     pub async fn check(&self, ip: IpAddr) -> Result<(), FirewallError> {
-        let mut firewall = self.inner.lock().await;
-
         // todo: saftey
         if ip.is_loopback() {
             return Ok(());
         }
+
+        let mut firewall = self.inner.lock().await;
 
         firewall.check(ip)
     }
