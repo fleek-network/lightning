@@ -23,8 +23,8 @@ use tokio::{pin, select, task, time};
 use tracing::{error, info};
 use typed_store::DBMetrics;
 
+use crate::broadcast_worker::BroadcastWorker;
 use crate::config::Config;
-use crate::edge_node::EdgeConsensus;
 use crate::execution::{AuthenticStampedParcel, CommitteeAttestation, Digest, Execution};
 use crate::narwhal::{NarwhalArgs, NarwhalService};
 use crate::transaction_manager::{TransactionStoreManager, TxnStoreCmd};
@@ -124,8 +124,8 @@ impl<C: Collection, Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static,
         }
     }
 
-    fn spawn_edge_consensus(&mut self, reconfigure_notify: Arc<Notify>) -> EdgeConsensus {
-        EdgeConsensus::spawn::<C, P, Q, NE>(
+    fn spawn_broadcast_worker(&mut self, reconfigure_notify: Arc<Notify>) -> BroadcastWorker {
+        BroadcastWorker::spawn::<C, P, Q, NE>(
             self.pub_sub.clone(),
             self.query_runner.clone(),
             self.narwhal_args
@@ -349,7 +349,8 @@ impl<C: Collection> Consensus<C> {
         spawn!(
             async move {
                 let txn_manager = epoch_state.spawn_transaction_manager();
-                let edge_node = epoch_state.spawn_edge_consensus(reconfigure_notify.clone());
+                let broadcast_worker =
+                    epoch_state.spawn_broadcast_worker(reconfigure_notify.clone());
                 epoch_state.start_current_epoch().await;
 
                 let shutdown_future = waiter.wait_for_shutdown();
@@ -364,7 +365,7 @@ impl<C: Collection> Consensus<C> {
                             if let Some(consensus) = epoch_state.consensus.take() {
                                 consensus.shutdown().await;
                             }
-                            edge_node.shutdown().await;
+                            broadcast_worker.shutdown().await;
                             txn_manager.shutdown().await;
                             epoch_state.shutdown();
                             break

@@ -1,6 +1,6 @@
+pub mod broadcast_worker;
 pub mod config;
 pub mod consensus;
-pub mod edge_node;
 pub mod execution;
 pub mod narwhal;
 #[cfg(test)]

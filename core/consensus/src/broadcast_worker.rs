@@ -19,7 +19,7 @@ use crate::transaction_manager::{NotExecuted, TxnStoreCmd};
 
 const MAX_PENDING_TIMEOUTS: usize = 100;
 
-pub struct EdgeConsensus {
+pub struct BroadcastWorker {
     handle: JoinHandle<()>,
     tx_shutdown: Arc<Notify>,
 }
@@ -40,7 +40,7 @@ struct Context<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface> {
     timeout: Duration,
 }
 
-impl EdgeConsensus {
+impl BroadcastWorker {
     pub fn spawn<
         C: Collection,
         P: PubSub<PubSubMsg> + 'static,
@@ -482,7 +482,7 @@ fn is_valid_message(in_committee: bool, msg_epoch: Epoch, current_epoch: Epoch) 
 
 #[cfg(test)]
 mod tests {
-    use crate::edge_node::is_valid_message;
+    use crate::broadcast_worker::is_valid_message;
 
     #[test]
     fn test_is_valid_message() {
