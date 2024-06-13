@@ -48,8 +48,10 @@ unsafe fn try_file_open(ctx: LsmContext) -> Result<i32, i32> {
             task: task_inode,
         };
         if let Some(cached_rule) = maps::FILE_CACHE.get(&cache_key) {
-            if cmp_slices(path, cached_rule.path.as_slice(), MAX_PATH_LEN)
-                && cached_rule.permissions & FileRule::OPEN_MASK > 0
+            if (cached_rule.is_dir == FileRule::IS_DIR
+                && cmp_str_bytes(cached_rule.path.as_slice(), path, MAX_PATH_LEN))
+                || cmp_str_bytes(path, cached_rule.path.as_slice(), MAX_PATH_LEN)
+                    && cached_rule.permissions & FileRule::OPEN_MASK > 0
             {
                 return Ok(ALLOW);
             }
@@ -98,7 +100,9 @@ fn find_match<'a>(
         }
 
         let full_path = rule.path.as_slice();
-        if cmp_slices(target_path, full_path, MAX_PATH_LEN) {
+        if (rule.is_dir == FileRule::IS_FILE && cmp_str_bytes(full_path, target_path, MAX_PATH_LEN))
+            || cmp_str_bytes(target_path, full_path, MAX_PATH_LEN)
+        {
             return Ok(Some(rule));
         }
     }
@@ -117,7 +121,8 @@ unsafe fn get_inode_from_current_task() -> Result<u64, i64> {
 
 // The eBPF verifier may reject this code
 // if `size` is not equal to the len of both parameters.
-fn cmp_slices(a: &[u8], b: &[u8], size: usize) -> bool {
+/// Compares slices to determine if they both contain the same NUL terminated string.
+fn cmp_str_bytes(a: &[u8], b: &[u8], size: usize) -> bool {
     for j in 0..size {
         if a[j] != b[j] {
             break;

@@ -7,6 +7,7 @@ use anyhow::bail;
 use aya::maps::{HashMap, MapData};
 use lightning_ebpf_common::{
     File,
+    FileRule,
     PacketFilter,
     PacketFilterParams,
     Profile,
@@ -112,10 +113,10 @@ impl SharedMap {
         let mut new = std::collections::HashMap::new();
         for profile in profiles {
             let exec_path = profile.name.as_ref().unwrap_or(&GLOBAL_PROFILE);
-            let exec = file_from_path(exec_path).await?;
+            let (exec, _) = file_from_path(exec_path).await?;
             let mut rules = vec![lightning_ebpf_common::FileRule::default(); MAX_FILE_RULES];
             for (i, rule) in profile.file_rules.iter().enumerate() {
-                let file = file_from_path(&rule.file).await?;
+                let (file, is_dir) = file_from_path(&rule.file).await?;
                 if exec.dev != file.dev {
                     // Protecting files in more than one device is not supported yet.
                     bail!("executable file device and file device do not match");
@@ -133,6 +134,11 @@ impl SharedMap {
                 vector[..path.len()].copy_from_slice(path.as_bytes());
 
                 rules[i].path = vector.try_into().expect("Size is hardcoded");
+                rules[i].is_dir = if is_dir {
+                    FileRule::IS_DIR
+                } else {
+                    FileRule::IS_FILE
+                };
                 rules[i].permissions = rule.permissions;
             }
 
@@ -164,10 +170,10 @@ impl SharedMap {
     pub async fn update_file_rules(&self, path: PathBuf) -> anyhow::Result<()> {
         let profile = self.config_src.read_profile(Some(path.as_os_str())).await?;
         let exec_path = profile.name.as_ref().unwrap_or(&GLOBAL_PROFILE);
-        let exec = file_from_path(exec_path).await?;
+        let (exec, _) = file_from_path(exec_path).await?;
         let mut file_open_rules = vec![lightning_ebpf_common::FileRule::default(); MAX_FILE_RULES];
         for (i, rule) in profile.file_rules.iter().enumerate() {
-            let file = file_from_path(&rule.file).await?;
+            let (file, is_dir) = file_from_path(&rule.file).await?;
             if exec.dev != file.dev {
                 // Protecting files in more than one device is not supported yet.
                 bail!("executable file device and file device do not match");
@@ -183,6 +189,11 @@ impl SharedMap {
             debug!("path {path} for profile {}", exec_path.display());
 
             file_open_rules[i].path = vector.try_into().expect("Size is hardcoded");
+            file_open_rules[i].is_dir = if is_dir {
+                FileRule::IS_DIR
+            } else {
+                FileRule::IS_FILE
+            };
             file_open_rules[i].permissions = rule.permissions;
         }
 
@@ -196,9 +207,10 @@ impl SharedMap {
     }
 }
 
-async fn file_from_path(path: &PathBuf) -> anyhow::Result<File> {
+async fn file_from_path(path: &PathBuf) -> anyhow::Result<(File, bool)> {
     let file = fs::File::open(path.as_path()).await?;
     let metadata = file.metadata().await?;
+    let is_dir = metadata.is_dir();
     let inode = metadata.ino();
-    Ok(File::new(inode))
+    Ok((File::new(inode), is_dir))
 }

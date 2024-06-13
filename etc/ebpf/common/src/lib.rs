@@ -99,6 +99,8 @@ pub struct FileRule {
     ///
     /// Allowed operations have their corresponding bit set.
     pub permissions: u32,
+    /// This rule is for a directory.
+    pub is_dir: u32,
     /// The file's path.
     pub path: [u8; MAX_PATH_LEN],
 }
@@ -110,12 +112,15 @@ impl Default for FileRule {
     fn default() -> Self {
         Self {
             path: [0u8; MAX_PATH_LEN],
+            is_dir: FileRule::IS_FILE,
             permissions: Self::NO_OPERATION,
         }
     }
 }
 
 impl FileRule {
+    pub const IS_DIR: u32 = 1;
+    pub const IS_FILE: u32 = 0;
     pub const NO_OPERATION: u32 = 0x00;
     pub const OPEN_MASK: u32 = 0x01 << 0;
     pub const READ_MASK: u32 = 0x01 << 1;
