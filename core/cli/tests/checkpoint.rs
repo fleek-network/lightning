@@ -1,5 +1,4 @@
 use std::fs::read_to_string;
-use std::path::Path;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
@@ -16,6 +15,10 @@ use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_blockstore_server::{BlockstoreServer, Config as BlockstoreServerConfig};
 use lightning_consensus::config::Config as ConsensusConfig;
 use lightning_consensus::consensus::Consensus;
+use lightning_dack_aggregator::{
+    Config as DeliveryAcknowledgmentConfig,
+    DeliveryAcknowledgmentAggregator,
+};
 use lightning_final_bindings::FinalTypes;
 use lightning_handshake::config::{HandshakeConfig, TransportConfig};
 use lightning_handshake::handshake::Handshake;
@@ -36,16 +39,19 @@ use lightning_syncronizer::syncronizer::Syncronizer;
 use lightning_utils::config::TomlConfigProvider;
 use lightning_utils::shutdown::ShutdownController;
 use serial_test::serial;
+use tempfile::{tempdir, TempDir};
 use tokio::pin;
 
 const NUM_RESTARTS: u16 = 3;
 
 fn build_config(
-    path: &Path,
+    temp_dir: &TempDir,
     genesis: Genesis,
     keystore_config: KeystoreConfig,
     ports: NodePorts,
 ) -> TomlConfigProvider<FinalTypes> {
+    let path = temp_dir.path().to_path_buf();
+
     let config = TomlConfigProvider::<FinalTypes>::default();
 
     config.inject::<Application<FinalTypes>>(AppConfig {
@@ -133,19 +139,25 @@ fn build_config(
         address: format!("127.0.0.1:{}", ports.pinger).parse().unwrap(),
         ping_interval: Duration::from_secs(5),
     });
+
+    config.inject::<DeliveryAcknowledgmentAggregator<FinalTypes>>(DeliveryAcknowledgmentConfig {
+        db_path: path
+            .join("data/dack_aggregator")
+            .try_into()
+            .expect("Failed to resolve path"),
+        ..Default::default()
+    });
+
     config
 }
 
 #[tokio::test]
 #[serial]
 async fn node_checkpointing() -> Result<()> {
+    let temp_dir = tempdir()?;
+
     let shutdown_controller = ShutdownController::default();
     shutdown_controller.install_handlers();
-
-    let path = std::env::temp_dir().join("lightning_test_node_checkpoint");
-    if path.exists() {
-        std::fs::remove_dir_all(&path).unwrap();
-    }
 
     let signer_config = KeystoreConfig::test();
     let node_secret_key =
@@ -202,7 +214,7 @@ async fn node_checkpointing() -> Result<()> {
         network: None,
         genesis: Some(genesis.clone()),
         storage: StorageConfig::RocksDb,
-        db_path: Some(path.join("data/app_db_temp").try_into().unwrap()),
+        db_path: Some(temp_dir.path().join("data/app_db_temp").try_into().unwrap()),
         db_options: None,
         dev: None,
     };
@@ -215,7 +227,7 @@ async fn node_checkpointing() -> Result<()> {
     std::mem::drop(env);
 
     // Now that we have a checkpoint, we initialize the node.
-    let config = build_config(&path, genesis, signer_config, node_ports);
+    let config = build_config(&temp_dir, genesis, signer_config, node_ports);
     let app_config = config.get::<<FinalTypes as Collection>::ApplicationInterface>();
 
     let mut node = Node::<FinalTypes>::init(config.clone())
@@ -262,10 +274,6 @@ async fn node_checkpointing() -> Result<()> {
 
     tokio::time::sleep(Duration::from_secs(30)).await;
     node.shutdown().await;
-
-    if path.exists() {
-        std::fs::remove_dir_all(path).unwrap();
-    }
 
     Ok(())
 }
