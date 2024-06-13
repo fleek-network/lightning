@@ -8,6 +8,7 @@ default-run = "lightning-node"
 
 [dependencies]
 lightning-application = { path = "../application" }
+lightning-keystore = { path = "../keystore" }
 lightning-rpc = { path = "../rpc" }
 lightning-handshake = { path = "../handshake" }
 lightning-ebpf-service = { path = "../../etc/ebpf/service" }

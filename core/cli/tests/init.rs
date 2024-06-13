@@ -67,14 +67,20 @@ mod init_tests {
 
         let config_path = temp_dir.path().join("config.toml");
         assert!(str::from_utf8(&output.stdout).unwrap().contains(&format!(
-            "Configuration file written to {}",
+            "Node configuration file written to {}",
             config_path.to_string_lossy()
         )));
         assert!(config_path.exists() && fs::metadata(&config_path).map_or(false, |m| m.len() > 0));
-
         let config = fs::read_to_string(&config_path).unwrap();
         assert!(!config.contains("[application.dev]"));
         assert!(!config.contains("update_epoch_start_to_now = true"));
+
+        let genesis_path = temp_dir.path().join("genesis.toml");
+        assert!(!str::from_utf8(&output.stdout).unwrap().contains(&format!(
+            "Genesis configuration written to {}",
+            genesis_path.to_string_lossy()
+        )));
+        assert!(!genesis_path.exists());
 
         assert!(
             str::from_utf8(&output.stdout)
@@ -115,10 +121,17 @@ mod init_tests {
 
         let config_path = temp_dir.path().join("config.toml");
         assert!(str::from_utf8(&output.stdout).unwrap().contains(&format!(
-            "Configuration file written to {}",
+            "Node configuration file written to {}",
             config_path.to_string_lossy()
         )));
         assert!(config_path.exists() && fs::metadata(config_path).map_or(false, |m| m.len() > 0));
+
+        let genesis_path = temp_dir.path().join("genesis.toml");
+        assert!(!str::from_utf8(&output.stdout).unwrap().contains(&format!(
+            "Genesis configuration written to {}",
+            genesis_path.to_string_lossy()
+        )));
+        assert!(!genesis_path.exists());
 
         assert!(
             !str::from_utf8(&output.stdout)
@@ -129,12 +142,6 @@ mod init_tests {
             !str::from_utf8(&output.stdout)
                 .unwrap()
                 .contains("Generated consensus key:")
-        );
-        // Genesis isn't applied when keys aren't generated.
-        assert!(
-            !str::from_utf8(&output.stdout)
-                .unwrap()
-                .contains("Genesis block loaded into application state.")
         );
     }
 
@@ -160,15 +167,29 @@ mod init_tests {
             str::from_utf8(&output.stdout).unwrap()
         );
 
+        println!("{}", str::from_utf8(&output.stdout).unwrap());
+
         let config_path = temp_dir.path().join("config.toml");
         assert!(str::from_utf8(&output.stdout).unwrap().contains(&format!(
-            "Configuration file written to {}",
+            "Node configuration file written to {}",
             config_path.to_string_lossy()
         )));
         assert!(config_path.exists());
 
+        let genesis_path = temp_dir.path().join("genesis.toml");
+        assert!(
+            str::from_utf8(&output.stdout)
+                .unwrap()
+                .contains(&format!(" written to {}", genesis_path.to_string_lossy()))
+        );
+        assert!(genesis_path.exists());
+
         let config = fs::read_to_string(&config_path).unwrap();
-        assert!(config.contains("network = \"localnet-example\""));
+        assert!(
+            config.contains(
+                format!("genesis_path = \"{}\"", genesis_path.to_string_lossy()).as_str()
+            )
+        );
         assert!(config.contains("[application.dev]"));
         assert!(config.contains("update_epoch_start_to_now = true"));
     }
@@ -185,29 +206,26 @@ mod init_tests {
 
         let output = cmd.output().unwrap();
 
+        assert!(!output.status.success());
+
         assert!(
-            output.status.success(),
-            "{}\n{}",
-            str::from_utf8(&output.stderr).unwrap(),
-            str::from_utf8(&output.stdout).unwrap()
-        );
-        assert!(
-            output.stderr.is_empty(),
-            "{}\n{}",
-            str::from_utf8(&output.stderr).unwrap(),
-            str::from_utf8(&output.stdout).unwrap()
+            str::from_utf8(&output.stderr)
+                .unwrap()
+                .contains("Cannot specify both --dev and --network")
         );
 
         let config_path = temp_dir.path().join("config.toml");
-        assert!(str::from_utf8(&output.stdout).unwrap().contains(&format!(
-            "Configuration file written to {}",
+        assert!(!str::from_utf8(&output.stdout).unwrap().contains(&format!(
+            "Node configuration file written to {}",
             config_path.to_string_lossy()
         )));
-        assert!(config_path.exists());
+        assert!(!config_path.exists());
 
-        let config = fs::read_to_string(&config_path).unwrap();
-        assert!(config.contains("network = \"localnet-example\""));
-        assert!(config.contains("[application.dev]"));
-        assert!(config.contains("update_epoch_start_to_now = true"));
+        let genesis_path = temp_dir.path().join("genesis.toml");
+        assert!(!str::from_utf8(&output.stdout).unwrap().contains(&format!(
+            "Genesis configuration written to {}",
+            genesis_path.to_string_lossy()
+        )));
+        assert!(!genesis_path.exists());
     }
 }

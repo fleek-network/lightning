@@ -87,11 +87,14 @@ for builds, which should be rust stable and at a minimum version 1.75.
 
 # Development
 
-To run the node and perform a simple healthcheck, do the following:
+To run a local devnet node and perform a simple healthcheck, do the following:
 
 ```bash
+# Initialize local devnet configuration
+$ cargo run -- init --dev
+
 # Start the node up
-$ cargo run -r -- run
+$ cargo run --all-features -- run
 
 # In another terminal, send a request to the ping rpc endpoint
 $ curl -X POST -H "Content-Type: application/json" -d '{
@@ -99,7 +102,7 @@ $ curl -X POST -H "Content-Type: application/json" -d '{
       "method": "flk_ping",
       "params": [],
       "id": 1
-    }' http://127.0.0.1:4069/rpc/v0
+    }' http://127.0.0.1:4230/rpc/v0
 # Response: {"jsonrpc":"2.0","result":"pong","id":1}
 ```
 
