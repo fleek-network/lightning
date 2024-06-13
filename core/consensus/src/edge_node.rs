@@ -28,6 +28,21 @@ pub struct EdgeConsensus {
     tx_shutdown: Arc<Notify>,
 }
 
+struct Context<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface> {
+    quorom_threshold: usize,
+    committee: Vec<NodeIndex>,
+    our_index: NodeIndex,
+    on_committee: bool,
+    node_public_key: NodePublicKey,
+    txn_mgr_cmd_tx: mpsc::Sender<TxnStoreCmd<P::Event>>,
+    pending_timeouts: HashSet<Digest>,
+    pending_requests: Cache<Digest, ()>,
+    query_runner: Q,
+    pub_sub: P,
+    timeout_tx: mpsc::Sender<Digest>,
+    reconfigure_notify: Arc<Notify>,
+}
+
 impl EdgeConsensus {
     pub fn spawn<
         C: Collection,
@@ -81,13 +96,12 @@ impl EdgeConsensus {
 
 /// Creates and event loop which consumes messages from pubsub and sends them to the
 /// right destination.
-#[allow(clippy::too_many_arguments)]
 async fn message_receiver_worker<
     C: Collection,
     P: PubSub<PubSubMsg>,
     Q: SyncQueryRunnerInterface,
 >(
-    mut pub_sub: P,
+    pub_sub: P,
     shutdown_notify: Arc<Notify>,
     query_runner: Q,
     node_public_key: NodePublicKey,
@@ -96,17 +110,32 @@ async fn message_receiver_worker<
     reconfigure_notify: Arc<Notify>,
 ) {
     info!("Edge node message worker is running");
-    let mut committee = query_runner.get_committee_members_by_index();
-    let mut quorom_threshold = (committee.len() * 2) / 3 + 1;
-    let mut our_index = query_runner
+    let committee = query_runner.get_committee_members_by_index();
+    let quorom_threshold = (committee.len() * 2) / 3 + 1;
+    let our_index = query_runner
         .pubkey_to_index(&node_public_key)
         .unwrap_or(u32::MAX);
-    let mut on_committee = committee.contains(&our_index);
+    let on_committee = committee.contains(&our_index);
     let (timeout_tx, mut timeout_rx) = mpsc::channel(128);
     // `pending_timeouts` is not a cache because we already limit the number of timeouts we spawn
     // with `MAX_PENDING_TIMEOUTS`, so `pending_timeouts` is bounded from above by that constant
-    let mut pending_timeouts = HashSet::new();
-    let mut pending_requests = Cache::new(100);
+    let pending_timeouts = HashSet::new();
+    let pending_requests = Cache::new(100);
+
+    let mut ctx = Context {
+        quorom_threshold,
+        committee,
+        our_index,
+        on_committee,
+        node_public_key,
+        txn_mgr_cmd_tx,
+        pending_timeouts,
+        pending_requests,
+        query_runner,
+        pub_sub,
+        timeout_tx,
+        reconfigure_notify,
+    };
 
     let mut epoch_changed_sub = notifier.subscribe_epoch_changed();
 
@@ -126,41 +155,27 @@ async fn message_receiver_worker<
                 // Maybe we remove that part from below and have both validators and edge nodes
                 // execute this branch?
                 if on_committee {
-                    committee = query_runner.get_committee_members_by_index();
-                    quorom_threshold = (committee.len() * 2) / 3 + 1;
+                    ctx.committee = ctx.query_runner.get_committee_members_by_index();
+                    ctx.quorom_threshold = (ctx.committee.len() * 2) / 3 + 1;
                     // We recheck our index incase it was non existant before
                     // and we staked during this epoch and finally got the certificate
-                    our_index = query_runner
+                    ctx.our_index = ctx.query_runner
                         .pubkey_to_index(&node_public_key)
                         .unwrap_or(u32::MAX);
-                    on_committee = committee.contains(&our_index);
+                    ctx.on_committee = ctx.committee.contains(&ctx.our_index);
                 }
             }
-            Some(msg) = pub_sub.recv_event() => {
-                handle_pubsub_event::<P, Q>(
-                    msg,
-                    &mut quorom_threshold,
-                    &mut committee,
-                    &mut our_index,
-                    &mut on_committee,
-                    &node_public_key,
-                    &txn_mgr_cmd_tx,
-                    &mut pending_timeouts,
-                    &mut pending_requests,
-                    &query_runner,
-                    &pub_sub,
-                    &timeout_tx,
-                    &reconfigure_notify,
-                ).await;
+            Some(msg) = ctx.pub_sub.recv_event() => {
+                handle_pubsub_event::<P, Q>(msg, &mut ctx).await;
             },
             digest = timeout_rx.recv() => {
                 // Timeout for a missing parcel. If we still haven't received the parcel, we send a
                 // request.
                 if let Some(digest) = digest {
-                    pending_timeouts.remove(&digest);
+                    ctx.pending_timeouts.remove(&digest);
 
                     let (response_tx, response_rx) = oneshot::channel();
-                    txn_mgr_cmd_tx.send(TxnStoreCmd::ContainsParcel {
+                    ctx.txn_mgr_cmd_tx.send(TxnStoreCmd::ContainsParcel {
                         digest,
                         response: response_tx
                     }).await.expect("Failed to send get parcel msg digest command");
@@ -168,8 +183,8 @@ async fn message_receiver_worker<
 
                     if !contains_parcel {
                         let request = PubSubMsg::RequestTransactions(digest);
-                        let _ = pub_sub.send(&request, None).await;
-                        pending_requests.insert(digest, ());
+                        let _ = ctx.pub_sub.send(&request, None).await;
+                        ctx.pending_requests.insert(digest, ());
                         info!("Send request for missing parcel with digest: {digest:?}");
 
                         increment_counter!(
@@ -183,61 +198,20 @@ async fn message_receiver_worker<
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn handle_pubsub_event<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface>(
     mut msg: P::Event,
-    quorom_threshold: &mut usize,
-    committee: &mut Vec<NodeIndex>,
-    our_index: &mut NodeIndex,
-    on_committee: &mut bool,
-    node_public_key: &NodePublicKey,
-    txn_mgr_cmd_tx: &mpsc::Sender<TxnStoreCmd<P::Event>>,
-    pending_timeouts: &mut HashSet<Digest>,
-    pending_requests: &mut Cache<Digest, ()>,
-    query_runner: &Q,
-    pub_sub: &P,
-    timeout_tx: &mpsc::Sender<Digest>,
-    reconfigure_notify: &Arc<Notify>,
+    ctx: &mut Context<P, Q>,
 ) {
     match msg.take().unwrap() {
         PubSubMsg::Transactions(parcel) => {
-            handle_parcel::<P, Q>(
-                msg,
-                parcel,
-                quorom_threshold,
-                committee,
-                our_index,
-                on_committee,
-                node_public_key,
-                txn_mgr_cmd_tx,
-                pending_timeouts,
-                pending_requests,
-                query_runner,
-                timeout_tx,
-                reconfigure_notify,
-            )
-            .await;
+            handle_parcel::<P, Q>(msg, parcel, ctx).await;
         },
         PubSubMsg::Attestation(att) => {
-            handle_attestation::<P, Q>(
-                msg,
-                att,
-                quorom_threshold,
-                committee,
-                our_index,
-                on_committee,
-                node_public_key,
-                txn_mgr_cmd_tx,
-                pending_timeouts,
-                query_runner,
-                timeout_tx,
-                reconfigure_notify,
-            )
-            .await;
+            handle_attestation::<P, Q>(msg, att, ctx).await;
         },
         PubSubMsg::RequestTransactions(digest) => {
             let (response_tx, response_rx) = oneshot::channel();
-            txn_mgr_cmd_tx
+            ctx.txn_mgr_cmd_tx
                 .send(TxnStoreCmd::GetParcelMessageDigest {
                     digest,
                     response: response_tx,
@@ -249,7 +223,7 @@ async fn handle_pubsub_event<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface>(
                 .expect("Failed to receive response from get parcel msg digest command");
             if let Some(msg_digest) = parcel_msg_digest {
                 let filter = HashSet::from([msg.originator()]);
-                pub_sub.repropagate(msg_digest, Some(filter)).await;
+                ctx.pub_sub.repropagate(msg_digest, Some(filter)).await;
                 info!("Responded to request for missing parcel with digest: {digest:?}");
                 increment_counter!(
                     "consensus_missing_parcel_sent",
@@ -267,25 +241,14 @@ async fn handle_pubsub_event<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface>(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn handle_parcel<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface>(
     msg: P::Event,
     parcel: AuthenticStampedParcel,
-    quorom_threshold: &mut usize,
-    committee: &mut Vec<NodeIndex>,
-    our_index: &mut NodeIndex,
-    on_committee: &mut bool,
-    node_public_key: &NodePublicKey,
-    txn_mgr_cmd_tx: &mpsc::Sender<TxnStoreCmd<P::Event>>,
-    pending_timeouts: &mut HashSet<Digest>,
-    pending_requests: &mut Cache<Digest, ()>,
-    query_runner: &Q,
-    timeout_tx: &mpsc::Sender<Digest>,
-    reconfigure_notify: &Arc<Notify>,
+    ctx: &mut Context<P, Q>,
 ) {
-    let epoch = query_runner.get_current_epoch();
+    let epoch = ctx.query_runner.get_current_epoch();
     let originator = msg.originator();
-    let is_committee = committee.contains(&originator);
+    let is_committee = ctx.committee.contains(&originator);
     if !is_valid_message(is_committee, parcel.epoch, epoch) {
         msg.mark_invalid_sender();
         return;
@@ -297,7 +260,7 @@ async fn handle_parcel<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface>(
     let last_executed = parcel.last_executed;
 
     let mut event = None;
-    if pending_requests.remove(&parcel_digest).is_none() && !from_next_epoch {
+    if ctx.pending_requests.remove(&parcel_digest).is_none() && !from_next_epoch {
         // We only want to propagate parcels that we did not request and that
         // are not from the next epoch.
         msg.propagate();
@@ -314,7 +277,7 @@ async fn handle_parcel<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface>(
         // figure this out on its own if we use `msg` directly here.
 
         // TODO(matthias): panic here or only log the error?
-        txn_mgr_cmd_tx
+        ctx.txn_mgr_cmd_tx
             .send(TxnStoreCmd::StorePendingParcel {
                 parcel,
                 originator,
@@ -326,7 +289,7 @@ async fn handle_parcel<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface>(
     } else {
         // only propagate normal parcels, not parcels we requested, and not
         // parcels that we optimistically accept from the next epoch
-        txn_mgr_cmd_tx
+        ctx.txn_mgr_cmd_tx
             .send(TxnStoreCmd::StoreParcel {
                 parcel,
                 originator,
@@ -337,7 +300,7 @@ async fn handle_parcel<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface>(
     }
 
     // Check if we requested this parcel
-    if pending_requests.remove(&parcel_digest).is_some() {
+    if ctx.pending_requests.remove(&parcel_digest).is_some() {
         // This is a parcel that we specifically requested, so
         // we have to set a timeout for the previous parcel, because
         // swallow the Err return in the loop of `try_execute`.
@@ -345,8 +308,8 @@ async fn handle_parcel<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface>(
             last_executed,
             //txn_store.get_timeout(),
             PARCEL_TIMEOUT,
-            timeout_tx.clone(),
-            pending_timeouts,
+            ctx.timeout_tx.clone(),
+            &mut ctx.pending_timeouts,
         );
         info!("Received requested parcel with digest: {parcel_digest:?}");
 
@@ -356,45 +319,22 @@ async fn handle_parcel<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface>(
         );
     }
 
-    if !*on_committee {
+    if !ctx.on_committee {
         info!("Received transaction parcel from gossip as an edge node");
 
-        try_execute::<P, Q>(
-            parcel_digest,
-            quorom_threshold,
-            committee,
-            our_index,
-            on_committee,
-            node_public_key,
-            txn_mgr_cmd_tx,
-            pending_timeouts,
-            query_runner,
-            timeout_tx,
-            reconfigure_notify,
-        )
-        .await;
+        try_execute::<P, Q>(parcel_digest, ctx).await;
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn handle_attestation<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface>(
     msg: P::Event,
     att: CommitteeAttestation,
-    quorom_threshold: &mut usize,
-    committee: &mut Vec<NodeIndex>,
-    our_index: &mut NodeIndex,
-    on_committee: &mut bool,
-    node_public_key: &NodePublicKey,
-    txn_mgr_cmd_tx: &mpsc::Sender<TxnStoreCmd<P::Event>>,
-    pending_timeouts: &mut HashSet<Digest>,
-    query_runner: &Q,
-    timeout_tx: &mpsc::Sender<Digest>,
-    reconfigure_notify: &Arc<Notify>,
+    ctx: &mut Context<P, Q>,
 ) {
     let originator = msg.originator();
 
-    let epoch = query_runner.get_current_epoch();
-    let is_committee = committee.contains(&originator);
+    let epoch = ctx.query_runner.get_current_epoch();
+    let is_committee = ctx.committee.contains(&originator);
     if originator != att.node_index || !is_valid_message(is_committee, att.epoch, epoch) {
         msg.mark_invalid_sender();
         return;
@@ -408,7 +348,7 @@ async fn handle_attestation<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface>(
         event = Some(msg);
     }
 
-    if !*on_committee {
+    if !ctx.on_committee {
         info!("Received parcel attestation from gossip as an edge node");
 
         if from_next_epoch {
@@ -417,7 +357,7 @@ async fn handle_attestation<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface>(
             // Note: this unwrap is safe. If `from_next_epoch=true`, then `event`
             // will always be `Some`. Unfortunately, the borrow checker cannot
             // figure this out on its own if we use `msg` directly here.
-            txn_mgr_cmd_tx
+            ctx.txn_mgr_cmd_tx
                 .send(TxnStoreCmd::StorePendingAttestation {
                     digest: att.digest,
                     node_index: att.node_index,
@@ -426,7 +366,7 @@ async fn handle_attestation<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface>(
                 .await
                 .expect("Failed to send pending attestation to txn store");
         } else {
-            txn_mgr_cmd_tx
+            ctx.txn_mgr_cmd_tx
                 .send(TxnStoreCmd::StoreAttestation {
                     digest: att.digest,
                     node_index: att.node_index,
@@ -435,42 +375,19 @@ async fn handle_attestation<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface>(
                 .expect("Failed to send attestation to txn store");
         }
 
-        try_execute::<P, Q>(
-            att.digest,
-            quorom_threshold,
-            committee,
-            our_index,
-            on_committee,
-            node_public_key,
-            txn_mgr_cmd_tx,
-            pending_timeouts,
-            query_runner,
-            timeout_tx,
-            reconfigure_notify,
-        )
-        .await;
+        try_execute::<P, Q>(att.digest, ctx).await;
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn try_execute<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface>(
     digest: Digest,
-    quorom_threshold: &mut usize,
-    committee: &mut Vec<NodeIndex>,
-    our_index: &mut NodeIndex,
-    on_committee: &mut bool,
-    node_public_key: &NodePublicKey,
-    txn_mgr_cmd_tx: &mpsc::Sender<TxnStoreCmd<P::Event>>,
-    pending_timeouts: &mut HashSet<Digest>,
-    query_runner: &Q,
-    timeout_tx: &mpsc::Sender<Digest>,
-    reconfigure_notify: &Arc<Notify>,
+    ctx: &mut Context<P, Q>,
 ) {
     let (response_tx, response_rx) = oneshot::channel();
-    txn_mgr_cmd_tx
+    ctx.txn_mgr_cmd_tx
         .send(TxnStoreCmd::TryExecute {
             digest,
-            quorom_threshold: *quorom_threshold,
+            quorom_threshold: ctx.quorom_threshold,
             response: response_tx,
         })
         .await
@@ -482,22 +399,27 @@ async fn try_execute<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface>(
     match res {
         Ok(epoch_changed) => {
             if epoch_changed {
-                *committee = query_runner.get_committee_members_by_index();
-                *quorom_threshold = (committee.len() * 2) / 3 + 1;
+                ctx.committee = ctx.query_runner.get_committee_members_by_index();
+                ctx.quorom_threshold = (ctx.committee.len() * 2) / 3 + 1;
                 // We recheck our index incase it was non existant before and
                 // we staked during this epoch and finally got the certificate
-                *our_index = query_runner
-                    .pubkey_to_index(node_public_key)
+                ctx.our_index = ctx
+                    .query_runner
+                    .pubkey_to_index(&ctx.node_public_key)
                     .unwrap_or(u32::MAX);
-                *on_committee = committee.contains(our_index);
-                reconfigure_notify.notify_waiters();
+                ctx.on_committee = ctx.committee.contains(&ctx.our_index);
+                ctx.reconfigure_notify.notify_waiters();
 
                 // Check the validity of the parcels/attestations that we
                 // stored optimistically.
             }
         },
         Err(not_executed) => {
-            handle_not_executed(not_executed, timeout_tx.clone(), pending_timeouts);
+            handle_not_executed(
+                not_executed,
+                ctx.timeout_tx.clone(),
+                &mut ctx.pending_timeouts,
+            );
         },
     }
 }
