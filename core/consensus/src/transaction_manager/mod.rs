@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::types::{Digest as BroadcastDigest, NodeIndex};
@@ -58,6 +59,9 @@ pub enum TxnStoreCmd<T: BroadcastEventInterface<PubSubMsg>> {
         digest: Digest,
         quorom_threshold: usize,
         response: oneshot::Sender<Result<bool, NotExecuted>>,
+    },
+    GetTimeout {
+        response: oneshot::Sender<Duration>,
     },
 }
 
@@ -278,6 +282,13 @@ async fn handle_cmd<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emitt
 
             if let Err(e) = response.send(res) {
                 error!("Failed to respond to try execute command in txn manager: {e:?}");
+            }
+        },
+        TxnStoreCmd::GetTimeout { response } => {
+            let timeout = ctx.txn_store.get_timeout();
+
+            if let Err(e) = response.send(timeout) {
+                error!("Failed to respond to get timeout command in txn manager: {e:?}");
             }
         },
     }

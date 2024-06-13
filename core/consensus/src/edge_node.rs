@@ -18,10 +18,6 @@ use crate::execution::{AuthenticStampedParcel, CommitteeAttestation, Digest};
 use crate::transaction_manager::{NotExecuted, TxnStoreCmd};
 
 const MAX_PENDING_TIMEOUTS: usize = 100;
-/// TODO(matthias): the txn store tracks the time between executions to get a better
-/// estimate for this timeout. However, now we don't have access to the txn store anymore.
-/// We could add another command to the txn store to get the timeout.
-const PARCEL_TIMEOUT: Duration = Duration::from_secs(30);
 
 pub struct EdgeConsensus {
     handle: JoinHandle<()>,
@@ -41,6 +37,7 @@ struct Context<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface> {
     pub_sub: P,
     timeout_tx: mpsc::Sender<Digest>,
     reconfigure_notify: Arc<Notify>,
+    timeout: Duration,
 }
 
 impl EdgeConsensus {
@@ -122,6 +119,17 @@ async fn message_receiver_worker<
     let pending_timeouts = HashSet::new();
     let pending_requests = Cache::new(100);
 
+    let (response_tx, response_rx) = oneshot::channel();
+    txn_mgr_cmd_tx
+        .send(TxnStoreCmd::GetTimeout {
+            response: response_tx,
+        })
+        .await
+        .expect("Failed to send get timeout digest command");
+    let timeout = response_rx
+        .await
+        .expect("Failed to receive response from get timeout command");
+
     let mut ctx = Context {
         quorom_threshold,
         committee,
@@ -135,6 +143,7 @@ async fn message_receiver_worker<
         pub_sub,
         timeout_tx,
         reconfigure_notify,
+        timeout,
     };
 
     let mut epoch_changed_sub = notifier.subscribe_epoch_changed();
@@ -307,7 +316,7 @@ async fn handle_parcel<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface>(
         set_parcel_timer(
             last_executed,
             //txn_store.get_timeout(),
-            PARCEL_TIMEOUT,
+            ctx.timeout,
             ctx.timeout_tx.clone(),
             &mut ctx.pending_timeouts,
         );
@@ -415,11 +424,7 @@ async fn try_execute<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface>(
             }
         },
         Err(not_executed) => {
-            handle_not_executed(
-                not_executed,
-                ctx.timeout_tx.clone(),
-                &mut ctx.pending_timeouts,
-            );
+            handle_not_executed(not_executed, ctx);
         },
     }
 }
@@ -434,13 +439,18 @@ async fn try_execute<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface>(
 // the intervals between executing parcels.
 // If we are missing a parcel, and the time that has passed since trying toexecute the last parcel
 // is larger than the expected time, we send out a request.
-fn handle_not_executed(
+fn handle_not_executed<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface>(
     not_executed: NotExecuted,
-    timeout_tx: mpsc::Sender<Digest>,
-    pending_timeouts: &mut HashSet<Digest>,
+    ctx: &mut Context<P, Q>,
 ) {
-    if let NotExecuted::MissingParcel { digest, timeout: _ } = not_executed {
-        set_parcel_timer(digest, PARCEL_TIMEOUT, timeout_tx, pending_timeouts);
+    if let NotExecuted::MissingParcel { digest, timeout } = not_executed {
+        ctx.timeout = timeout;
+        set_parcel_timer(
+            digest,
+            ctx.timeout,
+            ctx.timeout_tx.clone(),
+            &mut ctx.pending_timeouts,
+        );
     }
 }
 
