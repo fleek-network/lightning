@@ -122,7 +122,7 @@ impl TransactionStoreManager {
     }
 }
 
-pub async fn spawn_txn_worker<
+async fn spawn_txn_worker<
     P: PubSub<PubSubMsg> + 'static,
     Q: SyncQueryRunnerInterface,
     NE: Emitter,
@@ -238,17 +238,15 @@ async fn handle_cmd<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emitt
                 .store_pending_parcel(parcel, originator, message_digest, event);
         },
         TxnStoreCmd::StoreAttestation { digest, node_index } => {
-            // TODO(matthias): rename to store_attestation
-            ctx.txn_store.add_attestation(digest, node_index);
+            ctx.txn_store.store_attestation(digest, node_index);
         },
         TxnStoreCmd::StorePendingAttestation {
             digest,
             node_index,
             event,
         } => {
-            // TODO(matthias): rename to store_pending_attestation
             ctx.txn_store
-                .add_pending_attestation(digest, node_index, event);
+                .store_pending_attestation(digest, node_index, event);
         },
         TxnStoreCmd::GetParcelMessageDigest { digest, response } => {
             let parcel = ctx.txn_store.get_parcel(&digest);

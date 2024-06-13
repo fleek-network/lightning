@@ -86,13 +86,13 @@ impl<T: BroadcastEventInterface<PubSubMsg>> TransactionStore<T> {
             .store_pending_parcel(parcel, originator, Some(message_digest), event);
     }
 
-    pub fn add_attestation(&mut self, digest: Digest, node_index: NodeIndex) {
+    pub fn store_attestation(&mut self, digest: Digest, node_index: NodeIndex) {
         self.parcels.add_attestation(digest, node_index);
     }
 
     // Stores an attestation from the next epoch. After the epoch change we have to verify if this
     // attestation originated from a committee member.
-    pub fn add_pending_attestation(&mut self, digest: Digest, node_index: NodeIndex, event: T) {
+    pub fn store_pending_attestation(&mut self, digest: Digest, node_index: NodeIndex, event: T) {
         self.parcels
             .add_pending_attestation(digest, node_index, event);
     }
