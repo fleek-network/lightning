@@ -66,6 +66,17 @@ pub struct TransactionStoreManager {
     tx_shutdown: Arc<Notify>,
 }
 
+struct Context<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emitter> {
+    our_index: NodeIndex,
+    on_committee: bool,
+    committee: Vec<NodeIndex>,
+    node_public_key: NodePublicKey,
+    pub_sub: P,
+    query_runner: Q,
+    execution: Arc<Execution<Q, NE>>,
+    txn_store: TransactionStore<P::Event>,
+}
+
 impl TransactionStoreManager {
     pub fn spawn<P: PubSub<PubSubMsg> + 'static, Q: SyncQueryRunnerInterface, NE: Emitter>(
         cmd_ŕx: mpsc::Receiver<TxnStoreCmd<P::Event>>,
@@ -124,12 +135,24 @@ pub async fn spawn_txn_worker<
     node_public_key: NodePublicKey,
     shutdown_notify: Arc<Notify>,
 ) {
-    let mut txn_store = TransactionStore::<P::Event>::new();
-    let mut our_index = query_runner
+    let txn_store = TransactionStore::<P::Event>::new();
+    let our_index = query_runner
         .pubkey_to_index(&node_public_key)
         .unwrap_or(u32::MAX);
-    let mut committee = query_runner.get_committee_members_by_index();
-    let mut on_committee = committee.contains(&our_index);
+    let committee = query_runner.get_committee_members_by_index();
+    let on_committee = committee.contains(&our_index);
+
+    let mut ctx = Context {
+        our_index,
+        on_committee,
+        committee,
+        node_public_key,
+        pub_sub,
+        query_runner,
+        execution,
+        txn_store,
+    };
+
     let shutdown_future = shutdown_notify.notified();
     pin!(shutdown_future);
     loop {
@@ -141,77 +164,60 @@ pub async fn spawn_txn_worker<
                 let Some(cmd) = cmd else {
                     break;
                 };
-                handle_cmd::<P, Q, NE>(cmd, &query_runner, &execution, &mut txn_store).await;
+                handle_cmd::<P, Q, NE>(cmd, &mut ctx).await;
             }
             Some((parcel, epoch_changed)) = rx_narwhal_batch.recv() => {
                 if !on_committee {
                     // This should never happen if it somehow does there is critical error somewhere
                     panic!("We somehow sent ourselves a parcel from narwhal while not on committee");
                 }
-                handle_batch(
-                    &mut our_index,
-                    &mut on_committee,
-                    &mut committee,
-                    &node_public_key,
-                    parcel,
-                    epoch_changed,
-                    &pub_sub,
-                    &query_runner,
-                    &mut txn_store
-                ).await;
+                handle_batch(parcel, epoch_changed, &mut ctx).await;
             },
         }
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-async fn handle_batch<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface>(
-    our_index: &mut NodeIndex,
-    on_committee: &mut bool,
-    committee: &mut Vec<NodeIndex>,
-    node_public_key: &NodePublicKey,
+async fn handle_batch<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emitter>(
     parcel: AuthenticStampedParcel,
     epoch_changed: bool,
-    pub_sub: &P,
-    query_runner: &Q,
-    txn_store: &mut TransactionStore<P::Event>,
+    ctx: &mut Context<P, Q, NE>,
 ) {
     // This will only be executed by validator nodes
     let parcel_digest = parcel.to_digest();
     let attestation = CommitteeAttestation {
         digest: parcel_digest,
-        node_index: *our_index,
+        node_index: ctx.our_index,
         epoch: parcel.epoch,
     };
 
     info!("Send transaction parcel to broadcast as a validator");
-    let _ = pub_sub.send(&attestation.into(), None).await;
+    let _ = ctx.pub_sub.send(&attestation.into(), None).await;
 
-    if let Ok(msg_digest) = pub_sub.send(&parcel.clone().into(), None).await {
-        txn_store.store_parcel(parcel, *our_index, Some(msg_digest));
+    if let Ok(msg_digest) = ctx.pub_sub.send(&parcel.clone().into(), None).await {
+        ctx.txn_store
+            .store_parcel(parcel, ctx.our_index, Some(msg_digest));
     } else {
-        txn_store.store_parcel(parcel, *our_index, None);
+        ctx.txn_store.store_parcel(parcel, ctx.our_index, None);
     }
     // No need to store the attestation we have already executed it
 
     if epoch_changed {
-        *committee = query_runner.get_committee_members_by_index();
+        ctx.committee = ctx.query_runner.get_committee_members_by_index();
         //quorom_threshold = (committee.len() * 2) / 3 + 1;
         // We recheck our index incase it was non existant before
         // and we staked during this epoch and finally got the certificate
-        *our_index = query_runner
-            .pubkey_to_index(node_public_key)
+        ctx.our_index = ctx
+            .query_runner
+            .pubkey_to_index(&ctx.node_public_key)
             .unwrap_or(u32::MAX);
-        *on_committee = committee.contains(our_index);
-        txn_store.change_epoch(committee);
+        ctx.on_committee = ctx.committee.contains(&ctx.our_index);
+        ctx.txn_store.change_epoch(&ctx.committee);
     }
 }
 
 async fn handle_cmd<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emitter>(
     cmd: TxnStoreCmd<P::Event>,
-    query_runner: &Q,
-    execution: &Arc<Execution<Q, NE>>,
-    txn_store: &mut TransactionStore<P::Event>,
+    ctx: &mut Context<P, Q, NE>,
 ) {
     match cmd {
         TxnStoreCmd::StoreParcel {
@@ -219,7 +225,8 @@ async fn handle_cmd<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emitt
             originator,
             message_digest,
         } => {
-            txn_store.store_parcel(parcel, originator, message_digest);
+            ctx.txn_store
+                .store_parcel(parcel, originator, message_digest);
         },
         TxnStoreCmd::StorePendingParcel {
             parcel,
@@ -227,11 +234,12 @@ async fn handle_cmd<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emitt
             message_digest,
             event,
         } => {
-            txn_store.store_pending_parcel(parcel, originator, message_digest, event);
+            ctx.txn_store
+                .store_pending_parcel(parcel, originator, message_digest, event);
         },
         TxnStoreCmd::StoreAttestation { digest, node_index } => {
             // TODO(matthias): rename to store_attestation
-            txn_store.add_attestation(digest, node_index);
+            ctx.txn_store.add_attestation(digest, node_index);
         },
         TxnStoreCmd::StorePendingAttestation {
             digest,
@@ -239,16 +247,17 @@ async fn handle_cmd<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emitt
             event,
         } => {
             // TODO(matthias): rename to store_pending_attestation
-            txn_store.add_pending_attestation(digest, node_index, event);
+            ctx.txn_store
+                .add_pending_attestation(digest, node_index, event);
         },
         TxnStoreCmd::GetParcelMessageDigest { digest, response } => {
-            let parcel = txn_store.get_parcel(&digest);
+            let parcel = ctx.txn_store.get_parcel(&digest);
             if let Err(e) = response.send(parcel.and_then(|p| p.message_digest)) {
                 error!("Failed to respond to get parcel msg digest command in txn manager: {e:?}");
             }
         },
         TxnStoreCmd::ContainsParcel { digest, response } => {
-            let parcel = txn_store.get_parcel(&digest);
+            let parcel = ctx.txn_store.get_parcel(&digest);
             if let Err(e) = response.send(parcel.is_some()) {
                 error!("Failed to respond to get contains parcel command in txn manager: {e:?}");
             }
@@ -259,13 +268,14 @@ async fn handle_cmd<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emitt
             response,
         } => {
             // This will only be executed by edge nodes
-            let res = txn_store
-                .try_execute(digest, quorom_threshold, query_runner, execution)
+            let res = ctx
+                .txn_store
+                .try_execute(digest, quorom_threshold, &ctx.query_runner, &ctx.execution)
                 .await;
 
             if let Ok(true) = &res {
-                let committee = query_runner.get_committee_members_by_index();
-                txn_store.change_epoch(&committee);
+                let committee = ctx.query_runner.get_committee_members_by_index();
+                ctx.txn_store.change_epoch(&committee);
             }
 
             if let Err(e) = response.send(res) {
