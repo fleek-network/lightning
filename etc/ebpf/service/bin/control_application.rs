@@ -86,6 +86,13 @@ async fn main() -> anyhow::Result<()> {
             0,
         )
         .expect("");
+    buffers
+        .insert(
+            1,
+            PerCpuValues::try_from(vec![Buffer::default(); aya::util::nr_cpus()?])?,
+            0,
+        )
+        .expect("");
 
     let path_config = PathConfig {
         tmp_dir: opt.tmp,

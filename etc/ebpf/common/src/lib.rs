@@ -2,7 +2,10 @@
 
 pub const MAX_DEVICES: usize = 2;
 pub const MAX_FILE_RULES: usize = 20;
-pub const MAX_PATH_LEN: usize = 1024;
+pub const EVENT_HEADER_SIZE: usize = 2;
+pub const MAX_BUFFER_LEN: usize = 1024;
+pub const FILE_OPEN_PROG_ID: u8 = 0;
+pub const ACCESS_DENIED_EVENT: u8 = 0;
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
 #[repr(C)]
@@ -102,7 +105,7 @@ pub struct FileRule {
     /// This rule is for a directory.
     pub is_dir: u32,
     /// The file's path.
-    pub path: [u8; MAX_PATH_LEN],
+    pub path: [u8; MAX_BUFFER_LEN],
 }
 
 #[cfg(feature = "userspace")]
@@ -111,7 +114,7 @@ unsafe impl aya::Pod for FileRule {}
 impl Default for FileRule {
     fn default() -> Self {
         Self {
-            path: [0u8; MAX_PATH_LEN],
+            path: [0u8; MAX_BUFFER_LEN],
             is_dir: FileRule::IS_FILE,
             permissions: Self::NO_OPERATION,
         }
@@ -130,13 +133,13 @@ impl FileRule {
 
 #[derive(Clone, Copy)]
 pub struct Buffer {
-    pub buffer: [u8; MAX_PATH_LEN],
+    pub buf: [u8; MAX_BUFFER_LEN],
 }
 
 impl Default for Buffer {
     fn default() -> Self {
         Self {
-            buffer: [0u8; MAX_PATH_LEN],
+            buf: [0u8; MAX_BUFFER_LEN],
         }
     }
 }
@@ -148,7 +151,6 @@ impl Buffer {
 #[cfg(feature = "userspace")]
 unsafe impl aya::Pod for Buffer {}
 
-#[derive(Clone, Copy)]
 pub struct FileCacheKey {
     pub task: u64,
     pub target: u64,

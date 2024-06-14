@@ -1,5 +1,5 @@
 use aya_ebpf::macros::map;
-use aya_ebpf::maps::{HashMap, LpmTrie, LruPerCpuHashMap, PerCpuHashMap};
+use aya_ebpf::maps::{HashMap, LpmTrie, LruPerCpuHashMap, PerCpuHashMap, RingBuf};
 use lightning_ebpf_common::{
     Buffer,
     File,
@@ -25,3 +25,5 @@ pub static BUFFERS: PerCpuHashMap<u32, Buffer> =
 #[map]
 pub static FILE_CACHE: LruPerCpuHashMap<FileCacheKey, FileRule> =
     LruPerCpuHashMap::<FileCacheKey, FileRule>::with_max_entries(128, 0);
+#[map]
+pub static EVENTS: RingBuf = RingBuf::with_byte_size(1024 * 4096, 0);

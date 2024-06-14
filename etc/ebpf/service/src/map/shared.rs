@@ -12,7 +12,7 @@ use lightning_ebpf_common::{
     PacketFilterParams,
     Profile,
     MAX_FILE_RULES,
-    MAX_PATH_LEN,
+    MAX_BUFFER_LEN,
 };
 use log::debug;
 use tokio::fs;
@@ -126,7 +126,7 @@ impl SharedMap {
                     bail!("path maximum {MAX_FILE_RULES} execeeded");
                 }
 
-                let mut vector = vec![0u8; MAX_PATH_LEN];
+                let mut vector = vec![0u8; MAX_BUFFER_LEN];
                 let path = rule.file.as_path().display().to_string();
 
                 debug!("path {path} for profile {}", exec_path.display());
@@ -182,7 +182,7 @@ impl SharedMap {
                 bail!("path maximum {MAX_FILE_RULES} exceeded");
             }
 
-            let mut vector = vec![0u8; MAX_PATH_LEN];
+            let mut vector = vec![0u8; MAX_BUFFER_LEN];
             let path = rule.file.as_path().display().to_string();
             vector[..path.len()].copy_from_slice(path.as_bytes());
 
