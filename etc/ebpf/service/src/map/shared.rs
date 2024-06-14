@@ -11,8 +11,8 @@ use lightning_ebpf_common::{
     PacketFilter,
     PacketFilterParams,
     Profile,
-    MAX_FILE_RULES,
     MAX_BUFFER_LEN,
+    MAX_FILE_RULES,
 };
 use log::debug;
 use tokio::fs;

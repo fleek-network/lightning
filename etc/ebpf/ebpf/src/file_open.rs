@@ -3,7 +3,6 @@ use core::ffi::c_char;
 use aya_ebpf::macros::lsm;
 use aya_ebpf::programs::LsmContext;
 use lightning_ebpf_common::{
-    Buffer,
     File,
     FileCacheKey,
     FileRule,
@@ -32,10 +31,8 @@ unsafe fn try_file_open(ctx: LsmContext) -> Result<i32, i32> {
 
     if let Some(profile) = maps::PROFILES.get(&File::new(task_inode)) {
         // Get the path for the target file.
-        let buf = maps::BUFFERS
-            .get_ptr_mut(&Buffer::OPEN_FILE_BUFFER)
-            .ok_or(DENY)?;
-        let path = buf.as_mut().ok_or(DENY)?.buf.as_mut();
+        let buf = maps::BUFFERS.get_ptr_mut(&0).ok_or(DENY)?;
+        let path = buf.as_mut().ok_or(DENY)?.as_mut_slice();
         read_path(file, path)?;
 
         // Get the inode of the target file.
@@ -157,16 +154,15 @@ fn cmp_str_bytes(a: &[u8], b: &[u8], size: usize) -> bool {
 
 /// Send an event to userspace.
 unsafe fn send_event(event: u8, prog: u8, task: *const vmlinux::file, message: &[u8]) {
-    let Some(buffer) = maps::BUFFERS.get_ptr_mut(&Buffer::OPEN_FILE_BUFFER) else {
+    let Some(buf) = maps::BUFFERS
+        .get_ptr_mut(&1)
+        .map(|buf| buf.as_mut())
+        .flatten()
+    else {
         return;
     };
 
-    // Todo: let's switch to an array without a struct and remove some of these checks.
-    let Some(buf) = buffer.as_mut() else {
-        return;
-    };
-
-    let Some(task_name) = read_file_name(task, buf.buf.as_mut()).ok() else {
+    let Some(task_name) = read_file_name(task, buf.as_mut_slice()).ok() else {
         return;
     };
 

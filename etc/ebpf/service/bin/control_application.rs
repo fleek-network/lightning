@@ -6,7 +6,14 @@ use aya::programs::{Lsm, Xdp, XdpFlags};
 use aya::{include_bytes_aligned, Btf, Ebpf};
 use aya_log::EbpfLogger;
 use clap::Parser;
-use lightning_ebpf_common::{Buffer, File, PacketFilter, PacketFilterParams, Profile};
+use lightning_ebpf_common::{
+    Buffer,
+    File,
+    PacketFilter,
+    PacketFilterParams,
+    Profile,
+    MAX_BUFFER_LEN,
+};
 use lightning_ebpf_service::map::SharedMap;
 use lightning_ebpf_service::server::Server;
 use lightning_ebpf_service::{ConfigSource, PathConfig};
@@ -79,20 +86,16 @@ async fn main() -> anyhow::Result<()> {
     let mut buffers: PerCpuHashMap<_, u32, Buffer> =
         PerCpuHashMap::try_from(handle.take_map("BUFFERS").unwrap())?;
 
-    buffers
-        .insert(
-            Buffer::OPEN_FILE_BUFFER,
-            PerCpuValues::try_from(vec![Buffer::default(); aya::util::nr_cpus()?])?,
-            0,
-        )
-        .expect("");
-    buffers
-        .insert(
-            1,
-            PerCpuValues::try_from(vec![Buffer::default(); aya::util::nr_cpus()?])?,
-            0,
-        )
-        .expect("");
+    buffers.insert(
+        1,
+        PerCpuValues::try_from(vec![[0u8; MAX_BUFFER_LEN]; aya::util::nr_cpus()?])?,
+        0,
+    )?;
+    buffers.insert(
+        1,
+        PerCpuValues::try_from(vec![[0u8; MAX_BUFFER_LEN]; aya::util::nr_cpus()?])?,
+        0,
+    )?;
 
     let path_config = PathConfig {
         tmp_dir: opt.tmp,

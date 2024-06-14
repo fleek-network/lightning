@@ -7,6 +7,8 @@ pub const MAX_BUFFER_LEN: usize = 1024;
 pub const FILE_OPEN_PROG_ID: u8 = 0;
 pub const ACCESS_DENIED_EVENT: u8 = 0;
 
+pub type Buffer = [u8; MAX_BUFFER_LEN];
+
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
 #[repr(C)]
 pub struct PacketFilter {
@@ -130,26 +132,6 @@ impl FileRule {
     pub const WRITE_MASK: u32 = 0x01 << 2;
     pub const EXEC_MASK: u32 = 0x01 << 3;
 }
-
-#[derive(Clone, Copy)]
-pub struct Buffer {
-    pub buf: [u8; MAX_BUFFER_LEN],
-}
-
-impl Default for Buffer {
-    fn default() -> Self {
-        Self {
-            buf: [0u8; MAX_BUFFER_LEN],
-        }
-    }
-}
-
-impl Buffer {
-    pub const OPEN_FILE_BUFFER: u32 = 0;
-}
-
-#[cfg(feature = "userspace")]
-unsafe impl aya::Pod for Buffer {}
 
 pub struct FileCacheKey {
     pub task: u64,
