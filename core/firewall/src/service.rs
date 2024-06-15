@@ -51,7 +51,6 @@ where
 
         MakeSvcFuture {
             svc: Some(self.svc.clone()),
-            ip,
             fut: Box::pin({
                 let firewall = self.firewall.clone();
 
@@ -63,7 +62,6 @@ where
 
 pub struct MakeSvcFuture<S, Fut> {
     svc: Option<S>,
-    ip: std::net::IpAddr,
     fut: Fut,
 }
 
@@ -79,12 +77,6 @@ where
         _cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
         let this = self.get_mut();
-
-        if this.ip.is_loopback() {
-            return std::task::Poll::Ready(Ok(ConnectedService {
-                svc: this.svc.take().expect("firewall svc to be present"),
-            }));
-        }
 
         let pinned = std::pin::Pin::new(&mut this.fut);
 

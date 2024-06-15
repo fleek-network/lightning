@@ -25,11 +25,16 @@ pub enum ConnectionPolicyConfig {
     Blacklist { members: Vec<IpAddr> },
 }
 
+/// The connection policy for the firewall
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum RateLimitingConfig {
+    /// Default Value
+    /// Sets global RPS = 10
     None,
     Per,
-    Global { rules: Vec<RateLimitingRule> },
+    Global {
+        rules: Vec<RateLimitingRule>,
+    },
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

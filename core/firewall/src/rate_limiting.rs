@@ -230,7 +230,13 @@ impl RateLimiting {
 
 impl Default for RateLimiting {
     fn default() -> Self {
-        Self::None
+        Self::WithGlobal {
+            global: vec![RateLimitingRule {
+                period: Period::Second,
+                max_requests: 10,
+            }],
+            per: HashMap::new(),
+        }
     }
 }
 

@@ -79,7 +79,7 @@ impl Firewall {
         };
 
         let rate = match rate_limiting {
-            RateLimitingConfig::None => RateLimiting::none(),
+            RateLimitingConfig::None => RateLimiting::default(),
             RateLimitingConfig::Per => RateLimiting::per(),
             RateLimitingConfig::Global { rules } => RateLimiting::global(rules),
         };
@@ -147,7 +147,6 @@ impl Firewall {
 
 #[derive(Debug)]
 pub(crate) struct Inner {
-    name: &'static str,
     policy: ConnectionPolicy,
     rate_limiting: RateLimiting,
 }
@@ -166,7 +165,6 @@ impl Inner {
         }
 
         Self {
-            name,
             policy,
             rate_limiting,
         }
@@ -174,7 +172,6 @@ impl Inner {
 }
 
 impl Inner {
-    #[tracing::instrument(skip(self), fields(name = %self.name))]
     pub fn check(&mut self, ip: IpAddr) -> Result<(), FirewallError> {
         // Always check the policy first
         // someone shouldnt need ratelimiting if theyre not even
