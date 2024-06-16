@@ -1,3 +1,5 @@
+#![feature(float_minimum_maximum)]
+
 pub mod commands;
 pub mod policy;
 pub mod rate_limiting;
@@ -22,14 +24,27 @@ pub enum AdminError {
 
 #[derive(Debug, thiserror::Error)]
 pub enum FirewallError {
-    #[error("Rate limit exceeded curr: {}, max: {}", .0, .1)]
-    RateLimitExceeded(u64, u64),
-    #[error("Connection limit exceeded")]
-    ConnectionLimitExceeded,
+    #[error("Rate limit exceeded, current count: {}", .0)]
+    RateLimitExceeded(f64),
     #[error("IP is blacklisted")]
     Blacklisted,
     #[error("IP is not whitelisted")]
     NotWhitelisted,
+}
+
+impl From<FirewallError> for hyper::Response<hyper::Body> {
+    fn from(e: FirewallError) -> Self {
+        let status = match e {
+            FirewallError::RateLimitExceeded(_) => hyper::StatusCode::TOO_MANY_REQUESTS,
+            FirewallError::Blacklisted => hyper::StatusCode::FORBIDDEN,
+            FirewallError::NotWhitelisted => hyper::StatusCode::FORBIDDEN,
+        };
+
+        hyper::Response::builder()
+            .status(status)
+            .body(hyper::Body::empty())
+            .unwrap()
+    }
 }
 
 /// An indivudal firewall that can be used to protect an endpoint
@@ -89,9 +104,9 @@ impl Firewall {
 
     pub async fn check(&self, ip: IpAddr) -> Result<(), FirewallError> {
         // todo: saftey
-        if ip.is_loopback() {
-            return Ok(());
-        }
+        // if ip.is_loopback() {
+        //     return Ok(());
+        // }
 
         let mut firewall = self.inner.lock().await;
 
