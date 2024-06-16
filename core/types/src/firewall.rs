@@ -52,7 +52,7 @@ pub enum Period {
 }
 
 impl Period {
-    pub const MAX: u64 = Self::Day.as_millis();
+    pub const MAX: Self = Self::Day;
 
     pub fn as_duration(&self) -> std::time::Duration {
         std::time::Duration::from_secs(self.as_secs())
