@@ -106,6 +106,8 @@ $ curl -X POST -H "Content-Type: application/json" -d '{
 # Response: {"jsonrpc":"2.0","result":"pong","id":1}
 ```
 
+To run standard development checks such as testing, linting, and building locally, you can execute [`dev/checks`](./dev/checks), or any of `dev/test`, `dev/clippy`, `dev/fmt`, `dev/build` individually.
+
 # Nix
 
 The project provides a nix flake for a determanistic development and build environment.

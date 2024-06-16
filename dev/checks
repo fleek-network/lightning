@@ -1,0 +1,7 @@
+#!/bin/bash
+set -eou pipefail
+
+dev/fmt-check
+dev/clippy
+dev/build
+dev/test

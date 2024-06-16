@@ -1,4 +1,4 @@
 #!/bin/bash
 set -eou pipefail
 
-cargo fmt --check
+dev/fmt --check

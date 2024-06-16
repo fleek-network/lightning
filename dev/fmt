@@ -1,0 +1,5 @@
+#!/bin/bash
+set -eou pipefail
+
+set -x
+cargo fmt --all "$@"

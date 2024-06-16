@@ -1,5 +1,0 @@
-#!/bin/bash
-set -eou pipefail
-
-scripts/lint-fmt
-scripts/lint-clippy
