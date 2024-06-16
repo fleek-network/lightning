@@ -240,85 +240,64 @@ impl Default for RateLimiting {
     }
 }
 
-/// A rate limiting policy with linear decay,
+/// A rate limiting policy with linear decay
+///
+/// An implementation of the token bucket
 ///
 /// see [`RateLimitingPolicy::new`] for more information
 #[derive(Debug, Clone)]
 pub struct RateLimitingPolicy {
-    max_requests: u64,
+    max_requests: f64,
     last_request: std::time::Instant,
 
-    /// The decay rate of the requests
-    /// max_requests / period (ms)
-    slope: f64,
-    /// The last known value of the request counter
-    y_intercept: f64,
+    rate: f64,
+    allowed: f64,
 }
 
 impl RateLimitingPolicy {
     /// A period is a time frame in which the rate limiting policy is enforced
     /// any requests made to this policy will be assigned a linear decay rate that depends
     /// on the choice of period and the max_requests
+    ///
+    /// panics if
     pub fn new(period: Period, max_requests: u64) -> Self {
         Self {
-            max_requests,
+            max_requests: max_requests as f64,
             last_request: std::time::Instant::now(),
-            slope: {
-                // slope of line through (0, max_requests) -> (period, 0)
-                let m = max_requests as f64 / period.as_millis() as f64;
-                -m
-            },
-            y_intercept: 0.0,
+            allowed: max_requests as f64,
+            rate: max_requests as f64 / period.as_millis() as f64,
         }
     }
 
     /// Check (and increment the counter) if a request is allowed
     pub fn check(&mut self) -> Result<(), FirewallError> {
-        if self.max_requests >= self.track_request() {
+        let now = std::time::Instant::now();
+        let elapsed = now.duration_since(self.last_request).as_millis();
+
+        if elapsed > Period::MAX.into() {
+            self.allowed = self.max_requests;
+            self.last_request = now;
+
+            return Ok(());
+        }
+
+        // cast is safe since we checked above
+        let elapsed = elapsed as f64;
+
+        // top up the bucket
+        let new_allowed = self.max_requests.min(self.allowed + elapsed * self.rate);
+        if new_allowed >= 1.0 {
+            // include the new request
+            self.allowed = new_allowed - 1.0;
+            self.last_request = now;
+
             Ok(())
         } else {
-            Err(FirewallError::RateLimitExceeded(
-                self.max_requests,
-                self.y_intercept.ceil() as u64,
-            ))
+            self.allowed = new_allowed;
+            self.last_request = now;
+
+            Err(FirewallError::RateLimitExceeded(self.max_requests))
         }
-    }
-
-    /// Track a request and return the current request count
-    fn track_request(&mut self) -> u64 {
-        let elapsed = self.last_request.elapsed();
-
-        // is this the first request
-        if self.y_intercept == 0.0 {
-            self.y_intercept = 1.0;
-            self.last_request = std::time::Instant::now();
-
-            return 1;
-        }
-
-        // recover the x_intercept
-        // this should almost always be in range as its a function of period and total recieved
-        // requests and max requests requests
-        let x_intercept = -self.y_intercept / self.slope;
-
-        // has it hit 0?
-        if elapsed.as_millis() >= x_intercept.floor() as u128 {
-            self.y_intercept = 1.0;
-            self.last_request = std::time::Instant::now();
-
-            return 1;
-        }
-
-        let elapsed = elapsed.as_millis() as f64;
-        let y = self.slope * elapsed + self.y_intercept;
-
-        // include the new request
-        self.y_intercept = y + 1.0;
-        // update the last request time (set x=0)
-        self.last_request = std::time::Instant::now();
-
-        // round up cause we cant have partial requests
-        self.y_intercept.ceil() as u64
     }
 }
 
@@ -381,6 +360,7 @@ mod rate_limiting_test {
 
         for _ in 0..10 {
             assert!(policy.check().is_ok());
+            println!("{:?}", policy);
         }
 
         assert!(policy.check().is_err());
@@ -392,18 +372,21 @@ mod rate_limiting_test {
 
         for _ in 0..10 {
             assert!(policy.check().is_ok());
+            println!("{:?}", policy);
         }
 
         std::thread::sleep(std::time::Duration::from_secs(1));
 
         for _ in 0..10 {
             assert!(policy.check().is_ok());
+            println!("{:?}", policy);
         }
 
         std::thread::sleep(std::time::Duration::from_millis(500));
 
         for _ in 0..5 {
             assert!(policy.check().is_ok());
+            println!("{:?}", policy);
         }
 
         assert!(policy.check().is_err());

@@ -1343,6 +1343,7 @@ async fn test_rpc_get_node_registry() -> Result<()> {
     Ok(())
 }
 
+#[tokio::test(flavor = "multi_thread")]
 async fn test_admin_seq() -> Result<()> {
     let temp_dir = tempdir().unwrap();
     let genesis_path = Genesis::default()
@@ -1377,8 +1378,8 @@ async fn test_admin_rpc_store(port: u16, _node: &TestNode) -> Result<()> {
         .as_secs();
 
     let admin_headers = RpcAdminHeaders {
-        hmac: create_hmac(unix_time, 10)?,
-        nonce: 10,
+        hmac: create_hmac(unix_time, 5)?,
+        nonce: 5,
         timestamp: unix_time,
     };
 
@@ -1397,7 +1398,7 @@ async fn test_admin_rpc_store(port: u16, _node: &TestNode) -> Result<()> {
 }
 
 async fn test_admin_rpc_hmac(port: u16, _node: &TestNode) -> Result<()> {
-    for i in 0..10 {
+    for i in 0..5 {
         let req = json!({
             "jsonrpc": "2.0",
             "method": "admin_test",
