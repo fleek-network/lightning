@@ -92,9 +92,6 @@ impl TestNode {
     fn query_runner(&self) -> fdi::Ref<QueryRunner> {
         self.inner.provider.get()
     }
-    fn blockstore(&self) -> fdi::Ref<Blockstore<TestBinding>> {
-        self.inner.provider.get()
-    }
 }
 
 async fn init_rpc(temp_dir: &TempDir, genesis_path: ResolvedPathBuf, rpc_port: u16) -> TestNode {
@@ -1350,7 +1347,7 @@ async fn test_admin_seq() -> Result<()> {
         .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
         .unwrap();
 
-    let port = 30023;
+    let port = 30022;
     let node = init_rpc(&temp_dir, genesis_path, port).await;
 
     wait_for_server_start(port).await?;

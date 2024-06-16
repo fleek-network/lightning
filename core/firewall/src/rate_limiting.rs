@@ -247,6 +247,7 @@ impl Default for RateLimiting {
 /// see [`RateLimitingPolicy::new`] for more information
 #[derive(Debug, Clone)]
 pub struct RateLimitingPolicy {
+    period: Period,
     max_requests: f64,
     last_request: std::time::Instant,
 
@@ -262,6 +263,7 @@ impl RateLimitingPolicy {
     /// panics if
     pub fn new(period: Period, max_requests: u64) -> Self {
         Self {
+            period,
             max_requests: max_requests as f64,
             last_request: std::time::Instant::now(),
             allowed: max_requests as f64,
@@ -274,7 +276,7 @@ impl RateLimitingPolicy {
         let now = std::time::Instant::now();
         let elapsed = now.duration_since(self.last_request).as_millis();
 
-        if elapsed > Period::MAX.into() {
+        if elapsed > self.period.as_millis() as u128 {
             self.allowed = self.max_requests;
             self.last_request = now;
 
