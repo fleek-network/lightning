@@ -212,9 +212,9 @@ fn bad_request(
     })
 }
 
-pub fn create_hmac(ts: u64, nonce: usize) -> anyhow::Result<String> {
-    let mut mac =
-        Hmac::<Sha256>::new_from_slice(&super::HMAC_SECRET.get().expect("loaded hmac secret")[..])?;
+/// Creates a hmac from a timestamp and nonce
+pub fn create_hmac(secret: &[u8; 32], ts: u64, nonce: usize) -> anyhow::Result<String> {
+    let mut mac = Hmac::<Sha256>::new_from_slice(secret)?;
     mac.update(HMAC_SALT);
     mac.update(ts.to_string().as_bytes());
     mac.update(nonce.to_string().as_bytes());
@@ -244,7 +244,9 @@ fn verify_hmac(hmac: &str, ts: &str, nonce: &str) -> Result<(), BoxedError> {
         return Err("Timestamp is too far in the future".into());
     }
 
-    let correct_hmac = create_hmac(u64_ts, usize_nonce)?;
+    // assume hmac secret is loaded by now
+    // we have verified that params are valid so lets creat the correct one
+    let correct_hmac = create_hmac(super::hmac_secret(None)?, u64_ts, usize_nonce)?;
 
     if hmac != correct_hmac {
         return Err("Bad HMAC".into());

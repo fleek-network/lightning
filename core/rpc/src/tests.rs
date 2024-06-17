@@ -97,10 +97,15 @@ impl TestNode {
 async fn init_rpc(temp_dir: &TempDir, genesis_path: ResolvedPathBuf, rpc_port: u16) -> TestNode {
     let app_config = AppConfig::test(genesis_path);
 
+    let rpc_config = RpcConfig {
+        hmac_secret_dir: Some(temp_dir.path().to_path_buf()),
+        ..RpcConfig::default_with_port(rpc_port)
+    };
+
     let node = Node::<TestBinding>::init_with_provider(
         fdi::Provider::default().with(
             JsonConfigProvider::default()
-                .with::<Rpc<TestBinding>>(RpcConfig::default_with_port(rpc_port))
+                .with::<Rpc<TestBinding>>(rpc_config)
                 .with::<Application<TestBinding>>(app_config)
                 .with::<Blockstore<TestBinding>>(BlockstoreConfig {
                     root: temp_dir.path().join("blockstore").try_into().unwrap(),
@@ -1349,11 +1354,12 @@ async fn test_admin_seq() -> Result<()> {
 
     let port = 30022;
     let node = init_rpc(&temp_dir, genesis_path, port).await;
+    let secret = super::hmac_secret(Some(temp_dir.path().to_path_buf()))?;
 
     wait_for_server_start(port).await?;
 
-    test_admin_rpc_hmac(port, &node).await?;
-    test_admin_rpc_store(port, &node).await?;
+    test_admin_rpc_hmac(port, &node, secret).await?;
+    test_admin_rpc_store(port, &node, secret).await?;
 
     node.shutdown().await;
 
@@ -1362,7 +1368,7 @@ async fn test_admin_seq() -> Result<()> {
     Ok(())
 }
 
-async fn test_admin_rpc_store(port: u16, _node: &TestNode) -> Result<()> {
+async fn test_admin_rpc_store(port: u16, _node: &TestNode, secret: &[u8; 32]) -> Result<()> {
     let req = json!({
         "jsonrpc": "2.0",
         "method": "admin_test",
@@ -1375,7 +1381,7 @@ async fn test_admin_rpc_store(port: u16, _node: &TestNode) -> Result<()> {
         .as_secs();
 
     let admin_headers = RpcAdminHeaders {
-        hmac: create_hmac(unix_time, 5)?,
+        hmac: create_hmac(secret, unix_time, 5)?,
         nonce: 5,
         timestamp: unix_time,
     };
@@ -1394,7 +1400,7 @@ async fn test_admin_rpc_store(port: u16, _node: &TestNode) -> Result<()> {
     Ok(())
 }
 
-async fn test_admin_rpc_hmac(port: u16, _node: &TestNode) -> Result<()> {
+async fn test_admin_rpc_hmac(port: u16, _node: &TestNode, secret: &[u8; 32]) -> Result<()> {
     for i in 0..5 {
         let req = json!({
             "jsonrpc": "2.0",
@@ -1408,7 +1414,7 @@ async fn test_admin_rpc_hmac(port: u16, _node: &TestNode) -> Result<()> {
             .as_secs();
 
         let admin_headers = RpcAdminHeaders {
-            hmac: create_hmac(unix_time, i)?,
+            hmac: create_hmac(secret, unix_time, i)?,
             nonce: i,
             timestamp: unix_time,
         };
@@ -1440,7 +1446,7 @@ async fn test_admin_rpc_hmac(port: u16, _node: &TestNode) -> Result<()> {
 
     // pass bad nonce
     let admin_headers = RpcAdminHeaders {
-        hmac: create_hmac(unix_time, 0)?,
+        hmac: create_hmac(secret, unix_time, 0)?,
         nonce: 0,
         timestamp: unix_time,
     };

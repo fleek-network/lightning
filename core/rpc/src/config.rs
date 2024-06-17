@@ -11,7 +11,7 @@ pub struct Config {
     pub rpc_selection: RPCSelection,
     pub disallowed_methods: Option<Arc<Vec<String>>>,
     pub firewall: lightning_types::FirewallConfig,
-    pub hmac_secret: Option<PathBuf>,
+    pub hmac_secret_dir: Option<PathBuf>,
 }
 
 impl From<Config> for FirewallConfig {
@@ -26,10 +26,10 @@ impl Config {
         rpc_selection: RPCSelection,
         disallowed_methods: Option<Vec<String>>,
         firewall: lightning_types::FirewallConfig,
-        hmac_secret: Option<PathBuf>,
+        hmac_secret_dir: Option<PathBuf>,
     ) -> Self {
         Self {
-            hmac_secret,
+            hmac_secret_dir,
             firewall,
             addr,
             rpc_selection,
@@ -67,7 +67,7 @@ impl Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            hmac_secret: None,
+            hmac_secret_dir: None,
             addr: "0.0.0.0:4230".parse().expect("RPC Socket Addr to parse"),
             rpc_selection: Default::default(),
             disallowed_methods: None,
