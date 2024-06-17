@@ -35,12 +35,6 @@ use crate::config::Config;
 use crate::execution::{AuthenticStampedParcel, CommitteeAttestation, Digest, Execution};
 use crate::narwhal::{NarwhalArgs, NarwhalService};
 
-pub type ParcelWithResponse = mpsc::Receiver<(
-    AuthenticStampedParcel,
-    bool,
-    oneshot::Sender<Option<BroadcastDigest>>,
-)>;
-
 pub struct Consensus<C: Collection> {
     /// Inner state of the consensus
     #[allow(clippy::type_complexity)]
@@ -82,7 +76,7 @@ struct EpochState<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, N
     /// Interface for sending messages through the gossip layer
     pub_sub: P,
     /// Narhwal sends payloads ready for broadcast to this receiver
-    rx_narwhal_batches: Option<ParcelWithResponse>,
+    rx_narwhal_batches: Option<mpsc::Receiver<ParcelWithResponse>>,
     /// To notify when consensus is shutting down.
     shutdown_notify: Arc<Notify>,
 }
@@ -100,11 +94,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
         execution_state: Arc<Execution<P::Event, Q, NE>>,
         txn_socket: SubmitTxSocket,
         pub_sub: P,
-        rx_narwhal_batches: mpsc::Receiver<(
-            AuthenticStampedParcel,
-            bool,
-            oneshot::Sender<Option<BroadcastDigest>>,
-        )>,
+        rx_narwhal_batches: mpsc::Receiver<ParcelWithResponse>,
         shutdown_notify: Arc<Notify>,
     ) -> Self {
         Self {
@@ -488,6 +478,12 @@ fn garbage_collect_old_stores(current_epoch: &u64, store_location: &PathBuf, ret
     } else {
         error!("Unable to read narwhal store directory to garbage collect old databases");
     }
+}
+
+pub struct ParcelWithResponse {
+    pub parcel: AuthenticStampedParcel,
+    pub epoch_changed: bool,
+    pub response: oneshot::Sender<Option<BroadcastDigest>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, IsVariant, From, TryInto)]

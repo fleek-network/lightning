@@ -1,6 +1,6 @@
 use std::collections::{HashSet, VecDeque};
 use std::sync::{Arc, OnceLock, RwLock};
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
 use fastcrypto::hash::HashFunction;
@@ -25,10 +25,17 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, oneshot, Notify};
 use tracing::{error, info};
 
-use crate::consensus::PubSubMsg;
+use crate::consensus::{ParcelWithResponse, PubSubMsg};
 use crate::transaction_store::TransactionStore;
 
 pub type Digest = [u8; 32];
+
+// Exponentially moving average parameter for estimating the time between executions of parcels.
+// This parameter must be in range [0, 1].
+const TBE_EMA: f64 = 0.125;
+// Bounds for the estimated time between executions.
+const MIN_TBE: Duration = Duration::from_secs(30);
+const MAX_TBE: Duration = Duration::from_secs(40);
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AuthenticStampedParcel {
@@ -78,11 +85,7 @@ pub struct Execution<
     /// Used to signal internal consensus processes that it is time to reconfigure for a new epoch
     reconfigure_notify: Arc<Notify>,
     /// Used to send payloads to the edge node consensus to broadcast out to other nodes
-    tx_narwhal_batches: mpsc::Sender<(
-        AuthenticStampedParcel,
-        bool,
-        oneshot::Sender<Option<BroadcastDigest>>,
-    )>,
+    tx_narwhal_batches: mpsc::Sender<ParcelWithResponse>,
     /// Query runner to check application state, mainly used to make sure the last executed block
     /// is up to date from time we were an edge node
     query_runner: Q,
@@ -98,6 +101,7 @@ pub struct Execution<
     executed_digests: RwLock<HashSet<Digest>>,
     /// For non-validators only: digests of parcels we have stored but not yet executed
     pending_digests: RwLock<HashSet<Digest>>,
+    parcel_timeout_data: RwLock<ParcelTimeoutData>,
 }
 
 impl<T: BroadcastEventInterface<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emitter>
@@ -106,11 +110,7 @@ impl<T: BroadcastEventInterface<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
     pub fn new(
         executor: ExecutionEngineSocket,
         reconfigure_notify: Arc<Notify>,
-        tx_narwhal_batches: mpsc::Sender<(
-            AuthenticStampedParcel,
-            bool,
-            oneshot::Sender<Option<BroadcastDigest>>,
-        )>,
+        tx_narwhal_batches: mpsc::Sender<ParcelWithResponse>,
         query_runner: Q,
         notifier: NE,
         node_public_key: NodePublicKey,
@@ -126,6 +126,12 @@ impl<T: BroadcastEventInterface<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
             txn_store: RwLock::new(TransactionStore::default()),
             executed_digests: RwLock::new(HashSet::with_capacity(512)),
             pending_digests: RwLock::new(HashSet::with_capacity(512)),
+            parcel_timeout_data: RwLock::new(ParcelTimeoutData {
+                last_executed_timestamp: None,
+                // TODO(matthias): do some napkin math for these initial estimates
+                estimated_tbe: Duration::from_secs(30),
+                deviation_tbe: Duration::from_secs(5),
+            }),
         }
     }
 
@@ -370,7 +376,7 @@ impl<T: BroadcastEventInterface<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
 
                 // TODO(matthias): technically this call should be inside the for loop where we
                 // call `submit_batch`, but I think this might bias the estimate to be too low.
-                //update_estimated_tbe(&mut inner);
+                self.update_estimated_tbe();
 
                 return Ok(epoch_changed);
             } else {
@@ -389,7 +395,30 @@ impl<T: BroadcastEventInterface<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
 
     pub fn get_parcel_timeout(&self) -> Duration {
         // TODO(matthias): estimate time between parcel executions
-        Duration::from_secs(30)
+        let data = self.parcel_timeout_data.read().unwrap();
+        let mut timeout = 4 * data.deviation_tbe + data.estimated_tbe;
+        timeout = timeout.max(MIN_TBE);
+        timeout = timeout.min(MAX_TBE);
+        timeout
+    }
+
+    // This method should be called whenever we execute a parcel.
+    fn update_estimated_tbe(&self) {
+        let mut data = self.parcel_timeout_data.write().unwrap();
+        if let Some(timestamp) = data.last_executed_timestamp {
+            if let Ok(sample_tbe) = timestamp.elapsed() {
+                let sample_tbe = sample_tbe.as_millis() as f64;
+                let estimated_tbe = data.estimated_tbe.as_millis() as f64;
+                let new_estimated_tbe = (1.0 - TBE_EMA) * estimated_tbe + TBE_EMA * sample_tbe;
+                data.estimated_tbe = Duration::from_millis(new_estimated_tbe as u64);
+
+                let deviation_tbe = data.deviation_tbe.as_millis() as f64;
+                let new_deviation_tbe = (1.0 - TBE_EMA) * deviation_tbe
+                    + TBE_EMA * (new_estimated_tbe - sample_tbe).abs();
+                data.deviation_tbe = Duration::from_millis(new_deviation_tbe as u64);
+            }
+        }
+        data.last_executed_timestamp = Some(SystemTime::now());
     }
 }
 
@@ -448,7 +477,11 @@ impl<T: BroadcastEventInterface<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
         let (tx, rx) = oneshot::channel();
         if let Err(e) = self
             .tx_narwhal_batches
-            .send((parcel.clone(), epoch_changed, tx))
+            .send(ParcelWithResponse {
+                parcel: parcel.clone(),
+                epoch_changed,
+                response: tx,
+            })
             .await
         {
             // This shouldn't ever happen. But if it does there is no critical tasks
@@ -487,6 +520,12 @@ impl<T: BroadcastEventInterface<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
         // going to be the sub dag index they send us after a restart and we will re-execute it
         self.query_runner.get_sub_dag_index() + 1
     }
+}
+
+struct ParcelTimeoutData {
+    last_executed_timestamp: Option<SystemTime>,
+    estimated_tbe: Duration,
+    deviation_tbe: Duration,
 }
 
 #[derive(Debug)]

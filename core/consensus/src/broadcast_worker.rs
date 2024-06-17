@@ -13,7 +13,7 @@ use tokio::sync::{mpsc, oneshot, Notify};
 use tokio::task::JoinHandle;
 use tracing::{error, info};
 
-use crate::consensus::PubSubMsg;
+use crate::consensus::{ParcelWithResponse, PubSubMsg};
 use crate::execution::{
     AuthenticStampedParcel,
     CommitteeAttestation,
@@ -51,11 +51,7 @@ impl BroadcastWorker {
         query_runner: Q,
         execution: Arc<Execution<P::Event, Q, NE>>,
         node_public_key: NodePublicKey,
-        rx_narwhal_batches: mpsc::Receiver<(
-            AuthenticStampedParcel,
-            bool,
-            oneshot::Sender<Option<BroadcastDigest>>,
-        )>,
+        rx_narwhal_batches: mpsc::Receiver<ParcelWithResponse>,
         reconfigure_notify: Arc<Notify>,
     ) -> Self {
         let shutdown_notify = Arc::new(Notify::new());
@@ -104,11 +100,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
     query_runner: Q,
     execution: Arc<Execution<P::Event, Q, NE>>,
     node_public_key: NodePublicKey,
-    mut rx_narwhal_batches: mpsc::Receiver<(
-        AuthenticStampedParcel,
-        bool,
-        oneshot::Sender<Option<BroadcastDigest>>,
-    )>,
+    mut rx_narwhal_batches: mpsc::Receiver<ParcelWithResponse>,
     reconfigure_notify: Arc<Notify>,
 ) {
     info!("Edge node message worker is running");
@@ -152,7 +144,8 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
             _ = &mut shutdown_future => {
                 break;
             },
-            Some((parcel, epoch_changed, response)) = rx_narwhal_batches.recv() => {
+            Some(ParcelWithResponse{ parcel, epoch_changed, response })
+                = rx_narwhal_batches.recv() => {
                 if !on_committee {
                     // This should never happen if it somehow does there is critical error somewhere
                     panic!("We somehow sent ourselves a parcel from narwhal while not on committee");
