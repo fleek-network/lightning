@@ -1,7 +1,9 @@
 use std::fs::read_to_string;
+use std::path::PathBuf;
 use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, OnceLock};
 
+use anyhow::Context;
 use fleek_crypto::{ConsensusPublicKey, NodePublicKey};
 use jsonrpsee::server::{stop_channel, Server as JSONRPCServer};
 use jsonrpsee::{Methods, RpcModule};
@@ -34,13 +36,16 @@ static HMAC_SECRET: OnceLock<[u8; 32]> = OnceLock::new();
 pub static HMAC_NONCE: AtomicUsize = AtomicUsize::new(0);
 pub static HMAC_SALT: &[u8] = b"lightning-hmac-salt";
 
-/// Tries to read the hmac secret from the default FS location
+/// Tries to read the hmac secret from the given path or the default FS location
 /// or it will generate one and write it to disk
-pub fn hmac_secret() -> anyhow::Result<&'static [u8; 32]> {
+pub fn hmac_secret(secret_dir_path: Option<PathBuf>) -> anyhow::Result<&'static [u8; 32]> {
     match HMAC_SECRET.get() {
         Some(secret) => Ok(secret),
         None => {
-            let parent = ResolvedPathBuf::try_from(LIGHTNING_HOME_DIR.clone())?;
+            let path = secret_dir_path.unwrap_or_else(|| LIGHTNING_HOME_DIR.to_path_buf());
+
+            std::fs::create_dir_all(&path).context("Failed to create_dir_all path")?;
+            let parent = ResolvedPathBuf::try_from(path)?;
             let secret_path = parent.join("hmac_secret.hex");
 
             let secret_bytes = if secret_path.is_file() {
@@ -137,23 +142,9 @@ impl<C: Collection> Rpc<C> {
         fdi::Cloned(archive): fdi::Cloned<c!(C::ArchiveInterface)>,
         fdi::Cloned(query_runner): fdi::Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
     ) -> anyhow::Result<Self> {
-        let config = config_provider.get::<Self>();
+        let mut config = config_provider.get::<Self>();
 
-        if let Some(ref secret) = config.hmac_secret {
-            let secret_hex = read_to_string(secret)?;
-            let secret_bytes = hex::decode(secret_hex.trim())?;
-            assert!(
-                secret_bytes.len() == 32,
-                "HMAC secret must be hex encoded and 32 bytes"
-            );
-
-            let mut secret = [0_u8; 32];
-            secret.copy_from_slice(&secret_bytes);
-
-            HMAC_SECRET.set(secret).unwrap();
-        } else {
-            let _ = hmac_secret();
-        }
+        let _ = hmac_secret(config.hmac_secret_dir.take())?;
 
         let data: Arc<Data<C>> = Arc::new(Data {
             query_runner,
