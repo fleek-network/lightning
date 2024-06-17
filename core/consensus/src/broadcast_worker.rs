@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::prelude::*;
-use lightning_interfaces::types::{Epoch, NodeIndex};
+use lightning_interfaces::types::{Digest as BroadcastDigest, Epoch, NodeIndex};
 use lightning_metrics::increment_counter;
 use lightning_utils::application::QueryRunnerExt;
 use quick_cache::unsync::Cache;
@@ -14,8 +14,13 @@ use tokio::task::JoinHandle;
 use tracing::{error, info};
 
 use crate::consensus::PubSubMsg;
-use crate::execution::{AuthenticStampedParcel, CommitteeAttestation, Digest};
-use crate::transaction_manager::{NotExecuted, TxnStoreCmd};
+use crate::execution::{
+    AuthenticStampedParcel,
+    CommitteeAttestation,
+    Digest,
+    Execution,
+    NotExecuted,
+};
 
 const MAX_PENDING_TIMEOUTS: usize = 100;
 
@@ -24,16 +29,16 @@ pub struct BroadcastWorker {
     tx_shutdown: Arc<Notify>,
 }
 
-struct Context<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface> {
+struct Context<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emitter> {
     quorom_threshold: usize,
     committee: Vec<NodeIndex>,
     our_index: NodeIndex,
     on_committee: bool,
     node_public_key: NodePublicKey,
-    txn_mgr_cmd_tx: mpsc::Sender<TxnStoreCmd<P::Event>>,
     pending_timeouts: HashSet<Digest>,
     pending_requests: Cache<Digest, ()>,
     query_runner: Q,
+    execution: Arc<Execution<P::Event, Q, NE>>,
     pub_sub: P,
     timeout_tx: mpsc::Sender<Digest>,
     reconfigure_notify: Arc<Notify>,
@@ -41,29 +46,28 @@ struct Context<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface> {
 }
 
 impl BroadcastWorker {
-    pub fn spawn<
-        C: Collection,
-        P: PubSub<PubSubMsg> + 'static,
-        Q: SyncQueryRunnerInterface,
-        NE: Emitter,
-    >(
+    pub fn spawn<P: PubSub<PubSubMsg> + 'static, Q: SyncQueryRunnerInterface, NE: Emitter>(
         pub_sub: P,
         query_runner: Q,
+        execution: Arc<Execution<P::Event, Q, NE>>,
         node_public_key: NodePublicKey,
-        txn_mgr_cmd_tx: mpsc::Sender<TxnStoreCmd<P::Event>>,
-        notifier: C::NotifierInterface,
+        rx_narwhal_batches: mpsc::Receiver<(
+            AuthenticStampedParcel,
+            bool,
+            oneshot::Sender<Option<BroadcastDigest>>,
+        )>,
         reconfigure_notify: Arc<Notify>,
     ) -> Self {
         let shutdown_notify = Arc::new(Notify::new());
 
         let handle = spawn!(
-            message_receiver_worker::<C, P, Q>(
+            message_receiver_worker::<P, Q, NE>(
                 pub_sub,
                 shutdown_notify.clone(),
                 query_runner,
+                execution,
                 node_public_key,
-                notifier,
-                txn_mgr_cmd_tx,
+                rx_narwhal_batches,
                 reconfigure_notify,
             ),
             "CONSENSUS: message receiver worker"
@@ -93,17 +97,18 @@ impl BroadcastWorker {
 
 /// Creates and event loop which consumes messages from pubsub and sends them to the
 /// right destination.
-async fn message_receiver_worker<
-    C: Collection,
-    P: PubSub<PubSubMsg>,
-    Q: SyncQueryRunnerInterface,
->(
+#[allow(clippy::too_many_arguments)]
+async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emitter>(
     pub_sub: P,
     shutdown_notify: Arc<Notify>,
     query_runner: Q,
+    execution: Arc<Execution<P::Event, Q, NE>>,
     node_public_key: NodePublicKey,
-    notifier: C::NotifierInterface,
-    txn_mgr_cmd_tx: mpsc::Sender<TxnStoreCmd<P::Event>>,
+    mut rx_narwhal_batches: mpsc::Receiver<(
+        AuthenticStampedParcel,
+        bool,
+        oneshot::Sender<Option<BroadcastDigest>>,
+    )>,
     reconfigure_notify: Arc<Notify>,
 ) {
     info!("Edge node message worker is running");
@@ -119,16 +124,7 @@ async fn message_receiver_worker<
     let pending_timeouts = HashSet::new();
     let pending_requests = Cache::new(100);
 
-    let (response_tx, response_rx) = oneshot::channel();
-    txn_mgr_cmd_tx
-        .send(TxnStoreCmd::GetTimeout {
-            response: response_tx,
-        })
-        .await
-        .expect("Failed to send get timeout digest command");
-    let timeout = response_rx
-        .await
-        .expect("Failed to receive response from get timeout command");
+    let timeout = execution.get_parcel_timeout();
 
     let mut ctx = Context {
         quorom_threshold,
@@ -136,17 +132,15 @@ async fn message_receiver_worker<
         our_index,
         on_committee,
         node_public_key,
-        txn_mgr_cmd_tx,
         pending_timeouts,
         pending_requests,
         query_runner,
+        execution,
         pub_sub,
         timeout_tx,
         reconfigure_notify,
         timeout,
     };
-
-    let mut epoch_changed_sub = notifier.subscribe_epoch_changed();
 
     let shutdown_future = shutdown_notify.notified();
     pin!(shutdown_future);
@@ -158,24 +152,15 @@ async fn message_receiver_worker<
             _ = &mut shutdown_future => {
                 break;
             },
-            Some(_) = epoch_changed_sub.recv() => {
-                // Note: only validators need to execute this branch because edge nodes
-                // will know that the epoch changed, see below.
-                // Maybe we remove that part from below and have both validators and edge nodes
-                // execute this branch?
-                if on_committee {
-                    ctx.committee = ctx.query_runner.get_committee_members_by_index();
-                    ctx.quorom_threshold = (ctx.committee.len() * 2) / 3 + 1;
-                    // We recheck our index incase it was non existant before
-                    // and we staked during this epoch and finally got the certificate
-                    ctx.our_index = ctx.query_runner
-                        .pubkey_to_index(&node_public_key)
-                        .unwrap_or(u32::MAX);
-                    ctx.on_committee = ctx.committee.contains(&ctx.our_index);
+            Some((parcel, epoch_changed, response)) = rx_narwhal_batches.recv() => {
+                if !on_committee {
+                    // This should never happen if it somehow does there is critical error somewhere
+                    panic!("We somehow sent ourselves a parcel from narwhal while not on committee");
                 }
-            }
+                handle_batch(parcel, epoch_changed, response, &mut ctx).await;
+            },
             Some(msg) = ctx.pub_sub.recv_event() => {
-                handle_pubsub_event::<P, Q>(msg, &mut ctx).await;
+                handle_pubsub_event::<P, Q, NE>(msg, &mut ctx).await;
             },
             digest = timeout_rx.recv() => {
                 // Timeout for a missing parcel. If we still haven't received the parcel, we send a
@@ -183,14 +168,7 @@ async fn message_receiver_worker<
                 if let Some(digest) = digest {
                     ctx.pending_timeouts.remove(&digest);
 
-                    let (response_tx, response_rx) = oneshot::channel();
-                    ctx.txn_mgr_cmd_tx.send(TxnStoreCmd::ContainsParcel {
-                        digest,
-                        response: response_tx
-                    }).await.expect("Failed to send get parcel msg digest command");
-                    let contains_parcel = response_rx.await.expect("Failed to receive response from contains parcel command");
-
-                    if !contains_parcel {
+                    if !ctx.execution.contains_parcel(&digest) {
                         let request = PubSubMsg::RequestTransactions(digest);
                         let _ = ctx.pub_sub.send(&request, None).await;
                         ctx.pending_requests.insert(digest, ());
@@ -207,29 +185,19 @@ async fn message_receiver_worker<
     }
 }
 
-async fn handle_pubsub_event<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface>(
+async fn handle_pubsub_event<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emitter>(
     mut msg: P::Event,
-    ctx: &mut Context<P, Q>,
+    ctx: &mut Context<P, Q, NE>,
 ) {
     match msg.take().unwrap() {
         PubSubMsg::Transactions(parcel) => {
-            handle_parcel::<P, Q>(msg, parcel, ctx).await;
+            handle_parcel::<P, Q, NE>(msg, parcel, ctx).await;
         },
         PubSubMsg::Attestation(att) => {
-            handle_attestation::<P, Q>(msg, att, ctx).await;
+            handle_attestation::<P, Q, NE>(msg, att, ctx).await;
         },
         PubSubMsg::RequestTransactions(digest) => {
-            let (response_tx, response_rx) = oneshot::channel();
-            ctx.txn_mgr_cmd_tx
-                .send(TxnStoreCmd::GetParcelMessageDigest {
-                    digest,
-                    response: response_tx,
-                })
-                .await
-                .expect("Failed to send get parcel msg digest command");
-            let parcel_msg_digest = response_rx
-                .await
-                .expect("Failed to receive response from get parcel msg digest command");
+            let parcel_msg_digest = ctx.execution.get_parcel_message_digest(&digest);
             if let Some(msg_digest) = parcel_msg_digest {
                 let filter = HashSet::from([msg.originator()]);
                 ctx.pub_sub.repropagate(msg_digest, Some(filter)).await;
@@ -250,10 +218,53 @@ async fn handle_pubsub_event<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface>(
     }
 }
 
-async fn handle_parcel<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface>(
+async fn handle_batch<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emitter>(
+    parcel: AuthenticStampedParcel,
+    epoch_changed: bool,
+    response: oneshot::Sender<Option<BroadcastDigest>>,
+    ctx: &mut Context<P, Q, NE>,
+) {
+    // This will only be executed by validator nodes
+    let parcel_digest = parcel.to_digest();
+    let attestation = CommitteeAttestation {
+        digest: parcel_digest,
+        node_index: ctx.our_index,
+        epoch: parcel.epoch,
+    };
+
+    info!("Send transaction parcel to broadcast as a validator");
+    let _ = ctx.pub_sub.send(&attestation.into(), None).await;
+
+    let msg_digest = ctx.pub_sub.send(&parcel.clone().into(), None).await;
+    // Send the broadcast msg digest back to the execution, so that the execution can store it in
+    // the txn store.
+    // TODO(matthias): alternatively, we can give a clone of the pubsub to the execution
+    // and have it broadcast the parcels.
+    // The advantage of doing it this way is that the broadcast worker is solely responsible for
+    // handling the broadcast.
+    // The disadvantage is that we have more back and forth with channels.
+    response
+        .send(msg_digest.ok())
+        .expect("Failed to send response to execution");
+
+    if epoch_changed {
+        ctx.committee = ctx.query_runner.get_committee_members_by_index();
+        ctx.quorom_threshold = (ctx.committee.len() * 2) / 3 + 1;
+        // We recheck our index incase it was non existant before
+        // and we staked during this epoch and finally got the certificate
+        ctx.our_index = ctx
+            .query_runner
+            .pubkey_to_index(&ctx.node_public_key)
+            .unwrap_or(u32::MAX);
+        ctx.on_committee = ctx.committee.contains(&ctx.our_index);
+        //ctx.txn_store.change_epoch(&ctx.committee);
+    }
+}
+
+async fn handle_parcel<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emitter>(
     msg: P::Event,
     parcel: AuthenticStampedParcel,
-    ctx: &mut Context<P, Q>,
+    ctx: &mut Context<P, Q, NE>,
 ) {
     let epoch = ctx.query_runner.get_current_epoch();
     let originator = msg.originator();
@@ -286,26 +297,13 @@ async fn handle_parcel<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface>(
         // figure this out on its own if we use `msg` directly here.
 
         // TODO(matthias): panic here or only log the error?
-        ctx.txn_mgr_cmd_tx
-            .send(TxnStoreCmd::StorePendingParcel {
-                parcel,
-                originator,
-                message_digest: msg_digest,
-                event: event.unwrap(),
-            })
-            .await
-            .expect("Failed to send pending parcel to txn store");
+        ctx.execution
+            .store_pending_parcel(parcel, originator, Some(msg_digest), event.unwrap());
     } else {
         // only propagate normal parcels, not parcels we requested, and not
         // parcels that we optimistically accept from the next epoch
-        ctx.txn_mgr_cmd_tx
-            .send(TxnStoreCmd::StoreParcel {
-                parcel,
-                originator,
-                message_digest: Some(msg_digest),
-            })
-            .await
-            .expect("Failed to send parcel to txn store");
+        ctx.execution
+            .store_parcel(parcel, originator, Some(msg_digest));
     }
 
     // Check if we requested this parcel
@@ -331,14 +329,14 @@ async fn handle_parcel<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface>(
     if !ctx.on_committee {
         info!("Received transaction parcel from gossip as an edge node");
 
-        try_execute::<P, Q>(parcel_digest, ctx).await;
+        try_execute::<P, Q, NE>(parcel_digest, ctx).await;
     }
 }
 
-async fn handle_attestation<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface>(
+async fn handle_attestation<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emitter>(
     msg: P::Event,
     att: CommitteeAttestation,
-    ctx: &mut Context<P, Q>,
+    ctx: &mut Context<P, Q, NE>,
 ) {
     let originator = msg.originator();
 
@@ -366,46 +364,25 @@ async fn handle_attestation<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface>(
             // Note: this unwrap is safe. If `from_next_epoch=true`, then `event`
             // will always be `Some`. Unfortunately, the borrow checker cannot
             // figure this out on its own if we use `msg` directly here.
-            ctx.txn_mgr_cmd_tx
-                .send(TxnStoreCmd::StorePendingAttestation {
-                    digest: att.digest,
-                    node_index: att.node_index,
-                    event: event.unwrap(),
-                })
-                .await
-                .expect("Failed to send pending attestation to txn store");
+            ctx.execution
+                .store_pending_attestation(att.digest, att.node_index, event.unwrap());
         } else {
-            ctx.txn_mgr_cmd_tx
-                .send(TxnStoreCmd::StoreAttestation {
-                    digest: att.digest,
-                    node_index: att.node_index,
-                })
-                .await
-                .expect("Failed to send attestation to txn store");
+            ctx.execution.store_attestation(att.digest, att.node_index);
         }
 
-        try_execute::<P, Q>(att.digest, ctx).await;
+        try_execute::<P, Q, NE>(att.digest, ctx).await;
     }
 }
 
-async fn try_execute<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface>(
+async fn try_execute<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emitter>(
     digest: Digest,
-    ctx: &mut Context<P, Q>,
+    ctx: &mut Context<P, Q, NE>,
 ) {
-    let (response_tx, response_rx) = oneshot::channel();
-    ctx.txn_mgr_cmd_tx
-        .send(TxnStoreCmd::TryExecute {
-            digest,
-            quorom_threshold: ctx.quorom_threshold,
-            response: response_tx,
-        })
+    match ctx
+        .execution
+        .try_execute(digest, ctx.quorom_threshold)
         .await
-        .expect("Failed to send try execute command");
-    let res = response_rx
-        .await
-        .expect("Failed to receive response from try execute command");
-
-    match res {
+    {
         Ok(epoch_changed) => {
             if epoch_changed {
                 ctx.committee = ctx.query_runner.get_committee_members_by_index();
@@ -439,9 +416,9 @@ async fn try_execute<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface>(
 // the intervals between executing parcels.
 // If we are missing a parcel, and the time that has passed since trying toexecute the last parcel
 // is larger than the expected time, we send out a request.
-fn handle_not_executed<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface>(
+fn handle_not_executed<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emitter>(
     not_executed: NotExecuted,
-    ctx: &mut Context<P, Q>,
+    ctx: &mut Context<P, Q, NE>,
 ) {
     if let NotExecuted::MissingParcel { digest, timeout } = not_executed {
         ctx.timeout = timeout;

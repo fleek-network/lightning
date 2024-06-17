@@ -4,7 +4,6 @@ use std::collections::{HashMap, HashSet};
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Digest as BroadcastDigest, NodeIndex};
 
-use super::transaction_store::Parcel;
 use crate::consensus::PubSubMsg;
 use crate::execution::{AuthenticStampedParcel, Digest};
 
@@ -15,21 +14,25 @@ pub struct ParcelWrapper<T: BroadcastEventInterface<PubSubMsg>> {
     pub(crate) attestation_events: Option<HashMap<NodeIndex, T>>,
 }
 
-pub struct RingBuffer<T: BroadcastEventInterface<PubSubMsg>> {
+#[derive(Clone, Debug)]
+pub struct Parcel {
+    pub inner: AuthenticStampedParcel,
+    // The originator of this parcel.
+    pub originator: NodeIndex,
+    // This is the digest from the broadcast message that contained the parcel.
+    // At the moment, both broadcast and consensus use [u8; 32] for the digests, but we should
+    // treat them as different types nonetheless.
+    pub message_digest: Option<BroadcastDigest>,
+}
+
+pub struct TransactionStore<T: BroadcastEventInterface<PubSubMsg>> {
     ring: Vec<HashMap<Digest, ParcelWrapper<T>>>,
     pointer: usize,
 }
 
-impl<T: BroadcastEventInterface<PubSubMsg>> RingBuffer<T> {
+impl<T: BroadcastEventInterface<PubSubMsg>> TransactionStore<T> {
     pub fn new() -> Self {
-        RingBuffer {
-            ring: vec![
-                HashMap::with_capacity(100),
-                HashMap::with_capacity(100),
-                HashMap::with_capacity(100),
-            ],
-            pointer: 1,
-        }
+        Self::default()
     }
 
     // Returns the parcel for the given digest, if it exists.
@@ -84,14 +87,14 @@ impl<T: BroadcastEventInterface<PubSubMsg>> RingBuffer<T> {
     }
 
     // Store an attestation from the current epoch.
-    pub fn add_attestation(&mut self, digest: Digest, node_index: NodeIndex) {
-        self.add_attestation_internal(self.pointer, digest, node_index, None);
+    pub fn store_attestation(&mut self, digest: Digest, node_index: NodeIndex) {
+        self.store_attestation_internal(self.pointer, digest, node_index, None);
     }
 
     // Stores an attestation from the next epoch. After the epoch change we have to verify if this
     // attestation originated from a committee member.
-    pub fn add_pending_attestation(&mut self, digest: Digest, node_index: NodeIndex, event: T) {
-        self.add_attestation_internal(self.next_pointer(), digest, node_index, Some(event));
+    pub fn store_pending_attestation(&mut self, digest: Digest, node_index: NodeIndex, event: T) {
+        self.store_attestation_internal(self.next_pointer(), digest, node_index, Some(event));
     }
 
     // When the epoch changes, the parcels from the current epochs become
@@ -190,7 +193,7 @@ impl<T: BroadcastEventInterface<PubSubMsg>> RingBuffer<T> {
         }
     }
 
-    fn add_attestation_internal(
+    fn store_attestation_internal(
         &mut self,
         pointer: usize,
         digest: Digest,
@@ -224,6 +227,19 @@ impl<T: BroadcastEventInterface<PubSubMsg>> RingBuffer<T> {
             self.ring.len() - 1
         } else {
             self.pointer - 1
+        }
+    }
+}
+
+impl<T: BroadcastEventInterface<PubSubMsg>> Default for TransactionStore<T> {
+    fn default() -> Self {
+        Self {
+            ring: vec![
+                HashMap::with_capacity(100),
+                HashMap::with_capacity(100),
+                HashMap::with_capacity(100),
+            ],
+            pointer: 1,
         }
     }
 }

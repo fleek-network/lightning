@@ -7,7 +7,14 @@ use std::time::{Duration, SystemTime};
 use derive_more::{From, IsVariant, TryInto};
 use fleek_crypto::{ConsensusPublicKey, NodePublicKey, SecretKey};
 use lightning_interfaces::prelude::*;
-use lightning_interfaces::types::{Epoch, EpochInfo, Event, Topic, UpdateMethod};
+use lightning_interfaces::types::{
+    Digest as BroadcastDigest,
+    Epoch,
+    EpochInfo,
+    Event,
+    Topic,
+    UpdateMethod,
+};
 use lightning_utils::application::QueryRunnerExt;
 use mysten_metrics::RegistryService;
 use mysten_network::Multiaddr;
@@ -18,7 +25,7 @@ use narwhal_node::NodeStorage;
 use prometheus::Registry;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
-use tokio::sync::{mpsc, Notify};
+use tokio::sync::{mpsc, oneshot, Notify};
 use tokio::{pin, select, task, time};
 use tracing::{error, info};
 use typed_store::DBMetrics;
@@ -27,14 +34,18 @@ use crate::broadcast_worker::BroadcastWorker;
 use crate::config::Config;
 use crate::execution::{AuthenticStampedParcel, CommitteeAttestation, Digest, Execution};
 use crate::narwhal::{NarwhalArgs, NarwhalService};
-use crate::transaction_manager::{TransactionStoreManager, TxnStoreCmd};
+
+pub type ParcelWithResponse = mpsc::Receiver<(
+    AuthenticStampedParcel,
+    bool,
+    oneshot::Sender<Option<BroadcastDigest>>,
+)>;
 
 pub struct Consensus<C: Collection> {
     /// Inner state of the consensus
     #[allow(clippy::type_complexity)]
     epoch_state: Option<
         EpochState<
-            C,
             c![C::ApplicationInterface::SyncExecutor],
             c![C::BroadcastInterface::PubSub<PubSubMsg>],
             c![C::NotifierInterface::Emitter],
@@ -48,12 +59,7 @@ pub struct Consensus<C: Collection> {
 }
 
 /// This struct contains mutable state only for the current epoch.
-struct EpochState<
-    C: Collection,
-    Q: SyncQueryRunnerInterface,
-    P: PubSub<PubSubMsg> + 'static,
-    NE: Emitter,
-> {
+struct EpochState<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter> {
     /// The node public key of the node.
     node_public_key: NodePublicKey,
     /// The consensus public key of the node.
@@ -67,7 +73,7 @@ struct EpochState<
     /// Path to the database used by the narwhal implementation
     pub store_path: ResolvedPathBuf,
     /// Narwhal execution state.
-    execution_state: Arc<Execution<Q, NE>>,
+    execution_state: Arc<Execution<P::Event, Q, NE>>,
     /// Used to send transactions to consensus
     /// We still use this socket on consensus struct because a node is not always on the committee,
     /// so its not always sending     a transaction to its own mempool. The signer interface
@@ -75,21 +81,15 @@ struct EpochState<
     txn_socket: SubmitTxSocket,
     /// Interface for sending messages through the gossip layer
     pub_sub: P,
-    /// Notifier
-    notifier: C::NotifierInterface,
     /// Narhwal sends payloads ready for broadcast to this receiver
-    rx_narwhal_batches: Option<mpsc::Receiver<(AuthenticStampedParcel, bool)>>,
-    /// Send commands to the transaction store manager
-    txn_mgr_cmd_tx: mpsc::Sender<TxnStoreCmd<P::Event>>,
-    /// Transaction store manager command receiver. Only parked here until the worker is spawned.
-    txn_mgr_cmd_rx: Option<mpsc::Receiver<TxnStoreCmd<P::Event>>>,
+    rx_narwhal_batches: Option<ParcelWithResponse>,
     /// To notify when consensus is shutting down.
     shutdown_notify: Arc<Notify>,
 }
 
 #[allow(clippy::too_many_arguments)]
-impl<C: Collection, Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
-    EpochState<C, Q, P, NE>
+impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
+    EpochState<Q, P, NE>
 {
     fn new(
         node_public_key: NodePublicKey,
@@ -97,13 +97,14 @@ impl<C: Collection, Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static,
         query_runner: Q,
         narwhal_args: NarwhalArgs,
         store_path: ResolvedPathBuf,
-        execution_state: Arc<Execution<Q, NE>>,
+        execution_state: Arc<Execution<P::Event, Q, NE>>,
         txn_socket: SubmitTxSocket,
         pub_sub: P,
-        notifier: C::NotifierInterface,
-        rx_narwhal_batches: mpsc::Receiver<(AuthenticStampedParcel, bool)>,
-        txn_mgr_cmd_tx: mpsc::Sender<TxnStoreCmd<P::Event>>,
-        txn_mgr_cmd_rx: mpsc::Receiver<TxnStoreCmd<P::Event>>,
+        rx_narwhal_batches: mpsc::Receiver<(
+            AuthenticStampedParcel,
+            bool,
+            oneshot::Sender<Option<BroadcastDigest>>,
+        )>,
         shutdown_notify: Arc<Notify>,
     ) -> Self {
         Self {
@@ -116,41 +117,25 @@ impl<C: Collection, Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static,
             execution_state,
             txn_socket,
             pub_sub,
-            notifier,
             rx_narwhal_batches: Some(rx_narwhal_batches),
-            txn_mgr_cmd_tx,
-            txn_mgr_cmd_rx: Some(txn_mgr_cmd_rx),
             shutdown_notify,
         }
     }
 
     fn spawn_broadcast_worker(&mut self, reconfigure_notify: Arc<Notify>) -> BroadcastWorker {
-        BroadcastWorker::spawn::<C, P, Q, NE>(
+        BroadcastWorker::spawn::<P, Q, NE>(
             self.pub_sub.clone(),
             self.query_runner.clone(),
+            self.execution_state.clone(),
             self.narwhal_args
                 .primary_network_keypair
                 .public()
                 .to_owned()
                 .into(),
-            self.txn_mgr_cmd_tx.clone(),
-            self.notifier.clone(),
-            reconfigure_notify,
-        )
-    }
-
-    fn spawn_transaction_manager(&mut self) -> TransactionStoreManager {
-        TransactionStoreManager::spawn::<P, Q, NE>(
-            self.txn_mgr_cmd_rx
-                .take()
-                .expect("Transaction store manager command rx is missing"),
-            self.execution_state.clone(),
-            self.query_runner.clone(),
             self.rx_narwhal_batches
                 .take()
-                .expect("rx_narwhal_batches missing from EpochState"),
-            self.pub_sub.clone(),
-            self.node_public_key,
+                .expect("rx_narwhal_batches is missing"),
+            reconfigure_notify,
         )
     }
 
@@ -348,7 +333,6 @@ impl<C: Collection> Consensus<C> {
         let panic_waiter = waiter.clone();
         spawn!(
             async move {
-                let txn_manager = epoch_state.spawn_transaction_manager();
                 let broadcast_worker =
                     epoch_state.spawn_broadcast_worker(reconfigure_notify.clone());
                 epoch_state.start_current_epoch().await;
@@ -366,7 +350,6 @@ impl<C: Collection> Consensus<C> {
                                 consensus.shutdown().await;
                             }
                             broadcast_worker.shutdown().await;
-                            txn_manager.shutdown().await;
                             epoch_state.shutdown();
                             break
                         }
@@ -440,13 +423,13 @@ impl<C: Collection> Consensus<C> {
         // Todo(dalton): Figure out better default channel size
         let (tx_narwhal_batches, rx_narwhal_batches) = mpsc::channel(1000);
 
-        let (txn_mgr_cmd_tx, txn_mgr_cmd_rx) = mpsc::channel(1000);
         let execution_state = Arc::new(Execution::new(
             executor,
             reconfigure_notify.clone(),
             tx_narwhal_batches,
             query_runner.clone(),
             notifier.get_emitter(),
+            primary_pk,
         ));
 
         let shutdown_notify_epoch_state = Arc::new(Notify::new());
@@ -460,10 +443,7 @@ impl<C: Collection> Consensus<C> {
             execution_state,
             signer.get_socket(),
             pubsub,
-            notifier.clone(),
             rx_narwhal_batches,
-            txn_mgr_cmd_tx,
-            txn_mgr_cmd_rx,
             shutdown_notify_epoch_state.clone(),
         );
 
