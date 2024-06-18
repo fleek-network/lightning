@@ -103,7 +103,17 @@ jobs:
         # fix: 🐛 support gatsby path prefix https://github.com/open-rpc/generator/pull/708
         run: sed -i 's|href="/api-documentation"|href="/lightning/api-documentation"|g' src/pages/index.tsx
 
-      - name: Build docs
+      - name: Cached gatsby build
+        uses: actions/cache@v4
+        with:
+          path: |
+            docs/rpc/docs/gatsby/public
+            docs/rpc/docs/gatsby/.cache
+          key: ${{ runner.os }}-gatsby-build-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-gatsby-build-
+
+      - name: Build gatsby docs
         working-directory: ./docs/rpc/docs/gatsby
         run: |
           export NODE_OPTIONS="--max_old_space_size=4096"
