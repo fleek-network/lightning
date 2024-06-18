@@ -29,6 +29,9 @@ jobs:
         with:
           toolchain: stable
 
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+
       - name: Build RPC Docs
         run: cargo run --bin generate-openrpc-spec -- --write-to .
 
