@@ -19,11 +19,13 @@ jobs:
         working-directory: ./docs/rpc
 
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
         with:
           node-version: 16
-      - uses: actions-rs/toolchain@v1
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
 
@@ -105,7 +107,7 @@ jobs:
           npx gatsby build --prefix-paths
 
       - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
+        uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./docs/rpc/docs/gatsby/public
