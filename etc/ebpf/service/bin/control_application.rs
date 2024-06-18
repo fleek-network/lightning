@@ -86,14 +86,15 @@ async fn main() -> anyhow::Result<()> {
     let mut buffers: PerCpuHashMap<_, u32, Buffer> =
         PerCpuHashMap::try_from(handle.take_map("BUFFERS").unwrap())?;
 
+    let cpu_count = aya::util::nr_cpus()?;
     buffers.insert(
-        1,
-        PerCpuValues::try_from(vec![[0u8; MAX_BUFFER_LEN]; aya::util::nr_cpus()?])?,
+        0,
+        PerCpuValues::try_from(vec![[0u8; MAX_BUFFER_LEN]; cpu_count])?,
         0,
     )?;
     buffers.insert(
         1,
-        PerCpuValues::try_from(vec![[0u8; MAX_BUFFER_LEN]; aya::util::nr_cpus()?])?,
+        PerCpuValues::try_from(vec![[0u8; MAX_BUFFER_LEN]; cpu_count])?,
         0,
     )?;
 
