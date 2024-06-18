@@ -37,7 +37,7 @@ pub enum RateLimitingMode {
 
 impl RateLimiting {
     pub fn none() -> Self {
-        Self::default()
+        Self::None
     }
 
     pub fn global(policy: Vec<RateLimitingRule>) -> Self {
@@ -225,12 +225,6 @@ impl RateLimiting {
         };
 
         Ok(())
-    }
-}
-
-impl Default for RateLimiting {
-    fn default() -> Self {
-        Self::None
     }
 }
 

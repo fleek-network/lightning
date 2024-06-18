@@ -94,7 +94,7 @@ impl Firewall {
         };
 
         let rate = match rate_limiting {
-            RateLimitingConfig::None => RateLimiting::default(),
+            RateLimitingConfig::None => RateLimiting::None,
             RateLimitingConfig::Per => RateLimiting::per(),
             RateLimitingConfig::Global { rules } => RateLimiting::global(rules),
         };

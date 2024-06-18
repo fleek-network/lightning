@@ -8,7 +8,6 @@ pub struct FirewallConfig {
     pub rate_limiting: RateLimitingConfig,
 }
 
-// todo stricter defaults?
 impl Default for FirewallConfig {
     fn default() -> Self {
         Self {
@@ -19,6 +18,7 @@ impl Default for FirewallConfig {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub enum ConnectionPolicyConfig {
     All,
     Whitelist { members: Vec<IpAddr> },
@@ -27,6 +27,7 @@ pub enum ConnectionPolicyConfig {
 
 /// The connection policy for the firewall
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub enum RateLimitingConfig {
     /// Default Value
     /// Sets global RPS = 10

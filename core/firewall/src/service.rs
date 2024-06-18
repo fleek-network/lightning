@@ -54,7 +54,7 @@ where
 }
 
 #[derive(Clone)]
-pub struct ConnectedService<S: Clone> {
+pub struct ConnectedService<S> {
     svc: S,
     firewall: Firewall,
     ip: std::net::IpAddr,
@@ -65,14 +65,13 @@ impl<S, Req, Res> Service<Req> for ConnectedService<S>
 where
     S: Service<Req, Response = Res>,
     S: Unpin,
-    S: Clone,
-    S::Future: Unpin,
+    S::Future: Send + Unpin,
     Req: Unpin,
     Res: From<FirewallError>,
 {
     type Response = Res;
     type Error = S::Error;
-    type Future = ServiceFuture<S, Req, BoxedFuture<Result<(), FirewallError>>, S::Future>;
+    type Future = ServiceFuture<BoxedFuture<Result<(), FirewallError>>, S::Future>;
 
     fn poll_ready(
         &mut self,
@@ -82,48 +81,43 @@ where
     }
 
     fn call(&mut self, req: Req) -> Self::Future {
-        let fut = Box::pin({
+        let firewall_fut = Box::pin({
             let firewall = self.firewall.clone();
             let ip = self.ip;
             async move { firewall.check(ip).await }
         });
 
+        let svc_fut = self.svc.call(req);
+
         // This might get called again!
-        ServiceFuture::new(self.svc.clone(), fut, req)
+        ServiceFuture::new(firewall_fut, svc_fut)
     }
 }
 
-pub struct ServiceFuture<S, Req, FirewallFut, SvcFut> {
+pub struct ServiceFuture<FirewallFut, SvcFut> {
     called: bool,
-    svc: S,
-    svc_fut: Option<SvcFut>,
+    svc_fut: SvcFut,
     firewall_fut: FirewallFut,
-    req: Option<Req>,
 }
 
-impl<S, Req, FirewallFut, SvcFut> ServiceFuture<S, Req, FirewallFut, SvcFut> {
-    pub fn new(svc: S, firewall_fut: FirewallFut, req: Req) -> Self {
+impl<FirewallFut, SvcFut> ServiceFuture<FirewallFut, SvcFut> {
+    pub fn new(firewall_fut: FirewallFut, svc_fut: SvcFut) -> Self {
         Self {
             called: false,
-            svc,
-            svc_fut: None,
             firewall_fut,
-            req: Some(req),
+            svc_fut,
         }
     }
 }
 
-impl<S, Req, FirewallFut, SvcFut> Future for ServiceFuture<S, Req, FirewallFut, SvcFut>
+impl<FirewallFut, SvcFut, Res, Err> Future for ServiceFuture<FirewallFut, SvcFut>
 where
-    Req: Unpin,
-    S: Unpin,
-    S: Service<Req, Future = SvcFut>,
-    S::Response: From<FirewallError>,
+    Self: Send,
+    Res: From<FirewallError>,
     FirewallFut: Future<Output = Result<(), FirewallError>> + Unpin,
-    SvcFut: Future<Output = Result<S::Response, S::Error>> + Unpin,
-    S::Future: Unpin,
+    SvcFut: Future<Output = Result<Res, Err>> + Unpin,
 {
-    type Output = Result<S::Response, S::Error>;
+    type Output = Result<Res, Err>;
 
     fn poll(
         mut self: Pin<&mut Self>,
@@ -141,17 +135,7 @@ where
             self.called = true;
         }
 
-        loop {
-            if let Some(fut) = self.svc_fut.as_mut() {
-                match Pin::new(fut).poll(cx) {
-                    Poll::Ready(res) => return Poll::Ready(res),
-                    Poll::Pending => return Poll::Pending,
-                }
-            }
-
-            let req = self.req.take().expect("req is none");
-            self.svc_fut = Some(self.svc.call(req));
-        }
+        Pin::new(&mut self.svc_fut).poll(cx)
     }
 }
 
