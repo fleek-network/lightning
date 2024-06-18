@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - core/rpc/src/api/**
+      - .github/workflows/openrpc-docs.yml
 
   workflow_dispatch:
 
