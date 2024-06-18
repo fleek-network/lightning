@@ -133,7 +133,7 @@ impl RateLimiting {
                             .filter_map(|(k, v)| {
                                 // take the user rules if theyre are not global
                                 if v.first().map_or(false, |policy| !policy.is_global) {
-                                    return Some((k, v.into_iter().map(IsGlobal::take).collect()));
+                                    return Some((k, v.into_iter().map(IsGlobal::inner).collect()));
                                 }
 
                                 None
@@ -212,7 +212,7 @@ impl RateLimiting {
                 // there is no policy for this ip, use the global policy
                 let mut policies: Vec<IsGlobal<RateLimitingPolicy>> = global
                     .iter()
-                    .cloned()
+                    .copied()
                     .map(|p| IsGlobal::yes(p.into()))
                     .collect();
 
@@ -230,13 +230,7 @@ impl RateLimiting {
 
 impl Default for RateLimiting {
     fn default() -> Self {
-        Self::WithGlobal {
-            global: vec![RateLimitingRule {
-                period: Period::Second,
-                max_requests: 10,
-            }],
-            per: HashMap::new(),
-        }
+        Self::None
     }
 }
 
@@ -335,7 +329,7 @@ impl<T> IsGlobal<T> {
         }
     }
 
-    fn take(self) -> T {
+    fn inner(self) -> T {
         self.value
     }
 }

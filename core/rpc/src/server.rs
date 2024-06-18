@@ -245,7 +245,7 @@ fn verify_hmac(hmac: &str, ts: &str, nonce: &str) -> Result<(), BoxedError> {
     }
 
     // assume hmac secret is loaded by now
-    // we have verified that params are valid so lets creat the correct one
+    // we have verified that params are valid so lets create the correct one
     let correct_hmac = create_hmac(super::hmac_secret(None)?, u64_ts, usize_nonce)?;
 
     if hmac != correct_hmac {

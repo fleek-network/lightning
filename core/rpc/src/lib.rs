@@ -36,8 +36,9 @@ static HMAC_SECRET: OnceLock<[u8; 32]> = OnceLock::new();
 pub static HMAC_NONCE: AtomicUsize = AtomicUsize::new(0);
 pub static HMAC_SALT: &[u8] = b"lightning-hmac-salt";
 
-/// Tries to read the hmac secret from the given path or the default FS location
-/// or it will generate one and write it to disk
+/// Tries to read the hmac secret from the given path or the default location if empty
+/// if the file exists it will read the secret from it otherwise
+/// it will generate one and write it to disk in both cases
 pub fn hmac_secret(secret_dir_path: Option<PathBuf>) -> anyhow::Result<&'static [u8; 32]> {
     match HMAC_SECRET.get() {
         Some(secret) => Ok(secret),
