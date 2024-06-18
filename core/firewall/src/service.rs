@@ -129,29 +129,28 @@ where
         mut self: Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
-        let mut this = self.as_mut();
-
         // If we haven't called the firewall yet, do so
-        if !this.called {
-            let pinned = Pin::new(&mut this.firewall_fut);
+        if !self.called {
+            let pinned = Pin::new(&mut self.firewall_fut);
+
             match ready!(pinned.poll(cx)) {
                 Ok(_) => {},
                 Err(e) => return Poll::Ready(Ok(e.into())),
             }
 
-            this.called = true;
+            self.called = true;
         }
 
         loop {
-            if let Some(fut) = this.svc_fut.as_mut() {
+            if let Some(fut) = self.svc_fut.as_mut() {
                 match Pin::new(fut).poll(cx) {
                     Poll::Ready(res) => return Poll::Ready(res),
                     Poll::Pending => return Poll::Pending,
                 }
             }
 
-            let req = this.req.take().expect("req is none");
-            this.svc_fut = Some(this.svc.call(req));
+            let req = self.req.take().expect("req is none");
+            self.svc_fut = Some(self.svc.call(req));
         }
     }
 }

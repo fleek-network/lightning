@@ -37,7 +37,7 @@ pub enum RateLimitingConfig {
     },
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct RateLimitingRule {
     pub period: Period,
     pub max_requests: u64,
