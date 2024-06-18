@@ -250,7 +250,7 @@ async fn handle_batch<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
             .pubkey_to_index(&ctx.node_public_key)
             .unwrap_or(u32::MAX);
         ctx.on_committee = ctx.committee.contains(&ctx.our_index);
-        //ctx.txn_store.change_epoch(&ctx.committee);
+        ctx.execution.change_epoch(&ctx.committee);
     }
 }
 
@@ -388,9 +388,7 @@ async fn try_execute<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emit
                     .unwrap_or(u32::MAX);
                 ctx.on_committee = ctx.committee.contains(&ctx.our_index);
                 ctx.reconfigure_notify.notify_waiters();
-
-                // Check the validity of the parcels/attestations that we
-                // stored optimistically.
+                ctx.execution.change_epoch(&ctx.committee);
             }
         },
         Err(not_executed) => {

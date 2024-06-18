@@ -271,6 +271,10 @@ impl<T: BroadcastEventInterface<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
         self.txn_store.read().unwrap().get_parcel(digest).is_some()
     }
 
+    pub fn change_epoch(&self, committee: &[NodeIndex]) {
+        self.txn_store.write().unwrap().change_epoch(committee)
+    }
+
     // Threshold should be 2f + 1 of the committee
     // Returns true if the epoch has changed
     pub async fn try_execute(&self, digest: Digest, threshold: usize) -> Result<bool, NotExecuted> {
