@@ -26,6 +26,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 16
+          cache: 'npm'
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
