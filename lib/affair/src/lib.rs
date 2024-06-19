@@ -59,7 +59,7 @@ pub trait Worker: Send + 'static {
     fn spawn_with_spawner<S, Out>(self, spawner: S) -> (Out, Socket<Self::Request, Self::Response>)
     where
         Self: Sized,
-        S: FnOnce(BoxFuture<()>) -> Out,
+        S: FnOnce(BoxFuture<'static, ()>) -> Out,
     {
         let (tx, rx) = mpsc::channel(64);
         let future = run_non_blocking(rx, self);
@@ -96,7 +96,7 @@ pub trait AsyncWorker: Send + 'static {
     fn spawn_with_spawner<S, Out>(self, spawner: S) -> (Out, Socket<Self::Request, Self::Response>)
     where
         Self: Sized,
-        S: FnOnce(BoxFuture<()>) -> Out,
+        S: FnOnce(BoxFuture<'static, ()>) -> Out,
     {
         let (tx, rx) = mpsc::channel(64);
         let future = run_non_blocking_async(rx, self);
@@ -135,7 +135,7 @@ pub trait AsyncWorkerUnordered: Send + Sync + 'static {
     fn spawn_with_spawner<S, Out>(self, spawner: S) -> (Out, Socket<Self::Request, Self::Response>)
     where
         Self: Sized,
-        S: FnOnce(BoxFuture<()>) -> Out,
+        S: FnOnce(BoxFuture<'static, ()>) -> Out,
     {
         let (tx, rx) = mpsc::channel(64);
         let out = spawner(Box::pin(async move {
