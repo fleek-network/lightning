@@ -1,6 +1,9 @@
 use anyhow::{anyhow, bail};
-use log::{error, info};
+use aya::maps::{MapData, RingBuf};
+use lightning_ebpf_common::EventMessage;
+use log::{debug, error, info};
 use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
+use tokio::io::unix::AsyncFd;
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::mpsc;
 
@@ -14,15 +17,22 @@ pub struct Server {
     listener: UnixListener,
     shared_state: SharedMap,
     config_src: ConfigSource,
+    events: AsyncFd<RingBuf<MapData>>,
 }
 
 impl Server {
-    pub fn new(listener: UnixListener, shared_state: SharedMap, config_src: ConfigSource) -> Self {
-        Self {
+    pub fn new(
+        listener: UnixListener,
+        shared_state: SharedMap,
+        config_src: ConfigSource,
+        events: RingBuf<MapData>,
+    ) -> anyhow::Result<Self> {
+        Ok(Self {
             listener,
             shared_state,
             config_src,
-        }
+            events: AsyncFd::new(events)?,
+        })
     }
 
     pub async fn handle_watcher_event(&mut self, event: Event) -> anyhow::Result<()> {
@@ -116,7 +126,22 @@ impl Server {
                         }
                     }
                 }
+                next = self.events.readable_mut() => {
+                    let mut guard = next?;
+                    read_next_event(guard.get_inner_mut())?;
+                    guard.clear_ready();
+                }
             }
         }
     }
+}
+
+pub fn read_next_event(queue: &mut RingBuf<MapData>) -> anyhow::Result<Vec<EventMessage>> {
+    let mut events = Vec::new();
+    while let Some(read) = queue.next() {
+        let read: EventMessage = (*read).try_into()?;
+        debug!("received event {:?}", read);
+        events.push(read);
+    }
+    Ok(events)
 }

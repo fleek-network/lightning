@@ -8,6 +8,7 @@ pub const FILE_OPEN_PROG_ID: u8 = 0;
 pub const ACCESS_DENIED_EVENT: u8 = 0;
 
 pub type Buffer = [u8; MAX_BUFFER_LEN];
+pub type EventMessage = [u8; EVENT_HEADER_SIZE + 2 * MAX_BUFFER_LEN];
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
 #[repr(C)]

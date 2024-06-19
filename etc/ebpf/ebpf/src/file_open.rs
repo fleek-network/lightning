@@ -171,8 +171,11 @@ unsafe fn send_event(event: u8, prog: u8, task: *const vmlinux::file, message: &
     {
         match entry.as_mut_ptr().as_mut() {
             Some(dst) => {
+                // Set headers.
                 dst[0] = event;
                 dst[1] = prog;
+
+                // Set messages.
                 if aya_ebpf::helpers::bpf_probe_read_kernel_str_bytes(
                     task_name.as_ptr(),
                     core::slice::from_raw_parts_mut(

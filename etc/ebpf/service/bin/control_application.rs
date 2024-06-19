@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::Context;
-use aya::maps::{HashMap, PerCpuHashMap, PerCpuValues};
+use aya::maps::{HashMap, PerCpuHashMap, PerCpuValues, RingBuf};
 use aya::programs::{Lsm, Xdp, XdpFlags};
 use aya::{include_bytes_aligned, Btf, Ebpf};
 use aya_log::EbpfLogger;
@@ -85,6 +85,7 @@ async fn main() -> anyhow::Result<()> {
         HashMap::try_from(handle.take_map("PACKET_FILTERS").unwrap())?;
     let mut buffers: PerCpuHashMap<_, u32, Buffer> =
         PerCpuHashMap::try_from(handle.take_map("BUFFERS").unwrap())?;
+    let events: RingBuf<_> = RingBuf::try_from(handle.take_map("EVENTS").unwrap())?;
 
     let cpu_count = aya::util::nr_cpus()?;
     buffers.insert(
@@ -109,7 +110,7 @@ async fn main() -> anyhow::Result<()> {
     let listener = UnixListener::bind(opt.bind.as_path())?;
 
     let shared_state = SharedMap::new(packet_filters, file_open_allow, config_src.clone());
-    let server = Server::new(listener, shared_state, config_src);
+    let server = Server::new(listener, shared_state, config_src, events)?;
 
     log::info!("Enter Ctrl-C to shutdown");
 

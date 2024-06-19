@@ -33,7 +33,7 @@ serde_json = "1.0"
 lightning-utils = { path = "../../../core/utils" }
 
 [features]
-default = ["client"]
+default = ["client", "server"]
 client = ["bytes", "log", "tokio", "anyhow", "lightning-ebpf-common/default"]
 server = [
     "aya",

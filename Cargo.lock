@@ -6173,13 +6173,19 @@ dependencies = [
 [[package]]
 name = "lightning-ebpf-common"
 version = "0.0.0"
+dependencies = [
+ "aya",
+]
 
 [[package]]
 name = "lightning-ebpf-service"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "aya",
+ "aya-log",
  "bytes",
+ "libc",
  "lightning-ebpf-common",
  "lightning-utils",
  "log",
