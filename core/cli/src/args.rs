@@ -8,7 +8,7 @@ use lightning_utils::config::LIGHTNING_HOME_DIR;
 use crate::commands::admin::AdminSubCmd;
 
 #[derive(Parser)]
-#[command(about, version = crate::VERSION)]
+#[command(about, name = "lightning-node", version = crate::VERSION.clone())]
 pub struct Args {
     /// Path to the toml configuration file
     #[arg(short, long, global = true, default_value_t = String::from(LIGHTNING_HOME_DIR.join("config.toml").to_string_lossy().as_ref()) )]

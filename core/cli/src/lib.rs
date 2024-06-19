@@ -1,10 +1,14 @@
+use once_cell::sync::Lazy;
+
 pub mod args;
 pub mod cli;
 mod commands;
 mod utils;
 
-pub const VERSION: &str = concat!(
-    env!("CARGO_PKG_VERSION"),
-    "-",
-    compile_time_run::run_command_str!("git", "rev-parse", "HEAD")
-);
+pub static VERSION: Lazy<String> = Lazy::new(|| {
+    format!(
+        "{}-{}",
+        env!("CARGO_PKG_VERSION"),
+        lightning_interfaces::types::REVISION
+    )
+});

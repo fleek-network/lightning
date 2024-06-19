@@ -23,4 +23,5 @@ schemars.workspace = true
 ethers.workspace = true
 ruint = "1.11.1"
 url = "2.5.0"
+compile-time-run = "0.2.12"
 workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }

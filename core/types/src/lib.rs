@@ -61,3 +61,5 @@ pub enum InternetAddress {
     Ipv4([u8; 4]),
     Ipv6([u8; 16]),
 }
+
+pub const REVISION: &str = compile_time_run::run_command_str!("git", "rev-parse", "HEAD");

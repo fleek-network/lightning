@@ -11,6 +11,7 @@ use lightning_firewall::Firewall;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::{Events, FetcherSocket, MempoolSocket};
 use lightning_utils::config::LIGHTNING_HOME_DIR;
+use once_cell::sync::Lazy;
 use rand::{RngCore, SeedableRng};
 use reqwest::StatusCode;
 use resolved_pathbuf::ResolvedPathBuf;
@@ -35,6 +36,14 @@ mod tests;
 static HMAC_SECRET: OnceLock<[u8; 32]> = OnceLock::new();
 pub static HMAC_NONCE: AtomicUsize = AtomicUsize::new(0);
 pub static HMAC_SALT: &[u8] = b"lightning-hmac-salt";
+
+static VERSION: Lazy<String> = Lazy::new(|| {
+    format!(
+        "lightning-rpc {}-{}",
+        env!("CARGO_PKG_VERSION"),
+        lightning_interfaces::types::REVISION
+    )
+});
 
 /// Tries to read the hmac secret from the given path or the default location if empty
 /// if the file exists it will read the secret from it otherwise

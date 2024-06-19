@@ -5,8 +5,7 @@ use lightning_interfaces::Collection;
 use tracing::trace;
 
 use crate::api::NetApiServer;
-use crate::error::RPCError;
-use crate::Data;
+use crate::{Data, VERSION};
 
 pub struct NetApi<C: Collection> {
     _data: Arc<Data<C>>,
@@ -27,7 +26,7 @@ impl<C: Collection> NetApiServer for NetApi<C> {
     }
 
     async fn version(&self) -> RpcResult<Option<String>> {
-        Err(RPCError::unimplemented().into())
+        Ok(Some(VERSION.clone()))
     }
 
     async fn listening(&self) -> RpcResult<bool> {

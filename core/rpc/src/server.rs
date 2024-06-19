@@ -8,7 +8,7 @@ use hyper::{Body, Request, Response};
 use sha2::Sha256;
 use tower::Service as TowerService;
 
-use crate::{health, metrics, HMAC_NONCE, HMAC_SALT};
+use crate::{health, metrics, HMAC_NONCE, HMAC_SALT, VERSION};
 
 type BoxedError = Box<dyn std::error::Error + Sync + Send + 'static>;
 
@@ -106,6 +106,16 @@ impl<MainModule, AdminModule> RpcService<MainModule, AdminModule> {
                     hyper::Response::builder()
                         .status(hyper::StatusCode::OK)
                         .body(hyper::Body::from(res))
+                        .map_err(|e| e.into()) // box
+                };
+
+                Box::pin(fut)
+            },
+            "/version" => {
+                let fut = async {
+                    hyper::Response::builder()
+                        .status(hyper::StatusCode::OK)
+                        .body(hyper::Body::from(VERSION.clone()))
                         .map_err(|e| e.into()) // box
                 };
 
