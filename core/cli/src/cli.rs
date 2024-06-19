@@ -113,6 +113,7 @@ impl Cli {
         let registry = tracing_subscriber::registry().with(
             tracing_subscriber::fmt::layer()
                 .with_file(self.args.with_log_locations)
+                .with_line_number(true)
                 .with_filter(env_filter),
         );
 
