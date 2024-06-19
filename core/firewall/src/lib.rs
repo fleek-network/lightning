@@ -1,5 +1,3 @@
-#![feature(float_minimum_maximum)]
-
 pub mod commands;
 pub mod policy;
 pub mod rate_limiting;

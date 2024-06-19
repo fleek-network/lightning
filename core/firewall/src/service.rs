@@ -75,9 +75,9 @@ where
 
     fn poll_ready(
         &mut self,
-        _cx: &mut std::task::Context<'_>,
+        cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
+        self.svc.poll_ready(cx)
     }
 
     fn call(&mut self, req: Req) -> Self::Future {

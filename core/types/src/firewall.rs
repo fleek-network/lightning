@@ -29,13 +29,9 @@ pub enum ConnectionPolicyConfig {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum RateLimitingConfig {
-    /// Default Value
-    /// Sets global RPS = 10
     None,
     Per,
-    Global {
-        rules: Vec<RateLimitingRule>,
-    },
+    Global { rules: Vec<RateLimitingRule> },
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]

@@ -244,11 +244,6 @@ pub struct RateLimitingPolicy {
 }
 
 impl RateLimitingPolicy {
-    /// A period is a time frame in which the rate limiting policy is enforced
-    /// any requests made to this policy will be assigned a linear decay rate that depends
-    /// on the choice of period and the max_requests
-    ///
-    /// panics if
     pub fn new(period: Period, max_requests: u64) -> Self {
         Self {
             period,
