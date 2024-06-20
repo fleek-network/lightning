@@ -42,6 +42,7 @@ use lightning_rep_collector::ReputationAggregator;
 use lightning_signer::Signer;
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
+use lightning_types::FirewallConfig;
 use lightning_utils::application::QueryRunnerExt;
 use lightning_utils::rpc::{self as utils, RpcAdminHeaders};
 use reqwest::Client;
@@ -99,6 +100,7 @@ async fn init_rpc(temp_dir: &TempDir, genesis_path: ResolvedPathBuf, rpc_port: u
 
     let rpc_config = RpcConfig {
         hmac_secret_dir: Some(temp_dir.path().to_path_buf()),
+        firewall: FirewallConfig::none(format!("rpc-{}", rpc_port)),
         ..RpcConfig::default_with_port(rpc_port)
     };
 

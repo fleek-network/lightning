@@ -166,12 +166,13 @@ impl<C: Collection> Rpc<C> {
         let admin_module = Self::create_admin_module_from_config(&config, data.clone())?;
 
         let secret = load_hmac_secret(config.hmac_secret_dir.take())?;
+        let firewall = Firewall::from_config(config.firewall.clone());
         Ok(Self {
             config,
             module,
             admin_module,
             data,
-            firewall: config_provider.firewall::<Self>(),
+            firewall,
             secret,
         })
     }

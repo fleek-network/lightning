@@ -18,7 +18,7 @@ static COMMAND_CENTER: OnceCell<CommandCenter> = OnceCell::const_new();
 ///
 /// Every firewall registers itself with the [`COMMAND_CENTER`] and can be accessed by name.
 pub struct CommandCenter {
-    senders: Mutex<HashMap<&'static str, mpsc::Sender<FireWallRequest>>>,
+    senders: Mutex<HashMap<String, mpsc::Sender<FireWallRequest>>>,
 }
 
 impl CommandCenter {
@@ -38,8 +38,14 @@ impl CommandCenter {
         }
     }
 
-    pub fn register(&self, name: &'static str, sender: mpsc::Sender<FireWallRequest>) {
+    /// Warning! this method panics if the firewall  with the same name is already registered.
+    pub fn register(&self, name: String, sender: mpsc::Sender<FireWallRequest>) {
         let mut lock = self.senders.lock().unwrap();
+
+        if lock.contains_key(&name) {
+            tracing::warn!("Firewall with name {} already registered", name);
+            tracing::warn!("The old command sender will be overwritten");
+        }
 
         // overwrite if it exists in case of restarts
         lock.insert(name, sender);

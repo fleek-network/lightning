@@ -64,11 +64,11 @@ impl Clone for Firewall {
 }
 
 impl Firewall {
-    pub fn new(name: &'static str, policy: ConnectionPolicy, rate_limiting: RateLimiting) -> Self {
+    pub fn new(name: String, policy: ConnectionPolicy, rate_limiting: RateLimiting) -> Self {
+        let inner = Inner::new(&name, policy, rate_limiting);
+
         let (command_tx, command_rx) = mpsc::channel(100);
         commands::CommandCenter::global().register(name, command_tx);
-
-        let inner = Inner::new(name, policy, rate_limiting);
 
         let this = Self {
             inner: Arc::new(Mutex::new(inner)),
@@ -79,8 +79,9 @@ impl Firewall {
         this
     }
 
-    pub fn from_config(name: &'static str, config: FirewallConfig) -> Self {
+    pub fn from_config(config: FirewallConfig) -> Self {
         let FirewallConfig {
+            name,
             connection_policy,
             rate_limiting,
         } = config;
@@ -155,6 +156,8 @@ impl Firewall {
                 },
             };
         }
+
+        tracing::warn!("Firewall update loop ended");
     }
 }
 
@@ -166,7 +169,7 @@ pub(crate) struct Inner {
 
 /// Admin functionality for the firewall
 impl Inner {
-    pub fn new(name: &'static str, policy: ConnectionPolicy, rate_limiting: RateLimiting) -> Self {
+    pub fn new(name: &str, policy: ConnectionPolicy, rate_limiting: RateLimiting) -> Self {
         if rate_limiting.policy_type() == RateLimitingMode::Per
             && policy.mode() != ConnectionPolicyMode::Whitelist
         {

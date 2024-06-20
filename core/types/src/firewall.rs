@@ -4,13 +4,15 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FirewallConfig {
+    pub name: String,
     pub connection_policy: ConnectionPolicyConfig,
     pub rate_limiting: RateLimitingConfig,
 }
 
-impl Default for FirewallConfig {
-    fn default() -> Self {
+impl FirewallConfig {
+    pub fn none(name: String) -> Self {
         Self {
+            name,
             connection_policy: ConnectionPolicyConfig::All,
             rate_limiting: RateLimitingConfig::None,
         }

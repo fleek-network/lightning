@@ -37,20 +37,12 @@ impl Config {
         }
     }
 
-    pub fn default_with_port_and_addr(addr: String, port: u16) -> Self {
-        Self {
-            addr: format!("{}:{}", addr, port)
-                .parse()
-                .expect("RPC Socket Addr to parse"),
-            ..Default::default()
-        }
-    }
-
     pub fn default_with_port(port: u16) -> Self {
         Self {
             addr: format!("{}:{}", "0.0.0.0", port)
                 .parse()
                 .expect("RPC Socket Addr to parse"),
+            firewall: FirewallConfig::none(format!("rpc-{}", port)),
             ..Default::default()
         }
     }
@@ -71,7 +63,7 @@ impl Default for Config {
             addr: "0.0.0.0:4230".parse().expect("RPC Socket Addr to parse"),
             rpc_selection: Default::default(),
             disallowed_methods: None,
-            firewall: Default::default(),
+            firewall: FirewallConfig::none("rpc-4230".to_string()),
         }
     }
 }
