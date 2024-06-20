@@ -16,6 +16,7 @@ use lightning_metrics::increment_counter;
 use lightning_utils::application::QueryRunnerExt;
 use rand::seq::SliceRandom;
 use serde::de::DeserializeOwned;
+use tracing::error;
 
 use crate::config::Config;
 use crate::rpc::{self, rpc_epoch};
@@ -297,6 +298,7 @@ impl<C: Collection> SyncronizerInner<C> {
         {
             Ok(latest_checkpoint_hash)
         } else {
+            error!("Unable to download checkpoint");
             Err(anyhow!("Unable to download checkpoint"))
         }
     }

@@ -143,7 +143,7 @@ macro_rules! spawn {
             let handle = tokio::task::Builder::new().name($name).spawn($future).expect("Tokio task created outside of tokio runtime");
 
             if let Err(e) = handle.await {
-                tracing::error!("Crucial task:{} had a panic: {:?} \n Signaling to shutdown the rest of the node", $name, e);
+                tracing::error!("Crucial task {} had a panic: {:?} \n Signaling to shutdown the rest of the node", $name, e);
                 $crate::ShutdownWaiter::trigger_shutdown(&$waiter);
             }
         }).expect("Tokio task created outside of tokio runtime")
