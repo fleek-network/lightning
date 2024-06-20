@@ -1,7 +1,7 @@
 use std::fs::read_to_string;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicUsize;
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 
 use anyhow::Context;
 use fleek_crypto::{ConsensusPublicKey, NodePublicKey};
@@ -33,7 +33,6 @@ mod server;
 #[cfg(test)]
 mod tests;
 
-static HMAC_SECRET: OnceLock<[u8; 32]> = OnceLock::new();
 pub static HMAC_NONCE: AtomicUsize = AtomicUsize::new(0);
 pub static HMAC_SALT: &[u8] = b"lightning-hmac-salt";
 
@@ -48,47 +47,42 @@ static VERSION: Lazy<String> = Lazy::new(|| {
 /// Tries to read the hmac secret from the given path or the default location if empty
 /// if the file exists it will read the secret from it otherwise
 /// it will generate one and write it to disk in both cases
-pub fn hmac_secret(secret_dir_path: Option<PathBuf>) -> anyhow::Result<&'static [u8; 32]> {
-    match HMAC_SECRET.get() {
-        Some(secret) => Ok(secret),
-        None => {
-            let path = secret_dir_path.unwrap_or_else(|| LIGHTNING_HOME_DIR.to_path_buf());
+pub fn load_hmac_secret(secret_dir_path: Option<PathBuf>) -> anyhow::Result<[u8; 32]> {
+    let path = secret_dir_path.unwrap_or_else(|| LIGHTNING_HOME_DIR.to_path_buf());
 
-            std::fs::create_dir_all(&path).context("Failed to create_dir_all path")?;
-            let parent = ResolvedPathBuf::try_from(path)?;
-            let secret_path = parent.join("hmac_secret.hex");
+    let parent = ResolvedPathBuf::try_from(path.clone())
+        .context(format!("Failed to find HMAC secret path {path:?}"))?;
 
-            let secret_bytes = if secret_path.is_file() {
-                tracing::info!("Reading HMAC secret from file");
+    let secret_path = parent.join("hmac_secret.hex");
 
-                let secret_hex = read_to_string(&secret_path)?;
-                let secret_bytes = hex::decode(secret_hex.trim())?;
-                assert!(
-                    secret_bytes.len() == 32,
-                    "HMAC secret must be hex encoded and 32 bytes"
-                );
+    let secret_bytes = if secret_path.is_file() {
+        tracing::info!("Reading HMAC secret from file");
 
-                let mut secret = [0_u8; 32];
-                secret.copy_from_slice(&secret_bytes);
+        let secret_hex = read_to_string(&secret_path)?;
+        let secret_bytes = hex::decode(secret_hex.trim())?;
+        assert!(
+            secret_bytes.len() == 32,
+            "HMAC secret must be hex encoded and 32 bytes"
+        );
 
-                secret
-            } else {
-                tracing::info!("Generating new HMAC secret");
+        let mut secret = [0_u8; 32];
+        secret.copy_from_slice(&secret_bytes);
 
-                let mut dest = [0u8; 32];
-                rand::rngs::StdRng::from_entropy().fill_bytes(&mut dest);
+        secret
+    } else {
+        tracing::info!("Generating new HMAC secret");
 
-                let secret_hex = hex::encode(dest);
-                std::fs::File::create(&secret_path)?;
-                std::fs::write(&secret_path, secret_hex)?;
+        let mut dest = [0u8; 32];
+        rand::rngs::StdRng::from_entropy().fill_bytes(&mut dest);
 
-                dest
-            };
+        let secret_hex = hex::encode(dest);
+        std::fs::File::create(&secret_path)?;
+        std::fs::write(&secret_path, secret_hex)?;
 
-            HMAC_SECRET.set(secret_bytes).unwrap();
-            Ok(HMAC_SECRET.get().unwrap())
-        },
-    }
+        dest
+    };
+
+    Ok(secret_bytes)
 }
 
 /// The data shared with every request the rpc methods.
@@ -128,6 +122,7 @@ pub struct Rpc<C: Collection> {
     admin_module: RpcModule<()>,
     data: Arc<Data<C>>,
     firewall: Firewall,
+    secret: [u8; 32],
 }
 
 pub async fn health() -> &'static str {
@@ -154,8 +149,6 @@ impl<C: Collection> Rpc<C> {
     ) -> anyhow::Result<Self> {
         let mut config = config_provider.get::<Self>();
 
-        let _ = hmac_secret(config.hmac_secret_dir.take())?;
-
         let data: Arc<Data<C>> = Arc::new(Data {
             query_runner,
             mempool_socket: forwarder.mempool_socket(),
@@ -172,12 +165,14 @@ impl<C: Collection> Rpc<C> {
         let module = Self::create_modules_from_config(&config, data.clone())?;
         let admin_module = Self::create_admin_module_from_config(&config, data.clone())?;
 
+        let secret = load_hmac_secret(config.hmac_secret_dir.take())?;
         Ok(Self {
             config,
             module,
             admin_module,
             data,
             firewall: config_provider.firewall::<Self>(),
+            secret,
         })
     }
 
@@ -195,7 +190,8 @@ impl<C: Collection> Rpc<C> {
             stop.clone(),
         );
 
-        let rpc_server = server::RpcService::new(json_rpc_service, admin_json_rpc_service);
+        let rpc_server =
+            server::RpcService::new(json_rpc_service, admin_json_rpc_service, self.secret);
         let rpc_server = self.firewall.clone().service(rpc_server);
 
         let addr = self.config.addr();
