@@ -16,6 +16,7 @@ type BoxedError = Box<dyn std::error::Error + Sync + Send + 'static>;
 pub struct RpcService<MainModule, AdminModule> {
     pub main_server: MainModule,
     pub admin_server: AdminModule,
+    secret: [u8; 32],
 }
 
 impl<X, Y> Clone for RpcService<X, Y>
@@ -27,6 +28,7 @@ where
         Self {
             main_server: self.main_server.clone(),
             admin_server: self.admin_server.clone(),
+            secret: self.secret,
         }
     }
 }
@@ -60,10 +62,11 @@ where
 }
 
 impl<MainModule, AdminModule> RpcService<MainModule, AdminModule> {
-    pub fn new(main_server: MainModule, admin_server: AdminModule) -> Self {
+    pub fn new(main_server: MainModule, admin_server: AdminModule, secret: [u8; 32]) -> Self {
         Self {
             main_server,
             admin_server,
+            secret,
         }
     }
 }
@@ -150,17 +153,18 @@ impl<MainModule, AdminModule> RpcService<MainModule, AdminModule> {
                     ) {
                         (Some(hmac), Some(ts), Some(nonce)) => {
                             match (hmac.to_str(), ts.to_str(), nonce.to_str()) {
-                                (Ok(hmac), Ok(ts), Ok(nonce)) => match verify_hmac(hmac, ts, nonce)
-                                {
-                                    Ok(_) => (),
-                                    Err(err) => {
-                                        return Box::pin(async move {
-                                            hyper::Response::builder()
-                                                .status(hyper::StatusCode::UNAUTHORIZED)
-                                                .body(hyper::Body::from(err.to_string()))
-                                                .map_err(|e| e.into())
-                                        });
-                                    },
+                                (Ok(hmac), Ok(ts), Ok(nonce)) => {
+                                    match verify_hmac(&self.secret, hmac, ts, nonce) {
+                                        Ok(_) => (),
+                                        Err(err) => {
+                                            return Box::pin(async move {
+                                                hyper::Response::builder()
+                                                    .status(hyper::StatusCode::UNAUTHORIZED)
+                                                    .body(hyper::Body::from(err.to_string()))
+                                                    .map_err(|e| e.into())
+                                            });
+                                        },
+                                    }
                                 },
                                 _ => {
                                     return bad_request(
@@ -233,7 +237,7 @@ pub fn create_hmac(secret: &[u8; 32], ts: u64, nonce: usize) -> anyhow::Result<S
     Ok(hex::encode(result))
 }
 
-fn verify_hmac(hmac: &str, ts: &str, nonce: &str) -> Result<(), BoxedError> {
+fn verify_hmac(secret: &[u8; 32], hmac: &str, ts: &str, nonce: &str) -> Result<(), BoxedError> {
     if hmac.trim_start_matches("0x").len() != 64 {
         return Err("HMAC is not 32 bytes".into());
     }
@@ -256,7 +260,7 @@ fn verify_hmac(hmac: &str, ts: &str, nonce: &str) -> Result<(), BoxedError> {
 
     // assume hmac secret is loaded by now
     // we have verified that params are valid so lets create the correct one
-    let correct_hmac = create_hmac(super::hmac_secret(None)?, u64_ts, usize_nonce)?;
+    let correct_hmac = create_hmac(secret, u64_ts, usize_nonce)?;
 
     if hmac != correct_hmac {
         return Err("Bad HMAC".into());

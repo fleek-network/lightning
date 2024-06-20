@@ -1354,12 +1354,12 @@ async fn test_admin_seq() -> Result<()> {
 
     let port = 30022;
     let node = init_rpc(&temp_dir, genesis_path, port).await;
-    let secret = super::hmac_secret(Some(temp_dir.path().to_path_buf()))?;
+    let secret = super::load_hmac_secret(Some(temp_dir.path().to_path_buf()))?;
 
     wait_for_server_start(port).await?;
 
-    test_admin_rpc_hmac(port, &node, secret).await?;
-    test_admin_rpc_store(port, &node, secret).await?;
+    test_admin_rpc_hmac(port, &node, &secret).await?;
+    test_admin_rpc_store(port, &node, &secret).await?;
 
     node.shutdown().await;
 
