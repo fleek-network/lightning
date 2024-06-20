@@ -260,7 +260,7 @@ impl RateLimitingPolicy {
         let elapsed = now.duration_since(self.last_request).as_millis();
 
         if elapsed > self.period.as_millis() as u128 {
-            self.allowed = self.max_requests;
+            self.allowed = self.max_requests - 1.0;
             self.last_request = now;
 
             return Ok(());
