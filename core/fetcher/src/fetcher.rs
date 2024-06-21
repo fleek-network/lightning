@@ -1,6 +1,4 @@
-use std::marker::PhantomData;
-
-use affair::AsyncWorkerUnordered;
+use affair::{Socket, Task};
 use anyhow::{anyhow, Context, Result};
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
@@ -21,7 +19,7 @@ pub(crate) type Uri = Vec<u8>;
 
 pub struct Fetcher<C: Collection> {
     socket: FetcherSocket,
-    _collection: PhantomData<C>,
+    inner: Option<FetcherInner<C>>,
 }
 
 impl<C: Collection> Fetcher<C> {
@@ -44,6 +42,8 @@ impl<C: Collection> Fetcher<C> {
             resolver.clone(),
         );
 
+        let inner_waiter = waiter.clone();
+        // TODO(matthias): make this a crucial task?
         spawn!(
             async move {
                 waiter.run_until_shutdown(origin_fetcher.start()).await;
@@ -51,19 +51,29 @@ impl<C: Collection> Fetcher<C> {
             "FETCHER: shutdown waiter"
         );
 
-        let worker = FetcherWorker::<C> {
+        let (socket, socket_rx) = Socket::raw_bounded(128);
+
+        let inner = FetcherInner::<C>::new(
+            socket_rx,
             origin_tx,
             blockstore,
-            blockstore_server_socket: blockstore_server.get_socket(),
+            blockstore_server.get_socket(),
             resolver,
-        };
-
-        let socket = worker.spawn();
+            inner_waiter,
+        );
 
         Ok(Self {
+            inner: Some(inner),
             socket,
-            _collection: PhantomData,
         })
+    }
+
+    pub async fn start(mut this: fdi::RefMut<Self>) {
+        this.inner
+            .take()
+            .expect("Fetcher already started")
+            .run()
+            .await;
     }
 }
 
@@ -73,14 +83,83 @@ impl<C: Collection> FetcherInterface<C> for Fetcher<C> {
     }
 }
 
-struct FetcherWorker<C: Collection> {
+struct FetcherInner<C: Collection> {
+    socket_rx: mpsc::Receiver<Task<FetcherRequest, FetcherResponse>>,
     origin_tx: mpsc::Sender<OriginRequest>,
+    shutdown_waiter: ShutdownWaiter,
     blockstore: C::BlockstoreInterface,
     blockstore_server_socket: BlockstoreServerSocket,
     resolver: C::ResolverInterface,
 }
 
-impl<C: Collection> FetcherWorker<C> {
+impl<C: Collection> FetcherInner<C> {
+    fn new(
+        socket_rx: mpsc::Receiver<Task<FetcherRequest, FetcherResponse>>,
+        origin_tx: mpsc::Sender<OriginRequest>,
+        blockstore: C::BlockstoreInterface,
+        blockstore_server_socket: BlockstoreServerSocket,
+        resolver: C::ResolverInterface,
+        shutdown_waiter: ShutdownWaiter,
+    ) -> Self {
+        Self {
+            socket_rx,
+            origin_tx,
+            blockstore,
+            blockstore_server_socket,
+            resolver,
+            shutdown_waiter,
+        }
+    }
+
+    async fn run(mut self) {
+        loop {
+            tokio::select! {
+                biased;
+                _ = self.shutdown_waiter.wait_for_shutdown() => {
+                    return;
+                }
+                task = self.socket_rx.recv() => {
+                    let Some(task) = task else {
+                        break;
+                    };
+                    let req = task.request.clone();
+                    match req {
+                        FetcherRequest::Put { pointer } => {
+                            let res = self.put(pointer).await;
+                            if res.is_err() {
+                                increment_counter!(
+                                    "fetcher_put_request_failed",
+                                    Some("Counter for failed put requests for origin content")
+                                );
+                            } else {
+                                increment_counter!(
+                                    "fetcher_put_request_succeed",
+                                    Some("Counter for successful put requests for origin content")
+                                );
+                            }
+                            task.respond(FetcherResponse::Put(res));
+                        },
+                        FetcherRequest::Fetch { hash } => {
+                            let res = self.fetch(hash).await;
+                            if res.is_err() {
+                                increment_counter!(
+                                    "fetcher_fetch_request_failed",
+                                    Some("Counter for failed fetch requests for native content")
+                                );
+                            } else {
+                                increment_counter!(
+                                    "fetcher_fetch_request_succeed",
+                                    Some("Counter for successful fetch requests for native content")
+                                );
+                            }
+                            task.respond(FetcherResponse::Fetch(res));
+                        },
+                    }
+                }
+            }
+        }
+    }
+
     /// Fetches the data from the corresponding origin, puts it in the blockstore,
     /// and stores the mapping using the resolver. If pulling a origin fails, it will not ,
     /// the data will not be fetched from origin again.
@@ -194,46 +273,8 @@ impl<C: Collection> ConfigConsumer for Fetcher<C> {
 
 impl<C: Collection> fdi::BuildGraph for Fetcher<C> {
     fn build_graph() -> fdi::DependencyGraph {
-        fdi::DependencyGraph::new().with(Self::new)
-    }
-}
-
-impl<C: Collection> AsyncWorkerUnordered for FetcherWorker<C> {
-    type Request = FetcherRequest;
-    type Response = FetcherResponse;
-
-    async fn handle(&self, req: Self::Request) -> Self::Response {
-        match req {
-            FetcherRequest::Put { pointer } => {
-                let res = self.put(pointer).await;
-                if res.is_err() {
-                    increment_counter!(
-                        "fetcher_put_request_failed",
-                        Some("Counter for failed put requests for origin content")
-                    );
-                } else {
-                    increment_counter!(
-                        "fetcher_put_request_succeed",
-                        Some("Counter for successful put requests for origin content")
-                    );
-                }
-                FetcherResponse::Put(res)
-            },
-            FetcherRequest::Fetch { hash } => {
-                let res = self.fetch(hash).await;
-                if res.is_err() {
-                    increment_counter!(
-                        "fetcher_fetch_request_failed",
-                        Some("Counter for failed fetch requests for native content")
-                    );
-                } else {
-                    increment_counter!(
-                        "fetcher_fetch_request_succeed",
-                        Some("Counter for successful fetch requests for native content")
-                    );
-                }
-                FetcherResponse::Fetch(res)
-            },
-        }
+        fdi::DependencyGraph::new().with(
+            Self::new.with_event_handler("start", Self::start.wrap_with_spawn_named("FETCHER")),
+        )
     }
 }
