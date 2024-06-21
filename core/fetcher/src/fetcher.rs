@@ -33,6 +33,7 @@ impl<C: Collection> Fetcher<C> {
         fdi::Cloned(waiter): fdi::Cloned<lightning_interfaces::ShutdownWaiter>,
         fdi::Cloned(blockstore): fdi::Cloned<C::BlockstoreInterface>,
         fdi::Cloned(resolver): fdi::Cloned<C::ResolverInterface>,
+        fdi::Cloned(shutdown): fdi::Cloned<ShutdownWaiter>,
     ) -> anyhow::Result<Self> {
         let config = config.get::<Self>();
 
@@ -58,7 +59,7 @@ impl<C: Collection> Fetcher<C> {
             resolver,
         };
 
-        let socket = worker.spawn();
+        let socket = worker.spawn_with_shutdown(async move { shutdown.wait_for_shutdown().await });
 
         Ok(Self {
             socket,
