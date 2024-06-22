@@ -6,9 +6,10 @@ pub const EVENT_HEADER_SIZE: usize = 2;
 pub const MAX_BUFFER_LEN: usize = 1024;
 pub const FILE_OPEN_PROG_ID: u8 = 0;
 pub const ACCESS_DENIED_EVENT: u8 = 0;
+pub const EVENT_MESSAGE_LEN: usize = EVENT_HEADER_SIZE + 2 * MAX_BUFFER_LEN;
 
 pub type Buffer = [u8; MAX_BUFFER_LEN];
-pub type EventMessage = [u8; EVENT_HEADER_SIZE + 2 * MAX_BUFFER_LEN];
+pub type EventMessage = [u8; EVENT_MESSAGE_LEN];
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
 #[repr(C)]

@@ -13,6 +13,8 @@ use tokio::io::AsyncWriteExt;
 
 use crate::map::{PacketFilterRule, Profile};
 
+pub static EVENT_LOG_FILE_PATH: Lazy<PathBuf> =
+    Lazy::new(|| LIGHTNING_HOME_DIR.join("ebpf/events.json"));
 static TMP_DIR: Lazy<PathBuf> = Lazy::new(|| LIGHTNING_HOME_DIR.join("ebpf/tmp"));
 static PROFILES_DIR: Lazy<PathBuf> = Lazy::new(|| LIGHTNING_HOME_DIR.join("ebpf/profiles"));
 const PACKET_FILTER_CONFIG: &str = "filters.json";

@@ -1,6 +1,6 @@
 use anyhow::{anyhow, bail};
 use aya::maps::{MapData, RingBuf};
-use lightning_ebpf_common::EventMessage;
+use lightning_ebpf_common::{EventMessage, EVENT_MESSAGE_LEN};
 use log::{debug, error, info};
 use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
 use tokio::io::unix::AsyncFd;
@@ -9,6 +9,7 @@ use tokio::sync::mpsc;
 
 use crate::config::ConfigSource;
 use crate::connection::Connection;
+use crate::event::write_events;
 use crate::frame::{PACKET_FILTER_SERVICE, SUB_SECURITY_TOPIC, SUB_STATS_TOPIC};
 use crate::map::SharedMap;
 use crate::utils;
@@ -35,7 +36,7 @@ impl Server {
         })
     }
 
-    pub async fn handle_watcher_event(&mut self, event: Event) -> anyhow::Result<()> {
+    async fn handle_watcher_event(&mut self, event: Event) -> anyhow::Result<()> {
         info!("received event: {event:?}");
         if event.kind.is_modify() {
             if event
@@ -60,7 +61,7 @@ impl Server {
         Ok(())
     }
 
-    pub async fn handle_new_stream(&mut self, stream: UnixStream) -> anyhow::Result<()> {
+    async fn handle_new_stream(&mut self, stream: UnixStream) -> anyhow::Result<()> {
         let shared_state = self.shared_state.clone();
         let service = utils::read_service_header(&stream)
             .await?
@@ -126,22 +127,30 @@ impl Server {
                         }
                     }
                 }
+                // Todo: Verify that this is cancel safe.
                 next = self.events.readable_mut() => {
                     let mut guard = next?;
-                    read_next_event(guard.get_inner_mut())?;
+                    let queue = guard.get_inner_mut();
+                    let mut events: Vec<EventMessage> = Vec::with_capacity(EVENT_MESSAGE_LEN);
+                    while let Some(bytes) = queue.next() {
+                        match (*bytes).try_into() {
+                            Ok(event) => {
+                                debug!("received event {:?}", bytes);
+                                events.push(event);
+                            }
+                            Err(e) => {
+                                error!("failed to parse bytes from event queue: {e:?}");
+                            }
+                        }
+                    }
+
+                    if let Err(e) = write_events(events).await {
+                        error!("failed to write event records: {e:?}");
+                    }
+
                     guard.clear_ready();
                 }
             }
         }
     }
-}
-
-pub fn read_next_event(queue: &mut RingBuf<MapData>) -> anyhow::Result<Vec<EventMessage>> {
-    let mut events = Vec::new();
-    while let Some(read) = queue.next() {
-        let read: EventMessage = (*read).try_into()?;
-        debug!("received event {:?}", read);
-        events.push(read);
-    }
-    Ok(events)
 }

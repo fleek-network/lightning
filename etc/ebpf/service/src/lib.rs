@@ -1,3 +1,5 @@
+extern crate core;
+
 #[cfg(feature = "server")]
 mod connection;
 #[cfg(feature = "client")]
@@ -8,6 +10,7 @@ mod pubsub;
 pub mod server;
 
 mod config;
+mod event;
 pub mod frame;
 pub mod map;
 mod utils;
