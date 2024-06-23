@@ -13,9 +13,11 @@ use lightning_interfaces::types::{
 use lightning_interfaces::{BlockstoreServerSocket, FetcherSocket};
 use lightning_metrics::increment_counter;
 use tokio::sync::{mpsc, oneshot};
+use tracing::info;
+use types::{NodeIndex, PeerRequestError};
 
 use crate::config::Config;
-use crate::origin::{OriginFetcher, OriginRequest};
+use crate::origin::{OriginError, OriginFetcher, OriginRequest};
 
 pub(crate) type Uri = Vec<u8>;
 
@@ -94,36 +96,7 @@ impl<C: Collection> FetcherWorker<C> {
         }
 
         // Otherwise, try to fetch directly from the origin
-        self.fetch_origin(pointer).await
-    }
-
-    #[inline(always)]
-    async fn fetch_origin(&self, pointer: ImmutablePointer) -> Result<[u8; 32]> {
-        let (response_tx, response_rx) = oneshot::channel();
-        self.origin_tx
-            .send(OriginRequest {
-                pointer,
-                response: response_tx,
-            })
-            .await
-            .expect("Failed to send origin request");
-
-        let mut res = response_rx.await?;
-        let res = res.recv().await?.context("failed to fetch from origin");
-
-        if res.is_ok() {
-            increment_counter!(
-                "fetcher_from_origin",
-                Some("Counter for content that was fetched from an origin")
-            );
-        } else {
-            increment_counter!(
-                "fetcher_from_origin_failed",
-                Some("Counter for a failed attempts to fetch from an origin")
-            );
-        }
-
-        res
+        self.fetch_from_origin(pointer).await
     }
 
     /// Attempt to fetch the blake3 content. First, we check the blockstore,
@@ -151,40 +124,122 @@ impl<C: Collection> FetcherWorker<C> {
 
                 // Try to get the content from the peer that advertised the record.
                 // TODO: Maybe use indexer for getting peers instead
-                let mut res = self
-                    .blockstore_server_socket
-                    .run(ServerRequest {
-                        hash,
-                        peer: res_pointer.originator,
-                    })
+                if self
+                    .fetch_from_peer(res_pointer.originator, hash)
                     .await
-                    .expect("Failed to send request to blockstore server");
-                let res = res
-                    .recv()
-                    .await
-                    .expect("Failed to receive response from blockstore server");
-
-                if res.is_ok() {
-                    increment_counter!(
-                        "fetcher_from_peer",
-                        Some("Counter for content that was fetched from a peer")
-                    );
+                    .is_ok()
+                {
                     return Ok(());
-                } else {
-                    increment_counter!(
-                        "fetcher_from_peer_failed",
-                        Some("Counter for failed attempts to fetch from a peer")
-                    );
                 }
 
                 // If not, attempt to pull from the origin. This strikes a balance between trying
                 // to fetch from a bunch of peers vs going to the origin right away.
-                if self.fetch_origin(res_pointer.pointer).await.is_ok() {
+                if self.fetch_from_origin(res_pointer.pointer).await.is_ok() {
                     return Ok(());
                 }
             }
         }
         Err(anyhow!("Failed to resolve hash"))
+    }
+
+    #[inline(always)]
+    async fn fetch_from_origin(&self, pointer: ImmutablePointer) -> Result<[u8; 32]> {
+        let (response_tx, response_rx) = oneshot::channel();
+
+        #[inline(always)]
+        fn emit_failed_metric() {
+            increment_counter!(
+                "fetcher_from_origin_failed",
+                Some("Counter for a failed attempts to fetch from an origin")
+            );
+        }
+
+        #[inline(always)]
+        async fn recv(
+            rx: oneshot::Receiver<tokio::sync::broadcast::Receiver<Result<[u8; 32], OriginError>>>,
+        ) -> Result<[u8; 32]> {
+            rx.await?.recv().await?.map_err(|e| e.into())
+        }
+
+        let res = self
+            .origin_tx
+            .send(OriginRequest {
+                pointer,
+                response: response_tx,
+            })
+            .await;
+
+        match res {
+            Ok(_) => match recv(response_rx).await {
+                Ok(res) => {
+                    increment_counter!(
+                        "fetcher_from_origin",
+                        Some("Counter for content that was fetched from an origin")
+                    );
+                    Ok(res)
+                },
+                Err(err) => {
+                    info!("Failed to receive response from origin. Error: {:?}", err);
+                    emit_failed_metric();
+                    Err(err).context("Failed to fetch from origin")
+                },
+            },
+            Err(err) => {
+                info!("Failed to send origin request. Error: {:?}", err);
+                emit_failed_metric();
+                Err(err).context("Failed to send origin request")
+            },
+        }
+    }
+
+    #[inline(always)]
+    async fn fetch_from_peer(&self, peer: NodeIndex, hash: Blake3Hash) -> Result<()> {
+        #[inline(always)]
+        fn emit_failed_metric() {
+            increment_counter!(
+                "fetcher_from_peer_failed",
+                Some("Counter for failed attempts to fetch from a peer")
+            );
+        }
+
+        #[inline(always)]
+        async fn recv(
+            mut res: tokio::sync::broadcast::Receiver<Result<(), PeerRequestError>>,
+        ) -> Result<()> {
+            res.recv().await?.map_err(|e| e.into())
+        }
+
+        let res = self
+            .blockstore_server_socket
+            .run(ServerRequest { hash, peer })
+            .await;
+        match res {
+            Ok(res) => match recv(res).await {
+                Ok(_) => {
+                    increment_counter!(
+                        "fetcher_from_peer",
+                        Some("Counter for content that was fetched from a peer")
+                    );
+                    Ok(())
+                },
+                Err(err) => {
+                    info!(
+                        "Failed to receive response from blockstore server {:?}. Error: {:?}",
+                        peer, err
+                    );
+                    emit_failed_metric();
+                    Err(err).context("Failed to receive response from blockstore server")
+                },
+            },
+            Err(err) => {
+                info!(
+                    "Failed to send request to blockstore server {:?}. Error: {:?}",
+                    peer, err
+                );
+                emit_failed_metric();
+                Err(anyhow!("Failed to send request to blockstore server"))
+            },
+        }
     }
 }
 
