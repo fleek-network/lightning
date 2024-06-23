@@ -153,6 +153,46 @@ macro_rules! spawn {
     };
 }
 
+/// A macro to spawn tokio affair workers in the binary.
+/// Takes an affair worker and spawns it, returning the socket.
+/// A shutdown waiter is passed to as well which makes the worker shutdownable.
+/// If the crucial flag is passed, a panic in the worker task will trigger a shutdown notification.
+#[macro_export]
+macro_rules! spawn_worker {
+    ($worker:expr, $name:expr, $waiter:expr, crucial) => {{
+        let (_, socket) = $worker.spawn_with_spawner(|fut| {
+            let waiter_notify = $waiter.clone();
+            tokio::task::Builder::new().name(&format!("{}#WAITER", $name)).spawn(async move {
+                let shutdownable_fut = async move {
+                    tokio::select! {
+                        _ = fut => {},
+                        _ = $waiter.wait_for_shutdown() => {}
+                    }
+                };
+                let handle = tokio::task::Builder::new().name($name).spawn(shutdownable_fut).expect("Tokio task created outside of tokio runtime");
+                if let Err(e) = handle.await {
+                    tracing::error!("Crucial task {} had a panic: {:?} \n Signaling to shutdown the rest of the node", $name, e);
+                    $crate::ShutdownWaiter::trigger_shutdown(&waiter_notify);
+                }
+            }).expect("Tokio task created outside of tokio runtime");
+        });
+        socket
+    }};
+    ($worker:expr, $name:expr, $waiter:expr) => {{
+        let (_, socket) = $worker.spawn_with_spawner(|fut| {
+            let waiter_notify = waiter.clone();
+            let shutdownable_fut = async move {
+                tokio::select! {
+                    _ = fut => {},
+                    _ = waiter.wait_for_shutdown() => {}
+                }
+            };
+            tokio::task::Builder::new().name($name).spawn(shutdownable_fut).expect("Tokio task created outside of tokio runtime");
+        });
+        socket
+    }};
+}
+
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
