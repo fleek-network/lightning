@@ -3,9 +3,8 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::Blake3Hash;
-use lightning_rpc::create_hmac;
+use lightning_rpc::utils::rpc_request;
 use lightning_utils::config::TomlConfigProvider;
-use lightning_utils::rpc::{get_admin_nonce, get_timestamp, rpc_request, RpcAdminHeaders};
 use reqwest::Client;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde_json::json;
@@ -54,19 +53,11 @@ where
             .to_string();
             let client = Client::new();
 
-            let nonce = get_admin_nonce(&client, url.clone()).await?;
-            let timestamp = get_timestamp();
-            let hmac = create_hmac(&secret, timestamp, nonce)?;
-
             let response = rpc_request::<Blake3Hash>(
                 &client,
                 format!("{}/admin", url),
                 request,
-                Some(RpcAdminHeaders {
-                    hmac,
-                    nonce,
-                    timestamp,
-                }),
+                Some(&secret),
             )
             .await?;
 

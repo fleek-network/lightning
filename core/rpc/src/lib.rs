@@ -29,6 +29,7 @@ pub mod config;
 pub mod error;
 mod logic;
 mod server;
+pub mod utils;
 pub use server::create_hmac;
 #[cfg(test)]
 mod tests;

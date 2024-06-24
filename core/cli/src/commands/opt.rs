@@ -21,8 +21,8 @@ use lightning_interfaces::types::{
     UpdatePayload,
     UpdateRequest,
 };
+use lightning_rpc::utils::rpc_request;
 use lightning_utils::config::TomlConfigProvider;
-use lightning_utils::rpc::rpc_request;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::de::DeserializeOwned;
 use serde_json::json;

@@ -44,7 +44,6 @@ use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_types::FirewallConfig;
 use lightning_utils::application::QueryRunnerExt;
-use lightning_utils::rpc::{self as utils, RpcAdminHeaders};
 use reqwest::Client;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
@@ -53,8 +52,7 @@ use tempfile::{tempdir, TempDir};
 
 use crate::api::FleekApiClient;
 use crate::config::Config as RpcConfig;
-use crate::server::create_hmac;
-use crate::Rpc;
+use crate::{utils, Rpc};
 
 #[derive(Serialize, Deserialize, Debug)]
 struct RpcSuccessResponse<T> {
@@ -1377,23 +1375,12 @@ async fn test_admin_rpc_store(port: u16, _node: &TestNode, secret: &[u8; 32]) ->
         "id": 1,
     });
 
-    let unix_time = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
-
-    let admin_headers = RpcAdminHeaders {
-        hmac: create_hmac(secret, unix_time, 5)?,
-        nonce: 5,
-        timestamp: unix_time,
-    };
-
     let client = Client::new();
-    let res = utils::rpc_request::<String>(
+    let res = crate::utils::rpc_request::<String>(
         &client,
         format!("http://127.0.0.1:{port}/admin"),
         req.to_string(),
-        Some(admin_headers),
+        Some(secret),
     )
     .await;
 
@@ -1403,30 +1390,19 @@ async fn test_admin_rpc_store(port: u16, _node: &TestNode, secret: &[u8; 32]) ->
 }
 
 async fn test_admin_rpc_hmac(port: u16, _node: &TestNode, secret: &[u8; 32]) -> Result<()> {
-    for i in 0..5 {
+    for _ in 0..5 {
         let req = json!({
             "jsonrpc": "2.0",
             "method": "admin_test",
             "id": 1,
         });
 
-        let unix_time = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-
-        let admin_headers = RpcAdminHeaders {
-            hmac: create_hmac(secret, unix_time, i)?,
-            nonce: i,
-            timestamp: unix_time,
-        };
-
         let client = Client::new();
         let response = utils::rpc_request::<String>(
             &client,
             format!("http://127.0.0.1:{port}/admin"),
             req.to_string(),
-            Some(admin_headers),
+            Some(secret),
         )
         .await;
 
@@ -1441,24 +1417,12 @@ async fn test_admin_rpc_hmac(port: u16, _node: &TestNode, secret: &[u8; 32]) -> 
         "id": 1,
     });
 
-    let unix_time = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
-
-    // pass bad nonce
-    let admin_headers = RpcAdminHeaders {
-        hmac: create_hmac(secret, unix_time, 0)?,
-        nonce: 0,
-        timestamp: unix_time,
-    };
-
     let client = Client::new();
-    let response = utils::rpc_request::<String>(
+    let response = crate::utils::rpc_request::<String>(
         &client,
         format!("http://127.0.0.1:{port}/admin"),
         req.to_string(),
-        Some(admin_headers),
+        None,
     )
     .await;
 

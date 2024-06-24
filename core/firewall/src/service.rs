@@ -89,7 +89,7 @@ where
 
         let svc_fut = self.svc.call(req);
 
-        // This might get called again!
+        // `call` might get called again!
         ServiceFuture::new(firewall_fut, svc_fut)
     }
 }

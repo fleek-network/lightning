@@ -4,6 +4,7 @@ use std::sync::atomic::AtomicU32;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
+use futures::{FutureExt, TryFutureExt};
 use hmac::{Hmac, Mac};
 use hyper::{Body, Request, Response};
 use sha2::Sha256;
@@ -72,61 +73,6 @@ impl<MainModule, AdminModule> RpcService<MainModule, AdminModule> {
             secret: Arc::new(secret),
             nonce: Arc::new(0.into()),
         }
-    }
-
-    fn verify_hmac(&mut self, hmac: &str, ts: &str, nonce: &str) -> Result<(), BoxedError> {
-        if hmac.trim_start_matches("0x").len() != 64 {
-            return Err("HMAC is not 32 bytes".into());
-        }
-
-        let our_nonce = self.nonce.load(std::sync::atomic::Ordering::Acquire);
-
-        let user_timestamp = ts.parse::<u64>()?;
-        let user_nonce = nonce.parse::<u32>()?;
-
-        if user_nonce != our_nonce {
-            return Err(format!(
-                "Nonce is not valid, expected {}, got {}",
-                our_nonce, user_nonce
-            )
-            .into());
-        }
-
-        let sys = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_err(Box::new)?
-            .as_secs();
-
-        // it should be more than 5 seconsd in the past
-        if sys - 5 > user_timestamp {
-            return Err("Timestamp is too far in the past".into());
-        }
-
-        // it should not be in the future
-        if user_timestamp > sys {
-            return Err("Timestamp is too far in the future".into());
-        }
-
-        let correct_hmac = create_hmac(&self.secret, user_timestamp, user_nonce)?;
-
-        if hmac != correct_hmac {
-            return Err("Recreated HMAC doesnt match".into());
-        }
-
-        if self
-            .nonce
-            .compare_exchange(
-                our_nonce,
-                our_nonce + 1,
-                std::sync::atomic::Ordering::AcqRel,
-                std::sync::atomic::Ordering::Acquire,
-            )
-            .is_err()
-        {
-            return Err("Nonce was invalidated during request".into());
-        }
-
-        Ok(())
     }
 }
 
@@ -207,6 +153,9 @@ impl<MainModule, AdminModule> RpcService<MainModule, AdminModule> {
                 })
             },
             "/admin" => {
+                // todo this will be cleaner when we have a better router setup
+                let mut svc_clone = self.admin_server.clone();
+
                 if method == hyper::Method::POST {
                     match (
                         req.headers().get("X-Lightning-HMAC"),
@@ -216,34 +165,35 @@ impl<MainModule, AdminModule> RpcService<MainModule, AdminModule> {
                         (Some(hmac), Some(ts), Some(nonce)) => {
                             match (hmac.to_str(), ts.to_str(), nonce.to_str()) {
                                 (Ok(hmac), Ok(ts), Ok(nonce)) => {
-                                    match self.verify_hmac(hmac, ts, nonce) {
-                                        Ok(_) => (),
-                                        Err(err) => {
-                                            return Box::pin(async move {
-                                                hyper::Response::builder()
-                                                    .status(hyper::StatusCode::UNAUTHORIZED)
-                                                    .body(hyper::Body::from(err.to_string()))
-                                                    .map_err(|e| e.into())
-                                            });
-                                        },
-                                    }
-                                },
-                                _ => {
-                                    return bad_request(
-                                        "Invalid HMAC/Timestamp/Nonce charecters, couldnt serialize",
+                                    let (hmac, ts, nonce) = (
+                                        hmac.trim().to_string(),
+                                        ts.trim().to_string(),
+                                        nonce.trim().to_string(),
                                     );
+
+                                    extract_body_and_verify_hmac(
+                                        req,
+                                        self.secret.clone(),
+                                        self.nonce.clone(),
+                                        hmac,
+                                        ts,
+                                        nonce,
+                                    )
+                                    .and_then(move |req| svc_clone.call(req))
+                                    .boxed()
                                 },
+                                _ => bad_request(
+                                    "Invalid HMAC/Timestamp/Nonce charecters, couldnt serialize",
+                                ),
                             }
                         },
-                        _ => return bad_request("Missing HMAC/Timestamp/Nonce"),
-                    };
-
-                    self.admin_server.call(req)
+                        _ => bad_request("Missing HMAC/Timestamp/Nonce"),
+                    }
                 } else {
                     Box::pin(async move {
                         hyper::Response::builder()
                             .status(hyper::StatusCode::METHOD_NOT_ALLOWED)
-                            .body(hyper::Body::empty())
+                            .body(hyper::Body::from("Admin Module only accepts POST"))
                             .map_err(|e| e.into())
                     })
                 }
@@ -288,16 +238,99 @@ fn bad_request(
     })
 }
 
+async fn extract_body_and_verify_hmac(
+    req: Request<Body>,
+    secret: Arc<[u8; 32]>,
+    sys_nonce: Arc<AtomicU32>,
+    hmac: String,
+    ts: String,
+    nonce: String,
+) -> Result<Request<Body>, BoxedError> {
+    let (parts, body) = req.into_parts();
+
+    // todo(n): size upper bound?
+    let body = hyper::body::to_bytes(body).await?.to_vec();
+
+    verify_hmac(&secret, &sys_nonce, &body, &hmac, &ts, &nonce)?;
+
+    Ok(Request::from_parts(parts, body.into()))
+}
+
+fn verify_hmac(
+    secret: &[u8; 32],
+    sys_nonce: &AtomicU32,
+    body: &[u8],
+    hmac: &str,
+    ts: &str,
+    nonce: &str,
+) -> Result<(), BoxedError> {
+    if hmac.trim_start_matches("0x").len() != 64 {
+        return Err("HMAC is not 32 bytes".into());
+    }
+
+    let our_nonce = sys_nonce.load(std::sync::atomic::Ordering::Acquire);
+
+    let user_timestamp = ts.parse::<u64>()?;
+    let user_nonce = nonce.parse::<u32>()?;
+
+    if user_nonce != our_nonce {
+        return Err(format!(
+            "Nonce is not valid, expected {}, got {}",
+            our_nonce, user_nonce
+        )
+        .into());
+    }
+
+    let sys = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(Box::new)?
+        .as_secs();
+
+    // it should be more than 5 seconsd in the past
+    if sys - 5 > user_timestamp {
+        return Err("Timestamp is too far in the past".into());
+    }
+
+    // it should not be in the future
+    if user_timestamp > sys {
+        return Err("Timestamp is too far in the future".into());
+    }
+
+    let correct_hmac = create_hmac(secret, body, user_timestamp, user_nonce);
+
+    if hmac != correct_hmac {
+        return Err("Recreated HMAC doesnt match".into());
+    }
+
+    if sys_nonce
+        .compare_exchange(
+            our_nonce,
+            our_nonce + 1,
+            std::sync::atomic::Ordering::AcqRel,
+            std::sync::atomic::Ordering::Acquire,
+        )
+        .is_err()
+    {
+        return Err("Nonce was invalidated during request".into());
+    }
+
+    Ok(())
+}
+
 /// Creates a hmac from a timestamp and nonce
 ///
 /// ts: the unix timestamp in seconds
 /// nonce: returned from the '/admin/nonce' route
-pub fn create_hmac(secret: &[u8; 32], ts: u64, nonce: u32) -> anyhow::Result<String> {
-    let mut mac = Hmac::<Sha256>::new_from_slice(secret)?;
+///
+/// # Panics
+///
+/// If the key is not valid for the HMAC
+pub fn create_hmac(secret: &[u8; 32], body: &[u8], ts: u64, nonce: u32) -> String {
+    let mut mac = Hmac::<Sha256>::new_from_slice(secret).unwrap();
     mac.update(HMAC_SALT);
     mac.update(ts.to_string().as_bytes());
     mac.update(nonce.to_string().as_bytes());
+    mac.update(body);
 
-    let result = mac.finalize().into_bytes();
-    Ok(hex::encode(result))
+    hex::encode(mac.finalize().into_bytes())
 }
