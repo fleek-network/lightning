@@ -11,6 +11,7 @@ use std::time::Duration;
 use affair::AsyncWorkerUnordered;
 use fdi::Cloned;
 use lightning_interfaces::prelude::*;
+use lightning_interfaces::spawn_worker;
 use lightning_interfaces::types::{Block, TransactionRequest};
 use rand::{thread_rng, Rng, SeedableRng};
 use rand_chacha::ChaCha12Rng;
@@ -72,7 +73,7 @@ pub struct MockForwarder<C> {
 }
 
 impl<C: Collection> MockForwarder<C> {
-    fn new(sender: mpsc::Sender<TransactionRequest>) -> Self {
+    fn new(sender: mpsc::Sender<TransactionRequest>, waiter: ShutdownWaiter) -> Self {
         struct ProxyWorker(mpsc::Sender<TransactionRequest>);
         impl AsyncWorkerUnordered for ProxyWorker {
             type Request = TransactionRequest;
@@ -81,8 +82,10 @@ impl<C: Collection> MockForwarder<C> {
                 self.0.send(req).await.expect("Failed to send transaction.")
             }
         }
+        let worker = ProxyWorker(sender);
+        let socket = spawn_worker!(worker, "MOCK-FORWARDER", waiter, crucial);
         Self {
-            socket: ProxyWorker(sender).spawn(),
+            socket,
             c: PhantomData,
         }
     }
@@ -90,9 +93,12 @@ impl<C: Collection> MockForwarder<C> {
 
 impl<C: Collection> BuildGraph for MockForwarder<C> {
     fn build_graph() -> fdi::DependencyGraph {
-        fdi::DependencyGraph::new().with_infallible(|mut group: fdi::RefMut<MockConsensusGroup>| {
-            Self::new(group.req_tx.take().unwrap())
-        })
+        fdi::DependencyGraph::new().with_infallible(
+            |mut group: fdi::RefMut<MockConsensusGroup>,
+             fdi::Cloned(waiter): fdi::Cloned<ShutdownWaiter>| {
+                Self::new(group.req_tx.take().unwrap(), waiter)
+            },
+        )
     }
 }
 
