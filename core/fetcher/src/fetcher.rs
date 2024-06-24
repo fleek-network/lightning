@@ -10,7 +10,7 @@ use lightning_interfaces::types::{
     ImmutablePointer,
     ServerRequest,
 };
-use lightning_interfaces::{BlockstoreServerSocket, FetcherSocket};
+use lightning_interfaces::{spawn_worker, BlockstoreServerSocket, FetcherSocket};
 use lightning_metrics::increment_counter;
 use tokio::sync::{mpsc, oneshot};
 use tracing::info;
@@ -61,7 +61,7 @@ impl<C: Collection> Fetcher<C> {
             resolver,
         };
 
-        let socket = worker.spawn_with_shutdown(async move { shutdown.wait_for_shutdown().await });
+        let socket = spawn_worker!(worker, "FETCHER", shutdown, crucial);
 
         Ok(Self {
             socket,
