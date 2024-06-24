@@ -7,6 +7,7 @@ use std::net::IpAddr;
 use std::sync::Arc;
 
 pub use commands::{CommandCenter, FireWallRequest, FirewallCommand};
+use lightning_interfaces::ShutdownWaiter;
 use lightning_types::{ConnectionPolicyConfig, FirewallConfig, RateLimitingConfig};
 use policy::{ConnectionPolicy, ConnectionPolicyMode};
 use rate_limiting::{RateLimiting, RateLimitingMode};
@@ -64,7 +65,12 @@ impl Clone for Firewall {
 }
 
 impl Firewall {
-    pub fn new(name: String, policy: ConnectionPolicy, rate_limiting: RateLimiting) -> Self {
+    pub fn new(
+        name: String,
+        policy: ConnectionPolicy,
+        rate_limiting: RateLimiting,
+        shutdown: ShutdownWaiter,
+    ) -> Self {
         let inner = Inner::new(&name, policy, rate_limiting);
 
         let (command_tx, command_rx) = mpsc::channel(100);
@@ -74,12 +80,17 @@ impl Firewall {
             inner: Arc::new(Mutex::new(inner)),
         };
 
-        tokio::spawn(this.clone().update_loop(command_rx));
+        let clone = this.clone();
+        lightning_interfaces::spawn!(
+            clone.update_loop(command_rx),
+            "Firewall loop",
+            crucial(shutdown)
+        );
 
         this
     }
 
-    pub fn from_config(config: FirewallConfig) -> Self {
+    pub fn from_config(config: FirewallConfig, shutdown: ShutdownWaiter) -> Self {
         let FirewallConfig {
             name,
             connection_policy,
@@ -98,7 +109,7 @@ impl Firewall {
             RateLimitingConfig::Global { rules } => RateLimiting::global(rules),
         };
 
-        Self::new(name, policy, rate)
+        Self::new(name, policy, rate, shutdown)
     }
 
     pub async fn check(&self, ip: IpAddr) -> Result<(), FirewallError> {

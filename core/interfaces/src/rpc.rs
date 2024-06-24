@@ -1,8 +1,11 @@
+use std::path::PathBuf;
+
 use fdi::BuildGraph;
 use tokio::sync::broadcast;
 
 use crate::collection::Collection;
 use crate::types::Event;
+use crate::ConfigConsumer;
 
 /// A wrapper around a tokio broadcast
 #[derive(Debug)]
@@ -34,7 +37,11 @@ impl Events {
 /// The interface for the *RPC* server. Which is supposed to be opening a public
 /// port (possibly an HTTP server) and accepts queries or updates from the user.
 #[interfaces_proc::blank]
-pub trait RpcInterface<C: Collection>: BuildGraph + Sized + Send + Sync {
+pub trait RpcInterface<C: Collection>: ConfigConsumer + BuildGraph + Sized + Send + Sync {
     /// Panics if the event handler is not available.
     fn event_tx(&self) -> Events;
+
+    fn port(config: &<Self as ConfigConsumer>::Config) -> u16;
+
+    fn hmac_secret_dir(config: &<Self as ConfigConsumer>::Config) -> Option<PathBuf>;
 }

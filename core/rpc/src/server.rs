@@ -1,6 +1,7 @@
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::AtomicU32;
+use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use hmac::{Hmac, Mac};
@@ -8,7 +9,7 @@ use hyper::{Body, Request, Response};
 use sha2::Sha256;
 use tower::Service as TowerService;
 
-use crate::{health, metrics, HMAC_NONCE, HMAC_SALT, VERSION};
+use crate::{health, metrics, HMAC_SALT, VERSION};
 
 type BoxedError = Box<dyn std::error::Error + Sync + Send + 'static>;
 
@@ -16,7 +17,8 @@ type BoxedError = Box<dyn std::error::Error + Sync + Send + 'static>;
 pub struct RpcService<MainModule, AdminModule> {
     pub main_server: MainModule,
     pub admin_server: AdminModule,
-    secret: [u8; 32],
+    secret: Arc<[u8; 32]>,
+    nonce: Arc<AtomicU32>,
 }
 
 impl<X, Y> Clone for RpcService<X, Y>
@@ -28,7 +30,8 @@ where
         Self {
             main_server: self.main_server.clone(),
             admin_server: self.admin_server.clone(),
-            secret: self.secret,
+            secret: self.secret.clone(),
+            nonce: self.nonce.clone(),
         }
     }
 }
@@ -66,8 +69,64 @@ impl<MainModule, AdminModule> RpcService<MainModule, AdminModule> {
         Self {
             main_server,
             admin_server,
-            secret,
+            secret: Arc::new(secret),
+            nonce: Arc::new(0.into()),
         }
+    }
+
+    fn verify_hmac(&mut self, hmac: &str, ts: &str, nonce: &str) -> Result<(), BoxedError> {
+        if hmac.trim_start_matches("0x").len() != 64 {
+            return Err("HMAC is not 32 bytes".into());
+        }
+
+        let our_nonce = self.nonce.load(std::sync::atomic::Ordering::Acquire);
+
+        let user_timestamp = ts.parse::<u64>()?;
+        let user_nonce = nonce.parse::<u32>()?;
+
+        if user_nonce != our_nonce {
+            return Err(format!(
+                "Nonce is not valid, expected {}, got {}",
+                our_nonce, user_nonce
+            )
+            .into());
+        }
+
+        let sys = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(Box::new)?
+            .as_secs();
+
+        // it should be more than 5 seconsd in the past
+        if sys - 5 > user_timestamp {
+            return Err("Timestamp is too far in the past".into());
+        }
+
+        // it should not be in the future
+        if user_timestamp > sys {
+            return Err("Timestamp is too far in the future".into());
+        }
+
+        let correct_hmac = create_hmac(&self.secret, user_timestamp, user_nonce)?;
+
+        if hmac != correct_hmac {
+            return Err("Recreated HMAC doesnt match".into());
+        }
+
+        if self
+            .nonce
+            .compare_exchange(
+                our_nonce,
+                our_nonce + 1,
+                std::sync::atomic::Ordering::AcqRel,
+                std::sync::atomic::Ordering::Acquire,
+            )
+            .is_err()
+        {
+            return Err("Nonce was invalidated during request".into());
+        }
+
+        Ok(())
     }
 }
 
@@ -89,6 +148,7 @@ impl<MainModule, AdminModule> RpcService<MainModule, AdminModule> {
         let path = req.uri().path().to_string().to_ascii_lowercase();
         let method = req.method();
 
+        // todo(n)
         // in the future the struct could be change to suppport a "main" and a auxillary services
         // and you define new routes using a builder
         //
@@ -136,14 +196,16 @@ impl<MainModule, AdminModule> RpcService<MainModule, AdminModule> {
 
                 Box::pin(fut)
             },
-            "/admin/nonce" => Box::pin(async move {
-                hyper::Response::builder()
-                    .status(hyper::StatusCode::OK)
-                    .body(hyper::Body::from(
-                        crate::HMAC_NONCE.load(Ordering::Acquire).to_string(),
-                    ))
-                    .map_err(|e| e.into())
-            }),
+            "/admin/nonce" => {
+                let nonce = self.nonce.load(std::sync::atomic::Ordering::Acquire);
+
+                Box::pin(async move {
+                    hyper::Response::builder()
+                        .status(hyper::StatusCode::OK)
+                        .body(hyper::Body::from(nonce.to_string()))
+                        .map_err(|e| e.into())
+                })
+            },
             "/admin" => {
                 if method == hyper::Method::POST {
                     match (
@@ -154,7 +216,7 @@ impl<MainModule, AdminModule> RpcService<MainModule, AdminModule> {
                         (Some(hmac), Some(ts), Some(nonce)) => {
                             match (hmac.to_str(), ts.to_str(), nonce.to_str()) {
                                 (Ok(hmac), Ok(ts), Ok(nonce)) => {
-                                    match verify_hmac(&self.secret, hmac, ts, nonce) {
+                                    match self.verify_hmac(hmac, ts, nonce) {
                                         Ok(_) => (),
                                         Err(err) => {
                                             return Box::pin(async move {
@@ -227,7 +289,10 @@ fn bad_request(
 }
 
 /// Creates a hmac from a timestamp and nonce
-pub fn create_hmac(secret: &[u8; 32], ts: u64, nonce: usize) -> anyhow::Result<String> {
+///
+/// ts: the unix timestamp in seconds
+/// nonce: returned from the '/admin/nonce' route
+pub fn create_hmac(secret: &[u8; 32], ts: u64, nonce: u32) -> anyhow::Result<String> {
     let mut mac = Hmac::<Sha256>::new_from_slice(secret)?;
     mac.update(HMAC_SALT);
     mac.update(ts.to_string().as_bytes());
@@ -235,44 +300,4 @@ pub fn create_hmac(secret: &[u8; 32], ts: u64, nonce: usize) -> anyhow::Result<S
 
     let result = mac.finalize().into_bytes();
     Ok(hex::encode(result))
-}
-
-fn verify_hmac(secret: &[u8; 32], hmac: &str, ts: &str, nonce: &str) -> Result<(), BoxedError> {
-    if hmac.trim_start_matches("0x").len() != 64 {
-        return Err("HMAC is not 32 bytes".into());
-    }
-
-    let u64_ts = ts.parse::<u64>()?;
-    let usize_nonce = nonce.parse::<usize>()?;
-
-    let sys = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_err(Box::new)?
-        .as_secs();
-
-    if sys - 5 > u64_ts {
-        return Err("Timestamp is too far in the past".into());
-    }
-
-    if u64_ts > sys {
-        return Err("Timestamp is too far in the future".into());
-    }
-
-    // assume hmac secret is loaded by now
-    // we have verified that params are valid so lets create the correct one
-    let correct_hmac = create_hmac(secret, u64_ts, usize_nonce)?;
-
-    if hmac != correct_hmac {
-        return Err("Bad HMAC".into());
-    }
-
-    match HMAC_NONCE.compare_exchange(
-        usize_nonce,
-        usize_nonce + 1,
-        Ordering::AcqRel,
-        Ordering::Acquire,
-    ) {
-        Ok(_) => Ok(()),
-        Err(n) => Err(format!("Nonce is not valid, expected {}, got {}", n, usize_nonce).into()),
-    }
 }

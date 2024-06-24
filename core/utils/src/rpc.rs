@@ -13,7 +13,7 @@ pub struct RpcSuccessResponse<T> {
 
 pub struct RpcAdminHeaders {
     pub hmac: String,
-    pub nonce: usize,
+    pub nonce: u32,
     pub timestamp: u64,
 }
 
@@ -25,6 +25,23 @@ pub async fn make_request(address: String, req: String) -> Result<Response> {
         .body(req)
         .send()
         .await?)
+}
+
+pub fn get_timestamp() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("Can get time since unix epoch")
+        .as_secs()
+}
+
+pub async fn get_admin_nonce(client: &reqwest::Client, address: String) -> Result<u32> {
+    Ok(client
+        .get(format!("{}/admin/nonce", address))
+        .send()
+        .await?
+        .text()
+        .await?
+        .parse()?)
 }
 
 pub async fn rpc_request<T: DeserializeOwned>(

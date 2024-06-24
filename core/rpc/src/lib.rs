@@ -28,8 +28,8 @@ pub mod api_types;
 pub mod config;
 pub mod error;
 mod logic;
-
 mod server;
+pub use server::create_hmac;
 #[cfg(test)]
 mod tests;
 
@@ -121,7 +121,6 @@ pub struct Rpc<C: Collection> {
     /// RPC module for admin methods.
     admin_module: RpcModule<()>,
     data: Arc<Data<C>>,
-    firewall: Firewall,
     secret: [u8; 32],
 }
 
@@ -166,13 +165,11 @@ impl<C: Collection> Rpc<C> {
         let admin_module = Self::create_admin_module_from_config(&config, data.clone())?;
 
         let secret = load_hmac_secret(config.hmac_secret_dir.take())?;
-        let firewall = Firewall::from_config(config.firewall.clone());
         Ok(Self {
             config,
             module,
             admin_module,
             data,
-            firewall,
             secret,
         })
     }
@@ -193,7 +190,9 @@ impl<C: Collection> Rpc<C> {
 
         let rpc_server =
             server::RpcService::new(json_rpc_service, admin_json_rpc_service, self.secret);
-        let rpc_server = self.firewall.clone().service(rpc_server);
+
+        let firewall = Firewall::from_config(self.config.firewall.clone(), shutdown.clone());
+        let rpc_server = firewall.service(rpc_server);
 
         let addr = self.config.addr();
         let server = hyper::Server::bind(&addr).serve(rpc_server);
@@ -265,6 +264,14 @@ impl<C: Collection> RpcInterface<C> for Rpc<C> {
     fn event_tx(&self) -> Events {
         self.data.events.clone()
     }
+
+    fn port(config: &<Self as ConfigConsumer>::Config) -> u16 {
+        config.port()
+    }
+
+    fn hmac_secret_dir(config: &<Self as ConfigConsumer>::Config) -> Option<PathBuf> {
+        config.hmac_secret_dir.clone()
+    }
 }
 
 impl<C: Collection> ConfigConsumer for Rpc<C> {
@@ -308,9 +315,10 @@ fn filter_methods(
     let disallowed: Vec<_> = disallowed.as_ref().iter().map(|s| s.as_str()).collect();
     for method in method_names {
         if !disallowed.contains(&method) {
-            // this should work because we know the method is valid already and filtered
-            // is emtpy
-            let _ = filtered.verify_and_insert(method, methods.method(method).unwrap().clone());
+            // unwrap: we know the method is valid as it came from a valid methods object
+            let _ = filtered
+                .verify_and_insert(method, methods.method(method).unwrap().clone())
+                .unwrap();
         }
     }
 
