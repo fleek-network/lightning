@@ -8,6 +8,7 @@ use std::marker::PhantomData;
 use affair::AsyncWorkerUnordered;
 use demuxer::Demuxer;
 use lightning_interfaces::prelude::*;
+use lightning_interfaces::spawn_worker;
 
 pub use crate::config::Config;
 
@@ -25,10 +26,11 @@ impl<C: Collection> OriginDemuxer<C> {
     pub fn new(
         config: &C::ConfigProviderInterface,
         blockstore: &C::BlockstoreInterface,
+        fdi::Cloned(waiter): fdi::Cloned<ShutdownWaiter>,
     ) -> anyhow::Result<Self> {
         let config = config.get::<Self>();
         let demuxer = Demuxer::<C>::new(config, blockstore.clone())?;
-        let socket = demuxer.spawn();
+        let socket = spawn_worker!(demuxer, "ORIGIN-DEMUXER", waiter, crucial);
         Ok(Self {
             socket,
             _collection: PhantomData,
