@@ -106,7 +106,7 @@ impl<B: StorageBackend, S: SerdeBackend> AtomoInner<B, S> {
     /// inverse of a batch is another batch that when executed reverts the changes.
     #[inline]
     pub fn compute_inverse(&self, batch: &VerticalBatch) -> VerticalBatch {
-        let num_tables = self.tables.len();
+        let num_tables = self.tables.len() as u8;
         let mut inverse = VerticalBatch::new(num_tables);
 
         for t in 0..num_tables {

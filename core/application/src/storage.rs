@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use atomo::storage::TableIndex;
 use atomo::{InMemoryStorage, StorageBackend, StorageBackendConstructor};
 use atomo_rocks::{Options, RocksBackend, RocksBackendBuilder};
 
@@ -70,7 +71,7 @@ impl<'a> StorageBackendConstructor for AtomoStorageBuilder<'a> {
 
     type Error = anyhow::Error;
 
-    fn open_table(&mut self, name: String) {
+    fn open_table(&mut self, name: String) -> TableIndex {
         match self {
             AtomoStorageBuilder::InMemory(builder) => builder.open_table(name),
             AtomoStorageBuilder::RocksDb(builder) => builder.open_table(name),
@@ -116,21 +117,21 @@ impl StorageBackend for AtomoStorage {
         }
     }
 
-    fn keys(&self, tid: u8) -> Vec<atomo::batch::BoxedVec> {
+    fn keys(&self, tid: TableIndex) -> Vec<atomo::batch::BoxedVec> {
         match &self {
             AtomoStorage::InMemory(storage) => storage.keys(tid),
             AtomoStorage::RocksDb(storage) => storage.keys(tid),
         }
     }
 
-    fn get(&self, tid: u8, key: &[u8]) -> Option<Vec<u8>> {
+    fn get(&self, tid: TableIndex, key: &[u8]) -> Option<Vec<u8>> {
         match &self {
             AtomoStorage::InMemory(storage) => storage.get(tid, key),
             AtomoStorage::RocksDb(storage) => storage.get(tid, key),
         }
     }
 
-    fn contains(&self, tid: u8, key: &[u8]) -> bool {
+    fn contains(&self, tid: TableIndex, key: &[u8]) -> bool {
         match &self {
             AtomoStorage::InMemory(storage) => storage.contains(tid, key),
             AtomoStorage::RocksDb(storage) => storage.contains(tid, key),

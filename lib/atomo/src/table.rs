@@ -103,7 +103,7 @@ impl<B: StorageBackend, S: SerdeBackend> TableSelector<B, S> {
     /// Create a new table selector for the head of an Atomo instance.
     #[inline]
     pub fn new(atomo: Arc<AtomoInner<B, S>>) -> Self {
-        let num_tables = atomo.tables.len();
+        let num_tables = atomo.tables.len() as u8;
         let batch = VerticalBatch::new(num_tables);
         let snapshot = atomo.snapshot_list.current();
         let keys = snapshot.get_metadata().clone();
@@ -231,7 +231,7 @@ where
             _ => {},
         }
 
-        let index = self.tid as usize;
+        let index = self.tid;
         if let Some(operation) = self
             .selector
             .snapshot
@@ -263,7 +263,7 @@ where
             _ => {},
         }
 
-        let index = self.tid as usize;
+        let index = self.tid;
         if let Some(op) = self
             .selector
             .snapshot

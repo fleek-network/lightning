@@ -6,6 +6,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use atomo::batch::Operation;
+use atomo::storage::TableIndex;
 use atomo::{AtomoBuilder, DefaultSerdeBackend, StorageBackend, StorageBackendConstructor};
 use fxhash::FxHashMap;
 /// Re-export of [`rocksdb::Options`].
@@ -102,8 +103,9 @@ impl<'a> StorageBackendConstructor for RocksBackendBuilder<'a> {
 
     type Error = anyhow::Error;
 
-    fn open_table(&mut self, name: String) {
-        self.columns.push(name)
+    fn open_table(&mut self, name: String) -> TableIndex {
+        self.columns.push(name);
+        (self.columns.len() - 1).try_into().unwrap()
     }
 
     fn build(mut self) -> Result<Self::Storage, Self::Error> {
@@ -207,7 +209,7 @@ impl StorageBackend for RocksBackend {
             .expect("failed to commit batch to rocksdb");
     }
 
-    fn keys(&self, tid: u8) -> Vec<atomo::batch::BoxedVec> {
+    fn keys(&self, tid: TableIndex) -> Vec<atomo::batch::BoxedVec> {
         let cf = self.db.cf_handle(&self.columns[tid as usize]).unwrap();
         self.db
             .iterator_cf(&cf, rocksdb::IteratorMode::Start)
@@ -218,14 +220,14 @@ impl StorageBackend for RocksBackend {
             .collect()
     }
 
-    fn get(&self, tid: u8, key: &[u8]) -> Option<Vec<u8>> {
+    fn get(&self, tid: TableIndex, key: &[u8]) -> Option<Vec<u8>> {
         let cf = self.db.cf_handle(&self.columns[tid as usize]).unwrap();
         self.db
             .get_cf(&cf, key)
             .expect("failed to get value from rocksdb")
     }
 
-    fn contains(&self, tid: u8, key: &[u8]) -> bool {
+    fn contains(&self, tid: TableIndex, key: &[u8]) -> bool {
         let cf = self.db.cf_handle(&self.columns[tid as usize]).unwrap();
         if self.db.key_may_exist_cf(&cf, key) {
             self.db
