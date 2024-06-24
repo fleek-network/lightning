@@ -196,6 +196,8 @@ macro_rules! spawn_worker {
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
+
+    use affair::AsyncWorkerUnordered;
     partial!(BlanketCollection {});
 
     // This test only has to be compiled in order to be considered passing.
@@ -236,5 +238,51 @@ mod tests {
                     panic!("Failed to signal a shutdown when spawn thread panicked");
                 }
             });
+    }
+
+    #[test]
+    fn test_spawn_worker_macro_panic_shutdown() {
+        // Ensure that a spawned task using our macro signals a shutdown when it panics
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                let shutdown_controller = crate::ShutdownController::new(false);
+                let waiter = shutdown_controller.waiter();
+                let panic_waiter = shutdown_controller.waiter();
+
+                // Spawn a worker that will panic when we send a request
+                let worker = TestWorker {};
+                let socket = spawn_worker!(worker, "TEST-WORKER", panic_waiter, crucial);
+                socket.enqueue(TestRequest {}).await.unwrap();
+
+                // If the worker that panics doesn't trigger a shutdown afer it panics, fail the
+                // test
+                if let Err(e) =
+                    tokio::time::timeout(Duration::from_millis(100), waiter.wait_for_shutdown())
+                        .await
+                {
+                    println!("{e}");
+                    panic!("Failed to signal a shutdown when worker panicked");
+                }
+            });
+    }
+
+    pub struct TestWorker {}
+
+    #[derive(Clone, Debug)]
+    pub struct TestRequest {}
+
+    #[derive(Debug)]
+    pub struct TestResponse {}
+
+    impl AsyncWorkerUnordered for TestWorker {
+        type Request = TestRequest;
+        type Response = TestResponse;
+
+        async fn handle(&self, _req: Self::Request) -> Self::Response {
+            panic!();
+        }
     }
 }
