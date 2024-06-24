@@ -139,3 +139,16 @@ pub struct FileCacheKey {
     pub task: u64,
     pub target: u64,
 }
+
+#[derive(Clone, Copy)]
+pub struct GlobalConfig {
+    pub mode: u32,
+}
+
+impl GlobalConfig {
+    pub const ENFORCE_MODE: u32 = 0;
+    pub const LEARN_MODE: u32 = 1;
+}
+
+#[cfg(feature = "userspace")]
+unsafe impl aya::Pod for GlobalConfig {}

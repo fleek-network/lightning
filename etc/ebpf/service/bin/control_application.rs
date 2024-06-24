@@ -9,6 +9,7 @@ use clap::Parser;
 use lightning_ebpf_common::{
     Buffer,
     File,
+    GlobalConfig,
     PacketFilter,
     PacketFilterParams,
     Profile,
@@ -40,6 +41,14 @@ struct Opts {
     /// Load FILE_OPEN program in the corresponding LSM hook.
     #[clap(short, long, default_value_t = true)]
     enable_file_open: bool,
+    /// Enable learning mode.
+    ///
+    /// In learning mode, the filters allow all access and operations,
+    /// in addition to sending an event for each access and operation attempt.
+    /// This is useful for debugging and building the initial configurations
+    /// for each filter.
+    #[clap(short, long, default_value_t = false)]
+    learning_mode: bool,
 }
 
 #[tokio::main]
@@ -83,10 +92,10 @@ async fn main() -> anyhow::Result<()> {
         HashMap::try_from(handle.take_map("PROFILES").unwrap())?;
     let packet_filters: HashMap<_, PacketFilter, PacketFilterParams> =
         HashMap::try_from(handle.take_map("PACKET_FILTERS").unwrap())?;
-    let mut buffers: PerCpuHashMap<_, u32, Buffer> =
-        PerCpuHashMap::try_from(handle.take_map("BUFFERS").unwrap())?;
     let events: RingBuf<_> = RingBuf::try_from(handle.take_map("EVENTS").unwrap())?;
 
+    let mut buffers: PerCpuHashMap<_, u32, Buffer> =
+        PerCpuHashMap::try_from(handle.take_map("BUFFERS").unwrap())?;
     let cpu_count = aya::util::nr_cpus()?;
     buffers.insert(
         0,
@@ -96,6 +105,20 @@ async fn main() -> anyhow::Result<()> {
     buffers.insert(
         1,
         PerCpuValues::try_from(vec![[0u8; MAX_BUFFER_LEN]; cpu_count])?,
+        0,
+    )?;
+
+    let mut global_config: HashMap<_, u32, GlobalConfig> =
+        HashMap::try_from(handle.take_map("GLOBAL_CONFIG").unwrap())?;
+    global_config.insert(
+        0,
+        GlobalConfig {
+            mode: if opt.learning_mode {
+                GlobalConfig::LEARN_MODE
+            } else {
+                GlobalConfig::ENFORCE_MODE
+            },
+        },
         0,
     )?;
 

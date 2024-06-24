@@ -5,6 +5,7 @@ use lightning_ebpf_common::{
     File,
     FileCacheKey,
     FileRule,
+    GlobalConfig,
     PacketFilter,
     PacketFilterParams,
     Profile,
@@ -27,3 +28,6 @@ pub static FILE_CACHE: LruPerCpuHashMap<FileCacheKey, FileRule> =
     LruPerCpuHashMap::<FileCacheKey, FileRule>::with_max_entries(128, 0);
 #[map]
 pub static EVENTS: RingBuf = RingBuf::with_byte_size(1024 * 4096, 0);
+#[map]
+pub static GLOBAL_CONFIG: HashMap<u32, GlobalConfig> =
+    HashMap::<u32, GlobalConfig>::with_max_entries(1, 0);

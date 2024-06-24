@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::bail;
@@ -8,11 +9,14 @@ use lightning_ebpf_common::{
     FILE_OPEN_PROG_ID,
     MAX_BUFFER_LEN,
 };
+use lightning_utils::config::LIGHTNING_HOME_DIR;
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 
-use crate::config::EVENT_LOG_FILE_PATH;
+pub static EVENT_LOG_FILE_PATH: Lazy<PathBuf> =
+    Lazy::new(|| LIGHTNING_HOME_DIR.join("ebpf/events.json"));
 
 #[derive(Deserialize, Serialize)]
 pub struct Record {

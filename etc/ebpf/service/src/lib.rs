@@ -10,6 +10,7 @@ mod pubsub;
 pub mod server;
 
 mod config;
+#[cfg(feature = "server")]
 mod event;
 pub mod frame;
 pub mod map;

@@ -6,6 +6,7 @@ use lightning_ebpf_common::{
     File,
     FileCacheKey,
     FileRule,
+    GlobalConfig,
     Profile,
     ACCESS_DENIED_EVENT,
     EVENT_HEADER_SIZE,
@@ -30,47 +31,55 @@ unsafe fn try_file_open(ctx: LsmContext) -> Result<i32, i32> {
     let task_inode = read_file_inode(task_file).map_err(|_| ALLOW)?;
 
     if let Some(profile) = maps::PROFILES.get(&File::new(task_inode)) {
+        let global_config = maps::GLOBAL_CONFIG.get(&0).ok_or(DENY)?;
+
         // Get the path for the target file.
         let buf = maps::BUFFERS.get_ptr_mut(&0).ok_or(DENY)?;
         let path = buf.as_mut().ok_or(DENY)?.as_mut_slice();
         read_path(file, path)?;
 
-        // Get the inode of the target file.
-        let target_inode = {
-            let inode = aya_ebpf::helpers::bpf_probe_read_kernel(access::file_inode(file))
-                .map_err(|_| DENY)?;
-            aya_ebpf::helpers::bpf_probe_read_kernel(access::inode_i_ino(inode))
-                .map_err(|_| DENY)?
-        };
+        if global_config.mode == GlobalConfig::ENFORCE_MODE {
+            // Get the inode of the target file.
+            let target_inode = {
+                let inode = aya_ebpf::helpers::bpf_probe_read_kernel(access::file_inode(file))
+                    .map_err(|_| DENY)?;
+                aya_ebpf::helpers::bpf_probe_read_kernel(access::inode_i_ino(inode))
+                    .map_err(|_| DENY)?
+            };
 
-        // Check the cache first.
-        let cache_key = &FileCacheKey {
-            target: target_inode,
-            task: task_inode,
-        };
-        if let Some(cached_rule) = maps::FILE_CACHE.get(&cache_key) {
-            if (cached_rule.is_dir == FileRule::IS_DIR
-                && cmp_str_bytes(cached_rule.path.as_slice(), path, MAX_BUFFER_LEN))
-                || cmp_str_bytes(path, cached_rule.path.as_slice(), MAX_BUFFER_LEN)
-                    && cached_rule.permissions & FileRule::OPEN_MASK > 0
-            {
+            // Check the cache first.
+            let cache_key = &FileCacheKey {
+                target: target_inode,
+                task: task_inode,
+            };
+            if let Some(cached_rule) = maps::FILE_CACHE.get(&cache_key) {
+                if (cached_rule.is_dir == FileRule::IS_DIR
+                    && cmp_str_bytes(cached_rule.path.as_slice(), path, MAX_BUFFER_LEN))
+                    || cmp_str_bytes(path, cached_rule.path.as_slice(), MAX_BUFFER_LEN)
+                        && cached_rule.permissions & FileRule::OPEN_MASK > 0
+                {
+                    return Ok(ALLOW);
+                }
+                // If we get here, it means that the file's inode number
+                // has been assigned to a different file.
+            }
+
+            // Go through the rules in this profile and try to find a match.
+            if let Some(rule) = find_match(profile, path, FileRule::OPEN_MASK)? {
+                let _ = maps::FILE_CACHE.insert(cache_key, rule, 0);
                 return Ok(ALLOW);
             }
-            // If we get here, it means that the file's inode number
-            // has been assigned to a different file.
-        }
-
-        // Go through the rules in this profile and try to find a match.
-        if let Some(rule) = find_match(profile, path, FileRule::OPEN_MASK)? {
-            let _ = maps::FILE_CACHE.insert(cache_key, rule, 0);
-            return Ok(ALLOW);
         }
 
         // The error may indicate that the ring buffer is full so there is nothing
         // left to do but let the consumer catch up.
         let _ = send_event(ACCESS_DENIED_EVENT, FILE_OPEN_PROG_ID, task_file, path);
 
-        return Ok(DENY);
+        return if global_config.mode == GlobalConfig::LEARN_MODE {
+            Ok(ALLOW)
+        } else {
+            Ok(DENY)
+        };
     }
 
     Ok(ALLOW)
