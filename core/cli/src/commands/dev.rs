@@ -2,9 +2,10 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use lightning_interfaces::prelude::*;
-use lightning_interfaces::types::{Blake3Hash, NodePorts};
+use lightning_interfaces::types::Blake3Hash;
+use lightning_rpc::create_hmac;
 use lightning_utils::config::TomlConfigProvider;
-use lightning_utils::rpc::rpc_request;
+use lightning_utils::rpc::{get_admin_nonce, get_timestamp, rpc_request, RpcAdminHeaders};
 use reqwest::Client;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde_json::json;
@@ -17,7 +18,7 @@ where
 {
     match cmd {
         DevSubCmd::DepGraph => dep_graph::<C>().await,
-        DevSubCmd::Store { input } => store(input).await,
+        DevSubCmd::Store { input } => store::<C>(config_path, input).await,
         DevSubCmd::Fetch { remote, hash } => fetch::<C>(config_path, hash, remote).await,
     }
 }
@@ -29,10 +30,19 @@ async fn dep_graph<C: Collection>() -> Result<()> {
     Ok(())
 }
 
-async fn store(input: Vec<PathBuf>) -> Result<()> {
-    // Todo: is there a way to find the port for the locally running node?
-    let ports = NodePorts::default();
+async fn store<C>(config_path: ResolvedPathBuf, input: Vec<PathBuf>) -> Result<()>
+where
+    C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>,
+{
+    let provider = TomlConfigProvider::<C>::load(config_path)?;
+    let config = provider.get::<C::RpcInterface>();
+    let port = <C::RpcInterface as RpcInterface<C>>::port(&config);
+    let hmac_secret_path = <C::RpcInterface as RpcInterface<C>>::hmac_secret_dir(&config);
 
+    // by default loads or creates if hmac_secret_path.is_none() the secret from ~/.lightning
+    let secret = lightning_rpc::load_hmac_secret(hmac_secret_path)?;
+
+    let url = format!("http://127.0.0.1:{}", port);
     for path in &input {
         if let Some(path) = path.to_str() {
             let request = json!({
@@ -43,11 +53,20 @@ async fn store(input: Vec<PathBuf>) -> Result<()> {
             })
             .to_string();
             let client = Client::new();
+
+            let nonce = get_admin_nonce(&client, url.clone()).await?;
+            let timestamp = get_timestamp();
+            let hmac = create_hmac(&secret, timestamp, nonce)?;
+
             let response = rpc_request::<Blake3Hash>(
                 &client,
-                format!("http://127.0.0.1:{}/admin", ports.rpc),
+                format!("{}/admin", url),
                 request,
-                None,
+                Some(RpcAdminHeaders {
+                    hmac,
+                    nonce,
+                    timestamp,
+                }),
             )
             .await?;
 
@@ -56,6 +75,7 @@ async fn store(input: Vec<PathBuf>) -> Result<()> {
             println!("invalid unicode in {path:?}")
         };
     }
+
     Ok(())
 }
 

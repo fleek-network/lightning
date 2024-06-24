@@ -60,10 +60,9 @@ pub fn load_hmac_secret(secret_dir_path: Option<PathBuf>) -> anyhow::Result<[u8;
 
         let secret_hex = read_to_string(&secret_path)?;
         let secret_bytes = hex::decode(secret_hex.trim())?;
-        assert!(
-            secret_bytes.len() == 32,
-            "HMAC secret must be hex encoded and 32 bytes"
-        );
+        if secret_bytes.len() != 32 {
+            anyhow::bail!("HMAC secret is not 32 bytes long");
+        }
 
         let mut secret = [0_u8; 32];
         secret.copy_from_slice(&secret_bytes);

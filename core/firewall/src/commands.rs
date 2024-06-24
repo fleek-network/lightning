@@ -38,8 +38,11 @@ impl CommandCenter {
         }
     }
 
-    /// Warning! this method panics if the firewall  with the same name is already registered.
+    /// Register a firewall with the command center.
+    ///
+    /// If a firewall with the same name is already registered, it will be overwritten.
     pub fn register(&self, name: String, sender: mpsc::Sender<FireWallRequest>) {
+        // unwrap: no one should panic holding this lock
         let mut lock = self.senders.lock().unwrap();
 
         if lock.contains_key(&name) {
@@ -51,7 +54,9 @@ impl CommandCenter {
         lock.insert(name, sender);
     }
 
+    /// Get a sender for a firewall by name.
     pub fn sender(&self, name: &str) -> Option<mpsc::Sender<FireWallRequest>> {
+        // unwrap: no one should panic holding this lock
         self.senders.lock().unwrap().get(name).cloned()
     }
 }

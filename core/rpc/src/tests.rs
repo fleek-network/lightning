@@ -1417,7 +1417,7 @@ async fn test_admin_rpc_hmac(port: u16, _node: &TestNode, secret: &[u8; 32]) -> 
 
         let admin_headers = RpcAdminHeaders {
             hmac: create_hmac(secret, unix_time, i)?,
-            nonce: i as u32,
+            nonce: i,
             timestamp: unix_time,
         };
 
