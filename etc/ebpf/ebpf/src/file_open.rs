@@ -114,7 +114,7 @@ fn find_match<'a>(
         }
 
         let full_path = rule.path.as_slice();
-        if (rule.is_dir == FileRule::IS_FILE
+        if (rule.is_dir == FileRule::IS_DIR
             && cmp_str_bytes(full_path, target_path, MAX_BUFFER_LEN))
             || cmp_str_bytes(target_path, full_path, MAX_BUFFER_LEN)
         {
@@ -145,19 +145,27 @@ unsafe fn read_file_name(file: *const vmlinux::file, dst: &mut [u8]) -> Result<&
     aya_ebpf::helpers::bpf_probe_read_kernel_str_bytes(d_name, dst)
 }
 
-// The eBPF verifier may reject this code
-// if `size` is not equal to the len of both parameters.
+// The eBPF verifier may reject this code if:
+//  - `size` is not equal to the len of both parameters.
+//  - `size` is zero.
+// Due to limited stack space, we do not handle these cases in this function.
 /// Compares slices to determine if they both contain the same NUL terminated string.
 fn cmp_str_bytes(a: &[u8], b: &[u8], size: usize) -> bool {
-    for j in 0..size {
-        if a[j] != b[j] {
-            break;
-        }
+    // Handle empty strings.
+    if a[0] == 0 {
+        return b[0] == 0;
+    }
 
-        if a[j] == 0 {
+    for i in 0..size {
+        if a[i] == 0 {
             return true;
         }
+
+        if a[i] != b[i] {
+            break;
+        }
     }
+
     false
 }
 

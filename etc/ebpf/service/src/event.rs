@@ -28,6 +28,7 @@ pub struct Record {
 }
 pub async fn write_events(events: Vec<EventMessage>) -> anyhow::Result<()> {
     if !events.is_empty() {
+        log::info!("Creating: {:?}", EVENT_LOG_FILE_PATH.as_path());
         let mut file = File::options()
             .create(true)
             .append(true)

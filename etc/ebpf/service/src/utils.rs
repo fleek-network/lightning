@@ -25,6 +25,7 @@ pub async fn write(socket: &UnixStream, bytes: Bytes) -> io::Result<()> {
     }
 }
 
+#[cfg(feature = "server")]
 pub async fn read(socket: &UnixStream) -> io::Result<Option<Bytes>> {
     let mut read_buf = vec![0u8; 8];
     let mut bytes_read = 0;
