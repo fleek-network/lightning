@@ -1210,9 +1210,9 @@ fn get_stables_balance(query_runner: &QueryRunner, address: &EthAddress) -> HpUf
         .unwrap_or(HpUfixed::<6>::zero())
 }
 
-fn cid_to_providers(query_runner: &QueryRunner, cid: &Blake3Hash) -> Vec<NodeIndex> {
+fn uri_to_providers(query_runner: &QueryRunner, uri: &Blake3Hash) -> Vec<NodeIndex> {
     query_runner
-        .get_cid_providers(cid)
+        .get_uri_providers(uri)
         .unwrap_or_default()
         .into_iter()
         .collect()
@@ -1577,7 +1577,7 @@ async fn test_uptime_participation() {
 
     // Add records in the content registry for all nodes.
     let updates = vec![ContentUpdate {
-        cid: [0u8; 32],
+        uri: [0u8; 32],
         remove: false,
     }];
     let content_registry_update =
@@ -1596,7 +1596,7 @@ async fn test_uptime_participation() {
     let content_registry2 = content_registry(&query_runner, &index_peer2);
     assert!(!content_registry2.is_empty());
 
-    let providers = cid_to_providers(&query_runner, &[0u8; 32]);
+    let providers = uri_to_providers(&query_runner, &[0u8; 32]);
     assert_eq!(providers.len(), 2);
 
     let mut map = BTreeMap::new();
@@ -1650,7 +1650,7 @@ async fn test_uptime_participation() {
     let content_registry2 = content_registry(&query_runner, &index_peer2);
     assert!(!content_registry2.is_empty());
 
-    let providers = cid_to_providers(&query_runner, &[0u8; 32]);
+    let providers = uri_to_providers(&query_runner, &[0u8; 32]);
     assert_eq!(providers.len(), 1);
 }
 
@@ -3594,10 +3594,10 @@ async fn test_submit_content_registry_update() {
     // When: each node sends an update to register some content.
     let mut expected_records = Vec::new();
     for (list_idx, ck) in keystore.iter().enumerate() {
-        let cid = [list_idx as u8; 32];
-        expected_records.push((ck.node_secret_key.clone(), cid));
+        let uri = [list_idx as u8; 32];
+        expected_records.push((ck.node_secret_key.clone(), uri));
 
-        let updates = vec![ContentUpdate { cid, remove: false }];
+        let updates = vec![ContentUpdate { uri, remove: false }];
         let update = prepare_content_registry_update(updates, &ck.node_secret_key, 1);
         expect_tx_success!(update, &update_socket);
     }
@@ -3611,14 +3611,14 @@ async fn test_submit_content_registry_update() {
     // Then: all providers are accounted for.
     for (sk, cid) in expected_records.iter() {
         let index = query_runner.pubkey_to_index(&sk.to_pk()).unwrap();
-        let providers = cid_to_providers(&query_runner, cid);
+        let providers = uri_to_providers(&query_runner, cid);
         assert_eq!(providers, vec![index]);
     }
 
     // When: send an update to remove the records.
-    for (sk, cid) in expected_records.iter() {
+    for (sk, uri) in expected_records.iter() {
         let updates = vec![ContentUpdate {
-            cid: *cid,
+            uri: *uri,
             remove: true,
         }];
         let update = prepare_content_registry_update(updates, sk, 2);
@@ -3626,8 +3626,8 @@ async fn test_submit_content_registry_update() {
     }
 
     // Then: records are removed.
-    for (sk, cid) in expected_records.iter() {
-        let providers = cid_to_providers(&query_runner, cid);
+    for (sk, uri) in expected_records.iter() {
+        let providers = uri_to_providers(&query_runner, uri);
         assert!(providers.is_empty());
         let index = query_runner.pubkey_to_index(&sk.to_pk()).unwrap();
         let cids = content_registry(&query_runner, &index);
@@ -3645,13 +3645,13 @@ async fn test_submit_content_registry_update_multiple_providers_per_cid() {
     let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
 
     // Given: a cid.
-    let cid = [69u8; 32];
+    let uri = [69u8; 32];
     // Given: providers for that cid.
     let providers = keystore.clone();
 
     // When: all nodes send an update for that cid.
     for ck in &providers {
-        let updates = vec![ContentUpdate { cid, remove: false }];
+        let updates = vec![ContentUpdate { uri, remove: false }];
         let update = prepare_content_registry_update(updates, &ck.node_secret_key, 1);
         expect_tx_success!(update, &update_socket);
     }
@@ -3665,24 +3665,24 @@ async fn test_submit_content_registry_update_multiple_providers_per_cid() {
                 .unwrap()
         })
         .collect::<Vec<_>>();
-    let providers = cid_to_providers(&query_runner, &cid);
+    let providers = uri_to_providers(&query_runner, &uri);
     assert_eq!(providers, expected_providers);
     // Then: cid is in every node's registry.
     for provider in providers {
-        let cids = content_registry(&query_runner, &provider);
-        assert_eq!(vec![cid], cids);
+        let uris = content_registry(&query_runner, &provider);
+        assert_eq!(vec![uri], uris);
     }
 
     // When: send an update to remove the records.
     let providers = keystore.clone();
     for ck in &providers {
-        let updates = vec![ContentUpdate { cid, remove: true }];
+        let updates = vec![ContentUpdate { uri, remove: true }];
         let update = prepare_content_registry_update(updates, &ck.node_secret_key, 2);
         expect_tx_success!(update, &update_socket);
     }
 
     // Then: records are removed.
-    let providers = cid_to_providers(&query_runner, &cid);
+    let providers = uri_to_providers(&query_runner, &uri);
     assert!(providers.is_empty());
     for node in keystore {
         let index = query_runner
@@ -3703,17 +3703,17 @@ async fn test_submit_content_registry_update_mix_of_add_and_remove_updates() {
     let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
 
     // Given: multiple cids.
-    let mut cids = Vec::new();
+    let mut uris = Vec::new();
     for i in 0..6 {
-        let cid = [i as u8; 32];
-        cids.push(cid);
+        let uri = [i as u8; 32];
+        uris.push(uri);
     }
 
     // Given: a node provides the given cids.
     let mut updates = Vec::new();
-    for cid in &cids {
+    for uri in &uris {
         updates.push(ContentUpdate {
-            cid: *cid,
+            uri: *uri,
             remove: false,
         });
     }
@@ -3728,15 +3728,15 @@ async fn test_submit_content_registry_update_mix_of_add_and_remove_updates() {
         .step_by(2)
         .map(|mut update| {
             update.remove = true;
-            removed.push(update.cid);
+            removed.push(update.uri);
             update
         })
         .collect::<Vec<_>>();
 
     for i in 6..9 {
-        let cid = [i as u8; 32];
-        cids.push(cid);
-        updates.push(ContentUpdate { cid, remove: false });
+        let uri = [i as u8; 32];
+        uris.push(uri);
+        updates.push(ContentUpdate { uri, remove: false });
     }
 
     let update = prepare_content_registry_update(updates, &keystore[0].node_secret_key, 2);
@@ -3745,26 +3745,26 @@ async fn test_submit_content_registry_update_mix_of_add_and_remove_updates() {
     // Then: the state is updated appropriately.
     // Check that removed is a subset so that both branches below can be asserted.
     assert!(!removed.is_empty());
-    assert!(removed.len() < cids.len());
+    assert!(removed.len() < uris.len());
     let node = query_runner
         .pubkey_to_index(&keystore[0].node_secret_key.to_pk())
         .unwrap();
-    for cid in &cids {
-        if removed.contains(cid) {
-            let providers = cid_to_providers(&query_runner, cid);
+    for uri in &uris {
+        if removed.contains(uri) {
+            let providers = uri_to_providers(&query_runner, uri);
             assert!(providers.is_empty());
         } else {
-            let providers = cid_to_providers(&query_runner, cid);
+            let providers = uri_to_providers(&query_runner, uri);
             assert_eq!(providers, vec![node]);
         }
     }
-    let expected_cids = cids
+    let expected_uris = uris
         .iter()
         .copied()
-        .filter(|cid| !removed.contains(cid))
+        .filter(|uri| !removed.contains(uri))
         .collect::<Vec<_>>();
-    let cids_for_node = content_registry(&query_runner, &node);
-    assert_eq!(expected_cids, cids_for_node);
+    let uris_for_node = content_registry(&query_runner, &node);
+    assert_eq!(expected_uris, uris_for_node);
 }
 
 #[tokio::test]
@@ -3777,10 +3777,10 @@ async fn test_submit_content_registry_update_too_many_updates_in_transaction() {
     let (update_socket, _) = test_init_app(&temp_dir, committee);
 
     // Given: a big list of updates.
-    let cid = [69u8; 32];
+    let uri = [69u8; 32];
     let mut updates = Vec::new();
     for _ in 0..101u32 {
-        updates.push(ContentUpdate { cid, remove: false });
+        updates.push(ContentUpdate { uri, remove: false });
     }
 
     // When: we submit the update transaction.
@@ -3800,12 +3800,12 @@ async fn test_submit_content_registry_update_multiple_cids_per_provider() {
     let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
 
     // Given: multiple cids that some nodes will provide.
-    let mut cids = Vec::new();
+    let mut uris = Vec::new();
     let mut updates = Vec::new();
     for i in 0..6 {
-        let cid = [i as u8; 32];
-        cids.push(cid);
-        updates.push(ContentUpdate { cid, remove: false });
+        let uri = [i as u8; 32];
+        uris.push(uri);
+        updates.push(ContentUpdate { uri, remove: false });
     }
 
     // When: each node sends an update to register the cids.
@@ -3823,41 +3823,41 @@ async fn test_submit_content_registry_update_multiple_cids_per_provider() {
         .pubkey_to_index(&keystore[1].node_secret_key.to_pk())
         .unwrap();
 
-    for cid in &cids {
-        let providers = cid_to_providers(&query_runner, cid);
+    for uri in &uris {
+        let providers = uri_to_providers(&query_runner, uri);
         assert_eq!(providers, vec![node1, node2]);
     }
     // Then: each node is providing the correct set of cids.
-    let cids1 = content_registry(&query_runner, &node1);
-    assert_eq!(cids1, cids);
-    let cids2 = content_registry(&query_runner, &node2);
-    assert_eq!(cids2, cids);
+    let uris1 = content_registry(&query_runner, &node1);
+    assert_eq!(uris1, uris);
+    let uris2 = content_registry(&query_runner, &node2);
+    assert_eq!(uris2, uris);
 
     // When: one of the nodes submits an update to remove a record for one cid.
     let updates = vec![ContentUpdate {
-        cid: cids[0],
+        uri: uris[0],
         remove: true,
     }];
     let update = prepare_content_registry_update(updates, &keystore[0].node_secret_key, 2);
     expect_tx_success!(update, &update_socket);
 
     // Then: the record is removed for that one provider.
-    let providers = cid_to_providers(&query_runner, &cids[0]);
+    let providers = uri_to_providers(&query_runner, &uris[0]);
     assert_eq!(providers, vec![node2]);
     // Then: the rest of the records are not affected.
-    for cid in cids.iter().skip(1) {
-        let providers = cid_to_providers(&query_runner, cid);
+    for uri in uris.iter().skip(1) {
+        let providers = uri_to_providers(&query_runner, uri);
         assert_eq!(providers, vec![node1, node2]);
     }
-    let expected_cids = cids.clone()[1..].to_vec();
+    let expected_cids = uris.clone()[1..].to_vec();
     let cids1 = content_registry(&query_runner, &node1);
     assert_eq!(cids1, expected_cids);
 
     // When: we remove the rest for that same node.
     let mut updates = Vec::new();
-    for cid in cids.iter().skip(1) {
+    for uri in uris.iter().skip(1) {
         updates.push(ContentUpdate {
-            cid: *cid,
+            uri: *uri,
             remove: true,
         })
     }
@@ -3865,8 +3865,8 @@ async fn test_submit_content_registry_update_multiple_cids_per_provider() {
     expect_tx_success!(update, &update_socket);
 
     // Then: all records for that provider are gone.
-    for cid in cids {
-        let providers = cid_to_providers(&query_runner, &cid);
+    for uri in uris {
+        let providers = uri_to_providers(&query_runner, &uri);
         assert_eq!(providers, vec![node2]);
     }
     let cids = content_registry(&query_runner, &node1);
@@ -3883,12 +3883,12 @@ async fn test_submit_content_registry_update_multiple_updates_for_cid_in_same_tr
     let (update_socket, _) = test_init_app(&temp_dir, committee);
 
     // Given: a cid.
-    let cid = [0u8; 32];
+    let uri = [0u8; 32];
 
     // When: Add and remove the same given cid in the same transaction for some node.
     let updates = vec![
-        ContentUpdate { cid, remove: false },
-        ContentUpdate { cid, remove: true },
+        ContentUpdate { uri, remove: false },
+        ContentUpdate { uri, remove: true },
     ];
     let update = prepare_content_registry_update(updates, &keystore[0].node_secret_key, 1);
 
@@ -3900,10 +3900,10 @@ async fn test_submit_content_registry_update_multiple_updates_for_cid_in_same_tr
     );
 
     // When: we provide same updates for cid in the same transaction.
-    let cid = [88u8; 32];
+    let uri = [88u8; 32];
     let updates = vec![
-        ContentUpdate { cid, remove: false },
-        ContentUpdate { cid, remove: false },
+        ContentUpdate { uri, remove: false },
+        ContentUpdate { uri, remove: false },
     ];
     let update = prepare_content_registry_update(updates, &keystore[0].node_secret_key, 2);
 
@@ -3925,14 +3925,14 @@ async fn test_submit_content_registry_update_multiple_updates_for_cid_in_diff_tr
     let (update_socket, _) = test_init_app(&temp_dir, committee);
 
     // Given: a cid.
-    let cid = [0u8; 32];
+    let uri = [0u8; 32];
     // Given: register given cid in the node's register.
-    let updates = vec![ContentUpdate { cid, remove: false }];
+    let updates = vec![ContentUpdate { uri, remove: false }];
     let update = prepare_content_registry_update(updates, &keystore[0].node_secret_key, 1);
     expect_tx_success!(update, &update_socket);
 
     // When: we submit same update for same cid in different transaction.
-    let updates = vec![ContentUpdate { cid, remove: false }];
+    let updates = vec![ContentUpdate { uri, remove: false }];
     let update = prepare_content_registry_update(updates, &keystore[0].node_secret_key, 2);
 
     // Then: the transaction is successful.
@@ -3949,8 +3949,8 @@ async fn test_submit_content_registry_update_remove_unknown_cid() {
     let (update_socket, _) = test_init_app(&temp_dir, committee);
 
     // Given: a cid.
-    let cid = [0u8; 32];
-    let updates = vec![ContentUpdate { cid, remove: false }];
+    let uri = [0u8; 32];
+    let updates = vec![ContentUpdate { uri, remove: false }];
 
     // Given: one node provides the cid.
     let update = prepare_content_registry_update(updates.clone(), &keystore[1].node_secret_key, 1);
@@ -3960,7 +3960,7 @@ async fn test_submit_content_registry_update_remove_unknown_cid() {
     let mut updates = Vec::new();
     for idx in 1..4u8 {
         updates.push(ContentUpdate {
-            cid: [idx; 32],
+            uri: [idx; 32],
             remove: false,
         });
     }
@@ -3968,7 +3968,7 @@ async fn test_submit_content_registry_update_remove_unknown_cid() {
     expect_tx_success!(update, &update_socket);
 
     // When: that node tries to remove registry for the given cid which it doesn't have.
-    let updates = vec![ContentUpdate { cid, remove: true }];
+    let updates = vec![ContentUpdate { uri, remove: true }];
     let update = prepare_content_registry_update(updates, &keystore[0].node_secret_key, 2);
 
     // Then: the transaction is reverted.
@@ -3990,7 +3990,7 @@ async fn test_submit_content_registry_update_remove_unknown_cid_empty_registry()
 
     // Given: some cid that is not in the registry and the node is not providing any content.
     let updates = vec![ContentUpdate {
-        cid: [68u8; 32],
+        uri: [68u8; 32],
         remove: true,
     }];
 

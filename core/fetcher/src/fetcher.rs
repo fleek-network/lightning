@@ -51,7 +51,7 @@ impl<C: Collection> Fetcher<C> {
             async move {
                 waiter.run_until_shutdown(origin_fetcher.start()).await;
             },
-            "FETCHER: shutdown waiter"
+            "FETCHER: origin fetcher"
         );
 
         let worker = FetcherWorker::<C> {

@@ -121,8 +121,8 @@ pub struct State<B: Backend> {
     pub commodity_prices: B::Ref<CommodityTypes, HpUfixed<6>>,
     pub executed_digests: B::Ref<TxHash, ()>,
     pub uptime: B::Ref<NodeIndex, u8>,
-    pub cid_to_node: B::Ref<Blake3Hash, BTreeSet<NodeIndex>>,
-    pub node_to_cid: B::Ref<NodeIndex, BTreeSet<Blake3Hash>>,
+    pub uri_to_node: B::Ref<Blake3Hash, BTreeSet<NodeIndex>>,
+    pub node_to_uri: B::Ref<NodeIndex, BTreeSet<Blake3Hash>>,
     pub backend: B,
 }
 
@@ -149,8 +149,8 @@ impl<B: Backend> State<B> {
             service_revenue: backend.get_table_reference("service_revenue"),
             executed_digests: backend.get_table_reference("executed_digests"),
             uptime: backend.get_table_reference("uptime"),
-            cid_to_node: backend.get_table_reference("cid_to_node"),
-            node_to_cid: backend.get_table_reference("node_to_cid"),
+            uri_to_node: backend.get_table_reference("uri_to_node"),
+            node_to_uri: backend.get_table_reference("node_to_uri"),
             backend,
         }
     }
@@ -1165,20 +1165,20 @@ impl<B: Backend> State<B> {
             Err(e) => return e,
         };
 
-        let mut staged_cid_to_node = HashMap::new();
-        let mut staged_cids_provided = self.node_to_cid.get(&node_index).unwrap_or_default();
-        let empty_cids_provided = staged_cids_provided.is_empty();
+        let mut staged_uri_to_node = HashMap::new();
+        let mut staged_uris_provided = self.node_to_uri.get(&node_index).unwrap_or_default();
+        let empty_uris_provided = staged_uris_provided.is_empty();
 
         for update in updates {
-            // Check if they sent multiple updates for the same CID.
-            if staged_cid_to_node.contains_key(&update.cid) {
+            // Check if they sent multiple updates for the same URI.
+            if staged_uri_to_node.contains_key(&update.uri) {
                 return TransactionResponse::Revert(ExecutionError::TooManyUpdatesForContent);
             }
 
-            let providers = self.cid_to_node.get(&update.cid);
+            let providers = self.uri_to_node.get(&update.uri);
 
             // Check if a removal request makes sense given our state.
-            if update.remove && (providers.is_none() || empty_cids_provided) {
+            if update.remove && (providers.is_none() || empty_uris_provided) {
                 return TransactionResponse::Revert(ExecutionError::InvalidStateForContentRemoval);
             }
 
@@ -1188,22 +1188,22 @@ impl<B: Backend> State<B> {
                 if !providers.remove(&node_index) {
                     return TransactionResponse::Revert(ExecutionError::InvalidContentRemoval);
                 }
-                if !staged_cids_provided.remove(&update.cid) {
+                if !staged_uris_provided.remove(&update.uri) {
                     // Unreachable.
                     return TransactionResponse::Revert(ExecutionError::InvalidContentRemoval);
                 }
             } else {
                 providers.insert(node_index);
-                staged_cids_provided.insert(update.cid);
+                staged_uris_provided.insert(update.uri);
             }
 
-            staged_cid_to_node.insert(update.cid, providers);
+            staged_uri_to_node.insert(update.uri, providers);
         }
 
-        self.node_to_cid.set(node_index, staged_cids_provided);
+        self.node_to_uri.set(node_index, staged_uris_provided);
 
-        for (cid, providers) in staged_cid_to_node {
-            self.cid_to_node.set(cid, providers);
+        for (uri, providers) in staged_uri_to_node {
+            self.uri_to_node.set(uri, providers);
         }
 
         TransactionResponse::Success(ExecutionData::None)
@@ -1890,26 +1890,26 @@ impl<B: Backend> State<B> {
     }
 
     fn clear_content_registry(&self, node_index: &NodeIndex) -> Result<(), ExecutionError> {
-        let cids = self.node_to_cid.get(node_index).unwrap_or_default();
+        let uris = self.node_to_uri.get(node_index).unwrap_or_default();
 
         // Let's stage the changes before applying.
-        let mut staged_cid_to_node = HashMap::new();
-        for cid in cids {
+        let mut staged_uri_to_node = HashMap::new();
+        for uri in uris {
             let mut providers = self
-                .cid_to_node
-                .get(&cid)
+                .uri_to_node
+                .get(&uri)
                 .ok_or(ExecutionError::InvalidStateForContentRemoval)?;
             if !providers.remove(node_index) {
                 return Err(ExecutionError::InvalidStateForContentRemoval);
             }
-            staged_cid_to_node.insert(cid, providers);
+            staged_uri_to_node.insert(uri, providers);
         }
 
         // Apply changes.
-        for (cid, providers) in staged_cid_to_node {
-            self.cid_to_node.set(cid, providers);
+        for (uri, providers) in staged_uri_to_node {
+            self.uri_to_node.set(uri, providers);
         }
-        self.node_to_cid.remove(node_index);
+        self.node_to_uri.remove(node_index);
 
         Ok(())
     }

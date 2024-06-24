@@ -637,7 +637,7 @@ impl ToDigest for UpdatePayload {
                 for (idx, update) in updates.iter().enumerate() {
                     transcript_builder = transcript_builder
                         .with_prefix(idx.to_string())
-                        .with("cid", &update.cid)
+                        .with("cid", &update.uri)
                         .with("remove", &(update.remove as u8));
                 }
             },

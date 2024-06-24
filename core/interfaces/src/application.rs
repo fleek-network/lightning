@@ -219,7 +219,7 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     fn get_node_uptime(&self, node_index: &NodeIndex) -> Option<u8>;
 
     /// Returns nodes that are providing the content addressed by the cid.
-    fn get_cid_providers(&self, cid: &Blake3Hash) -> Option<BTreeSet<NodeIndex>>;
+    fn get_uri_providers(&self, uri: &Blake3Hash) -> Option<BTreeSet<NodeIndex>>;
 
     /// Returns the node's content registry.
     fn get_content_registry(&self, node_index: &NodeIndex) -> Option<BTreeSet<Blake3Hash>>;

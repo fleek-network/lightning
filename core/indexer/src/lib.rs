@@ -71,15 +71,15 @@ impl<C: Collection> BuildGraph for Indexer<C> {
 }
 
 impl<C: Collection> IndexerInterface<C> for Indexer<C> {
-    async fn register(&self, cid: Blake3Hash) {
+    async fn register(&self, uri: Blake3Hash) {
         if let Some(index) = self.get_index() {
             if self
                 .query_runner
                 .get_content_registry(&index)
-                .map(|registry| !registry.contains(&cid))
+                .map(|registry| !registry.contains(&uri))
                 .unwrap_or(true)
             {
-                let updates = vec![ContentUpdate { cid, remove: false }];
+                let updates = vec![ContentUpdate { uri, remove: false }];
                 if let Err(e) = self
                     .submit_tx
                     .enqueue(UpdateMethod::UpdateContentRegistry { updates })
@@ -91,15 +91,15 @@ impl<C: Collection> IndexerInterface<C> for Indexer<C> {
         }
     }
 
-    async fn unregister(&self, cid: Blake3Hash) {
+    async fn unregister(&self, uri: Blake3Hash) {
         if let Some(index) = self.get_index() {
             if self
                 .query_runner
                 .get_content_registry(&index)
-                .map(|registry| registry.contains(&cid))
+                .map(|registry| registry.contains(&uri))
                 .unwrap_or(false)
             {
-                let updates = vec![ContentUpdate { cid, remove: true }];
+                let updates = vec![ContentUpdate { uri, remove: true }];
 
                 if let Err(e) = self
                     .submit_tx

@@ -60,8 +60,8 @@ pub struct QueryRunner {
     _commodity_price: ResolvedTableReference<CommodityTypes, HpUfixed<6>>,
     executed_digests_table: ResolvedTableReference<TxHash, ()>,
     uptime_table: ResolvedTableReference<NodeIndex, u8>,
-    _cid_to_node: ResolvedTableReference<Blake3Hash, BTreeSet<NodeIndex>>,
-    _node_to_cid: ResolvedTableReference<NodeIndex, BTreeSet<Blake3Hash>>,
+    uri_to_node: ResolvedTableReference<Blake3Hash, BTreeSet<NodeIndex>>,
+    node_to_uri: ResolvedTableReference<NodeIndex, BTreeSet<Blake3Hash>>,
 }
 
 impl SyncQueryRunnerInterface for QueryRunner {
@@ -88,8 +88,8 @@ impl SyncQueryRunnerInterface for QueryRunner {
             _service_revenue: atomo.resolve::<ServiceId, ServiceRevenue>("service_revenue"),
             executed_digests_table: atomo.resolve::<TxHash, ()>("executed_digests"),
             uptime_table: atomo.resolve::<NodeIndex, u8>("uptime"),
-            _cid_to_node: atomo.resolve::<Blake3Hash, BTreeSet<NodeIndex>>("cid_to_node"),
-            _node_to_cid: atomo.resolve::<NodeIndex, BTreeSet<Blake3Hash>>("node_to_cid"),
+            uri_to_node: atomo.resolve::<Blake3Hash, BTreeSet<NodeIndex>>("uri_to_node"),
+            node_to_uri: atomo.resolve::<NodeIndex, BTreeSet<Blake3Hash>>("node_to_uri"),
             inner: atomo,
         }
     }
@@ -245,12 +245,12 @@ impl SyncQueryRunnerInterface for QueryRunner {
             .run(|ctx| self.uptime_table.get(ctx).get(node_index))
     }
 
-    fn get_cid_providers(&self, cid: &Blake3Hash) -> Option<BTreeSet<NodeIndex>> {
-        self.inner.run(|ctx| self._cid_to_node.get(ctx).get(cid))
+    fn get_uri_providers(&self, uri: &Blake3Hash) -> Option<BTreeSet<NodeIndex>> {
+        self.inner.run(|ctx| self.uri_to_node.get(ctx).get(uri))
     }
 
     fn get_content_registry(&self, node_index: &NodeIndex) -> Option<BTreeSet<Blake3Hash>> {
         self.inner
-            .run(|ctx| self._node_to_cid.get(ctx).get(node_index))
+            .run(|ctx| self.node_to_uri.get(ctx).get(node_index))
     }
 }

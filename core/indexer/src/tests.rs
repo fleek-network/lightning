@@ -127,15 +127,15 @@ async fn test_submission() {
     let us = query_runner.pubkey_to_index(&node_public_key).unwrap();
 
     // When: we register a cid.
-    let cid = [0u8; 32];
-    indexer.register(cid).await;
+    let uri = [0u8; 32];
+    indexer.register(uri).await;
 
     // Then: we show up in state as a provider of that CID.
     let mut interval = tokio::time::interval(Duration::from_millis(100));
     loop {
         tokio::select! {
             _ = interval.tick() => {
-                let providers = query_runner.get_cid_providers(&cid).unwrap_or_default();
+                let providers = query_runner.get_uri_providers(&uri).unwrap_or_default();
                 if !providers.is_empty() {
                         assert_eq!(providers.into_iter().collect::<Vec<_>>(), vec![us]);
                         break;
@@ -145,13 +145,13 @@ async fn test_submission() {
     }
 
     // When: we unregister the cid.
-    indexer.unregister(cid).await;
+    indexer.unregister(uri).await;
 
     // Then: state is cleared and we don't show up anymore.
     loop {
         tokio::select! {
             _ = interval.tick() => {
-                let providers = query_runner.get_cid_providers(&cid).unwrap_or_default();
+                let providers = query_runner.get_uri_providers(&uri).unwrap_or_default();
                 if providers.is_empty() {
                         break;
                 }
