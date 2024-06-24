@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 
 use affair::AsyncWorker;
 use lightning_interfaces::prelude::*;
+use lightning_interfaces::{spawn_worker, ShutdownWaiter};
 
 use crate::config::ForwarderConfig;
 use crate::worker::Worker;
@@ -25,10 +26,13 @@ impl<C> ConfigConsumer for Forwarder<C> {
 impl<C: Collection> BuildGraph for Forwarder<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::new().with_infallible(
-            |keystore: &C::KeystoreInterface, app: &C::ApplicationInterface| {
+            |keystore: &C::KeystoreInterface,
+             app: &C::ApplicationInterface,
+             fdi::Cloned(waiter): fdi::Cloned<ShutdownWaiter>| {
                 let consensus_key = keystore.get_bls_pk();
                 let query_runner = app.sync_query();
-                let socket = Worker::new(consensus_key, query_runner).spawn();
+                let worker = Worker::new(consensus_key, query_runner);
+                let socket = spawn_worker!(worker, "FORWARDER", waiter, crucial);
 
                 Self {
                     socket,
