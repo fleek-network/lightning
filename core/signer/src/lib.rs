@@ -16,7 +16,7 @@ use lightning_interfaces::types::{
     UpdatePayload,
     UpdateRequest,
 };
-use lightning_interfaces::BlockExecutedNotification;
+use lightning_interfaces::{spawn_worker, BlockExecutedNotification};
 use lightning_utils::application::QueryRunnerExt;
 use tokio::sync::Mutex;
 use tracing::error;
@@ -61,7 +61,11 @@ struct LazyNodeIndex {
 }
 
 impl<C: Collection> Signer<C> {
-    pub fn init(keystore: &C::KeystoreInterface, forwarder: &C::ForwarderInterface) -> Self {
+    pub fn init(
+        keystore: &C::KeystoreInterface,
+        forwarder: &C::ForwarderInterface,
+        fdi::Cloned(waiter): fdi::Cloned<lightning_interfaces::ShutdownWaiter>,
+    ) -> Self {
         let state = SignerState {
             node_secret_key: keystore.get_ed25519_sk(),
             node_public_key: keystore.get_ed25519_pk(),
@@ -77,7 +81,7 @@ impl<C: Collection> Signer<C> {
             state: Arc::new(Mutex::new(state)),
         };
 
-        let socket = worker.clone().spawn();
+        let socket = spawn_worker!(worker.clone(), "SIGNER", waiter, crucial);
 
         Self {
             socket,
