@@ -5,6 +5,7 @@ use std::time::Duration;
 use affair::AsyncWorker;
 use anyhow::{anyhow, Result};
 use lightning_interfaces::prelude::*;
+use lightning_interfaces::spawn_worker;
 use lightning_interfaces::types::{ChainId, NodeInfo};
 use tracing::{error, info};
 
@@ -22,6 +23,7 @@ impl<C: Collection> Application<C> {
     fn init(
         config: &C::ConfigProviderInterface,
         blockstore: &C::BlockstoreInterface,
+        fdi::Cloned(waiter): fdi::Cloned<ShutdownWaiter>,
     ) -> Result<Self> {
         let config = config.get::<Self>();
         if let StorageConfig::RocksDb = &config.storage {
@@ -40,7 +42,8 @@ impl<C: Collection> Application<C> {
         }
 
         let query_runner = env.query_runner();
-        let update_socket = UpdateWorker::<C>::new(env, blockstore.clone()).spawn();
+        let worker = UpdateWorker::<C>::new(env, blockstore.clone());
+        let update_socket = spawn_worker!(worker, "APPLICATION", waiter, crucial);
 
         Ok(Self {
             query_runner,
