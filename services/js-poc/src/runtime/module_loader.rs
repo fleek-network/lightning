@@ -96,6 +96,22 @@ impl ModuleLoader for FleekModuleLoader {
             maybe_referrer.map(|m| m.as_str()).unwrap_or("none")
         );
 
+        match module_specifier.as_str() {
+            "node:util" => {
+                return ModuleLoadResponse::Sync(Ok(ModuleSource::new(
+                    ModuleType::JavaScript,
+                    ModuleSourceCode::String(
+                        include_str!("../../polyfill/overrides/util.js")
+                            .to_string()
+                            .into(),
+                    ),
+                    module_specifier,
+                    None,
+                )));
+            },
+            _ => {},
+        }
+
         let module_type = match requested_module_type {
             RequestedModuleType::None => ModuleType::JavaScript,
             RequestedModuleType::Json => ModuleType::Json,

@@ -11,16 +11,6 @@
 // Polyfills are the same used by browserify and jspm:
 // - https://github.com/browserify/browserify/blob/master/lib/builtins.js
 // - https://github.com/jspm/jspm-core/blob/main/package.json
-//
-// Testing the imports:
-//
-// ```bash
-// # Run the node
-// lightning-node run -v
-//
-// # Curl this script, which will import all the polyfills from the runtime
-// curl localhost:4220/services/1/$(lightning-node admin store ./deps.js | awk '{print $1}')
-// ```
 
 export * as buffer from 'node:buffer'
 export * as crypto from 'node:crypto'
@@ -33,8 +23,6 @@ export * as punycode from 'node:punycode'
 export * as stream from 'node:stream'
 export * as string_decoder from 'node:string_decoder'
 export * as url from 'node:url'
-export * as util from 'node:util'
 export * as zlib from 'node:zlib'
 
-// Enables using deps.js directly to test the imports in the runtime
-export function main() { };
+export * as util from './overrides/util.js'
