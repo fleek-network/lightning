@@ -10,6 +10,34 @@
 You can run the eBPF control application process via the Lightning Node CLI.
 This feature is behind the `ebpf` feature flag.
 
+## Requirements
+
+You need a Linux kernel with version ≥ 5.8 and:
+
+- BTF support
+- BPF LSM support
+
+You can check if your kernel has BTF support by checking whether file `/sys/kernel/btf/vmlinux` exists.
+
+You also need support for BPF LSM. Run the command below and if the output is `CONFIG_BPF_LSM=y`, you have support for it.
+
+`$ cat /boot/config-$(uname -r) | grep BPF_LSM`
+
+`CONFIG_BPF_LSM=y`
+
+Run the command below to check if the `bpf` option is enabled for LSM.
+
+`$ cat /sys/kernel/security/lsm`
+
+`ndlock,lockdown,yama,integrity,apparmor`
+
+The output above does not include the bpf option so you will need to modify your grub 
+configuration by adding `bpf` to `GRUB_CMDLINE_LINUX` in  `/etc/default/grub` as shown below.
+
+`GRUB_CMDLINE_LINUX="lsm=ndlock,lockdown,yama,integrity,apparmor,bpf"`
+
+Update your grub then restart your system and check ``/sys/kernel/security/lsm`` again to make sure `bpf` is included.
+
 ## Dependencies
 
 > You need a Linux platform to run our eBPF solution.
