@@ -42,8 +42,6 @@ pub async fn rpc_request<T: DeserializeOwned>(
 
     if res.status().is_success() {
         let value: serde_json::Value = res.json().await?;
-        println!("{:?}", value);
-
         if value.get("result").is_some() {
             let value: RpcSuccessResponse<T> = serde_json::from_value(value)?;
             Ok(value)
