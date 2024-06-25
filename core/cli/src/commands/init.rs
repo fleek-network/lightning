@@ -13,12 +13,13 @@ use lightning_application::app::Application;
 use lightning_application::config::Config as AppConfig;
 use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_application::network::Network;
-use lightning_final_bindings::FinalTypes;
+use lightning_final_bindings::{FinalTypes, UseMockConsensus};
 use lightning_handshake::config::HandshakeConfig;
 use lightning_handshake::handshake::Handshake;
 use lightning_interfaces::prelude::*;
 use lightning_keystore::Keystore;
 use lightning_rpc::{Config as RpcConfig, Rpc};
+use lightning_test_utils::consensus::MockConsensus;
 use lightning_utils::config::TomlConfigProvider;
 use resolved_pathbuf::ResolvedPathBuf;
 use tracing::info;
@@ -98,6 +99,11 @@ where
             http_address: addr,
             ..Default::default()
         });
+    }
+
+    // Inject the mock consensus config, for configuring `--with-mock-consensus`
+    if dev {
+        config.inject::<MockConsensus<UseMockConsensus>>(Default::default());
     }
 
     // Write the configuration file.
