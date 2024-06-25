@@ -61,7 +61,7 @@ impl<C: Collection> Context<C> {
                                 1 => lightning_interfaces::types::OriginProvider::HTTP,
                                 _ => unreachable!(),
                             },
-                            uri: Vec::from(&uri),
+                            uri,
                         },
                     })
                     .await

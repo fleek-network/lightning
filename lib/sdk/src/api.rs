@@ -1,7 +1,7 @@
 use fleek_crypto::ClientPublicKey;
 
 use crate::ipc::send_and_await_response;
-use crate::ipc_types::{Request, StaticVec};
+use crate::ipc_types::Request;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Origin {
@@ -28,10 +28,10 @@ pub async fn query_client_flk_balance(pk: ClientPublicKey) -> u128 {
     }
 }
 
-pub async fn fetch_from_origin(origin: Origin, uri: impl AsRef<[u8]>) -> Option<[u8; 32]> {
+pub async fn fetch_from_origin(origin: Origin, uri: impl Into<Vec<u8>>) -> Option<[u8; 32]> {
     let req = Request::FetchFromOrigin {
         origin: origin as u8,
-        uri: StaticVec::new(uri.as_ref()),
+        uri: uri.into(),
     };
     let res = send_and_await_response(req).await;
     match res {

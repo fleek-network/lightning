@@ -64,7 +64,6 @@ rkyv = { version = "0.7.44", features = [
     "std",
     "hashbrown",
     "bytecheck",
-    "alloc",
 ] }
 triomphe = "0.1"
 tempfile = "3.10.1"

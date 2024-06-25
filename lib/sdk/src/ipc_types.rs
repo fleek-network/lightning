@@ -2,6 +2,7 @@ use std::ops::Deref;
 
 use derive_more::IsVariant;
 use lightning_schema::LightningMessage;
+use rkyv::ser::serializers::{AllocScratch, SharedSerializeMap, WriteSerializer};
 use rkyv::ser::Serializer;
 use rkyv::{Archive, Deserialize, Serialize};
 
@@ -58,7 +59,7 @@ impl<const CAP: usize> From<&StaticVec<CAP>> for Vec<u8> {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Archive, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Archive, Serialize, Deserialize)]
 #[archive(check_bytes)]
 pub struct IpcRequest {
     /// A pointer to the request context.
@@ -68,7 +69,7 @@ pub struct IpcRequest {
 }
 
 /// A message sent from the core process to the service.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Archive, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Archive, Serialize, Deserialize)]
 #[archive(check_bytes)]
 pub enum IpcMessage {
     Response {
@@ -128,10 +129,13 @@ impl LightningMessage for IpcRequest {
     }
 
     fn encode<W: std::io::prelude::Write>(&self, writer: &mut W) -> std::io::Result<()> {
-        let mut ser = rkyv::ser::serializers::WriteSerializer::new(writer);
-
-        // writes all internally
-        let _ = ser.serialize_value(self);
+        let _ = rkyv::ser::serializers::CompositeSerializer::new(
+            WriteSerializer::new(writer),
+            AllocScratch::default(),
+            SharedSerializeMap::default(),
+        )
+        .serialize_value(self)
+        .expect("failed to serialize ipc payload");
 
         Ok(())
     }
@@ -140,7 +144,7 @@ impl LightningMessage for IpcRequest {
         &self,
         writer: &mut W,
     ) -> std::io::Result<()> {
-        let encoded = rkyv::to_bytes::<_, 256>(self)
+        let encoded = rkyv::to_bytes::<_, 64>(self)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
         // we need to cast to an 8 byte uint incase a systems usize is not 8 bytes
@@ -156,11 +160,8 @@ ReqRes! {
     // we need an extra `endmeta` derive macros otherwise it could be a multiple parse
     // todo!(n) find out how to remove this,
     // for some reasons adding these directly into the macro invocation doesn't work
-    meta: #[derive(IsVariant, Archive, Serialize, Deserialize, PartialEq, Eq, Debug, Clone, Copy)],
-    meta: #[archive(check_bytes)],
-    // TODO: use a variable sized buffer type
-    meta: #[archive_attr(allow(clippy::large_enum_variant))],
-    meta: #[allow(clippy::large_enum_variant)]
+    meta: #[derive(IsVariant, Archive, Serialize, Deserialize, PartialEq, Eq, Debug, Clone)],
+    meta: #[archive(check_bytes)]
     endmeta,
     /// Query a client's bandwidth balance.
     QueryClientBandwidth {
@@ -181,11 +182,7 @@ ReqRes! {
     FetchFromOrigin {
         origin: u8,
         /// The encoded URI.
-        // TODO: Use a variable sized buffer here.
-        //       For some reason Vec<u8> and rkyv::util::AlignedVec
-        //       cause trait bound mismatches when using it in the
-        //       WriteSerializer.
-        uri: StaticVec<1024>,
+        uri: Vec<u8>,
         =>
         /// Returns the hash of the content on successful fetch.
         hash: Option<[u8; 32]>,
