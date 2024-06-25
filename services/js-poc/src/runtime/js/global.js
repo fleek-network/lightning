@@ -129,6 +129,46 @@ const globalContext = {
   // Fleek api
   Fleek: propNonEnumerable(Fleek),
 
+  // Node compatibility stuff
+  process: propWritable({
+    /**
+     * https://nodejs.org/api/process.html#process_process_version
+     *
+     * This value is hard coded to latest stable release of Node, as
+     * some packages are checking it for compatibility. Previously
+     * it pointed to Deno version, but that led to incompability
+     * with some packages.
+     */
+    version: "v20.11.1",
+    /**
+     * https://nodejs.org/api/process.html#process_process_versions
+     *
+     * This value is hard coded to latest stable release of Node, as
+     * some packages are checking it for compatibility. Previously
+     * it contained only output of `Deno.version`, but that led to incompability
+     * with some packages. Value of `v8` field is still taken from `Deno.version`.
+     */
+    versions: {
+      node: "20.11.1",
+      uv: "1.43.0",
+      zlib: "1.2.11",
+      brotli: "1.0.9",
+      ares: "1.18.1",
+      modules: "108",
+      nghttp2: "1.47.0",
+      napi: "8",
+      llhttp: "6.0.10",
+      openssl: "3.0.7+quic",
+      cldr: "41.0",
+      icu: "71.1",
+      tz: "2022b",
+      unicode: "14.0",
+      ngtcp2: "0.8.1",
+      nghttp3: "0.7.0",
+      v8: "12.3.219.9"
+    },
+  }),
+
   // Window apis
   console: propNonEnumerable(
     new Console((msg, level) => ops.log(msg, level > 0)),
