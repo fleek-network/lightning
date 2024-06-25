@@ -118,6 +118,8 @@ async fn test_retry_send() {
 
     let signer_socket = node.provider.get::<Signer<TestBinding>>().get_socket();
 
+    let new_nonce = get_our_nonce(&node);
+    assert_eq!(new_nonce, 0);
     // Send two transactions to the signer. The OptIn transaction was chosen arbitrarily.
     let update_method = UpdateMethod::OptIn {};
     signer_socket.run(update_method).await.unwrap();

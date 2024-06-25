@@ -32,7 +32,7 @@ impl<C: Collection> Fetcher<C> {
         config: &C::ConfigProviderInterface,
         blockstore_server: &C::BlockstoreServerInterface,
         origin: &C::OriginProviderInterface,
-        fdi::Cloned(waiter): fdi::Cloned<lightning_interfaces::ShutdownWaiter>,
+        app: &C::ApplicationInterface,
         fdi::Cloned(blockstore): fdi::Cloned<C::BlockstoreInterface>,
         fdi::Cloned(resolver): fdi::Cloned<C::ResolverInterface>,
         fdi::Cloned(shutdown): fdi::Cloned<ShutdownWaiter>,
@@ -47,6 +47,8 @@ impl<C: Collection> Fetcher<C> {
             resolver.clone(),
         );
 
+        let waiter = shutdown.clone();
+
         spawn!(
             async move {
                 waiter.run_until_shutdown(origin_fetcher.start()).await;
@@ -59,6 +61,7 @@ impl<C: Collection> Fetcher<C> {
             blockstore,
             blockstore_server_socket: blockstore_server.get_socket(),
             resolver,
+            query_runner: app.sync_query(),
         };
 
         let socket = spawn_worker!(worker, "FETCHER", shutdown, crucial);
@@ -81,6 +84,7 @@ struct FetcherWorker<C: Collection> {
     blockstore: C::BlockstoreInterface,
     blockstore_server_socket: BlockstoreServerSocket,
     resolver: C::ResolverInterface,
+    query_runner: c!(C::ApplicationInterface::SyncExecutor),
 }
 
 impl<C: Collection> FetcherWorker<C> {
@@ -110,9 +114,34 @@ impl<C: Collection> FetcherWorker<C> {
                 Some("Counter for content that was already cached locally")
             );
             return Ok(());
-        } else if let Some(pointers) = self.resolver.get_origins(hash) {
-            for res_pointer in pointers {
-                debug_assert_eq!(res_pointer.hash, hash);
+        }
+        let mut origin_pointers = self
+            .resolver
+            .get_origins(hash)
+            .unwrap_or_default()
+            .into_iter();
+        let mut peers = self
+            .query_runner
+            .get_uri_providers(&hash)
+            .unwrap_or_default()
+            .into_iter();
+        // TODO(matthias): more optimizations here are possible.
+        // For example, we can send concurrent requests to multiple peers and or multiple origins.
+        // Also, the list of peers would ideally be sorted by the latency to the local node.
+        loop {
+            let peer = peers.next();
+            let pointer = origin_pointers.next();
+            if peer.is_none() && pointer.is_none() {
+                break;
+            }
+            if let Some(peer) = peer {
+                // Try to get the content from the peer that advertised the record.
+                if self.fetch_from_peer(peer, hash).await.is_ok() {
+                    return Ok(());
+                }
+            }
+            if let Some(pointer) = pointer {
+                debug_assert_eq!(pointer.hash, hash);
                 if self.blockstore.get_tree(&hash).await.is_some() {
                     // in case we have the file
                     increment_counter!(
@@ -121,20 +150,9 @@ impl<C: Collection> FetcherWorker<C> {
                     );
                     return Ok(());
                 }
-
-                // Try to get the content from the peer that advertised the record.
-                // TODO: Maybe use indexer for getting peers instead
-                if self
-                    .fetch_from_peer(res_pointer.originator, hash)
-                    .await
-                    .is_ok()
-                {
-                    return Ok(());
-                }
-
                 // If not, attempt to pull from the origin. This strikes a balance between trying
                 // to fetch from a bunch of peers vs going to the origin right away.
-                if self.fetch_from_origin(res_pointer.pointer).await.is_ok() {
+                if self.fetch_from_origin(pointer.pointer).await.is_ok() {
                     return Ok(());
                 }
             }

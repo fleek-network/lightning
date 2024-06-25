@@ -30,6 +30,7 @@ lightning-blockstore-server = { path = "../blockstore-server" }
 lightning-pool = { path = "../pool" }
 lightning-application = { path = "../application", features = ["test"] }
 lightning-signer = { path = "../signer" }
+lightning-forwarder = { path = "../forwarder" }
 lightning-test-utils = { path = "../test-utils" }
 lightning-broadcast = { path = "../broadcast" }
 lightning-notifier = { path = "../notifier" }

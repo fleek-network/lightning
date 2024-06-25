@@ -28,7 +28,12 @@ use lightning_rep_collector::config::Config as RepCollConfig;
 use lightning_resolver::config::Config as ResolverConfig;
 use lightning_resolver::resolver::Resolver;
 use lightning_signer::Signer;
-use lightning_test_utils::consensus::MockConsensus;
+use lightning_test_utils::consensus::{
+    Config as ConsensusConfig,
+    MockConsensus,
+    MockConsensusGroup,
+    MockForwarder,
+};
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_test_utils::server::spawn_server;
@@ -42,6 +47,7 @@ use crate::fetcher::Fetcher;
 partial!(TestBinding {
     ConfigProviderInterface = JsonConfigProvider;
     FetcherInterface = Fetcher<Self>;
+    ForwarderInterface = MockForwarder<Self>;
     OriginProviderInterface = OriginDemuxer<Self>;
     BroadcastInterface = Broadcast<Self>;
     BlockstoreInterface = Blockstore<Self>;
@@ -104,56 +110,60 @@ async fn get_fetchers(
         .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
         .unwrap();
 
+    let consensus_group = MockConsensusGroup::new(ConsensusConfig::default());
     let peers = keystores
         .into_iter()
         .enumerate()
         .map(|(i, keystore)| {
             Node::<TestBinding>::init_with_provider(
-                fdi::Provider::default().with(keystore).with(
-                    JsonConfigProvider::default()
-                        .with::<Application<TestBinding>>(AppConfig::test(genesis_path.clone()))
-                        .with::<PoolProvider<TestBinding>>(PoolConfig {
-                            max_idle_timeout: Duration::from_secs(5),
-                            address: format!("0.0.0.0:{}", pool_port_offset + i as u16)
-                                .parse()
-                                .unwrap(),
-                            ..Default::default()
-                        })
-                        .with::<ReputationAggregator<TestBinding>>(RepCollConfig {
-                            reporter_buffer_size: 1,
-                        })
-                        .with::<Resolver<TestBinding>>(ResolverConfig {
-                            store_path: temp_dir
-                                .path()
-                                .join(format!("node-{i}/resolver"))
-                                .try_into()
-                                .unwrap(),
-                        })
-                        .with::<Blockstore<TestBinding>>(BlockstoreConfig {
-                            root: temp_dir
-                                .path()
-                                .join(format!("node-{i}/store"))
-                                .try_into()
-                                .unwrap(),
-                        })
-                        .with::<OriginDemuxer<TestBinding>>(DemuxerOriginConfig {
-                            ipfs: IPFSOriginConfig {
-                                gateways: vec![Gateway {
-                                    protocol: Protocol::Http,
-                                    authority: format!(
-                                        "127.0.0.1:{}",
-                                        gateway_port_offset + i as u16
-                                    ),
-                                    request_format: RequestFormat::CidLast,
-                                }],
-                                gateway_timeout: Duration::from_millis(5000),
-                            },
-                            ..Default::default()
-                        })
-                        .with::<Fetcher<TestBinding>>(Config {
-                            max_conc_origin_req: 3,
-                        }),
-                ),
+                fdi::Provider::default()
+                    .with(consensus_group.clone())
+                    .with(keystore)
+                    .with(
+                        JsonConfigProvider::default()
+                            .with::<Application<TestBinding>>(AppConfig::test(genesis_path.clone()))
+                            .with::<PoolProvider<TestBinding>>(PoolConfig {
+                                max_idle_timeout: Duration::from_secs(5),
+                                address: format!("0.0.0.0:{}", pool_port_offset + i as u16)
+                                    .parse()
+                                    .unwrap(),
+                                ..Default::default()
+                            })
+                            .with::<ReputationAggregator<TestBinding>>(RepCollConfig {
+                                reporter_buffer_size: 1,
+                            })
+                            .with::<Resolver<TestBinding>>(ResolverConfig {
+                                store_path: temp_dir
+                                    .path()
+                                    .join(format!("node-{i}/resolver"))
+                                    .try_into()
+                                    .unwrap(),
+                            })
+                            .with::<Blockstore<TestBinding>>(BlockstoreConfig {
+                                root: temp_dir
+                                    .path()
+                                    .join(format!("node-{i}/store"))
+                                    .try_into()
+                                    .unwrap(),
+                            })
+                            .with::<OriginDemuxer<TestBinding>>(DemuxerOriginConfig {
+                                ipfs: IPFSOriginConfig {
+                                    gateways: vec![Gateway {
+                                        protocol: Protocol::Http,
+                                        authority: format!(
+                                            "127.0.0.1:{}",
+                                            gateway_port_offset + i as u16
+                                        ),
+                                        request_format: RequestFormat::CidLast,
+                                    }],
+                                    gateway_timeout: Duration::from_millis(5000),
+                                },
+                                ..Default::default()
+                            })
+                            .with::<Fetcher<TestBinding>>(Config {
+                                max_conc_origin_req: 3,
+                            }),
+                    ),
             )
             .unwrap()
         })
@@ -231,7 +241,7 @@ async fn test_fetch_from_peer() {
         let response = socket1.run(FetcherRequest::Put { pointer }).await.unwrap();
         let hash = match response {
             FetcherResponse::Put(Ok(hash)) => hash,
-            FetcherResponse::Put(Err(e)) => panic!("Failed to put cid: {e:?}"),
+            FetcherResponse::Put(Err(e)) => panic!("Failed to put hash: {e:?}"),
             _ => panic!("Unexpected response"),
         };
         let _ = tx.send(hash);
@@ -245,7 +255,7 @@ async fn test_fetch_from_peer() {
     let hash = rx.await.unwrap();
 
     // Wait for peer1 to broadcast the record.
-    tokio::time::sleep(Duration::from_secs(4)).await;
+    tokio::time::sleep(Duration::from_secs(10)).await;
 
     // Send a fetch request to peer2.
     // We don't start the corresponding dummy ipfs gateway to ensure that peer2 can only fetch the
@@ -257,7 +267,7 @@ async fn test_fetch_from_peer() {
             let content2 = blockstore2.read_all_to_vec(&hash).await.unwrap();
             assert_eq!(content1, content2);
         },
-        FetcherResponse::Fetch(Err(e)) => panic!("Failed to fetch cid: {e:?}"),
+        FetcherResponse::Fetch(Err(e)) => panic!("Failed to fetch hash: {e:?}"),
         _ => panic!("Unexpected response"),
     }
 

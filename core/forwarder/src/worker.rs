@@ -105,6 +105,7 @@ impl<Q: SyncQueryRunnerInterface> Worker<Q> {
         if self.active_connections.is_empty() {
             bail!("Failed sending transaction to any worker")
         }
+
         Ok(())
     }
 

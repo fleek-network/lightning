@@ -6205,6 +6205,7 @@ dependencies = [
  "lightning-blockstore",
  "lightning-blockstore-server",
  "lightning-broadcast",
+ "lightning-forwarder",
  "lightning-indexer",
  "lightning-interfaces",
  "lightning-metrics",
