@@ -57,10 +57,10 @@ pub enum Command {
         network: Option<NetworkArg>,
         /// Whether to start the node with dev configuration. If set, the network will default to
         /// the local dev genesis configuration, and the dev configuration will be applied.
-        #[clap(long)]
+        #[clap(short, long)]
         dev: bool,
         /// Whether to force overwriting the config files.
-        #[clap(long)]
+        #[clap(short, long)]
         force: bool,
         /// Whether to not generate keys during initialization. The default is to generate keys.
         #[clap(long)]
