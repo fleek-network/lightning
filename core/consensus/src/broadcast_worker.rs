@@ -234,9 +234,12 @@ async fn handle_batch<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
     // We swallow the result here on purpose. Only validator nodes will execute this method.
     // validators only store parcels in order to respond to missing parcel
     // requests. Storing parcels is not critical for their consensus.
-    let _ = ctx
+    if let Err(e) = ctx
         .execution
-        .store_parcel(parcel, ctx.our_index, msg_digest.ok());
+        .store_parcel(parcel, ctx.our_index, msg_digest.ok())
+    {
+        error!("Failed to store parcel in txn store as a validator: {e:?}");
+    }
     // No need to store the attestation we have already executed it
 
     if epoch_changed {
@@ -249,7 +252,9 @@ async fn handle_batch<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
             .pubkey_to_index(&ctx.node_public_key)
             .unwrap_or(u32::MAX);
         ctx.on_committee = ctx.committee.contains(&ctx.our_index);
-        let _ = ctx.execution.change_epoch(&ctx.committee);
+        if let Err(e) = ctx.execution.change_epoch(&ctx.committee) {
+            error!("Failed to rotate epochs in txn store as a validator: {e:?}");
+        }
     }
 }
 
