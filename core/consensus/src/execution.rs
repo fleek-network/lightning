@@ -2,10 +2,10 @@ use std::collections::{HashSet, VecDeque};
 use std::sync::{Arc, OnceLock, RwLock};
 use std::time::{Duration, SystemTime};
 
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use fastcrypto::hash::HashFunction;
 use fleek_blake3 as blake3;
-use fleek_crypto::NodePublicKey;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
     Block,
@@ -22,10 +22,10 @@ use narwhal_crypto::DefaultHashFunction;
 use narwhal_executor::ExecutionState;
 use narwhal_types::{Batch, BatchDigest, ConsensusOutput, Transaction};
 use serde::{Deserialize, Serialize};
-use tokio::sync::{mpsc, oneshot, Notify};
+use tokio::sync::{mpsc, Notify};
 use tracing::{error, info};
 
-use crate::consensus::{ParcelWithResponse, PubSubMsg};
+use crate::consensus::PubSubMsg;
 use crate::transaction_store::TransactionStore;
 
 pub type Digest = [u8; 32];
@@ -85,7 +85,7 @@ pub struct Execution<
     /// Used to signal internal consensus processes that it is time to reconfigure for a new epoch
     reconfigure_notify: Arc<Notify>,
     /// Used to send payloads to the edge node consensus to broadcast out to other nodes
-    tx_narwhal_batches: mpsc::Sender<ParcelWithResponse>,
+    tx_narwhal_batches: mpsc::Sender<(AuthenticStampedParcel, bool)>,
     /// Query runner to check application state, mainly used to make sure the last executed block
     /// is up to date from time we were an edge node
     query_runner: Q,
@@ -93,8 +93,6 @@ pub struct Execution<
     notifier: NE,
     /// Send the event to the RPC
     event_tx: OnceLock<mpsc::Sender<Vec<Event>>>,
-    /// The node public key
-    node_public_key: NodePublicKey,
     /// Stores the parcels and attestations.
     txn_store: RwLock<TransactionStore<T>>,
     /// For non-validators only: digests of parcels we have stored and executed
@@ -110,10 +108,9 @@ impl<T: BroadcastEventInterface<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
     pub fn new(
         executor: ExecutionEngineSocket,
         reconfigure_notify: Arc<Notify>,
-        tx_narwhal_batches: mpsc::Sender<ParcelWithResponse>,
+        tx_narwhal_batches: mpsc::Sender<(AuthenticStampedParcel, bool)>,
         query_runner: Q,
         notifier: NE,
-        node_public_key: NodePublicKey,
     ) -> Self {
         Self {
             executor,
@@ -122,7 +119,6 @@ impl<T: BroadcastEventInterface<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
             query_runner,
             notifier,
             event_tx: OnceLock::new(),
-            node_public_key,
             txn_store: RwLock::new(TransactionStore::default()),
             executed_digests: RwLock::new(HashSet::with_capacity(512)),
             pending_digests: RwLock::new(HashSet::with_capacity(512)),
@@ -223,11 +219,13 @@ impl<T: BroadcastEventInterface<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
         parcel: AuthenticStampedParcel,
         originator: NodeIndex,
         message_digest: Option<BroadcastDigest>,
-    ) {
-        self.txn_store
-            .write()
-            .unwrap()
-            .store_parcel(parcel, originator, message_digest);
+    ) -> Result<()> {
+        if let Ok(mut txn_store) = self.txn_store.write() {
+            txn_store.store_parcel(parcel, originator, message_digest);
+            Ok(())
+        } else {
+            Err(anyhow!("Failed to acquire lock"))
+        }
     }
 
     pub fn store_pending_parcel(
@@ -236,27 +234,36 @@ impl<T: BroadcastEventInterface<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
         originator: NodeIndex,
         message_digest: Option<BroadcastDigest>,
         event: T,
-    ) {
-        self.txn_store.write().unwrap().store_pending_parcel(
-            parcel,
-            originator,
-            message_digest,
-            event,
-        );
+    ) -> Result<()> {
+        if let Ok(mut txn_store) = self.txn_store.write() {
+            txn_store.store_pending_parcel(parcel, originator, message_digest, event);
+            Ok(())
+        } else {
+            Err(anyhow!("Failed to acquire lock"))
+        }
     }
 
-    pub fn store_attestation(&self, digest: Digest, node_index: NodeIndex) {
-        self.txn_store
-            .write()
-            .unwrap()
-            .store_attestation(digest, node_index);
+    pub fn store_attestation(&self, digest: Digest, node_index: NodeIndex) -> Result<()> {
+        if let Ok(mut txn_store) = self.txn_store.write() {
+            txn_store.store_attestation(digest, node_index);
+            Ok(())
+        } else {
+            Err(anyhow!("Failed to acquire lock"))
+        }
     }
 
-    pub fn store_pending_attestation(&self, digest: Digest, node_index: NodeIndex, event: T) {
-        self.txn_store
-            .write()
-            .unwrap()
-            .store_pending_attestation(digest, node_index, event);
+    pub fn store_pending_attestation(
+        &self,
+        digest: Digest,
+        node_index: NodeIndex,
+        event: T,
+    ) -> Result<()> {
+        if let Ok(mut txn_store) = self.txn_store.write() {
+            txn_store.store_pending_attestation(digest, node_index, event);
+            Ok(())
+        } else {
+            Err(anyhow!("Failed to acquire lock"))
+        }
     }
 
     pub fn get_parcel_message_digest(&self, digest: &Digest) -> Option<BroadcastDigest> {
@@ -478,38 +485,12 @@ impl<T: BroadcastEventInterface<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
             .submit_batch(batch_payload, parcel.to_digest(), sub_dag_index)
             .await;
 
-        let (tx, rx) = oneshot::channel();
-        if let Err(e) = self
-            .tx_narwhal_batches
-            .send(ParcelWithResponse {
-                parcel: parcel.clone(),
-                epoch_changed,
-                response: tx,
-            })
-            .await
-        {
+        if let Err(e) = self.tx_narwhal_batches.send((parcel, epoch_changed)).await {
             // This shouldn't ever happen. But if it does there is no critical tasks
             // happening on the other end of this that would require a
             // panic
             error!("Narwhal failed to send batch payload to edge consensus: {e:?}");
         }
-        // TODO(matthias): store the index?
-        let our_index = self
-            .query_runner
-            .pubkey_to_index(&self.node_public_key)
-            .unwrap_or(u32::MAX);
-        if let Some(msg_digest) = rx.await.expect("Failed to receive response") {
-            self.txn_store
-                .write()
-                .unwrap()
-                .store_parcel(parcel, our_index, Some(msg_digest));
-        } else {
-            self.txn_store
-                .write()
-                .unwrap()
-                .store_parcel(parcel, our_index, None);
-        }
-        // No need to store the attestation we have already executed it
 
         // Submit the batches to application layer and if the epoch changed reset last
         // executed

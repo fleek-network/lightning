@@ -4,16 +4,16 @@ use std::time::Duration;
 
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::prelude::*;
-use lightning_interfaces::types::{Digest as BroadcastDigest, Epoch, NodeIndex};
+use lightning_interfaces::types::{Epoch, NodeIndex};
 use lightning_metrics::increment_counter;
 use lightning_utils::application::QueryRunnerExt;
 use quick_cache::unsync::Cache;
 use tokio::pin;
-use tokio::sync::{mpsc, oneshot, Notify};
+use tokio::sync::{mpsc, Notify};
 use tokio::task::JoinHandle;
 use tracing::{error, info};
 
-use crate::consensus::{ParcelWithResponse, PubSubMsg};
+use crate::consensus::PubSubMsg;
 use crate::execution::{
     AuthenticStampedParcel,
     CommitteeAttestation,
@@ -51,7 +51,7 @@ impl BroadcastWorker {
         query_runner: Q,
         execution: Arc<Execution<P::Event, Q, NE>>,
         node_public_key: NodePublicKey,
-        rx_narwhal_batches: mpsc::Receiver<ParcelWithResponse>,
+        rx_narwhal_batches: mpsc::Receiver<(AuthenticStampedParcel, bool)>,
         reconfigure_notify: Arc<Notify>,
     ) -> Self {
         let shutdown_notify = Arc::new(Notify::new());
@@ -100,7 +100,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
     query_runner: Q,
     execution: Arc<Execution<P::Event, Q, NE>>,
     node_public_key: NodePublicKey,
-    mut rx_narwhal_batches: mpsc::Receiver<ParcelWithResponse>,
+    mut rx_narwhal_batches: mpsc::Receiver<(AuthenticStampedParcel, bool)>,
     reconfigure_notify: Arc<Notify>,
 ) {
     info!("Edge node message worker is running");
@@ -144,13 +144,13 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
             _ = &mut shutdown_future => {
                 break;
             },
-            Some(ParcelWithResponse{ parcel, epoch_changed, response })
+            Some((parcel, epoch_changed))
                 = rx_narwhal_batches.recv() => {
                 if !on_committee {
                     // This should never happen if it somehow does there is critical error somewhere
                     panic!("We somehow sent ourselves a parcel from narwhal while not on committee");
                 }
-                handle_batch(parcel, epoch_changed, response, &mut ctx).await;
+                handle_batch(parcel, epoch_changed, &mut ctx).await;
             },
             Some(msg) = ctx.pub_sub.recv_event() => {
                 handle_pubsub_event::<P, Q, NE>(msg, &mut ctx).await;
@@ -214,7 +214,6 @@ async fn handle_pubsub_event<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, 
 async fn handle_batch<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emitter>(
     parcel: AuthenticStampedParcel,
     epoch_changed: bool,
-    response: oneshot::Sender<Option<BroadcastDigest>>,
     ctx: &mut Context<P, Q, NE>,
 ) {
     // This will only be executed by validator nodes
@@ -229,16 +228,14 @@ async fn handle_batch<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
     let _ = ctx.pub_sub.send(&attestation.into(), None).await;
 
     let msg_digest = ctx.pub_sub.send(&parcel.clone().into(), None).await;
-    // Send the broadcast msg digest back to the execution, so that the execution can store it in
-    // the txn store.
-    // TODO(matthias): alternatively, we can give a clone of the pubsub to the execution
-    // and have it broadcast the parcels.
-    // The advantage of doing it this way is that the broadcast worker is solely responsible for
-    // handling the broadcast.
-    // The disadvantage is that we have more back and forth with channels.
-    response
-        .send(msg_digest.ok())
-        .expect("Failed to send response to execution");
+
+    // We swallow the result here on purpose. Only validator nodes will execute this method.
+    // validators only store parcels in order to respond to missing parcel
+    // requests. Storing parcels is not critical for their consensus.
+    let _ = ctx
+        .execution
+        .store_parcel(parcel, ctx.our_index, msg_digest.ok());
+    // No need to store the attestation we have already executed it
 
     if epoch_changed {
         ctx.committee = ctx.query_runner.get_committee_members_by_index();
@@ -281,7 +278,7 @@ async fn handle_parcel<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Em
         event = Some(msg);
     }
 
-    if from_next_epoch {
+    let store_result = if from_next_epoch {
         // if the parcel is from the next epoch, we optimistically
         // store it and check if it's from a validator once we change epochs.
 
@@ -291,13 +288,13 @@ async fn handle_parcel<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Em
 
         // TODO(matthias): panic here or only log the error?
         ctx.execution
-            .store_pending_parcel(parcel, originator, Some(msg_digest), event.unwrap());
+            .store_pending_parcel(parcel, originator, Some(msg_digest), event.unwrap())
     } else {
         // only propagate normal parcels, not parcels we requested, and not
         // parcels that we optimistically accept from the next epoch
         ctx.execution
-            .store_parcel(parcel, originator, Some(msg_digest));
-    }
+            .store_parcel(parcel, originator, Some(msg_digest))
+    };
 
     // Check if we requested this parcel
     if ctx.pending_requests.remove(&parcel_digest).is_some() {
@@ -320,8 +317,10 @@ async fn handle_parcel<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Em
     }
 
     if !ctx.on_committee {
+        // If the node is not on the committee, storing parcels is crucial for the consensus.
+        // If storing parcels fails for some reason, we want to panic.
+        store_result.expect("Failed to store parcel");
         info!("Received transaction parcel from gossip as an edge node");
-
         try_execute::<P, Q, NE>(parcel_digest, ctx).await;
     }
 }
@@ -358,9 +357,12 @@ async fn handle_attestation<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, N
             // will always be `Some`. Unfortunately, the borrow checker cannot
             // figure this out on its own if we use `msg` directly here.
             ctx.execution
-                .store_pending_attestation(att.digest, att.node_index, event.unwrap());
+                .store_pending_attestation(att.digest, att.node_index, event.unwrap())
+                .expect("Failed to store attestation");
         } else {
-            ctx.execution.store_attestation(att.digest, att.node_index);
+            ctx.execution
+                .store_attestation(att.digest, att.node_index)
+                .expect("Failed to store attestation");
         }
 
         try_execute::<P, Q, NE>(att.digest, ctx).await;

@@ -7,14 +7,7 @@ use std::time::{Duration, SystemTime};
 use derive_more::{From, IsVariant, TryInto};
 use fleek_crypto::{ConsensusPublicKey, NodePublicKey, SecretKey};
 use lightning_interfaces::prelude::*;
-use lightning_interfaces::types::{
-    Digest as BroadcastDigest,
-    Epoch,
-    EpochInfo,
-    Event,
-    Topic,
-    UpdateMethod,
-};
+use lightning_interfaces::types::{Epoch, EpochInfo, Event, Topic, UpdateMethod};
 use lightning_utils::application::QueryRunnerExt;
 use mysten_metrics::RegistryService;
 use mysten_network::Multiaddr;
@@ -25,7 +18,7 @@ use narwhal_node::NodeStorage;
 use prometheus::Registry;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
-use tokio::sync::{mpsc, oneshot, Notify};
+use tokio::sync::{mpsc, Notify};
 use tokio::{pin, select, task, time};
 use tracing::{error, info};
 use typed_store::DBMetrics;
@@ -76,7 +69,7 @@ struct EpochState<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, N
     /// Interface for sending messages through the gossip layer
     pub_sub: P,
     /// Narhwal sends payloads ready for broadcast to this receiver
-    rx_narwhal_batches: Option<mpsc::Receiver<ParcelWithResponse>>,
+    rx_narwhal_batches: Option<mpsc::Receiver<(AuthenticStampedParcel, bool)>>,
     /// To notify when consensus is shutting down.
     shutdown_notify: Arc<Notify>,
 }
@@ -94,7 +87,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
         execution_state: Arc<Execution<P::Event, Q, NE>>,
         txn_socket: SubmitTxSocket,
         pub_sub: P,
-        rx_narwhal_batches: mpsc::Receiver<ParcelWithResponse>,
+        rx_narwhal_batches: mpsc::Receiver<(AuthenticStampedParcel, bool)>,
         shutdown_notify: Arc<Notify>,
     ) -> Self {
         Self {
@@ -419,7 +412,6 @@ impl<C: Collection> Consensus<C> {
             tx_narwhal_batches,
             query_runner.clone(),
             notifier.get_emitter(),
-            primary_pk,
         ));
 
         let shutdown_notify_epoch_state = Arc::new(Notify::new());
@@ -478,12 +470,6 @@ fn garbage_collect_old_stores(current_epoch: &u64, store_location: &PathBuf, ret
     } else {
         error!("Unable to read narwhal store directory to garbage collect old databases");
     }
-}
-
-pub struct ParcelWithResponse {
-    pub parcel: AuthenticStampedParcel,
-    pub epoch_changed: bool,
-    pub response: oneshot::Sender<Option<BroadcastDigest>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, IsVariant, From, TryInto)]
