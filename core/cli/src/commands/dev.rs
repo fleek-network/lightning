@@ -2,12 +2,9 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use lightning_interfaces::prelude::*;
-use lightning_interfaces::types::Blake3Hash;
-use lightning_rpc::utils::rpc_request;
+use lightning_rpc::api::AdminApiClient;
 use lightning_utils::config::TomlConfigProvider;
-use reqwest::Client;
 use resolved_pathbuf::ResolvedPathBuf;
-use serde_json::json;
 
 use crate::args::DevSubCmd;
 
@@ -39,29 +36,15 @@ where
     let hmac_secret_path = <C::RpcInterface as RpcInterface<C>>::hmac_secret_dir(&config);
 
     // by default loads or creates if hmac_secret_path.is_none() the secret from ~/.lightning
+    let url = format!("http://127.0.0.1:{}/admin", port);
     let secret = lightning_rpc::load_hmac_secret(hmac_secret_path)?;
+    let client = lightning_rpc::clients::HmacClient::new(&url, &secret).await?;
 
-    let url = format!("http://127.0.0.1:{}", port);
     for path in &input {
         if let Some(path) = path.to_str() {
-            let request = json!({
-                "jsonrpc": "2.0",
-                "method": "admin_store",
-                "params": { "path": path },
-                "id":1,
-            })
-            .to_string();
-            let client = Client::new();
+            let response = AdminApiClient::store(&client, path.to_string()).await?;
 
-            let response = rpc_request::<Blake3Hash>(
-                &client,
-                format!("{}/admin", url),
-                request,
-                Some(&secret),
-            )
-            .await?;
-
-            println!("{:x}\t{path:?}", ByteBuf(&response.result));
+            println!("{:x}\t{path:?}", ByteBuf(&response));
         } else {
             println!("invalid unicode in {path:?}")
         };

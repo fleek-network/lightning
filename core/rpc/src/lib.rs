@@ -23,6 +23,17 @@ use crate::logic::AdminApi;
 pub use crate::logic::{EthApi, FleekApi, NetApi};
 
 pub mod api;
+pub mod clients {
+    pub use super::api::{
+        rpc_client,
+        AdminApiClient as AdminRpcClient,
+        EthApiClient as EthRpcClient,
+        FleekApiClient as FleekRpcClient,
+        HmacClient,
+        NetApiClient as NetRpcClient,
+    };
+}
+
 pub mod api_types;
 pub mod config;
 pub mod error;

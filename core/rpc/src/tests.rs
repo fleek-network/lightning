@@ -6,7 +6,6 @@ use fleek_crypto::{
     AccountOwnerSecretKey,
     ConsensusSecretKey,
     EthAddress,
-    NodePublicKey,
     NodeSecretKey,
     SecretKey,
 };
@@ -23,18 +22,15 @@ use lightning_fetcher::fetcher::Fetcher;
 use lightning_indexer::Indexer;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
-    EpochInfo,
     Event,
     Metadata,
     NodeInfo,
     NodePorts,
-    NodeServed,
     ProtocolParams,
     Staking,
     TotalServed,
     Value,
 };
-use lightning_interfaces::PagingParams;
 use lightning_notifier::Notifier;
 use lightning_origin_demuxer::OriginDemuxer;
 use lightning_pool::PoolProvider;
@@ -47,12 +43,11 @@ use lightning_utils::application::QueryRunnerExt;
 use reqwest::Client;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use tempfile::{tempdir, TempDir};
 
-use crate::api::{admin_hmac_client, rpc_client, AdminApiClient, EthApiClient, FleekApiClient};
+use crate::api::{rpc_client, AdminApiClient, FleekApiClient, HmacClient};
 use crate::config::Config as RpcConfig;
-use crate::{utils, Rpc};
+use crate::Rpc;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct RpcSuccessResponse<T> {
@@ -423,7 +418,7 @@ async fn test_rpc_get_locked_time() -> Result<()> {
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
     let eth_address = owner_public_key.into();
-    let node_secret_key = NodeSecretKey::generate();
+    let node_secret_key: NodeSecretKey = NodeSecretKey::generate();
     let node_public_key = node_secret_key.to_pk();
     let consensus_secret_key = ConsensusSecretKey::generate();
     let consensus_public_key = consensus_secret_key.to_pk();
@@ -1081,10 +1076,10 @@ async fn test_admin_seq() -> Result<()> {
 
 async fn test_admin_client_can_call(port: u16, _node: &TestNode, secret: &[u8; 32]) -> Result<()> {
     let address = format!("http://127.0.0.1:{port}/admin");
-    let client = admin_hmac_client(&address, secret).await?;
+    let client = HmacClient::new(&address, secret).await?;
 
     for _ in 0..5 {
-        if let Err(e) = AdminApiClient::test(&*client).await {
+        if let Err(e) = AdminApiClient::test(&client).await {
             panic!("Expected OK got Error: {:?}", e);
         };
     }
