@@ -161,7 +161,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
                 if let Some(digest) = digest {
                     ctx.pending_timeouts.remove(&digest);
 
-                    if !ctx.execution.contains_parcel(&digest) {
+                    if !ctx.execution.contains_parcel(&digest).unwrap() {
                         let request = PubSubMsg::RequestTransactions(digest);
                         let _ = ctx.pub_sub.send(&request, None).await;
                         ctx.pending_requests.insert(digest, ());
@@ -190,7 +190,9 @@ async fn handle_pubsub_event<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, 
             handle_attestation::<P, Q, NE>(msg, att, ctx).await;
         },
         PubSubMsg::RequestTransactions(digest) => {
-            let parcel_msg_digest = ctx.execution.get_parcel_message_digest(&digest);
+            let Ok(parcel_msg_digest) = ctx.execution.get_parcel_message_digest(&digest) else {
+                return;
+            };
             if let Some(msg_digest) = parcel_msg_digest {
                 let filter = HashSet::from([msg.originator()]);
                 ctx.pub_sub.repropagate(msg_digest, Some(filter)).await;
@@ -247,7 +249,7 @@ async fn handle_batch<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
             .pubkey_to_index(&ctx.node_public_key)
             .unwrap_or(u32::MAX);
         ctx.on_committee = ctx.committee.contains(&ctx.our_index);
-        ctx.execution.change_epoch(&ctx.committee);
+        let _ = ctx.execution.change_epoch(&ctx.committee);
     }
 }
 
@@ -390,7 +392,9 @@ async fn try_execute<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emit
                     .unwrap_or(u32::MAX);
                 ctx.on_committee = ctx.committee.contains(&ctx.our_index);
                 ctx.reconfigure_notify.notify_waiters();
-                ctx.execution.change_epoch(&ctx.committee);
+                ctx.execution
+                    .change_epoch(&ctx.committee)
+                    .expect("Failed to rotate epochs for txn store");
             }
         },
         Err(not_executed) => {

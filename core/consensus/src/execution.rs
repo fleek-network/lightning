@@ -266,20 +266,29 @@ impl<T: BroadcastEventInterface<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
         }
     }
 
-    pub fn get_parcel_message_digest(&self, digest: &Digest) -> Option<BroadcastDigest> {
-        self.txn_store
-            .read()
-            .unwrap()
-            .get_parcel(digest)
-            .and_then(|p| p.message_digest)
+    pub fn get_parcel_message_digest(&self, digest: &Digest) -> Result<Option<BroadcastDigest>> {
+        if let Ok(txn_store) = self.txn_store.write() {
+            Ok(txn_store.get_parcel(digest).and_then(|p| p.message_digest))
+        } else {
+            Err(anyhow!("Failed to acquire lock"))
+        }
     }
 
-    pub fn contains_parcel(&self, digest: &Digest) -> bool {
-        self.txn_store.read().unwrap().get_parcel(digest).is_some()
+    pub fn contains_parcel(&self, digest: &Digest) -> Result<bool> {
+        if let Ok(txn_store) = self.txn_store.write() {
+            Ok(txn_store.get_parcel(digest).is_some())
+        } else {
+            Err(anyhow!("Failed to acquire lock"))
+        }
     }
 
-    pub fn change_epoch(&self, committee: &[NodeIndex]) {
-        self.txn_store.write().unwrap().change_epoch(committee)
+    pub fn change_epoch(&self, committee: &[NodeIndex]) -> Result<()> {
+        if let Ok(mut txn_store) = self.txn_store.write() {
+            txn_store.change_epoch(committee);
+            Ok(())
+        } else {
+            Err(anyhow!("Failed to acquire lock"))
+        }
     }
 
     // Threshold should be 2f + 1 of the committee
