@@ -1,6 +1,5 @@
 use std::fs::read_to_string;
 use std::path::PathBuf;
-use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 
 use anyhow::Context;
@@ -34,7 +33,6 @@ pub use server::create_hmac;
 #[cfg(test)]
 mod tests;
 
-pub static HMAC_NONCE: AtomicUsize = AtomicUsize::new(0);
 pub static HMAC_SALT: &[u8] = b"lightning-hmac-salt";
 
 static VERSION: Lazy<String> = Lazy::new(|| {

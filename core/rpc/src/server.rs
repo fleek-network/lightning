@@ -4,8 +4,8 @@ use std::sync::atomic::AtomicU32;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
-use futures::{FutureExt, TryFutureExt};
 use hmac::{Hmac, Mac};
+use hyper::body::HttpBody;
 use hyper::{Body, Request, Response};
 use sha2::Sha256;
 use tower::Service as TowerService;
@@ -13,6 +13,10 @@ use tower::Service as TowerService;
 use crate::{health, metrics, HMAC_SALT, VERSION};
 
 type BoxedError = Box<dyn std::error::Error + Sync + Send + 'static>;
+
+pub const LIGHTINING_HMAC_HEADER: &str = "X-Lightning-HMAC";
+pub const LIGHTINING_TIMESTAMP_HEADER: &str = "X-Lightning-Timestamp";
+pub const LIGHTINING_NONCE_HEADER: &str = "X-Lightning-Nonce";
 
 /// A struct that implements the Service trait for the RPC server.
 pub struct RpcService<MainModule, AdminModule> {
@@ -158,9 +162,9 @@ impl<MainModule, AdminModule> RpcService<MainModule, AdminModule> {
 
                 if method == hyper::Method::POST {
                     match (
-                        req.headers().get("X-Lightning-HMAC"),
-                        req.headers().get("X-Lightning-Timestamp"),
-                        req.headers().get("X-Lightning-Nonce"),
+                        req.headers().get(LIGHTINING_HMAC_HEADER),
+                        req.headers().get(LIGHTINING_TIMESTAMP_HEADER),
+                        req.headers().get(LIGHTINING_NONCE_HEADER),
                     ) {
                         (Some(hmac), Some(ts), Some(nonce)) => {
                             match (hmac.to_str(), ts.to_str(), nonce.to_str()) {
@@ -171,16 +175,20 @@ impl<MainModule, AdminModule> RpcService<MainModule, AdminModule> {
                                         nonce.trim().to_string(),
                                     );
 
-                                    extract_body_and_verify_hmac(
-                                        req,
-                                        self.secret.clone(),
-                                        self.nonce.clone(),
-                                        hmac,
-                                        ts,
-                                        nonce,
-                                    )
-                                    .and_then(move |req| svc_clone.call(req))
-                                    .boxed()
+                                    let secret = self.secret.clone();
+                                    let our_nonce = self.nonce.clone();
+
+                                    Box::pin(async move {
+                                        let r = extract_body_and_verify_hmac(
+                                            req, secret, our_nonce, hmac, ts, nonce,
+                                        )
+                                        .await;
+
+                                        match r {
+                                            Ok(req) => svc_clone.call(req).await,
+                                            Err(e) => Ok(e.into()),
+                                        }
+                                    })
                                 },
                                 _ => bad_request(
                                     "Invalid HMAC/Timestamp/Nonce charecters, couldnt serialize",
@@ -245,15 +253,63 @@ async fn extract_body_and_verify_hmac(
     hmac: String,
     ts: String,
     nonce: String,
-) -> Result<Request<Body>, BoxedError> {
+) -> Result<Request<Body>, VerifyHmacError> {
     let (parts, body) = req.into_parts();
 
-    // todo(n): size upper bound?
-    let body = hyper::body::to_bytes(body).await?.to_vec();
+    match body.size_hint().upper() {
+        Some(0) => return Err(VerifyHmacError::Other("got an empty request body")),
+        Some(n) if n > 1024 * 100 => return Err(VerifyHmacError::Other("body too large")),
+        _ => (),
+    }
+
+    let body = hyper::body::to_bytes(body)
+        .await
+        .map_err(|_| VerifyHmacError::Other("cant read req body"))?
+        .to_vec();
 
     verify_hmac(&secret, &sys_nonce, &body, &hmac, &ts, &nonce)?;
 
     Ok(Request::from_parts(parts, body.into()))
+}
+
+#[derive(Debug, thiserror::Error)]
+enum VerifyHmacError {
+    #[error("HMAC is not 32 bytes")]
+    LengthMismatch,
+    #[error("HMAC is not valid")]
+    InvalidHmac,
+    #[error("Timestamp is the future")]
+    TimestampInTheFuture,
+    #[error("Timestamp is too old")]
+    TimestampTooOld,
+    #[error("Nonce is not valid, expected {0}, got {1}")]
+    InvalidNonce(u32, u32),
+    #[error("Nonce was invalidated during request")]
+    TryAgain,
+    #[error(transparent)]
+    ParseError(#[from] std::num::ParseIntError),
+    #[error("System Error: {0}")]
+    Other(&'static str),
+}
+
+impl From<VerifyHmacError> for hyper::Response<hyper::Body> {
+    fn from(value: VerifyHmacError) -> Self {
+        let status = match &value {
+            VerifyHmacError::LengthMismatch => hyper::StatusCode::BAD_REQUEST,
+            VerifyHmacError::InvalidHmac => hyper::StatusCode::BAD_REQUEST,
+            VerifyHmacError::TimestampInTheFuture => hyper::StatusCode::BAD_REQUEST,
+            VerifyHmacError::InvalidNonce(_, _) => hyper::StatusCode::BAD_REQUEST,
+            VerifyHmacError::ParseError(_) => hyper::StatusCode::BAD_REQUEST,
+            VerifyHmacError::Other(_) => hyper::StatusCode::INTERNAL_SERVER_ERROR,
+            VerifyHmacError::TimestampTooOld => hyper::StatusCode::REQUEST_TIMEOUT,
+            VerifyHmacError::TryAgain => hyper::StatusCode::CONFLICT,
+        };
+
+        hyper::Response::builder()
+            .status(status)
+            .body(hyper::Body::from(value.to_string()))
+            .unwrap()
+    }
 }
 
 fn verify_hmac(
@@ -263,9 +319,9 @@ fn verify_hmac(
     hmac: &str,
     ts: &str,
     nonce: &str,
-) -> Result<(), BoxedError> {
+) -> Result<(), VerifyHmacError> {
     if hmac.trim_start_matches("0x").len() != 64 {
-        return Err("HMAC is not 32 bytes".into());
+        return Err(VerifyHmacError::LengthMismatch);
     }
 
     let our_nonce = sys_nonce.load(std::sync::atomic::Ordering::Acquire);
@@ -274,32 +330,28 @@ fn verify_hmac(
     let user_nonce = nonce.parse::<u32>()?;
 
     if user_nonce != our_nonce {
-        return Err(format!(
-            "Nonce is not valid, expected {}, got {}",
-            our_nonce, user_nonce
-        )
-        .into());
+        return Err(VerifyHmacError::InvalidNonce(our_nonce, user_nonce));
     }
 
     let sys = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .map_err(Box::new)?
+        .map_err(|_| VerifyHmacError::Other("cant read system time"))?
         .as_secs();
 
     // it should be more than 5 seconsd in the past
     if sys - 5 > user_timestamp {
-        return Err("Timestamp is too far in the past".into());
+        return Err(VerifyHmacError::TimestampTooOld);
     }
 
     // it should not be in the future
     if user_timestamp > sys {
-        return Err("Timestamp is too far in the future".into());
+        return Err(VerifyHmacError::TimestampInTheFuture);
     }
 
     let correct_hmac = create_hmac(secret, body, user_timestamp, user_nonce);
 
     if hmac != correct_hmac {
-        return Err("Recreated HMAC doesnt match".into());
+        return Err(VerifyHmacError::InvalidHmac);
     }
 
     if sys_nonce
@@ -311,7 +363,7 @@ fn verify_hmac(
         )
         .is_err()
     {
-        return Err("Nonce was invalidated during request".into());
+        return Err(VerifyHmacError::TryAgain);
     }
 
     Ok(())
