@@ -53,10 +53,8 @@ unsafe fn try_file_open(ctx: LsmContext) -> Result<i32, i32> {
                 task: task_inode,
             };
             if let Some(cached_rule) = maps::FILE_CACHE.get(&cache_key) {
-                if (cached_rule.is_dir == FileRule::IS_DIR
-                    && cmp_str_bytes(cached_rule.path.as_slice(), path, MAX_BUFFER_LEN))
-                    || cmp_str_bytes(path, cached_rule.path.as_slice(), MAX_BUFFER_LEN)
-                        && cached_rule.permissions & FileRule::OPEN_MASK > 0
+                if contains(cached_rule.path.as_slice(), path, MAX_BUFFER_LEN)
+                    && cached_rule.permissions & FileRule::OPEN_MASK > 0
                 {
                     return Ok(ALLOW);
                 }
@@ -113,11 +111,7 @@ fn find_match<'a>(
             continue;
         }
 
-        let full_path = rule.path.as_slice();
-        if (rule.is_dir == FileRule::IS_DIR
-            && cmp_str_bytes(full_path, target_path, MAX_BUFFER_LEN))
-            || cmp_str_bytes(target_path, full_path, MAX_BUFFER_LEN)
-        {
+        if contains(rule.path.as_slice(), target_path, MAX_BUFFER_LEN) {
             return Ok(Some(rule));
         }
     }
@@ -149,19 +143,19 @@ unsafe fn read_file_name(file: *const vmlinux::file, dst: &mut [u8]) -> Result<&
 //  - `size` is not equal to the len of both parameters.
 //  - `size` is zero.
 // Due to limited stack space, we do not handle these cases in this function.
-/// Compares slices to determine if they both contain the same NUL terminated string.
-fn cmp_str_bytes(a: &[u8], b: &[u8], size: usize) -> bool {
+/// Returns true if the given pattern matches a sub-slice of the target string slice.
+fn contains(pat: &[u8], target: &[u8], size: usize) -> bool {
     // Handle empty strings.
-    if a[0] == 0 {
-        return b[0] == 0;
+    if pat[0] == 0 {
+        return target[0] == 0;
     }
 
     for i in 0..size {
-        if a[i] == 0 {
+        if pat[i] == 0 {
             return true;
         }
 
-        if a[i] != b[i] {
+        if pat[i] != target[i] {
             break;
         }
     }

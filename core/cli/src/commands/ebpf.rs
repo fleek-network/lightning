@@ -1,19 +1,16 @@
+use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
 use std::process::Command;
 
 use anyhow::{bail, Result};
-use clap::Subcommand;
+use clap::{Args, Subcommand, ValueEnum};
 
 use crate::commands::admin::{BIND_PATH, PATH_CONFIG};
 
 pub fn exec(cmd: EbpfCmd) -> Result<()> {
     match cmd {
         EbpfCmd::Build { target, release } => build_bpf_program(target, release),
-        EbpfCmd::Run {
-            target,
-            release,
-            iface,
-        } => run(target, release, iface),
+        EbpfCmd::Run(opts) => run(opts),
     }
 }
 
@@ -29,17 +26,23 @@ pub enum EbpfCmd {
         release: bool,
     },
     /// Compile and run eBPF program and userspace application.
-    Run {
-        /// Set the target triple of the BPF program.
-        #[clap(default_value = "bpfel-unknown-none", long)]
-        target: Target,
-        /// Run in release mode.
-        #[clap(long)]
-        release: bool,
-        /// Interface to attach packet filter program.
-        #[clap(short, long, default_value = "eth0")]
-        iface: String,
-    },
+    Run(RunOpts),
+}
+
+#[derive(Args, Debug)]
+pub struct RunOpts {
+    /// Set the target triple of the BPF program.
+    #[clap(default_value = "bpfel-unknown-none", long)]
+    target: Target,
+    /// Run in release mode.
+    #[clap(long)]
+    release: bool,
+    /// Interface to attach packet filter program.
+    #[clap(short, long, default_value = "eth0")]
+    iface: String,
+    /// Enables the Lightning Guard.
+    #[clap(short, long, value_enum)]
+    guard: Option<GuardMode>,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -60,12 +63,29 @@ impl std::str::FromStr for Target {
     }
 }
 
-impl std::fmt::Display for Target {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for Target {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
             Target::BpfEl => "bpfel-unknown-none",
             Target::BpfEb => "bpfeb-unknown-none",
         })
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+enum GuardMode {
+    Enforce,
+    Learn,
+}
+
+impl Display for GuardMode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mode = match self {
+            GuardMode::Enforce => "enforce",
+            GuardMode::Learn => "learn",
+        };
+
+        write!(f, "{mode}")
     }
 }
 
@@ -117,7 +137,14 @@ fn build_userspace_application(release: bool) -> Result<()> {
     Ok(())
 }
 
-pub fn run(target: Target, release: bool, iface: String) -> Result<()> {
+pub fn run(opts: RunOpts) -> Result<()> {
+    let RunOpts {
+        target,
+        release,
+        iface,
+        guard,
+    } = opts;
+
     build_bpf_program(target, release)?;
     build_userspace_application(release)?;
 
@@ -133,6 +160,7 @@ pub fn run(target: Target, release: bool, iface: String) -> Result<()> {
         "--bind={}",
         BIND_PATH.get().expect("Static to be initialized").display()
     );
+
     let mut args: Vec<_> = vec!["sudo", "-E"];
     args.push(bin_path.as_str());
     args.push(&xdp_args);
@@ -140,6 +168,13 @@ pub fn run(target: Target, release: bool, iface: String) -> Result<()> {
     args.push(&tmp);
     args.push(&profile);
     args.push(&bind);
+
+    if let Some(mode) = guard {
+        args.push("--enable-guard");
+        if let GuardMode::Learn = mode {
+            args.push("--learning");
+        }
+    }
 
     let status = Command::new(args.first().expect("args are hardcoded"))
         .args(args.iter().skip(1))

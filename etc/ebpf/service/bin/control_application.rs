@@ -38,17 +38,17 @@ struct Opts {
     /// Bind path.
     #[clap(short, long)]
     bind: PathBuf,
-    /// Load FILE_OPEN program in the corresponding LSM hook.
-    #[clap(short, long, default_value_t = true)]
-    enable_file_open: bool,
-    /// Enable learning mode.
+    /// Enables the Lightning Guard.
+    #[clap(short, long, default_value_t = false)]
+    enable_guard: bool,
+    /// Enable learning mode for the Lightning Guard.
     ///
     /// In learning mode, the filters allow all access and operations,
     /// in addition to sending an event for each access and operation attempt.
     /// This is useful for debugging and building the initial configurations
     /// for each filter.
     #[clap(short, long, default_value_t = false)]
-    learning_mode: bool,
+    learning: bool,
 }
 
 #[tokio::main]
@@ -80,7 +80,7 @@ async fn main() -> anyhow::Result<()> {
         .context("failed to attach the XDP program")?;
 
     let mut _file_open_prog: Option<&mut Lsm> = None;
-    if opt.enable_file_open {
+    if opt.enable_guard {
         let prog: &mut Lsm = handle.program_mut("file_open").unwrap().try_into()?;
         let btf = Btf::from_sys_fs()?;
         prog.load("file_open", &btf)?;
@@ -113,7 +113,7 @@ async fn main() -> anyhow::Result<()> {
     global_config.insert(
         0,
         GlobalConfig {
-            mode: if opt.learning_mode {
+            mode: if opt.learning {
                 GlobalConfig::LEARN_MODE
             } else {
                 GlobalConfig::ENFORCE_MODE
