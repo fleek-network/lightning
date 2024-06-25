@@ -90,6 +90,8 @@ pub enum Command {
     /// Applications for administrators.
     #[command(subcommand)]
     Admin(AdminSubCmd),
+    /// Generate shell completions
+    Completions { shell: clap_complete::shells::Shell },
 }
 
 #[derive(Subcommand, Clone)]

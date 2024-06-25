@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 use lightning_final_bindings::{FinalTypes, UseMockConsensus};
 use lightning_interfaces::Collection;
 use lightning_utils::config::TomlConfigProvider;
@@ -69,6 +69,13 @@ impl Cli {
             Command::PrintConfig { default } => print_config::exec::<C>(default, config_path).await,
             Command::Dev(cmd) => dev::exec::<C>(cmd, config_path).await,
             Command::Admin(cmd) => admin::exec(cmd).await,
+            Command::Completions { shell } => {
+                // Generate and print a completion script for various shells
+                let mut cmd = Args::command();
+                let name = cmd.get_name().to_string();
+                clap_complete::generate(shell, &mut cmd, name, &mut std::io::stdout());
+                Ok(())
+            },
         }
     }
 

@@ -1775,9 +1775,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.5.4"
+version = "4.5.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "90bc066a67923782aa8515dbaea16946c5bcc5addbd668bb80af688e53e548a0"
+checksum = "5db83dced34638ad474f39f250d7fea9598bdd239eaced1bdf45d597da0f433f"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -1785,9 +1785,9 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
-version = "4.5.2"
+version = "4.5.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae129e2e766ae0ec03484e609954119f123cc1fe650337e155d03b022f24f7b4"
+checksum = "f7e204572485eb3fbf28f871612191521df159bc3e15a9f5064c66dba3a8c05f"
 dependencies = [
  "anstream",
  "anstyle",
@@ -1796,10 +1796,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "clap_derive"
-version = "4.5.4"
+name = "clap_complete"
+version = "4.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "528131438037fd55894f62d6e9f068b8f45ac57ffa77517819645d10aed04f64"
+checksum = "fbca90c87c2a04da41e95d1856e8bcd22f159bdbfa147314d2ce5218057b0e58"
+dependencies = [
+ "clap 4.5.7",
+]
+
+[[package]]
+name = "clap_derive"
+version = "4.5.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c780290ccf4fb26629baa7a1081e68ced113f1d3ec302fa5948f1c381ebf06c6"
 dependencies = [
  "heck 0.5.0",
  "proc-macro2 1.0.74",
@@ -2228,7 +2237,7 @@ dependencies = [
  "anes",
  "cast",
  "ciborium",
- "clap 4.5.4",
+ "clap 4.5.7",
  "criterion-plot",
  "futures",
  "is-terminal",
@@ -6009,7 +6018,8 @@ dependencies = [
  "assert_cmd",
  "aya",
  "aya-log",
- "clap 4.5.4",
+ "clap 4.5.7",
+ "clap_complete",
  "console-subscriber",
  "fleek-blake3",
  "fleek-crypto",
@@ -6129,7 +6139,7 @@ name = "lightning-e2e"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "clap 4.5.4",
+ "clap 4.5.7",
  "fleek-blake3",
  "fleek-crypto",
  "futures",
@@ -6316,7 +6326,7 @@ dependencies = [
  "bincode",
  "bytes",
  "cid 0.10.1",
- "clap 4.5.4",
+ "clap 4.5.7",
  "criterion",
  "dashmap",
  "derive_more",
@@ -6732,7 +6742,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "autometrics",
- "clap 4.5.4",
+ "clap 4.5.7",
  "ethers",
  "fleek-crypto",
  "futures",
@@ -13672,7 +13682,7 @@ dependencies = [
  "cc",
  "chrono",
  "cipher",
- "clap 4.5.4",
+ "clap 4.5.7",
  "clap_builder",
  "concurrent-queue",
  "core-foundation",

@@ -95,6 +95,7 @@
                 [[ $NIX_ENFORCE_PURITY -eq 1 ]] && echo ${gitRev} && exit
                 "${git}/bin/git" "$@"
               '')
+              installShellFiles
             ];
             buildInputs =
               with pkgs;
@@ -210,6 +211,12 @@
                   "--locked"
                   "--bin lightning-node"
                 ];
+                postInstall = lib.optionalString (pkgs.stdenv.buildPlatform.canExecute pkgs.stdenv.hostPlatform) ''
+                  installShellCompletion --cmd lightning-node \
+                    --bash <($out/bin/lightning-node completions bash) \
+                    --fish <($out/bin/lightning-node completions fish) \
+                    --zsh <($out/bin/lightning-node completions zsh)
+                '';
               }
             );
 
