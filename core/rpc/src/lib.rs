@@ -57,7 +57,7 @@ pub fn load_hmac_secret(secret_dir_path: Option<PathBuf>) -> anyhow::Result<[u8;
     let secret_path = parent.join("hmac_secret.hex");
 
     let secret_bytes = if secret_path.is_file() {
-        tracing::info!("Reading HMAC secret from file");
+        tracing::debug!("Reading HMAC secret from file");
 
         let secret_hex = read_to_string(&secret_path)?;
         let secret_bytes = hex::decode(secret_hex.trim())?;
@@ -70,7 +70,7 @@ pub fn load_hmac_secret(secret_dir_path: Option<PathBuf>) -> anyhow::Result<[u8;
 
         secret
     } else {
-        tracing::info!("Generating new HMAC secret");
+        tracing::warn!("Generating new HMAC secret");
 
         let mut dest = [0u8; 32];
         rand::rngs::StdRng::from_entropy().fill_bytes(&mut dest);
