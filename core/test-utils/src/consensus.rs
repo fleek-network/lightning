@@ -186,6 +186,7 @@ pub struct Config {
     /// arriving at the consensus will be lost.
     pub transactions_to_lose: HashSet<u32>,
     /// This specifies the interval for new blocks being pretend submitted to the application.
+    #[serde(with = "humantime_serde")]
     pub new_block_interval: Duration,
 }
 
