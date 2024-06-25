@@ -22,9 +22,9 @@ use self::module_loader::FleekModuleLoader;
 use self::tape::{Punch, Tape};
 use crate::params::{FETCH_BLACKLIST, HEAP_INIT, HEAP_LIMIT};
 
-mod extensions;
-mod module_loader;
-mod tape;
+pub mod extensions;
+pub mod module_loader;
+pub mod tape;
 
 /// Snapshot of the runtime after javascript modules have been initialized
 static SNAPSHOT: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/snapshot.bin"));

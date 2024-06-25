@@ -34,6 +34,9 @@ pub async fn main() {
     // Explicitly initialize the v8 platform on the main thread
     JsRuntime::init_platform(None);
 
+    // Initialize node polyfill imports
+    runtime::module_loader::get_or_init_imports();
+
     // To cancel events mid execution.
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<IsolateHandle>();
     tokio::spawn(async move {

@@ -23,6 +23,41 @@ use tracing::{debug, trace, warn};
 
 static IMPORTS: OnceLock<HashMap<ModuleSpecifier, ModuleSpecifier>> = OnceLock::new();
 
+// Initialize the module loader
+pub fn get_or_init_imports<'a>() -> &'a HashMap<ModuleSpecifier, ModuleSpecifier> {
+    IMPORTS.get_or_init(|| {
+        let map: HashMap<ModuleSpecifier, ModuleSpecifier> =
+            serde_json::from_str(include_str!(concat!(env!("OUT_DIR"), "/importmap.json")))
+                .unwrap();
+
+        // Spawn a task to prefetch the imports
+        let to_fetch = map.clone();
+        tokio::spawn(async move {
+            // Limit number of concurrent requests
+            let semaphore = Semaphore::new(16);
+            if to_fetch
+                .values()
+                .map(|uri| async {
+                    let _ = semaphore.acquire().await.ok()?;
+                    let uri = uri.as_str();
+                    let hash = fetch_from_origin(fn_sdk::api::Origin::HTTP, uri).await;
+                    trace!("Fetched {uri} from origin");
+                    hash
+                })
+                .collect::<FuturesUnordered<_>>()
+                .any(|res| async move { res.is_none() })
+                .await
+            {
+                warn!("Failed to prefetch runtime imports");
+            } else {
+                debug!("Prefetched runtime imports successfully")
+            }
+        });
+
+        map
+    })
+}
+
 pub struct FleekModuleLoader {}
 
 impl FleekModuleLoader {
@@ -38,39 +73,11 @@ impl ModuleLoader for FleekModuleLoader {
         referrer: &str,
         _kind: deno_core::ResolutionKind,
     ) -> Result<ModuleSpecifier, anyhow::Error> {
+        // Resolve import according to spec, reusing referrer base urls, etc
         let mut import = deno_core::resolve_import(specifier, referrer)?;
 
-        if let Some(mapped) = IMPORTS
-            .get_or_init(|| {
-                let map: HashMap<ModuleSpecifier, ModuleSpecifier> =
-                    serde_json::from_str(include_str!(concat!(env!("OUT_DIR"), "/importmap.json")))
-                        .unwrap();
-
-                // Spawn a task to prefetch the imports
-                let to_fetch = map.clone();
-                tokio::spawn(async move {
-                    // Limit number of concurrent requests
-                    let semaphore = Semaphore::new(16);
-                    if to_fetch
-                        .values()
-                        .map(|uri| async {
-                            let _ = semaphore.acquire().await.ok()?;
-                            fetch_from_origin(fn_sdk::api::Origin::HTTP, uri.as_str()).await
-                        })
-                        .collect::<FuturesUnordered<_>>()
-                        .any(|res| async move { res.is_none() })
-                        .await
-                    {
-                        warn!("Failed to prefetch runtime imports");
-                    } else {
-                        debug!("Prefetched runtime imports successfully")
-                    }
-                });
-
-                map
-            })
-            .get(&import)
-        {
+        // If we have an override in our importmap, use it instead
+        if let Some(mapped) = get_or_init_imports().get(&import) {
             import = mapped.clone();
         }
 
