@@ -49,6 +49,7 @@ impl Cli {
                 network,
                 no_generate_keys,
                 dev,
+                force,
                 rpc_address,
                 handshake_http_address,
             } => {
@@ -57,6 +58,7 @@ impl Cli {
                     network.map(Into::into),
                     no_generate_keys,
                     dev,
+                    force,
                     rpc_address,
                     handshake_http_address,
                 )

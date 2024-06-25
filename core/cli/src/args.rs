@@ -59,6 +59,9 @@ pub enum Command {
         /// the local dev genesis configuration, and the dev configuration will be applied.
         #[clap(long)]
         dev: bool,
+        /// Whether to force overwriting the config files.
+        #[clap(long)]
+        force: bool,
         /// Whether to not generate keys during initialization. The default is to generate keys.
         #[clap(long)]
         no_generate_keys: bool,

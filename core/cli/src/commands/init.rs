@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 use std::time::SystemTime;
 
-use anyhow::{anyhow, Result};
+use anyhow::{bail, Result};
 use fleek_crypto::{
     AccountOwnerSecretKey,
     ConsensusSecretKey,
@@ -22,7 +22,7 @@ use lightning_rpc::{Config as RpcConfig, Rpc};
 use lightning_test_utils::consensus::MockConsensus;
 use lightning_utils::config::TomlConfigProvider;
 use resolved_pathbuf::ResolvedPathBuf;
-use tracing::info;
+use tracing::{info, warn};
 use types::{NodePorts, Staking};
 
 pub async fn exec<C>(
@@ -30,6 +30,7 @@ pub async fn exec<C>(
     network: Option<Network>,
     no_generate_keys: bool,
     dev: bool,
+    force: bool,
     rpc_address: Option<SocketAddr>,
     handshake_http_address: Option<SocketAddr>,
 ) -> Result<()>
@@ -38,10 +39,17 @@ where
 {
     // Error if the configuration file already exists.
     if config_path.exists() {
-        return Err(anyhow!(
-            "Node configuration file already exists at {}",
-            config_path.to_str().unwrap()
-        ));
+        if !force {
+            bail!(
+                "Node configuration file already exists at {}",
+                config_path.to_str().unwrap()
+            );
+        } else {
+            warn!(
+                "Overwriting configuration file at {}",
+                config_path.to_str().unwrap()
+            );
+        }
     }
 
     // Initialize a new configuration with defaults.
@@ -50,9 +58,7 @@ where
 
     // Validate that either network or dev are set, and assign network if dev is set.
     if !dev && network.is_none() {
-        return Err(anyhow!(
-            "Either --network or --dev must be provided. See --help for details."
-        ));
+        bail!("Either --network or --dev must be provided. See --help for details.");
     }
 
     // Generate keys if requested.
@@ -65,7 +71,7 @@ where
     let mut app_config = AppConfig::default();
     if dev {
         if network.is_some() {
-            return Err(anyhow!("Cannot specify both --dev and --network"));
+            bail!("Cannot specify both --dev and --network");
         }
 
         app_config.dev = Some(Default::default());
