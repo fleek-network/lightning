@@ -127,7 +127,6 @@ impl Server {
                         }
                     }
                 }
-                // Todo: Verify that this is cancel safe.
                 next = self.events.readable_mut() => {
                     let mut guard = next?;
                     let queue = guard.get_inner_mut();

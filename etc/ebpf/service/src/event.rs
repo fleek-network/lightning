@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use anyhow::bail;
+use anyhow::{anyhow, bail};
 use lightning_ebpf_common::{
     EventMessage,
     ACCESS_DENIED_EVENT,
@@ -48,11 +48,24 @@ pub async fn write_events(events: Vec<EventMessage>) -> anyhow::Result<()> {
                     bail!("invalid program type: {event_ty}");
                 },
             };
+
+            let nul_pos = event[EVENT_HEADER_SIZE..EVENT_HEADER_SIZE + MAX_BUFFER_LEN]
+                .iter()
+                .position(|c| *c == 0)
+                .ok_or(anyhow!("C string is not NUL terminated"))?;
             let binary = String::from_utf8_lossy(
-                event[EVENT_HEADER_SIZE..EVENT_HEADER_SIZE + MAX_BUFFER_LEN].as_ref(),
+                event[EVENT_HEADER_SIZE..EVENT_HEADER_SIZE + nul_pos].as_ref(),
             );
-            let target =
-                String::from_utf8_lossy(event[EVENT_HEADER_SIZE + MAX_BUFFER_LEN..].as_ref());
+
+            let nul_pos = event[EVENT_HEADER_SIZE + MAX_BUFFER_LEN..]
+                .iter()
+                .position(|c| *c == 0)
+                .ok_or(anyhow!("C string is not NUL terminated"))?;
+            let target = String::from_utf8_lossy(
+                event[EVENT_HEADER_SIZE + MAX_BUFFER_LEN
+                    ..EVENT_HEADER_SIZE + MAX_BUFFER_LEN + nul_pos]
+                    .as_ref(),
+            );
 
             let timestamp = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
