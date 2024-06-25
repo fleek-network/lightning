@@ -50,7 +50,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tempfile::{tempdir, TempDir};
 
-use crate::api::FleekApiClient;
+use crate::api::{admin_hmac_client, rpc_client, AdminApiClient, EthApiClient, FleekApiClient};
 use crate::config::Config as RpcConfig;
 use crate::{utils, Rpc};
 
@@ -166,40 +166,6 @@ fn client(url: SocketAddr) -> HttpClient {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_rpc_ping() -> Result<()> {
-    let temp_dir = tempdir().unwrap();
-    let genesis_path = Genesis::default()
-        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
-        .unwrap();
-
-    let port = 30000;
-    let node = init_rpc(&temp_dir, genesis_path, port).await;
-
-    wait_for_server_start(port).await?;
-
-    let req = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_ping",
-        "params":[],
-        "id":1,
-    });
-
-    let response =
-        utils::make_request(format!("http://127.0.0.1:{port}/AHHHHHH"), req.to_string()).await?;
-
-    if response.status().is_success() {
-        let response_body = response.text().await?;
-        println!("Response body: {response_body}");
-    } else {
-        panic!("Request failed with status: {}", response.status());
-    }
-
-    node.shutdown().await;
-
-    Ok(())
-}
-
-#[tokio::test(flavor = "multi_thread")]
 async fn test_rpc_get_flk_balance() -> Result<()> {
     let temp_dir = tempdir()?;
 
@@ -226,22 +192,10 @@ async fn test_rpc_get_flk_balance() -> Result<()> {
 
     wait_for_server_start(port).await?;
 
-    let req = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_flk_balance",
-        "params": {"public_key": eth_address},
-        "id":1,
-    });
+    let client = rpc_client(&format!("http://127.0.0.1:{port}/rpc/v0"))?;
+    let response = FleekApiClient::get_flk_balance(&client, eth_address, None).await?;
 
-    let client = Client::new();
-    let response = utils::rpc_request::<HpUfixed<18>>(
-        &client,
-        format!("http://127.0.0.1:{port}/rpc/v0"),
-        req.to_string(),
-        None,
-    )
-    .await?;
-    assert_eq!(HpUfixed::<18>::from(1_000_u32), response.result);
+    assert_eq!(HpUfixed::<18>::from(1_000_u32), response);
 
     node.shutdown().await;
     Ok(())
@@ -292,22 +246,10 @@ async fn test_rpc_get_reputation() -> Result<()> {
 
     wait_for_server_start(port).await?;
 
-    let req = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_reputation",
-        "params": {"public_key": node_public_key},
-        "id":1,
-    });
+    let client = rpc_client(&format!("http://127.0.0.1:{port}/rpc/v0"))?;
+    let response = FleekApiClient::get_reputation(&client, node_public_key, None).await?;
 
-    let client = Client::new();
-    let response = utils::rpc_request::<Option<u8>>(
-        &client,
-        format!("http://127.0.0.1:{port}/rpc/v0"),
-        req.to_string(),
-        None,
-    )
-    .await?;
-    assert_eq!(Some(46), response.result);
+    assert_eq!(Some(46), response);
 
     node.shutdown().await;
 
@@ -364,22 +306,10 @@ async fn test_rpc_get_staked() -> Result<()> {
     let node = init_rpc(&temp_dir, genesis_path, port).await;
     wait_for_server_start(port).await?;
 
-    let req = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_staked",
-        "params": {"public_key": node_public_key},
-        "id":1,
-    });
+    let client = rpc_client(&format!("http://127.0.0.1:{port}/rpc/v0"))?;
+    let response = FleekApiClient::get_staked(&client, node_public_key, None).await?;
 
-    let client = Client::new();
-    let response = utils::rpc_request::<HpUfixed<18>>(
-        &client,
-        format!("http://127.0.0.1:{port}/rpc/v0"),
-        req.to_string(),
-        None,
-    )
-    .await?;
-    assert_eq!(HpUfixed::<18>::from(1_000_u32), response.result);
+    assert_eq!(HpUfixed::<18>::from(1_000_u32), response);
 
     node.shutdown().await;
 
@@ -413,22 +343,10 @@ async fn test_rpc_get_stables_balance() -> Result<()> {
 
     wait_for_server_start(port).await?;
 
-    let req = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_stables_balance",
-        "params": {"public_key": eth_address},
-        "id":1,
-    });
+    let client = rpc_client(&format!("http://127.0.0.1:{port}/rpc/v0"))?;
+    let response = FleekApiClient::get_stables_balance(&client, eth_address, None).await?;
 
-    let client = Client::new();
-    let response = utils::rpc_request::<HpUfixed<6>>(
-        &client,
-        format!("http://127.0.0.1:{port}/rpc/v0"),
-        req.to_string(),
-        None,
-    )
-    .await?;
-    assert_eq!(HpUfixed::<6>::from(2_00_u32), response.result);
+    assert_eq!(HpUfixed::<6>::from(2_00_u32), response);
 
     node.shutdown().await;
 
@@ -487,22 +405,10 @@ async fn test_rpc_get_stake_locked_until() -> Result<()> {
 
     wait_for_server_start(port).await?;
 
-    let req = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_stake_locked_until",
-        "params": {"public_key": node_public_key},
-        "id":1,
-    });
+    let client = rpc_client(&format!("http://127.0.0.1:{port}/rpc/v0"))?;
+    let response = FleekApiClient::get_stake_locked_until(&client, node_public_key, None).await?;
 
-    let client = Client::new();
-    let response = utils::rpc_request::<u64>(
-        &client,
-        format!("http://127.0.0.1:{port}/rpc/v0"),
-        req.to_string(),
-        None,
-    )
-    .await?;
-    assert_eq!(365, response.result);
+    assert_eq!(365, response);
 
     node.shutdown().await;
 
@@ -560,22 +466,10 @@ async fn test_rpc_get_locked_time() -> Result<()> {
 
     wait_for_server_start(port).await?;
 
-    let req = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_locked_time",
-        "params": {"public_key": node_public_key},
-        "id":1,
-    });
+    let client = rpc_client(&format!("http://127.0.0.1:{port}/rpc/v0"))?;
+    let response = FleekApiClient::get_locked_time(&client, node_public_key, None).await?;
 
-    let client = Client::new();
-    let response = utils::rpc_request::<u64>(
-        &client,
-        format!("http://127.0.0.1:{port}/rpc/v0"),
-        req.to_string(),
-        None,
-    )
-    .await?;
-    assert_eq!(2, response.result);
+    assert_eq!(2, response);
 
     node.shutdown().await;
 
@@ -670,22 +564,10 @@ async fn test_rpc_get_bandwidth_balance() -> Result<()> {
 
     wait_for_server_start(port).await?;
 
-    let req = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_bandwidth_balance",
-        "params": {"public_key": eth_address},
-        "id":1,
-    });
+    let client = rpc_client(&format!("http://127.0.0.1:{port}/rpc/v0"))?;
+    let response = FleekApiClient::get_bandwidth_balance(&client, eth_address, None).await?;
 
-    let client = Client::new();
-    let response = utils::rpc_request::<u128>(
-        &client,
-        format!("http://127.0.0.1:{port}/rpc/v0"),
-        req.to_string(),
-        None,
-    )
-    .await?;
-    assert_eq!(10_000, response.result);
+    assert_eq!(10_000, response);
 
     node.shutdown().await;
 
@@ -743,22 +625,10 @@ async fn test_rpc_get_node_info() -> Result<()> {
 
     wait_for_server_start(port).await?;
 
-    let req = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_node_info",
-        "params": {"public_key": node_public_key},
-        "id":1,
-    });
+    let client = rpc_client(&format!("http://127.0.0.1:{port}/rpc/v0"))?;
+    let response = FleekApiClient::get_node_info(&client, node_public_key, None).await?;
 
-    let client = Client::new();
-    let response = utils::rpc_request::<Option<NodeInfo>>(
-        &client,
-        format!("http://127.0.0.1:{port}/rpc/v0"),
-        req.to_string(),
-        None,
-    )
-    .await?;
-    assert_eq!(Some(NodeInfo::from(&node_info)), response.result);
+    assert_eq!(Some(NodeInfo::from(&node_info)), response);
 
     node.shutdown().await;
 
@@ -777,22 +647,10 @@ async fn test_rpc_get_staking_amount() -> Result<()> {
 
     wait_for_server_start(port).await?;
 
-    let req = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_staking_amount",
-        "params":[],
-        "id":1,
-    });
+    let client = rpc_client(&format!("http://127.0.0.1:{port}/rpc/v0"))?;
+    let response = FleekApiClient::get_staking_amount(&client).await?;
 
-    let client = Client::new();
-    let response = utils::rpc_request::<u128>(
-        &client,
-        format!("http://127.0.0.1:{port}/rpc/v0"),
-        req.to_string(),
-        None,
-    )
-    .await?;
-    assert_eq!(node.query_runner().get_staking_amount(), response.result);
+    assert_eq!(node.query_runner().get_staking_amount(), response);
 
     node.shutdown().await;
 
@@ -811,22 +669,10 @@ async fn test_rpc_get_committee_members() -> Result<()> {
 
     wait_for_server_start(port).await?;
 
-    let req = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_committee_members",
-        "params":[],
-        "id":1,
-    });
+    let client = rpc_client(&format!("http://127.0.0.1:{port}/rpc/v0"))?;
+    let response = FleekApiClient::get_committee_members(&client, None).await?;
 
-    let client = Client::new();
-    let response = utils::rpc_request::<Vec<NodePublicKey>>(
-        &client,
-        format!("http://127.0.0.1:{port}/rpc/v0"),
-        req.to_string(),
-        None,
-    )
-    .await?;
-    assert_eq!(node.query_runner().get_committee_members(), response.result);
+    assert_eq!(node.query_runner().get_committee_members(), response);
 
     node.shutdown().await;
 
@@ -845,22 +691,10 @@ async fn test_rpc_get_epoch() -> Result<()> {
 
     wait_for_server_start(port).await?;
 
-    let req = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_epoch",
-        "params":[],
-        "id":1,
-    });
+    let client = rpc_client(&format!("http://127.0.0.1:{port}/rpc/v0"))?;
+    let response = FleekApiClient::get_epoch(&client).await?;
 
-    let client = Client::new();
-    let response = utils::rpc_request::<u64>(
-        &client,
-        format!("http://127.0.0.1:{port}/rpc/v0"),
-        req.to_string(),
-        None,
-    )
-    .await?;
-    assert_eq!(node.query_runner().get_current_epoch(), response.result);
+    assert_eq!(node.query_runner().get_current_epoch(), response);
 
     node.shutdown().await;
 
@@ -879,22 +713,10 @@ async fn test_rpc_get_epoch_info() -> Result<()> {
 
     wait_for_server_start(port).await?;
 
-    let req = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_epoch_info",
-        "params":[],
-        "id":1,
-    });
+    let client = rpc_client(&format!("http://127.0.0.1:{port}/rpc/v0"))?;
+    let response = FleekApiClient::get_epoch_info(&client).await?;
 
-    let client = Client::new();
-    let response = utils::rpc_request::<EpochInfo>(
-        &client,
-        format!("http://127.0.0.1:{port}/rpc/v0"),
-        req.to_string(),
-        None,
-    )
-    .await?;
-    assert_eq!(node.query_runner().get_epoch_info(), response.result);
+    assert_eq!(node.query_runner().get_epoch_info(), response);
 
     node.shutdown().await;
 
@@ -913,28 +735,15 @@ async fn test_rpc_get_total_supply() -> Result<()> {
 
     wait_for_server_start(port).await?;
 
-    let req = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_total_supply",
-        "params":[],
-        "id":1,
-    });
-
-    let client = Client::new();
-    let response = utils::rpc_request::<HpUfixed<18>>(
-        &client,
-        format!("http://127.0.0.1:{port}/rpc/v0"),
-        req.to_string(),
-        None,
-    )
-    .await?;
+    let client = rpc_client(&format!("http://127.0.0.1:{port}/rpc/v0"))?;
+    let response = FleekApiClient::get_total_supply(&client, None).await?;
 
     let total_supply = match node.query_runner().get_metadata(&Metadata::TotalSupply) {
         Some(Value::HpUfixed(s)) => s,
         _ => panic!("TotalSupply is set genesis and should never be empty"),
     };
 
-    assert_eq!(total_supply, response.result);
+    assert_eq!(total_supply, response);
 
     node.shutdown().await;
 
@@ -953,28 +762,15 @@ async fn test_rpc_get_year_start_supply() -> Result<()> {
 
     wait_for_server_start(port).await?;
 
-    let req = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_year_start_supply",
-        "params":[],
-        "id":1,
-    });
-
-    let client = Client::new();
-    let response = utils::rpc_request::<HpUfixed<18>>(
-        &client,
-        format!("http://127.0.0.1:{port}/rpc/v0"),
-        req.to_string(),
-        None,
-    )
-    .await?;
+    let client = rpc_client(&format!("http://127.0.0.1:{port}/rpc/v0"))?;
+    let response = FleekApiClient::get_year_start_supply(&client, None).await?;
 
     let supply_year_start = match node.query_runner().get_metadata(&Metadata::SupplyYearStart) {
         Some(Value::HpUfixed(s)) => s,
         _ => panic!("SupplyYearStart is set genesis and should never be empty"),
     };
 
-    assert_eq!(supply_year_start, response.result);
+    assert_eq!(supply_year_start, response);
 
     node.shutdown().await;
 
@@ -993,21 +789,8 @@ async fn test_rpc_get_protocol_fund_address() -> Result<()> {
 
     wait_for_server_start(port).await?;
 
-    let req = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_protocol_fund_address",
-        "params":[],
-        "id":1,
-    });
-
-    let client = Client::new();
-    let response = utils::rpc_request::<EthAddress>(
-        &client,
-        format!("http://127.0.0.1:{port}/rpc/v0"),
-        req.to_string(),
-        None,
-    )
-    .await?;
+    let client = rpc_client(&format!("http://127.0.0.1:{port}/rpc/v0"))?;
+    let response = FleekApiClient::get_protocol_fund_address(&client).await?;
 
     let protocol_account = match node
         .query_runner()
@@ -1017,7 +800,7 @@ async fn test_rpc_get_protocol_fund_address() -> Result<()> {
         _ => panic!("AccountPublicKey is set genesis and should never be empty"),
     };
 
-    assert_eq!(protocol_account, response.result);
+    assert_eq!(protocol_account, response);
 
     node.shutdown().await;
 
@@ -1038,24 +821,12 @@ async fn test_rpc_get_protocol_params() -> Result<()> {
 
     let params = ProtocolParams::LockTime;
 
-    let req = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_protocol_params",
-        "params": {"protocol_params": params},
-        "id":1,
-    });
+    let client = rpc_client(&format!("http://127.0.0.1:{port}/rpc/v0"))?;
+    let response = FleekApiClient::get_protocol_params(&client, params.clone()).await?;
 
-    let client = Client::new();
-    let response = utils::rpc_request::<u128>(
-        &client,
-        format!("http://127.0.0.1:{port}/rpc/v0"),
-        req.to_string(),
-        None,
-    )
-    .await?;
     assert_eq!(
         node.query_runner().get_protocol_param(&params).unwrap(),
-        response.result
+        response
     );
 
     node.shutdown().await;
@@ -1084,22 +855,10 @@ async fn test_rpc_get_total_served() -> Result<()> {
 
     wait_for_server_start(port).await?;
 
-    let req = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_total_served",
-        "params": { "epoch": 0 },
-        "id":1,
-    });
+    let client = rpc_client(&format!("http://127.0.0.1:{port}/rpc/v0"))?;
+    let response = FleekApiClient::get_total_served(&client, 0).await?;
 
-    let client = Client::new();
-    let response = utils::rpc_request::<TotalServed>(
-        &client,
-        format!("http://127.0.0.1:{port}/rpc/v0"),
-        req.to_string(),
-        None,
-    )
-    .await?;
-    assert_eq!(total_served, response.result);
+    assert_eq!(total_served, response);
 
     node.shutdown().await;
 
@@ -1153,22 +912,10 @@ async fn test_rpc_get_node_served() -> Result<()> {
 
     wait_for_server_start(port).await?;
 
-    let req = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_node_served",
-        "params": {"public_key": node_public_key},
-        "id":1,
-    });
+    let client = rpc_client(&format!("http://127.0.0.1:{port}/rpc/v0"))?;
+    let response = FleekApiClient::get_node_served(&client, node_public_key, None).await?;
 
-    let client = Client::new();
-    let response = utils::rpc_request::<NodeServed>(
-        &client,
-        format!("http://127.0.0.1:{port}/rpc/v0"),
-        req.to_string(),
-        None,
-    )
-    .await?;
-    assert_eq!(vec![1000], response.result.served);
+    assert_eq!(vec![1000], response.served);
 
     node.shutdown().await;
 
@@ -1225,22 +972,10 @@ async fn test_rpc_is_valid_node() -> Result<()> {
     let node = init_rpc(&temp_dir, genesis_path, port).await;
     wait_for_server_start(port).await?;
 
-    let req = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_is_valid_node",
-        "params": {"public_key": node_public_key},
-        "id":1,
-    });
+    let client = rpc_client(&format!("http://127.0.0.1:{port}/rpc/v0"))?;
+    let response = FleekApiClient::is_valid_node(&client, node_public_key).await?;
 
-    let client = Client::new();
-    let response = utils::rpc_request::<bool>(
-        &client,
-        format!("http://127.0.0.1:{port}/rpc/v0"),
-        req.to_string(),
-        None,
-    )
-    .await?;
-    assert!(response.result);
+    assert!(response);
 
     node.shutdown().await;
 
@@ -1306,39 +1041,16 @@ async fn test_rpc_get_node_registry() -> Result<()> {
 
     wait_for_server_start(port).await?;
 
-    let req = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_node_registry",
-        "params": [],
-        "id":1,
-    });
+    let client = rpc_client(&format!("http://127.0.0.1:{port}/rpc/v0"))?;
+    let response = FleekApiClient::get_node_registry(&client, None).await?;
 
-    let client = Client::new();
-    let response = utils::rpc_request::<Vec<NodeInfo>>(
-        &client,
-        format!("http://127.0.0.1:{port}/rpc/v0"),
-        req.to_string(),
-        None,
-    )
-    .await?;
-    assert_eq!(response.result.len(), committee_size + 1);
-    assert!(response.result.contains(&NodeInfo::from(&node_info)));
+    assert_eq!(response.len(), committee_size + 1);
+    assert!(response.contains(&NodeInfo::from(&node_info)));
 
-    let req = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_node_registry",
-        "params": PagingParams { ignore_stake: true, start: committee_size as u32, limit: 10 },
-        "id":1,
-    });
+    let client = rpc_client(&format!("http://127.0.0.1:{port}/rpc/v0"))?;
+    let response = FleekApiClient::get_node_registry(&client, None).await?;
 
-    let response = utils::rpc_request::<Vec<NodeInfo>>(
-        &client,
-        format!("http://127.0.0.1:{port}/rpc/v0"),
-        req.to_string(),
-        None,
-    )
-    .await?;
-    assert!(response.result.contains(&NodeInfo::from(&node_info)));
+    assert!(response.contains(&NodeInfo::from(&node_info)));
 
     node.shutdown().await;
 
@@ -1358,75 +1070,30 @@ async fn test_admin_seq() -> Result<()> {
 
     wait_for_server_start(port).await?;
 
-    test_admin_rpc_hmac(port, &node, &secret).await?;
-    test_admin_rpc_store(port, &node, &secret).await?;
+    test_admin_client_can_call(port, &node, &secret).await?;
 
     node.shutdown().await;
 
-    println!("test complete");
+    println!("seq test complete");
 
     Ok(())
 }
 
-async fn test_admin_rpc_store(port: u16, _node: &TestNode, secret: &[u8; 32]) -> Result<()> {
-    let req = json!({
-        "jsonrpc": "2.0",
-        "method": "admin_test",
-        "id": 1,
-    });
+async fn test_admin_client_can_call(port: u16, _node: &TestNode, secret: &[u8; 32]) -> Result<()> {
+    let address = format!("http://127.0.0.1:{port}/admin");
+    let client = admin_hmac_client(&address, secret).await?;
 
-    let client = Client::new();
-    let res = crate::utils::rpc_request::<String>(
-        &client,
-        format!("http://127.0.0.1:{port}/admin"),
-        req.to_string(),
-        Some(secret),
-    )
-    .await;
-
-    assert!(res.is_ok());
-
-    Ok(())
-}
-
-async fn test_admin_rpc_hmac(port: u16, _node: &TestNode, secret: &[u8; 32]) -> Result<()> {
     for _ in 0..5 {
-        let req = json!({
-            "jsonrpc": "2.0",
-            "method": "admin_test",
-            "id": 1,
-        });
-
-        let client = Client::new();
-        let response = utils::rpc_request::<String>(
-            &client,
-            format!("http://127.0.0.1:{port}/admin"),
-            req.to_string(),
-            Some(secret),
-        )
-        .await;
-
-        if response.is_err() {
-            panic!("res: {:?}", response.err());
-        }
+        if let Err(e) = AdminApiClient::test(&*client).await {
+            panic!("Expected OK got Error: {:?}", e);
+        };
     }
 
-    let req = json!({
-        "jsonrpc": "2.0",
-        "method": "admin_test",
-        "id": 1,
-    });
+    let regular_client = jsonrpsee::http_client::HttpClientBuilder::default().build(&address)?;
 
-    let client = Client::new();
-    let response = crate::utils::rpc_request::<String>(
-        &client,
-        format!("http://127.0.0.1:{port}/admin"),
-        req.to_string(),
-        None,
-    )
-    .await;
+    println!("{:?}", AdminApiClient::test(&regular_client).await);
 
-    assert!(response.is_err());
+    assert!(AdminApiClient::test(&regular_client).await.is_err());
 
     Ok(())
 }
