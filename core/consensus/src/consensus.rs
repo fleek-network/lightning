@@ -24,8 +24,8 @@ use tokio::{pin, select, task, time};
 use tracing::{error, info};
 use typed_store::DBMetrics;
 
+use crate::broadcast_worker::BroadcastWorker;
 use crate::config::Config;
-use crate::edge_node::consensus::EdgeConsensus;
 use crate::execution::{AuthenticStampedParcel, CommitteeAttestation, Digest, Execution};
 use crate::narwhal::{NarwhalArgs, NarwhalService};
 
@@ -61,7 +61,7 @@ struct EpochState<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, N
     /// Path to the database used by the narwhal implementation
     pub store_path: ResolvedPathBuf,
     /// Narwhal execution state.
-    execution_state: Arc<Execution<Q, NE>>,
+    execution_state: Arc<Execution<P::Event, Q, NE>>,
     /// Used to send transactions to consensus
     /// We still use this socket on consensus struct because a node is not always on the committee,
     /// so its not always sending     a transaction to its own mempool. The signer interface
@@ -85,7 +85,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
         query_runner: Q,
         narwhal_args: NarwhalArgs,
         store_path: ResolvedPathBuf,
-        execution_state: Arc<Execution<Q, NE>>,
+        execution_state: Arc<Execution<P::Event, Q, NE>>,
         txn_socket: SubmitTxSocket,
         pub_sub: P,
         rx_narwhal_batches: mpsc::Receiver<(AuthenticStampedParcel, bool)>,
@@ -106,11 +106,11 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
         }
     }
 
-    fn spawn_edge_consensus(&mut self, reconfigure_notify: Arc<Notify>) -> EdgeConsensus {
-        EdgeConsensus::spawn(
+    fn spawn_broadcast_worker(&mut self, reconfigure_notify: Arc<Notify>) -> BroadcastWorker {
+        BroadcastWorker::spawn::<P, Q, NE>(
             self.pub_sub.clone(),
-            self.execution_state.clone(),
             self.query_runner.clone(),
+            self.execution_state.clone(),
             self.narwhal_args
                 .primary_network_keypair
                 .public()
@@ -118,7 +118,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
                 .into(),
             self.rx_narwhal_batches
                 .take()
-                .expect("rx_narwhal_batches missing from EpochState"),
+                .expect("rx_narwhal_batches is missing"),
             reconfigure_notify,
         )
     }
@@ -317,7 +317,8 @@ impl<C: Collection> Consensus<C> {
         let panic_waiter = waiter.clone();
         spawn!(
             async move {
-                let edge_node = epoch_state.spawn_edge_consensus(reconfigure_notify.clone());
+                let broadcast_worker =
+                    epoch_state.spawn_broadcast_worker(reconfigure_notify.clone());
                 epoch_state.start_current_epoch().await;
 
                 let shutdown_future = waiter.wait_for_shutdown();
@@ -332,7 +333,7 @@ impl<C: Collection> Consensus<C> {
                             if let Some(consensus) = epoch_state.consensus.take() {
                                 consensus.shutdown().await;
                             }
-                            edge_node.shutdown().await;
+                            broadcast_worker.shutdown().await;
                             epoch_state.shutdown();
                             break
                         }
