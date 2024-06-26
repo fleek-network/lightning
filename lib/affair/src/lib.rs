@@ -105,30 +105,6 @@ pub trait AsyncWorker: Send + 'static {
         Socket { sender: tx }
     }
 
-    fn spawn_with_shutdown(
-        self,
-        shutdown: impl Future + Send + 'static,
-    ) -> Socket<Self::Request, Self::Response>
-    where
-        Self: Sized,
-    {
-        let (tx, rx) = mpsc::channel(64);
-        tokio::task::Builder::new()
-            .name(&format!(
-                "{}: non-blocking async worker",
-                std::any::type_name::<Self>()
-            ))
-            .spawn(async move {
-                tokio::select! {
-                    _ = shutdown => {},
-                    _ = run_non_blocking_async(rx, self) => {},
-                }
-            })
-            .expect("failed to spawn worker");
-
-        Socket { sender: tx }
-    }
-
     /// Spawn the current worker with a custom task spawner.
     fn spawn_with_spawner<S, Out>(self, spawner: S) -> (Out, Socket<Self::Request, Self::Response>)
     where
@@ -168,29 +144,6 @@ pub trait AsyncWorkerUnordered: Send + Sync + 'static {
                 std::any::type_name::<Self>()
             ))
             .spawn(async move { run_unordered_async(rx, &self).await })
-            .expect("failed to spawn worker");
-        Socket { sender: tx }
-    }
-
-    fn spawn_with_shutdown(
-        self,
-        shutdown: impl Future + Send + 'static,
-    ) -> Socket<Self::Request, Self::Response>
-    where
-        Self: Sized,
-    {
-        let (tx, rx) = mpsc::channel(64);
-        tokio::task::Builder::new()
-            .name(&format!(
-                "{}: unordered async worker",
-                std::any::type_name::<Self>()
-            ))
-            .spawn(async move {
-                tokio::select! {
-                    _ = shutdown => {},
-                    _ = run_unordered_async(rx, &self) => {},
-                }
-            })
             .expect("failed to spawn worker");
         Socket { sender: tx }
     }
