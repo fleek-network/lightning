@@ -17,6 +17,7 @@ type BoxedError = Box<dyn std::error::Error + Sync + Send + 'static>;
 pub const LIGHTINING_HMAC_HEADER: &str = "X-Lightning-HMAC";
 pub const LIGHTINING_TIMESTAMP_HEADER: &str = "X-Lightning-Timestamp";
 pub const LIGHTINING_NONCE_HEADER: &str = "X-Lightning-Nonce";
+pub const MAX_HMAC_BODY_SIZE: usize = 1024 * 10;
 
 /// A struct that implements the Service trait for the RPC server.
 pub struct RpcService<MainModule, AdminModule> {
@@ -267,22 +268,29 @@ async fn extract_body_and_verify_hmac(
     ts: String,
     nonce: String,
 ) -> Result<Request<Body>, VerifyHmacError> {
-    let (parts, body) = req.into_parts();
+    let (parts, mut body) = req.into_parts();
 
-    match body.size_hint().upper() {
-        Some(0) => return Err(VerifyHmacError::Other("got an empty request body")),
-        Some(n) if n > 1024 * 100 => return Err(VerifyHmacError::Other("body too large")),
-        _ => (),
+    let mut buf = {
+        // reserve
+        let hint = body.size_hint().upper().min(Some(1024 * 10)).unwrap();
+        Vec::with_capacity(hint as usize)
+    };
+
+    while let Some(chunk) = body.data().await {
+        buf.extend_from_slice(&chunk.map_err(|_| {
+            VerifyHmacError::Other("hyper error while reading request body for HMAC")
+        })?);
+
+        if buf.len() > MAX_HMAC_BODY_SIZE {
+            return Err(VerifyHmacError::Other(
+                "request body too large to verify HMAC",
+            ));
+        }
     }
 
-    let body = hyper::body::to_bytes(body)
-        .await
-        .map_err(|_| VerifyHmacError::Other("cant read req body"))?
-        .to_vec();
+    verify_hmac(&secret, &sys_nonce, &buf, &hmac, &ts, &nonce)?;
 
-    verify_hmac(&secret, &sys_nonce, &body, &hmac, &ts, &nonce)?;
-
-    Ok(Request::from_parts(parts, body.into()))
+    Ok(Request::from_parts(parts, buf.into()))
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -351,8 +359,8 @@ fn verify_hmac(
         .map_err(|_| VerifyHmacError::Other("cant read system time"))?
         .as_secs();
 
-    // it should be more than 5 seconsd in the past
-    if sys - 5 > user_timestamp {
+    // it shouldnt be more than 5 seconsd in the past
+    if user_timestamp < sys - 5 {
         return Err(VerifyHmacError::TimestampTooOld);
     }
 

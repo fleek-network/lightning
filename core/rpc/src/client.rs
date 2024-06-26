@@ -229,6 +229,8 @@ where
     }
 }
 
+////////////  Implementations needed to make it friendly with the jsonrpsee trait bounds ///////////
+
 #[async_trait::async_trait]
 impl ClientT for RpcClient
 where
@@ -277,7 +279,6 @@ where
     }
 }
 
-/// Implementations needed to make it friendly with the jsonrpsee trait bounds
 #[async_trait::async_trait]
 impl ClientT for HmacClient
 where
@@ -318,34 +319,6 @@ where
 }
 
 #[async_trait::async_trait]
-impl SubscriptionClientT for HmacClient {
-    async fn subscribe<'a, Notif, Params>(
-        &self,
-        subscribe_method: &'a str,
-        params: Params,
-        unsubscribe_method: &'a str,
-    ) -> Result<Subscription<Notif>, jsonrpsee::core::client::Error>
-    where
-        Params: ToRpcParams + Send,
-        Notif: DeserializeOwned,
-    {
-        self.client
-            .subscribe(subscribe_method, params, unsubscribe_method)
-            .await
-    }
-
-    async fn subscribe_to_method<'a, Notif>(
-        &self,
-        method: &'a str,
-    ) -> Result<Subscription<Notif>, jsonrpsee::core::client::Error>
-    where
-        Notif: DeserializeOwned,
-    {
-        self.client.subscribe_to_method(method).await
-    }
-}
-
-#[async_trait::async_trait]
 impl SubscriptionClientT for RpcClient {
     async fn subscribe<'a, Notif, Params>(
         &self,
@@ -382,5 +355,33 @@ impl SubscriptionClientT for RpcClient {
             Self::Http(client) => client.subscribe_to_method(method).await,
             Self::WithHmac(client) => client.subscribe_to_method(method).await,
         }
+    }
+}
+
+#[async_trait::async_trait]
+impl SubscriptionClientT for HmacClient {
+    async fn subscribe<'a, Notif, Params>(
+        &self,
+        subscribe_method: &'a str,
+        params: Params,
+        unsubscribe_method: &'a str,
+    ) -> Result<Subscription<Notif>, jsonrpsee::core::client::Error>
+    where
+        Params: ToRpcParams + Send,
+        Notif: DeserializeOwned,
+    {
+        self.client
+            .subscribe(subscribe_method, params, unsubscribe_method)
+            .await
+    }
+
+    async fn subscribe_to_method<'a, Notif>(
+        &self,
+        method: &'a str,
+    ) -> Result<Subscription<Notif>, jsonrpsee::core::client::Error>
+    where
+        Notif: DeserializeOwned,
+    {
+        self.client.subscribe_to_method(method).await
     }
 }
