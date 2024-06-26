@@ -135,8 +135,8 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
             .with_table::<ServiceId, ServiceRevenue>("service_revenue")
             .with_table::<TxHash, ()>("executed_digests")
             .with_table::<NodeIndex, u8>("uptime")
-            .with_table::<Blake3Hash, BTreeSet<NodeIndex>>("cid_to_node")
-            .with_table::<NodeIndex, BTreeSet<Blake3Hash>>("node_to_cid")
+            .with_table::<Blake3Hash, BTreeSet<NodeIndex>>("uri_to_node")
+            .with_table::<NodeIndex, BTreeSet<Blake3Hash>>("node_to_uri")
     }
 
     /// Query Metadata Table
