@@ -6870,6 +6870,7 @@ dependencies = [
  "humantime-serde",
  "lightning-interfaces",
  "lightning-metrics",
+ "lightning-rpc",
  "lightning-utils",
  "rand",
  "reqwest",

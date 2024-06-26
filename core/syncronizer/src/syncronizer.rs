@@ -15,12 +15,10 @@ use lightning_interfaces::types::{
 use lightning_metrics::increment_counter;
 use lightning_utils::application::QueryRunnerExt;
 use rand::seq::SliceRandom;
-use serde::de::DeserializeOwned;
 use tracing::error;
 
 use crate::config::Config;
-use crate::rpc::{self, rpc_epoch};
-use crate::utils;
+use crate::{rpc, utils};
 
 pub struct Syncronizer<C: Collection> {
     state: State<C>,
@@ -37,7 +35,6 @@ struct SyncronizerInner<C: Collection> {
     notifier: C::NotifierInterface,
     blockstore_server_socket: BlockstoreServerSocket,
     genesis_committee: Vec<(NodeIndex, NodeInfo)>,
-    rpc_client: reqwest::Client,
     epoch_change_delta: Duration,
 }
 
@@ -59,14 +56,9 @@ impl<C: Collection> Syncronizer<C> {
 
         let our_public_key = keystore.get_ed25519_pk();
 
-        let rpc_client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(5))
-            .connect_timeout(Duration::from_secs(5))
-            .build()?;
-
         if !cfg!(debug_assertions) {
             // We only run the prelude in prod mode to avoid interfering with tests.
-            Syncronizer::<C>::prelude(our_public_key, &genesis_committee, &rpc_client);
+            Syncronizer::<C>::prelude(our_public_key, &genesis_committee);
         }
 
         let inner = SyncronizerInner::new(
@@ -76,7 +68,6 @@ impl<C: Collection> Syncronizer<C> {
             notifier.clone(),
             blockstore_server,
             config.epoch_change_delta,
-            rpc_client,
         )?;
 
         Ok(Self {
@@ -100,11 +91,7 @@ impl<C: Collection> Syncronizer<C> {
         );
     }
 
-    fn prelude(
-        our_public_key: NodePublicKey,
-        genesis_committee: &Vec<(NodeIndex, NodeInfo)>,
-        rpc_client: &reqwest::Client,
-    ) {
+    fn prelude(our_public_key: NodePublicKey, genesis_committee: &Vec<(NodeIndex, NodeInfo)>) {
         // Check if node is on genesis committee.
         for (_, node_info) in genesis_committee {
             if our_public_key == node_info.public_key {
@@ -120,7 +107,6 @@ impl<C: Collection> Syncronizer<C> {
         let is_valid = rpc::sync_call(rpc::check_is_valid_node(
             our_public_key,
             genesis_committee.clone(),
-            rpc_client.clone(),
         ))
         .expect("Cannot reach bootstrap nodes");
         if !is_valid {
@@ -133,16 +119,12 @@ impl<C: Collection> Syncronizer<C> {
         let node_info = rpc::sync_call(rpc::get_node_info(
             our_public_key,
             genesis_committee.clone(),
-            rpc_client.clone(),
         ))
         .expect("Cannot reach bootstrap nodes")
         .unwrap(); // we unwrap here because we already checked if the node is valid above
 
-        let epoch_info = rpc::sync_call(rpc::get_epoch_info(
-            genesis_committee.clone(),
-            rpc_client.clone(),
-        ))
-        .expect("Cannot reach bootstrap nodes");
+        let epoch_info = rpc::sync_call(rpc::get_epoch_info(genesis_committee.clone()))
+            .expect("Cannot reach bootstrap nodes");
 
         // Check participation status.
         match node_info.participation {
@@ -157,7 +139,6 @@ impl<C: Collection> Syncronizer<C> {
                 rpc::sync_call(utils::wait_to_next_epoch(
                     epoch_info,
                     genesis_committee.clone(),
-                    rpc_client.clone(),
                 ));
             },
             _ => (),
@@ -190,7 +171,6 @@ impl<C: Collection> SyncronizerInner<C> {
         notifier: C::NotifierInterface,
         blockstore_server: &C::BlockstoreServerInterface,
         epoch_change_delta: Duration,
-        rpc_client: reqwest::Client,
     ) -> Result<Self> {
         Ok(Self {
             our_public_key,
@@ -198,7 +178,6 @@ impl<C: Collection> SyncronizerInner<C> {
             blockstore_server_socket: blockstore_server.get_socket(),
             notifier,
             genesis_committee,
-            rpc_client,
             epoch_change_delta,
         })
     }
@@ -280,8 +259,6 @@ impl<C: Collection> SyncronizerInner<C> {
         // Get the epoch the bootstrap nodes are at
         let bootstrap_epoch = self.get_current_epoch().await?;
 
-        //let bootstrap_epoch = self.ask_bootstrap_nodes(rpc_epoch().to_string()).await?;
-
         if bootstrap_epoch <= current_epoch {
             bail!("Bootstrap nodes are on the same epoch");
         }
@@ -301,11 +278,6 @@ impl<C: Collection> SyncronizerInner<C> {
             error!("Unable to download checkpoint");
             Err(anyhow!("Unable to download checkpoint"))
         }
-    }
-
-    /// This function will rpc request genesis nodes in sequence and stop when one of them responds
-    async fn ask_bootstrap_nodes<T: DeserializeOwned>(&self, req: String) -> Result<Vec<T>> {
-        rpc::ask_nodes(req, &self.genesis_committee, &self.rpc_client).await
     }
 
     async fn download_checkpoint_from_bootstrap(&self, checkpoint_hash: [u8; 32]) -> Result<()> {
@@ -331,12 +303,12 @@ impl<C: Collection> SyncronizerInner<C> {
     // This function will hit the bootstrap nodes(Genesis committee) to ask what epoch they are on
     // who the current committee is
     async fn get_latest_checkpoint_hash(&self) -> Result<[u8; 32]> {
-        rpc::last_epoch_hash(&self.genesis_committee, &self.rpc_client).await
+        rpc::last_epoch_hash(&self.genesis_committee).await
     }
 
     /// Returns the epoch the bootstrap nodes are on
     async fn get_current_epoch(&self) -> Result<Epoch> {
-        let epochs = self.ask_bootstrap_nodes(rpc_epoch().to_string()).await?;
+        let epochs = rpc::get_epoch(self.genesis_committee.clone()).await?;
         let epoch = epochs
             .into_iter()
             .max()

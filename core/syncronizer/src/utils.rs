@@ -10,7 +10,6 @@ use crate::rpc;
 pub async fn wait_to_next_epoch(
     epoch_info: EpochInfo,
     genesis_committee: Vec<(NodeIndex, NodeInfo)>,
-    rpc_client: reqwest::Client,
 ) {
     let shutdown_controller = ShutdownController::default();
     shutdown_controller.install_handlers();
@@ -22,16 +21,12 @@ pub async fn wait_to_next_epoch(
             println!("Exiting...");
             std::process::exit(0);
         }
-        _ = wait_loop(epoch_info, genesis_committee, rpc_client) => {
+        _ = wait_loop(epoch_info, genesis_committee) => {
         }
     }
 }
 
-async fn wait_loop(
-    epoch_info: EpochInfo,
-    genesis_committee: Vec<(NodeIndex, NodeInfo)>,
-    rpc_client: reqwest::Client,
-) {
+async fn wait_loop(epoch_info: EpochInfo, genesis_committee: Vec<(NodeIndex, NodeInfo)>) {
     let mut stdout = stdout();
     println!();
     loop {
@@ -40,10 +35,9 @@ async fn wait_loop(
             .unwrap()
             .as_millis() as u64;
         if now > epoch_info.epoch_end {
-            let new_epoch_info =
-                rpc::get_epoch_info(genesis_committee.to_vec(), rpc_client.clone())
-                    .await
-                    .expect("Cannot reach bootstrap nodes");
+            let new_epoch_info = rpc::get_epoch_info(genesis_committee.to_vec())
+                .await
+                .expect("Cannot reach bootstrap nodes");
             if new_epoch_info.epoch > epoch_info.epoch {
                 // The new epoch started, time to start the node.
                 println!();
