@@ -107,6 +107,7 @@ impl Env<UpdatePerm, AtomoStorage> {
             .with_table::<NodeIndex, u8>("uptime")
             .with_table::<Blake3Hash, BTreeSet<NodeIndex>>("uri_to_node")
             .with_table::<NodeIndex, BTreeSet<Blake3Hash>>("node_to_uri")
+            .with_table::<Blake3Hash, u32>("js_hash_count")
             .enable_iter("current_epoch_served")
             .enable_iter("rep_measurements")
             .enable_iter("submitted_rep_measurements")
@@ -117,7 +118,8 @@ impl Env<UpdatePerm, AtomoStorage> {
             .enable_iter("uptime")
             .enable_iter("service_revenue")
             .enable_iter("uri_to_node")
-            .enable_iter("node_to_uri");
+            .enable_iter("node_to_uri")
+            .enable_iter("js_hash_count");
 
         #[cfg(debug_assertions)]
         {

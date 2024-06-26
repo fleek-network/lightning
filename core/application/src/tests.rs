@@ -935,6 +935,7 @@ fn prepare_pod_request(
             service_id, // service 0 serving bandwidth
             proofs: vec![DeliveryAcknowledgmentProof],
             metadata: None,
+            hashes: vec![],
         },
         secret_key,
         nonce,
@@ -1832,6 +1833,7 @@ async fn test_submit_pod_reverts_account_key() {
         service_id: 1,
         proofs: vec![DeliveryAcknowledgmentProof],
         metadata: None,
+        hashes: vec![],
     };
     let update = prepare_update_request_account(submit_pod, &secret_key, 1);
     expect_tx_revert!(update, &update_socket, ExecutionError::OnlyNode);
@@ -1853,6 +1855,7 @@ async fn test_submit_pod_reverts_node_does_not_exist() {
         service_id: 1,
         proofs: vec![DeliveryAcknowledgmentProof],
         metadata: None,
+        hashes: vec![],
     };
     let update = prepare_update_request_node(submit_pod, &node_secret_key, 1);
     expect_tx_revert!(update, &update_socket, ExecutionError::NodeDoesNotExist);
@@ -1889,6 +1892,7 @@ async fn test_submit_pod_reverts_insufficient_stake() {
         service_id: 1,
         proofs: vec![DeliveryAcknowledgmentProof],
         metadata: None,
+        hashes: vec![],
     };
     let update = prepare_update_request_node(submit_pod, &node_secret_key, 1);
     expect_tx_revert!(update, &update_socket, ExecutionError::InsufficientStake);

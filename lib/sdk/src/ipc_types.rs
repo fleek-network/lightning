@@ -195,4 +195,11 @@ ReqRes! {
         /// Returns true if the fetch succeeded.
         succeeded: bool
     },
+    SubmitJsHash {
+        service_id: u32,
+        /// Hash of the js code we executed.
+        hash: [u8; 32],
+        =>
+        res: ()
+    }
 }

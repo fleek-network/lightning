@@ -7,13 +7,14 @@ use dashmap::DashMap;
 use fleek_crypto::ClientPublicKey;
 use fn_sdk::ipc_types::{self, IpcMessage, IpcRequest, DELIMITER_SIZE};
 use lightning_interfaces::prelude::*;
+use lightning_interfaces::types::{DeliveryAcknowledgment, DeliveryAcknowledgmentProof};
 use tokio::io::{self, Interest};
 use tokio::net::{UnixListener, UnixStream};
 use tokio::process::Command;
 use tokio::sync::Notify;
 use tokio::task::JoinSet;
 use tokio::{pin, select};
-use tracing::instrument;
+use tracing::{error, instrument};
 use triomphe::Arc;
 
 /// The shared object with every service.
@@ -22,6 +23,7 @@ pub struct Context<C: Collection> {
     pub ipc_path: PathBuf,
     pub fetcher_socket: FetcherSocket,
     pub query_runner: c!(C::ApplicationInterface::SyncExecutor),
+    pub dack_aggregator_socket: DeliveryAcknowledgmentSocket,
 }
 
 impl<C: Collection> Context<C> {
@@ -84,6 +86,19 @@ impl<C: Collection> Context<C> {
                     lightning_interfaces::types::FetcherResponse::Fetch(v) => v.is_ok(),
                 };
                 ipc_types::Response::FetchBlake3 { succeeded }
+            },
+            ipc_types::Request::SubmitJsHash { service_id, hash } => {
+                let dack = DeliveryAcknowledgment {
+                    service_id,
+                    commodity: 1,
+                    proof: DeliveryAcknowledgmentProof,
+                    metadata: None,
+                    hashes: vec![hash],
+                };
+                if let Err(e) = self.dack_aggregator_socket.run(dack).await {
+                    error!("Failed to send delivery acknowledgement: {e:?}");
+                }
+                ipc_types::Response::SubmitJsHash { res: () }
             },
             _ => unreachable!(),
         }

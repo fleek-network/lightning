@@ -4,6 +4,7 @@ use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore_server::BlockstoreServer;
 use lightning_broadcast::Broadcast;
 use lightning_consensus::consensus::Consensus;
+use lightning_dack_aggregator::DeliveryAcknowledgmentAggregator;
 use lightning_fetcher::fetcher::Fetcher;
 use lightning_forwarder::Forwarder;
 use lightning_handshake::handshake::Handshake;
@@ -48,7 +49,7 @@ partial!(FinalTypes require full {
     PoolInterface = PoolProvider<Self>;
     PingerInterface = Pinger<Self>;
     IndexerInterface = Indexer<Self>;
-    DeliveryAcknowledgmentAggregatorInterface = lightning_interfaces::_hacks::Blanket;
+    DeliveryAcknowledgmentAggregatorInterface = DeliveryAcknowledgmentAggregator<Self>;
 });
 
 partial!(UseMockConsensus require full {
@@ -75,5 +76,5 @@ partial!(UseMockConsensus require full {
     PoolInterface = PoolProvider<Self>;
     PingerInterface = Pinger<Self>;
     IndexerInterface = Indexer<Self>;
-    DeliveryAcknowledgmentAggregatorInterface = lightning_interfaces::_hacks::Blanket;
+    DeliveryAcknowledgmentAggregatorInterface = DeliveryAcknowledgmentAggregator<Self>;
 });

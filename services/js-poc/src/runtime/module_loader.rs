@@ -110,6 +110,8 @@ impl ModuleLoader for FleekModuleLoader {
             )));
         }
 
+        let is_top_level_module = maybe_referrer.is_none();
+
         let module_type = match requested_module_type {
             RequestedModuleType::None => ModuleType::JavaScript,
             RequestedModuleType::Json => ModuleType::Json,
@@ -147,6 +149,11 @@ impl ModuleLoader for FleekModuleLoader {
                         bail!("Failed to fetch {module_specifier}")
                     }
 
+                    if is_top_level_module {
+                        // Submit the hash of the executed js
+                        fn_sdk::api::submit_js_hash(1, hash).await;
+                    }
+
                     let handle = ContentHandle::load(&hash).await?;
                     let source = handle.read_to_end().await?.into_boxed_slice();
 
@@ -172,6 +179,11 @@ impl ModuleLoader for FleekModuleLoader {
                         .with_context(|| {
                             format!("Failed to fetch {module_specifier} from origin")
                         })?;
+
+                    if is_top_level_module {
+                        // Submit the hash of the executed js
+                        fn_sdk::api::submit_js_hash(1, hash).await;
+                    }
 
                     let handle = ContentHandle::load(&hash).await?;
                     let bytes = handle.read_to_end().await?;
@@ -203,6 +215,11 @@ impl ModuleLoader for FleekModuleLoader {
                     )
                     .await
                     .with_context(|| format!("Failed to fetch {module_specifier} from origin"))?;
+
+                    if is_top_level_module {
+                        // Submit the hash of the executed js
+                        fn_sdk::api::submit_js_hash(1, hash).await;
+                    }
 
                     let handle = ContentHandle::load(&hash).await?;
                     let bytes = handle.read_to_end().await?;

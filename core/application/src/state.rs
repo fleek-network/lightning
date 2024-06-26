@@ -123,6 +123,7 @@ pub struct State<B: Backend> {
     pub uptime: B::Ref<NodeIndex, u8>,
     pub uri_to_node: B::Ref<Blake3Hash, BTreeSet<NodeIndex>>,
     pub node_to_uri: B::Ref<NodeIndex, BTreeSet<Blake3Hash>>,
+    pub js_hash_count: B::Ref<Blake3Hash, u32>,
     pub backend: B,
 }
 
@@ -151,6 +152,7 @@ impl<B: Backend> State<B> {
             uptime: backend.get_table_reference("uptime"),
             uri_to_node: backend.get_table_reference("uri_to_node"),
             node_to_uri: backend.get_table_reference("node_to_uri"),
+            js_hash_count: backend.get_table_reference("js_hash_count"),
             backend,
         }
     }
@@ -182,7 +184,8 @@ impl<B: Backend> State<B> {
                 service_id,
                 proofs,
                 metadata: _,
-            } => self.submit_pod(txn.payload.sender, commodity, service_id, proofs),
+                hashes,
+            } => self.submit_pod(txn.payload.sender, commodity, service_id, proofs, hashes),
 
             UpdateMethod::Withdraw {
                 amount,
@@ -368,6 +371,7 @@ impl<B: Backend> State<B> {
         commodity: u128,
         service_id: u32,
         _acknowledgments: Vec<DeliveryAcknowledgmentProof>,
+        hashes: Vec<Blake3Hash>,
     ) -> TransactionResponse {
         // Todo: function not done
         let sender: NodeIndex = match self.only_node(sender) {
@@ -385,6 +389,11 @@ impl<B: Backend> State<B> {
         // Todo: build proof based on delivery acks
         if !self.verify_proof_of_delivery(&account_owner, &sender, &commodity, &service_id, ()) {
             return TransactionResponse::Revert(ExecutionError::InvalidProof);
+        }
+
+        for hash in &hashes {
+            let count = self.js_hash_count.get(hash).unwrap_or(0);
+            self.js_hash_count.set(*hash, count.saturating_add(1));
         }
 
         let commodity_type = self

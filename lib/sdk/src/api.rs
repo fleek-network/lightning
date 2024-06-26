@@ -48,3 +48,12 @@ pub async fn fetch_blake3(hash: [u8; 32]) -> bool {
         _ => unreachable!(),
     }
 }
+
+pub async fn submit_js_hash(service_id: u32, hash: [u8; 32]) {
+    let req = Request::SubmitJsHash { hash, service_id };
+    let res = send_and_await_response(req).await;
+    match res {
+        crate::ipc_types::Response::SubmitJsHash { res: _ } => (),
+        _ => unreachable!(),
+    }
+}
