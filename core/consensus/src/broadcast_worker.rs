@@ -293,7 +293,6 @@ async fn handle_parcel<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Em
         // will always be `Some`. Unfortunately, the borrow checker cannot
         // figure this out on its own if we use `msg` directly here.
 
-        // TODO(matthias): panic here or only log the error?
         ctx.execution
             .store_pending_parcel(parcel, originator, Some(msg_digest), event.unwrap())
     } else {

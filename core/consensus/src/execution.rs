@@ -204,8 +204,6 @@ impl<T: BroadcastEventInterface<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
         self.event_tx.set(tx).unwrap();
     }
 
-    // These methods are only used for non-validators
-
     pub fn store_parcel(
         &self,
         parcel: AuthenticStampedParcel,
@@ -406,7 +404,6 @@ impl<T: BroadcastEventInterface<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
     }
 
     pub fn get_parcel_timeout(&self) -> Duration {
-        // TODO(matthias): estimate time between parcel executions
         let data = self.parcel_timeout_data.read().unwrap();
         let mut timeout = 4 * data.deviation_tbe + data.estimated_tbe;
         timeout = timeout.max(MIN_TBE);
