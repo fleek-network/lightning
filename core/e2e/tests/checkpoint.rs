@@ -3,7 +3,8 @@ use std::time::{Duration, SystemTime};
 
 use anyhow::Result;
 use lightning_e2e::swarm::Swarm;
-use lightning_rpc::{Fleek, RpcClient};
+use lightning_rpc::interface::Fleek;
+use lightning_rpc::RpcClient;
 use lightning_test_utils::config::LIGHTNING_TEST_HOME_DIR;
 use lightning_test_utils::logging;
 use resolved_pathbuf::ResolvedPathBuf;

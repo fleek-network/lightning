@@ -6,7 +6,7 @@ use fleek_blake3 as blake3;
 use lightning_e2e::swarm::Swarm;
 use lightning_interfaces::prelude::*;
 use lightning_rpc::api::RpcClient;
-use lightning_rpc::Fleek;
+use lightning_rpc::interface::Fleek;
 use lightning_test_utils::config::LIGHTNING_TEST_HOME_DIR;
 use lightning_test_utils::logging;
 use resolved_pathbuf::ResolvedPathBuf;

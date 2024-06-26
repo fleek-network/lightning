@@ -21,6 +21,7 @@ use lightning_interfaces::types::{
     UpdateRequest,
 };
 use lightning_rpc::api::RpcClient;
+use lightning_rpc::interface::Fleek;
 use lightning_utils::config::TomlConfigProvider;
 use resolved_pathbuf::ResolvedPathBuf;
 
@@ -272,11 +273,9 @@ pub async fn send_txn(update_request: UpdateRequest, nodes: &[NodeInfo]) -> Resu
 
     let client = RpcClient::new_no_auth(&rpc_address)?;
 
-    Ok(
-        lightning_rpc::Fleek::send_txn(&client, update_request.into())
-            .await
-            .map(|_| ())?,
-    )
+    Ok(Fleek::send_txn(&client, update_request.into())
+        .await
+        .map(|_| ())?)
 }
 
 pub async fn get_node_info_from_genesis_commitee(
@@ -294,9 +293,7 @@ pub async fn get_node_info_from_genesis_commitee(
                 .ok()?;
 
             Some((
-                lightning_rpc::Fleek::get_node_info_epoch(&client, public_key)
-                    .await
-                    .ok()?,
+                Fleek::get_node_info_epoch(&client, public_key).await.ok()?,
                 address,
             ))
         };
@@ -329,10 +326,7 @@ pub async fn get_epoch_info_from_genesis_commitee(
                 })
                 .ok()?;
 
-            Some((
-                lightning_rpc::Fleek::get_epoch_info(&client).await.ok()?,
-                address,
-            ))
+            Some((Fleek::get_epoch_info(&client).await.ok()?, address))
         };
         futs.push(fut);
     }

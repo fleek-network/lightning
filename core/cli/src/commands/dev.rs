@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use lightning_interfaces::prelude::*;
-use lightning_rpc::api::AdminApiClient;
+use lightning_rpc::interface::Admin;
 use lightning_utils::config::TomlConfigProvider;
 use resolved_pathbuf::ResolvedPathBuf;
 
@@ -42,7 +42,7 @@ where
 
     for path in &input {
         if let Some(path) = path.to_str() {
-            let response = AdminApiClient::store(&client, path.to_string()).await?;
+            let response = Admin::store(&client, path.to_string()).await?;
 
             println!("{:x}\t{path:?}", ByteBuf(&response));
         } else {

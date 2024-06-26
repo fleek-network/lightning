@@ -5,7 +5,8 @@ use fleek_crypto::NodePublicKey;
 use futures::stream::FuturesOrdered;
 use futures::StreamExt;
 use lightning_interfaces::types::{Epoch, EpochInfo, NodeIndex, NodeInfo};
-use lightning_rpc::{Fleek, RpcClient};
+use lightning_rpc::interface::Fleek;
+use lightning_rpc::RpcClient;
 use tokio::runtime::Handle;
 
 /// Runs the given future to completion on the current tokio runtime.

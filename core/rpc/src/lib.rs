@@ -25,13 +25,16 @@ pub use crate::logic::{EthApi, FleekApi, NetApi};
 pub mod client;
 
 pub mod api;
-pub use api::{
-    make_plain_rpc_client,
-    AdminApiClient as Admin,
-    EthApiClient as Eth,
-    FleekApiClient as Fleek,
-    NetApiClient as Net,
-};
+pub mod interface {
+    pub use super::api::{
+        make_plain_rpc_client,
+        AdminApiClient as Admin,
+        EthApiClient as Eth,
+        FleekApiClient as Fleek,
+        NetApiClient as Net,
+    };
+}
+
 pub use client::{HmacClient, RpcClient};
 
 pub type JsonRpcClient =

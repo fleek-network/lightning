@@ -23,6 +23,7 @@ pub fn make_plain_rpc_client(address: &str) -> anyhow::Result<HttpClient<HttpBac
         .context(format!("Trying to build rpc client for {address}"))
 }
 
+/// An HTTP JSON RPC client compatible with [`jsonrpsee`] derived servers
 pub enum RpcClient {
     WithHmac(HmacClient),
     Http(HttpClient<HttpBackend>),

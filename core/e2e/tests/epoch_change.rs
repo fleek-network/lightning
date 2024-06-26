@@ -7,7 +7,8 @@ use fleek_crypto::NodePublicKey;
 use hp_fixed::unsigned::HpUfixed;
 use lightning_e2e::swarm::{Swarm, SwarmNode};
 use lightning_interfaces::types::Staking;
-use lightning_rpc::{Fleek, RpcClient};
+use lightning_rpc::interface::Fleek;
+use lightning_rpc::RpcClient;
 use lightning_test_utils::config::LIGHTNING_TEST_HOME_DIR;
 use lightning_test_utils::logging;
 use resolved_pathbuf::ResolvedPathBuf;
@@ -241,7 +242,7 @@ async fn e2e_test_staking_auction() -> Result<()> {
     // Wait for epoch to change.
     tokio::time::sleep(Duration::from_secs(30)).await;
 
-    let client = RpcClient::new_no_auth(&rpc_endpoint.1)?;
+    let client = RpcClient::new_no_auth(rpc_endpoint.1)?;
     let response = client.get_committee_members(None).await?;
     let current_committee: BTreeSet<NodePublicKey> = response.into_iter().collect();
 
@@ -249,12 +250,8 @@ async fn e2e_test_staking_auction() -> Result<()> {
         .iter()
         .for_each(|node| println!("{:?}", node));
 
-    let rep_one = client
-        .get_reputation(low_stake_nodes[0].clone(), None)
-        .await?;
-    let rep_two = client
-        .get_reputation(low_stake_nodes[1].clone(), None)
-        .await?;
+    let rep_one = client.get_reputation(*low_stake_nodes[0], None).await?;
+    let rep_two = client.get_reputation(*low_stake_nodes[1], None).await?;
 
     // Make sure the lower reputation node lost the tiebreaker and is not on the active node list
     if rep_one <= rep_two {
@@ -288,7 +285,7 @@ async fn compare_committee(
         if &rpc_addresses[0].1 == address {
             continue;
         }
-        let client = RpcClient::new_no_auth(&address).unwrap();
+        let client = RpcClient::new_no_auth(address).unwrap();
 
         let committee: BTreeSet<_> = client
             .get_committee_members(None)
