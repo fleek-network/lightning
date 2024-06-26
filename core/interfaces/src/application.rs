@@ -223,6 +223,12 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
 
     /// Returns the node's content registry.
     fn get_content_registry(&self, node_index: &NodeIndex) -> Option<BTreeSet<Blake3Hash>>;
+
+    /// Returns the hashes of the executed js functions together with the counts.
+    fn get_js_hashes(&self) -> Vec<(Blake3Hash, u32)>;
+
+    /// Returns the total number of executed js functions.
+    fn get_js_hashes_count(&self) -> u128;
 }
 
 #[derive(Clone, Debug)]

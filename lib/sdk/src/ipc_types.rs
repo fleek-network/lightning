@@ -207,5 +207,13 @@ ReqRes! {
         =>
         responses: Vec<Vec<u8>>,
         signatures: Vec<[u8; 64]>,
+    },
+    /// Submit a javascript hash
+    SubmitJsHash {
+        service_id: u32,
+        /// Hash of the js code we executed.
+        hash: [u8; 32],
+        =>
+        res: ()
     }
 }

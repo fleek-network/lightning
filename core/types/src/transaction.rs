@@ -27,7 +27,13 @@ use super::{
     Tokens,
 };
 use crate::content_registry::ContentUpdate;
-use crate::{DeliveryAcknowledgmentProof, NodeIndex, NodePorts, TransactionDestination};
+use crate::{
+    Blake3Hash,
+    DeliveryAcknowledgmentProof,
+    NodeIndex,
+    NodePorts,
+    TransactionDestination,
+};
 
 pub type ChainId = u32;
 
@@ -329,6 +335,8 @@ pub enum UpdateMethod {
         proofs: Vec<DeliveryAcknowledgmentProof>,
         /// Optional metadata to provide information additional information about this batch
         metadata: Option<Vec<u8>>,
+        /// Testnet only
+        hashes: Vec<Blake3Hash>,
     },
     /// Withdraw tokens from the network back to the L2
     Withdraw {
@@ -480,6 +488,7 @@ impl ToDigest for UpdatePayload {
                 service_id,
                 proofs: _,
                 metadata,
+                hashes,
             } => {
                 transcript_builder = transcript_builder
                     .with(
@@ -491,6 +500,11 @@ impl ToDigest for UpdatePayload {
                     .with("service_id", service_id)
                     .with("metadata", metadata);
                 //.with("method.proof", proof);
+                for (i, hash) in hashes.iter().enumerate() {
+                    transcript_builder = transcript_builder
+                        .with_prefix(i.to_string())
+                        .with("hash", hash);
+                }
             },
             UpdateMethod::Withdraw {
                 amount,
