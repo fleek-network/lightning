@@ -3,12 +3,10 @@ use std::time::{Duration, SystemTime};
 
 use anyhow::Result;
 use lightning_e2e::swarm::Swarm;
-use lightning_e2e::utils::rpc;
-use lightning_interfaces::types::Epoch;
+use lightning_rpc::{Fleek, RpcClient};
 use lightning_test_utils::config::LIGHTNING_TEST_HOME_DIR;
 use lightning_test_utils::logging;
 use resolved_pathbuf::ResolvedPathBuf;
-use serde_json::json;
 use serial_test::serial;
 
 #[tokio::test]
@@ -39,38 +37,18 @@ async fn e2e_checkpoint() -> Result<()> {
     // Wait for the epoch to change.
     tokio::time::sleep(Duration::from_secs(35)).await;
 
-    let request = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_epoch",
-        "params":[],
-        "id":1,
-    });
     for (_, address) in swarm.get_rpc_addresses() {
-        let response = rpc::rpc_request(address, request.to_string())
-            .await
-            .unwrap();
+        let client = RpcClient::new_no_auth(&address)?;
+        let epoch = client.get_epoch().await?;
 
-        let epoch = rpc::parse_response::<u64>(response)
-            .await
-            .expect("Failed to parse response.");
         assert_eq!(epoch, 1);
     }
 
-    let request = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_last_epoch_hash",
-        "params":[],
-        "id":1,
-    });
     let mut target_hash = None;
     for (_, address) in swarm.get_rpc_addresses() {
-        let response = rpc::rpc_request(address, request.to_string())
-            .await
-            .unwrap();
+        let client = RpcClient::new_no_auth(&address)?;
+        let (epoch_hash, _) = client.get_last_epoch_hash().await?;
 
-        let (epoch_hash, _) = rpc::parse_response::<([u8; 32], Epoch)>(response)
-            .await
-            .expect("Failed to parse response.");
         if target_hash.is_none() {
             target_hash = Some(epoch_hash);
             // Make sure that we stored an epoch hash.

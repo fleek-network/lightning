@@ -38,7 +38,7 @@ where
     // by default loads or creates if hmac_secret_path.is_none() the secret from ~/.lightning
     let url = format!("http://127.0.0.1:{}/admin", port);
     let secret = lightning_rpc::load_hmac_secret(hmac_secret_path)?;
-    let client = lightning_rpc::clients::RpcClient::new(&url, Some(&secret)).await?;
+    let client = lightning_rpc::RpcClient::new(&url, Some(&secret)).await?;
 
     for path in &input {
         if let Some(path) = path.to_str() {

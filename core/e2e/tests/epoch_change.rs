@@ -6,12 +6,11 @@ use anyhow::Result;
 use fleek_crypto::NodePublicKey;
 use hp_fixed::unsigned::HpUfixed;
 use lightning_e2e::swarm::{Swarm, SwarmNode};
-use lightning_e2e::utils::rpc;
 use lightning_interfaces::types::Staking;
+use lightning_rpc::{Fleek, RpcClient};
 use lightning_test_utils::config::LIGHTNING_TEST_HOME_DIR;
 use lightning_test_utils::logging;
 use resolved_pathbuf::ResolvedPathBuf;
-use serde_json::json;
 use serial_test::serial;
 
 #[tokio::test]
@@ -43,20 +42,10 @@ async fn e2e_epoch_change_all_nodes_on_committee() -> Result<()> {
     // Wait a bit for the nodes to start.
     tokio::time::sleep(Duration::from_secs(5)).await;
 
-    let request = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_epoch",
-        "params":[],
-        "id":1,
-    });
     for (_, address) in swarm.get_rpc_addresses() {
-        let response = rpc::rpc_request(address, request.to_string())
-            .await
-            .unwrap();
+        let client = RpcClient::new_no_auth(&address)?;
 
-        let epoch = rpc::parse_response::<u64>(response)
-            .await
-            .expect("Failed to parse response.");
+        let epoch = client.get_epoch().await?;
         assert_eq!(epoch, 0);
     }
 
@@ -64,20 +53,10 @@ async fn e2e_epoch_change_all_nodes_on_committee() -> Result<()> {
     // To give some time for the epoch change, we will wait another 30 seconds here.
     tokio::time::sleep(Duration::from_secs(30)).await;
 
-    let request = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_epoch",
-        "params":[],
-        "id":1,
-    });
     for (_, address) in swarm.get_rpc_addresses() {
-        let response = rpc::rpc_request(address, request.to_string())
-            .await
-            .unwrap();
+        let client = RpcClient::new_no_auth(&address)?;
 
-        let epoch = rpc::parse_response::<u64>(response)
-            .await
-            .expect("Failed to parse response.");
+        let epoch = client.get_epoch().await?;
         assert_eq!(epoch, 1);
     }
 
@@ -115,20 +94,10 @@ async fn e2e_epoch_change_with_edge_node() -> Result<()> {
     // Wait a bit for the nodes to start.
     tokio::time::sleep(Duration::from_secs(5)).await;
 
-    let request = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_epoch",
-        "params":[],
-        "id":1,
-    });
     for (_, address) in swarm.get_rpc_addresses() {
-        let response = rpc::rpc_request(address, request.to_string())
-            .await
-            .unwrap();
+        let client = RpcClient::new_no_auth(&address)?;
+        let epoch = client.get_epoch().await?;
 
-        let epoch = rpc::parse_response::<u64>(response)
-            .await
-            .expect("Failed to parse response.");
         assert_eq!(epoch, 0);
     }
 
@@ -136,20 +105,10 @@ async fn e2e_epoch_change_with_edge_node() -> Result<()> {
     // To give some time for the epoch change, we will wait another 30 seconds here.
     tokio::time::sleep(Duration::from_secs(30)).await;
 
-    let request = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_epoch",
-        "params":[],
-        "id":1,
-    });
     for (_key, address) in swarm.get_rpc_addresses() {
-        let response = rpc::rpc_request(address, request.to_string())
-            .await
-            .unwrap();
+        let client = RpcClient::new_no_auth(&address)?;
 
-        let epoch = rpc::parse_response::<u64>(response)
-            .await
-            .expect("Failed to parse response.");
+        let epoch = client.get_epoch().await?;
         assert_eq!(epoch, 1);
     }
 
@@ -282,59 +241,23 @@ async fn e2e_test_staking_auction() -> Result<()> {
     // Wait for epoch to change.
     tokio::time::sleep(Duration::from_secs(30)).await;
 
-    // Get the new committee after the epoch change
-    let committee_member_request = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_committee_members",
-        "params":[],
-        "id":1,
-    });
-
-    let response = rpc::rpc_request(rpc_endpoint.1.clone(), committee_member_request.to_string())
-        .await
-        .unwrap();
-
-    let current_committee: BTreeSet<NodePublicKey> =
-        rpc::parse_response::<Vec<NodePublicKey>>(response)
-            .await
-            .expect("Failed to parse response.")
-            .into_iter()
-            .collect();
+    let client = RpcClient::new_no_auth(&rpc_endpoint.1)?;
+    let response = client.get_committee_members(None).await?;
+    let current_committee: BTreeSet<NodePublicKey> = response.into_iter().collect();
 
     current_committee
         .iter()
         .for_each(|node| println!("{:?}", node));
 
-    // Figure out the rep of our low staked nodes so we know which one shouldnt be on the committee
-    let rep_request_one = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_reputation",
-        "params":[low_stake_nodes[0].clone()],
-        "id":1,
-    });
-    let rep_request_two = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_reputation",
-        "params":[low_stake_nodes[1].clone()],
-        "id":1,
-    });
-
-    let response_one = rpc::rpc_request(rpc_endpoint.1.clone(), rep_request_one.to_string())
-        .await
-        .unwrap();
-    let response_two = rpc::rpc_request(rpc_endpoint.1.clone(), rep_request_two.to_string())
-        .await
-        .unwrap();
-
-    let rep_one: Option<u8> = rpc::parse_response::<Option<u8>>(response_one)
-        .await
-        .expect("Failed to parse response.");
-    let rep_two: Option<u8> = rpc::parse_response::<Option<u8>>(response_two)
-        .await
-        .expect("Failed to parse response.");
+    let rep_one = client
+        .get_reputation(low_stake_nodes[0].clone(), None)
+        .await?;
+    let rep_two = client
+        .get_reputation(low_stake_nodes[1].clone(), None)
+        .await?;
 
     // Make sure the lower reputation node lost the tiebreaker and is not on the active node list
-    if rep_one.unwrap() <= rep_two.unwrap() {
+    if rep_one <= rep_two {
         assert!(!current_committee.contains(low_stake_nodes[0]));
     } else {
         assert!(!current_committee.contains(low_stake_nodes[1]));
@@ -348,24 +271,15 @@ async fn compare_committee(
     rpc_addresses: HashMap<NodePublicKey, String>,
     committee_size: usize,
 ) -> BTreeSet<NodePublicKey> {
-    let request = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_committee_members",
-        "params":[],
-        "id":1,
-    });
-
     let rpc_addresses: Vec<(NodePublicKey, String)> = rpc_addresses.into_iter().collect();
 
-    let response = rpc::rpc_request(rpc_addresses[0].1.clone(), request.to_string())
+    let client = RpcClient::new_no_auth(&rpc_addresses[0].1).unwrap();
+    let target_committee: BTreeSet<_> = client
+        .get_committee_members(None)
         .await
-        .unwrap();
-    let target_committee: BTreeSet<NodePublicKey> =
-        rpc::parse_response::<Vec<NodePublicKey>>(response)
-            .await
-            .expect("Failed to parse response.")
-            .into_iter()
-            .collect();
+        .unwrap()
+        .into_iter()
+        .collect();
 
     // Make sure that the committee size equals the configured size.
     assert_eq!(target_committee.len(), committee_size);
@@ -374,15 +288,14 @@ async fn compare_committee(
         if &rpc_addresses[0].1 == address {
             continue;
         }
-        let response = rpc::rpc_request(address.clone(), request.to_string())
+        let client = RpcClient::new_no_auth(&address).unwrap();
+
+        let committee: BTreeSet<_> = client
+            .get_committee_members(None)
             .await
-            .unwrap();
-        let committee: BTreeSet<NodePublicKey> =
-            rpc::parse_response::<Vec<NodePublicKey>>(response)
-                .await
-                .expect("Failed to parse response.")
-                .into_iter()
-                .collect();
+            .unwrap()
+            .into_iter()
+            .collect();
 
         // Make sure all nodes have the same committee
         assert_eq!(target_committee, committee);

@@ -273,7 +273,7 @@ pub async fn send_txn(update_request: UpdateRequest, nodes: &[NodeInfo]) -> Resu
     let client = RpcClient::new_no_auth(&rpc_address)?;
 
     Ok(
-        lightning_rpc::clients::FleekRpcClient::send_txn(&client, update_request.into())
+        lightning_rpc::Fleek::send_txn(&client, update_request.into())
             .await
             .map(|_| ())?,
     )
@@ -294,7 +294,7 @@ pub async fn get_node_info_from_genesis_commitee(
                 .ok()?;
 
             Some((
-                lightning_rpc::clients::FleekRpcClient::get_node_info_epoch(&client, public_key)
+                lightning_rpc::Fleek::get_node_info_epoch(&client, public_key)
                     .await
                     .ok()?,
                 address,
@@ -330,9 +330,7 @@ pub async fn get_epoch_info_from_genesis_commitee(
                 .ok()?;
 
             Some((
-                lightning_rpc::clients::FleekRpcClient::get_epoch_info(&client)
-                    .await
-                    .ok()?,
+                lightning_rpc::Fleek::get_epoch_info(&client).await.ok()?,
                 address,
             ))
         };

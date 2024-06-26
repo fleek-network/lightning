@@ -22,21 +22,20 @@ use crate::error::RPCError;
 use crate::logic::AdminApi;
 pub use crate::logic::{EthApi, FleekApi, NetApi};
 
-pub mod api;
-pub mod clients {
-    pub use super::api::{
-        make_plain_rpc_client,
-        AdminApiClient as AdminRpcClient,
-        EthApiClient as EthRpcClient,
-        FleekApiClient as FleekRpcClient,
-        HmacClient as HmacRpcClient,
-        NetApiClient as NetRpcClient,
-        RpcClient,
-    };
+pub mod client;
 
-    pub type JsonRpcClient =
-        jsonrpsee::http_client::HttpClient<jsonrpsee::http_client::transport::HttpBackend>;
-}
+pub mod api;
+pub use api::{
+    make_plain_rpc_client,
+    AdminApiClient as Admin,
+    EthApiClient as Eth,
+    FleekApiClient as Fleek,
+    NetApiClient as Net,
+};
+pub use client::{HmacClient, RpcClient};
+
+pub type JsonRpcClient =
+    jsonrpsee::http_client::HttpClient<jsonrpsee::http_client::transport::HttpBackend>;
 
 pub mod api_types;
 pub mod config;

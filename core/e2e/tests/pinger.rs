@@ -3,12 +3,12 @@ use std::time::{Duration, SystemTime};
 
 use anyhow::Result;
 use lightning_e2e::swarm::Swarm;
-use lightning_e2e::utils::rpc;
-use lightning_interfaces::types::{NodeInfo, Participation};
+use lightning_interfaces::types::Participation;
+use lightning_rpc::api::RpcClient;
+use lightning_rpc::Fleek;
 use lightning_test_utils::config::LIGHTNING_TEST_HOME_DIR;
 use lightning_test_utils::logging;
 use resolved_pathbuf::ResolvedPathBuf;
-use serde_json::json;
 use serial_test::serial;
 
 #[tokio::test]
@@ -40,21 +40,10 @@ async fn e2e_detect_offline_node() -> Result<()> {
     // Wait for the epoch to change.
     tokio::time::sleep(Duration::from_secs(30)).await;
 
-    // Make sure that all genesis nodes changed epoch.
-    let request = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_epoch",
-        "params":[],
-        "id":1,
-    });
     for (_, address) in swarm.get_genesis_committee_rpc_addresses() {
-        let response = rpc::rpc_request(address, request.to_string())
-            .await
-            .unwrap();
+        let client = RpcClient::new_no_auth(&address)?;
+        let epoch = client.get_epoch().await?;
 
-        let epoch = rpc::parse_response::<u64>(response)
-            .await
-            .expect("Failed to parse response.");
         assert_eq!(epoch, 1);
     }
 
@@ -66,21 +55,13 @@ async fn e2e_detect_offline_node() -> Result<()> {
         .unwrap();
 
     // Make sure that the offline node was removed from participation.
-    let request = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_node_info",
-        "params": {"public_key": pubkey},
-        "id":1,
-    });
     for (_, address) in swarm.get_genesis_committee_rpc_addresses() {
-        let response = rpc::rpc_request(address, request.to_string())
-            .await
-            .unwrap();
+        let client = RpcClient::new_no_auth(&address)?;
+        let node_info = client
+            .get_node_info(pubkey, None)
+            .await?
+            .expect("No node info recieved from rpc");
 
-        let node_info = rpc::parse_response::<Option<NodeInfo>>(response)
-            .await
-            .expect("Failed to parse response.")
-            .unwrap();
         assert_eq!(node_info.participation, Participation::False);
     }
 

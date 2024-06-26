@@ -4,12 +4,12 @@ use std::time::{Duration, SystemTime};
 use anyhow::Result;
 use fleek_blake3 as blake3;
 use lightning_e2e::swarm::Swarm;
-use lightning_e2e::utils::rpc;
 use lightning_interfaces::prelude::*;
+use lightning_rpc::api::RpcClient;
+use lightning_rpc::Fleek;
 use lightning_test_utils::config::LIGHTNING_TEST_HOME_DIR;
 use lightning_test_utils::logging;
 use resolved_pathbuf::ResolvedPathBuf;
-use serde_json::json;
 use serial_test::serial;
 
 #[tokio::test]
@@ -43,21 +43,10 @@ async fn e2e_syncronize_state() -> Result<()> {
     // Wait for the epoch to change.
     tokio::time::sleep(Duration::from_secs(20)).await;
 
-    // Make sure that all genesis nodes changed epoch.
-    let request = json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_epoch",
-        "params":[],
-        "id":1,
-    });
     for (_, address) in swarm.get_genesis_committee_rpc_addresses() {
-        let response = rpc::rpc_request(address, request.to_string())
-            .await
-            .unwrap();
+        let client = RpcClient::new_no_auth(&address)?;
+        let epoch = client.get_epoch().await?;
 
-        let epoch = rpc::parse_response::<u64>(response)
-            .await
-            .expect("Failed to parse response.");
         assert_eq!(epoch, 1);
     }
 
