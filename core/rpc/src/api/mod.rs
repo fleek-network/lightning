@@ -14,7 +14,7 @@ pub use flk::{FleekApiClient, FleekApiOpenRpc, FleekApiServer};
 use futures::Stream;
 use hyper::header::CONTENT_TYPE;
 use hyper::Body;
-use jsonrpsee::core::client::{BatchResponse, ClientT};
+use jsonrpsee::core::client::{BatchResponse, ClientT, Subscription, SubscriptionClientT};
 use jsonrpsee::core::params::BatchRequestBuilder;
 use jsonrpsee::core::traits::ToRpcParams;
 use jsonrpsee::http_client::transport::HttpBackend;
@@ -25,6 +25,38 @@ use serde::de::DeserializeOwned;
 use tower::ServiceBuilder;
 
 use crate::server::{LIGHTINING_HMAC_HEADER, LIGHTINING_NONCE_HEADER, LIGHTINING_TIMESTAMP_HEADER};
+
+pub fn make_plain_rpc_client(address: &str) -> anyhow::Result<HttpClient<HttpBackend>> {
+    HttpClient::<HttpBackend>::builder()
+        .build(address)
+        .context(format!("Trying to build rpc client for {address}"))
+}
+
+pub enum RpcClient {
+    WithHmac(HmacClient),
+    Http(HttpClient<HttpBackend>),
+}
+
+impl RpcClient {
+    pub async fn new(address: &str, key: Option<&[u8; 32]>) -> anyhow::Result<Self> {
+        match key {
+            Some(key) => {
+                if !address.ends_with("/admin") {
+                    return Err(anyhow::anyhow!(
+                        "HMAC is only supported for /admin endpoints"
+                    ));
+                }
+
+                Ok(Self::WithHmac(HmacClient::new(address, key).await?))
+            },
+            None => Ok(Self::Http(make_plain_rpc_client(address)?)),
+        }
+    }
+
+    pub fn new_no_auth(address: &str) -> anyhow::Result<Self> {
+        Ok(Self::Http(make_plain_rpc_client(address)?))
+    }
+}
 
 pub struct HmacClient {
     client: HttpClient<HmacMiddleware<HttpBackend>>,
@@ -68,12 +100,6 @@ impl HmacClient {
         self.nonce.store(nonce, Ordering::Relaxed);
         Ok(())
     }
-}
-
-pub fn rpc_client(address: &str) -> anyhow::Result<HttpClient<HttpBackend>> {
-    HttpClient::<HttpBackend>::builder()
-        .build(address)
-        .context(format!("Trying to build rpc client for {address}"))
 }
 
 async fn get_nonce(client: &reqwest::Client, address: &str) -> anyhow::Result<u32> {
@@ -197,6 +223,64 @@ where
 }
 
 #[async_trait::async_trait]
+impl ClientT for RpcClient
+where
+    HttpClient<HmacMiddleware<HttpBackend>>: ClientT,
+{
+    /// Send a [notification request](https://www.jsonrpc.org/specification#notification)
+    async fn notification<Params>(
+        &self,
+        method: &str,
+        params: Params,
+    ) -> Result<(), jsonrpsee::core::client::Error>
+    where
+        Params: ToRpcParams + Send,
+    {
+        match self {
+            Self::Http(client) => client.notification(method, params).await,
+            Self::WithHmac(client) => client.notification(method, params).await,
+        }
+    }
+
+    /// Send a [method call request](https://www.jsonrpc.org/specification#request_object).
+    async fn request<R, Params>(
+        &self,
+        method: &str,
+        params: Params,
+    ) -> Result<R, jsonrpsee::core::client::Error>
+    where
+        R: DeserializeOwned,
+        Params: ToRpcParams + Send,
+    {
+        match self {
+            Self::Http(client) => client.request(method, params).await,
+            Self::WithHmac(client) => client.request(method, params).await,
+        }
+    }
+
+    /// Send a [batch request](https://www.jsonrpc.org/specification#batch).
+    ///
+    /// The response to batch are returned in the same order as it was inserted in the batch.
+    ///
+    ///
+    /// Returns `Ok` if all requests in the batch were answered.
+    /// Returns `Error` if the network failed or any of the responses could be parsed a valid
+    /// JSON-RPC response.
+    async fn batch_request<'a, R>(
+        &self,
+        batch: BatchRequestBuilder<'a>,
+    ) -> Result<BatchResponse<'a, R>, jsonrpsee::core::client::Error>
+    where
+        R: DeserializeOwned + std::fmt::Debug + 'a,
+    {
+        match self {
+            Self::Http(client) => client.batch_request(batch).await,
+            Self::WithHmac(client) => client.batch_request(batch).await,
+        }
+    }
+}
+
+#[async_trait::async_trait]
 impl ClientT for HmacClient
 where
     HttpClient<HmacMiddleware<HttpBackend>>: ClientT,
@@ -242,5 +326,107 @@ where
         R: DeserializeOwned + std::fmt::Debug + 'a,
     {
         self.client.batch_request(batch).await
+    }
+}
+
+#[async_trait::async_trait]
+impl SubscriptionClientT for HmacClient {
+    /// Initiate a subscription by performing a JSON-RPC method call where the server responds with
+    /// a `Subscription ID` that is used to fetch messages on that subscription,
+    ///
+    /// The `subscribe_method` and `params` are used to ask for the subscription towards the
+    /// server.
+    ///
+    /// The params may be used as input for the subscription for the server to process.
+    ///
+    /// The `unsubscribe_method` is used to close the subscription
+    ///
+    /// The `Notif` param is a generic type to receive generic subscriptions, see [`Subscription`]
+    /// for further documentation.
+    async fn subscribe<'a, Notif, Params>(
+        &self,
+        subscribe_method: &'a str,
+        params: Params,
+        unsubscribe_method: &'a str,
+    ) -> Result<Subscription<Notif>, jsonrpsee::core::client::Error>
+    where
+        Params: ToRpcParams + Send,
+        Notif: DeserializeOwned,
+    {
+        self.client
+            .subscribe(subscribe_method, params, unsubscribe_method)
+            .await
+    }
+
+    /// Register a method subscription, this is used to filter only server notifications that a user
+    /// is interested in.
+    ///
+    /// The `Notif` param is a generic type to receive generic subscriptions, see [`Subscription`]
+    /// for further documentation.
+    async fn subscribe_to_method<'a, Notif>(
+        &self,
+        method: &'a str,
+    ) -> Result<Subscription<Notif>, jsonrpsee::core::client::Error>
+    where
+        Notif: DeserializeOwned,
+    {
+        self.client.subscribe_to_method(method).await
+    }
+}
+
+#[async_trait::async_trait]
+impl SubscriptionClientT for RpcClient {
+    /// Initiate a subscription by performing a JSON-RPC method call where the server responds with
+    /// a `Subscription ID` that is used to fetch messages on that subscription,
+    ///
+    /// The `subscribe_method` and `params` are used to ask for the subscription towards the
+    /// server.
+    ///
+    /// The params may be used as input for the subscription for the server to process.
+    ///
+    /// The `unsubscribe_method` is used to close the subscription
+    ///
+    /// The `Notif` param is a generic type to receive generic subscriptions, see [`Subscription`]
+    /// for further documentation.
+    async fn subscribe<'a, Notif, Params>(
+        &self,
+        subscribe_method: &'a str,
+        params: Params,
+        unsubscribe_method: &'a str,
+    ) -> Result<Subscription<Notif>, jsonrpsee::core::client::Error>
+    where
+        Params: ToRpcParams + Send,
+        Notif: DeserializeOwned,
+    {
+        match self {
+            Self::Http(client) => {
+                client
+                    .subscribe(subscribe_method, params, unsubscribe_method)
+                    .await
+            },
+            Self::WithHmac(client) => {
+                client
+                    .subscribe(subscribe_method, params, unsubscribe_method)
+                    .await
+            },
+        }
+    }
+
+    /// Register a method subscription, this is used to filter only server notifications that a user
+    /// is interested in.
+    ///
+    /// The `Notif` param is a generic type to receive generic subscriptions, see [`Subscription`]
+    /// for further documentation.
+    async fn subscribe_to_method<'a, Notif>(
+        &self,
+        method: &'a str,
+    ) -> Result<Subscription<Notif>, jsonrpsee::core::client::Error>
+    where
+        Notif: DeserializeOwned,
+    {
+        match self {
+            Self::Http(client) => client.subscribe_to_method(method).await,
+            Self::WithHmac(client) => client.subscribe_to_method(method).await,
+        }
     }
 }

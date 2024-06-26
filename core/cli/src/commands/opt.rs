@@ -16,16 +16,13 @@ use lightning_interfaces::types::{
     EpochInfo,
     NodeInfo,
     Participation,
-    TransactionRequest,
     UpdateMethod,
     UpdatePayload,
     UpdateRequest,
 };
-use lightning_rpc::utils::rpc_request;
+use lightning_rpc::api::RpcClient;
 use lightning_utils::config::TomlConfigProvider;
 use resolved_pathbuf::ResolvedPathBuf;
-use serde::de::DeserializeOwned;
-use serde_json::json;
 
 use crate::args::OptSubCmd;
 
@@ -48,15 +45,10 @@ async fn opt_in<C: Collection>(config_path: ResolvedPathBuf) -> Result<()> {
 
     let (public_key, secret_key) = load_secret_key::<C>(config).await?;
 
-    let rpc_client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(5))
-        .connect_timeout(Duration::from_secs(5))
-        .build()?;
-
     let genesis_committee = C::ApplicationInterface::get_genesis_committee(&app_config)
         .context("Failed to load genesis committee info.")?;
 
-    let node_info = query_node_info(public_key, &genesis_committee, &rpc_client)
+    let node_info = query_node_info(public_key, &genesis_committee)
         .await
         .context("Failed to get node info from genesis committee")?;
 
@@ -66,7 +58,7 @@ async fn opt_in<C: Collection>(config_path: ResolvedPathBuf) -> Result<()> {
         return Ok(());
     }
 
-    let epoch_end_delta = get_epoch_end_delta(&genesis_committee, &rpc_client)
+    let epoch_end_delta = get_epoch_end_delta(&genesis_committee)
         .await
         .context("Failed to get epoch info from genesis committee")?;
     if epoch_end_delta < Duration::from_secs(300) {
@@ -87,20 +79,14 @@ async fn opt_in<C: Collection>(config_path: ResolvedPathBuf) -> Result<()> {
         chain_id,
     );
 
-    send_txn(tx, &genesis_committee, &rpc_client)
+    send_txn(tx, &genesis_committee)
         .await
         .context("Failed to send transaction to genesis committee")?;
 
     println!("Confirming transaction...");
-    wait_for_participation_status(
-        &genesis_committee,
-        public_key,
-        Participation::OptedIn,
-        10,
-        &rpc_client,
-    )
-    .await
-    .context("Timed out while trying to confirm opt in transaction.")?;
+    wait_for_participation_status(&genesis_committee, public_key, Participation::OptedIn, 10)
+        .await
+        .context("Timed out while trying to confirm opt in transaction.")?;
     println!(
         "Opt in transaction was successful. Your node will be participating once the next epoch starts."
     );
@@ -118,15 +104,10 @@ async fn opt_out<C: Collection>(config_path: ResolvedPathBuf) -> Result<()> {
 
     let (public_key, secret_key) = load_secret_key::<C>(config).await?;
 
-    let rpc_client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(5))
-        .connect_timeout(Duration::from_secs(5))
-        .build()?;
-
     let genesis_committee = C::ApplicationInterface::get_genesis_committee(&app_config)
         .context("Failed to load genesis committee info.")?;
 
-    let node_info = query_node_info(public_key, &genesis_committee, &rpc_client)
+    let node_info = query_node_info(public_key, &genesis_committee)
         .await
         .context("Failed to get node info from genesis committee")?;
     let node_info = node_info.context("Node not found on state.")?;
@@ -147,20 +128,14 @@ async fn opt_out<C: Collection>(config_path: ResolvedPathBuf) -> Result<()> {
         chain_id,
     );
 
-    send_txn(tx, &genesis_committee, &rpc_client)
+    send_txn(tx, &genesis_committee)
         .await
         .context("Failed to send transaction to genesis committee")?;
 
     println!("Confirming transaction...");
-    wait_for_participation_status(
-        &genesis_committee,
-        public_key,
-        Participation::OptedOut,
-        10,
-        &rpc_client,
-    )
-    .await
-    .context("Timed out while trying to confirm opt out transaction.")?;
+    wait_for_participation_status(&genesis_committee, public_key, Participation::OptedOut, 10)
+        .await
+        .context("Timed out while trying to confirm opt out transaction.")?;
     println!(
         "Opt out transaction was successful. Your can shutdown your node after the current epoch ends."
     );
@@ -173,15 +148,10 @@ async fn status<C: Collection>(config_path: ResolvedPathBuf) -> Result<()> {
 
     let (public_key, _secret_key) = load_secret_key::<C>(config).await?;
 
-    let rpc_client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(5))
-        .connect_timeout(Duration::from_secs(5))
-        .build()?;
-
     let genesis_committee = C::ApplicationInterface::get_genesis_committee(&app_config)
         .context("Failed to load genesis committee info.")?;
 
-    let node_info = query_node_info(public_key, &genesis_committee, &rpc_client)
+    let node_info = query_node_info(public_key, &genesis_committee)
         .await
         .context("Failed to get node info from genesis committee")?;
     let node_info = node_info.context("Node not found on state.")?;
@@ -196,7 +166,7 @@ async fn status<C: Collection>(config_path: ResolvedPathBuf) -> Result<()> {
             std::process::exit(210)
         },
         Participation::OptedIn => {
-            let delta = get_epoch_end_delta(&genesis_committee, &rpc_client)
+            let delta = get_epoch_end_delta(&genesis_committee)
                 .await
                 .context("Failed to get epoch info from genesis committee")?;
             // Warning: The following text has a timestamp in the format HH:MM:SS that might be
@@ -208,7 +178,7 @@ async fn status<C: Collection>(config_path: ResolvedPathBuf) -> Result<()> {
             std::process::exit(211)
         },
         Participation::OptedOut => {
-            let delta = get_epoch_end_delta(&genesis_committee, &rpc_client)
+            let delta = get_epoch_end_delta(&genesis_committee)
                 .await
                 .context("Failed to get epoch info from genesis committee")?;
             // Warning: The following text has a timestamp in the format HH:MM:SS that might be
@@ -222,11 +192,8 @@ async fn status<C: Collection>(config_path: ResolvedPathBuf) -> Result<()> {
     }
 }
 
-async fn get_epoch_end_delta(
-    genesis_committee: &[NodeInfo],
-    rpc_client: &reqwest::Client,
-) -> Result<Duration> {
-    let epoch_info = query_epoch_info(genesis_committee, rpc_client)
+async fn get_epoch_end_delta(genesis_committee: &[NodeInfo]) -> Result<Duration> {
+    let epoch_info = query_epoch_info(genesis_committee)
         .await
         .context("Failed to get node info from genesis committee")?;
     let now = SystemTime::now()
@@ -271,10 +238,9 @@ fn create_update_request(
 pub async fn query_node_info(
     public_key: NodePublicKey,
     nodes: &[NodeInfo],
-    rpc_client: &reqwest::Client,
 ) -> Result<Option<NodeInfo>> {
     let mut node_info: Vec<((Option<NodeInfo>, Epoch), String)> =
-        query_genesis_committee(get_node_info(public_key), nodes, rpc_client).await?;
+        get_node_info_from_genesis_commitee(nodes, public_key).await?;
 
     if node_info.is_empty() {
         return Err(anyhow!("Failed to get node info from bootstrap nodes"));
@@ -283,12 +249,9 @@ pub async fn query_node_info(
     Ok(node_info.pop().unwrap().0.0)
 }
 
-pub async fn query_epoch_info(
-    nodes: &[NodeInfo],
-    rpc_client: &reqwest::Client,
-) -> Result<EpochInfo> {
-    let mut epochs: Vec<(EpochInfo, String)> =
-        query_genesis_committee(get_epoch_info(), nodes, rpc_client).await?;
+pub async fn query_epoch_info(nodes: &[NodeInfo]) -> Result<EpochInfo> {
+    let mut epochs: Vec<(EpochInfo, String)> = get_epoch_info_from_genesis_commitee(nodes).await?;
+
     if epochs.is_empty() {
         return Err(anyhow!("Failed to get epoch info from bootstrap nodes"));
     }
@@ -296,13 +259,9 @@ pub async fn query_epoch_info(
     Ok(epochs.pop().unwrap().0)
 }
 
-pub async fn send_txn(
-    update_request: UpdateRequest,
-    nodes: &[NodeInfo],
-    rpc_client: &reqwest::Client,
-) -> Result<()> {
-    let mut epochs: Vec<(EpochInfo, String)> =
-        query_genesis_committee(get_epoch_info(), nodes, rpc_client).await?;
+pub async fn send_txn(update_request: UpdateRequest, nodes: &[NodeInfo]) -> Result<()> {
+    let mut epochs: Vec<(EpochInfo, String)> = get_epoch_info_from_genesis_commitee(nodes).await?;
+
     if epochs.is_empty() {
         return Err(anyhow!("Failed to get epoch info from bootstrap nodes"));
     }
@@ -311,39 +270,79 @@ pub async fn send_txn(
     epochs.sort_by(|(a, _), (b, _)| a.epoch.partial_cmp(&b.epoch).unwrap());
     let rpc_address = epochs.pop().unwrap().1;
 
-    rpc_request::<()>(
-        rpc_client,
-        rpc_address,
-        send_transaction(update_request),
-        None,
+    let client = RpcClient::new_no_auth(&rpc_address)?;
+
+    Ok(
+        lightning_rpc::clients::FleekRpcClient::send_txn(&client, update_request.into())
+            .await
+            .map(|_| ())?,
     )
-    .await
-    .map(|_| ())
 }
 
-pub async fn query_genesis_committee<T: DeserializeOwned>(
-    req: String,
+pub async fn get_node_info_from_genesis_commitee(
     nodes: &[NodeInfo],
-    rpc_client: &reqwest::Client,
-) -> Result<Vec<(T, String)>> {
+    public_key: NodePublicKey,
+) -> Result<Vec<((Option<NodeInfo>, Epoch), String)>> {
     let mut futs = Vec::new();
     for node in nodes {
-        let req_clone = req.clone();
         let fut = async move {
             let address = format!("http://{}:{}/rpc/v0", node.domain, node.ports.rpc);
-            match rpc_request::<T>(rpc_client, address.clone(), req_clone, None).await {
-                Ok(res) => Some((res, address)),
-                Err(_) => None,
-            }
+            let client = RpcClient::new_no_auth(&address)
+                .inspect_err(|e| {
+                    tracing::error!("failed to create client for {} \n {:?}", address.clone(), e)
+                })
+                .ok()?;
+
+            Some((
+                lightning_rpc::clients::FleekRpcClient::get_node_info_epoch(&client, public_key)
+                    .await
+                    .ok()?,
+                address,
+            ))
         };
         futs.push(fut);
     }
 
-    let results: Vec<(T, String)> = futures::future::join_all(futs)
+    let results: Vec<((Option<NodeInfo>, Epoch), String)> = futures::future::join_all(futs)
         .await
         .into_iter()
         .flatten()
-        .map(|(x, address)| (x.result, address))
+        .collect();
+
+    if results.is_empty() {
+        Err(anyhow!("Unable to get a response from nodes"))
+    } else {
+        Ok(results)
+    }
+}
+
+pub async fn get_epoch_info_from_genesis_commitee(
+    nodes: &[NodeInfo],
+) -> Result<Vec<(EpochInfo, String)>> {
+    let mut futs = Vec::new();
+    for node in nodes {
+        let fut = async move {
+            let address = format!("http://{}:{}/rpc/v0", node.domain, node.ports.rpc);
+            let client = RpcClient::new_no_auth(&address)
+                .inspect_err(|e| {
+                    tracing::error!("failed to create client for {} \n {:?}", address.clone(), e)
+                })
+                .ok()?;
+
+            Some((
+                lightning_rpc::clients::FleekRpcClient::get_epoch_info(&client)
+                    .await
+                    .ok()?,
+                address,
+            ))
+        };
+        futs.push(fut);
+    }
+
+    let results: Vec<(EpochInfo, String)> = futures::future::join_all(futs)
+        .await
+        .into_iter()
+        .flatten()
         .collect();
 
     if results.is_empty() {
@@ -358,10 +357,9 @@ async fn wait_for_participation_status(
     public_key: NodePublicKey,
     target_status: Participation,
     max_tries: u32,
-    rpc_client: &reqwest::Client,
 ) -> Result<()> {
     for _ in 0..max_tries {
-        let node_info = query_node_info(public_key, genesis_committee, rpc_client)
+        let node_info = query_node_info(public_key, genesis_committee)
             .await
             .context("Failed to get node info from genesis committee")?;
         let node_info = node_info.context("Node not found on state.")?;
@@ -404,37 +402,4 @@ fn get_timestamp(duration: Duration) -> String {
     let m = (duration.as_secs() / 60) % 60;
     let h = (duration.as_secs() / 60) / 60;
     format!("{:02}:{:02}:{:02}", h, m, s)
-}
-
-fn send_transaction(update_request: UpdateRequest) -> String {
-    json!({
-        "jsonrpc": "2.0",
-        "method":"flk_send_txn",
-        "params": {"tx": TransactionRequest::UpdateRequest(update_request)},
-        "id":1,
-    })
-    .to_string()
-}
-
-fn get_node_info(public_key: NodePublicKey) -> String {
-    json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_node_info_epoch",
-        "params":{
-            "public_key": public_key,
-            "version": 3
-        },
-        "id":1,
-    })
-    .to_string()
-}
-
-fn get_epoch_info() -> String {
-    json!({
-        "jsonrpc": "2.0",
-        "method":"flk_get_epoch_info",
-        "params":[],
-        "id":1,
-    })
-    .to_string()
 }

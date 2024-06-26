@@ -195,7 +195,7 @@ impl<MainModule, AdminModule> RpcService<MainModule, AdminModule> {
                                 ),
                             }
                         },
-                        _ => bad_request("Missing HMAC/Timestamp/Nonce"),
+                        _ => unauthorized("Missing HMAC/Timestamp/Nonce"),
                     }
                 } else {
                     Box::pin(async move {
@@ -241,6 +241,19 @@ fn bad_request(
     Box::pin(async move {
         hyper::Response::builder()
             .status(hyper::StatusCode::BAD_REQUEST)
+            .body(hyper::Body::from(b))
+            .map_err(|e| e.into())
+    })
+}
+
+fn unauthorized(
+    b: impl Into<String>,
+) -> Pin<Box<dyn Future<Output = Result<Response<Body>, BoxedError>> + Send>> {
+    let b = b.into();
+
+    Box::pin(async move {
+        hyper::Response::builder()
+            .status(hyper::StatusCode::UNAUTHORIZED)
             .body(hyper::Body::from(b))
             .map_err(|e| e.into())
     })
@@ -296,7 +309,7 @@ impl From<VerifyHmacError> for hyper::Response<hyper::Body> {
     fn from(value: VerifyHmacError) -> Self {
         let status = match &value {
             VerifyHmacError::LengthMismatch => hyper::StatusCode::BAD_REQUEST,
-            VerifyHmacError::InvalidHmac => hyper::StatusCode::BAD_REQUEST,
+            VerifyHmacError::InvalidHmac => hyper::StatusCode::UNAUTHORIZED,
             VerifyHmacError::TimestampInTheFuture => hyper::StatusCode::BAD_REQUEST,
             VerifyHmacError::InvalidNonce(_, _) => hyper::StatusCode::BAD_REQUEST,
             VerifyHmacError::ParseError(_) => hyper::StatusCode::BAD_REQUEST,
