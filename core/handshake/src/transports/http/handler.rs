@@ -147,6 +147,23 @@ pub async fn handler<P: ExecutorProviderInterface>(
     }
 }
 
+/// To support blinks on solana running in our javascript service wallets will be looking for this
+/// at /actions.json
+pub async fn blink_support() -> Response {
+    Response::builder()
+        .body(Body::from(
+            "{
+        \"rules\": [
+          {
+            \"pathPattern\": \"/services/1/ipfs/**\",
+            \"apiPath\": \"/services/1/ipfs/**\"
+          }
+        ]
+      }",
+        ))
+        .unwrap()
+}
+
 #[inline(always)]
 fn bad_request<T: AsRef<str> + Display>(msg: T) -> (StatusCode, String) {
     (StatusCode::BAD_REQUEST, msg.to_string())
