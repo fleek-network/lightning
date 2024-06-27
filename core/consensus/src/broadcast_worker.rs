@@ -146,7 +146,7 @@ async fn message_receiver_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
             },
             Some((parcel, epoch_changed))
                 = rx_narwhal_batches.recv() => {
-                if !on_committee {
+                if !ctx.on_committee {
                     // This should never happen if it somehow does there is critical error somewhere
                     panic!("We somehow sent ourselves a parcel from narwhal while not on committee");
                 }
