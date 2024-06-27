@@ -10,18 +10,26 @@ enum HeaderFormat {
 
 pub fn parse(value: &serde_json::Value) -> Result<HttpResponse> {
     let body = value_to_string(value.get("body").context("Body is missing")?);
-    let status = parse_status(value)?;
-    let headers = parse_headers(value)?;
+    let status = if let Some(status) = value.get("status") {
+        Some(parse_status(status)?)
+    } else {
+        None
+    };
+
+    let headers = if let Some(headers) = value.get("headers") {
+        Some(parse_headers(headers)?)
+    } else {
+        None
+    };
 
     Ok(HttpResponse {
-        headers: Some(headers),
-        status: Some(status),
+        headers,
+        status,
         body,
     })
 }
 
-fn parse_headers(value: &serde_json::Value) -> Result<Vec<(String, Vec<String>)>> {
-    let headers = value.get("headers").context("Missing headers")?;
+fn parse_headers(headers: &serde_json::Value) -> Result<Vec<(String, Vec<String>)>> {
     if headers.is_null() {
         return Err(anyhow!("Headers cannot be null"));
     }
@@ -145,8 +153,7 @@ fn parse_header(value: &serde_json::Value) -> Result<(String, Vec<String>)> {
     }
 }
 
-fn parse_status(value: &serde_json::Value) -> Result<u16> {
-    let status = value.get("status").context("Status is missing")?;
+fn parse_status(status: &serde_json::Value) -> Result<u16> {
     if status.is_null() {
         return Err(anyhow!("Status cannot be null"));
     }
@@ -154,7 +161,7 @@ fn parse_status(value: &serde_json::Value) -> Result<u16> {
     if let Some(status) = status.as_u64() {
         u16::try_from(status).context("Invalid status code")
     } else {
-        let status = value["status"]
+        let status = status
             .as_str()
             .context("Invalid status code, expected string or integer")?;
         status.parse::<u16>().context("Invalid status code")
@@ -544,5 +551,76 @@ mod tests {
 
         let value = serde_json::from_str::<serde_json::Value>(res).unwrap();
         assert!(parse(&value).is_err());
+    }
+
+    #[test]
+    fn test_key_val_object_no_status() {
+        let res = r###"
+{
+  "headers":{
+    "content-type":"text/html; charset=utf-8",
+    "vary":"RSC"
+  },
+  "body": "hello"
+}
+        "###;
+
+        let target = HttpResponse {
+            status: None,
+            headers: Some(vec![
+                (
+                    "content-type".to_string(),
+                    vec!["text/html; charset=utf-8".to_string()],
+                ),
+                ("vary".to_string(), vec!["RSC".to_string()]),
+            ]),
+            body: "hello".to_string(),
+        };
+
+        let value = serde_json::from_str::<serde_json::Value>(res).unwrap();
+        let http_res = parse(&value).unwrap();
+
+        assert_eq!(http_res, target);
+    }
+
+    #[test]
+    fn test_key_val_object_no_headers() {
+        let res = r###"
+{
+  "status":"200",
+  "body": "hello"
+}
+        "###;
+
+        let target = HttpResponse {
+            status: Some(200),
+            headers: None,
+            body: "hello".to_string(),
+        };
+
+        let value = serde_json::from_str::<serde_json::Value>(res).unwrap();
+        let http_res = parse(&value).unwrap();
+
+        assert_eq!(http_res, target);
+    }
+
+    #[test]
+    fn test_key_val_object_no_headers_no_status() {
+        let res = r###"
+{
+  "body": "hello"
+}
+        "###;
+
+        let target = HttpResponse {
+            status: None,
+            headers: None,
+            body: "hello".to_string(),
+        };
+
+        let value = serde_json::from_str::<serde_json::Value>(res).unwrap();
+        let http_res = parse(&value).unwrap();
+
+        assert_eq!(http_res, target);
     }
 }
