@@ -51,13 +51,20 @@ pub trait Worker: Send + 'static {
         Self: Sized,
     {
         let (tx, rx) = mpsc::channel(64);
+        let fut = run_non_blocking(rx, self);
+
+        #[cfg(not(tokio_unstable))]
+        tokio::spawn(fut);
+
+        #[cfg(tokio_unstable)]
         tokio::task::Builder::new()
             .name(&format!(
                 "{}: non-blocking worker",
                 std::any::type_name::<Self>()
             ))
-            .spawn(run_non_blocking(rx, self))
+            .spawn(fut)
             .expect("failed to spawn worker");
+
         Socket { sender: tx }
     }
 
@@ -94,12 +101,18 @@ pub trait AsyncWorker: Send + 'static {
         Self: Sized,
     {
         let (tx, rx) = mpsc::channel(64);
+        let fut = run_non_blocking_async(rx, self);
+
+        #[cfg(not(tokio_unstable))]
+        tokio::spawn(fut);
+
+        #[cfg(tokio_unstable)]
         tokio::task::Builder::new()
             .name(&format!(
                 "{}: non-blocking async worker",
                 std::any::type_name::<Self>()
             ))
-            .spawn(run_non_blocking_async(rx, self))
+            .spawn(fut)
             .expect("failed to spawn worker");
 
         Socket { sender: tx }
@@ -138,13 +151,20 @@ pub trait AsyncWorkerUnordered: Send + Sync + 'static {
         Self: Sized,
     {
         let (tx, rx) = mpsc::channel(64);
+        let fut = async move { run_unordered_async(rx, &self).await };
+
+        #[cfg(not(tokio_unstable))]
+        tokio::spawn(fut);
+
+        #[cfg(tokio_unstable)]
         tokio::task::Builder::new()
             .name(&format!(
                 "{}: unordered async worker",
                 std::any::type_name::<Self>()
             ))
-            .spawn(async move { run_unordered_async(rx, &self).await })
+            .spawn(fut)
             .expect("failed to spawn worker");
+
         Socket { sender: tx }
     }
 
