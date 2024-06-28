@@ -3,7 +3,7 @@ use std::net::Ipv4Addr;
 use anyhow::{anyhow, bail, Result};
 use crossterm::event::KeyEvent;
 use ipnet::Ipv4Net;
-use lightning_ebpf_service::map::PacketFilterRule;
+use lightning_guard::map::PacketFilterRule;
 use ratatui::prelude::{Constraint, Direction, Layout, Rect};
 use ratatui::widgets::Clear;
 use tokio::sync::mpsc::UnboundedSender;

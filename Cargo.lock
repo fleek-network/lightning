@@ -6031,8 +6031,8 @@ dependencies = [
  "lightning-broadcast",
  "lightning-consensus",
  "lightning-dack-aggregator",
- "lightning-ebpf-service",
  "lightning-final-bindings",
+ "lightning-guard",
  "lightning-handshake",
  "lightning-interfaces",
  "lightning-keystore",
@@ -6185,23 +6185,6 @@ name = "lightning-ebpf-common"
 version = "0.0.0"
 
 [[package]]
-name = "lightning-ebpf-service"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "bytes",
- "lightning-ebpf-common",
- "lightning-utils",
- "log",
- "notify",
- "once_cell",
- "resolved-pathbuf",
- "serde",
- "serde_json",
- "tokio",
-]
-
-[[package]]
 name = "lightning-fetcher"
 version = "0.0.0"
 dependencies = [
@@ -6309,6 +6292,23 @@ dependencies = [
  "tonic 0.8.3",
  "tracing",
  "workspace-hack 0.1.0",
+]
+
+[[package]]
+name = "lightning-guard"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "lightning-ebpf-common",
+ "lightning-utils",
+ "log",
+ "notify",
+ "once_cell",
+ "resolved-pathbuf",
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]
@@ -6964,7 +6964,7 @@ dependencies = [
  "ipnet",
  "json5",
  "lazy_static",
- "lightning-ebpf-service",
+ "lightning-guard",
  "lightning-utils",
  "log",
  "ratatui",

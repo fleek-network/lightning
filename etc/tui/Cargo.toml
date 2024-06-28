@@ -12,7 +12,7 @@ config = "0.14"
 crossterm = { version = "0.27", features = ["serde", "event-stream"] }
 derive_deref = "1.1"
 directories = "5.0"
-lightning-ebpf-service = { path = "../ebpf/service", default-features = false, features = [
+lightning-guard = { path = "../ebpf-apps/guard", default-features = false, features = [
     "client",
 ] }
 futures = "0.3"

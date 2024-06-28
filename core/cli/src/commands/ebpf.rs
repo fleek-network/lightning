@@ -90,7 +90,7 @@ impl Display for GuardMode {
 }
 
 pub fn build_bpf_program(target: Target, release: bool) -> Result<()> {
-    let dir = PathBuf::from("etc/ebpf/ebpf");
+    let dir = PathBuf::from("etc/ebpf-apps/ebpf");
     let target = format!("--target={}", target);
 
     let mut args = vec!["build", target.as_str(), "-Z", "build-std=core"];
@@ -127,7 +127,7 @@ fn build_userspace_application(release: bool) -> Result<()> {
 
     let status = Command::new("cargo")
         .args(&args)
-        .current_dir("etc/ebpf/service")
+        .current_dir("etc/ebpf-apps/guard")
         .status()?;
 
     if !status.success() {
@@ -149,7 +149,7 @@ pub fn run(opts: RunOpts) -> Result<()> {
     build_userspace_application(release)?;
 
     let mode = if release { "release" } else { "debug" };
-    let bin_path = format!("etc/ebpf/service/target/{mode}/control_application");
+    let bin_path = format!("etc/ebpf-apps/guard/target/{mode}/control_application");
 
     let path_config = PATH_CONFIG.get().expect("Static to be initialized");
     let xdp_args = format!("--iface={iface}");

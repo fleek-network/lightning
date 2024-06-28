@@ -3,7 +3,7 @@ use std::path::Path;
 
 use anyhow::{Error, Result};
 use clap::{Args, Subcommand};
-use lightning_ebpf_service::{ConfigSource, PathConfig};
+use lightning_guard::{ConfigSource, PathConfig};
 use lightning_tui::app::App;
 use lightning_utils::config::LIGHTNING_HOME_DIR;
 use once_cell::sync::OnceCell;

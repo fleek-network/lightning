@@ -1,8 +1,8 @@
 pub mod form;
 
 use anyhow::Result;
-use lightning_ebpf_service::map::PacketFilterRule;
-use lightning_ebpf_service::ConfigSource;
+use lightning_guard::map::PacketFilterRule;
+use lightning_guard::ConfigSource;
 use ratatui::prelude::{Color, Constraint, Modifier, Rect, Style, Text};
 use ratatui::widgets::{Cell, Row};
 use tokio::sync::mpsc::UnboundedSender;

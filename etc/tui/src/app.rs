@@ -1,6 +1,6 @@
 use anyhow::Result;
 use crossterm::event::KeyEvent;
-use lightning_ebpf_service::ConfigSource;
+use lightning_guard::ConfigSource;
 use log::debug;
 use ratatui::prelude::{Constraint, Direction, Layout, Rect};
 #[cfg(feature = "logger")]

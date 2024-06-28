@@ -4,7 +4,7 @@ mod view;
 use std::collections::HashSet;
 
 use anyhow::Result;
-use lightning_ebpf_service::{map, ConfigSource};
+use lightning_guard::{map, ConfigSource};
 use ratatui::prelude::Rect;
 use tokio::sync::mpsc::UnboundedSender;
 

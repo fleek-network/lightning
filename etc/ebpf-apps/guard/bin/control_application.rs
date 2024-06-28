@@ -15,9 +15,9 @@ use lightning_ebpf_common::{
     Profile,
     MAX_BUFFER_LEN,
 };
-use lightning_ebpf_service::map::SharedMap;
-use lightning_ebpf_service::server::Server;
-use lightning_ebpf_service::{ConfigSource, PathConfig};
+use lightning_guard::map::SharedMap;
+use lightning_guard::server::Server;
+use lightning_guard::{ConfigSource, PathConfig};
 use tokio::net::UnixListener;
 use tokio::signal;
 
@@ -59,11 +59,11 @@ async fn main() -> anyhow::Result<()> {
 
     #[cfg(debug_assertions)]
     let mut handle = Ebpf::load(include_bytes_aligned!(
-        "../../ebpf/target/bpfel-unknown-none/debug/lightning-ebpf-programs"
+        "../../ebpf/target/bpfel-unknown-none/debug/lightning-ebpf"
     ))?;
     #[cfg(not(debug_assertions))]
     let mut handle = Ebpf::load(include_bytes_aligned!(
-        "../../ebpf/target/bpfel-unknown-none/release/lightning-ebpf-programs"
+        "../../ebpf/target/bpfel-unknown-none/release/lightning-ebpf"
     ))?;
 
     if let Err(e) = EbpfLogger::init(&mut handle) {

@@ -1,5 +1,5 @@
 [package]
-name = "lightning-ebpf-service"
+name = "lightning-guard"
 version = "0.0.0"
 edition = "2021"
 authors = ["M. Meier <miguel@fleek.xyz>"]

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use crossterm::event::KeyEvent;
-use lightning_ebpf_service::map;
-use lightning_ebpf_service::map::FileRule;
+use lightning_guard::map;
+use lightning_guard::map::FileRule;
 use ratatui::prelude::{Constraint, Direction, Layout, Rect};
 use ratatui::widgets::Clear;
 use tokio::sync::mpsc::UnboundedSender;
