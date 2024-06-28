@@ -160,7 +160,10 @@
           # Allow using `nix flake check` to run tests and lints
           checks = {
             # Check formatting
-            fmt = craneLib.cargoFmt { inherit (commonArgs) pname src; };
+            fmt = craneLib.cargoFmt {
+              inherit (commonArgs) pname src;
+              cargoExtraArgs = "--all";
+            };
 
             # Check doc tests
             doc = craneLib.cargoDoc (commonArgs // { inherit cargoArtifacts; });
