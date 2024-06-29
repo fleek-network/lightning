@@ -1,14 +1,13 @@
-# Lightning eBPF
+# Lightning eBPF Applications
 
-## Packages
+## Crates
 
-- `service` - Contains the main control application binary and a client/server library. 
-- `ebpf` - Contains the kernel-space eBPF programs.
+- `guard` - Contains the control application for our eBPF-based security system. 
+- `ebpf` - Contains our eBPF kernel-space programs.
 
 ## Running
 
 You can run the eBPF control application process via the Lightning Node CLI.
-This feature is behind the `ebpf` feature flag.
 
 ## Requirements
 
@@ -36,7 +35,7 @@ configuration by adding `bpf` to `GRUB_CMDLINE_LINUX` in  `/etc/default/grub` as
 
 `GRUB_CMDLINE_LINUX="lsm=ndlock,lockdown,yama,integrity,apparmor,bpf"`
 
-Update your grub then restart your system and check ``/sys/kernel/security/lsm`` again to make sure `bpf` is included.
+Update your grub then restart your system and check eBPF ``/sys/kernel/security/lsm`` again to make sure `bpf` is included.
 
 ## Dependencies
 
