@@ -9,14 +9,12 @@ members = [
     "services/ai/examples/rust/*",
 ]
 exclude = [
-    "etc/global-metrics",
     "lib/cdk",
     "lib/blake3-js",
     "lib/cdk-x-platform-test",
     "etc/ebpf-apps/ebpf",
     "etc/ebpf-apps/common",
     "etc/ebpf-apps/guard",
-    "etc/global-metrics",
     "etc/socket-logger",
     "etc/tui",
 ]
