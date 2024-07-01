@@ -92,7 +92,7 @@ impl<C: Collection> Syncronizer<C> {
     }
 
     fn prelude(our_public_key: NodePublicKey, genesis_committee: &[(NodeIndex, NodeInfo)]) {
-        // Skip prelude if not on the genesis committee.
+        // Skip prelude if node is on the genesis committee.
         if genesis_committee
             .iter()
             .any(|(_, info)| info.public_key == our_public_key)
