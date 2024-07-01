@@ -91,13 +91,13 @@ impl<C: Collection> Syncronizer<C> {
         );
     }
 
-    fn prelude(our_public_key: NodePublicKey, genesis_committee: &Vec<(NodeIndex, NodeInfo)>) {
-        // Check if node is on genesis committee.
-        for (_, node_info) in genesis_committee {
-            if our_public_key == node_info.public_key {
-                // If the node is a member of the genesis committee, we skip the prelude.
-                return;
-            }
+    fn prelude(our_public_key: NodePublicKey, genesis_committee: &[(NodeIndex, NodeInfo)]) {
+        // Skip prelude if not on the genesis committee.
+        if genesis_committee
+            .iter()
+            .any(|(_, info)| info.public_key == our_public_key)
+        {
+            return;
         }
 
         // The rpc calls are using a lot of clones. This is necessary because the futures are
@@ -106,7 +106,7 @@ impl<C: Collection> Syncronizer<C> {
         // Check if node is staked.
         let is_valid = rpc::sync_call(rpc::check_is_valid_node(
             our_public_key,
-            genesis_committee.clone(),
+            genesis_committee.to_vec(),
         ))
         .expect("Cannot reach bootstrap nodes");
         if !is_valid {
@@ -118,12 +118,12 @@ impl<C: Collection> Syncronizer<C> {
         }
         let node_info = rpc::sync_call(rpc::get_node_info(
             our_public_key,
-            genesis_committee.clone(),
+            genesis_committee.to_vec(),
         ))
         .expect("Cannot reach bootstrap nodes")
         .unwrap(); // we unwrap here because we already checked if the node is valid above
 
-        let epoch_info = rpc::sync_call(rpc::get_epoch_info(genesis_committee.clone()))
+        let epoch_info = rpc::sync_call(rpc::get_epoch_info(genesis_committee.to_vec()))
             .expect("Cannot reach bootstrap nodes");
 
         // Check participation status.
@@ -138,7 +138,7 @@ impl<C: Collection> Syncronizer<C> {
             Participation::OptedIn => {
                 rpc::sync_call(utils::wait_to_next_epoch(
                     epoch_info,
-                    genesis_committee.clone(),
+                    genesis_committee.to_vec(),
                 ));
             },
             _ => (),
@@ -237,18 +237,14 @@ impl<C: Collection> SyncronizerInner<C> {
                             .get_node_info::<NodeInfo>(&node_idx, |n| n)
                             .unwrap();
 
-                        if node_info.participation == Participation::False {
-                            let mut is_genesis_committee = false;
-                            for (_, node_info) in &self.genesis_committee {
-                                if self.our_public_key == node_info.public_key {
-                                    // If the node is a member of the genesis committee, we skip the prelude.
-                                    is_genesis_committee = true;
-                                }
-                            }
-                            if !is_genesis_committee {
-                                println!("The node is currently not participating in the network. You either submitted a OptOut transaction, or the node did not respond to enough pings.");
-                                std::process::exit(1);
-                            }
+                        // Exit if a non-genesis node is not participating
+                        if node_info.participation == Participation::False
+                            && !self.genesis_committee
+                                .iter()
+                                .any(|(_, info)| info.public_key == self.our_public_key)
+                        {
+                            println!("The node is currently not participating in the network. You either submitted a OptOut transaction, or the node did not respond to enough pings.");
+                            std::process::exit(1);
                         }
                     }
                 }
