@@ -115,7 +115,7 @@ impl HmacMiddlewareLayer {
     }
 }
 
-impl<S: Clone> tower::Layer<S> for HmacMiddlewareLayer {
+impl<S> tower::Layer<S> for HmacMiddlewareLayer {
     type Service = HmacMiddleware<S>;
 
     fn layer(&self, inner: S) -> Self::Service {
