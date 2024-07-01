@@ -8,4 +8,4 @@
 *.mir linguist-language=Rust
 Cargo.lock linguist-generated=false
 services/js-poc/src/runtime/js/node*.js linguist-vendored
-etc/ebpf/ebpf/src/shim/vmlinux.h linguist-vendored
+etc/ebpf-apps/ebpf/src/shim/vmlinux.h linguist-vendored
