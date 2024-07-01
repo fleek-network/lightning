@@ -228,18 +228,27 @@ impl<C: Collection> SyncronizerInner<C> {
                             std::process::exit(1);
                         }
                         let node_idx = self
-                        .query_runner
-                        .pubkey_to_index(&self.our_public_key)
-                        .unwrap();
+                            .query_runner
+                            .pubkey_to_index(&self.our_public_key)
+                            .unwrap();
 
                         let node_info = self
-                        .query_runner
-                        .get_node_info::<NodeInfo>(&node_idx, |n| n)
-                        .unwrap();
+                            .query_runner
+                            .get_node_info::<NodeInfo>(&node_idx, |n| n)
+                            .unwrap();
 
                         if node_info.participation == Participation::False {
-                            println!("The node is currently not participating in the network. You either submitted a OptOut transaction, or the node did not respond to enough pings.");
-                            std::process::exit(1);
+                            let mut is_genesis_committee = false;
+                            for (_, node_info) in &self.genesis_committee {
+                                if self.our_public_key == node_info.public_key {
+                                    // If the node is a member of the genesis committee, we skip the prelude.
+                                    is_genesis_committee = true;
+                                }
+                            }
+                            if !is_genesis_committee {
+                                println!("The node is currently not participating in the network. You either submitted a OptOut transaction, or the node did not respond to enough pings.");
+                                std::process::exit(1);
+                            }
                         }
                     }
                 }
