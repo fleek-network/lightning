@@ -128,13 +128,13 @@ impl<S: Clone> tower::Layer<S> for HmacMiddlewareLayer {
 }
 
 #[derive(Clone)]
-pub struct HmacMiddleware<S: Clone> {
+pub struct HmacMiddleware<S> {
     nonce: Arc<AtomicU32>,
     key: Arc<[u8; 32]>,
     inner: S,
 }
 
-impl<S: Clone> HmacMiddleware<S> {
+impl<S> HmacMiddleware<S> {
     fn add_hmac_headers(&self, req: hyper::Request<hyper::Body>) -> hyper::Request<hyper::Body> {
         let content_type = req.headers().get(CONTENT_TYPE).cloned();
 
@@ -211,7 +211,6 @@ impl<S: Clone> HmacMiddleware<S> {
 impl<S, Res> tower::Service<hyper::Request<Body>> for HmacMiddleware<S>
 where
     S: tower::Service<hyper::Request<Body>, Response = Res>,
-    S: Clone,
 {
     type Error = S::Error;
     type Response = Res;
