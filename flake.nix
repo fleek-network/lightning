@@ -42,7 +42,7 @@
         let
           pkgs = (import nixpkgs { inherit system; });
           inherit (pkgs) lib;
-          craneLib = crane.lib.${system}.overrideToolchain (
+          craneLib = (crane.mkLib pkgs).overrideToolchain (
             fenix.packages.${system}.fromToolchainFile {
               file = ./rust-toolchain;
               sha256 = "4HfRQx49hyuJ8IjBWSty3OXCLOmeaZF5qZAXW6QiQNI=";
