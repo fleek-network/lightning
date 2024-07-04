@@ -185,7 +185,9 @@
               doInstallCargoArtifacts = false;
 
               buildPhaseCargoCommand = ''
-                dev/hakari-check
+                cargo hakari generate --diff
+                cargo hakari manage-deps --dry-run
+                cargo hakari verify
               '';
 
               nativeBuildInputs = [
