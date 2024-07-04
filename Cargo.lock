@@ -6016,6 +6016,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
+ "atomo",
  "aya",
  "aya-log",
  "clap 4.5.7",

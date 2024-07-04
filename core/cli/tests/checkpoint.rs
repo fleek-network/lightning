@@ -2,6 +2,7 @@ use std::fs::read_to_string;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
+use atomo::storage::StorageBackend;
 use fleek_blake3 as blake3;
 use fleek_crypto::{AccountOwnerSecretKey, ConsensusSecretKey, NodeSecretKey, SecretKey};
 use lightning_application::app::Application;

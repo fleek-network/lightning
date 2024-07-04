@@ -33,6 +33,11 @@ pub trait StorageBackend {
 
     /// Returns true if the table contains the provided key.
     fn contains(&self, tid: u8, key: &[u8]) -> bool;
+
+    /// Serialize the backend to a series of bytes.
+    fn serialize(&self) -> Option<Vec<u8>> {
+        None
+    }
 }
 
 #[derive(Default, Clone)]

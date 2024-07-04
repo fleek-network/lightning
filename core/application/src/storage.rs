@@ -96,15 +96,6 @@ pub enum AtomoStorage {
     RocksDb(RocksBackend),
 }
 
-impl AtomoStorage {
-    pub fn serialize(&self) -> Option<Vec<u8>> {
-        match &self {
-            AtomoStorage::InMemory(_storage) => None,
-            AtomoStorage::RocksDb(storage) => Some(storage.serialize()),
-        }
-    }
-}
-
 impl From<InMemoryStorage> for AtomoStorage {
     fn from(storage: InMemoryStorage) -> Self {
         AtomoStorage::InMemory(storage)
@@ -143,6 +134,13 @@ impl StorageBackend for AtomoStorage {
         match &self {
             AtomoStorage::InMemory(storage) => storage.contains(tid, key),
             AtomoStorage::RocksDb(storage) => storage.contains(tid, key),
+        }
+    }
+
+    fn serialize(&self) -> Option<Vec<u8>> {
+        match &self {
+            AtomoStorage::InMemory(_storage) => None,
+            AtomoStorage::RocksDb(storage) => Some(storage.serialize()),
         }
     }
 }

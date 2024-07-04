@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use affair::AsyncWorker as WorkerTrait;
 use anyhow::{Context, Result};
-use atomo::{Atomo, AtomoBuilder, DefaultSerdeBackend, QueryPerm, UpdatePerm};
+use atomo::{Atomo, AtomoBuilder, DefaultSerdeBackend, QueryPerm, StorageBackend, UpdatePerm};
 use atomo_rocks::{Cache as RocksCache, Env as RocksEnv, Options};
 use fleek_crypto::{ClientPublicKey, ConsensusPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
@@ -44,11 +44,11 @@ use crate::state::State;
 use crate::storage::{AtomoStorage, AtomoStorageBuilder};
 use crate::table::StateTables;
 
-pub struct Env<P> {
-    pub inner: Atomo<P, AtomoStorage>,
+pub struct Env<P, B: StorageBackend> {
+    pub inner: Atomo<P, B>,
 }
 
-impl Env<UpdatePerm> {
+impl Env<UpdatePerm, AtomoStorage> {
     pub fn new(config: &Config, checkpoint: Option<([u8; 32], &[u8])>) -> Result<Self> {
         let storage = match config.storage {
             StorageConfig::RocksDb => {
@@ -131,6 +131,12 @@ impl Env<UpdatePerm> {
         })
     }
 
+    pub fn query_runner(&self) -> QueryRunner {
+        QueryRunner::new(self.inner.query())
+    }
+}
+
+impl<B: StorageBackend> Env<UpdatePerm, B> {
     #[autometrics::autometrics]
     async fn run<F, P>(&mut self, mut block: Block, get_putter: F) -> BlockExecutionResponse
     where
@@ -238,14 +244,10 @@ impl Env<UpdatePerm> {
     }
 
     /// Returns an identical environment but with query permissions
-    pub fn query_socket(&self) -> Env<QueryPerm> {
+    pub fn query_socket(&self) -> Env<QueryPerm, B> {
         Env {
             inner: self.inner.query(),
         }
-    }
-
-    pub fn query_runner(&self) -> QueryRunner {
-        QueryRunner::new(self.inner.query())
     }
 
     /// Tries to seeds the application state with the genesis block
@@ -476,7 +478,7 @@ impl Env<UpdatePerm> {
     }
 }
 
-impl Default for Env<UpdatePerm> {
+impl Default for Env<UpdatePerm, AtomoStorage> {
     fn default() -> Self {
         Self::new(&Config::default(), None).unwrap()
     }
@@ -484,12 +486,12 @@ impl Default for Env<UpdatePerm> {
 
 /// The socket that receives all update transactions
 pub struct UpdateWorker<C: Collection> {
-    env: Env<UpdatePerm>,
+    env: Env<UpdatePerm, AtomoStorage>,
     blockstore: C::BlockstoreInterface,
 }
 
 impl<C: Collection> UpdateWorker<C> {
-    pub fn new(env: Env<UpdatePerm>, blockstore: C::BlockstoreInterface) -> Self {
+    pub fn new(env: Env<UpdatePerm, AtomoStorage>, blockstore: C::BlockstoreInterface) -> Self {
         Self { env, blockstore }
     }
 }
@@ -516,7 +518,7 @@ mod env_tests {
             .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
             .unwrap();
         let config = Config::test(genesis_path);
-        let mut env = Env::new(&config, None).unwrap();
+        let mut env = Env::<_, AtomoStorage>::new(&config, None).unwrap();
 
         assert!(env.apply_genesis_block(&config).unwrap());
 
