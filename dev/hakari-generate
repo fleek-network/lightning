@@ -2,7 +2,8 @@
 set -eou pipefail
 script_dir="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
-"$script_dir"/common/install-nextest.sh
+"$script_dir"/common/install-hakari.sh
 
 set -x
-cargo nextest run "$@"
+cargo hakari generate
+cargo hakari manage-deps

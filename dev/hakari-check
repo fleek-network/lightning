@@ -1,0 +1,16 @@
+#!/bin/bash
+set -eou pipefail
+script_dir="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
+"$script_dir"/common/install-hakari.sh
+
+set -x
+
+# Check that workspace-hack Cargo.toml is up-to-date
+cargo hakari generate --diff || (echo "Run 'cargo hakari generate' to fix" && exit 1)
+
+# Check that all workspace crates depend on workspace-hack
+cargo hakari manage-deps --dry-run || (echo "Run 'cargo hakari manage-deps' to fix" && exit 1)
+
+# Perform verification of the workspace-hack crate
+cargo hakari verify

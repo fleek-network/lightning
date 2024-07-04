@@ -2,6 +2,7 @@
 set -eou pipefail
 
 dev/fmt-check
+dev/hakari-check
 dev/clippy
 dev/build
 dev/test
