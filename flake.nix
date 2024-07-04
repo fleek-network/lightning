@@ -178,6 +178,21 @@
               }
             );
 
+            # Run hakari checks
+            hakari = craneLib.mkCargoDerivation {
+              inherit (commonArgs) pname src;
+              cargoArtifacts = null;
+              doInstallCargoArtifacts = false;
+
+              buildPhaseCargoCommand = ''
+                dev/hakari-check
+              '';
+
+              nativeBuildInputs = [
+                pkgs.cargo-hakari
+              ];
+            };
+
             # Run tests with cargo-nextest
             nextest = craneLib.cargoNextest (
               commonArgs
@@ -249,7 +264,11 @@
             // {
               # Inherit inputs from checks
               checks = self.checks.${system};
-              packages = [ pkgs.rust-analyzer ];
+              packages = [
+                pkgs.rust-analyzer
+                pkgs.cargo-nextest
+                pkgs.cargo-hakari
+              ];
             }
           );
 
