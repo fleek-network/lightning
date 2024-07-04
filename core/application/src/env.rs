@@ -138,7 +138,7 @@ impl Env<UpdatePerm, AtomoStorage> {
 
 impl<B: StorageBackend> Env<UpdatePerm, B> {
     #[autometrics::autometrics]
-    async fn run<F, P>(&mut self, mut block: Block, get_putter: F) -> BlockExecutionResponse
+    pub async fn run<F, P>(&mut self, mut block: Block, get_putter: F) -> BlockExecutionResponse
     where
         F: FnOnce() -> P,
         P: IncrementalPutInterface,
