@@ -4,6 +4,7 @@ builds:
   - checks.x86_64-linux.clippy
   - checks.x86_64-linux.doc
   - checks.x86_64-linux.nextest
+  - checks.x86_64-linux.hakari
   - packages.x86_64-linux.lightning-node-standalone
   - packages.x86_64-linux.lightning-services
   - devShells.x86_64-linux.default
