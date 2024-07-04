@@ -7,7 +7,9 @@ use lightning_ebpf_common::{
     ACCESS_DENIED_EVENT,
     EVENT_HEADER_SIZE,
     FILE_OPEN_PROG_ID,
+    LEARNING_MODE_EVENT,
     MAX_BUFFER_LEN,
+    TASK_FIX_SETUID_PROG_ID,
 };
 use lightning_utils::config::LIGHTNING_HOME_DIR;
 use once_cell::sync::Lazy;
@@ -35,37 +37,56 @@ pub async fn write_events(events: Vec<EventMessage>) -> anyhow::Result<()> {
             .open(EVENT_LOG_FILE_PATH.as_path())
             .await?;
 
-        for event in events {
-            let event_ty = match event[0] {
+        for message in events {
+            let event_ty = match message[0] {
                 ACCESS_DENIED_EVENT => "access-denied",
+                LEARNING_MODE_EVENT => "learning",
                 event_ty => {
                     bail!("invalid event type: {event_ty}");
                 },
             };
-            let prog_ty = match event[1] {
+            let prog_ty = match message[1] {
                 FILE_OPEN_PROG_ID => "file-open",
+                TASK_FIX_SETUID_PROG_ID => "task-fix-setuid",
                 event_ty => {
                     bail!("invalid program type: {event_ty}");
                 },
             };
 
-            let nul_pos = event[EVENT_HEADER_SIZE..EVENT_HEADER_SIZE + MAX_BUFFER_LEN]
+            let nul_pos = message[EVENT_HEADER_SIZE..EVENT_HEADER_SIZE + MAX_BUFFER_LEN]
                 .iter()
                 .position(|c| *c == 0)
                 .ok_or(anyhow!("C string is not NUL terminated"))?;
             let binary = String::from_utf8_lossy(
-                event[EVENT_HEADER_SIZE..EVENT_HEADER_SIZE + nul_pos].as_ref(),
+                message[EVENT_HEADER_SIZE..EVENT_HEADER_SIZE + nul_pos].as_ref(),
             );
 
-            let nul_pos = event[EVENT_HEADER_SIZE + MAX_BUFFER_LEN..]
-                .iter()
-                .position(|c| *c == 0)
-                .ok_or(anyhow!("C string is not NUL terminated"))?;
-            let target = String::from_utf8_lossy(
-                event[EVENT_HEADER_SIZE + MAX_BUFFER_LEN
-                    ..EVENT_HEADER_SIZE + MAX_BUFFER_LEN + nul_pos]
-                    .as_ref(),
-            );
+            let target = match message[1] {
+                FILE_OPEN_PROG_ID => {
+                    let nul_pos = message[EVENT_HEADER_SIZE + MAX_BUFFER_LEN..]
+                        .iter()
+                        .position(|c| *c == 0)
+                        .ok_or(anyhow!("C string is not NUL terminated"))?;
+                    String::from_utf8_lossy(
+                        message[EVENT_HEADER_SIZE + MAX_BUFFER_LEN
+                            ..EVENT_HEADER_SIZE + MAX_BUFFER_LEN + nul_pos]
+                            .as_ref(),
+                    )
+                },
+                TASK_FIX_SETUID_PROG_ID => {
+                    let uid_bytes: &[u8] = message[EVENT_HEADER_SIZE + MAX_BUFFER_LEN
+                        ..EVENT_HEADER_SIZE + MAX_BUFFER_LEN + 4]
+                        .as_ref();
+                    let uid = u32::from_le_bytes(uid_bytes.try_into()?);
+                    let gid_bytes: &[u8] = message[EVENT_HEADER_SIZE + MAX_BUFFER_LEN
+                        ..EVENT_HEADER_SIZE + MAX_BUFFER_LEN + 4]
+                        .as_ref();
+                    let gid = u32::from_le_bytes(gid_bytes.try_into()?);
+
+                    format!("uid={uid},gid={gid}").into()
+                },
+                _ => unreachable!(),
+            };
 
             let timestamp = SystemTime::now()
                 .duration_since(UNIX_EPOCH)

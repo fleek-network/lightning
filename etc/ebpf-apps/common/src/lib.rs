@@ -5,7 +5,9 @@ pub const MAX_FILE_RULES: usize = 20;
 pub const EVENT_HEADER_SIZE: usize = 2;
 pub const MAX_BUFFER_LEN: usize = 1024;
 pub const FILE_OPEN_PROG_ID: u8 = 0;
+pub const TASK_FIX_SETUID_PROG_ID: u8 = 3;
 pub const ACCESS_DENIED_EVENT: u8 = 0;
+pub const LEARNING_MODE_EVENT: u8 = 1;
 pub const EVENT_MESSAGE_LEN: usize = EVENT_HEADER_SIZE + 2 * MAX_BUFFER_LEN;
 
 pub type Buffer = [u8; MAX_BUFFER_LEN];
