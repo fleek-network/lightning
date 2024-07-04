@@ -30,8 +30,8 @@ bytes = { version = "1", features = ["serde"] }
 cbc = { version = "0.1", features = ["std"] }
 chrono = { version = "0.4" }
 cipher = { version = "0.4", default-features = false, features = ["block-padding", "std"] }
-clap = { version = "4", features = ["derive"] }
-clap_builder = { version = "4", default-features = false, features = ["color", "help", "std", "suggestions", "usage"] }
+clap = { version = "4", features = ["derive", "string"] }
+clap_builder = { version = "4", default-features = false, features = ["color", "help", "std", "string", "suggestions", "usage"] }
 concurrent-queue = { version = "2" }
 core2 = { version = "0.4", default-features = false, features = ["alloc"] }
 criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
@@ -57,7 +57,7 @@ futures-task = { version = "0.3", features = ["unstable"] }
 futures-util = { version = "0.3", features = ["bilock", "channel", "io", "sink", "unstable"] }
 generic-array = { version = "0.14", default-features = false, features = ["more_lengths", "serde", "zeroize"] }
 getrandom = { version = "0.2", default-features = false, features = ["std"] }
-hashbrown-582f2526e08bb6a0 = { package = "hashbrown", version = "0.14", default-features = false, features = ["inline-more", "raw"] }
+hashbrown-582f2526e08bb6a0 = { package = "hashbrown", version = "0.14", features = ["raw"] }
 hashbrown-594e8ee84c453af0 = { package = "hashbrown", version = "0.13" }
 hashbrown-5ef9efb8ec2df382 = { package = "hashbrown", version = "0.12", features = ["raw"] }
 hdrhistogram = { version = "7" }
@@ -100,7 +100,7 @@ quote = { version = "1" }
 rand = { version = "0.8", features = ["small_rng"] }
 rand_chacha = { version = "0.3" }
 regex = { version = "1" }
-regex-automata = { version = "0.4", default-features = false, features = ["dfa-onepass", "hybrid", "meta", "nfa-backtrack", "perf-inline", "perf-literal", "unicode"] }
+regex-automata = { version = "0.4", default-features = false, features = ["dfa-onepass", "dfa-search", "hybrid", "meta", "nfa-backtrack", "perf-inline", "perf-literal", "unicode"] }
 regex-syntax = { version = "0.8" }
 reqwest = { version = "0.11", features = ["brotli", "gzip", "json", "rustls-tls", "socks", "stream"] }
 ring-9067fe90e8c1f593 = { package = "ring", version = "0.17", features = ["std"] }
@@ -156,8 +156,8 @@ cbc = { version = "0.1", features = ["std"] }
 cc = { version = "1", default-features = false, features = ["parallel"] }
 chrono = { version = "0.4" }
 cipher = { version = "0.4", default-features = false, features = ["block-padding", "std"] }
-clap = { version = "4", features = ["derive"] }
-clap_builder = { version = "4", default-features = false, features = ["color", "help", "std", "suggestions", "usage"] }
+clap = { version = "4", features = ["derive", "string"] }
+clap_builder = { version = "4", default-features = false, features = ["color", "help", "std", "string", "suggestions", "usage"] }
 concurrent-queue = { version = "2" }
 core2 = { version = "0.4", default-features = false, features = ["alloc"] }
 criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
@@ -183,7 +183,7 @@ futures-task = { version = "0.3", features = ["unstable"] }
 futures-util = { version = "0.3", features = ["bilock", "channel", "io", "sink", "unstable"] }
 generic-array = { version = "0.14", default-features = false, features = ["more_lengths", "serde", "zeroize"] }
 getrandom = { version = "0.2", default-features = false, features = ["std"] }
-hashbrown-582f2526e08bb6a0 = { package = "hashbrown", version = "0.14", default-features = false, features = ["inline-more", "raw"] }
+hashbrown-582f2526e08bb6a0 = { package = "hashbrown", version = "0.14", features = ["raw"] }
 hashbrown-594e8ee84c453af0 = { package = "hashbrown", version = "0.13" }
 hashbrown-5ef9efb8ec2df382 = { package = "hashbrown", version = "0.12", features = ["raw"] }
 hdrhistogram = { version = "7" }
@@ -226,7 +226,7 @@ quote = { version = "1" }
 rand = { version = "0.8", features = ["small_rng"] }
 rand_chacha = { version = "0.3" }
 regex = { version = "1" }
-regex-automata = { version = "0.4", default-features = false, features = ["dfa-onepass", "hybrid", "meta", "nfa-backtrack", "perf-inline", "perf-literal", "unicode"] }
+regex-automata = { version = "0.4", default-features = false, features = ["dfa-onepass", "dfa-search", "hybrid", "meta", "nfa-backtrack", "perf-inline", "perf-literal", "unicode"] }
 regex-syntax = { version = "0.8" }
 reqwest = { version = "0.11", features = ["brotli", "gzip", "json", "rustls-tls", "socks", "stream"] }
 ring-9067fe90e8c1f593 = { package = "ring", version = "0.17", features = ["std"] }
@@ -268,7 +268,6 @@ zeroize = { version = "1", features = ["zeroize_derive"] }
 [target.x86_64-unknown-linux-gnu.dependencies]
 arrayvec = { version = "0.7", default-features = false, features = ["serde"] }
 bitflags = { version = "2", default-features = false, features = ["serde"] }
-hashbrown-582f2526e08bb6a0 = { package = "hashbrown", version = "0.14" }
 indexmap-f595c2ba2a3f28df = { package = "indexmap", version = "2", features = ["serde"] }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
 linux-raw-sys = { version = "0.4", default-features = false, features = ["elf", "errno", "general", "ioctl", "no_std", "std"] }
@@ -283,7 +282,6 @@ web-sys = { version = "0.3", default-features = false, features = ["Worker"] }
 [target.x86_64-unknown-linux-gnu.build-dependencies]
 arrayvec = { version = "0.7", default-features = false, features = ["serde"] }
 bitflags = { version = "2", default-features = false, features = ["serde"] }
-hashbrown-582f2526e08bb6a0 = { package = "hashbrown", version = "0.14" }
 indexmap-f595c2ba2a3f28df = { package = "indexmap", version = "2", features = ["serde"] }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
 linux-raw-sys = { version = "0.4", default-features = false, features = ["elf", "errno", "general", "ioctl", "no_std", "std"] }
@@ -300,7 +298,6 @@ arrayvec = { version = "0.7", default-features = false, features = ["serde"] }
 bitflags = { version = "2", default-features = false, features = ["serde"] }
 core-foundation = { version = "0.9" }
 core-foundation-sys = { version = "0.8" }
-hashbrown-582f2526e08bb6a0 = { package = "hashbrown", version = "0.14" }
 indexmap-f595c2ba2a3f28df = { package = "indexmap", version = "2", features = ["serde"] }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
 libc = { version = "0.2", default-features = false, features = ["extra_traits"] }
@@ -316,7 +313,6 @@ arrayvec = { version = "0.7", default-features = false, features = ["serde"] }
 bitflags = { version = "2", default-features = false, features = ["serde"] }
 core-foundation = { version = "0.9" }
 core-foundation-sys = { version = "0.8" }
-hashbrown-582f2526e08bb6a0 = { package = "hashbrown", version = "0.14" }
 indexmap-f595c2ba2a3f28df = { package = "indexmap", version = "2", features = ["serde"] }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
 libc = { version = "0.2", default-features = false, features = ["extra_traits"] }

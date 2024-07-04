@@ -6,6 +6,7 @@ edition.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }
 tower = "0.4.13"
 tokio.workspace = true
 thiserror.workspace = true

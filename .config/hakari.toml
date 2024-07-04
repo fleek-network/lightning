@@ -23,3 +23,38 @@ platforms = [
 
 # Write out exact versions rather than a semver range. (Defaults to false.)
 # exact-versions = true
+
+# Crates to exclude while traversing the dependency graph.
+[traversal-excludes]
+third-party = [
+    # These crates are in the workspace exclude list. If not excluded here, because they have other
+    # members depending on them, they'll be included in the generated Cargo.toml and result in
+    # cyclic dependencies.
+    { name = "lightning-guard", path = "etc/ebpf-apps/guard" },
+    { name = "lightning-tui", path = "etc/tui" },
+]
+
+# Crates to remove at the end of computation.
+[final-excludes]
+workspace-members = [
+    # These workspace/lib crates intentionally do not depend on workspace-hack.
+    "affair",
+    "atomo",
+    "atomo-rocks",
+    "better-shutdown",
+    "blake3-tree",
+    "blake3-wasm",
+    "cdk-rust",
+    "fast-sri",
+    "fdi",
+    "fleek-crypto",
+    "fleek-ipld",
+    "fn-sdk",
+    "hp-fixed",
+    "ink-quill",
+    "once-ptr",
+    "panic-report",
+    "resolved-pathbuf",
+    "safetensors-ndarray",
+    "simulon",
+]

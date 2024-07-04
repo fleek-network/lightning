@@ -6272,6 +6272,7 @@ dependencies = [
  "tokio",
  "tower",
  "tracing",
+ "workspace-hack 0.1.0",
 ]
 
 [[package]]
