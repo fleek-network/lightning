@@ -18,5 +18,5 @@ serde_json.workspace = true
 reqwest.workspace = true
 resolved-pathbuf.workspace = true
 toml = "0.7"
-workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }
+lightning-workspace-hack.workspace = true
 lazy_static.workspace = true

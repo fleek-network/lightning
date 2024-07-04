@@ -21,4 +21,4 @@ tokio.workspace = true
 rand.workspace = true
 fleek-crypto.workspace = true
 async-channel = "2.2"
-workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }
+lightning-workspace-hack.workspace = true

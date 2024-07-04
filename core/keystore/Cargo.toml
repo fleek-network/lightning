@@ -13,7 +13,7 @@ serde.workspace = true
 tracing.workspace = true
 resolved-pathbuf.workspace = true
 triomphe = "0.1"
-workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }
+lightning-workspace-hack.workspace = true
 
 [dev-dependencies]
 lightning-test-utils = { path = "../test-utils" }

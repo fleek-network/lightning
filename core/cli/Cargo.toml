@@ -38,7 +38,7 @@ panic-report.workspace = true
 once_cell = "1.19"
 os_info = "3.7.0"
 tui-logger = { version = "0.11", optional = true }
-workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }
+lightning-workspace-hack.workspace = true
 
 [dev-dependencies]
 serial_test = "3.0.0"

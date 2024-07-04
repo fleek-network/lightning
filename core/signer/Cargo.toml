@@ -15,7 +15,7 @@ tokio.workspace = true
 fleek-crypto.workspace = true
 affair.workspace = true
 resolved-pathbuf.workspace = true
-workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }
+lightning-workspace-hack.workspace = true
 
 [dev-dependencies]
 lightning-test-utils = { path = "../test-utils" }

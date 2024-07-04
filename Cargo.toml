@@ -25,6 +25,7 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace.dependencies]
+lightning-workspace-hack = "0.1.0"
 anyhow = "1.0"
 async-trait = "0.1"
 autometrics = { version = "0.6.0", features = ["prometheus-exporter"] }
@@ -81,6 +82,13 @@ resolved-pathbuf = { path = "lib/resolved-pathbuf" }
 panic-report = { path = "lib/panic-report" }
 better-shutdown = { path = "lib/better-shutdown" }
 fleek-blake3 = "1.5"
+
+# This ensures that while building within the workspace, the real workspace-hack is used. When
+# building outside of the workspace, such as via a Git or path dependency, the [patch] directive
+# is inactive, and the stub crate from crates.io is used.
+# See https://docs.rs/cargo-hakari/0.9.29/cargo_hakari/patch_directive/index.html
+[patch.crates-io.lightning-workspace-hack]
+path = "etc/workspace-hack"
 
 # Since MystenLabs uses Hakari in the sui repository, and we bring narwhal in from there, this
 # results into all of their dependencies and packages to be listed in their workspace-hack crate.

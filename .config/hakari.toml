@@ -1,7 +1,7 @@
 # This file contains settings for `cargo hakari`.
 # See https://docs.rs/cargo-hakari/latest/cargo_hakari/config for a full list of options.
 
-hakari-package = "workspace-hack"
+hakari-package = "lightning-workspace-hack"
 
 # Format version for hakari's output. Version 4 requires cargo-hakari 0.9.22 or above.
 dep-format-version = "4"
@@ -23,6 +23,9 @@ platforms = [
 
 # Write out exact versions rather than a semver range. (Defaults to false.)
 # exact-versions = true
+
+# Style of workspace-hack lines to output.
+workspace-hack-line-style = "workspace-dotted"
 
 # Crates to exclude while traversing the dependency graph.
 [traversal-excludes]

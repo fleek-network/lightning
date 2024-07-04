@@ -46,7 +46,7 @@ serde_json.workspace = true
 cid.workspace = true
 hex = "0.4"
 url = { version = "2.5.0", features = ["serde"] }
-workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }
+lightning-workspace-hack.workspace = true
 
 [dev-dependencies]
 criterion = { version = "0.5.0", features = ["html_reports", "async_tokio"] }

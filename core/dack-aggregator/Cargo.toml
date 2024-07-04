@@ -17,7 +17,7 @@ affair.workspace = true
 tracing.workspace = true
 resolved-pathbuf.workspace = true
 queue-file = "1.4.10"
-workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }
+lightning-workspace-hack.workspace = true
 
 [dev-dependencies]
 lightning-test-utils = { path = "../test-utils" }

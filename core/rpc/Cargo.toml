@@ -42,7 +42,7 @@ alloy-primitives = "0.5.2"
 resolved-pathbuf = { path = "../../lib/resolved-pathbuf" }
 
 futures.workspace = true
-workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }
+lightning-workspace-hack.workspace = true
 sha2 = "0.10.8"
 hmac = "0.12.1"
 rand.workspace = true

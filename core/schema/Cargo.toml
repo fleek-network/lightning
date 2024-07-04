@@ -14,4 +14,4 @@ lightning-types.workspace = true
 bytes = "1.5"
 arrayref = "0.3"
 flexbuffers = "2.0"
-workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }
+lightning-workspace-hack.workspace = true

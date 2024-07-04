@@ -16,4 +16,4 @@ quote = "1.0.33"
 syn = { version = "1.0.104", features = ["full", "derive", "extra-traits"] }
 unescape = "0.1.0"
 lightning-openrpc = { path = "../rpc-openrpc" }
-workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }
+lightning-workspace-hack.workspace = true

@@ -13,7 +13,7 @@ lightning-origin-http = { path = "../origin-http" }
 serde.workspace = true
 tokio.workspace = true
 tracing.workspace = true
-workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }
+lightning-workspace-hack.workspace = true
 
 [dev-dependencies]
 fleek-crypto.workspace = true

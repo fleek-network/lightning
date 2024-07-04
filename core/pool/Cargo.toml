@@ -36,7 +36,7 @@ thiserror = "1.0"
 webpki = { version = "0.22", features = ["std"] }
 x509-parser = "0.15.1"
 serde_json = "1.0"
-workspace-hack = { version = "0.1", path = "../../etc/workspace-hack" }
+lightning-workspace-hack.workspace = true
 
 [dev-dependencies]
 lightning-test-utils = { path = "../test-utils" }
