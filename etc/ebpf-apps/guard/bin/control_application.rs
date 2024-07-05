@@ -38,9 +38,9 @@ struct Opts {
     /// Bind path.
     #[clap(short, long)]
     bind: PathBuf,
-    /// Enables the Lightning Guard.
+    /// Enables `guard`'s access filters.
     #[clap(short, long, default_value_t = false)]
-    enable_guard: bool,
+    enable_access_filters: bool,
     /// Enable learning mode for the Lightning Guard.
     ///
     /// In learning mode, the filters allow all access and operations,
@@ -80,12 +80,19 @@ async fn main() -> anyhow::Result<()> {
         .context("failed to attach the XDP program")?;
 
     let mut _file_open_prog: Option<&mut Lsm> = None;
-    if opt.enable_guard {
+    let mut _task_fix_setuid: Option<&mut Lsm> = None;
+    if opt.enable_access_filters {
         let prog: &mut Lsm = handle.program_mut("file_open").unwrap().try_into()?;
         let btf = Btf::from_sys_fs()?;
         prog.load("file_open", &btf)?;
         prog.attach()?;
         _file_open_prog = Some(prog);
+
+        let prog: &mut Lsm = handle.program_mut("task_fix_setuid").unwrap().try_into()?;
+        let btf = Btf::from_sys_fs()?;
+        prog.load("task_fix_setuid", &btf)?;
+        prog.attach()?;
+        _task_fix_setuid = Some(prog);
     }
 
     let file_open_allow: HashMap<_, File, Profile> =

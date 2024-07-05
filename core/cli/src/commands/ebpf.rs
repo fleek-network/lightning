@@ -170,7 +170,7 @@ pub fn run(opts: RunOpts) -> Result<()> {
     args.push(&bind);
 
     if let Some(mode) = guard {
-        args.push("--enable-guard");
+        args.push("--enable-access-filters");
         if let GuardMode::Learn = mode {
             args.push("--learning");
         }
