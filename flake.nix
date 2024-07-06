@@ -185,8 +185,8 @@
               doInstallCargoArtifacts = false;
 
               buildPhaseCargoCommand = ''
-                cargo hakari generate --diff
-                cargo hakari manage-deps --dry-run
+                cargo hakari generate --diff || (echo "The workspace-hack is out of date. Run 'cargo hakari generate' and commit the changes." && exit 1)
+                cargo hakari manage-deps --dry-run || (echo "A crate is missing the workspace-hack dependency. Run 'cargo hakari manage-deps' and commit the changes." && exit 1)
                 cargo hakari verify
               '';
 

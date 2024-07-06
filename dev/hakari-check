@@ -7,10 +7,10 @@ script_dir="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 set -x
 
 # Check that workspace-hack Cargo.toml is up-to-date
-cargo hakari generate --diff || (echo "Run 'cargo hakari generate' to fix" && exit 1)
+cargo hakari generate --diff || (echo "The workspace-hack is out of date. Run 'cargo hakari generate' and commit the changes." && exit 1)
 
 # Check that all workspace crates depend on workspace-hack
-cargo hakari manage-deps --dry-run || (echo "Run 'cargo hakari manage-deps' to fix" && exit 1)
+cargo hakari manage-deps --dry-run || (echo "A crate is missing the workspace-hack dependency. Run 'cargo hakari manage-deps' and commit the changes." && exit 1)
 
 # Perform verification of the workspace-hack crate
 cargo hakari verify
