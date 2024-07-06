@@ -136,7 +136,7 @@ impl Runtime {
             // Construct parameters
             let time = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis();
             // TODO: parse directly from u128
-            let time: v8::Local<v8::Value> = v8::BigInt::new_from_u64(scope, time as u64).into();
+            let time: v8::Local<v8::Value> = v8::Number::new(scope, time as f64).into();
             let url = location.to_v8(scope).unwrap();
             let undefined = v8::undefined(scope);
 
