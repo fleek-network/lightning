@@ -42,6 +42,9 @@ import * as response from "ext:deno_fetch/23_response.js";
 import * as fetch from "ext:deno_fetch/26_fetch.js";
 import * as eventSource from "ext:deno_fetch/27_eventsource.js";
 
+import { WebSocket } from "ext:deno_websocket/01_websocket.js";
+import { WebSocketStream } from "ext:deno_websocket/02_websocketstream.js";
+
 import * as crypto from "ext:deno_crypto/00_crypto.js";
 
 import { loadWebGPU } from "ext:deno_webgpu/00_init.js";
@@ -245,6 +248,10 @@ const globalContext = {
   Response: propNonEnumerable(response.Response),
   fetch: propWritable(fetch.fetch),
   EventSource: propWritable(eventSource.EventSource),
+
+  // Websocket apis
+  WebSocket: propNonEnumerable(WebSocket),
+  WebSocketStream: propNonEnumerable(WebSocketStream), // note: marked unstable in deno
 
   // Crypto apis
   crypto: propReadOnly(crypto.crypto),

@@ -5,6 +5,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use ::deno_fetch::{deno_fetch, FetchPermissions, Options};
 use ::deno_net::{deno_net, NetPermissions};
 use ::deno_web::{deno_web, TimersPermission};
+use ::deno_websocket::{deno_websocket, WebSocketPermissions};
 use anyhow::{anyhow, bail, Result};
 use deno_canvas::deno_canvas;
 use deno_console::deno_console;
@@ -35,6 +36,20 @@ pub struct Runtime {
 }
 
 struct Permissions {}
+impl Permissions {
+    fn check_net_url(
+        &mut self,
+        url: &Url,
+        _api_name: &str,
+    ) -> Result<(), deno_core::error::AnyError> {
+        if let Some(host) = url.host_str() {
+            if FETCH_BLACKLIST.contains(&host) {
+                return Err(anyhow!("{host} is blacklisted"));
+            }
+        }
+        Ok(())
+    }
+}
 impl TimersPermission for Permissions {
     fn allow_hrtime(&mut self) -> bool {
         false
@@ -44,22 +59,26 @@ impl FetchPermissions for Permissions {
     fn check_net_url(
         &mut self,
         url: &Url,
-        _api_name: &str,
-    ) -> std::prelude::v1::Result<(), deno_core::error::AnyError> {
-        if let Some(host) = url.host_str() {
-            if FETCH_BLACKLIST.contains(&host) {
-                return Err(anyhow!("{host} is blacklisted"));
-            }
-        }
-        Ok(())
+        api_name: &str,
+    ) -> Result<(), deno_core::error::AnyError> {
+        self.check_net_url(url, api_name)
     }
     fn check_read(
         &mut self,
         _p: &std::path::Path,
         _api_name: &str,
-    ) -> std::prelude::v1::Result<(), deno_core::error::AnyError> {
+    ) -> Result<(), deno_core::error::AnyError> {
         // Disable reading files via fetch
         Err(anyhow!("paths are disabled :("))
+    }
+}
+impl WebSocketPermissions for Permissions {
+    fn check_net_url(
+        &mut self,
+        url: &Url,
+        api_name: &str,
+    ) -> Result<(), deno_core::error::AnyError> {
+        self.check_net_url(url, api_name)
     }
 }
 impl NetPermissions for Permissions {
@@ -67,7 +86,7 @@ impl NetPermissions for Permissions {
         &mut self,
         host: &(T, Option<u16>),
         _api_name: &str,
-    ) -> std::prelude::v1::Result<(), deno_core::error::AnyError> {
+    ) -> Result<(), deno_core::error::AnyError> {
         if FETCH_BLACKLIST.contains(&host.0.as_ref()) {
             Err(anyhow!("{} is blacklisted", host.0.as_ref()))
         } else {
@@ -78,7 +97,7 @@ impl NetPermissions for Permissions {
         &mut self,
         _p: &std::path::Path,
         _api_name: &str,
-    ) -> std::prelude::v1::Result<(), deno_core::error::AnyError> {
+    ) -> Result<(), deno_core::error::AnyError> {
         // Disable reading file descriptors
         Err(anyhow!("paths are disabled :("))
     }
@@ -86,7 +105,7 @@ impl NetPermissions for Permissions {
         &mut self,
         _p: &std::path::Path,
         _api_name: &str,
-    ) -> std::prelude::v1::Result<(), deno_core::error::AnyError> {
+    ) -> Result<(), deno_core::error::AnyError> {
         // Disable writing file descriptors
         Err(anyhow!("paths are disabled :("))
     }
@@ -105,6 +124,7 @@ impl Runtime {
                 deno_web::init_ops::<Permissions>(Arc::new(Default::default()), None),
                 deno_net::init_ops::<Permissions>(None, None),
                 deno_fetch::init_ops::<Permissions>(Options::default()),
+                deno_websocket::init_ops::<Permissions>(Default::default(), None, None),
                 deno_crypto::init_ops(None),
                 deno_webgpu::init_ops(),
                 deno_canvas::init_ops(),

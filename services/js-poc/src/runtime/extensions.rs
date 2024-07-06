@@ -19,6 +19,7 @@ extension!(
         deno_web,
         deno_net,
         deno_fetch,
+        deno_websocket,
         deno_crypto,
         deno_webgpu,
         deno_canvas

@@ -709,6 +709,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "atomic-waker"
+version = "1.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
+
+[[package]]
 name = "atomo"
 version = "0.0.5"
 dependencies = [
@@ -2853,6 +2859,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "deno_websocket"
+version = "0.151.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "490af9a58a13efaee72ea241c3bda791c5c47ae91182e6b3b59612cee3b40ce7"
+dependencies = [
+ "bytes",
+ "deno_core",
+ "deno_net",
+ "deno_tls",
+ "fastwebsockets",
+ "h2 0.4.5",
+ "http 1.0.0",
+ "http-body-util",
+ "hyper 1.1.0",
+ "hyper-util",
+ "once_cell",
+ "rustls-tokio-stream",
+ "serde",
+ "tokio",
+]
+
+[[package]]
 name = "der"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3876,6 +3904,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "fastwebsockets"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f63dd7b57f9b33b1741fa631c9522eb35d43e96dcca4a6a91d5e4ca7c93acdc1"
+dependencies = [
+ "base64 0.21.5",
+ "http-body-util",
+ "hyper 1.1.0",
+ "hyper-util",
+ "pin-project",
+ "rand",
+ "sha1 0.10.6",
+ "simdutf8",
+ "thiserror",
+ "tokio",
+ "utf-8",
+]
+
+[[package]]
 name = "fdeflate"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4063,6 +4110,7 @@ dependencies = [
  "deno_web",
  "deno_webgpu",
  "deno_webidl",
+ "deno_websocket",
  "fleek-crypto",
  "fn-sdk",
  "hex",
@@ -4652,15 +4700,15 @@ dependencies = [
 
 [[package]]
 name = "h2"
-version = "0.4.2"
+version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31d030e59af851932b72ceebadf4a2b5986dba4c3b99dd2493f8273a0f151943"
+checksum = "fa82e28a107a8cc405f0839610bdc9b15f1e25ec7d696aa5cf173edbcb1486ab"
 dependencies = [
+ "atomic-waker",
  "bytes",
  "fnv",
  "futures-core",
  "futures-sink",
- "futures-util",
  "http 1.0.0",
  "indexmap 2.2.6",
  "slab",
@@ -4996,7 +5044,7 @@ dependencies = [
  "bytes",
  "futures-channel",
  "futures-util",
- "h2 0.4.2",
+ "h2 0.4.5",
  "http 1.0.0",
  "http-body 1.0.0",
  "httparse",
@@ -5004,6 +5052,7 @@ dependencies = [
  "itoa",
  "pin-project-lite",
  "tokio",
+ "want",
 ]
 
 [[package]]

@@ -4,6 +4,7 @@ use std::sync::Arc;
 use ::deno_fetch::{deno_fetch, FetchPermissions};
 use ::deno_net::{deno_net, NetPermissions};
 use ::deno_web::{deno_web, TimersPermission};
+use ::deno_websocket::{deno_websocket, WebSocketPermissions};
 use base64::Engine;
 use deno_canvas::deno_canvas;
 use deno_console::deno_console;
@@ -22,6 +23,7 @@ extension!(
         deno_url,
         deno_web,
         deno_fetch,
+        deno_websocket,
         deno_crypto,
         deno_webgpu,
         deno_canvas
@@ -52,6 +54,15 @@ impl FetchPermissions for Permissions {
     fn check_read(
         &mut self,
         _p: &std::path::Path,
+        _api_name: &str,
+    ) -> Result<(), deno_core::error::AnyError> {
+        unreachable!()
+    }
+}
+impl WebSocketPermissions for Permissions {
+    fn check_net_url(
+        &mut self,
+        _url: &deno_core::url::Url,
         _api_name: &str,
     ) -> Result<(), deno_core::error::AnyError> {
         unreachable!()
@@ -107,6 +118,7 @@ fn main() {
         deno_web::init_ops_and_esm::<Permissions>(Arc::new(Default::default()), None),
         deno_net::init_ops_and_esm::<Permissions>(None, None),
         deno_fetch::init_ops_and_esm::<Permissions>(Default::default()),
+        deno_websocket::init_ops_and_esm::<Permissions>(Default::default(), None, None),
         deno_crypto::init_ops_and_esm(None),
         deno_webgpu::init_ops_and_esm(),
         deno_canvas::init_ops_and_esm(),
