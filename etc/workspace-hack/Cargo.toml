@@ -65,7 +65,8 @@ hdrhistogram = { version = "7" }
 hex = { version = "0.4" }
 hkdf = { version = "0.12", default-features = false, features = ["std"] }
 hmac = { version = "0.12", default-features = false, features = ["reset", "std"] }
-hyper = { version = "0.14", features = ["full"] }
+hyper-582f2526e08bb6a0 = { package = "hyper", version = "0.14", features = ["full"] }
+hyper-dff4ba8e3ae991db = { package = "hyper", version = "1", features = ["full"] }
 hyper-rustls = { version = "0.24", features = ["http2"] }
 image = { version = "0.24" }
 indexmap-dff4ba8e3ae991db = { package = "indexmap", version = "1", default-features = false, features = ["serde", "std"] }
@@ -118,6 +119,7 @@ serde_json = { version = "1", features = ["alloc", "float_roundtrip", "preserve_
 sha1 = { version = "0.10", features = ["oid"] }
 sha2 = { version = "0.10", features = ["oid"] }
 sha3 = { version = "0.10" }
+simdutf8 = { version = "0.1", features = ["aarch64_neon"] }
 smallvec = { version = "1", default-features = false, features = ["union"] }
 socket2 = { version = "0.5", default-features = false, features = ["all"] }
 spki = { version = "0.7", default-features = false, features = ["pem", "std"] }
@@ -191,7 +193,8 @@ hdrhistogram = { version = "7" }
 hex = { version = "0.4" }
 hkdf = { version = "0.12", default-features = false, features = ["std"] }
 hmac = { version = "0.12", default-features = false, features = ["reset", "std"] }
-hyper = { version = "0.14", features = ["full"] }
+hyper-582f2526e08bb6a0 = { package = "hyper", version = "0.14", features = ["full"] }
+hyper-dff4ba8e3ae991db = { package = "hyper", version = "1", features = ["full"] }
 hyper-rustls = { version = "0.24", features = ["http2"] }
 image = { version = "0.24" }
 indexmap-dff4ba8e3ae991db = { package = "indexmap", version = "1", default-features = false, features = ["serde", "std"] }
@@ -244,6 +247,7 @@ serde_json = { version = "1", features = ["alloc", "float_roundtrip", "preserve_
 sha1 = { version = "0.10", features = ["oid"] }
 sha2 = { version = "0.10", features = ["oid"] }
 sha3 = { version = "0.10" }
+simdutf8 = { version = "0.1", features = ["aarch64_neon"] }
 smallvec = { version = "1", default-features = false, features = ["union"] }
 socket2 = { version = "0.5", default-features = false, features = ["all"] }
 spki = { version = "0.7", default-features = false, features = ["pem", "std"] }
