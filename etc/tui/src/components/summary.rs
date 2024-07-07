@@ -4,15 +4,13 @@ use ratatui::prelude::{Alignment, Color, Constraint, Layout, Style, Stylize, Tex
 use ratatui::widgets::{Block, BorderType, Borders, Cell, Paragraph, Row};
 use tokio::sync::mpsc::UnboundedSender;
 
-use super::{Component, Frame};
-use crate::action::Action;
+use super::{Component, Draw, Frame};
 use crate::config::Config;
 use crate::widgets::table::Table;
 
 /// Component for displaying summary statistics and event notification.
 #[derive(Default)]
 pub struct Summary {
-    command_tx: Option<UnboundedSender<Action>>,
     process_metrics: Table<ProcessMetrics>,
     network_metrics: Table<NetworkMetrics>,
     config: Config,
@@ -182,17 +180,7 @@ impl Summary {
     }
 }
 
-impl Component for Summary {
-    fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
-        self.command_tx = Some(tx);
-        Ok(())
-    }
-
-    fn register_config_handler(&mut self, config: Config) -> Result<()> {
-        self.config = config;
-        Ok(())
-    }
-
+impl Draw for Summary {
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
         let overview = Paragraph::new("Overview\n")
             .block(

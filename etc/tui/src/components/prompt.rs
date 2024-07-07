@@ -6,19 +6,15 @@ use ratatui::prelude::{Alignment, Color, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Style, Stylize};
 use ratatui::widgets::Paragraph;
 use tokio::sync::mpsc::UnboundedSender;
-
-use super::{Component, Frame};
-use crate::action::Action;
+use super::{Component, Draw, Frame};
 use crate::config::Config;
-use crate::mode::Mode;
 
 const MAX_KEYS_PER_ROW: usize = 8;
 
 /// Component for displaying key bindings and error messages.
 #[derive(Default)]
 pub struct Prompt {
-    command_tx: Option<UnboundedSender<Action>>,
-    current: Vec<(KeySymbol, Action)>,
+    current: Vec<(KeySymbol, String)>,
     message: Option<String>,
     config: Config,
 }
@@ -32,7 +28,7 @@ impl Prompt {
         self.message = Some(message);
     }
 
-    pub fn update_state(&mut self, mode: Mode) {
+    pub fn update_state(&mut self, mode: &'static str) {
         if let Some(keys) = self.config.keybindings.get(&mode) {
             let keys = keys.clone();
             let codes = keys
@@ -42,6 +38,7 @@ impl Prompt {
                     (KeySymbol::from(key[0]), value)
                 })
                 .collect::<Vec<_>>();
+
             self.current = codes;
 
             // Remove an old message.
@@ -50,17 +47,7 @@ impl Prompt {
     }
 }
 
-impl Component for Prompt {
-    fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
-        self.command_tx = Some(tx);
-        Ok(())
-    }
-
-    fn register_config_handler(&mut self, config: Config) -> Result<()> {
-        self.config = config;
-        Ok(())
-    }
-
+impl Draw for Prompt {
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
         let rows = Layout::default()
             .direction(Direction::Vertical)
@@ -104,7 +91,6 @@ impl Component for Prompt {
         Ok(())
     }
 }
-
 #[derive(Debug, Hash, Eq, PartialEq)]
 struct KeySymbol(String);
 

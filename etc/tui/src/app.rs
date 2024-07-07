@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+use std::marker::PhantomData;
+
 use anyhow::Result;
 use crossterm::event::KeyEvent;
 use lightning_guard::ConfigSource;
@@ -9,119 +12,100 @@ use socket_logger::Listener;
 use tokio::net::UnixListener;
 use tokio::sync::mpsc;
 
-use crate::action::Action;
 use crate::components::firewall::form::FirewallForm;
 use crate::components::firewall::FireWall;
 use crate::components::home::Home;
 #[cfg(feature = "logger")]
-use crate::components::logger::Logger;
+// use crate::components::logger::Logger;
 use crate::components::navigator::Navigator;
 use crate::components::profile::Profile;
 use crate::components::prompt::Prompt;
 use crate::components::summary::Summary;
-use crate::components::Component;
+use crate::components::{self, Component};
 use crate::config::Config;
-use crate::mode::Mode;
 use crate::tui;
 use crate::tui::Frame;
 #[cfg(feature = "logger")]
 use crate::utils::SOCKET_LOGGER_FOLDER;
 
+/// A special case of behaviour that the main app can take.
+///
+/// These are typically explicity handled branches of the main loop.
+pub enum GlobalAction {
+    Render,
+    Quit,
+}
+
+pub struct ApplicationContext {
+    navigator: Navigator,
+    prompt: Prompt,
+    summary: Summary,
+}
+
+/// Actions that can by the main app.
+pub enum AppAction {
+    NavLeft,
+    NavRight,
+    Quit,
+}
+
+impl ApplicationContext {
+    pub fn handle_app_action(&mut self, action: AppAction) -> Option<GlobalAction> {
+        match action {
+            AppAction::NavLeft => {
+                self.navigator.nav_left();
+                self.prompt.update_state(self.navigator.active_component());
+                Some(GlobalAction::Render)
+            },
+            AppAction::NavRight => {
+                self.navigator.nav_right();
+                self.prompt.update_state(self.navigator.active_component());
+                Some(GlobalAction::Render)
+            },
+            AppAction::Quit => Some(GlobalAction::Quit),
+        }
+    }
+}
+
 pub struct App {
     pub config: Config,
     pub tick_rate: f64,
     pub frame_rate: f64,
-    pub should_quit: bool,
-    pub should_suspend: bool,
-    pub mode: Mode,
     pub last_tick_key_events: Vec<KeyEvent>,
-    // Components.
-    pub home: Home,
-    pub summary: Summary,
-    pub prompt: Prompt,
-    pub navigator: Navigator,
-    pub firewall: FireWall,
-    pub firewall_form: FirewallForm,
-    pub profiles: Profile,
-    #[cfg(feature = "logger")]
-    pub logger: Logger,
+    pub context: ApplicationContext,
+    pub components:
+        HashMap<&'static str, Box<dyn Component<Context = ApplicationContext>>>,
+    pub config_source: ConfigSource,
 }
 
 impl App {
     pub fn new(tick_rate: f64, frame_rate: f64, src: ConfigSource) -> Result<Self> {
-        let mode = Mode::Home;
-        let home = Home::new();
-        let firewall = FireWall::new(src.clone());
-        let firewall_form = FirewallForm::new();
-        #[cfg(feature = "logger")]
-        let logger = Logger::new();
-        let summary = Summary::new();
-        let prompt = Prompt::new();
-        let navigator = Navigator::new();
-        let profiles = Profile::new(src);
-        let config = Config::new()?;
         Ok(Self {
+            config: Config::default(),
             tick_rate,
             frame_rate,
-            home,
-            #[cfg(feature = "logger")]
-            logger,
-            summary,
-            prompt,
-            navigator,
-            firewall,
-            firewall_form,
-            profiles,
-            should_quit: false,
-            should_suspend: false,
-            config,
-            mode,
             last_tick_key_events: Vec::new(),
+            context: ApplicationContext {
+                navigator: Navigator::new(),
+                prompt: Prompt::new(),
+                summary: Summary::new(),
+            },
+            components: HashMap::new(),
+            config_source: src,
         })
     }
 
-    fn update_components(&mut self, action: Action) -> Result<Option<Action>> {
-        let maybe_action = match self.mode {
-            Mode::Home => self.home.update(action.clone())?,
-            Mode::Firewall => self.firewall.update(action.clone())?,
-            Mode::FirewallEdit => self.firewall.update(action.clone())?,
-            Mode::FirewallForm => self.firewall.form().update(action.clone())?,
-            Mode::Profiles => self.profiles.update(action.clone())?,
-            Mode::ProfilesEdit => self.profiles.update(action.clone())?,
-            Mode::ProfileView => self.profiles.view().update(action.clone())?,
-            Mode::ProfileViewEdit => self.profiles.view().update(action.clone())?,
-            Mode::ProfileForm => self.profiles.form().update(action.clone())?,
-            Mode::ProfileRuleForm => self.profiles.view().rule_form().update(action.clone())?,
-            #[cfg(feature = "logger")]
-            Mode::Logger => self.logger.update(action.clone())?,
-            #[cfg(not(feature = "logger"))]
-            Mode::Logger => None,
-        };
+    fn with_component<C: Component<Context = ApplicationContext>>(
+        &mut self,
+        mut component: C,
+    ) -> &mut Self {
+        component.register_keybindings(&self.config);
 
-        if maybe_action.is_none() {
-            self.navigator.update(action)
-        } else {
-            Ok(maybe_action)
-        }
-    }
+        self.context.navigator.with_tab(component.component_name());
+        self.components
+            .insert(component.component_name(), Box::new(component));
 
-    fn handle_event(&mut self, event: tui::Event) -> Result<Option<Action>> {
-        match self.mode {
-            Mode::Home => self.home.handle_events(Some(event)),
-            Mode::Firewall => self.firewall.handle_events(Some(event)),
-            Mode::FirewallEdit => self.firewall.handle_events(Some(event)),
-            Mode::FirewallForm => self.firewall.form().handle_events(Some(event)),
-            Mode::Profiles => self.profiles.handle_events(Some(event)),
-            Mode::ProfilesEdit => self.profiles.handle_events(Some(event)),
-            Mode::ProfileView => self.profiles.view().handle_events(Some(event)),
-            Mode::ProfileViewEdit => self.profiles.view().handle_events(Some(event)),
-            Mode::ProfileForm => self.profiles.form().handle_events(Some(event)),
-            Mode::ProfileRuleForm => self.profiles.view().rule_form().handle_events(Some(event)),
-            #[cfg(feature = "logger")]
-            Mode::Logger => self.logger.handle_events(Some(event)),
-            #[cfg(not(feature = "logger"))]
-            Mode::Logger => Ok(None),
-        }
+        self
     }
 
     fn draw_components(&mut self, f: &mut Frame<'_>, _area: Rect) -> Result<()> {
@@ -155,37 +139,7 @@ impl App {
             .constraints([Constraint::Percentage(100)])
             .split(navigation_area[0]);
 
-        match self.mode {
-            Mode::Home => {
-                self.home.draw(f, content[0])?;
-            },
-            Mode::Firewall | Mode::FirewallEdit => {
-                self.firewall.draw(f, content[0])?;
-            },
-            Mode::FirewallForm => {
-                self.firewall.form().draw(f, content[0])?;
-            },
-            Mode::Profiles | Mode::ProfilesEdit => {
-                self.profiles.draw(f, content[0])?;
-            },
-            Mode::ProfileView | Mode::ProfileViewEdit => {
-                self.profiles.view().draw(f, content[0])?;
-            },
-            Mode::ProfileForm => {
-                self.profiles.form().draw(f, content[0])?;
-            },
-            Mode::ProfileRuleForm => {
-                self.profiles.view().rule_form().draw(f, content[0])?;
-            },
-            #[cfg(feature = "logger")]
-            Mode::Logger => {
-                self.logger.draw(f, content[0])?;
-            },
-            #[cfg(not(feature = "logger"))]
-            Mode::Logger => {
-                self.home.draw(f, content[0])?;
-            },
-        }
+        self.components[self.context.navigator.active_component()].draw(f, content[0])?;
 
         Ok(())
     }
@@ -193,173 +147,118 @@ impl App {
     pub async fn run(&mut self) -> Result<()> {
         debug!(target: "Main Tui App", "Running!");
 
-        let (action_tx, mut action_rx) = mpsc::unbounded_channel();
-
-        #[cfg(feature = "logger")]
-        {
-            if !SOCKET_LOGGER_FOLDER.as_path().try_exists()? {
-                tokio::fs::create_dir_all(SOCKET_LOGGER_FOLDER.as_path()).await?;
-            }
-
-            let mut bind_path = SOCKET_LOGGER_FOLDER.to_path_buf();
-            bind_path.push("ctrl");
-            let _ = tokio::fs::remove_file(bind_path.as_path()).await;
-            let listener = UnixListener::bind(bind_path)?;
-
-            let action_tx_clone = action_tx.clone();
-            tokio::spawn(async move {
-                if let Err(e) = Listener::new(listener).run().await {
-                    let _ = action_tx_clone.send(Action::Error(e.to_string()));
-                }
-            });
-        }
+        let config_source = self.config_source.clone();
+        let this = self
+            .with_component(components::home::Home::new())
+            .with_component(components::firewall::FireWall::new(config_source.clone()))
+            .with_component(components::profile::Profile::new(config_source.clone()));
 
         let mut tui = tui::Tui::new()?
-            .tick_rate(self.tick_rate)
-            .frame_rate(self.frame_rate);
+            .tick_rate(this.tick_rate)
+            .frame_rate(this.frame_rate);
+
         tui.enter()?;
 
-        self.home.register_action_handler(action_tx.clone())?;
-        self.home.register_config_handler(self.config.clone())?;
-        self.home.init(tui.size()?)?;
-
-        self.summary.register_action_handler(action_tx.clone())?;
-        self.summary.register_config_handler(self.config.clone())?;
-        self.summary.init(tui.size()?)?;
-
-        self.prompt.register_action_handler(action_tx.clone())?;
-        self.prompt.register_config_handler(self.config.clone())?;
-        self.prompt.init(tui.size()?)?;
-        // On start up, state has not been set yet so we do that now.
-        self.prompt.update_state(self.mode);
-
-        self.navigator.register_action_handler(action_tx.clone())?;
-        self.navigator
-            .register_config_handler(self.config.clone())?;
-        self.navigator.init(tui.size()?)?;
-
-        self.firewall.register_action_handler(action_tx.clone())?;
-        self.firewall.register_config_handler(self.config.clone())?;
-        self.firewall.init(tui.size()?)?;
-        self.firewall.read_state_from_storage().await?;
-
-        self.firewall_form
-            .register_action_handler(action_tx.clone())?;
-        self.firewall_form
-            .register_config_handler(self.config.clone())?;
-        self.firewall_form.init(tui.size()?)?;
-
-        self.profiles.register_action_handler(action_tx.clone())?;
-        self.profiles.register_config_handler(self.config.clone())?;
-        self.profiles.init(tui.size()?)?;
-        self.profiles.get_profile_list_from_storage().await?;
+        // draw components for the first time
+        tui.draw(|f| {
+            if let Err(e) = this.draw_components(f, f.size()) {
+                log::error!("Failed to draw: {:?}", e);
+            }
+        })?;
 
         loop {
-            if let Some(e) = tui.next().await {
-                match e {
-                    tui::Event::Quit => action_tx.send(Action::Quit)?,
-                    tui::Event::Tick => action_tx.send(Action::Tick)?,
-                    tui::Event::Render => action_tx.send(Action::Render)?,
-                    tui::Event::Resize(x, y) => action_tx.send(Action::Resize(x, y))?,
+            if let Some(event) = tui.next().await {
+                let maybe_global_action = match event {
+                    tui::Event::Tick => {
+                        this.last_tick_key_events.drain(..);
+                        this.active_component().tick();
+
+                        None
+                    },
+                    tui::Event::Quit => {
+                        break;
+                        // todo!
+                    },
                     tui::Event::Key(key) => {
-                        if let Some(keymap) = self.config.keybindings.get(&self.mode) {
-                            if let Some(action) = keymap.get(&vec![key]) {
-                                log::info!("Got action: {action:?}");
-                                action_tx.send(action.clone())?;
-                            } else {
-                                // If the key was not handled as a single key action,
-                                // then consider it for multi-key combinations.
-                                self.last_tick_key_events.push(key);
+                        let component = this.context.navigator.active_component();
+                        let component = this
+                            .components
+                            .get_mut(component)
+                            .expect("A valid component given by the navigator.");
 
-                                // Check for multi-key combinations
-                                if let Some(action) = keymap.get(&self.last_tick_key_events) {
-                                    log::info!("Got action: {action:?}");
-                                    action_tx.send(action.clone())?;
+                        // possibly use this event as input to some form
+                        component.incoming_event(event);
+
+                        if component.is_known_event(&[key]) {
+                            match component.handle_known_event(&mut this.context, &[key]) {
+                                Ok(action) => action,
+                                Err(e) => {
+                                    log::error!("Failed to handle event: {:?}", e);
+                                    None
+                                },
+                            }
+                        } else {
+                            this.last_tick_key_events.push(key);
+
+                            if component.is_known_event(&this.last_tick_key_events) {
+                                match component.handle_known_event(
+                                    &mut this.context,
+                                    &this.last_tick_key_events,
+                                ) {
+                                    Ok(action) => action,
+                                    Err(e) => {
+                                        log::error!("Failed to handle event: {:?}", e);
+                                        None
+                                    },
                                 }
+                            } else {
+                                None
                             }
-                        };
+                        }
                     },
-                    _ => {},
-                }
-
-                if let Some(action) = self.handle_event(e)? {
-                    action_tx.send(action)?;
-                }
-            }
-
-            while let Ok(action) = action_rx.try_recv() {
-                if action != Action::Tick && action != Action::Render {
-                    log::debug!("{action:?}");
-                }
-                match &action {
-                    Action::Tick => {
-                        self.last_tick_key_events.drain(..);
-                    },
-                    Action::Quit => self.should_quit = true,
-                    Action::Suspend => self.should_suspend = true,
-                    Action::Resume => self.should_suspend = false,
-                    Action::Resize(w, h) => {
-                        tui.resize(Rect::new(0, 0, *w, *h))?;
+                    tui::Event::Resize(w, h) => {
+                        tui.resize(Rect::new(0, 0, w, h))?;
                         tui.draw(|f| {
-                            if let Err(e) = self.draw_components(f, f.size()) {
-                                action_tx
-                                    .send(Action::Error(format!("Failed to draw: {:?}", e)))
-                                    .unwrap();
+                            if let Err(e) = this.draw_components(f, f.size()) {
+                                log::error!("Failed to draw: {:?}", e);
                             }
                         })?;
-                    },
-                    Action::Render => {
-                        tui.draw(|f| {
-                            if let Err(e) = self.draw_components(f, f.size()) {
-                                action_tx
-                                    .send(Action::Error(format!("Failed to draw: {:?}", e)))
-                                    .unwrap();
-                            }
-                        })?;
-                    },
-                    Action::UpdateMode(mode) => {
-                        self.mode = *mode;
-                        self.prompt.update_state(self.mode);
-                        tui.draw(|f| {
-                            if let Err(e) = self.draw_components(f, f.size()) {
-                                action_tx
-                                    .send(Action::Error(format!("Failed to draw: {:?}", e)))
-                                    .unwrap();
-                            }
-                        })?;
-                    },
-                    Action::Error(e) => {
-                        self.prompt.new_message(e.clone());
-                        tui.draw(|f| {
-                            if let Err(e) = self.draw_components(f, f.size()) {
-                                action_tx
-                                    .send(Action::Error(format!("Failed to draw: {:?}", e)))
-                                    .unwrap();
-                            }
-                        })?;
-                    },
-                    _ => {},
-                }
 
-                if let Some(action) = self.update_components(action)? {
-                    action_tx.send(action)?;
-                }
-            }
+                        None
+                    },
+                    tui::Event::Render => {
+                        tui.draw(|f| {
+                            if let Err(e) = this.draw_components(f, f.size()) {
+                                log::error!("Failed to draw: {:?}", e);
+                            }
+                        })?;
 
-            if self.should_suspend {
-                tui.suspend()?;
-                action_tx.send(Action::Resume)?;
-                tui = tui::Tui::new()?
-                    .tick_rate(self.tick_rate)
-                    .frame_rate(self.frame_rate);
-                tui.enter()?;
-            } else if self.should_quit {
-                tui.stop()?;
-                break;
+                        None
+                    },
+                    tui::Event::Mouse(_) => None,
+                    tui::Event::Paste(_) => None,
+                    tui::Event::Init => None,
+                    tui::Event::Error => None,
+                };
+
+                if let Some(global_action) = maybe_global_action {
+                    match global_action {
+                        GlobalAction::Render => {
+                            tui.draw(|f| {
+                                if let Err(e) = this.draw_components(f, f.size()) {
+                                    log::error!("Failed to draw: {:?}", e);
+                                }
+                            })?;
+                        },
+                        GlobalAction::Quit => {
+                            log::warn!("Quitting!");
+                            break;
+                        },
+                    }
+                }
             }
         }
 
-        tui.exit()?;
         Ok(())
     }
 }

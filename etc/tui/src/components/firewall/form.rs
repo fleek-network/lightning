@@ -141,19 +141,8 @@ impl FirewallForm {
 }
 
 impl Component for FirewallForm {
-    fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
-        self.command_tx = Some(tx);
-        Ok(())
-    }
-
-    fn register_config_handler(&mut self, config: Config) -> Result<()> {
-        self.config = config;
-        Ok(())
-    }
-
-    fn handle_key_events(&mut self, key: KeyEvent) -> Result<Option<Action>> {
+    fn incoming_event(&mut self, _event: crate::tui::Event) -> Result<()> {
         self.selected_field().area.input(Input::from(key));
-        Ok(None)
     }
 
     fn update(&mut self, action: Action) -> Result<Option<Action>> {

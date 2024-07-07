@@ -4,17 +4,17 @@ use ratatui::prelude::{Constraint, Layout, Rect};
 use ratatui::widgets::Paragraph;
 use tokio::sync::mpsc::UnboundedSender;
 
-use super::{Component, Frame};
-use crate::action::Action;
-use crate::config::Config;
+use super::{Component, Draw, Frame};
+use crate::app::{AppAction, ApplicationContext};
+use crate::config::{ComponentKeyBindings, Config};
 
 /// Component that displaying the home page.
 #[derive(Default)]
 pub struct Home {
-    command_tx: Option<UnboundedSender<Action>>,
     title: String,
     logo: String,
     config: Config,
+    keybindings: ComponentKeyBindings<AppAction>
 }
 
 impl Home {
@@ -74,25 +74,15 @@ impl Home {
             .join("\n");
 
         Self {
-            command_tx: None,
             logo,
             title,
+            keybindings: Default::default(),
             config: Config::default(),
         }
     }
 }
 
-impl Component for Home {
-    fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
-        self.command_tx = Some(tx);
-        Ok(())
-    }
-
-    fn register_config_handler(&mut self, config: Config) -> Result<()> {
-        self.config = config;
-        Ok(())
-    }
-
+impl Draw for Home {
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
         let vchunks = Layout::vertical([
             Constraint::Percentage(30),
@@ -117,5 +107,36 @@ impl Component for Home {
         f.render_widget(Paragraph::new(self.title.as_str()).centered(), title[1]);
 
         Ok(())
+    }
+}
+
+impl Component for Home {
+    type Context = ApplicationContext;
+
+    fn component_name(&self) -> &'static str {
+        "Home"
+    }
+
+    fn handle_known_event(
+        &mut self,
+        context: &mut Self::Context,
+        event: &[crossterm::event::KeyEvent],
+    ) -> Result<Option<crate::app::GlobalAction>> {
+        if let Some(action) = self.keybindings.get(event) {
+            return Ok(context.handle_app_action(*action))
+        } else {
+            log::error!("Unknown event: {:?}", event);
+            log::error!("This should have been prevalidated before being passed to the component.")
+        }
+
+        Ok(None)
+    }
+
+    fn is_known_event(&self, event: &[crossterm::event::KeyEvent]) -> bool {
+        self.keybindings.get(event).is_some()
+    }
+
+    fn register_keybindings(&mut self, config: &Config) {
+        self.keybindings = crate::config::parse_actions(&config.keybindings[self.component_name()])
     }
 }

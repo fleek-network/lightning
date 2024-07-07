@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -9,8 +10,8 @@ use ratatui::style::{Color, Modifier, Style};
 use serde::de::Deserializer;
 use serde::Deserialize;
 
-use crate::action::Action;
-use crate::mode::Mode;
+
+pub type ComponentKeyBindings<T> = IndexMap<Vec<KeyEvent>, T>;
 
 const CONFIG: &str = include_str!("../.config/config.json5");
 
@@ -65,6 +66,7 @@ impl Config {
 
         let mut cfg: Self = builder.build()?.try_deserialize()?;
 
+        // insert bindings into the config
         for (mode, default_bindings) in default_config.keybindings.iter() {
             let user_bindings = cfg.keybindings.entry(*mode).or_default();
             for (key, cmd) in default_bindings.iter() {
@@ -73,6 +75,8 @@ impl Config {
                     .or_insert_with(|| cmd.clone());
             }
         }
+
+        // insert styles into the config
         for (mode, default_styles) in default_config.styles.iter() {
             let user_styles = cfg.styles.entry(*mode).or_default();
             for (style_key, style) in default_styles.iter() {
@@ -87,14 +91,26 @@ impl Config {
 }
 
 #[derive(Clone, Debug, Default, Deref, DerefMut)]
-pub struct KeyBindings(pub HashMap<Mode, IndexMap<Vec<KeyEvent>, Action>>);
+pub struct KeyBindings(pub HashMap<String, IndexMap<Vec<KeyEvent>, String>>);
+
+pub(crate) fn parse_actions<Action>(
+    actions: &indexmap::IndexMap<Vec<KeyEvent>, String>,
+) -> indexmap::IndexMap<Vec<KeyEvent>, Action> 
+    where 
+        Action: FromStr<Err = anyhow::Error>,
+{
+    actions
+        .iter()
+        .map(|(k, v)| (k.clone(), v.parse().unwrap()))
+        .collect()
+}
 
 impl<'de> Deserialize<'de> for KeyBindings {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        let parsed_map = HashMap::<Mode, IndexMap<String, Action>>::deserialize(deserializer)?;
+        let parsed_map = HashMap::<String, IndexMap<String, String>>::deserialize(deserializer)?;
 
         let keybindings = parsed_map
             .into_iter()
@@ -283,14 +299,14 @@ pub fn parse_key_sequence(raw: &str) -> Result<Vec<KeyEvent>, String> {
 }
 
 #[derive(Clone, Debug, Default, Deref, DerefMut)]
-pub struct Styles(pub HashMap<Mode, HashMap<String, Style>>);
+pub struct Styles(pub HashMap<String, HashMap<String, Style>>);
 
 impl<'de> Deserialize<'de> for Styles {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        let parsed_map = HashMap::<Mode, HashMap<String, String>>::deserialize(deserializer)?;
+        let parsed_map = HashMap::<String, HashMap<String, String>>::deserialize(deserializer)?;
 
         let styles = parsed_map
             .into_iter()

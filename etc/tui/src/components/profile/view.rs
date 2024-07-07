@@ -7,45 +7,51 @@ use ratatui::widgets::{Cell, Row};
 use tokio::sync::mpsc::UnboundedSender;
 use unicode_width::UnicodeWidthStr;
 
-use super::{Component, Frame};
-use crate::action::Action;
-use crate::components::profile::forms::RuleForm;
-use crate::config::Config;
-use crate::mode::Mode;
+use super::{Component, Frame, ProfileContext};
+use crate::app::GlobalAction;
+use crate::components::Draw;
+use crate::config::{ComponentKeyBindings, Config};
 use crate::widgets::table::Table;
 
 const COLUMN_COUNT: usize = 2;
 
 pub struct ProfileView {
-    command_tx: Option<UnboundedSender<Action>>,
     longest_item_per_column: [u16; COLUMN_COUNT],
     table: Table<FileRule>,
-    form: RuleForm,
     profile: Option<Profile>,
     src: ConfigSource,
     config: Config,
+    key_bindings: ComponentKeyBindings<ProfileViewActions>,
+}
+
+pub enum ProfileViewActions {
+    Edit,
+    Add,
+    Remove,
+    Save,
+    Cancel,
+    Back,
+    Up,
+    Down,
+    NavLeft,
+    NavRight,
 }
 
 impl ProfileView {
     pub fn new(src: ConfigSource) -> Self {
         Self {
-            command_tx: None,
             longest_item_per_column: [0; COLUMN_COUNT],
             table: Table::new(),
-            form: RuleForm::new(),
             profile: None,
             src,
             config: Config::default(),
+            key_bindings: Default::default(),
         }
     }
 
     pub fn load_profile(&mut self, profile: Profile) {
         self.table.load_records(profile.file_rules.clone());
         self.profile = Some(profile);
-    }
-
-    pub fn rule_form(&mut self) -> &mut RuleForm {
-        &mut self.form
     }
 
     fn space_between_columns(&self) -> [u16; COLUMN_COUNT] {
@@ -70,6 +76,7 @@ impl ProfileView {
             // Update the profile in view.
             let profile = self.profile.as_mut().expect("Profile to be initialized");
             profile.file_rules.push(rule.clone());
+
             // Update the rule table.
             self.table.add_record(rule);
         }
@@ -86,9 +93,11 @@ impl ProfileView {
             .profile
             .clone()
             .expect("The view should laways have a profile to view");
+
         // Update profile with the new rules.
         profile.file_rules = records;
         let src = self.src.clone();
+
         tokio::spawn(async move {
             if let Err(e) = src.write_profiles(vec![profile]).await {
                 error!("failed to write to list: {e:?}");
@@ -103,62 +112,94 @@ impl ProfileView {
 }
 
 impl Component for ProfileView {
-    fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
-        self.command_tx = Some(tx);
-        Ok(())
+    type Context = ProfileContext;
+
+    fn component_name(&self) -> &'static str {
+        "ProfileView"
     }
 
-    fn register_config_handler(&mut self, config: Config) -> Result<()> {
-        self.config = config;
-        Ok(())
+    fn register_keybindings(&mut self, config: &Config) {
+        // todo: this works becasue the components have no interlapping keybindings by default
+        // todo: refactor this into serperate maps?
+        let edit = crate::config::parse_actions(&config.keybindings["ProfileViewEdit"]);
+        let view = crate::config::parse_actions(&config.keybindings[self.component_name()]);
+
+        self.key_bindings.extend(edit);
+        self.key_bindings.extend(view);
     }
 
-    fn update(&mut self, action: Action) -> Result<Option<Action>> {
-        match action {
-            Action::Edit => Ok(Some(Action::UpdateMode(Mode::ProfileViewEdit))),
-            Action::Add => Ok(Some(Action::UpdateMode(Mode::ProfileRuleForm))),
-            Action::Remove => {
-                self.table.remove_selected_record();
-                Ok(Some(Action::Render))
-            },
-            Action::Save => {
-                self.save();
-                Ok(Some(Action::UpdateMode(Mode::ProfileView)))
-            },
-            Action::Cancel => {
-                self.restore();
-                Ok(Some(Action::UpdateMode(Mode::ProfileView)))
-            },
-            Action::UpdateMode(Mode::ProfileViewEdit) => {
-                self.update_rules_from_input();
-                Ok(None)
-            },
-            Action::Back => {
-                self.clear();
-                Ok(Some(Action::UpdateMode(Mode::Profiles)))
-            },
-            Action::Up => {
-                self.table.scroll_up();
-                Ok(Some(Action::Render))
-            },
-            Action::Down => {
-                self.table.scroll_down();
-                Ok(Some(Action::Render))
-            },
-            Action::NavLeft => {
-                self.clear();
-                Ok(None)
-            },
-            Action::NavRight => {
-                // Todo: update this after making a "wrapping" navigator or the big refactor.
-                #[cfg(feature = "logger")]
-                self.clear();
-                Ok(None)
-            },
-            _ => Ok(None),
+    fn handle_known_event(
+        &mut self,
+        context: &mut Self::Context,
+        event: &[crossterm::event::KeyEvent],
+    ) -> Result<Option<crate::app::GlobalAction>> {
+        if let Some(action) = self.key_bindings.get(event) {
+            match action {
+                ProfileViewActions::Edit => {
+                    context.mounted = super::ProfileSubComponent::ProfileViewEdit.as_str();
+
+                    return Ok(Some(GlobalAction::Render));
+                },
+                ProfileViewActions::Add => {
+                    context.mounted = super::ProfileSubComponent::ProfileForm.as_str();
+
+                    return Ok(Some(GlobalAction::Render));
+                },
+                ProfileViewActions::Remove => {
+                    self.table.remove_selected_record();
+                    return Ok(Some(GlobalAction::Render));
+                },
+                ProfileViewActions::Save => {
+                    self.save();
+                    context.mounted = super::ProfileSubComponent::ProfileView.as_str();
+
+                    return Ok(Some(GlobalAction::Render));
+                },
+                ProfileViewActions::Cancel => {
+                    self.restore();
+                    context.mounted = super::ProfileSubComponent::ProfileView.as_str();
+
+                    return Ok(Some(GlobalAction::Render));
+                },
+                ProfileViewActions::Back => {
+                    self.clear();
+                    context.mounted = super::ProfileSubComponent::Profiles.as_str();
+
+                    return Ok(Some(GlobalAction::Render));
+                },
+                ProfileViewActions::Up => {
+                    self.table.scroll_up();
+                    return Ok(Some(GlobalAction::Render));
+                },
+                ProfileViewActions::Down => {
+                    self.table.scroll_down();
+                    return Ok(Some(GlobalAction::Render));
+                },
+                ProfileViewActions::NavLeft => {
+                    self.clear();
+                    return Ok(None);
+                },
+                ProfileViewActions::NavRight => {
+                    self.clear();
+                },
+            }
+        } else {
+            log::error!("Unknown event: {:?}", event);
         }
+
+        Ok(None)
     }
 
+    fn is_known_event(&self, event: &[crossterm::event::KeyEvent]) -> bool {
+        self.key_bindings.get(event).is_some()
+    }
+}
+
+fn flatten_filter(filter: &FileRule) -> [String; COLUMN_COUNT] {
+    [filter.file.display().to_string(), filter.permissions()]
+}
+
+impl Draw for ProfileView {
     fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
         self.longest_item_per_column = self.space_between_columns();
         debug_assert!(self.longest_item_per_column.len() == COLUMN_COUNT);
@@ -203,8 +244,4 @@ impl Component for ProfileView {
 
         Ok(())
     }
-}
-
-fn flatten_filter(filter: &FileRule) -> [String; COLUMN_COUNT] {
-    [filter.file.display().to_string(), filter.permissions()]
 }
