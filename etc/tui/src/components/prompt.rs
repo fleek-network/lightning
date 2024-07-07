@@ -7,6 +7,7 @@ use ratatui::style::{Style, Stylize};
 use ratatui::widgets::Paragraph;
 use tokio::sync::mpsc::UnboundedSender;
 use super::{Component, Draw, Frame};
+use crate::app::ApplicationContext;
 use crate::config::Config;
 
 const MAX_KEYS_PER_ROW: usize = 8;
@@ -20,8 +21,12 @@ pub struct Prompt {
 }
 
 impl Prompt {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(config: Config) -> Self {
+        Self {
+            current: vec![],
+            message: None,
+            config,
+        }
     }
 
     pub fn new_message(&mut self, message: String) {
@@ -29,7 +34,7 @@ impl Prompt {
     }
 
     pub fn update_state(&mut self, mode: &'static str) {
-        if let Some(keys) = self.config.keybindings.get(&mode) {
+        if let Some(keys) = self.config.keybindings.get(mode) {
             let keys = keys.clone();
             let codes = keys
                 .into_iter()
@@ -48,7 +53,9 @@ impl Prompt {
 }
 
 impl Draw for Prompt {
-    fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
+    type Context = ();
+
+    fn draw(&mut self, _context: &mut Self::Context, f: &mut Frame<'_>, area: Rect) -> Result<()> {
         let rows = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Length(1), Constraint::Length(1)])

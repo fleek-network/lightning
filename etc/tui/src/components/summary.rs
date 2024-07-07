@@ -5,6 +5,7 @@ use ratatui::widgets::{Block, BorderType, Borders, Cell, Paragraph, Row};
 use tokio::sync::mpsc::UnboundedSender;
 
 use super::{Component, Draw, Frame};
+use crate::app::ApplicationContext;
 use crate::config::Config;
 use crate::widgets::table::Table;
 
@@ -181,7 +182,9 @@ impl Summary {
 }
 
 impl Draw for Summary {
-    fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
+    type Context = ();
+
+    fn draw(&mut self, _context: &mut Self::Context, f: &mut Frame<'_>, area: Rect) -> Result<()> {
         let overview = Paragraph::new("Overview\n")
             .block(
                 Block::bordered()

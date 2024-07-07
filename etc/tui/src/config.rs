@@ -68,7 +68,7 @@ impl Config {
 
         // insert bindings into the config
         for (mode, default_bindings) in default_config.keybindings.iter() {
-            let user_bindings = cfg.keybindings.entry(*mode).or_default();
+            let user_bindings = cfg.keybindings.entry(mode.clone()).or_default();
             for (key, cmd) in default_bindings.iter() {
                 user_bindings
                     .entry(key.clone())
@@ -78,7 +78,7 @@ impl Config {
 
         // insert styles into the config
         for (mode, default_styles) in default_config.styles.iter() {
-            let user_styles = cfg.styles.entry(*mode).or_default();
+            let user_styles = cfg.styles.entry(mode.clone()).or_default();
             for (style_key, style) in default_styles.iter() {
                 user_styles
                     .entry(style_key.clone())

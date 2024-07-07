@@ -22,9 +22,8 @@ impl Navigator {
         }
     }
 
-    pub fn with_tab(mut self, tab: &'static str) -> Self {
+    pub fn push_tab(&mut self, tab: &'static str) {
         self.tabs.push(tab);
-        self
     }
 
     pub fn nav_left(&mut self) {
@@ -45,7 +44,9 @@ impl Navigator {
 }
 
 impl Draw for Navigator {
-    fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
+    type Context = ();
+
+    fn draw(&mut self, _context: &mut Self::Context, f: &mut Frame<'_>, area: Rect) -> Result<()> {
         let t = Tabs::new(self.tabs.clone())
             .select(self.selected_tab)
             .block(Block::default().borders(Borders::ALL))

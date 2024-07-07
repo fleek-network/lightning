@@ -13,7 +13,6 @@ use crate::config::{ComponentKeyBindings, Config};
 pub struct Home {
     title: String,
     logo: String,
-    config: Config,
     keybindings: ComponentKeyBindings<AppAction>
 }
 
@@ -77,13 +76,14 @@ impl Home {
             logo,
             title,
             keybindings: Default::default(),
-            config: Config::default(),
         }
     }
 }
 
 impl Draw for Home {
-    fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
+    type Context = ApplicationContext;
+
+    fn draw(&mut self, _context: &mut Self::Context, f: &mut Frame<'_>, area: Rect) -> Result<()> {
         let vchunks = Layout::vertical([
             Constraint::Percentage(30),
             Constraint::Percentage(40),
@@ -111,8 +111,6 @@ impl Draw for Home {
 }
 
 impl Component for Home {
-    type Context = ApplicationContext;
-
     fn component_name(&self) -> &'static str {
         "Home"
     }

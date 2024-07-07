@@ -34,6 +34,7 @@
     },
     "Profiles": {
       "<i>": "Edit", // Enter edit mode.
+      "<Ctrl-a>": "Add", // Create a new profile entry
       "<Enter>": "Select", // Select profile to view.
       "<up>": "Up", // Scroll up.
       "<down>": "Down", // Scroll down.
@@ -57,8 +58,6 @@
       "<b>": "Back", // Return back to the list of profiles.
       "<up>": "Up", // Scroll up.
       "<down>": "Down", // Scroll down.
-      "<left>": "NavLeft", // Move left to the next page.
-      "<right>": "NavRight", // Move right to the next page.
       "<Ctrl-c>": "Quit", // Quit the application.
       "<Ctrl-z>": "Suspend" // Suspend the application.
     },
