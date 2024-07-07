@@ -20,6 +20,7 @@ use lightning_rpc::Rpc;
 use lightning_service_executor::shim::ServiceExecutor;
 use lightning_signer::Signer;
 use lightning_syncronizer::syncronizer::Syncronizer;
+use lightning_task_broker::TaskBroker;
 use lightning_test_utils::consensus::{MockConsensus, MockForwarder};
 use lightning_topology::Topology;
 use lightning_utils::config::TomlConfigProvider;
@@ -42,6 +43,7 @@ partial!(FinalTypes require full {
     ResolverInterface = Resolver<Self>;
     RpcInterface = Rpc<Self>;
     ServiceExecutorInterface = ServiceExecutor<Self>;
+    TaskBrokerInterface = TaskBroker<Self>;
     KeystoreInterface = Keystore<Self>;
     SignerInterface = Signer<Self>;
     FetcherInterface = Fetcher<Self>;
@@ -69,6 +71,7 @@ partial!(UseMockConsensus require full {
     ResolverInterface = Resolver<Self>;
     RpcInterface = Rpc<Self>;
     ServiceExecutorInterface = ServiceExecutor<Self>;
+    TaskBrokerInterface = TaskBroker<Self>;
     KeystoreInterface = Keystore<Self>;
     SignerInterface = Signer<Self>;
     FetcherInterface = Fetcher<Self>;

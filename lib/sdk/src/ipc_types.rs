@@ -95,10 +95,13 @@ impl LightningMessage for IpcMessage {
     }
 
     fn encode<W: std::io::prelude::Write>(&self, writer: &mut W) -> std::io::Result<()> {
-        let mut ser = rkyv::ser::serializers::WriteSerializer::new(writer);
-
-        // writes all internally
-        let _ = ser.serialize_value(self);
+        let _ = rkyv::ser::serializers::CompositeSerializer::new(
+            WriteSerializer::new(writer),
+            AllocScratch::default(),
+            SharedSerializeMap::default(),
+        )
+        .serialize_value(self)
+        .expect("failed to serialize ipc payload");
 
         Ok(())
     }
@@ -195,4 +198,14 @@ ReqRes! {
         /// Returns true if the fetch succeeded.
         succeeded: bool
     },
+    /// Submit a task
+    Task {
+        scope: u8,
+        service: u32,
+        payload: Vec<u8>,
+        =>
+        succeeded: bool,
+        responses: Vec<Vec<u8>>,
+        signatures: Vec<StaticVec<64>>,
+    }
 }

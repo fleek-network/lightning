@@ -13,8 +13,8 @@ use crate::collection::Collection;
 #[repr(u8)]
 pub enum ServiceScope {
     Broadcast = 0x00,
-    /// Fetcher.
     BlockstoreServer = 0x01,
+    TaskBroker = 0x02,
 }
 
 impl TryFrom<u8> for ServiceScope {
@@ -24,6 +24,7 @@ impl TryFrom<u8> for ServiceScope {
         match value {
             0x00 => Ok(Self::Broadcast),
             0x01 => Ok(Self::BlockstoreServer),
+            0x02 => Ok(Self::TaskBroker),
             _ => bail!("invalid scope value: {value:?}"),
         }
     }
@@ -37,7 +38,7 @@ pub struct RequestHeader {
 
 /// Defines the connection pool.
 #[interfaces_proc::blank]
-pub trait PoolInterface<C: Collection>: BuildGraph + Send + Sync + Sized {
+pub trait PoolInterface<C: Collection>: BuildGraph + Send + Sync + Sized + 'static {
     type EventHandler: EventHandlerInterface;
     type Requester: RequesterInterface;
     type Responder: ResponderInterface;
@@ -59,13 +60,18 @@ pub trait EventHandlerInterface: Send + Sync {
 }
 
 #[interfaces_proc::blank]
-pub trait RequesterInterface: Clone + Send + Sync {
+pub trait RequesterInterface: Clone + Send + Sync + 'static {
     type Response: ResponseInterface;
-    async fn request(&self, destination: NodeIndex, request: Bytes) -> io::Result<Self::Response>;
+    #[blank(async { Ok(Default::default()) })]
+    fn request(
+        &self,
+        destination: NodeIndex,
+        request: Bytes,
+    ) -> impl futures::Future<Output = io::Result<Self::Response>> + Send;
 }
 
 #[interfaces_proc::blank]
-pub trait ResponseInterface: Send + Sync {
+pub trait ResponseInterface: Send + Sync + 'static {
     #[blank(tokio_stream::Empty<io::Result<Bytes>>)]
     type Body: Stream<Item = io::Result<Bytes>> + Send + Unpin;
 
@@ -74,13 +80,13 @@ pub trait ResponseInterface: Send + Sync {
 }
 
 #[interfaces_proc::blank]
-pub trait ResponderInterface: Send + Sync {
+pub trait ResponderInterface: Send + Sync + 'static {
     type Request: RequestInterface;
     async fn get_next_request(&mut self) -> io::Result<(RequestHeader, Self::Request)>;
 }
 
 #[interfaces_proc::blank]
-pub trait RequestInterface: Send + Sync {
+pub trait RequestInterface: Send + Sync + 'static {
     fn reject(self, reason: RejectReason);
     async fn send(&mut self, frame: Bytes) -> io::Result<()>;
 }

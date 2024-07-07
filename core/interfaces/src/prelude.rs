@@ -73,6 +73,7 @@ pub use crate::{
     ResponseInterface,
     RpcInterface,
     ServiceExecutorInterface,
+    TaskBrokerInterface,
     SignerInterface,
     Subscriber,
     SyncQueryRunnerInterface,

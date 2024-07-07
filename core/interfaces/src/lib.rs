@@ -24,6 +24,7 @@ mod service;
 mod shutdown;
 mod signer;
 mod syncronizer;
+mod task_broker;
 mod topology;
 
 pub use application::*;
@@ -51,6 +52,7 @@ pub use service::*;
 pub use shutdown::*;
 pub use signer::*;
 pub use syncronizer::*;
+pub use task_broker::*;
 pub use topology::*;
 
 // The common types.

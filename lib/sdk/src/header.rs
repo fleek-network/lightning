@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use anyhow::Result;
+use bytes::Bytes;
 use fleek_crypto::ClientPublicKey;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -49,6 +50,9 @@ pub enum TransportDetail {
         method: HttpMethod,
         url: Url,
         header: HashMap<String, String>,
+    },
+    Task {
+        payload: Bytes,
     },
     Other,
 }

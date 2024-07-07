@@ -130,6 +130,12 @@ impl Connection {
         )
     }
 
+    /// Returns true if this connection is a task request from a node.
+    #[inline(always)]
+    pub fn is_task_request(&self) -> bool {
+        matches!(self.header.transport_detail, TransportDetail::Task { .. })
+    }
+
     /// Returns true if this connection is an anonymous connection without a public key.
     #[inline(always)]
     pub fn is_anonymous(&self) -> bool {

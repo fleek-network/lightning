@@ -68,6 +68,7 @@ impl<C: Collection> ServiceExecutor<C> {
         blockstore: &C::BlockstoreInterface,
         fetcher: &C::FetcherInterface,
         fdi::Cloned(query_runner): fdi::Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
+        fdi::Cloned(task_broker): fdi::Cloned<C::TaskBrokerInterface>,
     ) -> anyhow::Result<Self> {
         let config = Arc::new(config.get::<Self>());
 
@@ -76,6 +77,7 @@ impl<C: Collection> ServiceExecutor<C> {
             ipc_path: config.ipc_path.to_path_buf(),
             fetcher_socket: fetcher.get_socket(),
             query_runner,
+            task_broker,
         });
 
         Ok(ServiceExecutor {

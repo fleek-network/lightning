@@ -17,6 +17,8 @@ pub enum Topic {
     Resolver = 0x01,
     /// The debug topic for tests
     Debug = 0x02,
+    /// The gossip topic for the task broker
+    TaskBroker,
 }
 
 impl ink_quill::TranscriptBuilderInput for Topic {

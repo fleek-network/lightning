@@ -30,6 +30,7 @@ collection!([
     ResolverInterface,
     RpcInterface,
     ServiceExecutorInterface,
+    TaskBrokerInterface,
     SignerInterface,
     FetcherInterface,
     PoolInterface,

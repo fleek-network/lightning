@@ -15,10 +15,12 @@ pub trait ReputationAggregatorInterface<C: Collection>: BuildGraph {
 
     /// Returns a reputation reporter that can be used to capture interactions that we have
     /// with another peer.
+    #[blank = Default::default()]
     fn get_reporter(&self) -> Self::ReputationReporter;
 
     /// Returns a reputation query that can be used to answer queries about the local
     /// reputation we have of another peer.
+    #[blank = Default::default()]
     fn get_query(&self) -> Self::ReputationQuery;
 }
 

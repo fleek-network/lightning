@@ -88,6 +88,7 @@ macro_rules! partial {
             ResolverInterface,
             RpcInterface,
             ServiceExecutorInterface,
+            TaskBrokerInterface,
             SignerInterface,
             FetcherInterface,
             PoolInterface,
@@ -180,11 +181,11 @@ macro_rules! spawn_worker {
     }};
     ($worker:expr, $name:expr, $waiter:expr) => {{
         let (_, socket) = $worker.spawn_with_spawner(|fut| {
-            let waiter_notify = waiter.clone();
+            let waiter_notify = $waiter.clone();
             let shutdownable_fut = async move {
                 tokio::select! {
                     _ = fut => {},
-                    _ = waiter.wait_for_shutdown() => {}
+                    _ = $waiter.wait_for_shutdown() => {}
                 }
             };
             tokio::task::Builder::new().name($name).spawn(shutdownable_fut).expect("Tokio task created outside of tokio runtime");

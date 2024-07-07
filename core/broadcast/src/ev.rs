@@ -557,6 +557,7 @@ fn topic_to_index(topic: Topic) -> usize {
         Topic::Consensus => 0,
         Topic::Resolver => 1,
         Topic::Debug => 2,
+        Topic::TaskBroker => 3,
     }
 }
 

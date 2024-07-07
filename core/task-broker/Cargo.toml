@@ -1,0 +1,28 @@
+[package]
+name = "lightning-task-broker"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+lightning-interfaces = { path = "../interfaces" }
+lightning-metrics = { path = "../metrics" }
+fn-sdk = { path = "../../lib/sdk" }
+fleek-crypto.workspace = true
+affair.workspace = true
+tokio.workspace = true
+futures.workspace = true
+tracing.workspace = true
+anyhow.workspace = true
+triomphe.workspace = true
+rand.workspace = true
+bytes.workspace = true
+tokio-util.workspace = true
+
+[dev-dependencies]
+tokio-util.workspace = true
+lightning-test-utils = { path = "../test-utils" }
+lightning-application = { path = "../application" }
+lightning-pool = { path = "../pool" }
+lightning-broadcast = { path = "../broadcast" }
+lightning-topology = { path = "../topology" }
+tempdir = "0.3.7"

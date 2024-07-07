@@ -1,12 +1,13 @@
 use std::error::Error;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use dashmap::DashMap;
 use fleek_crypto::ClientPublicKey;
 use fn_sdk::ipc_types::{self, IpcMessage, IpcRequest, DELIMITER_SIZE};
 use lightning_interfaces::prelude::*;
+use lightning_interfaces::schema::task_broker::TaskScope;
 use tokio::io::{self, Interest};
 use tokio::net::{UnixListener, UnixStream};
 use tokio::process::Command;
@@ -22,6 +23,7 @@ pub struct Context<C: Collection> {
     pub ipc_path: PathBuf,
     pub fetcher_socket: FetcherSocket,
     pub query_runner: c!(C::ApplicationInterface::SyncExecutor),
+    pub task_broker: C::TaskBrokerInterface,
 }
 
 impl<C: Collection> Context<C> {
@@ -84,6 +86,32 @@ impl<C: Collection> Context<C> {
                     lightning_interfaces::types::FetcherResponse::Fetch(v) => v.is_ok(),
                 };
                 ipc_types::Response::FetchBlake3 { succeeded }
+            },
+            ipc_types::Request::Task {
+                scope,
+                service,
+                payload,
+            } => {
+                self.task_broker
+                    .run(
+                        match scope {
+                            0 => TaskScope::Local,
+                            1 => TaskScope::Single,
+                            2 => TaskScope::Cluster,
+                            x => TaskScope::Multicluster(x - 2),
+                        },
+                        schema::task_broker::TaskRequest {
+                            service,
+                            timestamp: SystemTime::now()
+                                .duration_since(UNIX_EPOCH)
+                                .unwrap()
+                                .as_secs(),
+                            payload: payload.into(),
+                        },
+                    )
+                    .await;
+
+                ipc_types::Response::Task { succeeded: false }
             },
             _ => unreachable!(),
         }
