@@ -306,14 +306,17 @@ async fn handle_parcel<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Em
     if ctx.pending_requests.remove(&parcel_digest).is_some() {
         // This is a parcel that we specifically requested, so
         // we have to set a timeout for the previous parcel, because
-        // swallow the Err return in the loop of `try_execute`.
-        set_parcel_timer(
-            last_executed,
-            //txn_store.get_timeout(),
-            ctx.timeout,
-            ctx.timeout_tx.clone(),
-            &mut ctx.pending_timeouts,
-        );
+        // we swallow the Err return in the loop of `try_execute`.
+        if last_executed != [0; 32] {
+            set_parcel_timer(
+                last_executed,
+                //txn_store.get_timeout(),
+                ctx.timeout,
+                ctx.timeout_tx.clone(),
+                &mut ctx.pending_timeouts,
+            );
+        }
+
         info!("Received requested parcel with digest: {parcel_digest:?}");
 
         increment_counter!(
