@@ -52,6 +52,7 @@ pub enum TransportDetail {
         header: HashMap<String, String>,
     },
     Task {
+        depth: u8,
         payload: Bytes,
     },
     Other,

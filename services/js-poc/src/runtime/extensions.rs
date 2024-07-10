@@ -1,11 +1,16 @@
 //! Javascript runtime bindings for the SDK APIs
 
+use std::cell::RefCell;
+use std::rc::Rc;
+use std::str::FromStr;
+
 use anyhow::{anyhow, Result};
 use arrayref::array_ref;
 use blake3_tree::utils::{tree_index, HashVec};
-use deno_core::{extension, op2};
-use fleek_crypto::ClientPublicKey;
+use deno_core::{extension, op2, OpState};
+use fleek_crypto::{ClientPublicKey, NodeSignature};
 use fn_sdk::blockstore::get_internal_path;
+use lightning_schema::task_broker::TaskScope;
 use tracing::info;
 
 use crate::runtime::Permissions;
@@ -25,6 +30,7 @@ extension!(
         deno_canvas
     ],
     ops = [
+        run_task,
         log,
         fetch_blake3,
         load_content,
@@ -32,11 +38,45 @@ extension!(
         query_client_flk_balance,
         query_client_bandwidth_balance
     ],
-    state = |state| {
+    options = { depth: u8 },
+    state = |state, config| {
         // initialize permissions
-        state.put(Permissions {})
+        state.put(Permissions {});
+        state.put(TaskDepth(config.depth));
     }
 );
+
+/// Marker type for current task depth
+struct TaskDepth(u8);
+
+#[derive(serde::Serialize)]
+pub struct Task {
+    responses: Vec<Vec<u8>>,
+    signatures: Vec<NodeSignature>,
+}
+
+#[op2(async)]
+#[serde]
+pub async fn run_task(
+    state: Rc<RefCell<OpState>>,
+    service: u32,
+    #[buffer(copy)] body: Vec<u8>,
+    #[string] scope: String,
+) -> Result<Task> {
+    let scope = TaskScope::from_str(&scope)?;
+
+    let depth = {
+        let state = state.borrow();
+        state.borrow::<TaskDepth>().0
+    };
+
+    let (responses, signatures) = fn_sdk::api::run_task(depth + 1, scope, service, body).await;
+
+    Ok(Task {
+        responses,
+        signatures,
+    })
+}
 
 #[op2(fast)]
 pub fn log(#[string] message: String) {

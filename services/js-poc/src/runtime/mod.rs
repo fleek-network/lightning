@@ -113,7 +113,7 @@ impl NetPermissions for Permissions {
 
 impl Runtime {
     /// Create a new runtime
-    pub fn new(mut location: Url) -> Result<Self> {
+    pub fn new(mut location: Url, depth: u8) -> Result<Self> {
         let tape = Tape::new(location.clone());
         let mut deno = JsRuntime::new(RuntimeOptions {
             extensions: vec![
@@ -129,7 +129,7 @@ impl Runtime {
                 deno_webgpu::init_ops(),
                 deno_canvas::init_ops(),
                 // Fleek runtime
-                fleek::init_ops(),
+                fleek::init_ops(depth),
             ],
             startup_snapshot: Some(SNAPSHOT),
             op_metrics_factory_fn: Some(tape.op_metrics_factory_fn()),

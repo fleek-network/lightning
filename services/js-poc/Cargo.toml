@@ -19,6 +19,8 @@ hex = "0.4"
 cid = "0.11"
 urlencoding = "2.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+lightning-schema = { path = "../../core/schema" }
+lightning-workspace-hack.workspace = true
 
 # Deno core + webapi extensions
 deno_core = "0.272"
@@ -32,10 +34,6 @@ deno_crypto = "0.160"
 deno_canvas = "0.15.0"
 deno_webgpu = "0.113"
 deno_websocket = "0.151"
-lightning-workspace-hack.workspace = true
-
-[dev-dependencies]
-lightning-schema = { path = "../../core/schema" }
 
 [build-dependencies]
 serde.workspace = true

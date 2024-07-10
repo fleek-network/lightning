@@ -1,5 +1,7 @@
 use std::fmt::Display;
+use std::str::FromStr;
 
+use anyhow::anyhow;
 use bytes::Bytes;
 use fleek_crypto::NodeSignature;
 use ink_quill::{ToDigest, TranscriptBuilder};
@@ -27,6 +29,17 @@ impl Display for TaskScope {
             TaskScope::Single => f.write_str("single"),
             TaskScope::Cluster => f.write_str("cluster"),
             TaskScope::Multicluster(n) => f.write_str(&format!("{n}-multicluster")),
+        }
+    }
+}
+impl FromStr for TaskScope {
+    type Err = anyhow::Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "local" => Ok(TaskScope::Local),
+            "single" => Ok(TaskScope::Single),
+            "cluster" => Ok(TaskScope::Cluster),
+            _ => Err(anyhow!("unsupported scope")),
         }
     }
 }

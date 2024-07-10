@@ -1,5 +1,4 @@
-use std::marker::PhantomData;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use affair::AsyncWorkerUnordered;
 use anyhow::Result;
@@ -21,12 +20,22 @@ use types::NodeIndex;
 use crate::local::{LocalTaskSocket, LocalTaskWorker};
 
 pub struct TaskBroker<C: Collection> {
-    socket: LocalTaskSocket,
+    socket: Arc<RwLock<Option<LocalTaskSocket>>>,
     requester: Arc<<C::PoolInterface as PoolInterface<C>>::Requester>,
     topology: tokio::sync::watch::Receiver<Arc<Vec<Vec<NodePublicKey>>>>,
     query_runner: c!(C::ApplicationInterface::SyncExecutor),
     max_depth: u8,
-    _p: PhantomData<C>,
+    temp: Option<Temp<C>>,
+}
+
+/// Temporary holder struct used after init and before post
+struct Temp<C: Collection> {
+    key: NodeSecretKey,
+    // For sending and receiving task requests to the network
+    event: c!(C::PoolInterface::EventHandler),
+    // Receive incoming tasks
+    responder: c!(C::PoolInterface::Responder),
+    shutdown: ShutdownWaiter,
 }
 
 impl<C: Collection> Clone for TaskBroker<C> {
@@ -37,7 +46,7 @@ impl<C: Collection> Clone for TaskBroker<C> {
             requester: self.requester.clone(),
             topology: self.topology.clone(),
             query_runner: self.query_runner.clone(),
-            _p: self._p,
+            temp: None,
         }
     }
 }
@@ -46,13 +55,40 @@ impl<C: Collection> TaskBroker<C> {
     fn init(
         config: &C::ConfigProviderInterface,
         keystore: &C::KeystoreInterface,
-        service_executor: &C::ServiceExecutorInterface,
         topology: &C::TopologyInterface,
         pool: &C::PoolInterface,
         fdi::Cloned(query_runner): fdi::Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
         fdi::Cloned(shutdown): fdi::Cloned<ShutdownWaiter>,
     ) -> Result<Self> {
         let TaskBrokerConfig { max_depth } = config.get::<Self>();
+
+        // Spawn state loop for handling pool and pubsub events
+        let (req, responder) = pool.open_req_res(lightning_interfaces::ServiceScope::TaskBroker);
+        let event = pool.open_event(lightning_interfaces::ServiceScope::TaskBroker);
+
+        Ok(Self {
+            max_depth,
+            socket: Arc::new(RwLock::new(None)),
+            requester: req.into(),
+            topology: topology.get_receiver(),
+            query_runner,
+            temp: Some(Temp {
+                key: keystore.get_ed25519_sk(),
+                event,
+                responder,
+                shutdown: shutdown.clone(),
+            }),
+        })
+    }
+
+    fn post_init(&mut self, service_executor: &C::ServiceExecutorInterface) {
+        let Temp {
+            key,
+            event,
+            responder,
+            shutdown,
+        } = self.temp.take().unwrap();
+
         // spawn worker to handle executing local tasks
         let provider = service_executor.get_provider();
         let waiter = shutdown.clone();
@@ -62,28 +98,17 @@ impl<C: Collection> TaskBroker<C> {
             waiter
         );
 
-        // Spawn state loop for handling pool and pubsub events
-        let (req, res) = pool.open_req_res(lightning_interfaces::ServiceScope::TaskBroker);
-        let events = pool.open_event(lightning_interfaces::ServiceScope::TaskBroker);
+        *self.socket.write().unwrap() = Some(socket.clone());
 
         State::<C>::new(
-            keystore.get_ed25519_sk(),
-            events,
-            topology.get_receiver(),
-            res,
+            key,
+            event,
+            self.topology.clone(),
+            responder,
             socket.clone(),
             shutdown,
         )
         .spawn();
-
-        Ok(Self {
-            max_depth,
-            socket,
-            requester: req.into(),
-            topology: topology.get_receiver(),
-            query_runner,
-            _p: PhantomData,
-        })
     }
 
     async fn run_single_node_task(&self, task: TaskRequest) -> Result<TaskResponse, TaskError> {
@@ -127,7 +152,8 @@ impl<C: Collection> TaskBroker<C> {
 
 impl<C: Collection> fdi::BuildGraph for TaskBroker<C> {
     fn build_graph() -> fdi::DependencyGraph {
-        fdi::DependencyGraph::default().with(Self::init)
+        fdi::DependencyGraph::default()
+            .with(Self::init.with_event_handler("_post", Self::post_init))
     }
 }
 
@@ -164,16 +190,25 @@ impl<C: Collection> TaskBrokerInterface<C> for TaskBroker<C> {
             return vec![Err(err)];
         }
         match scope {
-            TaskScope::Local => vec![
-                self.socket
-                    .run(task)
+            TaskScope::Local => {
+                let socket = self
+                    .socket
+                    .read()
+                    .expect("failed to access")
+                    .as_ref()
+                    .unwrap()
+                    .clone();
+
+                let res = socket
+                    .run((depth, task))
                     .await
                     .expect("failed to run task")
                     .map_err(|e| {
                         task_failed_metric(scope);
                         TaskError::Internal(e.to_string())
-                    }),
-            ],
+                    });
+                vec![res]
+            },
             TaskScope::Single => {
                 let res = self.run_single_node_task(task).await;
                 if let Err(e) = &res {
@@ -278,7 +313,7 @@ impl<C: Collection> State<C> {
 
         let socket = self.socket.clone();
         self.pending_tasks.spawn(async move {
-            match socket.run(request).await {
+            match socket.run((0, request)).await {
                 Ok(Ok(res)) => {
                     let mut bytes = Vec::new();
                     res.encode(&mut bytes).expect("failed to encode response");

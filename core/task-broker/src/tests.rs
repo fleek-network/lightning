@@ -59,9 +59,9 @@ impl ExecutorProviderInterface for EchoProvider {
                 let mut framed =
                     Framed::new(server, tokio_util::codec::LengthDelimitedCodec::new());
 
-                if let TransportDetail::Task { payload } = header {
+                if let TransportDetail::Task { payload, .. } = header {
                     framed
-                        .send(payload.into())
+                        .send(payload)
                         .await
                         .expect("failed to send task response");
                 } else {
@@ -106,7 +106,7 @@ async fn run_local_echo_task() -> anyhow::Result<()> {
     let digest = request.to_digest();
 
     let response = broker
-        .run(schema::task_broker::TaskScope::Local, request)
+        .run(0, schema::task_broker::TaskScope::Local, request)
         .await;
 
     assert!(
@@ -132,32 +132,34 @@ async fn run_single_echo_task() -> anyhow::Result<()> {
         .map(|_| EphemeralKeystore::<TestBinding>::default())
         .collect::<Vec<_>>();
     let owner = EthAddress::default();
-    let mut genesis = Genesis::default();
-    genesis.node_info = keystores
-        .iter()
-        .enumerate()
-        .map(|(i, k)| {
-            GenesisNode::new(
-                owner,
-                k.get_ed25519_pk(),
-                [127, 0, 0, 1].into(),
-                k.get_bls_pk(),
-                [127, 0, 0, 1].into(),
-                k.get_ed25519_pk(),
-                NodePorts {
-                    pool: 19420 + i as u16,
-                    ..Default::default()
-                },
-                Some(types::Staking {
-                    staked: 420u64.into(),
-                    stake_locked_until: 0,
-                    locked: 0u64.into(),
-                    locked_until: 0,
-                }),
-                true,
-            )
-        })
-        .collect();
+    let genesis = Genesis {
+        node_info: keystores
+            .iter()
+            .enumerate()
+            .map(|(i, k)| {
+                GenesisNode::new(
+                    owner,
+                    k.get_ed25519_pk(),
+                    [127, 0, 0, 1].into(),
+                    k.get_bls_pk(),
+                    [127, 0, 0, 1].into(),
+                    k.get_ed25519_pk(),
+                    NodePorts {
+                        pool: 19420 + i as u16,
+                        ..Default::default()
+                    },
+                    Some(types::Staking {
+                        staked: 420u64.into(),
+                        stake_locked_until: 0,
+                        locked: 0u64.into(),
+                        locked_until: 0,
+                    }),
+                    true,
+                )
+            })
+            .collect(),
+        ..Default::default()
+    };
 
     let dir = tempdir::TempDir::new("run_local_echo_task")?;
     let path = &genesis.write_to_dir(dir.path().to_path_buf().try_into().unwrap())?;
@@ -215,7 +217,7 @@ async fn run_single_echo_task() -> anyhow::Result<()> {
     let digest = request.to_digest();
 
     let response = broker
-        .run(schema::task_broker::TaskScope::Single, request)
+        .run(0, schema::task_broker::TaskScope::Single, request)
         .await;
 
     assert!(
@@ -225,7 +227,7 @@ async fn run_single_echo_task() -> anyhow::Result<()> {
 
     let response = response
         .into_iter()
-        .nth(0)
+        .next()
         .unwrap()
         .expect("task to succeed");
 

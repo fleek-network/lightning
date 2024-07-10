@@ -7255,6 +7255,7 @@ dependencies = [
  "lightning-test-utils",
  "lightning-topology",
  "rand 0.8.5",
+ "serde",
  "tempdir",
  "tokio",
  "tokio-util 0.7.10 (registry+https://github.com/rust-lang/crates.io-index)",

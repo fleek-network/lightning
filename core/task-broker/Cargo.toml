@@ -17,6 +17,7 @@ triomphe.workspace = true
 rand.workspace = true
 bytes.workspace = true
 tokio-util.workspace = true
+serde.workspace = true
 
 [dev-dependencies]
 tokio-util.workspace = true

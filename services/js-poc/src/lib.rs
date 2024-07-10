@@ -72,42 +72,52 @@ async fn handle_connection(
     tx: UnboundedSender<IsolateHandle>,
     mut connection: Connection,
 ) -> anyhow::Result<()> {
-    if connection.is_http_request() {
-        let body = connection
-            .read_payload()
-            .await
-            .context("Could not read body.")?;
+    match &connection.header.transport_detail {
+        TransportDetail::HttpRequest { .. } => {
+            let body = connection
+                .read_payload()
+                .await
+                .context("Could not read body.")?;
 
-        let TransportDetail::HttpRequest {
-            method,
-            ref url,
-            ref header,
-        } = connection.header.transport_detail
-        else {
-            unreachable!()
-        };
+            let TransportDetail::HttpRequest {
+                method,
+                ref url,
+                ref header,
+            } = connection.header.transport_detail
+            else {
+                unreachable!()
+            };
+            let request = http::request::extract(url, header, method, body.to_vec())
+                .context("failed to parse request")?;
 
-        let request = http::request::extract(url, header, method, body.to_vec())
-            .context("failed to parse request")?;
-
-        if let Err(e) = handle_request(&mut connection, &tx, request).await {
-            respond_with_error(&mut connection, format!("{e:?}").as_bytes(), 400).await?;
-            return Err(e);
-        }
-    } else {
-        while let Some(payload) = connection.read_payload().await {
-            let request: Request = serde_json::from_slice(&payload)?;
-            if let Err(e) = handle_request(&mut connection, &tx, request).await {
+            if let Err(e) = handle_request(0, &mut connection, &tx, request).await {
+                respond_with_error(&mut connection, format!("{e:?}").as_bytes(), 400).await?;
+                return Err(e);
+            }
+        },
+        TransportDetail::Task { depth, payload } => {
+            let request: Request = serde_json::from_slice(payload)?;
+            if let Err(e) = handle_request(*depth, &mut connection, &tx, request).await {
                 respond_with_error(&mut connection, e.to_string().as_bytes(), 400).await?;
                 return Err(e);
-            };
-        }
+            }
+        },
+        TransportDetail::Other => {
+            while let Some(payload) = connection.read_payload().await {
+                let request: Request = serde_json::from_slice(&payload)?;
+                if let Err(e) = handle_request(0, &mut connection, &tx, request).await {
+                    respond_with_error(&mut connection, e.to_string().as_bytes(), 400).await?;
+                    return Err(e);
+                };
+            }
+        },
     }
 
     Ok(())
 }
 
 async fn handle_request(
+    depth: u8,
     connection: &mut Connection,
     tx: &UnboundedSender<IsolateHandle>,
     request: Request,
@@ -137,7 +147,8 @@ async fn handle_request(
     }
 
     // Create runtime and execute the source
-    let mut runtime = Runtime::new(location.clone()).context("Failed to initialize runtime")?;
+    let mut runtime =
+        Runtime::new(location.clone(), depth).context("Failed to initialize runtime")?;
     tx.send(runtime.deno.v8_isolate().thread_safe_handle())
         .context("Failed to send the IsolateHandle to main thread.")?;
 

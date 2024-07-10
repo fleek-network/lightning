@@ -1,6 +1,21 @@
 import { core } from "ext:core/mod.js";
 const { ops } = core;
 
+/** Service Ids */
+const ServiceId = {
+  Fetcher: 0 | 0,
+  Js: 1 | 0,
+  Ai: 2 | 0,
+}
+
+/** Run a service task either locally, on a single node in the cluster, or replicated across the cluster.
+ * @param {Number} service - Service ID, must be a 32 bit unsigned integer
+ * @param {Uint8Array} body - Request body to send to a service
+ * @param {"local"|"single"|"cluster"} scope - Optional scope to run the task under. If undefined, defaults to local.
+ * @returns {Promise<Uint8Array>} - Raw response body from the service
+ */
+const runTask = async (service, body, scope = "local") => await ops.run_task(service, body, scope);
+
 /** Fetch some blake3 content
  * @param {Uint8Array} hash - Blake3 hash of content to fetch
  * @returns {Promise<bool>} True if the fetch was successful
@@ -69,6 +84,8 @@ class ContentHandle {
   */
 export const Fleek = {
   ContentHandle,
+  ServiceId,
+  runTask,
   fetchBlake3,
   loadContent,
   queryClientFlkBalance,

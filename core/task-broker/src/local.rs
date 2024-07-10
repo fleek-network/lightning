@@ -9,7 +9,7 @@ use lightning_interfaces::prelude::*;
 use lightning_interfaces::schema::task_broker::{TaskRequest, TaskResponse};
 use tokio_util::codec::{Framed, LengthDelimitedCodec};
 
-pub type LocalTaskSocket = Socket<TaskRequest, anyhow::Result<TaskResponse>>;
+pub type LocalTaskSocket = Socket<(u8, TaskRequest), anyhow::Result<TaskResponse>>;
 
 /// Local task worker that acts as a simple client to services, executing a single request and
 /// response under the task connection type. Output payloads are streamed back and returned as a
@@ -26,9 +26,9 @@ impl<P: ExecutorProviderInterface> LocalTaskWorker<P> {
 }
 
 impl<P: ExecutorProviderInterface> AsyncWorkerUnordered for LocalTaskWorker<P> {
-    type Request = TaskRequest;
+    type Request = (u8, TaskRequest);
     type Response = Result<TaskResponse>;
-    async fn handle(&self, req: Self::Request) -> Self::Response {
+    async fn handle(&self, (depth, req): Self::Request) -> Self::Response {
         let digest = req.to_digest();
 
         // Connect to the service
@@ -43,6 +43,7 @@ impl<P: ExecutorProviderInterface> AsyncWorkerUnordered for LocalTaskWorker<P> {
             &ConnectionHeader {
                 pk: None,
                 transport_detail: fn_sdk::header::TransportDetail::Task {
+                    depth,
                     payload: req.payload,
                 },
             },
