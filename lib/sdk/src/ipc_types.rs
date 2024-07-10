@@ -200,12 +200,12 @@ ReqRes! {
     },
     /// Submit a task
     Task {
+        depth: u8,
         scope: u8,
         service: u32,
         payload: Vec<u8>,
         =>
-        succeeded: bool,
         responses: Vec<Vec<u8>>,
-        signatures: Vec<StaticVec<64>>,
+        signatures: Vec<[u8; 64]>,
     }
 }

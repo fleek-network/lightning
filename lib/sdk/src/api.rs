@@ -1,4 +1,5 @@
-use fleek_crypto::ClientPublicKey;
+use fleek_crypto::{ClientPublicKey, NodeSignature};
+use lightning_schema::task_broker::TaskScope;
 
 use crate::ipc::send_and_await_response;
 use crate::ipc_types::Request;
@@ -45,6 +46,31 @@ pub async fn fetch_blake3(hash: [u8; 32]) -> bool {
     let res = send_and_await_response(req).await;
     match res {
         crate::ipc_types::Response::FetchBlake3 { succeeded } => succeeded,
+        _ => unreachable!(),
+    }
+}
+
+pub async fn run_task(
+    depth: u8,
+    scope: TaskScope,
+    service: u32,
+    payload: Vec<u8>,
+) -> (Vec<Vec<u8>>, Vec<NodeSignature>) {
+    let req = Request::Task {
+        scope: scope.into(),
+        depth,
+        service,
+        payload,
+    };
+    let res = send_and_await_response(req).await;
+    match res {
+        crate::ipc_types::Response::Task {
+            responses,
+            signatures,
+        } => (
+            responses,
+            signatures.into_iter().map(NodeSignature).collect(),
+        ),
         _ => unreachable!(),
     }
 }

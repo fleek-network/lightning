@@ -30,6 +30,26 @@ impl Display for TaskScope {
         }
     }
 }
+impl From<u8> for TaskScope {
+    fn from(value: u8) -> Self {
+        match value {
+            0 => Self::Local,
+            1 => Self::Single,
+            2 => Self::Cluster,
+            x => Self::Multicluster(x - 1),
+        }
+    }
+}
+impl From<TaskScope> for u8 {
+    fn from(val: TaskScope) -> Self {
+        match val {
+            TaskScope::Local => 0,
+            TaskScope::Single => 1,
+            TaskScope::Cluster => 2,
+            TaskScope::Multicluster(x) => x + 1,
+        }
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub struct TaskMessage {
@@ -45,6 +65,14 @@ pub enum TaskPayload {
     Response(TaskResponse),
 }
 impl AutoImplSerde for TaskPayload {}
+impl ToDigest for TaskPayload {
+    fn transcript(&self) -> TranscriptBuilder {
+        match self {
+            TaskPayload::Request(r) => r.transcript(),
+            TaskPayload::Response(r) => r.transcript(),
+        }
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub struct TaskRequest {

@@ -4,7 +4,7 @@ use std::process::Stdio;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use dashmap::DashMap;
-use fleek_crypto::ClientPublicKey;
+use fleek_crypto::{ClientPublicKey};
 use fn_sdk::ipc_types::{self, IpcMessage, IpcRequest, DELIMITER_SIZE};
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::schema::task_broker::TaskScope;
@@ -88,12 +88,15 @@ impl<C: Collection> Context<C> {
                 ipc_types::Response::FetchBlake3 { succeeded }
             },
             ipc_types::Request::Task {
+                depth,
                 scope,
                 service,
                 payload,
             } => {
-                self.task_broker
+                let (responses, signatures): (Vec<_>, Vec<_>) = self
+                    .task_broker
                     .run(
+                        depth,
                         match scope {
                             0 => TaskScope::Local,
                             1 => TaskScope::Single,
@@ -109,9 +112,15 @@ impl<C: Collection> Context<C> {
                             payload: payload.into(),
                         },
                     )
-                    .await;
+                    .await
+                    .into_iter()
+                    .filter_map(|res| res.ok().map(|v| (v.payload.to_vec(), [0u8; 64])))
+                    .unzip();
 
-                ipc_types::Response::Task { succeeded: false }
+                ipc_types::Response::Task {
+                    responses,
+                    signatures,
+                }
             },
             _ => unreachable!(),
         }
