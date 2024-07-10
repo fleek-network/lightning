@@ -257,7 +257,7 @@ impl<T: BroadcastEventInterface<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
     }
 
     pub fn get_parcel_message_digest(&self, digest: &Digest) -> Result<Option<BroadcastDigest>> {
-        if let Ok(txn_store) = self.txn_store.write() {
+        if let Ok(txn_store) = self.txn_store.read() {
             Ok(txn_store.get_parcel(digest).and_then(|p| p.message_digest))
         } else {
             Err(anyhow!("Failed to acquire lock"))
@@ -265,7 +265,7 @@ impl<T: BroadcastEventInterface<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
     }
 
     pub fn contains_parcel(&self, digest: &Digest) -> Result<bool> {
-        if let Ok(txn_store) = self.txn_store.write() {
+        if let Ok(txn_store) = self.txn_store.read() {
             Ok(txn_store.get_parcel(digest).is_some())
         } else {
             Err(anyhow!("Failed to acquire lock"))
