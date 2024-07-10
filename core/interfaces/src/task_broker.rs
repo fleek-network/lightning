@@ -16,6 +16,8 @@ pub enum TaskError {
     PeerDisconnect,
     #[error("Peer sent invalid response")]
     InvalidResponse,
+    #[error("Maximum depth reached: {_0:?}")]
+    MaxDepth(u8),
 }
 
 /// Task broker for services on the node.
@@ -24,10 +26,14 @@ pub enum TaskError {
 /// various scopes of tasks.
 #[interfaces_proc::blank]
 pub trait TaskBrokerInterface<C: Collection>: BuildGraph + Clone + Send + Sync + 'static {
-    /// Run a task in a given scope, returning the (collection of) responses for the task
+    /// Run a task in a given scope, returning the (collection of) responses for the task.
+    /// For services and use cases that allow recursion (ie, runtimes that expose running
+    /// subtasks), depth should be used to stop requests
     #[blank = async { vec![] }]
     fn run(
         &self,
+
+        depth: u8,
         scope: TaskScope,
         task: TaskRequest,
     ) -> impl Future<Output = Vec<Result<TaskResponse, TaskError>>> + Send;

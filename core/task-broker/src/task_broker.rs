@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use affair::AsyncWorkerUnordered;
 use anyhow::Result;
+use bytes::Bytes;
 use fleek_crypto::{NodePublicKey, NodeSecretKey};
 use futures::{AsyncReadExt, TryStreamExt};
 use lightning_interfaces::prelude::*;
@@ -11,9 +12,11 @@ use lightning_metrics::increment_counter;
 use rand::prelude::SliceRandom;
 use rand::thread_rng;
 use schema::task_broker::{TaskPayload, TaskRequest, TaskResponse, TaskScope};
+use serde::{Deserialize, Serialize};
 use tokio::sync::watch;
 use tokio::task::JoinSet;
 use tracing::warn;
+use types::NodeIndex;
 
 use crate::local::{LocalTaskSocket, LocalTaskWorker};
 
@@ -22,12 +25,14 @@ pub struct TaskBroker<C: Collection> {
     requester: Arc<<C::PoolInterface as PoolInterface<C>>::Requester>,
     topology: tokio::sync::watch::Receiver<Arc<Vec<Vec<NodePublicKey>>>>,
     query_runner: c!(C::ApplicationInterface::SyncExecutor),
+    max_depth: u8,
     _p: PhantomData<C>,
 }
 
 impl<C: Collection> Clone for TaskBroker<C> {
     fn clone(&self) -> Self {
         Self {
+            max_depth: self.max_depth,
             socket: self.socket.clone(),
             requester: self.requester.clone(),
             topology: self.topology.clone(),
@@ -39,14 +44,15 @@ impl<C: Collection> Clone for TaskBroker<C> {
 
 impl<C: Collection> TaskBroker<C> {
     fn init(
+        config: &C::ConfigProviderInterface,
         keystore: &C::KeystoreInterface,
         service_executor: &C::ServiceExecutorInterface,
         topology: &C::TopologyInterface,
         pool: &C::PoolInterface,
-        broadcast: &C::BroadcastInterface,
         fdi::Cloned(query_runner): fdi::Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
         fdi::Cloned(shutdown): fdi::Cloned<ShutdownWaiter>,
     ) -> Result<Self> {
+        let TaskBrokerConfig { max_depth } = config.get::<Self>();
         // spawn worker to handle executing local tasks
         let provider = service_executor.get_provider();
         let waiter = shutdown.clone();
@@ -58,10 +64,11 @@ impl<C: Collection> TaskBroker<C> {
 
         // Spawn state loop for handling pool and pubsub events
         let (req, res) = pool.open_req_res(lightning_interfaces::ServiceScope::TaskBroker);
-        let pubsub = broadcast.get_pubsub::<TaskPayload>(types::Topic::TaskBroker);
+        let events = pool.open_event(lightning_interfaces::ServiceScope::TaskBroker);
+
         State::<C>::new(
             keystore.get_ed25519_sk(),
-            pubsub,
+            events,
             topology.get_receiver(),
             res,
             socket.clone(),
@@ -70,6 +77,7 @@ impl<C: Collection> TaskBroker<C> {
         .spawn();
 
         Ok(Self {
+            max_depth,
             socket,
             requester: req.into(),
             topology: topology.get_receiver(),
@@ -82,7 +90,7 @@ impl<C: Collection> TaskBroker<C> {
         let id = {
             // Get current topology
             let topology = self.topology.borrow();
-            let Some(nodes) = topology.get(0) else {
+            let Some(nodes) = topology.first() else {
                 return Err(TaskError::Internal("topology not initialized".to_string()));
             };
             if nodes.is_empty() {
@@ -92,7 +100,7 @@ impl<C: Collection> TaskBroker<C> {
             // Select a random node within the local cluster
             let pub_key = { nodes.choose(&mut thread_rng()).unwrap() };
             self.query_runner
-                .pubkey_to_index(&pub_key)
+                .pubkey_to_index(pub_key)
                 .expect("topology should never ever give unknown node pubkeys/indecies")
         };
 
@@ -123,12 +131,38 @@ impl<C: Collection> fdi::BuildGraph for TaskBroker<C> {
     }
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(default)]
+pub struct TaskBrokerConfig {
+    max_depth: u8,
+}
+impl Default for TaskBrokerConfig {
+    fn default() -> Self {
+        Self { max_depth: 8 }
+    }
+}
+
+impl<C: Collection> ConfigConsumer for TaskBroker<C> {
+    const KEY: &'static str = "task_broker";
+    type Config = TaskBrokerConfig;
+}
+
 impl<C: Collection> TaskBrokerInterface<C> for TaskBroker<C> {
     async fn run(
         &self,
+        depth: u8,
         scope: TaskScope,
         task: TaskRequest,
     ) -> Vec<Result<TaskResponse, TaskError>> {
+        if depth > self.max_depth {
+            increment_counter!(
+                "task_broker_task_blocked",
+                Some("Number of task requests blocked due to reaching max depth")
+            );
+            let err = TaskError::MaxDepth(self.max_depth);
+            warn!("{err}");
+            return vec![Err(err)];
+        }
         match scope {
             TaskScope::Local => vec![
                 self.socket
@@ -168,7 +202,7 @@ fn task_failed_metric(scope: TaskScope) {
 /// State for handling incoming tasks
 pub struct State<C: Collection> {
     // For sending and receiving task requests to the network
-    pubsub: c!(C::BroadcastInterface::PubSub<TaskPayload>),
+    event: c!(C::PoolInterface::EventHandler),
     // For finding single nodes within the cluster
     _topology: watch::Receiver<Arc<Vec<Vec<NodePublicKey>>>>,
     // Receive incoming tasks
@@ -183,7 +217,7 @@ pub struct State<C: Collection> {
 impl<C: Collection> State<C> {
     pub fn new(
         _sk: NodeSecretKey,
-        pubsub: c!(C::BroadcastInterface::PubSub<TaskPayload>),
+        event: c!(C::PoolInterface::EventHandler),
         _topology: watch::Receiver<Arc<Vec<Vec<NodePublicKey>>>>,
         responder: c!(C::PoolInterface::Responder),
         socket: LocalTaskSocket,
@@ -194,7 +228,7 @@ impl<C: Collection> State<C> {
         set.spawn(futures::future::pending());
 
         Self {
-            pubsub,
+            event,
             _topology,
             responder,
             socket,
@@ -222,11 +256,11 @@ impl<C: Collection> State<C> {
                     }
                 },
                 // Incoming pubsub messages
-                Some(payload) = self.pubsub.recv() => {
-                    if let Err(e) = self.handle_incoming_pubsub_task(payload) {
+                Some((node_id, payload)) = self.event.receive() => {
+                    if let Err(e) = self.handle_incoming_event_payload(node_id, payload) {
                         warn!("Failed to handle incoming pubsub payload: {e}");
                     }
-                }
+                },
                 else => {
                     break;
                 }
@@ -263,7 +297,11 @@ impl<C: Collection> State<C> {
         Ok(())
     }
 
-    fn handle_incoming_pubsub_task(&mut self, _payload: TaskPayload) -> Result<()> {
-        unimplemented!("todo: handle incoming reqs for cluster consensus");
+    fn handle_incoming_event_payload(&mut self, _node_id: NodeIndex, payload: Bytes) -> Result<()> {
+        let payload = TaskPayload::decode(&payload)?;
+        match payload {
+            TaskPayload::Request(_) => todo!("handle consensus request"),
+            TaskPayload::Response(_) => todo!("handle responses"),
+        }
     }
 }
