@@ -155,8 +155,8 @@ pub async fn blink_support() -> Response {
             "{
         \"rules\": [
           {
-            \"pathPattern\": \"/services/1/ipfs/**\",
-            \"apiPath\": \"/services/1/ipfs/**\"
+            \"pathPattern\": \"/services/1/**\",
+            \"apiPath\": \"/services/1/**\"
           }
         ]
       }",
