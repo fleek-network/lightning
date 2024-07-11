@@ -28,14 +28,13 @@ pub struct TaskBroker<C: Collection> {
     temp: Option<Temp<C>>,
 }
 
-/// Temporary holder struct used after init and before post
+/// Temporary holder struct used during post init
 struct Temp<C: Collection> {
     key: NodeSecretKey,
     // For sending and receiving task requests to the network
     event: c!(C::PoolInterface::EventHandler),
     // Receive incoming tasks
     responder: c!(C::PoolInterface::Responder),
-    shutdown: ShutdownWaiter,
 }
 
 impl<C: Collection> Clone for TaskBroker<C> {
@@ -58,7 +57,6 @@ impl<C: Collection> TaskBroker<C> {
         topology: &C::TopologyInterface,
         pool: &C::PoolInterface,
         fdi::Cloned(query_runner): fdi::Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
-        fdi::Cloned(shutdown): fdi::Cloned<ShutdownWaiter>,
     ) -> Result<Self> {
         let TaskBrokerConfig { max_depth } = config.get::<Self>();
 
@@ -76,17 +74,19 @@ impl<C: Collection> TaskBroker<C> {
                 key: keystore.get_ed25519_sk(),
                 event,
                 responder,
-                shutdown: shutdown.clone(),
             }),
         })
     }
 
-    fn post_init(&mut self, service_executor: &C::ServiceExecutorInterface) {
+    fn post_init(
+        &mut self,
+        service_executor: &C::ServiceExecutorInterface,
+        fdi::Cloned(shutdown): fdi::Cloned<ShutdownWaiter>,
+    ) {
         let Temp {
             key,
             event,
             responder,
-            shutdown,
         } = self.temp.take().unwrap();
 
         // spawn worker to handle executing local tasks
