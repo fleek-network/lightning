@@ -1,5 +1,5 @@
 {
-  description = "Build a cargo project";
+  description = "Lightning - Fleek Network Node";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
@@ -190,9 +190,7 @@
                 cargo hakari verify
               '';
 
-              nativeBuildInputs = [
-                pkgs.cargo-hakari
-              ];
+              nativeBuildInputs = [ pkgs.cargo-hakari ];
             };
 
             # Run tests with cargo-nextest
@@ -266,6 +264,7 @@
             // {
               # Inherit inputs from checks
               checks = self.checks.${system};
+              name = "lightning-dev";
               packages = [
                 pkgs.rust-analyzer
                 pkgs.cargo-nextest
