@@ -7254,6 +7254,7 @@ dependencies = [
  "lightning-pool",
  "lightning-test-utils",
  "lightning-topology",
+ "lightning-workspace-hack",
  "rand 0.8.5",
  "serde",
  "tempdir",

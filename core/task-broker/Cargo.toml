@@ -18,6 +18,7 @@ rand.workspace = true
 bytes.workspace = true
 tokio-util.workspace = true
 serde.workspace = true
+lightning-workspace-hack.workspace = true
 
 [dev-dependencies]
 tokio-util.workspace = true
