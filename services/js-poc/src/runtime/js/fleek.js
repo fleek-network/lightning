@@ -10,11 +10,23 @@ const ServiceId = {
 
 /** Run a service task either locally, on a single node in the cluster, or replicated across the cluster.
  * @param {Number} service - Service ID, must be a 32 bit unsigned integer
- * @param {Uint8Array} body - Request body to send to a service
+ * @param {ArrayBufferLike | string | any} body - Request body to send to a service. Buffers are sent directly,
+ *                                                strings are encoded, and anything else is encoded as json.
  * @param {"local"|"single"|"cluster"} scope - Optional scope to run the task under. If undefined, defaults to local.
  * @returns {Promise<Uint8Array>} - Raw response body from the service
  */
-const runTask = async (service, body, scope = "local") => await ops.run_task(service, body, scope);
+const runTask = async (service, body, scope = "local") => {
+  // TODO: move this encoding to rust
+  if (!ArrayBuffer.isView(body)) {
+    let encoder = new TextEncoder();
+    if (typeof body == "string") {
+      body = encoder.encode(body);
+    } else {
+      body = encoder.encode(JSON.stringify(body));;
+    }
+  }
+  return await ops.run_task(service, body, scope)
+};
 
 /** Fetch some blake3 content
  * @param {Uint8Array} hash - Blake3 hash of content to fetch
