@@ -75,6 +75,13 @@ pub async fn handle_connection(mut conn: Connection) {
         if let Err(e) = handle_request(&mut conn, origin, uri).await {
             error!("{e}");
         }
+    } else if let TransportDetail::Task { payload, .. } = &mut conn.header.transport_detail {
+        let origin = Origin::from(payload[0]);
+        payload.advance(1);
+        let payload = payload.split_to(payload.len());
+        if let Err(e) = handle_request(&mut conn, origin, payload).await {
+            error!("{e}");
+        }
     } else {
         while let Some(mut payload) = conn.read_payload().await {
             let origin = Origin::from(payload[0]);
