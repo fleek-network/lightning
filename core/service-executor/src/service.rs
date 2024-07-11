@@ -4,7 +4,7 @@ use std::process::Stdio;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use dashmap::DashMap;
-use fleek_crypto::{ClientPublicKey};
+use fleek_crypto::ClientPublicKey;
 use fn_sdk::ipc_types::{self, IpcMessage, IpcRequest, DELIMITER_SIZE};
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::schema::task_broker::TaskScope;
