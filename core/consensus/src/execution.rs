@@ -319,7 +319,7 @@ impl<T: BroadcastEventInterface<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
         threshold: usize,
         head: Digest,
     ) -> Result<bool, NotExecuted> {
-        if self.pending_digests.read().unwrap().contains(&digest) {
+        if self.executed_digests.read().unwrap().contains(&digest) {
             // we already executed this parcel
             return Ok(false);
         }
@@ -341,29 +341,63 @@ impl<T: BroadcastEventInterface<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
 
     async fn try_execute_chain(&self, digest: Digest, head: Digest) -> Result<bool, NotExecuted> {
         let mut txn_chain = VecDeque::new();
-        let mut last_digest = digest;
+        let mut current_digest = digest;
         let mut parcel_chain = Vec::new();
 
         loop {
-            let Some(parcel) = self
+            let last_executed;
+            if let Some(parcel) = self
                 .txn_store
                 .read()
                 .unwrap()
-                .get_parcel(&last_digest)
+                .get_parcel(&current_digest)
                 .cloned()
-            else {
-                break;
-            };
+            {
+                if parcel.inner.epoch < self.query_runner.get_current_epoch()
+                    || (parcel.inner.last_executed == [0; 32] && head != [0; 32])
+                {
+                    // if the parcel is from the previous epoch, or it points to the zero digest,
+                    // even though the head isn't the zero digest, we abort and throw away
+                    // the current parcel chain
+                    return Err(NotExecuted::RejectedParcel(current_digest));
+                }
+                // if parcel.inner.last_executed == [0; 32] && head == [0; 32], then the check
+                // `last_executed == head` further down will be true and we will execute.
+                parcel_chain.push(current_digest);
+                txn_chain.push_front((
+                    parcel.inner.transactions,
+                    parcel.inner.sub_dag_index,
+                    current_digest,
+                ));
+                last_executed = parcel.inner.last_executed;
+            } else if current_digest != [0; 32] {
+                // parcel not available, we will set a timer for a missing parcel request
+                let mut pending_digests = self.pending_digests.write().unwrap();
+                for digest in parcel_chain {
+                    pending_digests.insert(digest);
+                }
+                return Err(NotExecuted::MissingParcel {
+                    digest: current_digest,
+                    timeout: self.get_parcel_timeout(),
+                });
+            } else {
+                // This case cannot happen. `current_digest` cannot be [0; 32]. If `current_digest`
+                // was [0; 32], then `last_executed` was [0; 32] in the previous
+                // iteration of the loop. If `last_executed` was [0; 32], then there
+                // are two cases:
+                // 1. `head` is [0; 32]. In this case the check `last_executed == head` is true, so
+                //    we will execute the parcel chain and return without going to the next loop
+                //    iteration.
+                // 2. `head` is not [0; 32]. In this case we abort and return without going to the
+                //    next loop iteration.
+                // In both cases we don't go to the next loop iteration, so `current_digest` will
+                // never be set to [0; 32].
+                // We only handle this case to appease the compiler. Otherwise `last_executed`
+                // could be uninitialized.
+                return Err(NotExecuted::RejectedParcel(current_digest));
+            }
 
-            parcel_chain.push(last_digest);
-
-            txn_chain.push_front((
-                parcel.inner.transactions,
-                parcel.inner.sub_dag_index,
-                last_digest,
-            ));
-
-            if parcel.inner.last_executed == head {
+            if last_executed == head {
                 let mut epoch_changed = false;
 
                 // We connected the chain now execute all the transactions
@@ -390,17 +424,9 @@ impl<T: BroadcastEventInterface<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
 
                 return Ok(epoch_changed);
             } else {
-                last_digest = parcel.inner.last_executed;
+                current_digest = last_executed;
             }
         }
-        let mut pending_digests = self.pending_digests.write().unwrap();
-        for digest in parcel_chain {
-            pending_digests.insert(digest);
-        }
-        Err(NotExecuted::MissingParcel {
-            digest: last_digest,
-            timeout: self.get_parcel_timeout(),
-        })
     }
 
     pub fn get_parcel_timeout(&self) -> Duration {
@@ -515,4 +541,5 @@ struct ParcelTimeoutData {
 pub enum NotExecuted {
     MissingParcel { digest: Digest, timeout: Duration },
     MissingAttestations(Digest),
+    RejectedParcel(Digest),
 }
