@@ -25,6 +25,7 @@ pub enum HttpMethod {
     PUT,
     DELETE,
     PATCH,
+    OPTIONS,
 }
 
 ///  Response type used by a service to override the handshake http response fields when the

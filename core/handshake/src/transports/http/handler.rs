@@ -39,6 +39,7 @@ pub async fn handler<P: ExecutorProviderInterface>(
         Method::PUT => HttpMethod::PUT,
         Method::DELETE => HttpMethod::DELETE,
         Method::PATCH => HttpMethod::PATCH,
+        Method::OPTIONS => HttpMethod::OPTIONS,
         _ => return Err((StatusCode::NOT_FOUND, "invalid method".to_string())),
     };
 
