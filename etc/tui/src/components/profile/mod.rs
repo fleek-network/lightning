@@ -10,6 +10,7 @@ use lightning_guard::{map, ConfigSource};
 use ratatui::prelude::Rect;
 use view::ProfileViewContext;
 
+use super::prompt::PromptChange;
 use super::{Component, Draw, Frame};
 use crate::app::{ApplicationContext, GlobalAction};
 use crate::components::profile::forms::ProfileForm;
@@ -308,9 +309,10 @@ impl Component for Profile {
             },
         };
 
-        // if the top level profiles is mounted, lets make sure we track any subcompomnent prompts
-        if context.active_component() == self.component_name() {
-            context.change_prompt(self.context.mounted.as_str());
+        // if the top level profiles is mounted, 
+        // lets make sure we track any subcompomnent prompts
+        if !context.component_changed() {
+            context.change_prompt(PromptChange::Change(self.context.mounted.as_str()));
         }
 
         maybe_action

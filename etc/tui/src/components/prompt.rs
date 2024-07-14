@@ -12,6 +12,11 @@ use crate::config::Config;
 
 const MAX_KEYS_PER_ROW: usize = 8;
 
+pub enum PromptChange {
+    Change(&'static str),
+    ActiveComponent
+}
+
 /// Component for displaying key bindings and error messages.
 #[derive(Default)]
 pub struct Prompt {
@@ -40,6 +45,7 @@ impl Prompt {
                 .into_iter()
                 .map(|(key, value)| {
                     debug_assert!(key.len() == 1);
+                    
                     (KeySymbol::from(key[0]), value)
                 })
                 .collect::<Vec<_>>();
@@ -53,9 +59,18 @@ impl Prompt {
 }
 
 impl Draw for Prompt {
-    type Context = ();
+    type Context = ApplicationContext;
 
-    fn draw(&mut self, _context: &mut Self::Context, f: &mut Frame<'_>, area: Rect) -> Result<()> {
+    fn draw(&mut self, context: &mut Self::Context, f: &mut Frame<'_>, area: Rect) -> Result<()> {
+        if let Some(mode) = context.prompt_change.take() {
+            let mode = match mode {
+                PromptChange::Change(mode) => mode,
+                PromptChange::ActiveComponent => context.active_component(),
+            };
+
+            self.update_state(mode);
+        }
+
         let rows = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Length(1), Constraint::Length(1)])

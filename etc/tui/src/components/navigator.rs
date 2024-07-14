@@ -8,6 +8,11 @@ use super::{Component, Draw, Frame};
 use crate::app::{ApplicationContext, GlobalAction};
 use crate::config::{ComponentKeyBindings, Config};
 
+pub enum NavDirection {
+    Left,
+    Right,
+}
+
 /// Component for switching between tabs.
 pub struct Navigator {
     selected_tab: usize,
@@ -38,15 +43,25 @@ impl Navigator {
         }
     }
 
+    #[inline]
     pub fn active_component(&self) -> &'static str {
         self.tabs[self.selected_tab]
     }
 }
 
 impl Draw for Navigator {
-    type Context = ();
+    type Context = ApplicationContext;
 
-    fn draw(&mut self, _context: &mut Self::Context, f: &mut Frame<'_>, area: Rect) -> Result<()> {
+    fn draw(&mut self, context: &mut Self::Context, f: &mut Frame<'_>, area: Rect) -> Result<()> {
+        unsafe {
+            if let Some(nav) = context.nav().take() {
+                match nav {
+                    NavDirection::Left => self.nav_left(),
+                    NavDirection::Right => self.nav_right(),
+                }
+            }
+        }
+
         let t = Tabs::new(self.tabs.clone())
             .select(self.selected_tab)
             .block(Block::default().borders(Borders::ALL))

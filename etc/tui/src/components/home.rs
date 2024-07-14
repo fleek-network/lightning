@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use anyhow::Result;
 use indoc::indoc;
 use ratatui::prelude::{Constraint, Layout, Rect};
@@ -5,8 +7,31 @@ use ratatui::widgets::Paragraph;
 use tokio::sync::mpsc::UnboundedSender;
 
 use super::{Component, Draw, Frame};
-use crate::app::{AppAction, ApplicationContext};
+use crate::app::ApplicationContext;
 use crate::config::{ComponentKeyBindings, Config};
+
+/// Actions that can by the main app.
+#[derive(Debug, Clone, Copy)]
+pub enum AppAction {
+    Suspend,
+    NavLeft,
+    NavRight,
+    Quit,
+}
+
+impl FromStr for AppAction {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        match s {
+            "NavLeft" => Ok(Self::NavLeft),
+            "NavRight" => Ok(Self::NavRight),
+            "Quit" => Ok(Self::Quit),
+            "Suspend" => Ok(Self::Suspend),
+            _ => Err(anyhow::anyhow!("Invalid AppAction {s}")),
+        }
+    }
+}
 
 /// Component that displaying the home page.
 #[derive(Default)]
@@ -121,7 +146,22 @@ impl Component for Home {
         event: &[crossterm::event::KeyEvent],
     ) -> Result<Option<crate::app::GlobalAction>> {
         if let Some(action) = self.keybindings.get(event) {
-            return Ok(context.handle_app_action(*action))
+            match action {
+                AppAction::NavLeft => {
+                    context.nav_left();
+                    return Ok(Some(crate::app::GlobalAction::Render));
+                }
+                AppAction::NavRight => {
+                    context.nav_right();
+                    return Ok(Some(crate::app::GlobalAction::Render));
+                }
+                AppAction::Quit => {
+                    return Ok(Some(crate::app::GlobalAction::Quit));
+                }
+                AppAction::Suspend => {
+                    // todo
+                }
+            }
         } else {
             log::error!("Unknown event: {:?}", event);
             log::error!("This should have been prevalidated before being passed to the component.")

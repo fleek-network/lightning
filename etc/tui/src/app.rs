@@ -18,9 +18,9 @@ use tokio::sync::mpsc;
 use crate::components::home::Home;
 // #[cfg(feature = "logger")]
 // use crate::components::logger::Logger;
-use crate::components::navigator::Navigator;
+use crate::components::navigator::{NavDirection, Navigator};
 use crate::components::profile::Profile;
-use crate::components::prompt::Prompt;
+use crate::components::prompt::{Prompt, PromptChange};
 use crate::components::summary::Summary;
 use crate::components::{self, Component, Draw};
 use crate::config::Config;
@@ -38,72 +38,51 @@ pub enum GlobalAction {
 }
 
 pub struct ApplicationContext {
-    navigator: Navigator,
-    prompt: Prompt,
-    summary: Summary,
+    /// The active component. Set by the navigator
+    active_component: &'static str,
+    /// Set by user components to signal a navigation event.
+    nav: Option<NavDirection>,
+    /// The prompt change if any. This is useful for subcomponents that need to change the prompt.
+    pub prompt_change: Option<PromptChange>,
 }
 
-/// Actions that can by the main app.
-#[derive(Debug, Clone, Copy)]
-pub enum AppAction {
-    Suspend,
-    NavLeft,
-    NavRight,
-    Quit,
-}
+impl ApplicationContext {
+    pub fn nav_left(&mut self) {
+        self.nav = Some(NavDirection::Left);
+        self.prompt_change = Some(PromptChange::ActiveComponent);
+    }
 
-impl FromStr for AppAction {
-    type Err = anyhow::Error;
+    pub fn nav_right(&mut self) {
+        self.nav = Some(NavDirection::Right);
+        self.prompt_change = Some(PromptChange::ActiveComponent);
+    }
 
-    fn from_str(s: &str) -> Result<Self> {
-        match s {
-            "NavLeft" => Ok(Self::NavLeft),
-            "NavRight" => Ok(Self::NavRight),
-            "Quit" => Ok(Self::Quit),
-            "Suspend" => Ok(Self::Suspend),
-            _ => Err(anyhow::anyhow!("Invalid AppAction {s}")),
-        }
+    #[inline]
+    pub fn component_changed(&self)-> bool {
+        self.nav.is_some()
+    }
+
+    pub fn change_prompt(&mut self, prompt: PromptChange) {
+        self.prompt_change = Some(prompt);
+    }
+
+    pub fn active_component(&self) -> &'static str {
+        self.active_component
     }
 }
 
 impl ApplicationContext {
-    pub fn handle_app_action(&mut self, action: AppAction) -> Option<GlobalAction> {
-        match action {
-            AppAction::NavLeft => {
-                self.nav_left();
-                Some(GlobalAction::Render)
-            },
-            AppAction::NavRight => {
-                self.nav_right();
-                Some(GlobalAction::Render)
-            },
-            AppAction::Quit => Some(GlobalAction::Quit),
-            // todo
-            AppAction::Suspend => None,
-        }
-    }
-
-    pub fn nav_left(&mut self) {
-        self.navigator.nav_left();
-        self.prompt.update_state(self.navigator.active_component());
-    }
-
-    pub fn nav_right(&mut self) {
-        self.navigator.nav_right();
-        self.prompt.update_state(self.navigator.active_component());
-    }
-
-    pub fn change_prompt(&mut self, prompt: &'static str) {
-        self.prompt.update_state(prompt);
-    }
-
-    pub fn active_component(&self) -> &'static str {
-        self.navigator.active_component()
+    // prompt should be set between top level component changes
+    pub unsafe fn nav(&mut self) -> &mut Option<NavDirection> {
+        &mut self.nav
     }
 }
 
 pub struct App {
-    pub config: Config,
+    config: Config,
+    navigator: Navigator,
+    prompt: Prompt,
+    summary: Summary,
     pub tick_rate: f64,
     pub frame_rate: f64,
     pub last_tick_key_events: Vec<KeyEvent>,
@@ -119,15 +98,18 @@ impl App {
         prompt.update_state("Home");
 
         Ok(Self {
+            prompt,
+            navigator: Navigator::new(),
             config: config.clone(),
             tick_rate,
             frame_rate,
             last_tick_key_events: Vec::new(),
             context: ApplicationContext {
-                navigator: Navigator::new(),
-                prompt: prompt,
-                summary: Summary::new(),
+                active_component: "Starting Component Str",
+                prompt_change: None,
+                nav: None,
             },
+            summary: Summary::new(),
             components: HashMap::new(),
             config_source: src,
         })
@@ -135,7 +117,7 @@ impl App {
 
     fn active_component(&mut self) -> &mut Box<dyn Component<Context = ApplicationContext>> {
         self.components
-            .get_mut(self.context.navigator.active_component())
+            .get_mut(self.navigator.active_component())
             .expect("A valid active component name from navigator")
     }
 
@@ -146,7 +128,7 @@ impl App {
     {
         let _ = component.register_keybindings(&self.config);
 
-        self.context.navigator.push_tab(component.component_name());
+        self.navigator.push_tab(component.component_name());
         self.components
             .insert(component.component_name(), Box::new(component));
 
@@ -159,8 +141,6 @@ impl App {
             .constraints([Constraint::Fill(1), Constraint::Length(3)])
             .split(f.size());
 
-        self.context.prompt.draw(&mut (), f, body_footer_area[1])?;
-
         let content_area = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
@@ -169,16 +149,27 @@ impl App {
             ])
             .split(body_footer_area[0]);
 
-        self.context.summary.draw(&mut (), f, content_area[0])?;
+        self.summary.draw(&mut self.context, f, content_area[0])?;
 
         let navigation_area = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Percentage(100)])
             .split(content_area[1]);
 
-        self.context
-            .navigator
-            .draw(&mut (), f, navigation_area[0])?;
+        // note: the order here is load bearing
+        // the prompt requires that the navigator determines the active component first
+        // so that we can update the context with it
+        // the tldr is that prompt may be displaying keybindins for subcomponents, so this is mostly a no op
+        // except for top level component changes, in which case the order matters
+        {
+            self.navigator
+                .draw(&mut self.context, f, navigation_area[0])?;
+
+            self.context.active_component = self.navigator.active_component();
+
+            self.prompt
+                .draw(&mut self.context, f, body_footer_area[1])?;
+        }
 
         let content = Layout::default()
             .vertical_margin(3)
@@ -188,9 +179,9 @@ impl App {
 
         let component = self
             .components
-            .get_mut(self.context.navigator.active_component())
+            .get_mut(self.navigator.active_component())
             .expect("A valid component from the navigator");
-        
+
         component.draw(&mut self.context, f, content[0])?;
 
         Ok(())
@@ -233,7 +224,7 @@ impl App {
                         // todo!
                     },
                     tui::Event::Key(key) => {
-                        let component = this.context.navigator.active_component();
+                        let component = this.navigator.active_component();
                         let component = this
                             .components
                             .get_mut(component)
@@ -266,6 +257,8 @@ impl App {
                             }
                         }
                     },
+                    // These calls come from a timer and a resize therefore there c
+                    // an be no component change as sa side effect.
                     tui::Event::Resize(w, h) => {
                         tui.resize(Rect::new(0, 0, w, h))?;
                         tui.draw(|f| {
@@ -276,6 +269,7 @@ impl App {
 
                         None
                     },
+                    // See above
                     tui::Event::Render => {
                         tui.draw(|f| {
                             if let Err(e) = this.draw_components(f, f.size()) {
@@ -299,6 +293,8 @@ impl App {
                                     log::error!("Failed to draw: {:?}", e);
                                 }
                             })?;
+
+                            this.context.active_component = this.navigator.active_component();
                         },
                         GlobalAction::Quit => {
                             log::warn!("Quitting!");
