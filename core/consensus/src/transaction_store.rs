@@ -115,6 +115,8 @@ impl<T: BroadcastEventInterface<PubSubMsg>> TransactionStore<T> {
                     if let Some(event) = parcel_event {
                         event.mark_invalid_sender();
                     }
+                } else if let Some(event) = parcel_event {
+                    event.propagate();
                 }
             }
 
@@ -123,13 +125,17 @@ impl<T: BroadcastEventInterface<PubSubMsg>> TransactionStore<T> {
                     .iter()
                     .copied()
                     .partition(|node_index| committee.contains(node_index));
-
                 if let Some(mut events) = attn_events {
                     invalid_attn.into_iter().for_each(|node_index| {
                         if let Some(event) = events.remove(&node_index) {
                             event.mark_invalid_sender();
                         }
-                    })
+                    });
+                    valid_attn.iter().for_each(|node_index| {
+                        if let Some(event) = events.remove(node_index) {
+                            event.propagate();
+                        }
+                    });
                 }
 
                 if valid_attn.is_empty() {
