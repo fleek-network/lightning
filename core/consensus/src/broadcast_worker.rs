@@ -277,7 +277,8 @@ async fn handle_parcel<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Em
     let last_executed = parcel.last_executed;
 
     let mut event = None;
-    if ctx.pending_requests.remove(&parcel_digest).is_none() && !from_next_epoch {
+    let parcel_request = ctx.pending_requests.remove(&parcel_digest);
+    if parcel_request.is_none() && !from_next_epoch {
         // We only want to propagate parcels that we did not request and that
         // are not from the next epoch.
         msg.propagate();
@@ -303,7 +304,7 @@ async fn handle_parcel<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Em
     };
 
     // Check if we requested this parcel
-    if ctx.pending_requests.remove(&parcel_digest).is_some() {
+    if parcel_request.is_some() {
         // This is a parcel that we specifically requested, so
         // we have to set a timeout for the previous parcel, because
         // we swallow the Err return in the loop of `try_execute`.
