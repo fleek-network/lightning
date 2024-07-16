@@ -354,31 +354,36 @@ impl<B: BroadcastBackend> Context<B> {
                     return;
                 };
 
-                let Some(mut q) = self.processing.remove(&cmd.digest) else {
-                    debug_assert!(
-                        false,
-                        "We should not be trying to propagate a message we don't have."
-                    );
-                    return;
-                };
-                let Some(msg) = q.pop_front() else {
-                    debug_assert!(
-                        false,
-                        "We should not be trying to propagate a message we don't have."
-                    );
-                    return;
-                };
-                // Insert the message into the database for future lookups.
-                self.db.insert_message(&cmd.digest, msg.message);
+                // If the message originated from this node, it won't be stored in `processing`.
+                // Also, if we re-propagate a message, it won't be stored in `processing` anymore,
+                // but will already be in the `db`.
+                if !self.db.contains_message(&cmd.digest) {
+                    let Some(mut q) = self.processing.remove(&cmd.digest) else {
+                        debug_assert!(
+                            false,
+                            "We should not be trying to propagate a message we don't have."
+                        );
+                        return;
+                    };
+                    let Some(msg) = q.pop_front() else {
+                        debug_assert!(
+                            false,
+                            "We should not be trying to propagate a message we don't have."
+                        );
+                        return;
+                    };
+                    // Report a satisfactory interaction when we receive a message.
+                    self.backend.report_sat(msg.sender, Weight::Weak);
+
+                    // Insert the message into the database for future lookups.
+                    self.db.insert_message(&cmd.digest, msg.message);
+                }
 
                 // Remove the received message from the pending store.
                 self.pending_store.remove_message(id);
 
                 // Continue with advertising this message to the connected peers.
                 self.advertise(id, cmd.digest, cmd.filter);
-
-                // Report a satisfactory interaction when we receive a message.
-                self.backend.report_sat(msg.sender, Weight::Weak);
 
                 increment_counter!(
                     "broadcast_messages_propagated",
