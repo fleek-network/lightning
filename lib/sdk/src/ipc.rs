@@ -34,8 +34,9 @@ pub async fn conn_bind() -> ConnectionListener {
     ConnectionListener::new(listener)
 }
 
-/// Init the service event loop using environment variables. This method *MUST* only be called
-/// once.
+/// Init the service event loop using environment variables, and set the signal handler via prctl to
+/// kill when the parent process dies ([`libc::PR_SET_CHILD_SUBREAPER`]). This method *MUST* only be
+/// called once.
 pub fn init_from_env() {
     let blockstore_path: PathBuf = std::env::var("BLOCKSTORE_PATH")
         .expect("Expected BLOCKSTORE_PATH env")
@@ -53,6 +54,8 @@ pub fn init_from_env() {
         BLOCKSTORE = Some(blockstore_path);
         IPC_PATH = Some(ipc_path.clone());
     }
+
+    prctl::set_death_signal(2).expect("failed to set parent death signal");
 
     tokio::spawn(async {
         let _ = spawn_service_loop(ipc_path, rx).await;

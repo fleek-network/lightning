@@ -74,7 +74,7 @@ inout = { version = "0.1", default-features = false, features = ["std"] }
 itertools = { version = "0.10" }
 k256 = { version = "0.13" }
 lazy_static = { version = "1", default-features = false, features = ["spin_no_std"] }
-libc = { version = "0.2" }
+libc = { version = "0.2", features = ["extra_traits"] }
 log = { version = "0.4", default-features = false, features = ["std"] }
 matrixmultiply = { version = "0.3", features = ["cgemm"] }
 memchr = { version = "2" }
@@ -202,7 +202,7 @@ inout = { version = "0.1", default-features = false, features = ["std"] }
 itertools = { version = "0.10" }
 k256 = { version = "0.13" }
 lazy_static = { version = "1", default-features = false, features = ["spin_no_std"] }
-libc = { version = "0.2" }
+libc = { version = "0.2", features = ["extra_traits"] }
 log = { version = "0.4", default-features = false, features = ["std"] }
 matrixmultiply = { version = "0.3", features = ["cgemm"] }
 memchr = { version = "2" }
@@ -305,7 +305,6 @@ core-foundation = { version = "0.9" }
 core-foundation-sys = { version = "0.8" }
 indexmap-f595c2ba2a3f28df = { package = "indexmap", version = "2", features = ["serde"] }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
-libc = { version = "0.2", default-features = false, features = ["extra_traits"] }
 mio = { version = "0.8", features = ["net", "os-ext"] }
 rustix = { version = "0.38", features = ["fs", "termios"] }
 security-framework-sys = { version = "2" }
@@ -320,7 +319,6 @@ core-foundation = { version = "0.9" }
 core-foundation-sys = { version = "0.8" }
 indexmap-f595c2ba2a3f28df = { package = "indexmap", version = "2", features = ["serde"] }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
-libc = { version = "0.2", default-features = false, features = ["extra_traits"] }
 mio = { version = "0.8", features = ["net", "os-ext"] }
 rustix = { version = "0.38", features = ["fs", "termios"] }
 security-framework-sys = { version = "2" }
