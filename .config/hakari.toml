@@ -60,4 +60,5 @@ workspace-members = [
     "resolved-pathbuf",
     "safetensors-ndarray",
     "simulon",
+    "b3fs",
 ]
