@@ -54,7 +54,9 @@ pub fn init_from_env() {
         IPC_PATH = Some(ipc_path.clone());
     }
 
-    // SIGINT
+    // SIGINT: Only supported on linux. This tells the kernel to shut the child (this bin) down
+    // if the parent dies.
+    #[cfg(target_os = "linux")]
     prctl::set_death_signal(2).expect("failed to set parent death signal");
 
     tokio::spawn(async {
