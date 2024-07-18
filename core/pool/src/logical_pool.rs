@@ -11,11 +11,12 @@ use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::ServiceScope;
 use lightning_metrics::histogram;
+use lightning_types::{Param, PeerFilter};
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 
 use crate::endpoint::EndpointTask;
-use crate::event::{Message, Param};
+use crate::event::Message;
 use crate::provider::Response;
 use crate::state::NodeInfo;
 
@@ -261,19 +262,21 @@ where
         &self,
         service_scope: ServiceScope,
         message: Bytes,
-        param: Param,
+        peer_filter: PeerFilter,
     ) -> Option<EndpointTask> {
-        let peers: Vec<ConnectionInfo> = match param {
+        let peers: Vec<ConnectionInfo> = match peer_filter.param {
             Param::Filter(filter) => self
                 .pool
                 .iter()
-                .filter(|(index, info)| info.from_topology && filter(**index))
+                .filter(|(index, info)| {
+                    (!peer_filter.by_topology || info.from_topology) && filter(**index)
+                })
                 .map(|(_, info)| info.clone())
                 .collect(),
             Param::Index(index) => self
                 .pool
                 .get(&index)
-                .filter(|info| info.from_topology)
+                .filter(|info| !peer_filter.by_topology || info.from_topology)
                 .map(|info| vec![info.clone()])
                 .unwrap_or_default(),
         };

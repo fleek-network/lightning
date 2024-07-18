@@ -6754,6 +6754,7 @@ dependencies = [
  "lightning-signer",
  "lightning-test-utils",
  "lightning-topology",
+ "lightning-types",
  "lightning-utils",
  "lightning-workspace-hack",
  "quinn",

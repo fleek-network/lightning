@@ -16,6 +16,7 @@ futures.workspace = true
 lightning-interfaces = { path = "../interfaces" }
 lightning-metrics = { path = "../metrics" }
 lightning-utils = { path = "../utils" }
+lightning-types = { path = "../types" }
 tracing.workspace = true
 serde.workspace = true
 humantime-serde.workspace = true

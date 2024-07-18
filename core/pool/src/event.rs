@@ -10,6 +10,7 @@ use futures::stream::FuturesUnordered;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::{RequestHeader, ServiceScope};
+use lightning_types::PeerFilter;
 use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot, watch};
@@ -44,7 +45,7 @@ pub enum Event {
     Broadcast {
         service_scope: ServiceScope,
         message: Bytes,
-        param: Param,
+        peer_filter: PeerFilter,
     },
     SendRequest {
         dst: NodeIndex,
@@ -195,9 +196,9 @@ where
             Event::Broadcast {
                 service_scope,
                 message,
-                param,
+                peer_filter,
             } => {
-                let _ = self.handle_outgoing_broadcast(service_scope, message, param);
+                let _ = self.handle_outgoing_broadcast(service_scope, message, peer_filter);
             },
             Event::SendRequest {
                 dst,
@@ -346,11 +347,11 @@ where
         &self,
         service_scope: ServiceScope,
         message: Bytes,
-        param: Param,
+        peer_filter: PeerFilter,
     ) -> anyhow::Result<()> {
-        if let Some(task) = self
-            .handler
-            .process_outgoing_broadcast(service_scope, message, param)
+        if let Some(task) =
+            self.handler
+                .process_outgoing_broadcast(service_scope, message, peer_filter)
         {
             self.enqueue_endpoint_task(task);
         }
@@ -450,14 +451,6 @@ where
     }
 }
 
-pub enum Param<F = BoxedFilterCallback>
-where
-    F: Fn(NodeIndex) -> bool,
-{
-    Filter(F),
-    Index(NodeIndex),
-}
-
 #[derive(Clone, Debug)]
 pub struct Message {
     pub service: ServiceScope,
@@ -486,5 +479,3 @@ impl From<Message> for Bytes {
         buf.into()
     }
 }
-
-pub type BoxedFilterCallback = Box<dyn Fn(NodeIndex) -> bool + Send + Sync + 'static>;
