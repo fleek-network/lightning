@@ -20,12 +20,13 @@ use lightning_signer::Signer;
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_topology::Topology;
+use lightning_types::{Param, PeerFilter};
 use tempfile::{tempdir, TempDir};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
 
 use crate::endpoint::EndpointTask;
-use crate::event::{Event, EventReceiver, Param};
+use crate::event::{Event, EventReceiver};
 use crate::{provider, Config, PoolProvider};
 
 partial!(TestBinding {
@@ -688,7 +689,10 @@ async fn test_log_pool_only_broadcast_to_peers_in_topology_cluster() {
         .handle_event(Event::Broadcast {
             service_scope: ServiceScope::Broadcast,
             message: Bytes::new(),
-            param: Param::Filter(Box::new(|_| true)),
+            peer_filter: PeerFilter {
+                by_topology: true,
+                param: Param::Filter(Box::new(|_| true)),
+            },
         })
         .unwrap();
 
@@ -748,7 +752,10 @@ async fn test_log_pool_only_broadcast_to_one_peer() {
         .handle_event(Event::Broadcast {
             service_scope: ServiceScope::Broadcast,
             message: Bytes::new(),
-            param: Param::Index(peers[1].node_index),
+            peer_filter: PeerFilter {
+                by_topology: false,
+                param: Param::Index(peers[1].node_index),
+            },
         })
         .unwrap();
 
@@ -775,7 +782,10 @@ async fn test_log_pool_only_broadcast_to_one_peer() {
         .handle_event(Event::Broadcast {
             service_scope: ServiceScope::Broadcast,
             message: Bytes::new(),
-            param: Param::Index(6969),
+            peer_filter: PeerFilter {
+                by_topology: false,
+                param: Param::Index(6969),
+            },
         })
         .unwrap();
 

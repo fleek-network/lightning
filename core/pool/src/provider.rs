@@ -9,12 +9,14 @@ use futures::{SinkExt, Stream};
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{NodeIndex, RejectReason};
 use lightning_interfaces::{RequestHeader, ServiceScope};
+use lightning_types::Param;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
+use types::PeerFilter;
 
 use crate::config::Config;
 use crate::endpoint::{Endpoint, EndpointTask};
-use crate::event::{Event, EventReceiver, Param};
+use crate::event::{Event, EventReceiver};
 use crate::muxer::quinn::QuinnMuxer;
 use crate::muxer::{BoxedChannel, MuxerInterface};
 use crate::{http, muxer, tls};
@@ -205,7 +207,10 @@ impl EventHandlerInterface for EventHandler {
                     .send(Event::Broadcast {
                         service_scope,
                         message,
-                        param: Param::Filter(Box::new(filter)),
+                        peer_filter: PeerFilter {
+                            param: Param::Filter(Box::new(filter)),
+                            by_topology: false,
+                        },
                     })
                     .await
                     .is_err()
@@ -226,7 +231,10 @@ impl EventHandlerInterface for EventHandler {
                     .send(Event::Broadcast {
                         service_scope,
                         message,
-                        param: Param::Index(index),
+                        peer_filter: PeerFilter {
+                            param: Param::Index(index),
+                            by_topology: false,
+                        },
                     })
                     .await
                     .is_err()
