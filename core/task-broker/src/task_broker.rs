@@ -2,15 +2,15 @@ use std::sync::{Arc, RwLock};
 
 use affair::AsyncWorkerUnordered;
 use anyhow::Result;
-use bytes::Bytes;
 use fleek_crypto::{NodePublicKey, NodeSecretKey};
-use futures::{AsyncReadExt, TryStreamExt};
+use futures::stream::FuturesUnordered;
+use futures::{AsyncReadExt, StreamExt, TryStreamExt};
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::{spawn_worker, RequestHeader, RequesterInterface, TaskError};
 use lightning_metrics::increment_counter;
 use rand::prelude::SliceRandom;
 use rand::thread_rng;
-use schema::task_broker::{TaskPayload, TaskRequest, TaskResponse, TaskScope};
+use schema::task_broker::{TaskRequest, TaskResponse, TaskScope};
 use serde::{Deserialize, Serialize};
 use tokio::sync::watch;
 use tokio::task::JoinSet;
@@ -25,16 +25,8 @@ pub struct TaskBroker<C: Collection> {
     topology: tokio::sync::watch::Receiver<Arc<Vec<Vec<NodePublicKey>>>>,
     query_runner: c!(C::ApplicationInterface::SyncExecutor),
     max_depth: u8,
-    temp: Option<Temp<C>>,
-}
-
-/// Temporary holder struct used during post init
-struct Temp<C: Collection> {
-    key: NodeSecretKey,
-    // For sending and receiving task requests to the network
-    event: c!(C::PoolInterface::EventHandler),
-    // Receive incoming tasks
-    responder: c!(C::PoolInterface::Responder),
+    // temp objects used for state loop
+    temp: Option<(NodeSecretKey, c!(C::PoolInterface::Responder))>,
 }
 
 impl<C: Collection> Clone for TaskBroker<C> {
@@ -62,7 +54,6 @@ impl<C: Collection> TaskBroker<C> {
 
         // Spawn state loop for handling pool and pubsub events
         let (req, responder) = pool.open_req_res(lightning_interfaces::ServiceScope::TaskBroker);
-        let event = pool.open_event(lightning_interfaces::ServiceScope::TaskBroker);
 
         Ok(Self {
             max_depth,
@@ -70,11 +61,7 @@ impl<C: Collection> TaskBroker<C> {
             requester: req.into(),
             topology: topology.get_receiver(),
             query_runner,
-            temp: Some(Temp {
-                key: keystore.get_ed25519_sk(),
-                event,
-                responder,
-            }),
+            temp: Some((keystore.get_ed25519_sk(), responder)),
         })
     }
 
@@ -83,11 +70,7 @@ impl<C: Collection> TaskBroker<C> {
         service_executor: &C::ServiceExecutorInterface,
         fdi::Cloned(shutdown): fdi::Cloned<ShutdownWaiter>,
     ) {
-        let Temp {
-            key,
-            event,
-            responder,
-        } = self.temp.take().unwrap();
+        let (key, responder) = self.temp.take().unwrap();
 
         // spawn worker to handle executing local tasks
         let provider = service_executor.get_provider();
@@ -100,42 +83,50 @@ impl<C: Collection> TaskBroker<C> {
 
         *self.socket.write().unwrap() = Some(socket.clone());
 
-        State::<C>::new(
+        State::<C>::spawn(
             key,
-            event,
             self.topology.clone(),
             responder,
             socket.clone(),
             shutdown,
-        )
-        .spawn();
+        );
     }
 
-    async fn run_single_node_task(&self, task: TaskRequest) -> Result<TaskResponse, TaskError> {
-        let id = {
-            // Get current topology
-            let topology = self.topology.borrow();
-            let Some(nodes) = topology.first() else {
-                return Err(TaskError::Internal("topology not initialized".to_string()));
-            };
-            if nodes.is_empty() {
-                return Err(TaskError::Internal("no nodes in cluster".into()));
-            }
-
-            // Select a random node within the local cluster
-            let pub_key = { nodes.choose(&mut thread_rng()).unwrap() };
-            self.query_runner
-                .pubkey_to_index(pub_key)
-                .expect("topology should never ever give unknown node pubkeys/indecies")
+    fn get_cluster(&self) -> Result<Vec<NodePublicKey>, TaskError> {
+        // Get current topology cluster
+        let topology = self.topology.borrow();
+        let Some(nodes) = topology.first() else {
+            return Err(TaskError::Internal("topology not initialized".to_string()));
         };
+        if nodes.is_empty() {
+            return Err(TaskError::Internal("no nodes in cluster".into()));
+        }
+        Ok(nodes.clone())
+    }
 
+    fn get_random_cluster_node(&self) -> Result<u32, TaskError> {
+        // Select a random node within the local cluster
+        let cluster = self.get_cluster()?;
+        let pub_key = cluster.choose(&mut thread_rng()).unwrap();
+        let idx = self
+            .query_runner
+            .pubkey_to_index(pub_key)
+            .expect("topology should never ever give unknown node pubkeys/indecies");
+        Ok(idx)
+    }
+
+    async fn run_task_on_peer(
+        &self,
+        task: TaskRequest,
+        peer: NodeIndex,
+    ) -> Result<TaskResponse, TaskError> {
         // Encode task and send the request
         let mut buf = Vec::new();
         task.encode(&mut buf)
             .map_err(|e| TaskError::Internal(e.to_string()))?;
         let res = self
             .requester
-            .request(id, buf.into())
+            .request(peer, buf.into())
             .await
             .map_err(|_| TaskError::Connect)?;
 
@@ -147,6 +138,32 @@ impl<C: Collection> TaskBroker<C> {
             .map_err(|_| TaskError::InvalidResponse)?;
 
         TaskResponse::decode(&buf).map_err(|_| TaskError::InvalidResponse)
+    }
+
+    /// Get a random peer and run the task on it
+    async fn run_single_task(&self, task: TaskRequest) -> Result<TaskResponse, TaskError> {
+        let idx = self.get_random_cluster_node()?;
+        self.run_task_on_peer(task, idx).await
+    }
+
+    /// Get peers in the cluster and run the task on them
+    /// TODO: Collect 2/3 of the same responses and respond early, pruning invalid ones.
+    async fn run_cluster_task(&self, task: TaskRequest) -> Vec<Result<TaskResponse, TaskError>> {
+        match self.get_cluster() {
+            Ok(c) => {
+                c.iter()
+                    .map(|v| {
+                        self.query_runner
+                            .pubkey_to_index(v)
+                            .expect("topology should never give unknown node pubkeys/indecies")
+                    })
+                    .map(|idx| self.run_task_on_peer(task.clone(), idx))
+                    .collect::<FuturesUnordered<_>>()
+                    .collect::<Vec<_>>()
+                    .await
+            },
+            Err(e) => vec![Err(e)],
+        }
     }
 }
 
@@ -210,16 +227,14 @@ impl<C: Collection> TaskBrokerInterface<C> for TaskBroker<C> {
                 vec![res]
             },
             TaskScope::Single => {
-                let res = self.run_single_node_task(task).await;
+                let res = self.run_single_task(task).await;
                 if let Err(e) = &res {
                     warn!("Failed to run task on peer: {e}");
                     task_failed_metric(scope);
                 }
                 vec![res]
             },
-            TaskScope::Cluster => unimplemented!(
-                "Cluster task consensus not implemented (need cluster aware broadcasts)"
-            ),
+            TaskScope::Cluster => self.run_cluster_task(task).await,
             TaskScope::Multicluster(_) => {
                 unimplemented!(
                     "Multicluster task consensus not implemented (need multicluster aware broadcasts)"
@@ -236,8 +251,6 @@ fn task_failed_metric(scope: TaskScope) {
 
 /// State for handling incoming tasks
 pub struct State<C: Collection> {
-    // For sending and receiving task requests to the network
-    event: c!(C::PoolInterface::EventHandler),
     // For finding single nodes within the cluster
     _topology: watch::Receiver<Arc<Vec<Vec<NodePublicKey>>>>,
     // Receive incoming tasks
@@ -246,35 +259,30 @@ pub struct State<C: Collection> {
     socket: LocalTaskSocket,
     // Pending tasks we spawn
     pending_tasks: JoinSet<()>,
-    shutdown: ShutdownWaiter,
 }
 
 impl<C: Collection> State<C> {
-    pub fn new(
+    pub fn spawn(
         _sk: NodeSecretKey,
-        event: c!(C::PoolInterface::EventHandler),
         _topology: watch::Receiver<Arc<Vec<Vec<NodePublicKey>>>>,
         responder: c!(C::PoolInterface::Responder),
         socket: LocalTaskSocket,
         shutdown: ShutdownWaiter,
-    ) -> Self {
+    ) {
+        // Hack to ensure the task set is never empty
         let mut set = JoinSet::new();
-        // Hack to ensure the set is never empty
         set.spawn(futures::future::pending());
 
-        Self {
-            event,
+        let fut = Self {
             _topology,
             responder,
             socket,
             pending_tasks: set,
-            shutdown,
         }
-    }
+        .run();
 
-    pub fn spawn(self) {
         spawn!(
-            async move { self.shutdown.clone().run_until_shutdown(self.run()).await },
+            async move { shutdown.run_until_shutdown(fut).await },
             "TASK BROKER: Incoming task loop"
         );
     }
@@ -288,12 +296,6 @@ impl<C: Collection> State<C> {
                Ok((header, responder)) = self.responder.get_next_request() => {
                     if let Err(e) = self.handle_incoming_pool_task(header, responder) {
                         warn!("Failed to handle incoming pool task: {e}");
-                    }
-                },
-                // Incoming pubsub messages
-                Some((node_id, payload)) = self.event.receive() => {
-                    if let Err(e) = self.handle_incoming_event_payload(node_id, payload) {
-                        warn!("Failed to handle incoming pubsub payload: {e}");
                     }
                 },
                 else => {
@@ -330,13 +332,5 @@ impl<C: Collection> State<C> {
         });
 
         Ok(())
-    }
-
-    fn handle_incoming_event_payload(&mut self, _node_id: NodeIndex, payload: Bytes) -> Result<()> {
-        let payload = TaskPayload::decode(&payload)?;
-        match payload {
-            TaskPayload::Request(_) => todo!("handle consensus request"),
-            TaskPayload::Response(_) => todo!("handle responses"),
-        }
     }
 }
