@@ -9,6 +9,7 @@ use lightning_application::app::Application;
 use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_broadcast::Broadcast;
 use lightning_interfaces::prelude::*;
+use lightning_interfaces::TaskError;
 use lightning_pool::PoolProvider;
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
@@ -18,7 +19,7 @@ use tokio::net::UnixStream;
 use tokio_util::codec::Framed;
 use types::NodePorts;
 
-use crate::TaskBroker;
+use crate::{TaskBroker, TaskBrokerConfig};
 
 partial!(TestBinding {
     ConfigProviderInterface = JsonConfigProvider;
@@ -92,8 +93,9 @@ fn build_cluster(
     let name = format!("task-broker-test-{line}");
     let port_start = 13000 + line;
     let owner = EthAddress::default();
-
     async move {
+        let dir = tempdir::TempDir::new(&name)?;
+
         // Initialize keystores
         let keystores = (0..n)
             .map(|_| EphemeralKeystore::<TestBinding>::default())
@@ -130,7 +132,6 @@ fn build_cluster(
         };
 
         // Write genesis
-        let dir = tempdir::TempDir::new(&name)?;
         let path = &genesis.write_to_dir(dir.path().to_path_buf().try_into().unwrap())?;
 
         // Initialize nodes and start them
@@ -149,6 +150,10 @@ fn build_cluster(
                                     max_idle_timeout: Duration::from_secs(5),
                                     address: ([127, 0, 0, 1], port_start + i as u16).into(),
                                     http: None,
+                                })
+                                .with::<TaskBroker<TestBinding>>(TaskBrokerConfig {
+                                    request_timeout: Duration::from_secs(5),
+                                    ..Default::default()
                                 }),
                         )
                         .with(keystore),
@@ -295,6 +300,105 @@ async fn run_cluster_echo_task() -> anyhow::Result<()> {
         .collect::<FuturesUnordered<_>>()
         .collect::<()>()
         .await;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn run_cluster_echo_task_1_offline_of_8() -> anyhow::Result<()> {
+    lightning_test_utils::logging::setup();
+    let (_, mut nodes) = build_cluster(8).await?;
+
+    // shutdown a node
+    nodes.remove(0).shutdown().await;
+
+    let broker = nodes[1].provider.get::<TaskBroker<TestBinding>>();
+
+    const PAYLOAD: &[u8] = b"hello world";
+    let request = schema::task_broker::TaskRequest {
+        service: 0,
+        timestamp: SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs(),
+        payload: PAYLOAD.into(),
+    };
+    let digest = request.to_digest();
+
+    let responses = broker
+        .run(0, schema::task_broker::TaskScope::Cluster, request)
+        .await;
+
+    // Ensure at least 2/3 of nodes had a response
+    assert!(responses.len() >= (2. * nodes.len() as f32 / 3.).ceil() as usize);
+
+    for response in responses {
+        match response {
+            Ok(response) => {
+                assert_eq!(response.payload, PAYLOAD);
+                assert_eq!(response.request, digest);
+            },
+            Err(e) => {
+                if !matches!(e, TaskError::PeerDisconnect | TaskError::Timeout) {
+                    panic!("unexpected error")
+                }
+            },
+        }
+    }
+
+    // Shutdown all nodes
+    nodes
+        .iter_mut()
+        .map(|n| n.shutdown())
+        .collect::<FuturesUnordered<_>>()
+        .collect::<()>()
+        .await;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn run_cluster_echo_task_7_offline_of_8_should_fail() -> anyhow::Result<()> {
+    lightning_test_utils::logging::setup();
+    let (_, mut nodes) = build_cluster(8).await?;
+
+    // shutdown all nodes but one
+    nodes
+        .iter_mut()
+        .skip(1)
+        .map(Node::shutdown)
+        .collect::<FuturesUnordered<_>>()
+        .collect::<()>()
+        .await;
+
+    let broker = nodes[0].provider.get::<TaskBroker<TestBinding>>();
+
+    const PAYLOAD: &[u8] = b"hello world";
+    let request = schema::task_broker::TaskRequest {
+        service: 0,
+        timestamp: SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs(),
+        payload: PAYLOAD.into(),
+    };
+    // let digest = request.to_digest();
+
+    let responses = broker
+        .run(0, schema::task_broker::TaskScope::Cluster, request)
+        .await;
+
+    for response in responses {
+        let response = response.expect_err("only errors should happen");
+        println!("{response:?}");
+        assert!(
+            matches!(response, TaskError::Connect | TaskError::Timeout),
+            "unexpected error"
+        );
+    }
+
+    // Shutdown the last node
+    nodes.get_mut(0).unwrap().shutdown().await;
 
     Ok(())
 }

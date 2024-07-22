@@ -7,6 +7,7 @@ use fn_sdk::header::{write_header, ConnectionHeader};
 use futures::StreamExt;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::schema::task_broker::{TaskRequest, TaskResponse};
+use tokio::sync::Semaphore;
 use tokio_util::codec::{Framed, LengthDelimitedCodec};
 
 pub type LocalTaskSocket = Socket<(u8, TaskRequest), anyhow::Result<TaskResponse>>;
@@ -17,11 +18,16 @@ pub type LocalTaskSocket = Socket<(u8, TaskRequest), anyhow::Result<TaskResponse
 pub struct LocalTaskWorker<P: ExecutorProviderInterface> {
     // For connecting to local services
     provider: P,
+    // Limit concurrent tasks
+    semaphore: Semaphore,
 }
 
 impl<P: ExecutorProviderInterface> LocalTaskWorker<P> {
-    pub fn new(provider: P) -> Self {
-        Self { provider }
+    pub fn new(provider: P, max_tasks: usize) -> Self {
+        Self {
+            provider,
+            semaphore: Semaphore::new(max_tasks),
+        }
     }
 }
 
@@ -29,6 +35,9 @@ impl<P: ExecutorProviderInterface> AsyncWorkerUnordered for LocalTaskWorker<P> {
     type Request = (u8, TaskRequest);
     type Response = Result<TaskResponse>;
     async fn handle(&self, (depth, req): Self::Request) -> Self::Response {
+        // Wait for our turn
+        let _ = self.semaphore.acquire().await;
+
         let digest = req.to_digest();
 
         // Connect to the service

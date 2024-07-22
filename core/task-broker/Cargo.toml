@@ -7,6 +7,7 @@ edition.workspace = true
 lightning-interfaces = { path = "../interfaces" }
 lightning-metrics = { path = "../metrics" }
 fn-sdk = { path = "../../lib/sdk" }
+fleek-blake3 = "1.5"
 fleek-crypto.workspace = true
 affair.workspace = true
 tokio.workspace = true
@@ -18,6 +19,7 @@ rand.workspace = true
 bytes.workspace = true
 tokio-util.workspace = true
 serde.workspace = true
+humantime-serde = "1.1"
 lightning-workspace-hack.workspace = true
 
 [dev-dependencies]

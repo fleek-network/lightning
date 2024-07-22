@@ -1,4 +1,6 @@
+use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
+use std::time::Duration;
 
 use affair::AsyncWorkerUnordered;
 use anyhow::Result;
@@ -12,9 +14,10 @@ use rand::prelude::SliceRandom;
 use rand::thread_rng;
 use schema::task_broker::{TaskRequest, TaskResponse, TaskScope};
 use serde::{Deserialize, Serialize};
-use tokio::sync::watch;
+use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
-use tracing::warn;
+use tokio::time::timeout;
+use tracing::{debug, warn};
 use types::NodeIndex;
 
 use crate::local::{LocalTaskSocket, LocalTaskWorker};
@@ -25,18 +28,25 @@ pub struct TaskBroker<C: Collection> {
     topology: tokio::sync::watch::Receiver<Arc<Vec<Vec<NodePublicKey>>>>,
     query_runner: c!(C::ApplicationInterface::SyncExecutor),
     max_depth: u8,
-    // temp objects used for state loop
-    temp: Option<(NodeSecretKey, c!(C::PoolInterface::Responder))>,
+    request_timeout: Duration,
+    temp: Option<RequestWorkerInner<C>>,
+}
+
+struct RequestWorkerInner<C: Collection> {
+    sk: NodeSecretKey,
+    responder: c!(C::PoolInterface::Responder),
+    config: TaskBrokerConfig,
 }
 
 impl<C: Collection> Clone for TaskBroker<C> {
     fn clone(&self) -> Self {
         Self {
-            max_depth: self.max_depth,
             socket: self.socket.clone(),
             requester: self.requester.clone(),
             topology: self.topology.clone(),
             query_runner: self.query_runner.clone(),
+            max_depth: self.max_depth,
+            request_timeout: self.request_timeout,
             temp: None,
         }
     }
@@ -50,18 +60,26 @@ impl<C: Collection> TaskBroker<C> {
         pool: &C::PoolInterface,
         fdi::Cloned(query_runner): fdi::Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
     ) -> Result<Self> {
-        let TaskBrokerConfig { max_depth } = config.get::<Self>();
+        let config @ TaskBrokerConfig {
+            max_depth,
+            request_timeout,
+            ..
+        } = config.get::<Self>();
 
-        // Spawn state loop for handling pool and pubsub events
         let (req, responder) = pool.open_req_res(lightning_interfaces::ServiceScope::TaskBroker);
 
         Ok(Self {
-            max_depth,
             socket: Arc::new(RwLock::new(None)),
             requester: req.into(),
             topology: topology.get_receiver(),
             query_runner,
-            temp: Some((keystore.get_ed25519_sk(), responder)),
+            max_depth,
+            request_timeout,
+            temp: Some(RequestWorkerInner {
+                sk: keystore.get_ed25519_sk(),
+                responder,
+                config,
+            }),
         })
     }
 
@@ -70,32 +88,38 @@ impl<C: Collection> TaskBroker<C> {
         service_executor: &C::ServiceExecutorInterface,
         fdi::Cloned(shutdown): fdi::Cloned<ShutdownWaiter>,
     ) {
-        let (key, responder) = self.temp.take().unwrap();
+        let RequestWorkerInner {
+            sk,
+            responder,
+            config,
+        } = self.temp.take().unwrap();
 
         // spawn worker to handle executing local tasks
         let provider = service_executor.get_provider();
         let waiter = shutdown.clone();
         let socket = spawn_worker!(
-            LocalTaskWorker::new(provider),
+            LocalTaskWorker::new(provider, config.max_tasks),
             "TASK BROKER: Local task worker",
             waiter
         );
 
         *self.socket.write().unwrap() = Some(socket.clone());
 
-        State::<C>::spawn(
-            key,
-            self.topology.clone(),
+        RequestWorker::<C>::spawn(
+            sk,
             responder,
             socket.clone(),
+            config.max_peer_tasks,
             shutdown,
         );
     }
 
+    /// Get current topology cluster
     fn get_cluster(&self) -> Result<Vec<NodePublicKey>, TaskError> {
-        // Get current topology cluster
         let topology = self.topology.borrow();
         let Some(nodes) = topology.first() else {
+            // TODO(oz): should we attempt to wait for topology to change and
+            //           recover from the error here?
             return Err(TaskError::Internal("topology not initialized".to_string()));
         };
         if nodes.is_empty() {
@@ -120,24 +144,38 @@ impl<C: Collection> TaskBroker<C> {
         task: TaskRequest,
         peer: NodeIndex,
     ) -> Result<TaskResponse, TaskError> {
+        debug!("Running task on peer {peer}");
+
         // Encode task and send the request
         let mut buf = Vec::new();
         task.encode(&mut buf)
             .map_err(|e| TaskError::Internal(e.to_string()))?;
-        let res = self
-            .requester
-            .request(peer, buf.into())
-            .await
-            .map_err(|_| TaskError::Connect)?;
 
-        // Stream and decode response
-        let mut res = res.body().into_async_read();
-        let mut buf = Vec::new();
-        res.read_to_end(&mut buf)
-            .await
-            .map_err(|_| TaskError::InvalidResponse)?;
+        match timeout(
+            self.request_timeout,
+            self.requester.request(peer, buf.into()),
+        )
+        .await
+        {
+            Ok(Ok(res)) => {
+                // Stream and decode response
+                let mut res = res.body().into_async_read();
+                let mut buf = Vec::new();
+                res.read_to_end(&mut buf)
+                    .await
+                    .map_err(|_| TaskError::InvalidResponse)?;
 
-        TaskResponse::decode(&buf).map_err(|_| TaskError::InvalidResponse)
+                TaskResponse::decode(&buf).map_err(|_| TaskError::InvalidResponse)
+            },
+            Ok(Err(e)) => {
+                warn!("Task on peer {peer} failed: {e}");
+                Err(TaskError::Connect)
+            },
+            Err(_) => {
+                warn!("Task on peer {peer} timed out");
+                Err(TaskError::Timeout)
+            },
+        }
     }
 
     /// Get a random peer and run the task on it
@@ -151,16 +189,46 @@ impl<C: Collection> TaskBroker<C> {
     async fn run_cluster_task(&self, task: TaskRequest) -> Vec<Result<TaskResponse, TaskError>> {
         match self.get_cluster() {
             Ok(c) => {
-                c.iter()
+                let n = c.len();
+                let min = (2. * n as f32 / 3.).ceil() as usize;
+
+                let mut futs = c
+                    .iter()
                     .map(|v| {
                         self.query_runner
                             .pubkey_to_index(v)
                             .expect("topology should never give unknown node pubkeys/indecies")
                     })
                     .map(|idx| self.run_task_on_peer(task.clone(), idx))
-                    .collect::<FuturesUnordered<_>>()
-                    .collect::<Vec<_>>()
-                    .await
+                    .collect::<FuturesUnordered<_>>();
+
+                let mut responses = HashMap::<fleek_blake3::Hash, Vec<TaskResponse>>::new();
+                let mut errors = Vec::new();
+                while let Some(result) = futs.next().await {
+                    match result {
+                        Ok(response) => {
+                            let hash = fleek_blake3::hash(&response.payload);
+                            let entry = responses.entry(hash).or_default();
+                            entry.push(response);
+                            let len = entry.len();
+
+                            if len >= min {
+                                // We have reached consensus on >=2/3 responses.
+                                // Collect them, chain any errors onto the end, and return.
+                                return responses
+                                    .remove(&hash)
+                                    .unwrap()
+                                    .into_iter()
+                                    .map(Ok)
+                                    .chain(errors.into_iter().map(Err))
+                                    .collect();
+                            }
+                        },
+                        Err(e) => errors.push(e),
+                    }
+                }
+
+                errors.into_iter().map(Err).collect()
             },
             Err(e) => vec![Err(e)],
         }
@@ -177,11 +245,24 @@ impl<C: Collection> fdi::BuildGraph for TaskBroker<C> {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
 pub struct TaskBrokerConfig {
-    max_depth: u8,
+    // Maximum depth of task recursion allowed
+    pub max_depth: u8,
+    // Maximum number of peer requested tasks allowed to run concurrently
+    pub max_peer_tasks: usize,
+    // Maximum number of all tasks allowed to run concurrently
+    pub max_tasks: usize,
+    // Request timeout
+    #[serde(with = "humantime_serde")]
+    pub request_timeout: Duration,
 }
 impl Default for TaskBrokerConfig {
     fn default() -> Self {
-        Self { max_depth: 8 }
+        Self {
+            max_depth: 8,
+            max_peer_tasks: 128,
+            max_tasks: 256,
+            request_timeout: Duration::from_secs(30),
+        }
     }
 }
 
@@ -236,9 +317,7 @@ impl<C: Collection> TaskBrokerInterface<C> for TaskBroker<C> {
             },
             TaskScope::Cluster => self.run_cluster_task(task).await,
             TaskScope::Multicluster(_) => {
-                unimplemented!(
-                    "Multicluster task consensus not implemented (need multicluster aware broadcasts)"
-                )
+                unimplemented!("Multicluster task consensus not implemented")
             },
         }
     }
@@ -249,24 +328,24 @@ fn task_failed_metric(scope: TaskScope) {
     increment_counter!("task_broker_request_failed", Some("Task broker request failures per scope"), "scope" => scope.as_str())
 }
 
-/// State for handling incoming tasks
-pub struct State<C: Collection> {
-    // For finding single nodes within the cluster
-    _topology: watch::Receiver<Arc<Vec<Vec<NodePublicKey>>>>,
+/// Worker for handling incoming tasks
+pub struct RequestWorker<C: Collection> {
     // Receive incoming tasks
     responder: c!(C::PoolInterface::Responder),
     // For executing tasks we receive locally
     socket: LocalTaskSocket,
+    // Limit number of concurrent incoming requests
+    semaphore: Arc<Semaphore>,
     // Pending tasks we spawn
     pending_tasks: JoinSet<()>,
 }
 
-impl<C: Collection> State<C> {
+impl<C: Collection> RequestWorker<C> {
     pub fn spawn(
         _sk: NodeSecretKey,
-        _topology: watch::Receiver<Arc<Vec<Vec<NodePublicKey>>>>,
         responder: c!(C::PoolInterface::Responder),
         socket: LocalTaskSocket,
+        max_peer_tasks: usize,
         shutdown: ShutdownWaiter,
     ) {
         // Hack to ensure the task set is never empty
@@ -274,10 +353,10 @@ impl<C: Collection> State<C> {
         set.spawn(futures::future::pending());
 
         let fut = Self {
-            _topology,
             responder,
             socket,
             pending_tasks: set,
+            semaphore: Arc::new(Semaphore::new(max_peer_tasks)),
         }
         .run();
 
@@ -314,7 +393,10 @@ impl<C: Collection> State<C> {
         let request = TaskRequest::decode(&header.bytes)?;
 
         let socket = self.socket.clone();
+        let lock = self.semaphore.clone();
         self.pending_tasks.spawn(async move {
+            // wait our turn before running
+            let _ = lock.acquire().await;
             match socket.run((0, request)).await {
                 Ok(Ok(res)) => {
                     let mut bytes = Vec::new();

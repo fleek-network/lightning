@@ -4,7 +4,7 @@ use futures::Future;
 use crate::schema::task_broker::{TaskRequest, TaskResponse, TaskScope};
 use crate::Collection;
 
-#[derive(Debug, Clone, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum TaskError {
     #[error("Internal error running task: {_0:?}")]
     Internal(String),
@@ -32,7 +32,6 @@ pub trait TaskBrokerInterface<C: Collection>: BuildGraph + Clone + Send + Sync +
     #[blank = async { vec![] }]
     fn run(
         &self,
-
         depth: u8,
         scope: TaskScope,
         task: TaskRequest,
