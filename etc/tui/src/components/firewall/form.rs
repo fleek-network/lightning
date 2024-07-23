@@ -181,7 +181,7 @@ impl Component for FirewallForm {
     /// ### todo
     /// - return result
     fn register_keybindings(&mut self, config: &Config) {
-        self.keybindings = crate::config::parse_actions(&config.keybindings[self.component_name()]);
+        self.keybindings = config.keybindings.parse_actions(self.component_name());
     }
 
     /// The main entry point for updating the components state.

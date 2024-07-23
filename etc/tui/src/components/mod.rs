@@ -40,6 +40,8 @@ pub trait Draw {
 /// `Component` is a trait that represents a visual and interactive element of the user interface.
 /// Implementors of this trait can be registered with the main application loop and will be able to
 /// receive events, update state, and be rendered on the screen.
+/// 
+/// These elements must implement [`Component::register_keybindings`], which takes complete control of the app[ications incoming key events]
 pub trait Component: Draw {
     /// The unique identifier of the component. 
     /// Registered with the main application loop.

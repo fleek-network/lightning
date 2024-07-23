@@ -146,13 +146,8 @@ impl Component for ProfileView {
     }
 
     fn register_keybindings(&mut self, config: &Config) {
-        // todo: this works becasue the components have no interlapping keybindings by default
-        // todo: refactor this into serperate maps?
-        let edit = crate::config::parse_actions(&config.keybindings["ProfileViewEdit"]);
-        let view = crate::config::parse_actions(&config.keybindings[self.component_name()]);
-
-        self.key_bindings.extend(edit);
-        self.key_bindings.extend(view);
+        self.key_bindings.extend(config.keybindings.parse_actions("ProfileViewEdit"));
+        self.key_bindings.extend(config.keybindings.parse_actions(self.component_name()));
     }
 
     fn handle_event(

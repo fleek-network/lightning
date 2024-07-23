@@ -1,19 +1,11 @@
 use std::collections::HashMap;
-use std::marker::PhantomData;
-use std::str::FromStr;
 
 use anyhow::Result;
 use crossterm::event::KeyEvent;
 use lightning_guard::ConfigSource;
 use log::debug;
 use ratatui::prelude::{Constraint, Direction, Layout, Rect};
-#[cfg(feature = "logger")]
-use socket_logger::Listener;
-#[cfg(feature = "logger")]
-use tokio::net::UnixListener;
-use tokio::sync::mpsc;
 
-use crate::components::firewall::form::FirewallForm;
 use crate::components::firewall::FireWall;
 use crate::components::home::Home;
 #[cfg(feature = "logger")]
@@ -22,12 +14,10 @@ use crate::components::navigator::{NavDirection, Navigator};
 use crate::components::profile::Profile;
 use crate::components::prompt::{Prompt, PromptChange};
 use crate::components::summary::Summary;
-use crate::components::{self, Component, Draw};
+use crate::components::{Component, Draw};
 use crate::config::Config;
 use crate::tui;
 use crate::tui::Frame;
-#[cfg(feature = "logger")]
-use crate::utils::SOCKET_LOGGER_FOLDER;
 
 /// A special case of behaviour that the main app can take.
 ///
@@ -193,10 +183,9 @@ impl App {
 
         let config_source = self.config_source.clone();
         let mut this = self
-            .with_component(components::home::Home::new())
-            // .with_component(components::firewall::FireWall::new(config_source.clone()))
-            .with_component(components::profile::Profile::new(config_source.clone()).await?)
-            .with_component(components::firewall::FireWall::new(config_source.clone()));
+            .with_component(Home::new())
+            .with_component(Profile::new(config_source.clone()).await?)
+            .with_component(FireWall::new(config_source.clone()));
 
         #[cfg(feature = "logger")]
         {

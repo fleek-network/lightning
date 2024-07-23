@@ -99,7 +99,6 @@ pub struct FireWall {
     longest_item_per_column: [u16; COLUMN_COUNT],
     form: FirewallForm,
     src: ConfigSource,
-    config: Config,
     context: FirewallContext,
     main_keybindings: ComponentKeyBindings<FirewallAction>,
     edit_keybindings: ComponentKeyBindings<FirewallEditAction>,
@@ -112,7 +111,6 @@ impl FireWall {
             table: Table::new(),
             longest_item_per_column: [0; COLUMN_COUNT],
             form: FirewallForm::new(),
-            config: Config::default(),
             context: FirewallContext {
                 mounted: FirewallMounted::Main,
             },
@@ -215,9 +213,8 @@ impl Component for FireWall {
     /// ### todo
     /// - return result
     fn register_keybindings(&mut self, config: &Config) {
-        self.main_keybindings =
-            crate::config::parse_actions(&config.keybindings[self.component_name()]);
-        self.edit_keybindings = crate::config::parse_actions(&config.keybindings["FirewallEdit"]);
+        self.main_keybindings = config.keybindings.parse_actions(self.component_name());
+        self.edit_keybindings = config.keybindings.parse_actions("FirewallEdit");
 
         // todo form
     }

@@ -2,7 +2,6 @@ use anyhow::Result;
 use ratatui::layout::Rect;
 use ratatui::prelude::{Alignment, Color, Constraint, Layout, Style, Stylize, Text};
 use ratatui::widgets::{Block, BorderType, Borders, Cell, Paragraph, Row};
-use tokio::sync::mpsc::UnboundedSender;
 
 use super::{Component, Draw, Frame};
 use crate::app::ApplicationContext;

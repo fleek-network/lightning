@@ -10,7 +10,6 @@ use ratatui::style::{Color, Modifier, Style};
 use serde::de::Deserializer;
 use serde::Deserialize;
 
-
 pub type ComponentKeyBindings<T> = IndexMap<Vec<KeyEvent>, T>;
 
 const CONFIG: &str = include_str!("../.config/config.json5");
@@ -93,16 +92,25 @@ impl Config {
 #[derive(Clone, Debug, Default, Deref, DerefMut)]
 pub struct KeyBindings(pub HashMap<String, IndexMap<Vec<KeyEvent>, String>>);
 
-pub(crate) fn parse_actions<Action>(
-    actions: &indexmap::IndexMap<Vec<KeyEvent>, String>,
-) -> indexmap::IndexMap<Vec<KeyEvent>, Action> 
-    where 
-        Action: FromStr<Err = anyhow::Error>,
-{
-    actions
-        .iter()
-        .map(|(k, v)| (k.clone(), v.parse().unwrap()))
-        .collect()
+impl KeyBindings {
+    /// Parse the keybinding defined actions for a specific component from the string
+    /// representation.
+    ///
+    /// # Panics
+    ///
+    /// - If the component is not valid
+    /// - If the action string is not valid for T
+    pub fn parse_actions<T>(&self, component: &str) -> ComponentKeyBindings<T>
+    where
+        T: FromStr<Err = anyhow::Error>,
+    {
+        let component_actions = &self[component];
+
+        component_actions
+            .iter()
+            .map(|(k, v)| (k.clone(), v.parse().unwrap()))
+            .collect()
+    }
 }
 
 impl<'de> Deserialize<'de> for KeyBindings {

@@ -93,7 +93,7 @@ impl Component for Logger {
     }
 
     fn register_keybindings(&mut self, config: &Config) {
-        self.keybindings = crate::config::parse_actions(&config.keybindings[self.component_name()]);
+        self.keybindings = config.keybindings.parse_actions(self.component_name());
     }
 
     fn handle_event(

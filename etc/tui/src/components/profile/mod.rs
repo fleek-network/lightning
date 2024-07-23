@@ -222,13 +222,8 @@ impl Component for Profile {
         let _ = self.form.register_keybindings(config);
         let _ = self.rule_form.register_keybindings(config);
 
-        // todo this works because the keybinds dont have any overlap
-        let main_bindings =
-            crate::config::parse_actions(&config.keybindings[self.component_name()]);
-        let edit_bindinsg = crate::config::parse_actions(&config.keybindings["ProfilesEdit"]);
-
-        self.keybindings.extend(main_bindings);
-        self.keybindings.extend(edit_bindinsg);
+        self.keybindings.extend(config.keybindings.parse_actions(self.component_name()));
+        self.keybindings.extend(config.keybindings.parse_actions("ProfilesEdit"));
     }
 
     fn handle_event(
