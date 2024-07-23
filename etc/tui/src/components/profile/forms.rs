@@ -107,6 +107,8 @@ impl ProfileForm {
 }
 
 impl Component for ProfileForm {
+    type Context = ProfileContext;
+
     fn component_name(&self) -> &'static str {
         "ProfileForm"
     }
@@ -162,9 +164,7 @@ impl Component for ProfileForm {
 }
 
 impl Draw for ProfileForm {
-    type Context = ProfileContext;
-
-    fn draw(&mut self, _context: &mut Self::Context, f: &mut Frame<'_>, area: Rect) -> Result<()> {
+    fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
         // Display form to enter new rule.
         debug_assert!(self.input_fields.len() == PROFILE_NAME_INPUT_FIELD_COUNT);
 
@@ -300,50 +300,9 @@ impl RuleForm {
     }
 }
 
-impl Draw for RuleForm {
+impl Component for RuleForm {
     type Context = ProfileContext;
 
-    fn draw(&mut self, _context: &mut Self::Context, f: &mut Frame<'_>, area: Rect) -> Result<()> {
-        // Display form to enter new rule.
-        debug_assert!(self.input_fields.len() == RULE_INPUT_FIELD_COUNT);
-
-        f.render_widget(Clear, area);
-        let area = utils::center_form(INPUT_FORM_X, INPUT_FORM_Y, area);
-
-        let chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints(
-                [
-                    Constraint::Percentage(0),
-                    Constraint::Length(3),
-                    Constraint::Length(3),
-                    Constraint::Percentage(0),
-                ]
-                .as_ref(),
-            )
-            .split(area);
-
-        for (i, (textarea, chunk)) in self
-            .input_fields
-            .iter_mut()
-            // We don't want the first or last because they're for padding.
-            .zip(chunks.iter().take(3).skip(1))
-            .enumerate()
-        {
-            if i == self.selected_input_field {
-                utils::activate(textarea);
-            } else {
-                utils::inactivate(textarea)
-            }
-            let widget = textarea.area.widget();
-            f.render_widget(widget, *chunk);
-        }
-
-        Ok(())
-    }
-}
-
-impl Component for RuleForm {
     fn component_name(&self) -> &'static str {
         "ProfileRuleForm"
     }
@@ -395,5 +354,47 @@ impl Component for RuleForm {
         }
 
         Ok(Some(crate::app::GlobalAction::Render))
+    }
+}
+
+
+impl Draw for RuleForm {
+    fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
+        // Display form to enter new rule.
+        debug_assert!(self.input_fields.len() == RULE_INPUT_FIELD_COUNT);
+
+        f.render_widget(Clear, area);
+        let area = utils::center_form(INPUT_FORM_X, INPUT_FORM_Y, area);
+
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(
+                [
+                    Constraint::Percentage(0),
+                    Constraint::Length(3),
+                    Constraint::Length(3),
+                    Constraint::Percentage(0),
+                ]
+                .as_ref(),
+            )
+            .split(area);
+
+        for (i, (textarea, chunk)) in self
+            .input_fields
+            .iter_mut()
+            // We don't want the first or last because they're for padding.
+            .zip(chunks.iter().take(3).skip(1))
+            .enumerate()
+        {
+            if i == self.selected_input_field {
+                utils::activate(textarea);
+            } else {
+                utils::inactivate(textarea)
+            }
+            let widget = textarea.area.widget();
+            f.render_widget(widget, *chunk);
+        }
+
+        Ok(())
     }
 }

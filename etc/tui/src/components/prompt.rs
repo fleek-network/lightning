@@ -40,7 +40,13 @@ impl Prompt {
         self.message = Some(message);
     }
 
-    pub fn update_state(&mut self, mode: &'static str) {
+    pub fn update_state(&mut self, context: &mut ApplicationContext) {
+        let mode = match context.prompt_change.take() {
+            Some(PromptChange::Change(mode)) => mode,
+            Some(PromptChange::ActiveComponent) => context.active_component(),
+            None => return,
+        };
+
         if self.mode == mode {
             return;
         }
@@ -67,18 +73,7 @@ impl Prompt {
 }
 
 impl Draw for Prompt {
-    type Context = ApplicationContext;
-
-    fn draw(&mut self, context: &mut Self::Context, f: &mut Frame<'_>, area: Rect) -> Result<()> {
-        if let Some(mode) = context.prompt_change.take() {
-            let mode = match mode {
-                PromptChange::Change(mode) => mode,
-                PromptChange::ActiveComponent => context.active_component(),
-            };
-
-            self.update_state(mode);
-        }
-
+    fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
         let rows = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Length(1), Constraint::Length(1)])

@@ -106,9 +106,7 @@ impl Home {
 }
 
 impl Draw for Home {
-    type Context = ApplicationContext;
-
-    fn draw(&mut self, _context: &mut Self::Context, f: &mut Frame<'_>, area: Rect) -> Result<()> {
+    fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
         let vchunks = Layout::vertical([
             Constraint::Percentage(30),
             Constraint::Percentage(40),
@@ -136,6 +134,8 @@ impl Draw for Home {
 }
 
 impl Component for Home {
+    type Context = ApplicationContext;
+
     fn component_name(&self) -> &'static str {
         "Home"
     }

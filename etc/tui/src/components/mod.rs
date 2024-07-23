@@ -22,8 +22,6 @@ pub mod summary;
 /// 
 /// An example of a type that could implement this trait is [test::Paginated].
 pub trait Draw {
-    type Context;
-
     /// Render the component on the screen. (REQUIRED)
     ///
     /// # Arguments
@@ -34,7 +32,7 @@ pub trait Draw {
     /// # Returns
     ///
     /// * `Result<()>` - An Ok result or an error.
-    fn draw(&mut self, context: &mut Self::Context, f: &mut Frame<'_>, area: Rect) -> Result<()>;
+    fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()>;
 }
 
 /// `Component` is a trait that represents a visual and interactive element of the user interface.
@@ -43,6 +41,8 @@ pub trait Draw {
 /// 
 /// These elements must implement [`Component::register_keybindings`], which takes complete control of the app[ications incoming key events]
 pub trait Component: Draw {
+    type Context;
+
     /// The unique identifier of the component. 
     /// Registered with the main application loop.
     /// This ID will be displayed in the navigator.
@@ -79,6 +79,8 @@ pub trait Component: Draw {
     /// 
     /// ### todo
     /// - return result
+    /// combine this with init?
+    /// make init return the context?
     fn register_keybindings(&mut self, config: &Config);
 
     /// The main entry point for updating the components state.

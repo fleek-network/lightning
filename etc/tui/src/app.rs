@@ -85,7 +85,12 @@ impl App {
     pub fn new(tick_rate: f64, frame_rate: f64, src: ConfigSource) -> Result<Self> {
         let config = Config::new()?;
         let mut prompt = Prompt::new(config.clone());
-        prompt.update_state("Home");
+        let mut context = ApplicationContext {
+            active_component: "Home",
+            nav: None,
+            prompt_change: Some(PromptChange::ActiveComponent),
+        };
+        prompt.update_state(&mut context);
 
         Ok(Self {
             prompt,
@@ -94,11 +99,7 @@ impl App {
             tick_rate,
             frame_rate,
             last_tick_key_events: Vec::new(),
-            context: ApplicationContext {
-                active_component: "Starting Component Str",
-                prompt_change: None,
-                nav: None,
-            },
+            context,
             summary: Summary::new(),
             components: HashMap::new(),
             config_source: src,
@@ -140,7 +141,7 @@ impl App {
             ])
             .split(body_footer_area[0]);
 
-        self.summary.draw(&mut self.context, f, content_area[0])?;
+        self.summary.draw( f, content_area[0])?;
 
         let navigation_area = Layout::default()
             .direction(Direction::Vertical)
@@ -152,14 +153,19 @@ impl App {
         // so that we can update the context with it
         // the tldr is that prompt may be displaying keybindins for subcomponents, so this is mostly
         // a no op except for top level component changes, in which case the order matters
+        // these are special cases of components that dont have thier own keybindings
         {
+            self.navigator.update_state(&mut self.context);
+
             self.navigator
-                .draw(&mut self.context, f, navigation_area[0])?;
+                .draw(f, navigation_area[0])?;
 
             self.context.active_component = self.navigator.active_component();
 
+            self.prompt.update_state(&mut self.context);
+
             self.prompt
-                .draw(&mut self.context, f, body_footer_area[1])?;
+                .draw(f, body_footer_area[1])?;
         }
 
         let content = Layout::default()
@@ -173,7 +179,7 @@ impl App {
             .get_mut(self.navigator.active_component())
             .expect("A valid component from the navigator");
 
-        component.draw(&mut self.context, f, content[0])?;
+        component.draw(f, content[0])?;
 
         Ok(())
     }

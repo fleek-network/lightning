@@ -47,12 +47,8 @@ impl Navigator {
     pub fn active_component(&self) -> &'static str {
         self.tabs[self.selected_tab]
     }
-}
 
-impl Draw for Navigator {
-    type Context = ApplicationContext;
-
-    fn draw(&mut self, context: &mut Self::Context, f: &mut Frame<'_>, area: Rect) -> Result<()> {
+    pub fn update_state(&mut self, context: &mut ApplicationContext) {
         unsafe {
             if let Some(nav) = context.nav().take() {
                 match nav {
@@ -61,7 +57,11 @@ impl Draw for Navigator {
                 }
             }
         }
+    }
+}
 
+impl Draw for Navigator {
+    fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
         let t = Tabs::new(self.tabs.clone())
             .select(self.selected_tab)
             .block(Block::default().borders(Borders::ALL))

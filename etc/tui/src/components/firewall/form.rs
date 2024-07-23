@@ -162,6 +162,8 @@ impl FirewallForm {
 }
 
 impl Component for FirewallForm {
+    type Context = FirewallContext;
+
     /// The unique identifier of the component. 
     /// Registered with the main application loop.
     /// This ID will be displayed in the navigator.
@@ -225,9 +227,7 @@ impl Component for FirewallForm {
 }
 
 impl Draw for FirewallForm {
-    type Context = FirewallContext;
-
-    fn draw(&mut self, context: &mut Self::Context, f: &mut Frame<'_>, area: Rect) -> Result<()> {
+    fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
         // Display form to enter new rule.
         debug_assert!(self.input_fields.len() == INPUT_FIELD_COUNT);
 

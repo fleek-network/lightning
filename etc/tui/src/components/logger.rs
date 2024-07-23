@@ -88,6 +88,8 @@ impl Logger {
 }
 
 impl Component for Logger {
+    type Context = ApplicationContext;
+
     fn component_name(&self) -> &'static str {
         "Logger"
     }
@@ -129,9 +131,7 @@ impl Component for Logger {
 }
 
 impl Draw for Logger {
-    type Context = ApplicationContext;
-
-    fn draw(&mut self, _context: &mut Self::Context, f: &mut Frame<'_>, area: Rect) -> Result<()> {
+    fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
         let chunk: [Rect; 2] =
             Layout::vertical([Constraint::Length(3), Constraint::Fill(1)]).areas(area);
 

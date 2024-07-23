@@ -194,6 +194,8 @@ impl FireWall {
 }
 
 impl Component for FireWall {
+    type Context = ApplicationContext;
+        
     /// The unique identifier of the component.
     /// Registered with the main application loop.
     /// This ID will be displayed in the navigator.
@@ -310,9 +312,11 @@ impl Component for FireWall {
 }
 
 impl Draw for FireWall {
-    type Context = ApplicationContext;
+    fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
+        if matches!(self.context.mounted, FirewallMounted::Form) {
+            return self.form.draw(f, area);
+        }
 
-    fn draw(&mut self, _context: &mut Self::Context, f: &mut Frame<'_>, area: Rect) -> Result<()> {
         self.longest_item_per_column = self.space_between_columns();
         debug_assert!(self.longest_item_per_column.len() == COLUMN_COUNT);
 

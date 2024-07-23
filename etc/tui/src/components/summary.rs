@@ -181,9 +181,7 @@ impl Summary {
 }
 
 impl Draw for Summary {
-    type Context = ApplicationContext;
-
-    fn draw(&mut self, _context: &mut Self::Context, f: &mut Frame<'_>, area: Rect) -> Result<()> {
+    fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
         let overview = Paragraph::new("Overview\n")
             .block(
                 Block::bordered()

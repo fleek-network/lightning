@@ -1,7 +1,9 @@
 mod forms;
 mod view;
 
+use std::cell::RefCell;
 use std::collections::HashSet;
+use std::rc::Rc;
 use std::str::FromStr;
 
 use anyhow::Result;
@@ -120,9 +122,13 @@ impl FromStr for ProfileAction {
 
 impl Profile {
     pub async fn new(src: ConfigSource) -> Result<Self> {
+        let profile_view_context = ProfileViewContext {
+            table: Rc::new(RefCell::new(Table::new())),
+            profile: None,
+        };
         let mut this = Self {
             src: src.clone(),
-            view: ProfileView::new(src),
+            view: ProfileView::new(src, &profile_view_context),
             form: ProfileForm::new(),
             rule_form: RuleForm::new(),
             keybindings: Default::default(),
@@ -130,10 +136,7 @@ impl Profile {
                 mounted: ProfileSubComponent::Profiles,
                 profiles_to_update: None,
                 list: List::new("Profiles"),
-                profile_view_context: ProfileViewContext {
-                    table: Table::new(),
-                    profile: None,
-                },
+                profile_view_context,
             },
         };
 
@@ -196,15 +199,13 @@ impl Profile {
 }
 
 impl Draw for Profile {
-    type Context = ApplicationContext;
-
-    fn draw(&mut self, _context: &mut Self::Context, f: &mut Frame<'_>, area: Rect) -> Result<()> {
+    fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
         match self.context.mounted {
-            ProfileSubComponent::ProfileForm => self.form.draw(&mut self.context, f, area),
+            ProfileSubComponent::ProfileForm => self.form.draw(f, area),
             ProfileSubComponent::ProfileView | ProfileSubComponent::ProfileViewEdit => {
-                self.view.draw(&mut self.context, f, area)
+                self.view.draw(f, area)
             },
-            ProfileSubComponent::ProfileRuleForm => self.rule_form.draw(&mut self.context, f, area),
+            ProfileSubComponent::ProfileRuleForm => self.rule_form.draw(f, area),
             ProfileSubComponent::Profiles | ProfileSubComponent::ProfilesEdit => {
                 self.context.list.render(f, area)
             },
@@ -213,6 +214,8 @@ impl Draw for Profile {
 }
 
 impl Component for Profile {
+    type Context = ApplicationContext;
+
     fn component_name(&self) -> &'static str {
         "Profiles"
     }
