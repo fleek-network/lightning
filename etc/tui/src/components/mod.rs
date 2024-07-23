@@ -24,8 +24,7 @@ pub mod summary;
 /// 
 /// Its very typical for a component to need access to shared state, thats why there is a `Context` type.
 /// 
-/// An example of a type that could implement this trait is a paginated list. Paginated could be a a struct contating metadata on
-/// formatting the paginated list, and the context contains the list of items to be displayed.
+/// An example of a type that could implement this trait is [test::Paginated].
 pub trait Draw {
     type Context;
 
@@ -104,33 +103,4 @@ pub trait Component: Draw {
         context: &mut Self::Context,
         event: &[KeyEvent],
     ) -> Result<Option<GlobalAction>>;
-}
-
-mod test {
-    use super::*;
-
-    pub struct DrawMe;
-
-    pub struct Context;
-
-    impl Draw for DrawMe {
-        type Context = Context;
-
-        fn draw(&mut self, _context: &mut Self::Context, _f: &mut Frame<'_>, _area: Rect) -> Result<()> {
-            Ok(())
-        }
-    }
-
-    pub struct Paginated<T> { _limit: usize, _items: Vec<T> }
-
-    impl<T, C> Draw for Paginated<T> 
-        where
-            T: Draw<Context = C>
-    {
-        type Context = C;
-
-        fn draw(&mut self, _context: &mut Self::Context, _f: &mut Frame<'_>, _area: Rect) -> Result<()> {
-            todo!()
-        }
-    }
 }

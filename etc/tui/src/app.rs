@@ -16,8 +16,8 @@ use tokio::sync::mpsc;
 // use crate::components::firewall::form::FirewallForm;
 // use crate::components::firewall::FireWall;
 use crate::components::home::Home;
-// #[cfg(feature = "logger")]
-// use crate::components::logger::Logger;
+#[cfg(feature = "logger")]
+use crate::components::logger::Logger;
 use crate::components::navigator::{NavDirection, Navigator};
 use crate::components::profile::Profile;
 use crate::components::prompt::{Prompt, PromptChange};
@@ -129,6 +129,7 @@ impl App {
         let _ = component.register_keybindings(&self.config);
 
         self.navigator.push_tab(component.component_name());
+        
         self.components
             .insert(component.component_name(), Box::new(component));
 
