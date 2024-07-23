@@ -231,52 +231,45 @@ impl Component for Profile {
         self.keybindings.extend(edit_bindinsg);
     }
 
-    fn handle_known_event(
+    fn handle_event(
         &mut self,
         context: &mut Self::Context,
         event: &[crossterm::event::KeyEvent],
     ) -> Result<Option<crate::app::GlobalAction>> {
         let maybe_action = match self.context.mounted {
             ProfileSubComponent::ProfileForm => {
-                self.form.handle_known_event(&mut self.context, event)
+                self.form.handle_event(&mut self.context, event)
             },
             ProfileSubComponent::ProfileView | ProfileSubComponent::ProfileViewEdit => {
-                self.view.handle_known_event(&mut self.context, event)
+                self.view.handle_event(&mut self.context, event)
             },
             ProfileSubComponent::ProfileRuleForm => {
-                self.rule_form.handle_known_event(&mut self.context, event)
+                self.rule_form.handle_event(&mut self.context, event)
             },
             ProfileSubComponent::Profiles | ProfileSubComponent::ProfilesEdit => {
                 if let Some(action) = self.keybindings.get(event) {
                     match action {
                         ProfileAction::Add => {
                             self.context.mounted = ProfileSubComponent::ProfileForm;
-                            Ok(Some(crate::app::GlobalAction::Render))
                         },
                         ProfileAction::Edit => {
                             self.context.mounted = ProfileSubComponent::ProfilesEdit;
-                            Ok(Some(crate::app::GlobalAction::Render))
                         },
                         ProfileAction::Remove => {
                             self.context.list.remove_selected_record();
-                            Ok(Some(crate::app::GlobalAction::Render))
                         },
                         ProfileAction::Save => {
                             self.save();
-                            Ok(None)
                         },
                         ProfileAction::Cancel => {
                             self.context.mounted = ProfileSubComponent::Profiles;
                             self.restore_state();
-                            Ok(None)
                         },
                         ProfileAction::Up => {
                             self.context.list.scroll_up();
-                            Ok(Some(crate::app::GlobalAction::Render))
                         },
                         ProfileAction::Down => {
                             self.context.list.scroll_down();
-                            Ok(Some(crate::app::GlobalAction::Render))
                         },
                         ProfileAction::Select => {
                             if let Err(e) = self.load_profile_into_view() {
@@ -284,26 +277,21 @@ impl Component for Profile {
                             }
 
                             self.context.mounted = ProfileSubComponent::ProfileView;
-                            Ok(Some(crate::app::GlobalAction::Render))
                         },
                         ProfileAction::NavLeft => {
                             context.nav_left();
 
-                            Ok(Some(crate::app::GlobalAction::Render))
                         },
                         ProfileAction::NavRight => {
                             context.nav_right();
 
-                            Ok(Some(crate::app::GlobalAction::Render))
                         },
-                        ProfileAction::Quit => Ok(Some(GlobalAction::Quit)),
-                        _ => Ok(None),
+                        ProfileAction::Quit => return Ok(Some(GlobalAction::Quit)),
+                        _ => {},
                     }
+
+                    Ok(Some(GlobalAction::Render))
                 } else {
-                    log::error!("Unknown event: {:?}", event);
-                    log::error!(
-                        "This should have been prevalidated before being passed to the component."
-                    );
                     Ok(None)
                 }
             },
@@ -316,18 +304,5 @@ impl Component for Profile {
         }
 
         maybe_action
-    }
-
-    fn is_known_event(&self, event: &[crossterm::event::KeyEvent]) -> bool {
-        match self.context.mounted {
-            ProfileSubComponent::ProfileForm => self.form.is_known_event(event),
-            ProfileSubComponent::ProfileRuleForm => self.rule_form.is_known_event(event),
-            ProfileSubComponent::ProfileView | ProfileSubComponent::ProfileViewEdit => {
-                self.view.is_known_event(event)
-            },
-            ProfileSubComponent::Profiles | ProfileSubComponent::ProfilesEdit => {
-                self.keybindings.contains_key(event)
-            },
-        }
     }
 }

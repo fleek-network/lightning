@@ -184,25 +184,13 @@ impl Component for FirewallForm {
         self.keybindings = crate::config::parse_actions(&config.keybindings[self.component_name()]);
     }
 
-    /// Check if this event is to be handled by this component
-    /// 
-    /// # Note
-    /// The events are lists because there may be multikey combinations.
-    fn is_known_event(
-        &self,
-        event: &[KeyEvent],
-    ) -> bool {
-        // this may be incoming text or a key event
-        true
-    }
-
     /// The main entry point for updating the components state.
     /// 
     /// Before calling this method, the [Component::is_known_event] method should be called
     /// to determine if the compomenet cares about this event.
     /// 
     /// Events are lists because there may be multikey combinations.    
-    fn handle_known_event(
+    fn handle_event(
         &mut self,
         context: &mut Self::Context,
         event: &[KeyEvent],

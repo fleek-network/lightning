@@ -155,7 +155,7 @@ impl Component for ProfileView {
         self.key_bindings.extend(view);
     }
 
-    fn handle_known_event(
+    fn handle_event(
         &mut self,
         context: &mut Self::Context,
         event: &[crossterm::event::KeyEvent],
@@ -164,62 +164,41 @@ impl Component for ProfileView {
             match action {
                 ProfileViewActions::Edit => {
                     context.mounted = super::ProfileSubComponent::ProfileViewEdit;
-
-                    return Ok(Some(GlobalAction::Render));
                 },
                 ProfileViewActions::Add => {
                     context.mounted = super::ProfileSubComponent::ProfileRuleForm;
-
-                    return Ok(Some(GlobalAction::Render));
                 },
                 ProfileViewActions::Remove => {
                     context.profile_view_context.table.remove_selected_record();
-
-                    return Ok(Some(GlobalAction::Render));
                 },
                 ProfileViewActions::Save => {
                     self.save(&mut context.profile_view_context);
-                    context.mounted = super::ProfileSubComponent::ProfileView;
 
-                    return Ok(Some(GlobalAction::Render));
+                    context.mounted = super::ProfileSubComponent::ProfileView;
                 },
                 ProfileViewActions::Cancel => {
                     context.profile_view_context.restore();
-                    context.mounted = super::ProfileSubComponent::ProfileView;
 
-                    return Ok(Some(GlobalAction::Render));
+                    context.mounted = super::ProfileSubComponent::ProfileView;
                 },
                 ProfileViewActions::Back => {
                     context.profile_view_context.clear();
+                    
                     context.mounted = super::ProfileSubComponent::Profiles;
-
-                    return Ok(Some(GlobalAction::Render));
                 },
                 ProfileViewActions::Up => {
                     context.profile_view_context.table.scroll_up();
-                    return Ok(Some(GlobalAction::Render));
                 },
                 ProfileViewActions::Down => {
                     context.profile_view_context.table.scroll_down();
-                    return Ok(Some(GlobalAction::Render));
                 },
-                ProfileViewActions::Suspend => {
-                    // todo
-                    return Ok(None);
-                },
-                ProfileViewActions::Quit => {
-                    return Ok(Some(GlobalAction::Quit));
-                },
+                _ => return Ok(None),
             }
-        } else {
-            log::error!("Unknown event: {:?}", event);
+
+            return Ok(Some(GlobalAction::Render));
         }
 
         Ok(None)
-    }
-
-    fn is_known_event(&self, event: &[crossterm::event::KeyEvent]) -> bool {
-        self.key_bindings.get(event).is_some()
     }
 }
 

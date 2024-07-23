@@ -8,6 +8,7 @@ use ratatui::prelude::{Color, Constraint, Modifier, Rect, Style, Text};
 use ratatui::widgets::{Cell, Row};
 use unicode_width::UnicodeWidthStr;
 
+use super::prompt::PromptChange;
 use super::{Component, Draw, Frame};
 use crate::app::{ApplicationContext, GlobalAction};
 use crate::components::firewall::form::FirewallForm;
@@ -22,6 +23,16 @@ enum FirewallMounted {
     Form,
 }
 
+impl FirewallMounted {
+    fn as_str(&self) -> &'static str {
+        match self {
+            FirewallMounted::Main => "Firewall",
+            FirewallMounted::Edit => "FirewallEdit",
+            FirewallMounted::Form => "FirewallForm",
+        }
+    }
+}
+
 pub struct FirewallContext {
     mounted: FirewallMounted,
 }
@@ -33,6 +44,7 @@ enum FirewallAction {
     NavLeft,
     NavRight,
     Quit,
+    Suspend
 }
 
 impl std::str::FromStr for FirewallAction {
@@ -46,6 +58,7 @@ impl std::str::FromStr for FirewallAction {
             "NavLeft" => Ok(FirewallAction::NavLeft),
             "NavRight" => Ok(FirewallAction::NavRight),
             "Quit" => Ok(FirewallAction::Quit),
+            "Suspend" => Ok(FirewallAction::Suspend),
             _ => Err(anyhow::anyhow!("Invalid FirewallAction {s}")),
         }
     }
@@ -58,6 +71,8 @@ enum FirewallEditAction {
     Remove,
     Up,
     Down,
+    Quit,
+    Suspend
 }
 
 impl std::str::FromStr for FirewallEditAction {
@@ -71,6 +86,8 @@ impl std::str::FromStr for FirewallEditAction {
             "Remove" => Ok(FirewallEditAction::Remove),
             "Up" => Ok(FirewallEditAction::Up),
             "Down" => Ok(FirewallEditAction::Down),
+            "Quit" => Ok(FirewallEditAction::Quit),
+            "Suspend" => Ok(FirewallEditAction::Suspend),
             _ => Err(anyhow::anyhow!("Invalid FirewallEditAction {s}")),
         }
     }
@@ -205,31 +222,18 @@ impl Component for FireWall {
         // todo form
     }
 
-    /// Check if this event is to be handled by this component
-    ///
-    /// # Note
-    /// The events are lists because there may be multikey combinations.
-    fn is_known_event(&self, event: &[KeyEvent]) -> bool {
-        match self.context.mounted {
-            FirewallMounted::Main => self.main_keybindings.get(event).is_some(),
-            FirewallMounted::Edit => self.edit_keybindings.get(event).is_some(),
-            _ => false,
-            // FirewallMounted::Form => self.form.is_known_event(event),
-        }
-    }
-
     /// The main entry point for updating the components state.
     ///
     /// Before calling this method, the [Component::is_known_event] method should be called
     /// to determine if the compomenet cares about this event.
     ///
     /// Events are lists because there may be multikey combinations.    
-    fn handle_known_event(
+    fn handle_event(
         &mut self,
         context: &mut Self::Context,
         event: &[KeyEvent],
     ) -> Result<Option<GlobalAction>> {
-        match self.context.mounted {
+        let res = match self.context.mounted {
             FirewallMounted::Main => {
                 if let Some(action) = self.main_keybindings.get(event) {
                     match action {
@@ -253,6 +257,10 @@ impl Component for FireWall {
                         },
                         _ => {}
                     }
+
+                    Ok(Some(GlobalAction::Render))
+                } else {
+                    Ok(None)
                 }
             }
             FirewallMounted::Edit => {
@@ -277,16 +285,30 @@ impl Component for FireWall {
                         }
                         FirewallEditAction::Down => {
                             self.table.scroll_down();
-                        }
+                        },
+                        FirewallEditAction::Quit => {
+                            return Ok(Some(GlobalAction::Quit));
+                        },
+                        _ => {}
                     }
+
+                    Ok(Some(GlobalAction::Render))
+                } else {
+                    Ok(None)
                 }
             }
             FirewallMounted::Form => {
-                return self.form.handle_known_event(&mut self.context, event);
+                self.form.handle_event(&mut self.context, event)
             }
+        };
+
+        // if the top level profiles is mounted, 
+        // lets make sure we track any subcompomnent prompts
+        if !context.component_changed() {
+            context.change_prompt(PromptChange::Change(self.context.mounted.as_str()));
         }
 
-        Ok(Some(GlobalAction::Render))
+        res
     }
 }
 

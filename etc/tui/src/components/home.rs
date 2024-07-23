@@ -140,7 +140,7 @@ impl Component for Home {
         "Home"
     }
 
-    fn handle_known_event(
+    fn handle_event(
         &mut self,
         context: &mut Self::Context,
         event: &[crossterm::event::KeyEvent],
@@ -168,10 +168,6 @@ impl Component for Home {
         }
 
         Ok(None)
-    }
-
-    fn is_known_event(&self, event: &[crossterm::event::KeyEvent]) -> bool {
-        self.keybindings.get(event).is_some()
     }
 
     fn register_keybindings(&mut self, config: &Config) {

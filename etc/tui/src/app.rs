@@ -13,8 +13,8 @@ use socket_logger::Listener;
 use tokio::net::UnixListener;
 use tokio::sync::mpsc;
 
-// use crate::components::firewall::form::FirewallForm;
-// use crate::components::firewall::FireWall;
+use crate::components::firewall::form::FirewallForm;
+use crate::components::firewall::FireWall;
 use crate::components::home::Home;
 #[cfg(feature = "logger")]
 use crate::components::logger::Logger;
@@ -58,7 +58,7 @@ impl ApplicationContext {
     }
 
     #[inline]
-    pub fn component_changed(&self)-> bool {
+    pub fn component_changed(&self) -> bool {
         self.nav.is_some()
     }
 
@@ -115,7 +115,7 @@ impl App {
         })
     }
 
-    fn active_component(&mut self) -> &mut Box<dyn Component<Context = ApplicationContext>> {
+    fn active_component_ref(&mut self) -> &mut Box<dyn Component<Context = ApplicationContext>> {
         self.components
             .get_mut(self.navigator.active_component())
             .expect("A valid active component name from navigator")
@@ -129,7 +129,7 @@ impl App {
         let _ = component.register_keybindings(&self.config);
 
         self.navigator.push_tab(component.component_name());
-        
+
         self.components
             .insert(component.component_name(), Box::new(component));
 
@@ -160,8 +160,8 @@ impl App {
         // note: the order here is load bearing
         // the prompt requires that the navigator determines the active component first
         // so that we can update the context with it
-        // the tldr is that prompt may be displaying keybindins for subcomponents, so this is mostly a no op
-        // except for top level component changes, in which case the order matters
+        // the tldr is that prompt may be displaying keybindins for subcomponents, so this is mostly
+        // a no op except for top level component changes, in which case the order matters
         {
             self.navigator
                 .draw(&mut self.context, f, navigation_area[0])?;
@@ -192,10 +192,16 @@ impl App {
         debug!(target: "Main Tui App", "Running!");
 
         let config_source = self.config_source.clone();
-        let this = self
+        let mut this = self
             .with_component(components::home::Home::new())
             // .with_component(components::firewall::FireWall::new(config_source.clone()))
-            .with_component(components::profile::Profile::new(config_source.clone()).await?);
+            .with_component(components::profile::Profile::new(config_source.clone()).await?)
+            .with_component(components::firewall::FireWall::new(config_source.clone()));
+
+        #[cfg(feature = "logger")]
+        {
+            this = this.with_component(Logger::new());
+        }
 
         let mut tui = tui::Tui::new()?
             .tick_rate(this.tick_rate)
@@ -215,7 +221,7 @@ impl App {
                 let maybe_global_action = match event {
                     tui::Event::Tick => {
                         this.last_tick_key_events.drain(..);
-                        let _ = this.active_component().tick();
+                        let _ = this.active_component_ref().tick();
 
                         None
                     },
@@ -231,8 +237,19 @@ impl App {
                             .get_mut(component)
                             .expect("A valid component given by the navigator.");
 
-                        if component.is_known_event(&[key]) {
-                            match component.handle_known_event(&mut this.context, &[key]) {
+                        let first_action = match component.handle_event(&mut this.context, &[key]) {
+                            Ok(action) => action,
+                            Err(e) => {
+                                log::error!("Failed to handle event: {:?}", e);
+                                None
+                            },
+                        };
+
+                        this.last_tick_key_events.push(key);
+                        let second_action = if this.last_tick_key_events.len() > 1 {
+                            match component
+                                .handle_event(&mut this.context, &this.last_tick_key_events)
+                            {
                                 Ok(action) => action,
                                 Err(e) => {
                                     log::error!("Failed to handle event: {:?}", e);
@@ -240,23 +257,16 @@ impl App {
                                 },
                             }
                         } else {
-                            this.last_tick_key_events.push(key);
+                            None
+                        };
 
-                            if component.is_known_event(&this.last_tick_key_events) {
-                                match component.handle_known_event(
-                                    &mut this.context,
-                                    &this.last_tick_key_events,
-                                ) {
-                                    Ok(action) => action,
-                                    Err(e) => {
-                                        log::error!("Failed to handle event: {:?}", e);
-                                        None
-                                    },
-                                }
-                            } else {
-                                None
-                            }
+                        if second_action.is_some() && first_action.is_some() {
+                            log::warn!(
+                                "Got two competing actions, you have key bindings that share a prefix"
+                            );
                         }
+
+                        second_action.or(first_action)
                     },
                     // These calls come from a timer and a resize therefore there c
                     // an be no component change as sa side effect.

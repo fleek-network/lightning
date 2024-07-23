@@ -1,10 +1,6 @@
-use std::str::FromStr;
-
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use crossterm::event::{KeyEvent, MouseEvent};
 use ratatui::layout::Rect;
-use serde::Deserialize;
-use tokio::sync::mpsc::UnboundedSender;
 
 use crate::app::GlobalAction;
 use crate::config::Config;
@@ -83,22 +79,14 @@ pub trait Component: Draw {
     /// - return result
     fn register_keybindings(&mut self, config: &Config);
 
-    /// Check if this event is to be handled by this component
-    /// 
-    /// # Note
-    /// The events are lists because there may be multikey combinations.
-    fn is_known_event(
-        &self,
-        event: &[KeyEvent],
-    ) -> bool;
-
     /// The main entry point for updating the components state.
     /// 
     /// Before calling this method, the [Component::is_known_event] method should be called
     /// to determine if the compomenet cares about this event.
     /// 
-    /// Events are lists because there may be multikey combinations.    
-    fn handle_known_event(
+    /// Events are lists because there may be multikey combinations.   
+    /// Ok(None) should be returned if there was changes made to any state.
+    fn handle_event(
         &mut self,
         context: &mut Self::Context,
         event: &[KeyEvent],

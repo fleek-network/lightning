@@ -96,7 +96,7 @@ impl Component for Logger {
         self.keybindings = crate::config::parse_actions(&config.keybindings[self.component_name()]);
     }
 
-    fn handle_known_event(
+    fn handle_event(
         &mut self,
         context: &mut Self::Context,
         event: &[crossterm::event::KeyEvent],
@@ -125,10 +125,6 @@ impl Component for Logger {
         }
 
         Ok(None)
-    }
-
-    fn is_known_event(&self, event: &[crossterm::event::KeyEvent]) -> bool {
-        true
     }
 }
 

@@ -20,6 +20,7 @@ pub enum PromptChange {
 /// Component for displaying key bindings and error messages.
 #[derive(Default)]
 pub struct Prompt {
+    mode: &'static str,
     current: Vec<(KeySymbol, String)>,
     message: Option<String>,
     config: Config,
@@ -28,6 +29,7 @@ pub struct Prompt {
 impl Prompt {
     pub fn new(config: Config) -> Self {
         Self {
+            mode: "starting mode placeholder",
             current: vec![],
             message: None,
             config,
@@ -39,6 +41,10 @@ impl Prompt {
     }
 
     pub fn update_state(&mut self, mode: &'static str) {
+        if self.mode == mode {
+            return;
+        }
+
         if let Some(keys) = self.config.keybindings.get(mode) {
             let keys = keys.clone();
             let codes = keys
@@ -54,6 +60,8 @@ impl Prompt {
 
             // Remove an old message.
             self.message.take();
+
+            self.mode = mode;
         }
     }
 }

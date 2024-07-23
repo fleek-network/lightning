@@ -121,7 +121,7 @@ impl Component for ProfileForm {
         );
     }
 
-    fn handle_known_event(
+    fn handle_event(
         &mut self,
         context: &mut Self::Context,
         event: &[KeyEvent],
@@ -164,10 +164,6 @@ impl Component for ProfileForm {
         }
 
         Ok(Some(crate::app::GlobalAction::Render))
-    }
-
-    fn is_known_event(&self, _event: &[KeyEvent]) -> bool {
-        true
     }
 }
 
@@ -362,7 +358,7 @@ impl Component for RuleForm {
         self.keybindings = crate::config::parse_actions(&config.keybindings[self.component_name()]);
     }
 
-    fn handle_known_event(
+    fn handle_event(
         &mut self,
         context: &mut Self::Context,
         event: &[KeyEvent],
@@ -405,9 +401,5 @@ impl Component for RuleForm {
         }
 
         Ok(Some(crate::app::GlobalAction::Render))
-    }
-
-    fn is_known_event(&self, _event: &[KeyEvent]) -> bool {
-        true
     }
 }
