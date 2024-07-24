@@ -5,6 +5,7 @@ use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::prelude::{Modifier, Style};
 use ratatui::widgets::{Block, Borders, ListState};
 
+use crate::components::{Extractor, DynExtractor};
 use crate::tui::Frame;
 
 #[derive(Default)]
