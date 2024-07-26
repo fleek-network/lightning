@@ -9,11 +9,11 @@ use ratatui::widgets::Clear;
 use tokio::sync::mpsc::UnboundedSender;
 use tui_textarea::{Input, TextArea};
 
-use super::view::ProfileViewContext;
 use super::{Component, Frame, ProfileContext};
 use crate::app::GlobalAction;
-use crate::components::Draw;
+use crate::components::{Draw, DynExtractor, Extractor};
 use crate::config::{ComponentKeyBindings, Config};
+use crate::helpers::StableVec;
 use crate::widgets::utils;
 use crate::widgets::utils::InputField;
 
@@ -123,14 +123,14 @@ impl Component for ProfileForm {
         if event.len() == 1 {
             self.selected_field().area.input(event[0]);
         }
-        
+
         if let Some(action) = self.keybindings.get(event) {
             match action {
                 ProfileFormActions::Add => {
                     context.mounted = super::ProfileSubComponent::ProfilesEdit;
 
                     if let Err(e) = self.update_profile_from_input() {
-                        return Err(anyhow::anyhow!("creating profile failed {e}"))
+                        return Err(anyhow::anyhow!("creating profile failed {e}"));
                     } else {
                         if let Some(profile) = self.yank_input() {
                             context.add_profile(profile);
@@ -203,9 +203,9 @@ impl Draw for ProfileForm {
     }
 }
 
-#[derive(Default)]
 pub struct RuleForm {
     input_fields: Vec<InputField>,
+    rules_extractor: DynExtractor<ProfileContext, StableVec<FileRule>>,
     selected_input_field: usize,
     buf: Option<FileRule>,
     keybindings: ComponentKeyBindings<RuleFormActions>,
@@ -253,6 +253,7 @@ impl RuleForm {
 
         Self {
             keybindings: Default::default(),
+            rules_extractor: Box::new(|c: &mut ProfileContext| &mut c.view_profile.as_mut().expect("A profile to be loaded").1),
             input_fields,
             selected_input_field: 0,
             buf: None,
@@ -360,7 +361,7 @@ impl Component for RuleForm {
         if event.len() == 1 {
             self.selected_field().area.input(event[0]);
         }
-            
+
         if let Some(action) = self.keybindings.get(event) {
             match action {
                 RuleFormActions::Add => {
@@ -369,10 +370,10 @@ impl Component for RuleForm {
                     }
 
                     context.mounted = super::ProfileSubComponent::ProfileViewEdit;
-                    context.profile_view_context.update_rules_from_input(
+                    self.rules_extractor.get(context).push(
                         self.buf
                             .take()
-                            .expect("A rule should have been created. This is a bug."),
+                            .ok_or(anyhow::anyhow!("No rule found to add to buf"))?,
                     );
                 },
                 RuleFormActions::Cancel => {
@@ -389,7 +390,7 @@ impl Component for RuleForm {
                         self.selected_input_field += 1;
                     }
                 },
-                RuleFormActions::Quit => { return Ok(Some(GlobalAction::Quit)) },
+                RuleFormActions::Quit => return Ok(Some(GlobalAction::Quit)),
                 _ => {},
             }
         }

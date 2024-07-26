@@ -12,75 +12,33 @@ use unicode_width::UnicodeWidthStr;
 use super::forms::RuleForm;
 use super::{Component, Frame, ProfileContext};
 use crate::app::GlobalAction;
-use crate::components::Draw;
+use crate::components::{profile, Draw, DynExtractor};
 use crate::config::{ComponentKeyBindings, Config};
-use crate::widgets::table::Table;
+use crate::helpers::StableVec;
+use crate::widgets::context_table::Table;
 
-pub struct ProfileViewContext {
-    pub table: Table<FileRule>,
-    pub profile: Option<Profile>,
-}
+fn space_between_columns(rules: &Vec<FileRule>) -> [u16; COLUMN_COUNT] {
+    let name = rules
+        .iter()
+        .map(|r| r.file.display().to_string().as_str().width())
+        .max()
+        .unwrap_or(0);
 
-impl ProfileViewContext {
-    pub(crate) fn update_rules_from_input(&mut self, rule: FileRule) {
-        // Update the profile in view.
-        let profile = self.profile.as_mut().expect("Profile to be initialized");
-        profile.file_rules.push(rule.clone());
+    let permissions = rules
+        .iter()
+        .map(|r| r.permissions().as_str().width())
+        .max()
+        .unwrap_or(0);
 
-        // Update the rule table.
-        self.table.add_record(rule);
-    }
-
-    pub fn load_profile(&mut self, profile: Profile) {
-       self.table.load_records(profile.file_rules.clone());
-       self.profile = Some(profile);
-    }
-
-    fn space_between_columns(&self) -> [u16; COLUMN_COUNT] {
-        let name = self
-            .table
-            .records()
-            .map(|r| r.file.display().to_string().as_str().width())
-            .max()
-            .unwrap_or(0);
-
-        let permissions = self
-            .table
-            .records()
-            .map(|r| r.permissions().as_str().width())
-            .max()
-            .unwrap_or(0);
-
-        [name as u16, permissions as u16]
-    }
-
-    fn restore(&mut self) {
-        self.table.restore_state();
-    }
-
-    fn save(&mut self) -> Profile {
-        self.table.commit_changes();
-        let records = self.table.records().cloned().collect::<Vec<_>>();
-        let mut profile = self
-            .profile
-            .clone()
-            .expect("The view should laways have a profile to view");
-
-        // Update profile with the new rules.
-        profile.file_rules = records;
-
-        profile
-    }
-
-    fn clear(&mut self) {
-        self.profile.take();
-        self.table.clear();
-    }
+    [name as u16, permissions as u16]
 }
 
 const COLUMN_COUNT: usize = 2;
 
 pub struct ProfileView {
+    profile_extractor: DynExtractor<ProfileContext, Profile>,
+    rules_extractor: DynExtractor<ProfileContext, StableVec<FileRule>>,
+    table: crate::widgets::context_table::Table<ProfileContext, FileRule>,
     longest_item_per_column: [u16; COLUMN_COUNT],
     src: ConfigSource,
     key_bindings: ComponentKeyBindings<ProfileViewActions>,
@@ -122,14 +80,49 @@ impl FromStr for ProfileViewActions {
 impl ProfileView {
     pub fn new(src: ConfigSource) -> Self {
         Self {
+            table: Table::new("ProfileView", |context: &mut ProfileContext| {
+                &mut context
+                    .view_profile
+                    .as_mut()
+                    .expect("A profile to be loaded")
+                    .1
+            }),
+            rules_extractor: Box::new(|context: &mut ProfileContext| {
+                &mut context
+                    .view_profile
+                    .as_mut()
+                    .expect("A profile to be loaded")
+                    .1
+            }),
+            profile_extractor: Box::new(|context: &mut ProfileContext| {
+                let idx = context
+                    .view_profile
+                    .as_mut()
+                    .expect("A profile to be loaded")
+                    .0;
+
+                context
+                    .profiles
+                    .get_mut(idx)
+                    .expect("A loaded view idx to correspond to a profile")
+            }),
             longest_item_per_column: [0; COLUMN_COUNT],
             src,
             key_bindings: Default::default(),
         }
     }
 
-    fn save(&mut self, context: &mut ProfileViewContext) {
-        let profile = context.save();
+    fn save(&mut self, context: &mut ProfileContext) {
+        let mut profile = self
+            .profile_extractor
+            .get(context)
+            .clone();
+
+        let rules = self
+            .rules_extractor
+            .get(context);
+
+        profile.file_rules = rules.iter().cloned().collect();
 
         let src = self.src.clone();
         tokio::spawn(async move {
@@ -146,8 +139,10 @@ impl Component for ProfileView {
     }
 
     fn register_keybindings(&mut self, config: &Config) {
-        self.key_bindings.extend(config.keybindings.parse_actions("ProfileViewEdit"));
-        self.key_bindings.extend(config.keybindings.parse_actions(self.component_name()));
+        self.key_bindings
+            .extend(config.keybindings.parse_actions("ProfileViewEdit"));
+        self.key_bindings
+            .extend(config.keybindings.parse_actions(self.component_name()));
     }
 
     fn handle_event(
@@ -164,28 +159,28 @@ impl Component for ProfileView {
                     context.mounted = super::ProfileSubComponent::ProfileRuleForm;
                 },
                 ProfileViewActions::Remove => {
-                    context.profile_view_context.table.remove_selected_record();
+                    self.table.remove_selected_record(context);
                 },
                 ProfileViewActions::Save => {
-                    self.save(&mut context.profile_view_context);
+                    self.save(context);
 
                     context.mounted = super::ProfileSubComponent::ProfileView;
                 },
                 ProfileViewActions::Cancel => {
-                    context.profile_view_context.restore();
+                    self.table.restore_state(context);
 
                     context.mounted = super::ProfileSubComponent::ProfileView;
                 },
                 ProfileViewActions::Back => {
-                    context.profile_view_context.clear();
-                    
+                    context.view_profile = None;
+
                     context.mounted = super::ProfileSubComponent::Profiles;
                 },
                 ProfileViewActions::Up => {
-                    context.profile_view_context.table.scroll_up();
+                    self.table.scroll_up();
                 },
                 ProfileViewActions::Down => {
-                    context.profile_view_context.table.scroll_down();
+                    self.table.scroll_down(context);
                 },
                 _ => return Ok(None),
             }
@@ -205,9 +200,13 @@ impl Draw for ProfileView {
     type Context = ProfileContext;
 
     fn draw(&mut self, context: &mut Self::Context, f: &mut Frame<'_>, area: Rect) -> Result<()> {
-        let context = &mut context.profile_view_context;
+        let rules = self.rules_extractor.get(context);
 
-        self.longest_item_per_column = context.space_between_columns();
+        if self.table.state().selected().is_none() && !rules.is_empty() {
+            self.table.state().select(Some(0));
+        }
+
+        self.longest_item_per_column = space_between_columns(rules);
         debug_assert!(self.longest_item_per_column.len() == COLUMN_COUNT);
 
         let column_names = ["Target", "Permissions"];
@@ -223,7 +222,7 @@ impl Draw for ProfileView {
             .collect::<Row>()
             .style(header_style);
 
-        let rows = context.table.records().map(|data| {
+        let rows = rules.iter().map(|data| {
             let item = flatten_filter(data);
             item.into_iter()
                 .map(|content| {
@@ -246,7 +245,7 @@ impl Draw for ProfileView {
             .highlight_style(selected_style)
             .highlight_symbol(Text::from(bar));
 
-        f.render_stateful_widget(table, area, context.table.state());
+        f.render_stateful_widget(table, area, self.table.state());
 
         Ok(())
     }
