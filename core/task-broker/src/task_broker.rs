@@ -144,7 +144,7 @@ impl<C: Collection> TaskBroker<C> {
         task: TaskRequest,
         peer: NodeIndex,
     ) -> Result<TaskResponse, TaskError> {
-        debug!("Running task on peer {peer}");
+        debug!("Running task on peer {peer} for service {}", task.service);
 
         // Encode task and send the request
         let mut buf = Vec::new();
@@ -169,10 +169,10 @@ impl<C: Collection> TaskBroker<C> {
             },
             Ok(Err(e)) => {
                 warn!("Task on peer {peer} failed: {e}");
-                Err(TaskError::Connect)
+                Err(TaskError::PeerDisconnect)
             },
             Err(_) => {
-                warn!("Task on peer {peer} timed out");
+                warn!("Request connection for peer {peer} timed out");
                 Err(TaskError::Timeout)
             },
         }

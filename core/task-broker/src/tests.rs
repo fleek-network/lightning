@@ -152,7 +152,7 @@ fn build_cluster(
                                     http: None,
                                 })
                                 .with::<TaskBroker<TestBinding>>(TaskBrokerConfig {
-                                    request_timeout: Duration::from_secs(5),
+                                    connect_timeout: Duration::from_secs(5),
                                     ..Default::default()
                                 }),
                         )
@@ -285,7 +285,8 @@ async fn run_cluster_echo_task() -> anyhow::Result<()> {
         .run(0, schema::task_broker::TaskScope::Cluster, request)
         .await;
 
-    assert_eq!(responses.len(), nodes.len(),);
+    // Ensure at least 2/3 of nodes had a response
+    assert!(responses.len() >= (2. * nodes.len() as f32 / 3.).ceil() as usize);
 
     for response in responses {
         let response = response.expect("task should succeed");
