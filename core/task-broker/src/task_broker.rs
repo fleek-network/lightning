@@ -27,6 +27,7 @@ pub struct TaskBroker<C: Collection> {
     requester: Arc<<C::PoolInterface as PoolInterface<C>>::Requester>,
     topology: tokio::sync::watch::Receiver<Arc<Vec<Vec<NodePublicKey>>>>,
     query_runner: c!(C::ApplicationInterface::SyncExecutor),
+    rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
     max_depth: u8,
     connect_timeout: Duration,
     temp: Option<RequestWorkerInner<C>>,
@@ -45,6 +46,7 @@ impl<C: Collection> Clone for TaskBroker<C> {
             requester: self.requester.clone(),
             topology: self.topology.clone(),
             query_runner: self.query_runner.clone(),
+            rep_reporter: self.rep_reporter.clone(),
             max_depth: self.max_depth,
             connect_timeout: self.connect_timeout,
             temp: None,
@@ -58,6 +60,7 @@ impl<C: Collection> TaskBroker<C> {
         keystore: &C::KeystoreInterface,
         topology: &C::TopologyInterface,
         pool: &C::PoolInterface,
+        reputation: &C::ReputationAggregatorInterface,
         fdi::Cloned(query_runner): fdi::Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
     ) -> Result<Self> {
         let config @ TaskBrokerConfig {
@@ -73,6 +76,7 @@ impl<C: Collection> TaskBroker<C> {
             requester: req.into(),
             topology: topology.get_receiver(),
             query_runner,
+            rep_reporter: reputation.get_reporter(),
             max_depth,
             connect_timeout,
             temp: Some(RequestWorkerInner {
@@ -108,6 +112,7 @@ impl<C: Collection> TaskBroker<C> {
         RequestWorker::<C>::spawn(
             sk,
             responder,
+            self.rep_reporter.clone(),
             socket.clone(),
             config.max_peer_tasks,
             shutdown,
@@ -161,18 +166,28 @@ impl<C: Collection> TaskBroker<C> {
                 // Stream and decode response
                 let mut res = res.body().into_async_read();
                 let mut buf = Vec::new();
-                res.read_to_end(&mut buf)
-                    .await
-                    .map_err(|_| TaskError::InvalidResponse)?;
+                res.read_to_end(&mut buf).await.map_err(|_| {
+                    self.rep_reporter
+                        .report_unsat(peer, lightning_interfaces::Weight::Weak);
+                    TaskError::InvalidResponse
+                })?;
 
-                TaskResponse::decode(&buf).map_err(|_| TaskError::InvalidResponse)
+                TaskResponse::decode(&buf).map_err(|_| {
+                    self.rep_reporter
+                        .report_unsat(peer, lightning_interfaces::Weight::Weak);
+                    TaskError::InvalidResponse
+                })
             },
             Ok(Err(e)) => {
                 warn!("Task on peer {peer} failed: {e}");
+                self.rep_reporter
+                    .report_unsat(peer, lightning_interfaces::Weight::Weak);
                 Err(TaskError::PeerDisconnect)
             },
             Err(_) => {
                 warn!("Request connection for peer {peer} timed out");
+                self.rep_reporter
+                    .report_unsat(peer, lightning_interfaces::Weight::Strong);
                 Err(TaskError::Timeout)
             },
         }
@@ -180,8 +195,12 @@ impl<C: Collection> TaskBroker<C> {
 
     /// Get a random peer and run the task on it
     async fn run_single_task(&self, task: TaskRequest) -> Result<TaskResponse, TaskError> {
-        let idx = self.get_random_cluster_node()?;
-        self.run_task_on_peer(task, idx).await
+        let peer = self.get_random_cluster_node()?;
+        self.run_task_on_peer(task, peer).await.map(|response| {
+            self.rep_reporter
+                .report_sat(peer, lightning_interfaces::Weight::Weak);
+            response
+        })
     }
 
     /// Get peers in the cluster and run the task on them
@@ -332,6 +351,7 @@ fn task_failed_metric(scope: TaskScope) {
 pub struct RequestWorker<C: Collection> {
     // Receive incoming tasks
     responder: c!(C::PoolInterface::Responder),
+    rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
     // For executing tasks we receive locally
     socket: LocalTaskSocket,
     // Limit number of concurrent incoming requests
@@ -344,6 +364,7 @@ impl<C: Collection> RequestWorker<C> {
     pub fn spawn(
         _sk: NodeSecretKey,
         responder: c!(C::PoolInterface::Responder),
+        rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
         socket: LocalTaskSocket,
         max_peer_tasks: usize,
         shutdown: ShutdownWaiter,
@@ -354,6 +375,7 @@ impl<C: Collection> RequestWorker<C> {
 
         let fut = Self {
             responder,
+            rep_reporter,
             socket,
             pending_tasks: set,
             semaphore: Arc::new(Semaphore::new(max_peer_tasks)),
@@ -369,17 +391,17 @@ impl<C: Collection> RequestWorker<C> {
     async fn run(mut self) {
         loop {
             tokio::select! {
-                // Drive pending tasks forward
-                _ = self.pending_tasks.join_next() => {},
-                // Incoming direct task requests
-               Ok((header, responder)) = self.responder.get_next_request() => {
-                    if let Err(e) = self.handle_incoming_pool_task(header, responder) {
-                        warn!("Failed to handle incoming pool task: {e}");
-                    }
-                },
-                else => {
-                    break;
-                }
+              // Drive pending tasks forward
+              _ = self.pending_tasks.join_next() => {},
+              // Incoming direct task requests
+              Ok((header, responder)) = self.responder.get_next_request() => {
+                  if let Err(e) = self.handle_incoming_pool_task(header, responder) {
+                      warn!("Failed to handle incoming pool task: {e}");
+                  }
+              },
+              else => {
+                  break;
+              }
             }
         }
     }
@@ -390,7 +412,11 @@ impl<C: Collection> RequestWorker<C> {
         mut handle: impl lightning_interfaces::RequestInterface,
     ) -> Result<()> {
         // Parse request payload
-        let request = TaskRequest::decode(&header.bytes)?;
+        let request = TaskRequest::decode(&header.bytes).map_err(|e| {
+            self.rep_reporter
+                .report_unsat(header.peer, lightning_interfaces::Weight::Weak);
+            e
+        })?;
 
         let socket = self.socket.clone();
         let lock = self.semaphore.clone();
