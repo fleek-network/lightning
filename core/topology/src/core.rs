@@ -104,7 +104,14 @@ pub fn suggest_connections<K: Hash + Eq + Copy>(
         };
         connections
             .iter()
-            .map(|ids| ids.iter().map(|idx| mappings[idx]).collect())
+            .map(|ids| {
+                ids.iter()
+                    .filter_map(|idx| {
+                        let pk = mappings[idx];
+                        (pk != our_key).then_some(pk)
+                    })
+                    .collect()
+            })
             .collect()
     } else {
         // Not in the topology: return all nodes to bootstrap from
