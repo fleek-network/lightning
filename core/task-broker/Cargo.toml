@@ -27,6 +27,5 @@ tokio-util.workspace = true
 lightning-test-utils = { path = "../test-utils" }
 lightning-application = { path = "../application" }
 lightning-pool = { path = "../pool" }
-lightning-broadcast = { path = "../broadcast" }
 lightning-topology = { path = "../topology" }
 tempdir = "0.3.7"

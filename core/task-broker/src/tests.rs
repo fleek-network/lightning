@@ -7,7 +7,6 @@ use futures::stream::FuturesUnordered;
 use futures::{Future, SinkExt, StreamExt};
 use lightning_application::app::Application;
 use lightning_application::genesis::{Genesis, GenesisNode};
-use lightning_broadcast::Broadcast;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::TaskError;
 use lightning_pool::PoolProvider;
@@ -27,7 +26,6 @@ partial!(TestBinding {
     KeystoreInterface = EphemeralKeystore<Self>;
     TopologyInterface = Topology<Self>;
     PoolInterface = PoolProvider<Self>;
-    BroadcastInterface = Broadcast<Self>;
     ServiceExecutorInterface = EchoServiceExecutor;
     TaskBrokerInterface = TaskBroker<Self>;
 });
@@ -147,7 +145,7 @@ fn build_cluster(
                                     lightning_application::config::Config::test(path.clone()),
                                 )
                                 .with::<PoolProvider<TestBinding>>(lightning_pool::Config {
-                                    max_idle_timeout: Duration::from_secs(5),
+                                    max_idle_timeout: Duration::from_secs(1),
                                     address: ([127, 0, 0, 1], port_start + i as u16).into(),
                                     http: None,
                                 })
