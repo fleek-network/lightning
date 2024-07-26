@@ -28,7 +28,7 @@ pub struct TaskBroker<C: Collection> {
     topology: tokio::sync::watch::Receiver<Arc<Vec<Vec<NodePublicKey>>>>,
     query_runner: c!(C::ApplicationInterface::SyncExecutor),
     max_depth: u8,
-    request_timeout: Duration,
+    connect_timeout: Duration,
     temp: Option<RequestWorkerInner<C>>,
 }
 
@@ -46,7 +46,7 @@ impl<C: Collection> Clone for TaskBroker<C> {
             topology: self.topology.clone(),
             query_runner: self.query_runner.clone(),
             max_depth: self.max_depth,
-            request_timeout: self.request_timeout,
+            connect_timeout: self.connect_timeout,
             temp: None,
         }
     }
@@ -62,7 +62,7 @@ impl<C: Collection> TaskBroker<C> {
     ) -> Result<Self> {
         let config @ TaskBrokerConfig {
             max_depth,
-            request_timeout,
+            connect_timeout,
             ..
         } = config.get::<Self>();
 
@@ -74,7 +74,7 @@ impl<C: Collection> TaskBroker<C> {
             topology: topology.get_receiver(),
             query_runner,
             max_depth,
-            request_timeout,
+            connect_timeout,
             temp: Some(RequestWorkerInner {
                 sk: keystore.get_ed25519_sk(),
                 responder,
@@ -152,7 +152,7 @@ impl<C: Collection> TaskBroker<C> {
             .map_err(|e| TaskError::Internal(e.to_string()))?;
 
         match timeout(
-            self.request_timeout,
+            self.connect_timeout,
             self.requester.request(peer, buf.into()),
         )
         .await
@@ -253,7 +253,7 @@ pub struct TaskBrokerConfig {
     pub max_tasks: usize,
     // Request timeout
     #[serde(with = "humantime_serde")]
-    pub request_timeout: Duration,
+    pub connect_timeout: Duration,
 }
 impl Default for TaskBrokerConfig {
     fn default() -> Self {
@@ -261,7 +261,7 @@ impl Default for TaskBrokerConfig {
             max_depth: 8,
             max_peer_tasks: 128,
             max_tasks: 256,
-            request_timeout: Duration::from_secs(30),
+            connect_timeout: Duration::from_secs(30),
         }
     }
 }
