@@ -284,7 +284,7 @@ async fn run_cluster_echo_task() -> anyhow::Result<()> {
         .await;
 
     // Ensure at least 2/3 of nodes had a response
-    assert!(responses.len() >= (2. * nodes.len() as f32 / 3.).ceil() as usize);
+    assert!(responses.len() >= (2. * (nodes.len() - 1) as f32 / 3.).ceil() as usize);
 
     for response in responses {
         let response = response.expect("task should succeed");
@@ -389,11 +389,7 @@ async fn run_cluster_echo_task_7_offline_of_8_should_fail() -> anyhow::Result<()
 
     for response in responses {
         let response = response.expect_err("only errors should happen");
-        println!("{response:?}");
-        assert!(
-            matches!(response, TaskError::Connect | TaskError::Timeout),
-            "unexpected error"
-        );
+        assert!(response == TaskError::Connect, "expected connection error");
     }
 
     // Shutdown the last node

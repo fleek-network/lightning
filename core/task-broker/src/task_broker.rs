@@ -169,7 +169,7 @@ impl<C: Collection> TaskBroker<C> {
                 res.read_to_end(&mut buf).await.map_err(|_| {
                     self.rep_reporter
                         .report_unsat(peer, lightning_interfaces::Weight::Weak);
-                    TaskError::InvalidResponse
+                    TaskError::PeerDisconnect
                 })?;
 
                 TaskResponse::decode(&buf).map_err(|_| {
@@ -182,7 +182,7 @@ impl<C: Collection> TaskBroker<C> {
                 warn!("Task on peer {peer} failed: {e}");
                 self.rep_reporter
                     .report_unsat(peer, lightning_interfaces::Weight::Weak);
-                Err(TaskError::PeerDisconnect)
+                Err(TaskError::Connect)
             },
             Err(_) => {
                 warn!("Request connection for peer {peer} timed out");
