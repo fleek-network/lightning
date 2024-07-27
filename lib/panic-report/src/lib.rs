@@ -111,7 +111,7 @@ pub fn print_default_panic<S: ToString>(
 
     let mut stderr = anstream::stderr().lock();
     stderr
-        .write(anstyle::AnsiColor::Red.render_fg().to_string().as_bytes())
+        .write_all(anstyle::AnsiColor::Red.render_fg().to_string().as_bytes())
         .ok();
 
     writeln!(
@@ -156,7 +156,7 @@ Thank you kindly!
     .ok();
 
     stderr
-        .write(anstyle::Reset.render().to_string().as_bytes())
+        .write_all(anstyle::Reset.render().to_string().as_bytes())
         .ok();
 }
 

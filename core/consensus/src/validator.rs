@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use anyhow::{anyhow, Context, Error, Result};
-use async_trait::async_trait;
 use fleek_crypto::{ConsensusPublicKey, EthAddress, NodePublicKey, TransactionSender};
 use lightning_interfaces::types::{
     TransactionRequest,
@@ -33,7 +32,6 @@ impl Validator {
     }
 }
 
-#[async_trait]
 impl TransactionValidator for Validator {
     type Error = Error;
 
@@ -41,7 +39,7 @@ impl TransactionValidator for Validator {
         self.validate_txn(t, true)
     }
 
-    async fn validate_batch(&self, b: &Batch, _protocol_config: &ProtocolConfig) -> Result<()> {
+    fn validate_batch(&self, b: &Batch, _protocol_config: &ProtocolConfig) -> Result<()> {
         let txns = match b {
             Batch::V1(batch) => &batch.transactions,
             Batch::V2(batch) => &batch.transactions,
