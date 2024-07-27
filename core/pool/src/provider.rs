@@ -418,7 +418,6 @@ impl TryFrom<u8> for Status {
             1 => Self::Failed(RejectReason::TooManyRequests),
             2 => Self::Failed(RejectReason::ContentNotFound),
             3 => Self::Failed(RejectReason::Other),
-            4 => Self::Failed(RejectReason::ConnectionAttemptFailed),
             _ => {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
