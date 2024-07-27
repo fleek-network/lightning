@@ -5,7 +5,10 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use derive_more::{From, IsVariant, TryInto};
+use fastcrypto::bls12381::min_sig::BLS12381PrivateKey;
+use fastcrypto::ed25519::Ed25519PrivateKey;
 use fleek_crypto::{ConsensusPublicKey, NodePublicKey, SecretKey};
+use gethostname::gethostname;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Epoch, EpochInfo, Topic, UpdateMethod};
 use lightning_interfaces::Events;
@@ -16,17 +19,19 @@ use narwhal_config::{Committee, CommitteeBuilder, WorkerCache, WorkerIndex, Work
 use narwhal_crypto::traits::{KeyPair as _, ToFromBytes};
 use narwhal_crypto::{KeyPair, NetworkKeyPair, NetworkPublicKey, PublicKey};
 use narwhal_node::NodeStorage;
+use narwhal_types::ConsensusOutput;
 use prometheus::Registry;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
-use tokio::sync::{mpsc, Notify};
+use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::{mpsc, oneshot, Notify};
 use tokio::{pin, select, task, time};
 use tracing::{error, info};
 use typed_store::DBMetrics;
 
-use crate::broadcast_worker::BroadcastWorker;
 use crate::config::Config;
-use crate::execution::{AuthenticStampedParcel, CommitteeAttestation, Digest, Execution};
+use crate::execution::parcel::{AuthenticStampedParcel, CommitteeAttestation, Digest};
+use crate::execution::worker::ExecutionWorker;
 use crate::narwhal::{NarwhalArgs, NarwhalService};
 
 pub struct Consensus<C: Collection> {
@@ -39,6 +44,8 @@ pub struct Consensus<C: Collection> {
             c![C::NotifierInterface::Emitter],
         >,
     >,
+    /// To send the event sender to the execution worker.
+    event_tx_tx: Option<oneshot::Sender<Events>>,
     /// Timestamp of the narwhal certificate that caused an epoch change
     /// is sent through this channel to notify that epoch chould change.
     reconfigure_notify: Arc<Notify>,
@@ -48,6 +55,8 @@ pub struct Consensus<C: Collection> {
 
 /// This struct contains mutable state only for the current epoch.
 struct EpochState<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter> {
+    /// Execute transactions.
+    executor: ExecutionEngineSocket,
     /// The node public key of the node.
     node_public_key: NodePublicKey,
     /// The consensus public key of the node.
@@ -58,10 +67,10 @@ struct EpochState<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, N
     query_runner: Q,
     /// This narwhal node data
     narwhal_args: NarwhalArgs,
+    /// Notifications emitter
+    notifier: NE,
     /// Path to the database used by the narwhal implementation
     pub store_path: ResolvedPathBuf,
-    /// Narwhal execution state.
-    execution_state: Arc<Execution<P::Event, Q, NE>>,
     /// Used to send transactions to consensus
     /// We still use this socket on consensus struct because a node is not always on the committee,
     /// so its not always sending     a transaction to its own mempool. The signer interface
@@ -69,8 +78,12 @@ struct EpochState<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, N
     txn_socket: SubmitTxSocket,
     /// Interface for sending messages through the gossip layer
     pub_sub: P,
-    /// Narhwal sends payloads ready for broadcast to this receiver
-    rx_narwhal_batches: Option<mpsc::Receiver<(AuthenticStampedParcel, bool)>>,
+    /// Send consensus output from the execution state to the execution worker.
+    consensus_output_tx: Sender<ConsensusOutput>,
+    /// Receive consensus output in the execution worker from the execution state.
+    consensus_output_rx: Option<Receiver<ConsensusOutput>>,
+    /// Receive the rpc event sender in the execution worker.
+    event_tx_rx: Option<oneshot::Receiver<Events>>,
     /// To notify when consensus is shutting down.
     shutdown_notify: Arc<Notify>,
 }
@@ -80,46 +93,54 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
     EpochState<Q, P, NE>
 {
     fn new(
+        executor: ExecutionEngineSocket,
         node_public_key: NodePublicKey,
         consensus_public_key: ConsensusPublicKey,
         query_runner: Q,
         narwhal_args: NarwhalArgs,
         store_path: ResolvedPathBuf,
-        execution_state: Arc<Execution<P::Event, Q, NE>>,
         txn_socket: SubmitTxSocket,
+        notifier: NE,
         pub_sub: P,
-        rx_narwhal_batches: mpsc::Receiver<(AuthenticStampedParcel, bool)>,
+        consensus_output_tx: Sender<ConsensusOutput>,
+        consensus_output_rx: Receiver<ConsensusOutput>,
+        event_tx_rx: oneshot::Receiver<Events>,
         shutdown_notify: Arc<Notify>,
     ) -> Self {
         Self {
+            executor,
             node_public_key,
             consensus_public_key,
             consensus: None,
             query_runner,
             narwhal_args,
+            notifier,
             store_path,
-            execution_state,
             txn_socket,
             pub_sub,
-            rx_narwhal_batches: Some(rx_narwhal_batches),
+            consensus_output_tx,
+            consensus_output_rx: Some(consensus_output_rx),
+            event_tx_rx: Some(event_tx_rx),
             shutdown_notify,
         }
     }
 
-    fn spawn_broadcast_worker(&mut self, reconfigure_notify: Arc<Notify>) -> BroadcastWorker {
-        BroadcastWorker::spawn::<P, Q, NE>(
+    fn spawn_execution_worker(&mut self, reconfigure_notify: Arc<Notify>) -> ExecutionWorker {
+        ExecutionWorker::spawn::<P, Q, NE>(
+            self.executor.clone(),
+            self.consensus_output_rx
+                .take()
+                .expect("consensus_output_rx is missing"),
             self.pub_sub.clone(),
             self.query_runner.clone(),
-            self.execution_state.clone(),
             self.narwhal_args
                 .primary_network_keypair
                 .public()
                 .to_owned()
                 .into(),
-            self.rx_narwhal_batches
-                .take()
-                .expect("rx_narwhal_batches is missing"),
             reconfigure_notify,
+            self.notifier.clone(),
+            self.event_tx_rx.take().expect("event_tx_rx is missing"),
         )
     }
 
@@ -161,8 +182,13 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
                 PublicKey::from_bytes(&node.consensus_key.0),
                 NetworkPublicKey::from_bytes(&node.public_key.0),
             ) {
-                committee_builder =
-                    committee_builder.add_authority(consensus_key, 1, address, public_key);
+                committee_builder = committee_builder.add_authority(
+                    consensus_key,
+                    1,
+                    address,
+                    public_key,
+                    gethostname().to_string_lossy().into_owned(),
+                );
             }
         }
         let narwhal_committee = committee_builder.build();
@@ -264,7 +290,9 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
             worker_cache,
         );
 
-        service.start(self.execution_state.clone()).await;
+        service
+            .start(self.consensus_output_tx.clone(), self.query_runner.clone())
+            .await;
 
         // start the timer to signal when your node thinks its ready to change epochs
         let now = SystemTime::now()
@@ -280,11 +308,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
     }
 
     pub fn shutdown(&self) {
-        self.execution_state.shutdown();
-    }
-
-    fn set_event_tx(&mut self, tx: Events) {
-        self.execution_state.set_event_tx(tx);
+        self.executor.downgrade();
     }
 
     /// Creates or reopens a narwhal store specific to current epoch. Also garbage collects stores
@@ -317,8 +341,8 @@ impl<C: Collection> Consensus<C> {
         let panic_waiter = waiter.clone();
         spawn!(
             async move {
-                let broadcast_worker =
-                    epoch_state.spawn_broadcast_worker(reconfigure_notify.clone());
+                let execution_worker =
+                    epoch_state.spawn_execution_worker(reconfigure_notify.clone());
                 epoch_state.start_current_epoch().await;
 
                 let shutdown_future = waiter.wait_for_shutdown();
@@ -333,7 +357,7 @@ impl<C: Collection> Consensus<C> {
                             if let Some(consensus) = epoch_state.consensus.take() {
                                 consensus.shutdown().await;
                             }
-                            broadcast_worker.shutdown().await;
+                            execution_worker.shutdown().await;
                             epoch_state.shutdown();
                             break
                         }
@@ -395,8 +419,8 @@ impl<C: Collection> Consensus<C> {
         let (consensus_sk, primary_sk) = (keystore.get_bls_sk(), keystore.get_ed25519_sk());
         let (consensus_pk, primary_pk) = (consensus_sk.to_pk(), primary_sk.to_pk());
         let reconfigure_notify = Arc::new(Notify::new());
-        let networking_keypair = NetworkKeyPair::from(primary_sk);
-        let primary_keypair = KeyPair::from(consensus_sk);
+        let networking_keypair = NetworkKeyPair::from(Ed25519PrivateKey::from(&primary_sk));
+        let primary_keypair = KeyPair::from(BLS12381PrivateKey::from(&consensus_sk));
         let narwhal_args = NarwhalArgs {
             primary_keypair,
             primary_network_keypair: networking_keypair.copy(),
@@ -405,43 +429,41 @@ impl<C: Collection> Consensus<C> {
         };
 
         // Todo(dalton): Figure out better default channel size
-        let (tx_narwhal_batches, rx_narwhal_batches) = mpsc::channel(1000);
-
-        let execution_state = Arc::new(Execution::new(
-            executor,
-            reconfigure_notify.clone(),
-            tx_narwhal_batches,
-            query_runner.clone(),
-            notifier.get_emitter(),
-        ));
+        let (consensus_output_tx, consensus_output_rx) = mpsc::channel(1000);
+        let (event_tx_tx, event_tx_rx) = oneshot::channel();
 
         let shutdown_notify_epoch_state = Arc::new(Notify::new());
 
         let epoch_state = EpochState::new(
+            executor,
             primary_pk,
             consensus_pk,
             query_runner,
             narwhal_args,
             config.store_path,
-            execution_state,
             signer.get_socket(),
+            notifier.get_emitter(),
             pubsub,
-            rx_narwhal_batches,
+            consensus_output_tx,
+            consensus_output_rx,
+            event_tx_rx,
             shutdown_notify_epoch_state.clone(),
         );
 
         Ok(Self {
             epoch_state: Some(epoch_state),
+            event_tx_tx: Some(event_tx_tx),
             reconfigure_notify,
             shutdown_notify_epoch_state,
         })
     }
 
     fn post_init(&mut self, rpc: &C::RpcInterface) {
-        self.epoch_state
-            .as_mut()
-            .expect("Consensus was tried to start before initialization")
-            .set_event_tx(rpc.event_tx());
+        self.event_tx_tx
+            .take()
+            .expect("Tried to start consensus before initialization")
+            .send(rpc.event_tx())
+            .expect("Failed to send events sender to execution worker");
     }
 }
 

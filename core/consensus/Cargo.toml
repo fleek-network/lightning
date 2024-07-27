@@ -27,26 +27,25 @@ fxhash = "0.2.1"
 dashmap = "5.5.0"
 fleek-blake3 = "1.5"
 quick_cache = "0.4.0"
+gethostname = "0.5.0"
 
 # Narwhal b06ada015694890d7c46347b13fbc3e9a763513c
-narwhal-config = { git = "https://github.com/MystenLabs/sui.git", rev = "b06ada015694890d7c46347b13fbc3e9a763513c", package = "narwhal-config" }
-narwhal-consensus = { git = "https://github.com/MystenLabs/sui.git", rev = "b06ada015694890d7c46347b13fbc3e9a763513c", package = "narwhal-consensus" }
-narwhal-crypto = { git = "https://github.com/MystenLabs/sui.git", rev = "b06ada015694890d7c46347b13fbc3e9a763513c", package = "narwhal-crypto" }
-narwhal-executor = { git = "https://github.com/MystenLabs/sui.git", rev = "b06ada015694890d7c46347b13fbc3e9a763513c", package = "narwhal-executor" }
-narwhal-node = { git = "https://github.com/MystenLabs/sui.git", rev = "b06ada015694890d7c46347b13fbc3e9a763513c", package = "narwhal-node" }
-narwhal-primary = { git = "https://github.com/MystenLabs/sui.git", rev = "b06ada015694890d7c46347b13fbc3e9a763513c", package = "narwhal-primary" }
-narwhal-types = { git = "https://github.com/MystenLabs/sui.git", rev = "b06ada015694890d7c46347b13fbc3e9a763513c", package = "narwhal-types" }
-narwhal-worker = { git = "https://github.com/MystenLabs/sui.git", rev = "b06ada015694890d7c46347b13fbc3e9a763513c", package = "narwhal-worker" }
-narwhal-network = { git = "https://github.com/MystenLabs/sui.git", rev = "b06ada015694890d7c46347b13fbc3e9a763513c", package = "narwhal-network" }
-typed-store = { git = "https://github.com/MystenLabs/sui.git", rev = "b06ada015694890d7c46347b13fbc3e9a763513c", package = "typed-store" }
-mysten-metrics = { git = "https://github.com/MystenLabs/sui.git", rev = "b06ada015694890d7c46347b13fbc3e9a763513c", package = "mysten-metrics" }
-mysten-network = { git = "https://github.com/MystenLabs/sui.git", rev = "b06ada015694890d7c46347b13fbc3e9a763513c", package = "mysten-network" }
-sui-protocol-config = { git = "https://github.com/MystenLabs/sui.git", rev = "b06ada015694890d7c46347b13fbc3e9a763513c", package = "sui-protocol-config" }
-tonic = { version = "0.8.2", features = ["transport", "tls"] }
+narwhal-config = { git = "https://github.com/MystenLabs/sui.git", rev = "bbfaafc17652d221651e835c908028c440f039d7", package = "narwhal-config" }
+narwhal-crypto = { git = "https://github.com/MystenLabs/sui.git", rev = "bbfaafc17652d221651e835c908028c440f039d7", package = "narwhal-crypto" }
+narwhal-executor = { git = "https://github.com/MystenLabs/sui.git", rev = "bbfaafc17652d221651e835c908028c440f039d7", package = "narwhal-executor" }
+narwhal-node = { git = "https://github.com/MystenLabs/sui.git", rev = "bbfaafc17652d221651e835c908028c440f039d7", package = "narwhal-node" }
+narwhal-primary = { git = "https://github.com/MystenLabs/sui.git", rev = "bbfaafc17652d221651e835c908028c440f039d7", package = "narwhal-primary" }
+narwhal-types = { git = "https://github.com/MystenLabs/sui.git", rev = "bbfaafc17652d221651e835c908028c440f039d7", package = "narwhal-types" }
+narwhal-worker = { git = "https://github.com/MystenLabs/sui.git", rev = "bbfaafc17652d221651e835c908028c440f039d7", package = "narwhal-worker" }
+narwhal-network = { git = "https://github.com/MystenLabs/sui.git", rev = "bbfaafc17652d221651e835c908028c440f039d7", package = "narwhal-network" }
+typed-store = { git = "https://github.com/MystenLabs/sui.git", rev = "bbfaafc17652d221651e835c908028c440f039d7", package = "typed-store" }
+mysten-metrics = { git = "https://github.com/MystenLabs/sui.git", rev = "bbfaafc17652d221651e835c908028c440f039d7", package = "mysten-metrics" }
+mysten-network = { git = "https://github.com/MystenLabs/sui.git", rev = "bbfaafc17652d221651e835c908028c440f039d7", package = "mysten-network" }
+sui-protocol-config = { git = "https://github.com/MystenLabs/sui.git", rev = "bbfaafc17652d221651e835c908028c440f039d7", package = "sui-protocol-config" }
 
 prometheus = "0.13.3"
 multiaddr = "0.17.1"
-fastcrypto = { git = "https://github.com/MystenLabs/fastcrypto", rev = "c961a01596a87e76f590c7e43aca9d57106dbbb1" }
+fastcrypto = { git = "https://github.com/MystenLabs/fastcrypto", rev = "55e7e568842939e01c8545a71d72e2402ad74538" }
 lightning-workspace-hack.workspace = true
 
 [dev-dependencies]

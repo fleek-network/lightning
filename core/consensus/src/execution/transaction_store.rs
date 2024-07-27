@@ -4,8 +4,8 @@ use std::collections::{HashMap, HashSet};
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Digest as BroadcastDigest, NodeIndex};
 
+use super::parcel::{AuthenticStampedParcel, Digest};
 use crate::consensus::PubSubMsg;
-use crate::execution::{AuthenticStampedParcel, Digest};
 
 pub struct ParcelWrapper<T: BroadcastEventInterface<PubSubMsg>> {
     pub(crate) parcel: Option<Parcel>,
@@ -31,10 +31,6 @@ pub struct TransactionStore<T: BroadcastEventInterface<PubSubMsg>> {
 }
 
 impl<T: BroadcastEventInterface<PubSubMsg>> TransactionStore<T> {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     // Returns the parcel for the given digest, if it exists.
     // If the parcel does not exist for the current epoch, we will check for parcels from the
     // previous epoch.

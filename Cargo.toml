@@ -56,7 +56,7 @@ scc = "1.8.1"
 num-traits = "0.2.15"
 num-derive = "0.3.3"
 lazy_static = "1.4.0"
-schemars = "0.8.1"
+schemars = "0.8.21"
 rkyv = { version = "0.7.44", features = [
     "validation",
     "alloc",

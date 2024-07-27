@@ -1,20 +1,21 @@
-use std::sync::Arc;
-
-use fastcrypto::traits::KeyPair as _;
 use fleek_crypto::{ConsensusPublicKey, NodePublicKey};
+use lightning_interfaces::SyncQueryRunnerInterface;
 use mysten_metrics::RegistryService;
 use narwhal_config::{Committee, Parameters, WorkerCache};
+use narwhal_crypto::traits::KeyPair as _;
 use narwhal_crypto::{KeyPair, NetworkKeyPair};
-use narwhal_executor::ExecutionState;
 use narwhal_network::client::NetworkClient;
 use narwhal_node::primary_node::PrimaryNode;
 use narwhal_node::worker_node::WorkerNode;
 use narwhal_node::NodeStorage;
+use narwhal_types::ConsensusOutput;
 use sui_protocol_config::{Chain, ProtocolConfig, ProtocolVersion};
+use tokio::sync::mpsc::Sender;
 use tokio::sync::Mutex;
 use tokio::time::Instant;
 use tracing::{debug, error, trace, warn};
 
+use crate::execution::state::Execution;
 use crate::validator::Validator;
 
 // Copyright 2022-2023 Fleek Network
@@ -67,11 +68,7 @@ impl NarwhalService {
             ProtocolConfig::get_for_version_if_supported(ProtocolVersion::new(12), Chain::Unknown)
                 .unwrap();
         // Todo(dalton): Create our own protocol default paramaters
-        let primary = PrimaryNode::new(
-            Parameters::default(),
-            true,
-            arguments.registry_service.clone(),
-        );
+        let primary = PrimaryNode::new(Parameters::default(), arguments.registry_service.clone());
 
         // Sui intertwined their protocol config with there narwhal library with a recent update,
         // which is why we are bringing ProtocolConfig in and passing it to the worker.
@@ -109,10 +106,11 @@ impl NarwhalService {
     /// # Panics
     ///
     /// This function panics if it can not start either the Primary or the Worker.
-    pub async fn start<State>(&self, state: State)
-    where
-        State: ExecutionState + Send + Sync + 'static,
-    {
+    pub async fn start<Q: SyncQueryRunnerInterface>(
+        &self,
+        consensus_output_tx: Sender<ConsensusOutput>,
+        query_runner: Q,
+    ) {
         let mut status = self.status.lock().await;
         if *status == Status::Running {
             error!("NarwhalService is already running.");
@@ -120,7 +118,6 @@ impl NarwhalService {
         }
 
         let name = self.arguments.primary_keypair.public().clone();
-        let execution_state = Arc::new(state);
 
         let epoch = self.committee.epoch();
         debug!("Starting NarwhalService for epoch {epoch}");
@@ -136,6 +133,7 @@ impl NarwhalService {
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             }
 
+            let execution_state = Execution::new(consensus_output_tx.clone(), query_runner.clone());
             if let Err(e) = self
                 .primary
                 .start(
@@ -146,7 +144,7 @@ impl NarwhalService {
                     self.worker_cache.clone(),
                     network_client.clone(),
                     &self.store,
-                    execution_state.clone(),
+                    execution_state,
                 )
                 .await
             {
