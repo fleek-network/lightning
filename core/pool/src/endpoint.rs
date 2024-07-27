@@ -689,6 +689,26 @@ where
         }
     }
 
+    // Todo: `EventReceiver` should be keeping state of the responds instead.
+    fn send_connection_failed_notification(&mut self, dst: NodeIndex) {
+        if let Some(requests) = self.pending_task.remove(&dst) {
+            for request in requests {
+                if let connection::Request::SendReqResp { respond, .. } = request {
+                    self.ongoing_async_tasks.push(spawn!(
+                        async move {
+                            let _ = respond.send(Err(io::Error::new(
+                                io::ErrorKind::ConnectionRefused,
+                                "failed to connect to peer",
+                            )));
+                            AsyncTaskResult::GenericTaskEnded
+                        },
+                        "POOL: notify connection attempt failed"
+                    ));
+                }
+            }
+        }
+    }
+
     fn handle_finished_async_task(&mut self, task_result: AsyncTaskResult<M::Connection>) {
         match task_result {
             AsyncTaskResult::ConnectionSuccess { conn, .. } => {
@@ -701,6 +721,7 @@ where
                     let peer = remote.unwrap();
                     tracing::warn!("failed to dial peer {:?}: {error:?}", peer);
                     self.remove_pending_dial(&peer);
+                    self.send_connection_failed_notification(peer);
                     self.enqueue_event(Event::ConnectionEnded { remote: peer });
                 }
             },
