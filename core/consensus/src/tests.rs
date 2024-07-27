@@ -5,8 +5,8 @@ use rand::Rng;
 use sui_protocol_config::{Chain, ProtocolConfig, ProtocolVersion};
 
 use crate::consensus::PubSubMsg;
-use crate::execution::{AuthenticStampedParcel, Digest};
-use crate::transaction_store::TransactionStore;
+use crate::execution::parcel::{AuthenticStampedParcel, Digest};
+use crate::execution::transaction_store::TransactionStore;
 
 fn generate_random_tx(length: usize) -> Transaction {
     let mut rng = rand::thread_rng();
@@ -60,6 +60,7 @@ fn test_to_digest_ne() {
 }
 
 #[test]
+#[allow(clippy::assigning_clones)]
 fn test_to_digest_reorder_batches() {
     let parcel1 = generate_random_parcel(5, 4, 10, None);
     let mut parcel2 = parcel1.clone();
@@ -72,7 +73,7 @@ fn test_to_digest_reorder_batches() {
 
 #[test]
 fn test_ring_buffer_store_get_parcel() {
-    let mut ring_buffer = TransactionStore::<Event>::new();
+    let mut ring_buffer = TransactionStore::<Event>::default();
     let parcel = generate_random_parcel(2, 1, 2, None);
     let digest = parcel.to_digest();
     ring_buffer.store_parcel(parcel, 99, None);
@@ -85,7 +86,7 @@ fn test_ring_buffer_store_get_parcel() {
 
 #[test]
 fn test_ring_buffer_store_get_att() {
-    let mut ring_buffer = TransactionStore::<Event>::new();
+    let mut ring_buffer = TransactionStore::<Event>::default();
     let parcel = generate_random_parcel(2, 1, 2, None);
     let digest = parcel.to_digest();
     ring_buffer.store_attestation(digest, 4);
@@ -99,7 +100,7 @@ fn test_ring_buffer_store_get_att() {
 
 #[test]
 fn test_ring_buffer_epoch_change() {
-    let mut ring_buffer = TransactionStore::<Event>::new();
+    let mut ring_buffer = TransactionStore::<Event>::default();
     let parcel = generate_random_parcel(2, 1, 2, None);
     let digest = parcel.to_digest();
     let event = Event {
@@ -139,7 +140,7 @@ fn test_ring_buffer_epoch_change() {
 
 #[test]
 fn test_ring_buffer_invalid_parcel() {
-    let mut ring_buffer = TransactionStore::<Event>::new();
+    let mut ring_buffer = TransactionStore::<Event>::default();
     let parcel = generate_random_parcel(2, 1, 2, None);
     let digest = parcel.to_digest();
     let event = Event {
