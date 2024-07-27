@@ -100,6 +100,16 @@ impl<C, T> ContextList<C, T> {
         &self.removing
     }
 
+    pub fn uncommitted<'a>(&self, context: &'a mut C) -> &'a [T] {
+        match self.last_known_len {
+            Some(len) => {
+                let lower = len.checked_sub(1).unwrap_or(0);
+                &self.records(context)[lower..]
+            },
+            None => &[],
+        }
+    }
+
     pub fn restore_state(&mut self, context: &mut C) {
         let buf = unsafe { self.values.get(context).as_vec() };
         if let Some(len) = self.last_known_len {

@@ -6,13 +6,11 @@ use lightning_guard::ConfigSource;
 use log::error;
 use ratatui::prelude::{Color, Constraint, Modifier, Rect, Style, Text};
 use ratatui::widgets::{Cell, Row};
-use tokio::sync::mpsc::UnboundedSender;
 use unicode_width::UnicodeWidthStr;
 
-use super::forms::RuleForm;
 use super::{Component, Frame, ProfileContext};
 use crate::app::GlobalAction;
-use crate::components::{profile, Draw, DynExtractor};
+use crate::components::{Draw, DynExtractor};
 use crate::config::{ComponentKeyBindings, Config};
 use crate::helpers::StableVec;
 use crate::widgets::context_table::Table;
@@ -79,6 +77,8 @@ impl FromStr for ProfileViewActions {
 
 impl ProfileView {
     pub fn new(src: ConfigSource) -> Self {
+        // todo DRY ?
+        // problem is we cant assign a for<'a> Fn(&'a _) -> &'a _ afaik
         Self {
             table: Table::new("ProfileView", |context: &mut ProfileContext| {
                 &mut context
@@ -113,6 +113,8 @@ impl ProfileView {
     }
 
     fn save(&mut self, context: &mut ProfileContext) {
+        // we dont actually update the profile rules since next time we load the profile
+        // into view we need to read from FS again in case the file has been updated
         let mut profile = self
             .profile_extractor
             .get(context)

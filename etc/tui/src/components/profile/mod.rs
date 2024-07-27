@@ -22,26 +22,8 @@ use crate::widgets::context_list::ContextList;
 pub struct ProfileContext {
     /// The current mounted subcomponent
     mounted: ProfileSubComponent,
-    profiles_to_update: Option<Vec<map::Profile>>,
     profiles: StableVec<map::Profile>,
     view_profile: Option<(usize, StableVec<FileRule>)>,
-}
-
-impl ProfileContext {
-    fn add_profile(&mut self, profile: map::Profile) {
-        self.profiles.push(profile.clone());
-
-        if self.profiles_to_update.is_none() {
-            self.profiles_to_update = Some(Vec::new());
-        }
-
-        let profiles_to_update = self
-            .profiles_to_update
-            .as_mut()
-            .expect("Already initialized");
-
-        profiles_to_update.push(profile);
-    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -123,16 +105,13 @@ impl Profile {
     pub async fn new(src: ConfigSource) -> Result<Self> {
         let mut this = Self {
             src: src.clone(),
-            list: ContextList::new("Profiles", |context: &mut ProfileContext| {
-                &mut context.profiles
-            }),
+            list: ContextList::new("Profiles", |context: &mut ProfileContext| &mut context.profiles),
             view: ProfileView::new(src),
             form: ProfileForm::new(),
             rule_form: RuleForm::new(),
             keybindings: Default::default(),
             context: ProfileContext {
                 mounted: ProfileSubComponent::Profiles,
-                profiles_to_update: None,
                 profiles: StableVec::new(),
                 view_profile: None,
             },
@@ -160,7 +139,7 @@ impl Profile {
             .map(|p| p.name)
             .collect::<HashSet<_>>();
 
-        let update = self.context.profiles_to_update.take();
+        let update = self.list.uncommitted(&mut self.context).to_vec();
         let storage = self.src.clone();
         tokio::spawn(async move {
             // Todo: do better.
@@ -168,8 +147,8 @@ impl Profile {
                 log::error!("Failed to delete profiles: {:?}", e);
             }
 
-            if let Some(profiles) = update {
-                if let Err(e) = storage.write_profiles(profiles).await {
+            if !update.is_empty() {
+                if let Err(e) = storage.write_profiles(update).await {
                     log::error!("Failed to delete profiles: {:?}", e);
                 }
             }
@@ -196,7 +175,6 @@ impl Profile {
 
     fn restore_state(&mut self) {
         self.list.restore_state(&mut self.context);
-        self.context.profiles_to_update.take();
     }
 }
 

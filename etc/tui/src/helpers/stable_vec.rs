@@ -1,5 +1,5 @@
-/// An instanceo of a vector that can only be safely added to becasue a component is depending on the order
-/// Changing the order of this vector in anyway is unsafe if dont account for the things that is depending on it
+/// An instance of a vector that can only be safely added to becasue a component is depending on the order
+/// Changing the order of this vector in anyway is unsafe if you dont account for the components that is depending on it
 /// 
 /// This is used in something like [crate::widgets::context_list::ContextList]
 pub struct StableVec<T>(Vec<T>);

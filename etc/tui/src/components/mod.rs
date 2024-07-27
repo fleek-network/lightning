@@ -15,12 +15,12 @@ pub mod profile;
 pub mod prompt;
 pub mod summary;
 
-pub trait Extractor<C, T>
+pub trait Extractor<C, T> 
 where
     Self: for<'a> Fn(&'a mut C) -> &'a mut T,
     T: ?Sized,
 {
-    fn get<'b>(&self, context: &'b mut C) -> &'b mut T {
+    fn get<'a>(&self, context: &'a mut C) -> &'a mut T {
         (self)(context)
     }
 }
@@ -31,25 +31,25 @@ where
     T: ?Sized,
 {}
 
-pub trait TryExtractor<C, T>
-where
-    Self: for<'a> Fn(&'a mut C) -> Result<&'a mut T>,
-    T: ?Sized,
+pub trait TryExtractor<C, T> 
+    where 
+        Self: for<'a> Fn(&'a mut C) -> Result<&'a mut T>,
+        T: ?Sized,
 {
-    fn get<'b>(&self, context: &'b mut C) -> Result<&'b mut T> {
+    fn try_get<'b>(&self, context: &'b mut C) -> Result<&'b mut T> {
         (self)(context)
     }
 }
 
-impl<C, T, F> TryExtractor<C, T> for F
+impl<C, T, E> TryExtractor<C, T> for E
 where
-    F: for<'a> Fn(&'a mut C) -> Result<&'a mut T>,
+    E: for<'a> Fn(&'a mut C) -> Result<&'a mut T>,
     T: ?Sized,
 {}
 
 /// A type that can extract a value from a context.
 pub type DynExtractor<C, T> = Box<dyn Extractor<C, T>>;
-pub type TryDynExtractor<C, T> = Box<dyn TryExtractor<C, T>>;
+pub type DynTryExtractor <C, T> = Box<dyn TryExtractor<C, T>>;
 
 /// A type which can be drawn in the tui.
 /// Think of this type as the base unit of what can be drawn.

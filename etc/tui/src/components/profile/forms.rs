@@ -133,7 +133,7 @@ impl Component for ProfileForm {
                         return Err(anyhow::anyhow!("creating profile failed {e}"));
                     } else {
                         if let Some(profile) = self.yank_input() {
-                            context.add_profile(profile);
+                            context.profiles.push(profile);
                         } else {
                             log::error!("Failed to create profile. This is a bug");
                         }
