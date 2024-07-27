@@ -72,8 +72,6 @@ mod from_display {
     use std::fmt::{Debug, Display};
     use std::str::FromStr;
 
-    use fastcrypto::ed25519::Ed25519PrivateKey;
-
     use crate::{
         AccountOwnerSecretKey,
         ConsensusSecretKey,
