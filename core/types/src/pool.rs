@@ -7,7 +7,6 @@ pub enum RejectReason {
     TooManyRequests = 1,
     ContentNotFound = 2,
     Other = 3,
-    ConnectionAttemptFailed,
 }
 
 pub type BoxedFilterCallback = Box<dyn Fn(NodeIndex) -> bool + Send + Sync + 'static>;
