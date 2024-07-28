@@ -124,6 +124,15 @@ pub trait QueryRunnerExt: SyncQueryRunnerInterface {
         }
     }
 
+    /// Returns the current sub dag round
+    fn get_sub_dag_round(&self) -> u64 {
+        if let Some(Value::SubDagRound(value)) = self.get_metadata(&Metadata::SubDagRound) {
+            value
+        } else {
+            0
+        }
+    }
+
     /// Returns a full copy of the entire node-registry,
     /// Paging Params - filtering nodes that are still a valid node and have enough stake; Takes
     /// from starting index and specified amount.

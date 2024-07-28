@@ -235,7 +235,8 @@ async fn group_worker(
                 Block {
                     transactions: vec![req.unwrap()],
                     digest: [0; 32],
-                    sub_dag_index: 0
+                    sub_dag_index: 0,
+                    sub_dag_round: 0,
                 }
             },
             Some(req) = req_rx.recv() => {
@@ -270,7 +271,8 @@ async fn group_worker(
                 Block {
                     transactions: vec![],
                     digest: [0; 32],
-                    sub_dag_index: 0
+                    sub_dag_index: 0,
+                    sub_dag_round: 0,
                 }
             },
             else => {

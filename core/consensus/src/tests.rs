@@ -41,6 +41,7 @@ fn generate_random_parcel(
         last_executed: last_executed.unwrap_or([0; 32]),
         epoch: 1,
         sub_dag_index: 0,
+        sub_dag_round: 0,
     }
 }
 
@@ -60,7 +61,6 @@ fn test_to_digest_ne() {
 }
 
 #[test]
-#[allow(clippy::assigning_clones)]
 fn test_to_digest_reorder_batches() {
     let parcel1 = generate_random_parcel(5, 4, 10, None);
     let mut parcel2 = parcel1.clone();

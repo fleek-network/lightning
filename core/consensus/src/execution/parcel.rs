@@ -14,6 +14,7 @@ pub struct AuthenticStampedParcel {
     pub last_executed: Digest,
     pub epoch: Epoch,
     pub sub_dag_index: u64,
+    pub sub_dag_round: u64,
 }
 
 impl ToDigest for AuthenticStampedParcel {

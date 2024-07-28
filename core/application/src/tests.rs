@@ -1034,6 +1034,7 @@ async fn run_transaction(
             transactions: requests,
             digest: [0; 32],
             sub_dag_index: 0,
+            sub_dag_round: 0,
         })
         .await
         .map_err(|r| anyhow!(format!("{r:?}")))?;

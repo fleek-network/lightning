@@ -271,14 +271,23 @@ async fn handle_consensus_output<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
     // We have batches in the payload send them over broadcast along with an attestion
     // of them
     let last_executed = ctx.query_runner.get_last_block();
+    let sub_dag_round = consensus_output.sub_dag.leader.round();
     let parcel = AuthenticStampedParcel {
         transactions: batch_payload.clone(),
         last_executed,
         epoch: current_epoch,
         sub_dag_index,
+        sub_dag_round,
     };
 
-    let epoch_changed = submit_batch(ctx, batch_payload, parcel.to_digest(), sub_dag_index).await;
+    let epoch_changed = submit_batch(
+        ctx,
+        batch_payload,
+        parcel.to_digest(),
+        sub_dag_index,
+        sub_dag_round,
+    )
+    .await;
 
     let parcel_digest = parcel.to_digest();
     let attestation = CommitteeAttestation {
@@ -318,6 +327,7 @@ async fn submit_batch<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
     payload: Vec<Transaction>,
     digest: Digest,
     sub_dag_index: u64,
+    sub_dag_round: u64,
 ) -> bool {
     let transactions = payload
         .into_iter()
@@ -338,6 +348,7 @@ async fn submit_batch<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
     let block = Block {
         digest,
         sub_dag_index,
+        sub_dag_round,
         transactions,
     };
 
@@ -623,6 +634,7 @@ async fn try_execute_chain<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE
             txn_chain.push_front((
                 parcel.inner.transactions.clone(),
                 parcel.inner.sub_dag_index,
+                parcel.inner.sub_dag_round,
                 current_digest,
             ));
             last_executed = parcel.inner.last_executed;
@@ -652,8 +664,8 @@ async fn try_execute_chain<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE
             let mut epoch_changed = false;
 
             // We connected the chain now execute all the transactions
-            for (batch, sub_dag_index, digest) in txn_chain {
-                if submit_batch(ctx, batch, digest, sub_dag_index).await {
+            for (batch, sub_dag_index, sub_dag_round, digest) in txn_chain {
+                if submit_batch(ctx, batch, digest, sub_dag_index, sub_dag_round).await {
                     epoch_changed = true;
                 }
             }

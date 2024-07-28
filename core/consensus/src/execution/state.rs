@@ -26,7 +26,9 @@ impl<Q: SyncQueryRunnerInterface> ExecutionState for Execution<Q> {
     }
 
     fn last_executed_sub_dag_round(&self) -> u64 {
-        todo!()
+        // The sub dag round is currently not used by Narwhal, so it's not clear if adding 1 is
+        // necessary here as well.
+        self.query_runner.get_sub_dag_round() + 1
     }
 
     fn last_executed_sub_dag_index(&self) -> u64 {

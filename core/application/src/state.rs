@@ -1066,11 +1066,13 @@ impl<B: Backend> State<B> {
     }
 
     // This function should only be called in the `run` method on `Env`.
-    pub fn set_last_block(&self, block_hash: [u8; 32], sub_dag_index: u64) {
+    pub fn set_last_block(&self, block_hash: [u8; 32], sub_dag_index: u64, sub_dag_round: u64) {
         self.metadata
             .set(Metadata::LastBlockHash, Value::Hash(block_hash));
         self.metadata
             .set(Metadata::SubDagIndex, Value::SubDagIndex(sub_dag_index));
+        self.metadata
+            .set(Metadata::SubDagRound, Value::SubDagRound(sub_dag_round));
         self.metadata.set(
             Metadata::BlockNumber,
             Value::BlockNumber(self.get_block_number() + 1),
@@ -1874,6 +1876,15 @@ impl<B: Backend> State<B> {
     /// Gets subdag index, returns 0 if not set in state table
     pub fn get_sub_dag_index(&self) -> u64 {
         if let Some(Value::SubDagIndex(value)) = self.metadata.get(&Metadata::SubDagIndex) {
+            value
+        } else {
+            0
+        }
+    }
+
+    /// Gets subdag round, returns 0 if not set in state table
+    pub fn get_sub_dag_round(&self) -> u64 {
+        if let Some(Value::SubDagRound(value)) = self.metadata.get(&Metadata::SubDagRound) {
             value
         } else {
             0

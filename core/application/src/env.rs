@@ -200,13 +200,13 @@ impl<B: StorageBackend> Env<UpdatePerm, B> {
             }
 
             // if epoch changed a new committee starts and subdag starts back at 0
-            let new_sub_dag_index = if response.change_epoch {
-                0
+            let (new_sub_dag_index, new_sub_dag_round) = if response.change_epoch {
+                (0, 0)
             } else {
-                block.sub_dag_index
+                (block.sub_dag_index, block.sub_dag_round)
             };
             // Set the last executed block hash and sub dag index
-            app.set_last_block(block.digest, new_sub_dag_index);
+            app.set_last_block(block.digest, new_sub_dag_index, new_sub_dag_round);
 
             // Return the response
             response

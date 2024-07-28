@@ -93,6 +93,8 @@ pub struct Block {
     pub digest: [u8; 32],
     /// The narwhal subdag index that included these transactions
     pub sub_dag_index: u64,
+    /// The narwhal subdag round that included these transactions
+    pub sub_dag_round: u64,
     /// List of transactions to be executed in this block
     pub transactions: Vec<TransactionRequest>,
 }
@@ -241,6 +243,8 @@ impl TryFrom<&Block> for Vec<u8> {
         bytes.extend_from_slice(&value.digest);
         // Next 8 bytes are the subdag index
         bytes.extend_from_slice(&value.sub_dag_index.to_le_bytes());
+        // Next 8 bytes are the subdag round
+        bytes.extend_from_slice(&value.sub_dag_round.to_le_bytes());
         // Next 8 bytes are the number of transactions that are following
         let num_txns = value.transactions.len() as u64;
         bytes.extend_from_slice(&num_txns.to_le_bytes());
@@ -262,13 +266,16 @@ impl TryFrom<Vec<u8>> for Block {
     fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
         let digest: [u8; 32] = value.get(0..32).context("Out of bounds")?.try_into()?;
 
-        let sub_dag_bytes = value.get(32..40).context("Out of bounds")?.try_into()?;
-        let sub_dag_index = u64::from_le_bytes(sub_dag_bytes);
+        let sub_dag_index_bytes = value.get(32..40).context("Out of bounds")?.try_into()?;
+        let sub_dag_index = u64::from_le_bytes(sub_dag_index_bytes);
 
-        let num_txns_bytes: [u8; 8] = value.get(40..48).context("Out of bounds")?.try_into()?;
+        let sub_dag_round_bytes = value.get(40..48).context("Out of bounds")?.try_into()?;
+        let sub_dag_round = u64::from_le_bytes(sub_dag_round_bytes);
+
+        let num_txns_bytes: [u8; 8] = value.get(48..56).context("Out of bounds")?.try_into()?;
         let num_txns = u64::from_le_bytes(num_txns_bytes);
 
-        let mut pointer = 48;
+        let mut pointer = 56;
         let mut transactions = Vec::with_capacity(num_txns as usize);
         for _ in 0..num_txns {
             let tx_len_bytes: [u8; 8] = value
@@ -288,6 +295,7 @@ impl TryFrom<Vec<u8>> for Block {
         Ok(Block {
             digest,
             sub_dag_index,
+            sub_dag_round,
             transactions,
         })
     }
@@ -775,6 +783,7 @@ mod tests {
         let block = Block {
             digest: [2; 32],
             sub_dag_index: 0,
+            sub_dag_round: 0,
             transactions: vec![txn.clone(), txn.clone(), txn.clone()],
         };
 
