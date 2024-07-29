@@ -128,8 +128,9 @@ impl ExecutionWorker {
     }
 }
 
-/// Creates and event loop which consumes messages from pubsub and sends them to the
-/// right destination.
+/// Creates the execution worker event loop.
+/// The event loop is responsible for handling consensus messages from the pubsub, managing the
+/// transaction store, and handling the parcel execution logic for the non-validators.
 #[allow(clippy::too_many_arguments)]
 async fn spawn_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emitter>(
     executor: ExecutionEngineSocket,

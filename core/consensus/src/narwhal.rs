@@ -65,7 +65,7 @@ impl NarwhalService {
         worker_cache: WorkerCache,
     ) -> Self {
         let protocol_config =
-            ProtocolConfig::get_for_version_if_supported(ProtocolVersion::new(12), Chain::Unknown)
+            ProtocolConfig::get_for_version_if_supported(ProtocolVersion::new(20), Chain::Unknown)
                 .unwrap();
         // Todo(dalton): Create our own protocol default paramaters
         let primary = PrimaryNode::new(Parameters::default(), arguments.registry_service.clone());
