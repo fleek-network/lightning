@@ -26,7 +26,7 @@ const MAX_PENDING_TIMEOUTS: usize = 100;
 const TBE_EMA: f64 = 0.125;
 
 // Bounds for the estimated time between parcel executions.
-const MIN_TBE: Duration = Duration::from_secs(30);
+const MIN_TBE: Duration = Duration::from_secs(10);
 const MAX_TBE: Duration = Duration::from_secs(40);
 
 pub struct ExecutionWorker {
@@ -178,7 +178,7 @@ async fn spawn_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
         timeout_tx,
         reconfigure_notify,
         last_executed_timestamp: None,
-        estimated_tbe: Duration::from_secs(30),
+        estimated_tbe: Duration::from_secs(20),
         deviation_tbe: Duration::from_secs(5),
     };
 
