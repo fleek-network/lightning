@@ -195,14 +195,14 @@ async fn spawn_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
                 break;
             },
             output = consensus_output_rx.recv() => {
+                let Some(consensus_output) = output else {
+                    break;
+                };
                 if !ctx.on_committee {
                     // This should never happen if it somehow does there is critical error somewhere
                     panic!("We received consensus output from narwhal while not on the committee");
                 }
                 // This branch is only executed by validators.
-                let Some(consensus_output) = output else {
-                    break;
-                };
                 handle_consensus_output(&mut ctx, consensus_output).await;
             }
             Some(msg) = ctx.pub_sub.recv_event() => {
