@@ -30,6 +30,8 @@ impl ToDigest for AuthenticStampedParcel {
         bytes.extend_from_slice(&(self.transactions.len() as u32).to_le_bytes());
         bytes.extend_from_slice(&batch_digest.0);
         bytes.extend_from_slice(&self.last_executed);
+        bytes.extend_from_slice(&self.sub_dag_index.to_le_bytes());
+        bytes.extend_from_slice(&self.sub_dag_round.to_le_bytes());
 
         blake3::hash(&bytes).into()
     }
