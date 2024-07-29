@@ -335,9 +335,6 @@ impl<C: Collection> TaskBrokerInterface<C> for TaskBroker<C> {
                 vec![res]
             },
             TaskScope::Cluster => self.run_cluster_task(task).await,
-            TaskScope::Multicluster(_) => {
-                unimplemented!("Multicluster task consensus not implemented")
-            },
         }
     }
 }

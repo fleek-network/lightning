@@ -19,8 +19,6 @@ pub enum TaskScope {
     Single,
     /// Cluster scope for duplicating a task with the current cluster
     Cluster,
-    /// Multicluster scope for duplicating a task across multiple clusters
-    Multicluster(u8),
 }
 impl Display for TaskScope {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -28,18 +26,19 @@ impl Display for TaskScope {
             TaskScope::Local => f.write_str("local"),
             TaskScope::Single => f.write_str("single"),
             TaskScope::Cluster => f.write_str("cluster"),
-            TaskScope::Multicluster(n) => f.write_str(&format!("{n}-multicluster")),
         }
     }
 }
 impl FromStr for TaskScope {
     type Err = anyhow::Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
+        match s.to_lowercase().as_str() {
             "local" => Ok(TaskScope::Local),
             "single" => Ok(TaskScope::Single),
             "cluster" => Ok(TaskScope::Cluster),
-            _ => Err(anyhow!("unsupported scope")),
+            s => Err(anyhow!(
+                "scope '{s}' unknown, should be one of 'local', 'single', or 'cluster'"
+            )),
         }
     }
 }
@@ -48,8 +47,7 @@ impl From<u8> for TaskScope {
         match value {
             0 => Self::Local,
             1 => Self::Single,
-            2 => Self::Cluster,
-            x => Self::Multicluster(x - 1),
+            2.. => Self::Cluster,
         }
     }
 }
@@ -59,7 +57,6 @@ impl From<TaskScope> for u8 {
             TaskScope::Local => 0,
             TaskScope::Single => 1,
             TaskScope::Cluster => 2,
-            TaskScope::Multicluster(x) => x + 1,
         }
     }
 }

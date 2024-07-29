@@ -100,8 +100,7 @@ impl<C: Collection> Context<C> {
                         match scope {
                             0 => TaskScope::Local,
                             1 => TaskScope::Single,
-                            2 => TaskScope::Cluster,
-                            x => TaskScope::Multicluster(x - 2),
+                            2.. => TaskScope::Cluster,
                         },
                         schema::task_broker::TaskRequest {
                             service,
