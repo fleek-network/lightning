@@ -230,6 +230,8 @@ async fn spawn_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
     }
 }
 
+// This function is only executed by validators. The function is called when the execution state
+// receives transactions that have been ordered by Narwhal.
 async fn handle_consensus_output<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emitter>(
     ctx: &mut Context<P, Q, NE>,
     consensus_output: ConsensusOutput,
@@ -321,7 +323,8 @@ async fn handle_consensus_output<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
     }
 }
 
-// Returns true if the epoch changed
+// This function sends transactions to the application to be executed. Returns true if the epoch
+// changed.
 async fn submit_batch<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emitter>(
     ctx: &Context<P, Q, NE>,
     payload: Vec<Transaction>,
@@ -384,6 +387,7 @@ async fn submit_batch<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
     change_epoch
 }
 
+// This function is called when the current node receives a consensus event via broadcast.
 async fn handle_pubsub_event<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emitter>(
     mut msg: P::Event,
     ctx: &mut Context<P, Q, NE>,
@@ -420,6 +424,7 @@ async fn handle_pubsub_event<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, 
     }
 }
 
+// This function is called when the current node receives a parcel via broadcast.
 async fn handle_parcel<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emitter>(
     msg: P::Event,
     parcel: AuthenticStampedParcel,
@@ -488,13 +493,12 @@ async fn handle_parcel<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Em
     }
 
     if !ctx.on_committee {
-        // If the node is not on the committee, storing parcels is crucial for the consensus.
-        // If storing parcels fails for some reason, we want to panic.
         info!("Received transaction parcel from gossip as an edge node");
         execute_digest::<P, Q, NE>(parcel_digest, ctx).await;
     }
 }
 
+// This function is called when the current node receives an attestation via broadcast.
 async fn handle_attestation<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emitter>(
     msg: P::Event,
     att: CommitteeAttestation,
@@ -536,6 +540,9 @@ async fn handle_attestation<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, N
     }
 }
 
+// This function will try to execute the parcel with the given digest and also handle the case
+// where a parcel is missing. This function will only be called by nodes that are not currently
+// validators.
 async fn execute_digest<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emitter>(
     digest: Digest,
     ctx: &mut Context<P, Q, NE>,
@@ -562,8 +569,9 @@ async fn execute_digest<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: E
     }
 }
 
-// Threshold should be 2f + 1 of the committee
-// Returns true if the epoch has changed
+// This function will try to execute the parcel with the given digest. It's a helper function for
+// `execute_digest`. This function will only be called by nodes that are not currently validators.
+// Returns Some(true) if the epoch has changed.
 async fn try_execute<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emitter>(
     digest: Digest,
     ctx: &mut Context<P, Q, NE>,
@@ -589,6 +597,9 @@ async fn try_execute<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emit
     Ok(epoch_changed)
 }
 
+// Helper function for `try_execute`. Only called by nodes that are not currently validators.
+// This function checks if we have enough attestations (2f + 1 of the committee) to execute the
+// current parcel.
 async fn try_execute_internal<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emitter>(
     digest: Digest,
     head: Digest,
@@ -608,6 +619,10 @@ async fn try_execute_internal<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface,
     Err(NotExecuted::MissingAttestations(digest))
 }
 
+// Helper function for `try_execute_internal`. Only called by nodes that are not currently
+// validators. This function is called if we have enough attestations for the current parcel.
+// The function tries to walk the parcel chain backwards from the current parcel to the last
+// executed parcel.
 async fn try_execute_chain<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emitter>(
     digest: Digest,
     head: Digest,
@@ -711,6 +726,9 @@ fn handle_not_executed<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Em
     }
 }
 
+// If the execution of the parcel chain fails because of a missing parcel, we first set a timer
+// before sending a missing parcel request. This is to avoid sending premature missing parcel
+// requests, because parcels may arrive out of order.
 fn set_parcel_timer(
     digest: Digest,
     timeout: Duration,
@@ -729,6 +747,8 @@ fn set_parcel_timer(
     }
 }
 
+// This function calculates the exponentially weigted average of the time between parcel executions
+// and its deviation. The estimates are calculated the same way TCP timeouts are calculated.
 fn update_estimated_tbe<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emitter>(
     ctx: &mut Context<P, Q, NE>,
 ) {
@@ -748,6 +768,7 @@ fn update_estimated_tbe<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: E
     ctx.last_executed_timestamp = Some(SystemTime::now());
 }
 
+// calculate the timeout for sending missing parcel requests based on the estimates.
 fn get_timeout<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emitter>(
     ctx: &Context<P, Q, NE>,
 ) -> Duration {
