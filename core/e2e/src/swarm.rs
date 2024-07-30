@@ -277,6 +277,7 @@ impl SwarmBuilder {
             max_lock_time: 1460,
             supply_at_genesis: 1000000,
             min_num_measurements: 2,
+            chain_id: 59330,
 
             ..Default::default()
         };
