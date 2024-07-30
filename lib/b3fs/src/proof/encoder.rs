@@ -20,24 +20,7 @@ impl ProofEncoder {
         // Compute the byte capacity for this encoder, which is 32-byte per hash and 1
         // byte per 8 one of these.
         let capacity = n * 32 + (n + 8 - 1) / 8;
-        // Create a `Vec<u8>` with the given size and set its len to the byte capacity
-        // it is not important for us to take care of initializing the items since the
-        // type is a u8 and has no drop logic except the deallocatation of the slice
-        // itself.
-        let mut vec = Vec::<u8>::with_capacity(capacity);
-        if capacity > 0 {
-            // SAFETY: The note above explains the use case. The justification of this
-            // customization over just using a regular vector is that we need to write
-            // from the end of the vector to the beginning (rev push), of course we can
-            // use a regular vector and just flip everything at the end, but that will
-            // be more complicated.
-            unsafe {
-                vec.set_len(capacity);
-                // Make sure the last item in the vec which is supposed to be holding the
-                // non-finalized sign byte is not dirty by setting it to zero.
-                *vec.get_unchecked_mut(capacity - 1) = 0;
-            }
-        }
+        let mut vec = vec![0; capacity];
 
         let buffer = vec.into_boxed_slice();
         debug_assert_eq!(

@@ -29,31 +29,39 @@ pub const fn tree_index(block_counter: usize) -> usize {
 }
 
 /// Inverse of [`tree_index`].
-pub const fn block_counter_from_tree_index(a: usize) -> Option<usize> {
-    // we can prove these bounds
-    let mut lo = a / 2;
-    let mut hi = lo + (usize::BITS as usize);
-    if hi > a + 1 {
-        hi = a + 1;
+pub const fn block_counter_from_tree_index(index: usize) -> Option<usize> {
+    let mut result = 0;
+    let mut x = index;
+    // tree_index(7)=11 ; 7 = 4+2+1
+    // 11 = 4 + (2*4-1)
+    // 4  = 1 + (2*2-1)
+    // 1  = 0 + (2*1-1)
+    //
+    // f(11) = f(4) + 4
+    // f(4) = f(1) + 2
+    // f(1) = f(0) + 1
+    // f(0) = 0
+    //
+    // f(n) = f(r) + 2^e(n) such that: n = r + (2*2^e(n) - 1) and 0<=r<=2^e(n)
+    // solving for e(n) we have e(n)=floor(log2((n + 1) / 2))=floor(log2(n + 1)) - 1
+    while x != 0 {
+        // compute the number of elements in the largest left subtree that it is
+        // itself a full power of 2 elements.
+        // =floor(log2(x + 1))
+        let exp = usize::BITS - (x + 1).leading_zeros() - 1;
+        let m = 1usize << (exp - 1); // 2^(exp - 1)
+        // find our position in the right subtree and perform
+        // the next step recursivly.
+        x -= 2 * m - 1;
+        // our index is at least as largest as all of the items in our left
+        // subtree. All of the `m`s we are adding are unique power of twos
+        // so we can use the `|=` instead which looks cooler.
+        result |= m;
     }
-
-    loop {
-        let mid = (hi + lo) / 2;
-        let n = tree_index(mid);
-
-        if n == a {
-            return Some(mid);
-        }
-
-        if mid == hi || mid == lo {
-            return None;
-        }
-
-        if n > a {
-            hi = mid;
-        } else {
-            lo = mid;
-        }
+    if tree_index(result) == index {
+        Some(result)
+    } else {
+        None
     }
 }
 
@@ -169,7 +177,7 @@ mod tests {
 
     #[test]
     fn tree_index_inv() {
-        for i in 0..10_000 {
+        for i in 0..100_000 {
             assert_eq!(Some(i), block_counter_from_tree_index(tree_index(i)));
         }
     }

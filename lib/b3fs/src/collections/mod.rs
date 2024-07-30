@@ -1,9 +1,9 @@
 //! Helper wrappers around a collection of hashes.
 //!
-//! In this codebase we treat a list of hashes in two major way. In one way we treat such list
+//! In this codebase we treat a list of hashes in two main ways. In one way we treat such list
 //! simply as an array of hashes one appearing after another. In this way the iteration goes
-//! from the first item in the array one after another all the way to the end. For this simple
-//! method we implemented [FlatHashSlice].
+//! from the first item in the array and then one after another all the way to the end. For this
+//! simple method we implemented [FlatHashSlice].
 //!
 //! In other scenarios also common to our use cases, a series of hashes is to be treated as a
 //! post-order traversal of a binary tree. The way we balance a binary tree is exactly the same

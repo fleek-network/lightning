@@ -2,9 +2,9 @@
 
 use smallvec::SmallVec;
 
-/// A vec that can keep up to 16 items without allocating heap space. This is 32-bytes
+/// A vec that can keep up to 24 items without allocating heap space. This is 32-bytes
 /// while a normal Vec takes up only 24 bytes.
-pub type InlineVec = SmallVec<[u8; 16]>;
+pub type InlineVec = SmallVec<[u8; 24]>;
 
 #[derive(Clone, Debug)]
 pub struct OwnedEntry {

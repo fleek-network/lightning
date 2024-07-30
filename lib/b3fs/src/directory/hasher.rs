@@ -135,7 +135,6 @@ impl DirectoryHasher {
 
             // Step 2: Check validity of variable content (i.e filename and link content)
             if !is_valid_filename(entry.name) {
-                println!("{:?}", entry.name);
                 return Err(Error::InvalidFileName);
             }
 

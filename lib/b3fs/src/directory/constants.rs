@@ -12,12 +12,14 @@ pub const EMPTY_HASH: [u8; 32] = [
     128, 89, 147, 234, 130, 71, 29, 80, 131, 193, 231, 128,
 ];
 
+// Flags used for writing a directory entry transcript.
+
 pub const IS_ROOT_FLAG: u8 = 1;
 pub const IS_FILE_FLAG: u8 = 2;
 pub const IS_DIR_FLAG: u8 = 4;
 pub const IS_SYM_FLAG: u8 = 8;
 
-// Flags borrowed from blake3 spec.
+// Flags borrowed from blake3 spec used in the implementation of the merge.
 
 pub const B3_ROOT: u8 = 1 << 3;
 pub const B3_PARENT: u8 = 1 << 2;
