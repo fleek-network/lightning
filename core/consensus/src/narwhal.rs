@@ -8,14 +8,13 @@ use narwhal_network::client::NetworkClient;
 use narwhal_node::primary_node::PrimaryNode;
 use narwhal_node::worker_node::WorkerNode;
 use narwhal_node::NodeStorage;
-use narwhal_types::ConsensusOutput;
 use sui_protocol_config::{Chain, ProtocolConfig, ProtocolVersion};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::Mutex;
 use tokio::time::Instant;
 use tracing::{debug, error, trace, warn};
 
-use crate::execution::state::Execution;
+use crate::execution::state::{Execution, FilteredConsensusOutput};
 use crate::validator::Validator;
 
 // Copyright 2022-2023 Fleek Network
@@ -108,7 +107,7 @@ impl NarwhalService {
     /// This function panics if it can not start either the Primary or the Worker.
     pub async fn start<Q: SyncQueryRunnerInterface>(
         &self,
-        consensus_output_tx: Sender<ConsensusOutput>,
+        consensus_output_tx: Sender<FilteredConsensusOutput>,
         query_runner: Q,
     ) {
         let mut status = self.status.lock().await;

@@ -19,7 +19,6 @@ use narwhal_config::{Committee, CommitteeBuilder, WorkerCache, WorkerIndex, Work
 use narwhal_crypto::traits::{KeyPair as _, ToFromBytes};
 use narwhal_crypto::{KeyPair, NetworkKeyPair, NetworkPublicKey, PublicKey};
 use narwhal_node::NodeStorage;
-use narwhal_types::ConsensusOutput;
 use prometheus::Registry;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
@@ -31,6 +30,7 @@ use typed_store::DBMetrics;
 
 use crate::config::Config;
 use crate::execution::parcel::{AuthenticStampedParcel, CommitteeAttestation, Digest};
+use crate::execution::state::FilteredConsensusOutput;
 use crate::execution::worker::ExecutionWorker;
 use crate::narwhal::{NarwhalArgs, NarwhalService};
 
@@ -79,9 +79,9 @@ struct EpochState<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, N
     /// Interface for sending messages through the gossip layer
     pub_sub: P,
     /// Send consensus output from the execution state to the execution worker.
-    consensus_output_tx: Sender<ConsensusOutput>,
+    consensus_output_tx: Sender<FilteredConsensusOutput>,
     /// Receive consensus output in the execution worker from the execution state.
-    consensus_output_rx: Option<Receiver<ConsensusOutput>>,
+    consensus_output_rx: Option<Receiver<FilteredConsensusOutput>>,
     /// Receive the rpc event sender in the execution worker.
     event_tx_rx: Option<oneshot::Receiver<Events>>,
     /// To notify when consensus is shutting down.
@@ -102,8 +102,8 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
         txn_socket: SubmitTxSocket,
         notifier: NE,
         pub_sub: P,
-        consensus_output_tx: Sender<ConsensusOutput>,
-        consensus_output_rx: Receiver<ConsensusOutput>,
+        consensus_output_tx: Sender<FilteredConsensusOutput>,
+        consensus_output_rx: Receiver<FilteredConsensusOutput>,
         event_tx_rx: oneshot::Receiver<Events>,
         shutdown_notify: Arc<Notify>,
     ) -> Self {

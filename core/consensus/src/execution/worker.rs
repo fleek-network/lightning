@@ -8,7 +8,7 @@ use lightning_interfaces::types::{Block, Epoch, Metadata, NodeIndex, Transaction
 use lightning_interfaces::Events;
 use lightning_metrics::increment_counter;
 use lightning_utils::application::QueryRunnerExt;
-use narwhal_types::{Batch, ConsensusOutput, Transaction};
+use narwhal_types::Transaction;
 use quick_cache::unsync::Cache;
 use tokio::pin;
 use tokio::sync::mpsc::Receiver;
@@ -17,6 +17,7 @@ use tokio::task::JoinHandle;
 use tracing::{error, info};
 
 use super::parcel::{AuthenticStampedParcel, CommitteeAttestation, Digest};
+use super::state::FilteredConsensusOutput;
 use super::transaction_store::TransactionStore;
 use crate::consensus::PubSubMsg;
 
@@ -81,7 +82,7 @@ impl ExecutionWorker {
     #[allow(clippy::too_many_arguments)]
     pub fn spawn<P: PubSub<PubSubMsg> + 'static, Q: SyncQueryRunnerInterface, NE: Emitter>(
         executor: ExecutionEngineSocket,
-        consensus_output_rx: Receiver<ConsensusOutput>,
+        consensus_output_rx: Receiver<FilteredConsensusOutput>,
         pub_sub: P,
         query_runner: Q,
         node_public_key: NodePublicKey,
@@ -134,7 +135,7 @@ impl ExecutionWorker {
 #[allow(clippy::too_many_arguments)]
 async fn spawn_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emitter>(
     executor: ExecutionEngineSocket,
-    mut consensus_output_rx: Receiver<ConsensusOutput>,
+    mut consensus_output_rx: Receiver<FilteredConsensusOutput>,
     pub_sub: P,
     shutdown_notify: Arc<Notify>,
     query_runner: Q,
@@ -196,11 +197,6 @@ async fn spawn_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
             },
             output = consensus_output_rx.recv() => {
                 if let Some(consensus_output) = output {
-                    if !ctx.on_committee {
-                        // This should never happen if it somehow does there is critical error somewhere
-                        panic!("We received consensus output from narwhal while not on the committee");
-                    }
-                    // This branch is only executed by validators.
                     handle_consensus_output(&mut ctx, consensus_output).await;
                 }
             }
@@ -234,60 +230,31 @@ async fn spawn_worker<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
 // receives transactions that have been ordered by Narwhal.
 async fn handle_consensus_output<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emitter>(
     ctx: &mut Context<P, Q, NE>,
-    consensus_output: ConsensusOutput,
+    consensus_output: FilteredConsensusOutput,
 ) {
-    let current_epoch = ctx.query_runner.get_current_epoch();
-    let sub_dag_index = consensus_output.sub_dag.sub_dag_index;
-
-    let batch_payload: Vec<Vec<u8>> = consensus_output
-        .sub_dag
-        .certificates
-        .iter()
-        .zip(consensus_output.batches.into_iter())
-        .filter_map(|(cert, batch)| {
-            // Skip over the ones that have a different epoch. Shouldnt ever happen besides an
-            // edge case towards the end of an epoch
-            if cert.epoch() != current_epoch {
-                error!("we recieved a consensus cert from an epoch we are not on");
-                None
-            } else {
-                // Map the batch to just the transactions
-                Some(
-                    batch
-                        .into_iter()
-                        .flat_map(|batch| match batch {
-                            // work around because batch.transactions() would require clone
-                            Batch::V1(btch) => btch.transactions,
-                            Batch::V2(btch) => btch.transactions,
-                        })
-                        .collect::<Vec<Vec<u8>>>(),
-                )
-            }
-        })
-        .flatten()
-        .collect();
-
-    if batch_payload.is_empty() {
+    if !ctx.on_committee {
+        error!("We received consensus output from narwhal while not on the committee");
         return;
     }
+    // This function is only executed by validators.
+    let current_epoch = ctx.query_runner.get_current_epoch();
     // We have batches in the payload send them over broadcast along with an attestion
     // of them
     let last_executed = ctx.query_runner.get_last_block();
-    let sub_dag_round = consensus_output.sub_dag.leader.round();
     let parcel = AuthenticStampedParcel {
-        transactions: batch_payload.clone(),
+        transactions: consensus_output.transactions.clone(),
         last_executed,
         epoch: current_epoch,
-        sub_dag_index,
-        sub_dag_round,
+        sub_dag_index: consensus_output.sub_dag_index,
+        sub_dag_round: consensus_output.sub_dag_round,
     };
 
     let epoch_changed = submit_batch(
         ctx,
-        batch_payload,
+        consensus_output.transactions,
         parcel.to_digest(),
-        sub_dag_index,
-        sub_dag_round,
+        consensus_output.sub_dag_index,
+        consensus_output.sub_dag_round,
     )
     .await;
 
