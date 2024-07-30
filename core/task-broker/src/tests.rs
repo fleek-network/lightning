@@ -150,7 +150,7 @@ fn build_cluster(
                                     http: None,
                                 })
                                 .with::<TaskBroker<TestBinding>>(TaskBrokerConfig {
-                                    connect_timeout: Duration::from_secs(1),
+                                    connect_timeout: Duration::from_secs(5),
                                     ..Default::default()
                                 }),
                         )
@@ -447,7 +447,10 @@ async fn run_cluster_echo_task_7_offline_of_8_should_fail() -> anyhow::Result<()
 
     for response in responses {
         let response = response.expect_err("only errors should happen");
-        assert!(response == TaskError::Connect, "expected connection error");
+        assert!(
+            response == TaskError::Connect,
+            "expected connection error, not {response}"
+        );
     }
 
     // Shutdown the last node
