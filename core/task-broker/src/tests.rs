@@ -145,12 +145,12 @@ fn build_cluster(
                                     lightning_application::config::Config::test(path.clone()),
                                 )
                                 .with::<PoolProvider<TestBinding>>(lightning_pool::Config {
-                                    max_idle_timeout: Duration::from_secs(1),
+                                    max_idle_timeout: Duration::from_millis(100),
                                     address: ([127, 0, 0, 1], port_start + i as u16).into(),
                                     http: None,
                                 })
                                 .with::<TaskBroker<TestBinding>>(TaskBrokerConfig {
-                                    connect_timeout: Duration::from_secs(5),
+                                    connect_timeout: Duration::from_secs(1),
                                     ..Default::default()
                                 }),
                         )
@@ -257,6 +257,64 @@ async fn run_single_echo_task() -> anyhow::Result<()> {
         .collect::<FuturesUnordered<_>>()
         .collect::<()>()
         .await;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn run_single_echo_task_with_fallback() -> anyhow::Result<()> {
+    lightning_test_utils::logging::setup();
+    let (_, mut nodes) = build_cluster(4).await?;
+
+    // shutdown all nodes except 2; one to perform the request,
+    // and another to be the fallback node.
+    nodes
+        .iter_mut()
+        .skip(2)
+        .map(|n| n.shutdown())
+        .collect::<FuturesUnordered<_>>()
+        .collect::<()>()
+        .await;
+
+    // Run the test a few times just for a bit of fuzz given the rng used for node selection.
+    for i in 0..8 {
+        let broker = nodes[0].provider.get::<TaskBroker<TestBinding>>();
+
+        const PAYLOAD: &[u8] = b"hello world";
+        let request = schema::task_broker::TaskRequest {
+            service: 0,
+            timestamp: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            payload: PAYLOAD.into(),
+        };
+        let digest = request.to_digest();
+
+        let response = broker
+            .run(0, schema::task_broker::TaskScope::Single, request)
+            .await;
+
+        assert!(
+            response.len() == 1,
+            "exactly one response should be given for single node tasks"
+        );
+
+        let response = response
+            .into_iter()
+            .next()
+            .unwrap()
+            .expect("task to succeed");
+
+        assert_eq!(response.payload, PAYLOAD);
+        assert_eq!(response.request, digest);
+
+        println!("finished task {i}");
+    }
+
+    // Shutdown the last 2 running nodes
+    nodes.get_mut(0).unwrap().shutdown().await;
+    nodes.get_mut(1).unwrap().shutdown().await;
 
     Ok(())
 }

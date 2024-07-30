@@ -39,6 +39,30 @@ struct RequestWorkerInner<C: Collection> {
     config: TaskBrokerConfig,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(default)]
+pub struct TaskBrokerConfig {
+    // Maximum depth of task recursion allowed
+    pub max_depth: u8,
+    // Maximum number of peer requested tasks allowed to run concurrently
+    pub max_peer_tasks: usize,
+    // Maximum number of all tasks allowed to run concurrently
+    pub max_tasks: usize,
+    // Request timeout
+    #[serde(with = "humantime_serde")]
+    pub connect_timeout: Duration,
+}
+impl Default for TaskBrokerConfig {
+    fn default() -> Self {
+        Self {
+            max_depth: 8,
+            max_peer_tasks: 128,
+            max_tasks: 256,
+            connect_timeout: Duration::from_secs(30),
+        }
+    }
+}
+
 impl<C: Collection> Clone for TaskBroker<C> {
     fn clone(&self) -> Self {
         Self {
@@ -133,17 +157,7 @@ impl<C: Collection> TaskBroker<C> {
         Ok(nodes.clone())
     }
 
-    fn get_random_cluster_node(&self) -> Result<u32, TaskError> {
-        // Select a random node within the local cluster
-        let cluster = self.get_cluster()?;
-        let pub_key = cluster.choose(&mut thread_rng()).unwrap();
-        let idx = self
-            .query_runner
-            .pubkey_to_index(pub_key)
-            .expect("topology should never ever give unknown node pubkeys/indecies");
-        Ok(idx)
-    }
-
+    /// Run a task on a specific peer
     async fn run_task_on_peer(
         &self,
         task: TaskRequest,
@@ -195,16 +209,36 @@ impl<C: Collection> TaskBroker<C> {
 
     /// Get a random peer and run the task on it
     async fn run_single_task(&self, task: TaskRequest) -> Result<TaskResponse, TaskError> {
-        let peer = self.get_random_cluster_node()?;
-        self.run_task_on_peer(task, peer).await.map(|response| {
-            self.rep_reporter
-                .report_sat(peer, lightning_interfaces::Weight::Weak);
-            response
-        })
+        // get the cluster and shuffle the nodes randomly. Cheap O(n) with our cluster size.
+        // TODO: weight the shuffle based on reputation and/or latency?
+        let mut cluster = self.get_cluster()?;
+        cluster.shuffle(&mut thread_rng());
+
+        for pub_key in cluster {
+            let peer = self
+                .query_runner
+                .pubkey_to_index(&pub_key)
+                .expect("topology should never ever give unknown node pubkeys/indecies");
+
+            match self.run_task_on_peer(task.clone(), peer).await {
+                // If we have a successful response, return
+                Ok(res) => {
+                    self.rep_reporter
+                        .report_sat(peer, lightning_interfaces::Weight::Weak);
+                    return Ok(res);
+                },
+                // Otherwise, print a warning and continue onto to the next peer
+                Err(e) => warn!("failed to run task on peer {pub_key}: {e:?}"),
+            }
+        }
+
+        Err(TaskError::Connect)
     }
 
     /// Get peers in the cluster and run the task on them
-    /// TODO: Collect 2/3 of the same responses and respond early, pruning invalid ones.
+    ///
+    /// Collects `ciel(nodes * 2 / 3)` of the same responses and returns, appending any errors.
+    /// If consensus could not be reached, only the errors are returned.
     async fn run_cluster_task(&self, task: TaskRequest) -> Vec<Result<TaskResponse, TaskError>> {
         match self.get_cluster() {
             Ok(c) => {
@@ -258,30 +292,6 @@ impl<C: Collection> fdi::BuildGraph for TaskBroker<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::default()
             .with(Self::init.with_event_handler("_post", Self::post_init))
-    }
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(default)]
-pub struct TaskBrokerConfig {
-    // Maximum depth of task recursion allowed
-    pub max_depth: u8,
-    // Maximum number of peer requested tasks allowed to run concurrently
-    pub max_peer_tasks: usize,
-    // Maximum number of all tasks allowed to run concurrently
-    pub max_tasks: usize,
-    // Request timeout
-    #[serde(with = "humantime_serde")]
-    pub connect_timeout: Duration,
-}
-impl Default for TaskBrokerConfig {
-    fn default() -> Self {
-        Self {
-            max_depth: 8,
-            max_peer_tasks: 128,
-            max_tasks: 256,
-            connect_timeout: Duration::from_secs(30),
-        }
     }
 }
 

@@ -27,6 +27,7 @@ pub enum TaskError {
 #[interfaces_proc::blank]
 pub trait TaskBrokerInterface<C: Collection>: BuildGraph + Clone + Send + Sync + 'static {
     /// Run a task in a given scope, returning the (collection of) responses for the task.
+    ///
     /// For services and use cases that allow recursion (ie, runtimes that expose running
     /// subtasks), depth should be used to stop requests
     #[blank = async { vec![] }]
