@@ -85,14 +85,6 @@ impl<'s> IntoIterator for HashTree<'s> {
 }
 
 impl<'s> HashTree<'s> {
-    /// See [`FlatHashSlice::load`].
-    #[inline]
-    pub fn load(&self) -> Self {
-        Self {
-            inner: self.inner.load(),
-        }
-    }
-
     #[inline]
     pub fn root(&self) -> &'s [u8; 32] {
         self.inner.get(self.inner.len() - 1)
@@ -188,6 +180,3 @@ impl<'s> Debug for HashTree<'s> {
         super::printer::print(self, f)
     }
 }
-
-#[cfg(test)]
-mod tests {}

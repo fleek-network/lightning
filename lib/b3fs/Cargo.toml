@@ -6,14 +6,23 @@ edition.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-fleek-blake3 = "1.5"
+# Rust utils
 thiserror = "1.0"
+
+# Data structures
 arrayref = "0.3"
 arrayvec = "0.7"
 smol_str = "0.2"
 smallvec = "1.11"
-fmmap = { version = "0.2", features = ["tokio-async"] }
-rand = "0.8"
 triomphe = "0.1.9"
 bytes = "1.5"
+
+# IO
 tokio = { version = "1.28", features = ["fs"] }
+
+# Randomnness and hashing
+rand = "0.8"
+fleek-blake3 = "1.5"
+
+phf_generator = "0.11"
+phf_shared = "0.11"

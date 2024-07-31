@@ -1134,7 +1134,8 @@ dependencies = [
  "arrayvec",
  "bytes",
  "fleek-blake3",
- "fmmap",
+ "phf_generator",
+ "phf_shared 0.11.2",
  "rand 0.8.5",
  "smallvec",
  "smol_str",
@@ -4445,23 +4446,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fmmap"
-version = "0.2.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c856179d83bd039548702e1d5241f96bb80bc710437c62a55994f82d23a45a3c"
-dependencies = [
- "async-trait",
- "byteorder",
- "bytes",
- "enum_dispatch",
- "fs4",
- "memmap2",
- "parse-display",
- "pin-project-lite",
- "tokio",
-]
-
-[[package]]
 name = "fn-sdk"
 version = "0.0.0"
 dependencies = [
@@ -4599,18 +4583,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9564fc758e15025b46aa6643b1b77d047d1a56a1aea6e01002ac0c7026876213"
 dependencies = [
  "libc",
- "winapi",
-]
-
-[[package]]
-name = "fs4"
-version = "0.5.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cef5c93884e5cef757f63446122c2f420713c3e03f85540d09485b9415983b4a"
-dependencies = [
- "async-trait",
- "libc",
- "tokio",
  "winapi",
 ]
 
@@ -7851,15 +7823,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 
 [[package]]
-name = "memmap2"
-version = "0.5.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83faa42c0a078c393f6b29d5db232d8be22776a891f8f56e5284faee4a20b327"
-dependencies = [
- "libc",
-]
-
-[[package]]
 name = "memoffset"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9683,32 +9646,6 @@ dependencies = [
  "redox_syscall 0.5.3",
  "smallvec",
  "windows-targets 0.52.6",
-]
-
-[[package]]
-name = "parse-display"
-version = "0.5.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "813e91c6232dbeb2e9deba0eb0dc5c967bd6f380676fd34419f9ddd71411faa7"
-dependencies = [
- "once_cell",
- "parse-display-derive",
- "regex",
-]
-
-[[package]]
-name = "parse-display-derive"
-version = "0.5.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "007ed61a69cf7d9b95cc5dc18489dbb4f70d4adb0a0c100e2dd46f0be241711a"
-dependencies = [
- "once_cell",
- "proc-macro2 1.0.86",
- "quote 1.0.36",
- "regex",
- "regex-syntax 0.6.29",
- "structmeta",
- "syn 1.0.109",
 ]
 
 [[package]]
@@ -12789,29 +12726,6 @@ name = "strsim"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
-
-[[package]]
-name = "structmeta"
-version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "104842d6278bf64aa9d2f182ba4bde31e8aec7a131d29b7f444bb9b344a09e2a"
-dependencies = [
- "proc-macro2 1.0.86",
- "quote 1.0.36",
- "structmeta-derive",
- "syn 1.0.109",
-]
-
-[[package]]
-name = "structmeta-derive"
-version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "24420be405b590e2d746d83b01f09af673270cf80e9b003a5fa7b651c58c7d93"
-dependencies = [
- "proc-macro2 1.0.86",
- "quote 1.0.36",
- "syn 1.0.109",
-]
 
 [[package]]
 name = "strum"

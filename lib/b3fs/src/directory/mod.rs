@@ -1,6 +1,4 @@
-//! Implementation of the utility types and functions related to directories.
-//!
-//! Here it is important to say that in this implementation we treat
+//! Implementation of the utility types and functions related to hashing directories.
 
 pub mod constants;
 pub mod entry;

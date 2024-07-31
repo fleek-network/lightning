@@ -17,8 +17,6 @@
 use std::fmt::Debug;
 use std::ops::Index;
 
-use fmmap::tokio::AsyncMmapFileExt;
-
 use super::error::CollectionTryFromError;
 use crate::utils::{flatten, Digest};
 
@@ -35,14 +33,6 @@ pub struct FlatHashSlice<'s> {
 #[derive(Clone, Copy)]
 enum FlatHashSliceRepr<'s> {
     Slice(&'s [u8]),
-    /// This allows us to use a memory mapping as the backend of a hash slice. There are no public
-    /// APIs on the struct to generate this backend, and it is only created by the `store` APIs to
-    /// generally return a hashtree
-    TokioMmap {
-        start: usize,
-        end: usize,
-        file: &'s fmmap::tokio::AsyncMmapFile,
-    },
 }
 
 /// An iterator over a [`FlatHashSlice`] obtained by calling the [iter] method on the slice.
@@ -112,37 +102,6 @@ impl<'s> AsRef<[u8]> for FlatHashSlice<'s> {
 }
 
 impl<'s> FlatHashSlice<'s> {
-    /// Create a new flat hash slice backed by a memory mapping.
-    pub(crate) fn from_tokio_mmap(
-        start: usize,
-        end: usize,
-        file: &'s fmmap::tokio::AsyncMmapFile,
-    ) -> Self {
-        let len = end - start;
-        if len & 31 != 0 {
-            panic!("File size not a multiple of 32")
-        }
-
-        Self {
-            repr: FlatHashSliceRepr::TokioMmap { start, end, file },
-        }
-    }
-
-    /// If the hash slice is backed by a memory mapping or anything else, this loads the content
-    /// into memory.
-    pub fn load(&self) -> Self {
-        Self {
-            repr: match self.repr {
-                FlatHashSliceRepr::Slice(slice) => FlatHashSliceRepr::Slice(slice),
-                FlatHashSliceRepr::TokioMmap { start, end, file } => {
-                    FlatHashSliceRepr::Slice(file.bytes(start, end - start).unwrap())
-                },
-            },
-        }
-    }
-
-    /// Returns the hash at the given index.
-    ///
     /// # Panics
     ///
     /// If the provided index is out of bound.
@@ -154,9 +113,6 @@ impl<'s> FlatHashSlice<'s> {
         let n = index << BYTES_POW_2;
         let bytes = match self.repr {
             FlatHashSliceRepr::Slice(s) => &s[n..],
-            FlatHashSliceRepr::TokioMmap { start, file, .. } => {
-                file.bytes(start + n, 32).expect("Could not read bytes.")
-            },
         };
         arrayref::array_ref![bytes, 0, 32]
     }
@@ -166,7 +122,6 @@ impl<'s> FlatHashSlice<'s> {
     pub fn len(&self) -> usize {
         match self.repr {
             FlatHashSliceRepr::Slice(s) => s.len() >> BYTES_POW_2,
-            FlatHashSliceRepr::TokioMmap { start, end, .. } => (end - start) >> BYTES_POW_2,
         }
     }
 
@@ -181,9 +136,6 @@ impl<'s> FlatHashSlice<'s> {
     pub fn as_slice(&self) -> &[u8] {
         match self.repr {
             FlatHashSliceRepr::Slice(s) => s,
-            FlatHashSliceRepr::TokioMmap { start, end, file } => file
-                .bytes(start, end - start)
-                .expect("Could not read bytes."),
         }
     }
 
@@ -197,11 +149,6 @@ impl<'s> FlatHashSlice<'s> {
         let n = n << BYTES_POW_2;
         let repr = match self.repr {
             FlatHashSliceRepr::Slice(s) => FlatHashSliceRepr::Slice(&s[n..]),
-            FlatHashSliceRepr::TokioMmap { start, end, file } => FlatHashSliceRepr::TokioMmap {
-                start: start + n,
-                end,
-                file,
-            },
         };
 
         Self { repr }
@@ -219,11 +166,6 @@ impl<'s> FlatHashSlice<'s> {
         let size = len - n;
         let repr = match self.repr {
             FlatHashSliceRepr::Slice(s) => FlatHashSliceRepr::Slice(&s[..(size << BYTES_POW_2)]),
-            FlatHashSliceRepr::TokioMmap { start, end, file } => FlatHashSliceRepr::TokioMmap {
-                start,
-                end: end - (n << BYTES_POW_2),
-                file,
-            },
         };
 
         Self { repr }
