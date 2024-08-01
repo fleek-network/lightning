@@ -25,9 +25,9 @@ use lightning_consensus::consensus::Consensus;
 use lightning_final_bindings::FinalTypes;
 use lightning_handshake::config::{HandshakeConfig, TransportConfig};
 use lightning_handshake::handshake::Handshake;
-use lightning_handshake::transports::webrtc::WebRtcConfig;
+use lightning_handshake::transports::http::Config;
 use lightning_interfaces::prelude::*;
-use lightning_interfaces::types::{NodePorts, Staking};
+use lightning_interfaces::types::{NodePorts, ServiceId, Staking};
 use lightning_keystore::{Keystore, KeystoreConfig};
 use lightning_pinger::{Config as PingerConfig, Pinger};
 use lightning_pool::{Config as PoolConfig, PoolProvider};
@@ -179,6 +179,7 @@ pub struct SwarmBuilder {
     use_persistence: bool,
     specific_nodes: Option<Vec<SwarmNode>>,
     committee_size: Option<u64>,
+    services: Vec<ServiceId>,
 }
 
 impl SwarmBuilder {
@@ -245,6 +246,11 @@ impl SwarmBuilder {
 
     pub fn with_specific_nodes(mut self, nodes: Vec<SwarmNode>) -> Self {
         self.specific_nodes = Some(nodes);
+        self
+    }
+
+    pub fn with_services(mut self, services: Vec<ServiceId>) -> Self {
+        self.services = services;
         self
     }
 
@@ -335,6 +341,7 @@ impl SwarmBuilder {
                 ports.clone(),
                 self.archiver,
                 self.syncronizer_delta.unwrap_or(Duration::from_secs(300)),
+                &self.services,
             );
 
             // Generate and store the node public key.
@@ -438,6 +445,7 @@ fn build_config(
     ports: NodePorts,
     archiver: bool,
     syncronizer_delta: Duration,
+    services: &[ServiceId],
 ) -> TomlConfigProvider<FinalTypes> {
     let config = TomlConfigProvider::<FinalTypes>::default();
 
@@ -478,16 +486,14 @@ fn build_config(
 
     config.inject::<Handshake<FinalTypes>>(HandshakeConfig {
         // TODO: figure out how to have e2e testing for the different transports (browser oriented)
-        transports: vec![TransportConfig::WebRTC(WebRtcConfig {
-            address: ([0, 0, 0, 0], ports.handshake.webrtc).into(),
-        })],
-        http_address: ([127, 0, 0, 1], ports.handshake.http).into(),
+        transports: vec![TransportConfig::Http(Config {})],
+        http_address: ([0, 0, 0, 0], ports.handshake.http).into(),
         ..Default::default()
     });
 
     config.inject::<ServiceExecutor<FinalTypes>>(ServiceExecutorConfig {
-        services: Default::default(),
-        ..Default::default()
+        services: services.iter().copied().collect(),
+        ipc_path: root.join("ipc").try_into().expect("Failed to resolve path"),
     });
 
     config.inject::<ReputationAggregator<FinalTypes>>(RepAggConfig {

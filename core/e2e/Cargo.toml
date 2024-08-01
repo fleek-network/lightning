@@ -47,3 +47,6 @@ toml = "0.7"
 resolve-path = "0.1.0"
 clap = { version = "4.2", features = ["derive"] }
 lightning-workspace-hack.workspace = true
+
+[features]
+default = ["lightning-final-bindings/services"]
