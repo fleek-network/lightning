@@ -89,11 +89,11 @@ fn main() -> Result<()> {
         swarm.launch().await.unwrap();
 
         let mut s = String::from("#####################################\n\n");
-        for (pub_key, rpc_address) in swarm.get_rpc_addresses() {
+        for (pub_key, ports) in swarm.get_ports() {
             s.push_str(&format!(
-                "Public Key: {}\nRPC Address: {}\n\n",
+                "Public Key: {}\nPorts: {:?}\n\n",
                 pub_key.to_base58(),
-                rpc_address
+                ports
             ));
         }
         s.push_str("#####################################");

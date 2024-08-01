@@ -4,7 +4,7 @@ use lightning_blockstore::blockstore::Blockstore;
 use lightning_final_bindings::FinalTypes;
 use lightning_interfaces::fdi::MultiThreadedProvider;
 use lightning_interfaces::prelude::*;
-use lightning_interfaces::types::Staking;
+use lightning_interfaces::types::{NodePorts, Staking};
 use lightning_node::ContainedNode;
 use lightning_rpc::Rpc;
 use lightning_utils::config::TomlConfigProvider;
@@ -15,6 +15,7 @@ pub struct ContainerizedNode {
     node: ContainedNode<FinalTypes>,
     index: usize,
     genesis_stake: Staking,
+    ports: NodePorts,
     is_genesis_committee: bool,
 }
 
@@ -22,6 +23,7 @@ impl ContainerizedNode {
     pub fn new(
         config: TomlConfigProvider<FinalTypes>,
         owner_secret_key: AccountOwnerSecretKey,
+        ports: NodePorts,
         index: usize,
         is_genesis_committee: bool,
         genesis_stake: Staking,
@@ -35,6 +37,7 @@ impl ContainerizedNode {
             node,
             index,
             genesis_stake,
+            ports,
             is_genesis_committee,
         }
     }
@@ -49,6 +52,10 @@ impl ContainerizedNode {
 
     pub fn shutdown(self) -> impl Future<Output = ()> {
         self.node.shutdown()
+    }
+
+    pub fn get_ports(&self) -> &NodePorts {
+        &self.ports
     }
 
     pub fn get_rpc_address(&self) -> String {

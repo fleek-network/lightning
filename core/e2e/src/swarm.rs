@@ -103,6 +103,13 @@ impl Swarm {
         self.cleanup();
     }
 
+    pub fn get_ports(&self) -> HashMap<NodePublicKey, NodePorts> {
+        self.nodes
+            .iter()
+            .map(|(pubkey, node)| (*pubkey, node.get_ports().clone()))
+            .collect()
+    }
+
     pub fn get_rpc_addresses(&self) -> HashMap<NodePublicKey, String> {
         self.nodes
             .iter()
@@ -359,7 +366,7 @@ impl SwarmBuilder {
                 primary_domain: "127.0.0.1".parse().unwrap(),
                 worker_domain: "127.0.0.1".parse().unwrap(),
                 worker_public_key: node_pk,
-                ports,
+                ports: ports.clone(),
                 stake: stake.clone(),
                 reputation: reputation_score,
                 current_epoch_served: None,
@@ -368,7 +375,7 @@ impl SwarmBuilder {
 
             genesis.node_info.push(node_info);
 
-            tmp_nodes.push((owner_sk, node_pk, config, is_committee, stake));
+            tmp_nodes.push((owner_sk, node_pk, config, is_committee, stake, ports));
 
             index += 1;
         }
@@ -379,7 +386,7 @@ impl SwarmBuilder {
         // Now that we have built the configuration of all nodes and also have compiled the
         // proper genesis config. We can inject the genesis config.
         let mut nodes = HashMap::new();
-        for (index, (owner_sk, node_pk, config, is_committee, stake)) in
+        for (index, (owner_sk, node_pk, config, is_committee, stake, ports)) in
             tmp_nodes.into_iter().enumerate()
         {
             let root = directory.join(format!("node-{index}"));
@@ -397,7 +404,7 @@ impl SwarmBuilder {
                 dev: None,
             });
 
-            let node = ContainerizedNode::new(config, owner_sk, index, is_committee, stake);
+            let node = ContainerizedNode::new(config, owner_sk, ports, index, is_committee, stake);
             nodes.insert(node_pk, node);
         }
 
