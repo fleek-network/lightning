@@ -49,4 +49,4 @@ clap = { version = "4.2", features = ["derive"] }
 lightning-workspace-hack.workspace = true
 
 [features]
-default = ["lightning-final-bindings/services"]
+services = ["lightning-final-bindings/services"]
