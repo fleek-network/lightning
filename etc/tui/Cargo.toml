@@ -13,7 +13,7 @@ crossterm = { version = "0.27", features = ["serde", "event-stream"] }
 derive_deref = "1.1"
 directories = "5.0"
 lightning-guard = { path = "../ebpf-apps/guard", default-features = false, features = [
-    "client",
+  "client",
 ] }
 futures = "0.3"
 indexmap = { version = "2.2", features = ["serde"] }
@@ -22,7 +22,7 @@ ipnet = "2.9"
 json5 = "0.4"
 lazy_static = "1.4"
 log = "0.4"
-ratatui = { version = "0.26", features = ["serde", "macros"] }
+ratatui = { version = "0.27", features = ["serde", "macros"] }
 resolved-pathbuf = { path = "../../lib/resolved-pathbuf" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -32,7 +32,7 @@ strum = { version = "0.26", features = ["derive"] }
 tokio = { version = "1.32", features = ["full"] }
 tokio-util = "0.7"
 tui-logger = { version = "0.11", optional = true }
-tui-textarea = "0.4"
+tui-textarea = "0.5"
 unicode-width = "0.1"
 lightning-utils = { path = "../../core/utils" }
 

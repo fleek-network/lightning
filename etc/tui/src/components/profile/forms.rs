@@ -157,8 +157,7 @@ impl Component for ProfileForm {
             } else {
                 utils::inactivate(textarea)
             }
-            let widget = textarea.area.widget();
-            f.render_widget(widget, *chunk);
+            f.render_widget(&textarea.area, *chunk);
         }
 
         Ok(())
@@ -319,8 +318,7 @@ impl Component for RuleForm {
             } else {
                 utils::inactivate(textarea)
             }
-            let widget = textarea.area.widget();
-            f.render_widget(widget, *chunk);
+            f.render_widget(&textarea.area, *chunk);
         }
 
         Ok(())
