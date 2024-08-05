@@ -523,11 +523,11 @@ mod tests {
 
     #[test]
     fn test_try_into() {
-        let large = HpFixed::<20>::from(BigInt::from(std::i64::MIN as i128 - 1));
-        let medium = HpFixed::<19>::from(BigInt::from(std::i32::MAX as i64 + 1));
-        let small = HpFixed::<18>::from(BigInt::from(std::i16::MAX as i32 + 1));
+        let large = HpFixed::<20>::from(BigInt::from(i64::MIN as i128 - 1));
+        let medium = HpFixed::<19>::from(BigInt::from(i32::MAX as i64 + 1));
+        let small = HpFixed::<18>::from(BigInt::from(i16::MAX as i32 + 1));
 
-        assert_eq!(std::i64::MIN as i128 - 1, large.clone().try_into().unwrap());
+        assert_eq!(i64::MIN as i128 - 1, large.clone().try_into().unwrap());
         assert!(matches!(
             TryInto::<isize>::try_into(large.clone()),
             Err(HpFixedConversionError::Underflow)
@@ -543,15 +543,15 @@ mod tests {
 
         assert_eq!(
             TryInto::<i128>::try_into(medium.clone()).unwrap(),
-            std::i32::MAX as i128 + 1
+            i32::MAX as i128 + 1
         );
         assert_eq!(
             TryInto::<i64>::try_into(medium.clone()).unwrap(),
-            std::i32::MAX as i64 + 1
+            i32::MAX as i64 + 1
         );
         assert_eq!(
             TryInto::<isize>::try_into(medium.clone()).unwrap(),
-            std::i32::MAX as isize + 1
+            i32::MAX as isize + 1
         );
         assert!(matches!(
             TryInto::<i32>::try_into(medium),
@@ -560,19 +560,19 @@ mod tests {
 
         assert_eq!(
             TryInto::<i128>::try_into(small.clone()).unwrap(),
-            std::i16::MAX as i128 + 1
+            i16::MAX as i128 + 1
         );
         assert_eq!(
             TryInto::<isize>::try_into(small.clone()).unwrap(),
-            std::i16::MAX as isize + 1_isize
+            i16::MAX as isize + 1_isize
         );
         assert_eq!(
             TryInto::<i64>::try_into(small.clone()).unwrap(),
-            std::i16::MAX as i64 + 1
+            i16::MAX as i64 + 1
         );
         assert_eq!(
             TryInto::<i32>::try_into(small.clone()).unwrap(),
-            std::i16::MAX as i32 + 1
+            i16::MAX as i32 + 1
         );
 
         let small_by_2 = &small / &200_i64.into();

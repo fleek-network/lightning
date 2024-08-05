@@ -460,14 +460,11 @@ mod tests {
 
     #[test]
     fn test_try_into() {
-        let large = HpUfixed::<20>::from(std::u64::MAX as u128 + 1_u128);
-        let medium = HpUfixed::<19>::from(std::u32::MAX as u64 + 1_u64);
-        let small = HpUfixed::<18>::from(std::u16::MAX as u32 + 1_u32);
+        let large = HpUfixed::<20>::from(u64::MAX as u128 + 1_u128);
+        let medium = HpUfixed::<19>::from(u32::MAX as u64 + 1_u64);
+        let small = HpUfixed::<18>::from(u16::MAX as u32 + 1_u32);
 
-        assert_eq!(
-            std::u64::MAX as u128 + 1_u128,
-            large.clone().try_into().unwrap()
-        );
+        assert_eq!(u64::MAX as u128 + 1_u128, large.clone().try_into().unwrap());
         assert!(matches!(
             TryInto::<usize>::try_into(large.clone()),
             Err(HpFixedConversionError::Overflow)
@@ -483,15 +480,15 @@ mod tests {
 
         assert_eq!(
             TryInto::<u128>::try_into(medium.clone()).unwrap(),
-            std::u32::MAX as u128 + 1
+            u32::MAX as u128 + 1
         );
         assert_eq!(
             TryInto::<u64>::try_into(medium.clone()).unwrap(),
-            std::u32::MAX as u64 + 1
+            u32::MAX as u64 + 1
         );
         assert_eq!(
             TryInto::<usize>::try_into(medium.clone()).unwrap(),
-            std::u32::MAX as usize + 1
+            u32::MAX as usize + 1
         );
         assert!(matches!(
             TryInto::<u32>::try_into(medium),
@@ -500,19 +497,19 @@ mod tests {
 
         assert_eq!(
             TryInto::<u128>::try_into(small.clone()).unwrap(),
-            std::u16::MAX as u128 + 1
+            u16::MAX as u128 + 1
         );
         assert_eq!(
             TryInto::<usize>::try_into(small.clone()).unwrap(),
-            std::u16::MAX as usize + 1
+            u16::MAX as usize + 1
         );
         assert_eq!(
             TryInto::<u64>::try_into(small.clone()).unwrap(),
-            std::u16::MAX as u64 + 1
+            u16::MAX as u64 + 1
         );
         assert_eq!(
             TryInto::<u32>::try_into(small.clone()).unwrap(),
-            std::u16::MAX as u32 + 1
+            u16::MAX as u32 + 1
         );
 
         let small_by_2 = &small / &200_u64.into();

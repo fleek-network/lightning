@@ -16,16 +16,21 @@ futures = "0.3"
 log = "0.4"
 ring = "0.16"
 rustls = "0.21"
-tokio = { version = "1.32", features = ["rt-multi-thread", "time", "sync", "io-util"] }
+tokio = { version = "1.32", features = [
+  "rt-multi-thread",
+  "time",
+  "sync",
+  "io-util",
+] }
 tokio-util = { version = "0.7", features = ["codec"] }
 wtransport = { version = "0.1", features = ["dangerous-configuration"] }
 lightning-schema = { path = "../../core/schema" }
 arrayref = "0.3"
-fleek-crypto = { path = "../fleek-crypto"}
+fleek-crypto = { path = "../fleek-crypto" }
 
 # Fork with wasm-bindgen unpinned.
 # https://github.com/cloudflare/workers-rs/issues/439
-worker = { git = "https://github.com/fleek-network/workers-rs", rev = "97095997bac0864a277cb4d01d54e8d0abccaac3", optional = true }
+worker = { version = "0.3.1", optional = true }
 
 [features]
 cloudflare = ["dep:worker"]

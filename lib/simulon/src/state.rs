@@ -12,7 +12,7 @@ use crate::report::{Metrics, NodeMetrics};
 use crate::storage::TypedStorage;
 
 thread_local! {
-    static NODES: RefCell<*mut NodeState> = RefCell::new(std::ptr::null_mut());
+    static NODES: RefCell<*mut NodeState> = const { RefCell::new(std::ptr::null_mut()) };
 }
 
 /// Provide the node that is being executed on the current thread.

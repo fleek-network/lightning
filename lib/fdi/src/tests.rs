@@ -76,10 +76,10 @@ impl Counter {
         *self.counter.entry(key).or_default() += 1;
     }
 
-    pub fn get<Q: ?Sized>(&self, k: &Q) -> usize
+    pub fn get<Q>(&self, k: &Q) -> usize
     where
         String: Borrow<Q>,
-        Q: Hash + Eq,
+        Q: Hash + Eq + ?Sized,
     {
         *self.counter.get(k).unwrap_or(&0)
     }
@@ -287,6 +287,7 @@ fn depend_on_ref_should_resolve() {
 #[test]
 fn demo_captured() {
     #[derive(Default)]
+    #[allow(unused)]
     struct A(u32);
 
     impl A {
@@ -313,6 +314,7 @@ fn demo_captured() {
 #[test]
 fn demo_consume() {
     #[derive(Default)]
+    #[allow(unused)]
     struct A(u32);
 
     impl A {
@@ -338,6 +340,7 @@ fn demo_consume() {
 #[test]
 fn demo_bounded() {
     #[derive(Default)]
+    #[allow(unused)]
     struct A(u32);
 
     impl A {
