@@ -1139,10 +1139,8 @@ impl<B: Backend> State<B> {
                     && self.is_valid_node(&peer_index).unwrap_or(false)
                     && measurements.verify()
                 {
-                    let mut node_measurements = match self.rep_measurements.get(&peer_index) {
-                        Some(node_measurements) => node_measurements,
-                        None => Vec::new(),
-                    };
+                    let mut node_measurements =
+                        self.rep_measurements.get(&peer_index).unwrap_or_default();
                     node_measurements.push(ReportedReputationMeasurements {
                         reporting_node,
                         measurements,
