@@ -35,6 +35,9 @@ third-party = [
     # cyclic dependencies.
     { name = "lightning-guard", path = "etc/ebpf-apps/guard" },
     { name = "lightning-tui", path = "etc/tui" },
+
+    # The generated workspace-hack/Cargo.toml entry for this crate is different depending on the system.
+    { name = "linux-raw-sys" },
 ]
 
 # Crates to remove at the end of computation.

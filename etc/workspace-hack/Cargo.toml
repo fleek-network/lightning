@@ -75,6 +75,7 @@ hmac = { version = "0.12", default-features = false, features = ["reset", "std"]
 hyper-582f2526e08bb6a0 = { package = "hyper", version = "0.14", features = ["full"] }
 hyper-dff4ba8e3ae991db = { package = "hyper", version = "1", features = ["full"] }
 hyper-rustls = { version = "0.24", features = ["http2"] }
+hyper-util = { version = "0.1", features = ["client-legacy", "server-auto"] }
 image = { version = "0.24" }
 indexmap-dff4ba8e3ae991db = { package = "indexmap", version = "1", default-features = false, features = ["serde", "std"] }
 indexmap-f595c2ba2a3f28df = { package = "indexmap", version = "2", features = ["serde"] }
@@ -116,13 +117,14 @@ rand_chacha = { version = "0.3" }
 regex = { version = "1" }
 regex-automata = { version = "0.4", default-features = false, features = ["dfa-onepass", "dfa-search", "hybrid", "meta", "nfa-backtrack", "perf-inline", "perf-literal", "unicode"] }
 regex-syntax = { version = "0.8" }
-reqwest = { version = "0.11", features = ["blocking", "brotli", "gzip", "json", "rustls-tls", "socks", "stream"] }
+reqwest = { version = "0.11", features = ["blocking", "json", "rustls-tls"] }
 ring-9067fe90e8c1f593 = { package = "ring", version = "0.17", features = ["std"] }
 ring-986da7b5efc2b80e = { package = "ring", version = "0.16", features = ["std"] }
 rocksdb = { version = "0.21", features = ["multi-threaded-cf"] }
 ruint = { version = "1", features = ["num-bigint", "primitive-types", "serde"] }
 rustls = { version = "0.21", features = ["dangerous_configuration", "quic"] }
 rustls-pki-types = { version = "1", features = ["std"] }
+rustls-webpki = { version = "0.102" }
 schemars = { version = "0.8", features = ["either"] }
 scopeguard = { version = "1" }
 sec1 = { version = "0.7", features = ["pem", "std", "subtle"] }
@@ -133,7 +135,7 @@ sha1 = { version = "0.10", features = ["oid"] }
 sha2 = { version = "0.10", features = ["oid"] }
 sha3 = { version = "0.10" }
 simdutf8 = { version = "0.1", features = ["aarch64_neon"] }
-smallvec = { version = "1", default-features = false, features = ["union"] }
+smallvec = { version = "1", default-features = false, features = ["const_new", "union"] }
 socket2 = { version = "0.5", default-features = false, features = ["all"] }
 spin = { version = "0.9" }
 spki = { version = "0.7", default-features = false, features = ["pem", "std"] }
@@ -146,13 +148,12 @@ tokio-util = { version = "0.7", features = ["codec", "compat", "io", "time"] }
 toml_datetime = { version = "0.6", default-features = false, features = ["serde"] }
 toml_edit = { version = "0.20", features = ["serde"] }
 tower = { version = "0.4", features = ["full"] }
-tower-http = { version = "0.3", features = ["full"] }
+tower-http-468e82937335b1c9 = { package = "tower-http", version = "0.3", features = ["full"] }
+tower-http-d8f496e17d97b5cb = { package = "tower-http", version = "0.5", features = ["cors", "decompression-br", "decompression-gzip", "set-header"] }
 tracing = { version = "0.1", features = ["log"] }
 tracing-core = { version = "0.1" }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "time"] }
 uint = { version = "0.9" }
-unicode-bidi = { version = "0.3" }
-unicode-normalization = { version = "0.1" }
 url = { version = "2", features = ["expose_internals", "serde"] }
 uuid = { version = "1", features = ["fast-rng", "serde", "v4"] }
 web-sys = { version = "0.3", default-features = false, features = ["AbortController", "AbortSignal", "AddEventListenerOptions", "BinaryType", "Cache", "CacheQueryOptions", "CacheStorage", "CloseEvent", "CloseEventInit", "Document", "ErrorEvent", "File", "FileReader", "FormData", "Headers", "History", "HtmlHeadElement", "Location", "MessageEvent", "ProgressEvent", "QueuingStrategy", "ReadableByteStreamController", "ReadableStream", "ReadableStreamByobReader", "ReadableStreamByobRequest", "ReadableStreamDefaultController", "ReadableStreamDefaultReader", "ReadableStreamGetReaderOptions", "ReadableStreamReadResult", "ReadableStreamReaderMode", "ReadableStreamType", "ReadableWritablePair", "Request", "RequestInit", "RequestRedirect", "Response", "ResponseInit", "StreamPipeOptions", "TransformStream", "TransformStreamDefaultController", "Transformer", "UnderlyingSink", "UnderlyingSource", "WebSocket", "Window", "WorkerGlobalScope", "WritableStream", "WritableStreamDefaultController", "WritableStreamDefaultWriter", "console"] }
@@ -219,6 +220,7 @@ hmac = { version = "0.12", default-features = false, features = ["reset", "std"]
 hyper-582f2526e08bb6a0 = { package = "hyper", version = "0.14", features = ["full"] }
 hyper-dff4ba8e3ae991db = { package = "hyper", version = "1", features = ["full"] }
 hyper-rustls = { version = "0.24", features = ["http2"] }
+hyper-util = { version = "0.1", features = ["client-legacy", "server-auto"] }
 image = { version = "0.24" }
 indexmap-dff4ba8e3ae991db = { package = "indexmap", version = "1", default-features = false, features = ["serde", "std"] }
 indexmap-f595c2ba2a3f28df = { package = "indexmap", version = "2", features = ["serde"] }
@@ -261,13 +263,14 @@ rand_chacha = { version = "0.3" }
 regex = { version = "1" }
 regex-automata = { version = "0.4", default-features = false, features = ["dfa-onepass", "dfa-search", "hybrid", "meta", "nfa-backtrack", "perf-inline", "perf-literal", "unicode"] }
 regex-syntax = { version = "0.8" }
-reqwest = { version = "0.11", features = ["blocking", "brotli", "gzip", "json", "rustls-tls", "socks", "stream"] }
+reqwest = { version = "0.11", features = ["blocking", "json", "rustls-tls"] }
 ring-9067fe90e8c1f593 = { package = "ring", version = "0.17", features = ["std"] }
 ring-986da7b5efc2b80e = { package = "ring", version = "0.16", features = ["std"] }
 rocksdb = { version = "0.21", features = ["multi-threaded-cf"] }
 ruint = { version = "1", features = ["num-bigint", "primitive-types", "serde"] }
 rustls = { version = "0.21", features = ["dangerous_configuration", "quic"] }
 rustls-pki-types = { version = "1", features = ["std"] }
+rustls-webpki = { version = "0.102" }
 schemars = { version = "0.8", features = ["either"] }
 scopeguard = { version = "1" }
 sec1 = { version = "0.7", features = ["pem", "std", "subtle"] }
@@ -278,7 +281,7 @@ sha1 = { version = "0.10", features = ["oid"] }
 sha2 = { version = "0.10", features = ["oid"] }
 sha3 = { version = "0.10" }
 simdutf8 = { version = "0.1", features = ["aarch64_neon"] }
-smallvec = { version = "1", default-features = false, features = ["union"] }
+smallvec = { version = "1", default-features = false, features = ["const_new", "union"] }
 socket2 = { version = "0.5", default-features = false, features = ["all"] }
 spin = { version = "0.9" }
 spki = { version = "0.7", default-features = false, features = ["pem", "std"] }
@@ -292,13 +295,12 @@ tokio-util = { version = "0.7", features = ["codec", "compat", "io", "time"] }
 toml_datetime = { version = "0.6", default-features = false, features = ["serde"] }
 toml_edit = { version = "0.20", features = ["serde"] }
 tower = { version = "0.4", features = ["full"] }
-tower-http = { version = "0.3", features = ["full"] }
+tower-http-468e82937335b1c9 = { package = "tower-http", version = "0.3", features = ["full"] }
+tower-http-d8f496e17d97b5cb = { package = "tower-http", version = "0.5", features = ["cors", "decompression-br", "decompression-gzip", "set-header"] }
 tracing = { version = "0.1", features = ["log"] }
 tracing-core = { version = "0.1" }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "time"] }
 uint = { version = "0.9" }
-unicode-bidi = { version = "0.3" }
-unicode-normalization = { version = "0.1" }
 url = { version = "2", features = ["expose_internals", "serde"] }
 uuid = { version = "1", features = ["fast-rng", "serde", "v4"] }
 web-sys = { version = "0.3", default-features = false, features = ["AbortController", "AbortSignal", "AddEventListenerOptions", "BinaryType", "Cache", "CacheQueryOptions", "CacheStorage", "CloseEvent", "CloseEventInit", "Document", "ErrorEvent", "File", "FileReader", "FormData", "Headers", "History", "HtmlHeadElement", "Location", "MessageEvent", "ProgressEvent", "QueuingStrategy", "ReadableByteStreamController", "ReadableStream", "ReadableStreamByobReader", "ReadableStreamByobRequest", "ReadableStreamDefaultController", "ReadableStreamDefaultReader", "ReadableStreamGetReaderOptions", "ReadableStreamReadResult", "ReadableStreamReaderMode", "ReadableStreamType", "ReadableWritablePair", "Request", "RequestInit", "RequestRedirect", "Response", "ResponseInit", "StreamPipeOptions", "TransformStream", "TransformStreamDefaultController", "Transformer", "UnderlyingSink", "UnderlyingSource", "WebSocket", "Window", "WorkerGlobalScope", "WritableStream", "WritableStreamDefaultController", "WritableStreamDefaultWriter", "console"] }
@@ -308,7 +310,6 @@ zeroize = { version = "1", features = ["zeroize_derive"] }
 arrayvec = { version = "0.7", default-features = false, features = ["serde"] }
 bitflags = { version = "2", default-features = false, features = ["serde"] }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
-linux-raw-sys = { version = "0.4", default-features = false, features = ["elf", "errno", "general", "ioctl", "no_std", "system"] }
 openssl = { version = "0.10", features = ["vendored"] }
 openssl-sys = { version = "0.9", default-features = false, features = ["vendored"] }
 rustix = { version = "0.38", features = ["fs", "system", "termios"] }
@@ -320,7 +321,6 @@ web-sys = { version = "0.3", default-features = false, features = ["Worker"] }
 arrayvec = { version = "0.7", default-features = false, features = ["serde"] }
 bitflags = { version = "2", default-features = false, features = ["serde"] }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
-linux-raw-sys = { version = "0.4", default-features = false, features = ["elf", "errno", "general", "ioctl", "no_std", "system"] }
 openssl = { version = "0.10", features = ["vendored"] }
 openssl-sys = { version = "0.9", default-features = false, features = ["vendored"] }
 rustix = { version = "0.38", features = ["fs", "system", "termios"] }

@@ -9,7 +9,7 @@ use ::deno_websocket::{deno_websocket, WebSocketPermissions};
 use anyhow::{anyhow, bail, Result};
 use deno_canvas::deno_canvas;
 use deno_console::deno_console;
-use deno_core::serde_v8::{self, Serializable};
+use deno_core::serde_v8::{self, to_v8};
 use deno_core::url::Url;
 use deno_core::v8::{self, CreateParams, Global, Value};
 use deno_core::{JsRuntime, ModuleSpecifier, PollEventLoopOptions, RuntimeOptions};
@@ -113,7 +113,7 @@ impl NetPermissions for Permissions {
 
 impl Runtime {
     /// Create a new runtime
-    pub fn new(mut location: Url, depth: u8) -> Result<Self> {
+    pub fn new(location: Url, depth: u8) -> Result<Self> {
         let tape = Tape::new(location.clone());
         let mut deno = JsRuntime::new(RuntimeOptions {
             extensions: vec![
@@ -157,7 +157,7 @@ impl Runtime {
             let time = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis();
             // TODO: parse directly from u128
             let time: v8::Local<v8::Value> = v8::Number::new(scope, time as f64).into();
-            let url = location.to_v8(scope).unwrap();
+            let url = to_v8(scope, location).unwrap();
             let undefined = v8::undefined(scope);
 
             // Bootstrap.
