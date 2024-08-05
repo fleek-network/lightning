@@ -3,7 +3,6 @@ use std::time::SystemTime;
 
 use anyhow::Result;
 use clap::Parser;
-use fleek_crypto::PublicKey;
 use lightning_application::app::Application;
 use lightning_e2e::swarm::Swarm;
 use lightning_e2e::utils::shutdown;
@@ -90,11 +89,7 @@ fn main() -> Result<()> {
 
         let mut s = String::from("#####################################\n\n");
         for (pub_key, ports) in swarm.get_ports() {
-            s.push_str(&format!(
-                "Public Key: {}\nPorts: {:?}\n\n",
-                pub_key.to_base58(),
-                ports
-            ));
+            s.push_str(&format!("Public Key: {pub_key}\n{ports}\n\n"));
         }
         s.push_str("#####################################");
         println!("{s}");

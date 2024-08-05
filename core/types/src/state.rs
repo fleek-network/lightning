@@ -1,4 +1,5 @@
 //! The data types used in the application state
+use std::fmt::Display;
 use std::net::IpAddr;
 
 use anyhow::anyhow;
@@ -268,6 +269,34 @@ impl Default for NodePorts {
             rpc: 4230,
             pinger: 4350,
         }
+    }
+}
+
+impl Display for NodePorts {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Node Ports:
+  Pool: {}
+  Primary: {}
+  Worker: {}
+  Mempool: {}
+  RPC: {}
+  Pinger: {}
+  Handshake:
+    HTTP: {}
+    WebRTC: {}
+    WebTransport: {}",
+            self.pool,
+            self.primary,
+            self.worker,
+            self.mempool,
+            self.rpc,
+            self.pinger,
+            self.handshake.http,
+            self.handshake.webrtc,
+            self.handshake.webtransport
+        )
     }
 }
 
