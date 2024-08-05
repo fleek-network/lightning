@@ -9,7 +9,7 @@ use lightning_utils::config::LIGHTNING_HOME_DIR;
 use once_cell::sync::OnceCell;
 use resolved_pathbuf::ResolvedPathBuf;
 use tracing::debug;
-#[cfg(feature = "tui-dev")]
+#[cfg(feature = "dev")]
 use tracing::log::LevelFilter;
 
 #[cfg(target_os = "linux")]
@@ -100,7 +100,7 @@ pub async fn exec(cmd: AdminSubCmd) -> Result<()> {
 }
 
 pub async fn tui(cmd: TuiCmd) -> Result<()> {
-    #[cfg(feature = "tui-dev")]
+    #[cfg(feature = "dev")]
     {
         let _ = tui_logger::init_logger(LevelFilter::Trace);
         tui_logger::set_default_level(LevelFilter::Trace);
