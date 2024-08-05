@@ -48,7 +48,7 @@ pub async fn main_loop(ctx: Context) {
                 match webtransport::create_cert_hash_and_server_config(
                     NodeSecretKey::generate(),
                     ctx.transport_config.clone()
-                ) {
+                ).await {
                     Ok((cert_hash, server_config)) => {
                         match ctx.endpoint.reload_config(server_config, false) {
                             Ok(_) => {

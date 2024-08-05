@@ -14,8 +14,8 @@ use lightning_interfaces::prelude::*;
 use lightning_metrics::increment_counter;
 use tokio::sync::mpsc::{self, Receiver};
 use tracing::{error, info};
-use wtransport::tls::Certificate;
-use wtransport::{Endpoint, SendStream, ServerConfig};
+use wtransport::tls::{Certificate, CertificateChain, PrivateKey};
+use wtransport::{Endpoint, Identity, SendStream, ServerConfig};
 
 use super::delimit_frame;
 use crate::schema::{
@@ -45,7 +45,7 @@ impl Transport for WebTransport {
         info!("Binding WebTransport on {}", config.address);
 
         let (cert_hash, server_config) =
-            create_cert_hash_and_server_config(NodeSecretKey::generate(), config.clone())?;
+            create_cert_hash_and_server_config(NodeSecretKey::generate(), config.clone()).await?;
 
         let shared_cert_hash = Arc::new(RwLock::new(cert_hash));
         let router = Router::new()
@@ -189,7 +189,7 @@ impl TransportReceiver for WebTransportReceiver {
     }
 }
 
-pub fn create_cert_hash_and_server_config(
+pub async fn create_cert_hash_and_server_config(
     sk: NodeSecretKey,
     config: WebTransportConfig,
 ) -> anyhow::Result<(Vec<u8>, ServerConfig)> {
@@ -204,10 +204,10 @@ pub fn create_cert_hash_and_server_config(
         cert_hash,
         ServerConfig::builder()
             .with_bind_address(config.address)
-            .with_certificate(
-                Certificate::new(vec![cert_der], cert.serialize_private_key_der())
-                    .expect("failed to create serialized certificate"),
-            )
+            .with_identity(&Identity::new(
+                CertificateChain::single(Certificate::from_der(cert_der)?),
+                PrivateKey::from_der_pkcs8(cert.serialize_private_key_der()),
+            ))
             .keep_alive_interval(config.keep_alive)
             .build(),
     ))
