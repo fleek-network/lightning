@@ -7,6 +7,7 @@ use lightning_test_utils::statistics::{get_mean, get_variance};
 pub struct Summary {
     pub mean: f64,
     pub variance: f64,
+    #[allow(unused)]
     pub n: usize,
 }
 
