@@ -1,22 +1,22 @@
 [workspace]
 resolver = "2"
 members = [
-    "core/*",
-    "core/interfaces/proc",
-    "etc/workspace-hack",
-    "lib/*",
-    "services/*",
-    "services/ai/examples/rust/*",
+  "core/*",
+  "core/interfaces/proc",
+  "etc/workspace-hack",
+  "lib/*",
+  "services/*",
+  "services/ai/examples/rust/*",
 ]
 exclude = [
-    "lib/cdk",
-    "lib/blake3-js",
-    "lib/cdk-x-platform-test",
-    "etc/ebpf-apps/ebpf",
-    "etc/ebpf-apps/common",
-    "etc/ebpf-apps/guard",
-    "etc/socket-logger",
-    "etc/tui",
+  "lib/cdk",
+  "lib/blake3-js",
+  "lib/cdk-x-platform-test",
+  "etc/ebpf-apps/ebpf",
+  "etc/ebpf-apps/common",
+  "etc/ebpf-apps/guard",
+  "etc/socket-logger",
+  "etc/tui",
 ]
 
 
@@ -40,7 +40,7 @@ futures = "0.3"
 lru = "0.10.0"
 multihash = "0.19"
 rand = { version = "0.8.5", features = ["small_rng"] }
-reqwest = "0.11.18"
+reqwest = { version = "0.11.20", features = ["rustls-tls", "json"] }
 serde = { version = "1.0", features = ["derive"] }
 serde-big-array = "0.5.1"
 serde_json = "1.0.96"
@@ -54,15 +54,15 @@ tracing = "0.1.37"
 zeroize = "1.6"
 scc = "1.8.1"
 num-traits = "0.2.15"
-num-derive = "0.3.3"
+num-derive = "0.4.2"
 lazy_static = "1.4.0"
 schemars = "0.8.21"
 rkyv = { version = "0.7.44", features = [
-    "validation",
-    "alloc",
-    "std",
-    "hashbrown",
-    "bytecheck",
+  "validation",
+  "alloc",
+  "std",
+  "hashbrown",
+  "bytecheck",
 ] }
 triomphe = "0.1"
 tempfile = "3.10.1"
