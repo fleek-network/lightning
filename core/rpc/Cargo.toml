@@ -48,9 +48,8 @@ hmac = "0.12.1"
 rand.workspace = true
 hex = "0.4.3"
 
-
 [dev-dependencies]
-reqwest = { workspace = true, features = ["json"] }
+reqwest.workspace = true
 lightning-test-utils = { path = "../test-utils" }
 lightning-application = { path = "../application" }
 lightning-fetcher = { path = "../fetcher" }

@@ -35,7 +35,7 @@ futures.workspace = true
 serde_json.workspace = true
 fleek-crypto.workspace = true
 resolved-pathbuf.workspace = true
-reqwest = { workspace = true, features = ["json"] }
+reqwest.workspace = true
 serde.workspace = true
 rand.workspace = true
 hp-fixed.workspace = true
