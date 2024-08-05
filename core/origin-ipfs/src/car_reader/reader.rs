@@ -1,3 +1,7 @@
+// libipld throws this warning from the derive macros
+// see https://github.com/rust-lang/rust/issues/123748
+#![allow(dependency_on_unit_never_type_fallback)]
+
 use anyhow::{anyhow, Context, Result};
 use cid::Cid;
 use libipld::cbor::DagCborCodec;
