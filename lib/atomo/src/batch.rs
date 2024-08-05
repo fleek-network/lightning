@@ -6,11 +6,13 @@ pub type BoxedVec = Box<[u8]>;
 
 pub type BatchHashMap = FxHashMap<BoxedVec, Operation>;
 
+#[derive(Clone)]
 /// A vertical batch contains a list of slots for each different table. Putting
 /// the [`VerticalBatch`] into a [`SnapshotList`] will provide a valid snapshot
 /// list.
 pub struct VerticalBatch(Vec<BatchHashMap>);
 
+#[derive(Clone)]
 /// The change on a value.
 pub enum Operation {
     Remove,

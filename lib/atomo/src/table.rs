@@ -17,8 +17,9 @@ use crate::serder::SerdeBackend;
 use crate::snapshot::Snapshot;
 use crate::{KeyIterator, StorageBackend};
 
+#[derive(Clone)]
 pub struct TableMeta {
-    pub _name: String,
+    pub name: String,
     pub k_id: TypeId,
     pub v_id: TypeId,
 }
@@ -81,10 +82,10 @@ pub struct TableRef<
 
 impl TableMeta {
     #[inline(always)]
-    pub fn new<K: Any, V: Any>(_name: String) -> Self {
+    pub fn new<K: Any, V: Any>(name: String) -> Self {
         let k_id = TypeId::of::<K>();
         let v_id = TypeId::of::<V>();
-        Self { _name, k_id, v_id }
+        Self { name, k_id, v_id }
     }
 }
 
@@ -122,6 +123,16 @@ impl<B: StorageBackend, S: SerdeBackend> TableSelector<B, S> {
         (self.batch, self.keys.into_inner())
     }
 
+    #[inline]
+    pub fn batch(&self) -> VerticalBatch {
+        self.batch.clone()
+    }
+
+    #[inline]
+    pub fn tables(&self) -> Vec<TableMeta> {
+        self.atomo.tables.clone()
+    }
+
     /// Return the table reference for the table with the provided name and K, V type.
     ///
     /// # Panics
@@ -133,6 +144,16 @@ impl<B: StorageBackend, S: SerdeBackend> TableSelector<B, S> {
         V: Serialize + DeserializeOwned + Any,
     {
         self.atomo.resolve::<K, V>(name).get(self)
+    }
+
+    /// Get the raw, serialized bytes value of a given table and key. The key is also expected to be
+    /// serialized bytes.
+    /// Returns [`None`] if the table or the key is not found.
+    pub fn get_raw_value(&self, table: impl AsRef<str>, key: &[u8]) -> Option<Vec<u8>> {
+        self.atomo
+            .table_name_to_id
+            .get(table.as_ref())
+            .and_then(|tid| self.atomo.get_raw(*tid, key))
     }
 }
 
