@@ -51,6 +51,7 @@ tokio = { version = "1.28", features = ["full", "tracing"] }
 tokio-stream = "0.1"
 tokio-util = { version = "0.7", features = ["time"] }
 tracing = "0.1.37"
+tracing-subscriber = { version = "0.3", features = ["fmt", "json"] }
 zeroize = "1.6"
 scc = "1.8.1"
 num-traits = "0.2.15"
@@ -68,8 +69,12 @@ triomphe = "0.1"
 tempfile = "3.10.1"
 hyper = { version = "0.14.27", features = ["server", "full"] }
 tower = { version = "0.4.13", features = ["tokio", "steer"] }
+hex = { version = "0.4.3", features = ["serde"] }
 
 # Our libraries
+lightning-application = { path = "core/application" }
+lightning-interfaces = { path = "core/interfaces" }
+lightning-test-utils = { path = "core/test-utils" }
 lightning-types = { path = "core/types" }
 affair = { path = "lib/affair" }
 atomo = { path = "lib/atomo" }
@@ -82,6 +87,7 @@ resolved-pathbuf = { path = "lib/resolved-pathbuf" }
 panic-report = { path = "lib/panic-report" }
 better-shutdown = { path = "lib/better-shutdown" }
 fleek-blake3 = "1.5"
+merklize = { path = "lib/merklize" }
 
 # This ensures that while building within the workspace, the real workspace-hack is used. When
 # building outside of the workspace, such as via a Git or path dependency, the [patch] directive
