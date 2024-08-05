@@ -7,6 +7,7 @@ name = "lightning-workspace-hack"
 version = "0.1.0"
 description = "workspace-hack package, managed by hakari"
 license = "MIT"
+edition = "2021"
 # You can choose to publish this crate: see https://docs.rs/cargo-hakari/latest/cargo_hakari/publishing.
 publish = false
 
@@ -21,6 +22,7 @@ arrayvec = { version = "0.7" }
 autometrics = { version = "0.6", default-features = false, features = ["prometheus", "prometheus-exporter"] }
 axum-3b31131e45eafb45 = { package = "axum", version = "0.6", features = ["headers", "http2", "ws"] }
 axum-ca01ad9e24f5d932 = { package = "axum", version = "0.7", features = ["macros"] }
+base64-3c51e837cfc5589a = { package = "base64", version = "0.22" }
 base64-594e8ee84c453af0 = { package = "base64", version = "0.13", features = ["alloc"] }
 base64-647d43efb71741da = { package = "base64", version = "0.21" }
 bitflags = { version = "2", default-features = false, features = ["std"] }
@@ -62,6 +64,7 @@ futures-task = { version = "0.3", features = ["unstable"] }
 futures-util = { version = "0.3", features = ["bilock", "channel", "io", "sink", "unstable"] }
 generic-array = { version = "0.14", default-features = false, features = ["more_lengths", "serde", "zeroize"] }
 getrandom = { version = "0.2", default-features = false, features = ["std"] }
+half = { version = "2" }
 hashbrown-582f2526e08bb6a0 = { package = "hashbrown", version = "0.14", features = ["raw"] }
 hashbrown-594e8ee84c453af0 = { package = "hashbrown", version = "0.13" }
 hashbrown-5ef9efb8ec2df382 = { package = "hashbrown", version = "0.12", features = ["raw"] }
@@ -77,7 +80,6 @@ indexmap-dff4ba8e3ae991db = { package = "indexmap", version = "1", default-featu
 indexmap-f595c2ba2a3f28df = { package = "indexmap", version = "2", features = ["serde"] }
 inout = { version = "0.1", default-features = false, features = ["std"] }
 itertools-93f6ce9d446188ac = { package = "itertools", version = "0.10" }
-itertools-a6292c17cd707f01 = { package = "itertools", version = "0.11" }
 k256 = { version = "0.13" }
 lazy_static = { version = "1", default-features = false, features = ["spin_no_std"] }
 libc = { version = "0.2", features = ["extra_traits"] }
@@ -92,18 +94,16 @@ num-bigint-dig = { version = "0.8", default-features = false, features = ["i128"
 num-complex = { version = "0.4", default-features = false, features = ["std"] }
 num-integer = { version = "0.1", features = ["i128"] }
 num-iter = { version = "0.1", features = ["i128"] }
-num-rational = { version = "0.4", default-features = false, features = ["num-bigint-std", "std"] }
 num-traits = { version = "0.2", features = ["i128", "libm"] }
 opentelemetry_api = { version = "0.20", features = ["logs", "metrics"] }
 opentelemetry_sdk = { version = "0.20", features = ["logs", "metrics", "rt-tokio"] }
 p256 = { version = "0.13", features = ["ecdh"] }
-phf_shared = { version = "0.11" }
 plotters = { version = "0.3" }
 portable-atomic = { version = "1", features = ["require-cas"] }
 prettyplease = { version = "0.2", default-features = false, features = ["verbatim"] }
 primitive-types = { version = "0.12", features = ["byteorder", "rlp", "rustc-hex", "scale-info", "serde_no_std"] }
 proc-macro2 = { version = "1", features = ["span-locations"] }
-prost-5ef9efb8ec2df382 = { package = "prost", version = "0.12" }
+prost-5ef9efb8ec2df382 = { package = "prost", version = "0.12", features = ["prost-derive"] }
 prost-a6292c17cd707f01 = { package = "prost", version = "0.11" }
 prost-types = { version = "0.12" }
 protobuf = { version = "2", default-features = false, features = ["with-bytes"] }
@@ -135,6 +135,7 @@ sha3 = { version = "0.10" }
 simdutf8 = { version = "0.1", features = ["aarch64_neon"] }
 smallvec = { version = "1", default-features = false, features = ["union"] }
 socket2 = { version = "0.5", default-features = false, features = ["all"] }
+spin = { version = "0.9" }
 spki = { version = "0.7", default-features = false, features = ["pem", "std"] }
 syn-f595c2ba2a3f28df = { package = "syn", version = "2", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
 time = { version = "0.3", features = ["formatting", "local-offset", "macros", "parsing"] }
@@ -143,6 +144,7 @@ tokio-rustls = { version = "0.24" }
 tokio-stream = { version = "0.1", features = ["net", "sync"] }
 tokio-util = { version = "0.7", features = ["codec", "compat", "io", "time"] }
 toml_datetime = { version = "0.6", default-features = false, features = ["serde"] }
+toml_edit = { version = "0.20", features = ["serde"] }
 tower = { version = "0.4", features = ["full"] }
 tower-http = { version = "0.3", features = ["full"] }
 tracing = { version = "0.1", features = ["log"] }
@@ -153,7 +155,7 @@ unicode-bidi = { version = "0.3" }
 unicode-normalization = { version = "0.1" }
 url = { version = "2", features = ["expose_internals", "serde"] }
 uuid = { version = "1", features = ["fast-rng", "serde", "v4"] }
-web-sys = { version = "0.3", default-features = false, features = ["AbortController", "AbortSignal", "AddEventListenerOptions", "BinaryType", "Cache", "CacheQueryOptions", "CacheStorage", "CloseEvent", "CloseEventInit", "Document", "ErrorEvent", "File", "FileReader", "FormData", "Headers", "History", "HtmlHeadElement", "Location", "MessageEvent", "ProgressEvent", "ReadableStream", "ReadableStreamDefaultReader", "Request", "RequestInit", "RequestRedirect", "Response", "ResponseInit", "TransformStream", "WebSocket", "Window", "WorkerGlobalScope", "WritableStream", "WritableStreamDefaultWriter", "console"] }
+web-sys = { version = "0.3", default-features = false, features = ["AbortController", "AbortSignal", "AddEventListenerOptions", "BinaryType", "Cache", "CacheQueryOptions", "CacheStorage", "CloseEvent", "CloseEventInit", "Document", "ErrorEvent", "File", "FileReader", "FormData", "Headers", "History", "HtmlHeadElement", "Location", "MessageEvent", "ProgressEvent", "QueuingStrategy", "ReadableByteStreamController", "ReadableStream", "ReadableStreamByobReader", "ReadableStreamByobRequest", "ReadableStreamDefaultController", "ReadableStreamDefaultReader", "ReadableStreamGetReaderOptions", "ReadableStreamReadResult", "ReadableStreamReaderMode", "ReadableStreamType", "ReadableWritablePair", "Request", "RequestInit", "RequestRedirect", "Response", "ResponseInit", "StreamPipeOptions", "TransformStream", "TransformStreamDefaultController", "Transformer", "UnderlyingSink", "UnderlyingSource", "WebSocket", "Window", "WorkerGlobalScope", "WritableStream", "WritableStreamDefaultController", "WritableStreamDefaultWriter", "console"] }
 zeroize = { version = "1", features = ["zeroize_derive"] }
 
 [build-dependencies]
@@ -163,6 +165,7 @@ arrayvec = { version = "0.7" }
 autometrics = { version = "0.6", default-features = false, features = ["prometheus", "prometheus-exporter"] }
 axum-3b31131e45eafb45 = { package = "axum", version = "0.6", features = ["headers", "http2", "ws"] }
 axum-ca01ad9e24f5d932 = { package = "axum", version = "0.7", features = ["macros"] }
+base64-3c51e837cfc5589a = { package = "base64", version = "0.22" }
 base64-594e8ee84c453af0 = { package = "base64", version = "0.13", features = ["alloc"] }
 base64-647d43efb71741da = { package = "base64", version = "0.21" }
 bitflags = { version = "2", default-features = false, features = ["std"] }
@@ -205,6 +208,7 @@ futures-task = { version = "0.3", features = ["unstable"] }
 futures-util = { version = "0.3", features = ["bilock", "channel", "io", "sink", "unstable"] }
 generic-array = { version = "0.14", default-features = false, features = ["more_lengths", "serde", "zeroize"] }
 getrandom = { version = "0.2", default-features = false, features = ["std"] }
+half = { version = "2" }
 hashbrown-582f2526e08bb6a0 = { package = "hashbrown", version = "0.14", features = ["raw"] }
 hashbrown-594e8ee84c453af0 = { package = "hashbrown", version = "0.13" }
 hashbrown-5ef9efb8ec2df382 = { package = "hashbrown", version = "0.12", features = ["raw"] }
@@ -219,8 +223,8 @@ image = { version = "0.24" }
 indexmap-dff4ba8e3ae991db = { package = "indexmap", version = "1", default-features = false, features = ["serde", "std"] }
 indexmap-f595c2ba2a3f28df = { package = "indexmap", version = "2", features = ["serde"] }
 inout = { version = "0.1", default-features = false, features = ["std"] }
+itertools-5ef9efb8ec2df382 = { package = "itertools", version = "0.12" }
 itertools-93f6ce9d446188ac = { package = "itertools", version = "0.10" }
-itertools-a6292c17cd707f01 = { package = "itertools", version = "0.11" }
 k256 = { version = "0.13" }
 lazy_static = { version = "1", default-features = false, features = ["spin_no_std"] }
 libc = { version = "0.2", features = ["extra_traits"] }
@@ -235,18 +239,16 @@ num-bigint-dig = { version = "0.8", default-features = false, features = ["i128"
 num-complex = { version = "0.4", default-features = false, features = ["std"] }
 num-integer = { version = "0.1", features = ["i128"] }
 num-iter = { version = "0.1", features = ["i128"] }
-num-rational = { version = "0.4", default-features = false, features = ["num-bigint-std", "std"] }
 num-traits = { version = "0.2", features = ["i128", "libm"] }
 opentelemetry_api = { version = "0.20", features = ["logs", "metrics"] }
 opentelemetry_sdk = { version = "0.20", features = ["logs", "metrics", "rt-tokio"] }
 p256 = { version = "0.13", features = ["ecdh"] }
-phf_shared = { version = "0.11" }
 plotters = { version = "0.3" }
 portable-atomic = { version = "1", features = ["require-cas"] }
 prettyplease = { version = "0.2", default-features = false, features = ["verbatim"] }
 primitive-types = { version = "0.12", features = ["byteorder", "rlp", "rustc-hex", "scale-info", "serde_no_std"] }
 proc-macro2 = { version = "1", features = ["span-locations"] }
-prost-5ef9efb8ec2df382 = { package = "prost", version = "0.12" }
+prost-5ef9efb8ec2df382 = { package = "prost", version = "0.12", features = ["prost-derive"] }
 prost-a6292c17cd707f01 = { package = "prost", version = "0.11" }
 prost-types = { version = "0.12" }
 protobuf = { version = "2", default-features = false, features = ["with-bytes"] }
@@ -278,6 +280,7 @@ sha3 = { version = "0.10" }
 simdutf8 = { version = "0.1", features = ["aarch64_neon"] }
 smallvec = { version = "1", default-features = false, features = ["union"] }
 socket2 = { version = "0.5", default-features = false, features = ["all"] }
+spin = { version = "0.9" }
 spki = { version = "0.7", default-features = false, features = ["pem", "std"] }
 syn-dff4ba8e3ae991db = { package = "syn", version = "1", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
 syn-f595c2ba2a3f28df = { package = "syn", version = "2", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
@@ -287,6 +290,7 @@ tokio-rustls = { version = "0.24" }
 tokio-stream = { version = "0.1", features = ["net", "sync"] }
 tokio-util = { version = "0.7", features = ["codec", "compat", "io", "time"] }
 toml_datetime = { version = "0.6", default-features = false, features = ["serde"] }
+toml_edit = { version = "0.20", features = ["serde"] }
 tower = { version = "0.4", features = ["full"] }
 tower-http = { version = "0.3", features = ["full"] }
 tracing = { version = "0.1", features = ["log"] }
@@ -297,20 +301,18 @@ unicode-bidi = { version = "0.3" }
 unicode-normalization = { version = "0.1" }
 url = { version = "2", features = ["expose_internals", "serde"] }
 uuid = { version = "1", features = ["fast-rng", "serde", "v4"] }
-web-sys = { version = "0.3", default-features = false, features = ["AbortController", "AbortSignal", "AddEventListenerOptions", "BinaryType", "Cache", "CacheQueryOptions", "CacheStorage", "CloseEvent", "CloseEventInit", "Document", "ErrorEvent", "File", "FileReader", "FormData", "Headers", "History", "HtmlHeadElement", "Location", "MessageEvent", "ProgressEvent", "ReadableStream", "ReadableStreamDefaultReader", "Request", "RequestInit", "RequestRedirect", "Response", "ResponseInit", "TransformStream", "WebSocket", "Window", "WorkerGlobalScope", "WritableStream", "WritableStreamDefaultWriter", "console"] }
+web-sys = { version = "0.3", default-features = false, features = ["AbortController", "AbortSignal", "AddEventListenerOptions", "BinaryType", "Cache", "CacheQueryOptions", "CacheStorage", "CloseEvent", "CloseEventInit", "Document", "ErrorEvent", "File", "FileReader", "FormData", "Headers", "History", "HtmlHeadElement", "Location", "MessageEvent", "ProgressEvent", "QueuingStrategy", "ReadableByteStreamController", "ReadableStream", "ReadableStreamByobReader", "ReadableStreamByobRequest", "ReadableStreamDefaultController", "ReadableStreamDefaultReader", "ReadableStreamGetReaderOptions", "ReadableStreamReadResult", "ReadableStreamReaderMode", "ReadableStreamType", "ReadableWritablePair", "Request", "RequestInit", "RequestRedirect", "Response", "ResponseInit", "StreamPipeOptions", "TransformStream", "TransformStreamDefaultController", "Transformer", "UnderlyingSink", "UnderlyingSource", "WebSocket", "Window", "WorkerGlobalScope", "WritableStream", "WritableStreamDefaultController", "WritableStreamDefaultWriter", "console"] }
 zeroize = { version = "1", features = ["zeroize_derive"] }
 
 [target.x86_64-unknown-linux-gnu.dependencies]
 arrayvec = { version = "0.7", default-features = false, features = ["serde"] }
 bitflags = { version = "2", default-features = false, features = ["serde"] }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
-linux-raw-sys = { version = "0.4", default-features = false, features = ["elf", "errno", "general", "ioctl", "no_std", "std", "system"] }
-mio = { version = "0.8", features = ["net", "os-ext"] }
+linux-raw-sys = { version = "0.4", default-features = false, features = ["elf", "errno", "general", "ioctl", "no_std", "system"] }
 openssl = { version = "0.10", features = ["vendored"] }
 openssl-sys = { version = "0.9", default-features = false, features = ["vendored"] }
 rustix = { version = "0.38", features = ["fs", "system", "termios"] }
 semver = { version = "1", features = ["serde"] }
-spin = { version = "0.9" }
 tokio-tungstenite = { version = "0.20", features = ["rustls-tls-webpki-roots"] }
 web-sys = { version = "0.3", default-features = false, features = ["Worker"] }
 
@@ -318,13 +320,11 @@ web-sys = { version = "0.3", default-features = false, features = ["Worker"] }
 arrayvec = { version = "0.7", default-features = false, features = ["serde"] }
 bitflags = { version = "2", default-features = false, features = ["serde"] }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
-linux-raw-sys = { version = "0.4", default-features = false, features = ["elf", "errno", "general", "ioctl", "no_std", "std", "system"] }
-mio = { version = "0.8", features = ["net", "os-ext"] }
+linux-raw-sys = { version = "0.4", default-features = false, features = ["elf", "errno", "general", "ioctl", "no_std", "system"] }
 openssl = { version = "0.10", features = ["vendored"] }
 openssl-sys = { version = "0.9", default-features = false, features = ["vendored"] }
 rustix = { version = "0.38", features = ["fs", "system", "termios"] }
 semver = { version = "1", features = ["serde"] }
-spin = { version = "0.9" }
 tokio-tungstenite = { version = "0.20", features = ["rustls-tls-webpki-roots"] }
 web-sys = { version = "0.3", default-features = false, features = ["Worker"] }
 
@@ -333,12 +333,11 @@ arrayvec = { version = "0.7", default-features = false, features = ["serde"] }
 bitflags = { version = "2", default-features = false, features = ["serde"] }
 core-foundation = { version = "0.9" }
 core-foundation-sys = { version = "0.8" }
+core-graphics-types = { version = "0.1" }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
-mio = { version = "0.8", features = ["net", "os-ext"] }
 rustix = { version = "0.38", features = ["fs", "system", "termios"] }
 security-framework-sys = { version = "2" }
 semver = { version = "1", features = ["serde"] }
-spin = { version = "0.9" }
 tokio-tungstenite = { version = "0.20", features = ["rustls-tls-webpki-roots"] }
 web-sys = { version = "0.3", default-features = false, features = ["Worker"] }
 
@@ -347,12 +346,11 @@ arrayvec = { version = "0.7", default-features = false, features = ["serde"] }
 bitflags = { version = "2", default-features = false, features = ["serde"] }
 core-foundation = { version = "0.9" }
 core-foundation-sys = { version = "0.8" }
+core-graphics-types = { version = "0.1" }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
-mio = { version = "0.8", features = ["net", "os-ext"] }
 rustix = { version = "0.38", features = ["fs", "system", "termios"] }
 security-framework-sys = { version = "2" }
 semver = { version = "1", features = ["serde"] }
-spin = { version = "0.9" }
 tokio-tungstenite = { version = "0.20", features = ["rustls-tls-webpki-roots"] }
 web-sys = { version = "0.3", default-features = false, features = ["Worker"] }
 
