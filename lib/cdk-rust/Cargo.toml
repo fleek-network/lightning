@@ -6,8 +6,6 @@ authors = ["Miguel Meier G. <miguel@fleek.xyz>"]
 description = "Fleek Network Rust CDK"
 repository = "https://github.com/fleek-network/lightning"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 anyhow = "1.0"
 async-trait = "0.1"
@@ -28,8 +26,6 @@ lightning-schema = { path = "../../core/schema" }
 arrayref = "0.3"
 fleek-crypto = { path = "../fleek-crypto" }
 
-# Fork with wasm-bindgen unpinned.
-# https://github.com/cloudflare/workers-rs/issues/439
 worker = { version = "0.3.1", optional = true }
 
 [features]

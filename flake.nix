@@ -248,12 +248,6 @@
                   "--locked"
                   "--bin lightning-node"
                 ];
-                postInstall = lib.optionalString (pkgs.stdenv.buildPlatform.canExecute pkgs.stdenv.hostPlatform) ''
-                  installShellCompletion --cmd lightning-node \
-                    --bash <($out/bin/lightning-node completions bash) \
-                    --fish <($out/bin/lightning-node completions fish) \
-                    --zsh <($out/bin/lightning-node completions zsh)
-                '';
               }
             );
 
