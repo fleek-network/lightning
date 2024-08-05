@@ -9,6 +9,7 @@ use crate::utils::write;
 
 /// Client to update dynamic list of packet filter rules.
 #[derive(Debug)]
+#[allow(unused)]
 pub struct PacketFilter {
     inner: UnixStream,
 }
