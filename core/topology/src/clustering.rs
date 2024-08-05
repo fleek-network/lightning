@@ -118,10 +118,10 @@ impl<N: Zero> Rec<N> {
 
 /// Find the minimum (index and value)
 #[inline]
-pub(crate) fn find_min<'a, L: 'a, I: 'a>(a: &mut I) -> (usize, L)
+pub(crate) fn find_min<'a, L, I>(a: &mut I) -> (usize, L)
 where
-    L: PartialOrd + Copy + Zero,
-    I: std::iter::Iterator<Item = &'a L>,
+    L: 'a + PartialOrd + Copy + Zero,
+    I: 'a + std::iter::Iterator<Item = &'a L>,
 {
     let mut a = a.enumerate();
     let mut best: (usize, L) = (0, *a.next().unwrap().1);

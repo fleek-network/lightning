@@ -21,7 +21,7 @@ struct ServerData {
     latitude: f32,
     longitude: f32,
 }
-
+#[allow(unused)]
 #[derive(Debug, serde::Serialize)]
 struct DSOutput {
     src: u16,
@@ -73,7 +73,7 @@ fn run<P: AsRef<Path>>(ping: P, servers: P) -> Result<(), Box<dyn Error>> {
         for dst in &ids {
             let src_info = map.get(src).unwrap();
 
-            if src_info.map.get(dst).is_none() {
+            if src_info.map.contains_key(dst) {
                 // src -> dst unavailable, check dst -> src
                 let dst_info = map.get(dst).unwrap();
                 if let Some(&latency) = dst_info.map.get(src) {
