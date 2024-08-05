@@ -3,12 +3,12 @@
 //! What should be included here?
 //!
 //! 1. All of the traits. This makes every method available and in scope leading to a better IDE
-//! support and dev ex.
+//!    support and dev ex.
 //!
 //! 2. Modules exported from top level.
 //!
-//! 3. Highly used macros, structs or enums that are used in almost all of the dependencies and
-//! are not only related to 1 particular component. Such as the `c` macro
+//! 3. Highly used macros, structs or enums that are used in almost all of the dependencies and are
+//!    not only related to 1 particular component. Such as the `c` macro
 
 // Re-export more traits from our lib dependencies.
 pub use fdi::{Bind, BuildGraph, MethodExt};

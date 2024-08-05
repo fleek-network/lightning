@@ -6,6 +6,7 @@ use syn::parse::Parse;
 use syn::Token;
 
 pub struct IdentSet {
+    #[allow(unused)]
     pub brace_token: syn::token::Brace,
     pub ident: syn::punctuated::Punctuated<syn::Ident, Token![,]>,
 }
@@ -22,6 +23,7 @@ impl Parse for IdentSet {
 
 pub struct IdentSetPair {
     pub left: IdentSet,
+    #[allow(unused)]
     pub comma: Token![,],
     pub right: IdentSet,
 }
