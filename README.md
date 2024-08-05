@@ -71,7 +71,7 @@ and process as objects that communicate with each other by message passing.
 # Rust Version
 
 To get the best of the ecosystem by default the nightly version of Rust is set in the `rust-toolchain`
-file, the version in use is `nightly-2023-07-01`, which is the version used by the `rustfmt` project
+file, the version in use is `nightly-2024-06-25`, which is the version used by the `rustfmt` project
 itself which is a good sign of reliability.
 
 This is set so that the default that the IDEs will pick and default invocation of `cargo fmt` is consistent
@@ -79,11 +79,11 @@ between everyone and also we get to use some of the nightly options when it come
 
 But this does not mean we're going to use this for building and releasing the binary, building the binary
 for any actual use cases should use the `cargo +stable build` command and the coming scripts and CI config
-will ease this process. Our MSRV (Minimum Supported Rust Version) is 1.75.
+will ease this process. Our MSRV (Minimum Supported Rust Version) is 1.80.
 
 So in summary: We use the default that is set in the `rust-toolchain` to have consistent formatting of
 the code. And does not necessarily indicate that it is the version of the compiler we are going to use
-for builds, which should be rust stable and at a minimum version 1.75.
+for builds, which should be rust stable and at a minimum version 1.80.
 
 # Development
 
