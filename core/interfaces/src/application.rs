@@ -7,6 +7,7 @@ use anyhow::Result;
 use atomo::{
     Atomo,
     AtomoBuilder,
+    DefaultSerdeBackend,
     InMemoryStorage,
     KeyIterator,
     QueryPerm,
@@ -26,10 +27,13 @@ use lightning_types::{
     Metadata,
     NodeIndex,
     ServiceRevenue,
+    StateProofKey,
+    StateProofValue,
     TransactionRequest,
     TxHash,
     Value,
 };
+use merklize::{MerklizeProvider, StateRootHash};
 use serde::{Deserialize, Serialize};
 
 use crate::collection::Collection;
@@ -99,7 +103,7 @@ pub trait ApplicationInterface<C: Collection>:
 #[interfaces_proc::blank]
 pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     #[blank(InMemoryStorage)]
-    type Backend: StorageBackend;
+    type Backend: StorageBackend + Send + Sync;
 
     fn new(atomo: Atomo<QueryPerm, Self::Backend>) -> Self;
 
@@ -141,6 +145,16 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
 
     /// Query Metadata Table
     fn get_metadata(&self, key: &lightning_types::Metadata) -> Option<Value>;
+
+    /// Get the state root hash.
+    fn get_state_root<M>(&self) -> Result<StateRootHash>
+    where
+        M: MerklizeProvider<Storage = Self::Backend, Serde = DefaultSerdeBackend>;
+
+    /// Get a state proof for a given key.
+    fn get_state_proof<M>(&self, key: StateProofKey) -> Result<(Option<StateProofValue>, M::Proof)>
+    where
+        M: MerklizeProvider<Storage = Self::Backend, Serde = DefaultSerdeBackend>;
 
     /// Query Account Table
     /// Returns information about an account.

@@ -28,6 +28,7 @@ lightning-types.workspace = true
 affair.workspace = true
 atomo.workspace = true
 atomo-rocks.workspace = true
+merklize.workspace = true
 fleek-crypto.workspace = true
 hp-fixed.workspace = true
 ink-quill.workspace = true

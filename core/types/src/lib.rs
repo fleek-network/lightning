@@ -18,6 +18,7 @@ mod reputation;
 mod response;
 mod rpc;
 mod state;
+mod state_proof;
 mod transaction;
 
 pub use application::*;
@@ -38,6 +39,7 @@ pub use reputation::*;
 pub use response::*;
 pub use rpc::*;
 pub use state::*;
+pub use state_proof::*;
 pub use transaction::*;
 
 /// The physical address of a node where it can be reached, the port numbers are

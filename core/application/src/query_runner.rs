@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 use std::path::Path;
 use std::time::Duration;
 
+use anyhow::Result;
 use atomo::{
     Atomo,
     AtomoBuilder,
@@ -27,6 +28,8 @@ use lightning_interfaces::types::{
     Service,
     ServiceId,
     ServiceRevenue,
+    StateProofKey,
+    StateProofValue,
     TotalServed,
     TransactionRequest,
     TransactionResponse,
@@ -34,6 +37,7 @@ use lightning_interfaces::types::{
     Value,
 };
 use lightning_interfaces::SyncQueryRunnerInterface;
+use merklize::{MerklizeProvider, StateRootHash};
 
 use crate::state::State;
 use crate::storage::{AtomoStorage, AtomoStorageBuilder};
@@ -126,6 +130,28 @@ impl SyncQueryRunnerInterface for QueryRunner {
 
     fn get_metadata(&self, key: &Metadata) -> Option<Value> {
         self.inner.run(|ctx| self.metadata_table.get(ctx).get(key))
+    }
+
+    fn get_state_root<M>(&self) -> Result<StateRootHash>
+    where
+        M: MerklizeProvider<Storage = Self::Backend, Serde = DefaultSerdeBackend>,
+    {
+        self.inner.run(|ctx| M::get_state_root(ctx))
+    }
+
+    fn get_state_proof<M>(&self, key: StateProofKey) -> Result<(Option<StateProofValue>, M::Proof)>
+    where
+        M: MerklizeProvider<Storage = Self::Backend, Serde = DefaultSerdeBackend>,
+    {
+        self.inner.run(|ctx| {
+            let (table, serialized_key) = key.raw::<M::Serde>();
+            let proof = M::get_state_proof(ctx, &table, serialized_key.clone())?;
+            let value = self
+                .inner
+                .run(|ctx| ctx.get_raw_value(table, &serialized_key))
+                .map(|value| key.value::<M::Serde>(value));
+            Ok((value, proof))
+        })
     }
 
     #[inline]

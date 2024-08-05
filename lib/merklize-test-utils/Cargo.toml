@@ -12,4 +12,12 @@ tokio.workspace = true
 # Lightning dependencies
 atomo.workspace = true
 atomo-rocks.workspace = true
+fleek-crypto.workspace = true
+hp-fixed.workspace = true
+ink-quill.workspace = true
+lightning-application.workspace = true
+lightning-interfaces.workspace = true
+lightning-test-utils.workspace = true
+lightning-types.workspace = true
 merklize = { path = "../merklize" }
+resolved-pathbuf.workspace = true

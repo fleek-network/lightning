@@ -54,6 +54,11 @@ tracing-subscriber.workspace = true
 # Lightning dependencies
 atomo.workspace = true
 atomo-rocks.workspace = true
+fleek-crypto.workspace = true
+# Some of these crates should only be included in dev dependencies, and never in non-dev, since
+# this crate is a dependency of those crates, so we will have a cyclic dependency.
+lightning-application.workspace = true
+lightning-types.workspace = true
 merklize-test-utils = { path = "../merklize-test-utils" }
 
 

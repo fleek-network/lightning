@@ -50,8 +50,8 @@ hex = "0.4.3"
 
 [dev-dependencies]
 reqwest.workspace = true
-lightning-test-utils = { path = "../test-utils" }
 lightning-application = { path = "../application" }
+lightning-test-utils = { path = "../test-utils" }
 lightning-fetcher = { path = "../fetcher" }
 lightning-blockstore = { path = "../blockstore" }
 lightning-blockstore-server = { path = "../blockstore-server" }
