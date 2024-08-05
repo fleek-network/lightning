@@ -3,18 +3,14 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-
     crane = {
       url = "github:ipetkov/crane";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-
     fenix = {
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
-      inputs.rust-analyzer-src.follows = "";
     };
-
     flake-utils.url = "github:numtide/flake-utils";
   };
 
@@ -40,12 +36,35 @@
       (
         system:
         let
-          pkgs = (import nixpkgs { inherit system; });
+          pkgs = (
+            import nixpkgs {
+              inherit system;
+              overlays = [
+                (final: prev: {
+                  # update cargo-hakari until this makes it to nixpkgs-unstable:
+                  # https://github.com/NixOS/nixpkgs/pull/331820
+                  cargo-hakari = prev.cargo-hakari.overrideAttrs (old: rec {
+                    version = "0.9.30";
+                    src = final.fetchFromGitHub {
+                      owner = "guppy-rs";
+                      repo = "guppy";
+                      rev = "cargo-hakari-${version}";
+                      sha256 = "sha256-fwqMV8oTEYqS0Y/IXar1DSZ0Gns1qJ9oGhbdehScrgw=";
+                    };
+                    cargoDeps = old.cargoDeps.overrideAttrs {
+                      inherit src;
+                      outputHash = "sha256-zGW5+5dGHZmIrFo+kj3P2Vvn+IfzQB74pymve+YlpqQ=";
+                    };
+                  });
+                })
+              ];
+            }
+          );
           inherit (pkgs) lib;
           craneLib = (crane.mkLib pkgs).overrideToolchain (
             fenix.packages.${system}.fromToolchainFile {
               file = ./rust-toolchain;
-              sha256 = "4HfRQx49hyuJ8IjBWSty3OXCLOmeaZF5qZAXW6QiQNI=";
+              sha256 = "X4me+hn5B6fbQGQ7DThreB/DqxexAhEQT8VNvW6Pwq4=";
             }
           );
 
@@ -265,11 +284,7 @@
               # Inherit inputs from checks
               checks = self.checks.${system};
               name = "lightning-dev";
-              packages = [
-                pkgs.rust-analyzer
-                pkgs.cargo-nextest
-                pkgs.cargo-hakari
-              ];
+              packages = [ pkgs.rust-analyzer ];
             }
           );
 
