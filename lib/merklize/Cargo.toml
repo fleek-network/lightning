@@ -1,0 +1,76 @@
+[package]
+name = "merklize"
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+blake3 = { version = "1.5", optional = true }
+digest = "0.10.7"
+fxhash = { version = "0.2", optional = true }
+hex.workspace = true
+lru = { version = "0.12.3", optional = true }
+serde.workspace = true
+serde_json.workspace = true
+schemars.workspace = true
+sha2 = { version = "0.10.8", optional = true }
+tiny-keccak = { version = "2.0.2", features = ["keccak"], optional = true }
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+# JMT dependencies
+ics23 = "0.11.0"
+# This `jmt` dependency is referencing the sha on `s/ics23-hashop-on-proofs` of the fork.
+jmt = { git = "https://github.com/snormore/jmt.git", rev = "fa3d97d130febf0b6df6bf3908de6dc80662a136", features = [
+    "ics23",
+], optional = true }
+
+# MPT dependencies
+# These `paritytech` dependencies are referencing the latest sha on `main`.
+hash-db = { git = "https://github.com/paritytech/trie.git", rev = "c3348e4b335443c17586a8b7491ba893cfde76a6", optional = true }
+hash256-std-hasher = { git = "https://github.com/paritytech/trie.git", rev = "c3348e4b335443c17586a8b7491ba893cfde76a6", optional = true }
+reference-trie = { git = "https://github.com/paritytech/trie.git", rev = "c3348e4b335443c17586a8b7491ba893cfde76a6", optional = true }
+trie-db = { git = "https://github.com/paritytech/trie.git", rev = "c3348e4b335443c17586a8b7491ba893cfde76a6", optional = true }
+keccak-hasher = { git = "https://github.com/paritytech/trie.git", rev = "c3348e4b335443c17586a8b7491ba893cfde76a6", optional = true }
+
+# Lightning dependencies
+atomo.workspace = true
+
+[dev-dependencies]
+futures.workspace = true
+rand.workspace = true
+tempfile.workspace = true
+tokio.workspace = true
+
+# Tracing and open telemetry dependencies
+# This is used for tracing examples.
+opentelemetry = "0.24.0"
+opentelemetry-otlp = "0.17.0"
+opentelemetry-semantic-conventions = "0.16.0"
+opentelemetry_sdk = { version = "0.24.1", features = ["tokio", "rt-tokio"] }
+tracing.workspace = true
+tracing-opentelemetry = "0.25.0"
+tracing-subscriber.workspace = true
+
+# Lightning dependencies
+atomo.workspace = true
+atomo-rocks.workspace = true
+merklize-test-utils = { path = "../merklize-test-utils" }
+
+
+[features]
+default = ["hashers", "strategies"]
+hashers = ["hasher-sha2", "hasher-keccak", "hasher-blake3"]
+strategies = ["provider-jmt", "provider-mpt"]
+
+hasher-blake3 = ["dep:blake3"] # Compile with blake3 hashers
+hasher-sha2 = ["dep:sha2"] # Compile with sha2/sha2 hashers
+hasher-keccak = ["dep:tiny-keccak"] # Compile with keccak hashers
+provider-jmt = ["dep:fxhash", "dep:jmt", "dep:lru"] # Compile with JMT provider
+provider-mpt = [
+    "dep:fxhash",
+    "dep:hash-db",
+    "dep:hash256-std-hasher",
+    "dep:reference-trie",
+    "dep:trie-db",
+    "dep:keccak-hasher",
+] # Compile with MPT provider

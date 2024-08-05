@@ -1,0 +1,15 @@
+[package]
+name = "merklize-test-utils"
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+futures.workspace = true
+rand.workspace = true
+tempfile.workspace = true
+tokio.workspace = true
+
+# Lightning dependencies
+atomo.workspace = true
+atomo-rocks.workspace = true
+merklize = { path = "../merklize" }

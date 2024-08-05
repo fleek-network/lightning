@@ -22,12 +22,16 @@ arrayvec = { version = "0.7" }
 autometrics = { version = "0.6", default-features = false, features = ["prometheus", "prometheus-exporter"] }
 axum-3b31131e45eafb45 = { package = "axum", version = "0.6", features = ["headers", "http2", "ws"] }
 axum-ca01ad9e24f5d932 = { package = "axum", version = "0.7", features = ["macros"] }
+axum-core = { version = "0.4", default-features = false, features = ["tracing"] }
 base64-3c51e837cfc5589a = { package = "base64", version = "0.22" }
 base64-594e8ee84c453af0 = { package = "base64", version = "0.13", features = ["alloc"] }
 base64-647d43efb71741da = { package = "base64", version = "0.21" }
 bitflags = { version = "2", default-features = false, features = ["std"] }
+blake2 = { version = "0.10" }
+blake3 = { version = "1" }
 block-buffer = { version = "0.9", default-features = false, features = ["block-padding"] }
 block-padding = { version = "0.3", default-features = false, features = ["std"] }
+borsh = { version = "1", features = ["de_strict_order", "derive"] }
 bytemuck = { version = "1", default-features = false, features = ["extern_crate_alloc"] }
 byteorder = { version = "1", features = ["i128"] }
 bytes = { version = "1", features = ["serde"] }
@@ -48,6 +52,7 @@ crypto-common = { version = "0.1", default-features = false, features = ["getran
 curve25519-dalek-ng = { version = "4", features = ["serde"] }
 data-encoding = { version = "2" }
 der = { version = "0.7", default-features = false, features = ["derive", "oid", "pem", "std"] }
+digest = { version = "0.10", features = ["mac", "oid", "std"] }
 ecdsa = { version = "0.16", features = ["pem", "signing", "std", "verifying"] }
 either = { version = "1" }
 elliptic-curve = { version = "0.13", features = ["ecdh", "hash2curve", "hazmat", "pem", "std"] }
@@ -69,13 +74,13 @@ hashbrown-582f2526e08bb6a0 = { package = "hashbrown", version = "0.14", features
 hashbrown-594e8ee84c453af0 = { package = "hashbrown", version = "0.13" }
 hashbrown-5ef9efb8ec2df382 = { package = "hashbrown", version = "0.12", features = ["raw"] }
 hdrhistogram = { version = "7" }
-hex = { version = "0.4" }
+hex = { version = "0.4", features = ["serde"] }
 hkdf = { version = "0.12", default-features = false, features = ["std"] }
 hmac = { version = "0.12", default-features = false, features = ["reset", "std"] }
 hyper-582f2526e08bb6a0 = { package = "hyper", version = "0.14", features = ["full"] }
 hyper-dff4ba8e3ae991db = { package = "hyper", version = "1", features = ["full"] }
 hyper-rustls = { version = "0.24", features = ["http2"] }
-hyper-util = { version = "0.1", features = ["client-legacy", "server-auto"] }
+hyper-util = { version = "0.1", features = ["client-legacy", "server-auto", "service"] }
 image = { version = "0.24" }
 indexmap-dff4ba8e3ae991db = { package = "indexmap", version = "1", default-features = false, features = ["serde", "std"] }
 indexmap-f595c2ba2a3f28df = { package = "indexmap", version = "2", features = ["serde"] }
@@ -99,6 +104,7 @@ num-traits = { version = "0.2", features = ["i128", "libm"] }
 opentelemetry_api = { version = "0.20", features = ["logs", "metrics"] }
 opentelemetry_sdk = { version = "0.20", features = ["logs", "metrics", "rt-tokio"] }
 p256 = { version = "0.13", features = ["ecdh"] }
+parity-scale-codec = { version = "3", features = ["derive", "max-encoded-len"] }
 plotters = { version = "0.3" }
 portable-atomic = { version = "1", features = ["require-cas"] }
 prettyplease = { version = "0.2", default-features = false, features = ["verbatim"] }
@@ -120,8 +126,10 @@ regex-syntax = { version = "0.8" }
 reqwest = { version = "0.11", features = ["blocking", "json", "rustls-tls"] }
 ring-9067fe90e8c1f593 = { package = "ring", version = "0.17", features = ["std"] }
 ring-986da7b5efc2b80e = { package = "ring", version = "0.16", features = ["std"] }
+ripemd = { version = "0.1" }
 rocksdb = { version = "0.21", features = ["multi-threaded-cf"] }
 ruint = { version = "1", features = ["num-bigint", "primitive-types", "serde"] }
+rustc-hex = { version = "2", default-features = false, features = ["std"] }
 rustls = { version = "0.21", features = ["dangerous_configuration", "quic"] }
 rustls-pki-types = { version = "1", features = ["std"] }
 rustls-webpki = { version = "0.102" }
@@ -139,6 +147,7 @@ smallvec = { version = "1", default-features = false, features = ["const_new", "
 socket2 = { version = "0.5", default-features = false, features = ["all"] }
 spin = { version = "0.9" }
 spki = { version = "0.7", default-features = false, features = ["pem", "std"] }
+subtle = { version = "2", default-features = false, features = ["i128"] }
 syn-f595c2ba2a3f28df = { package = "syn", version = "2", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
 time = { version = "0.3", features = ["formatting", "local-offset", "macros", "parsing"] }
 tokio = { version = "1", features = ["full", "test-util", "tracing"] }
@@ -166,12 +175,16 @@ arrayvec = { version = "0.7" }
 autometrics = { version = "0.6", default-features = false, features = ["prometheus", "prometheus-exporter"] }
 axum-3b31131e45eafb45 = { package = "axum", version = "0.6", features = ["headers", "http2", "ws"] }
 axum-ca01ad9e24f5d932 = { package = "axum", version = "0.7", features = ["macros"] }
+axum-core = { version = "0.4", default-features = false, features = ["tracing"] }
 base64-3c51e837cfc5589a = { package = "base64", version = "0.22" }
 base64-594e8ee84c453af0 = { package = "base64", version = "0.13", features = ["alloc"] }
 base64-647d43efb71741da = { package = "base64", version = "0.21" }
 bitflags = { version = "2", default-features = false, features = ["std"] }
+blake2 = { version = "0.10" }
+blake3 = { version = "1" }
 block-buffer = { version = "0.9", default-features = false, features = ["block-padding"] }
 block-padding = { version = "0.3", default-features = false, features = ["std"] }
+borsh = { version = "1", features = ["de_strict_order", "derive"] }
 bytemuck = { version = "1", default-features = false, features = ["extern_crate_alloc"] }
 byteorder = { version = "1", features = ["i128"] }
 bytes = { version = "1", features = ["serde"] }
@@ -193,6 +206,7 @@ crypto-common = { version = "0.1", default-features = false, features = ["getran
 curve25519-dalek-ng = { version = "4", features = ["serde"] }
 data-encoding = { version = "2" }
 der = { version = "0.7", default-features = false, features = ["derive", "oid", "pem", "std"] }
+digest = { version = "0.10", features = ["mac", "oid", "std"] }
 ecdsa = { version = "0.16", features = ["pem", "signing", "std", "verifying"] }
 either = { version = "1" }
 elliptic-curve = { version = "0.13", features = ["ecdh", "hash2curve", "hazmat", "pem", "std"] }
@@ -214,13 +228,13 @@ hashbrown-582f2526e08bb6a0 = { package = "hashbrown", version = "0.14", features
 hashbrown-594e8ee84c453af0 = { package = "hashbrown", version = "0.13" }
 hashbrown-5ef9efb8ec2df382 = { package = "hashbrown", version = "0.12", features = ["raw"] }
 hdrhistogram = { version = "7" }
-hex = { version = "0.4" }
+hex = { version = "0.4", features = ["serde"] }
 hkdf = { version = "0.12", default-features = false, features = ["std"] }
 hmac = { version = "0.12", default-features = false, features = ["reset", "std"] }
 hyper-582f2526e08bb6a0 = { package = "hyper", version = "0.14", features = ["full"] }
 hyper-dff4ba8e3ae991db = { package = "hyper", version = "1", features = ["full"] }
 hyper-rustls = { version = "0.24", features = ["http2"] }
-hyper-util = { version = "0.1", features = ["client-legacy", "server-auto"] }
+hyper-util = { version = "0.1", features = ["client-legacy", "server-auto", "service"] }
 image = { version = "0.24" }
 indexmap-dff4ba8e3ae991db = { package = "indexmap", version = "1", default-features = false, features = ["serde", "std"] }
 indexmap-f595c2ba2a3f28df = { package = "indexmap", version = "2", features = ["serde"] }
@@ -245,10 +259,13 @@ num-traits = { version = "0.2", features = ["i128", "libm"] }
 opentelemetry_api = { version = "0.20", features = ["logs", "metrics"] }
 opentelemetry_sdk = { version = "0.20", features = ["logs", "metrics", "rt-tokio"] }
 p256 = { version = "0.13", features = ["ecdh"] }
+parity-scale-codec = { version = "3", features = ["derive", "max-encoded-len"] }
+parity-scale-codec-derive = { version = "3", default-features = false, features = ["max-encoded-len"] }
 plotters = { version = "0.3" }
 portable-atomic = { version = "1", features = ["require-cas"] }
 prettyplease = { version = "0.2", default-features = false, features = ["verbatim"] }
 primitive-types = { version = "0.12", features = ["byteorder", "rlp", "rustc-hex", "scale-info", "serde_no_std"] }
+proc-macro-error = { version = "1" }
 proc-macro2 = { version = "1", features = ["span-locations"] }
 prost-5ef9efb8ec2df382 = { package = "prost", version = "0.12", features = ["prost-derive"] }
 prost-a6292c17cd707f01 = { package = "prost", version = "0.11" }
@@ -266,8 +283,10 @@ regex-syntax = { version = "0.8" }
 reqwest = { version = "0.11", features = ["blocking", "json", "rustls-tls"] }
 ring-9067fe90e8c1f593 = { package = "ring", version = "0.17", features = ["std"] }
 ring-986da7b5efc2b80e = { package = "ring", version = "0.16", features = ["std"] }
+ripemd = { version = "0.1" }
 rocksdb = { version = "0.21", features = ["multi-threaded-cf"] }
 ruint = { version = "1", features = ["num-bigint", "primitive-types", "serde"] }
+rustc-hex = { version = "2", default-features = false, features = ["std"] }
 rustls = { version = "0.21", features = ["dangerous_configuration", "quic"] }
 rustls-pki-types = { version = "1", features = ["std"] }
 rustls-webpki = { version = "0.102" }
@@ -285,6 +304,7 @@ smallvec = { version = "1", default-features = false, features = ["const_new", "
 socket2 = { version = "0.5", default-features = false, features = ["all"] }
 spin = { version = "0.9" }
 spki = { version = "0.7", default-features = false, features = ["pem", "std"] }
+subtle = { version = "2", default-features = false, features = ["i128"] }
 syn-dff4ba8e3ae991db = { package = "syn", version = "1", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
 syn-f595c2ba2a3f28df = { package = "syn", version = "2", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
 time = { version = "0.3", features = ["formatting", "local-offset", "macros", "parsing"] }
