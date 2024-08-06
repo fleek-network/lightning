@@ -63,7 +63,7 @@
           inherit (pkgs) lib;
           craneLib = (crane.mkLib pkgs).overrideToolchain (
             fenix.packages.${system}.fromToolchainFile {
-              file = ./rust-toolchain;
+              dir = ./.;
               sha256 = "X4me+hn5B6fbQGQ7DThreB/DqxexAhEQT8VNvW6Pwq4=";
             }
           );
