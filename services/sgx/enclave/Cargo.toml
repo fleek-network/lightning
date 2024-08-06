@@ -1,0 +1,5 @@
+[package]
+name = "fleek-service-sgx-enclave"
+version = "0.1.0"
+
+[dependencies]
