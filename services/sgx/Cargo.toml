@@ -1,0 +1,16 @@
+[package]
+name = "fleek-service-sgx"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+aesm-client = { version = "0.5.0", features = ["sgxs"] }
+enclave-runner = { version = "0.5.0" }
+sgxs-loaders = { version = "0.3.0" }
+futures = "0.3"
+tokio = { version = "0.2", features = ["process"] }
+pin-utils = "0.1"
+
+[[bin]]
+name = "fn-service-3"
+path = "src/bin.rs"
