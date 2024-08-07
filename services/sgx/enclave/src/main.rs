@@ -1,3 +1,5 @@
+mod blockstore;
+
 extern crate bytes;
 
 fn main() -> std::io::Result<()> {
