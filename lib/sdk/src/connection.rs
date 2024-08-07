@@ -10,7 +10,7 @@ use crate::io_util::read_length_delimited;
 
 /// Listener for incoming connections
 pub struct ConnectionListener {
-    rx: mpsc::Receiver<std::io::Result<Connection>>,
+    pub rx: mpsc::Receiver<std::io::Result<Connection>>,
 }
 
 impl ConnectionListener {
