@@ -1,5 +1,6 @@
 use std::future::Future;
 use std::io::Result as IoResult;
+use std::sync::atomic::AtomicBool;
 
 use aesm_client::AesmClient;
 use arrayref::array_ref;
@@ -11,6 +12,7 @@ use sgxs_loaders::isgx::Device as IsgxDevice;
 use crate::blockstore::VerifiedStream;
 
 mod blockstore;
+mod listener;
 
 const ENCLAVE: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/enclave.sgxs"));
 
@@ -51,8 +53,12 @@ impl UsercallExtension for ExternalService {
         >,
     > {
         async move {
-            if addr == "requests" {
-                todo!("impl request listener")
+            if addr == "requests.fleek" {
+                // Bind to request listener. Can only be used once (when enclave starts up).
+                static STARTED: AtomicBool = AtomicBool::new(false);
+                if STARTED.swap(true, std::sync::atomic::Ordering::Relaxed) {
+                    return Ok(Some(Box::new(listener::RequestListener::bind().await) as _));
+                }
             }
 
             // Otherwise, fallback to default behavior of binding to a tcp address.
