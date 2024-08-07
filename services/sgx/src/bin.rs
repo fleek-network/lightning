@@ -8,7 +8,7 @@ use enclave_runner::EnclaveBuilder;
 use futures::FutureExt;
 use sgxs_loaders::isgx::Device as IsgxDevice;
 
-use crate::blockstore::VerifiedContentStream;
+use crate::blockstore::VerifiedStream;
 
 mod blockstore;
 
@@ -26,11 +26,11 @@ impl UsercallExtension for ExternalService {
     ) -> std::pin::Pin<Box<dyn Future<Output = IoResult<Option<Box<dyn AsyncStream>>>> + 'future>>
     {
         async move {
-            if let Some(hash) = addr.strip_suffix(".fleek_blockstore") {
-                // Connect the enclave to a blockstore content-stream
+            // Connect the enclave to a blockstore content-stream
+            if let Some(hash) = addr.strip_suffix(".blockstore.fleek") {
                 let hash = hex::decode(hash).expect("valid blake3 hex");
                 let hash = array_ref![hash, 0, 32];
-                let stream = Box::new(VerifiedContentStream::new(hash).await?);
+                let stream = Box::new(VerifiedStream::new(hash).await?);
                 return Ok(Some(stream as _));
             }
 
