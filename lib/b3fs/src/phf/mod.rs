@@ -1,4 +1,4 @@
-//! An implementation of CHD algorithm borrowed from the `phf` crate and adjusted for our
+//! An implementation of CHD algorithm borrowed mostly from the `phf` crate and adjusted for our
 //! use case.
 
 use crate::directory::BorrowedEntry;

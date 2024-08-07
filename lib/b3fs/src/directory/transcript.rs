@@ -25,15 +25,19 @@ pub fn write_entry_transcript(
 
     buffer.reserve(5 + entry.name.len() + content.len());
     buffer.push(flag);
-    buffer.push((counter & 0xff) as u8);
-    buffer.push(((counter >> 8) & 0xff) as u8);
     buffer.extend_from_slice(entry.name);
+
     // A valid file name never contains the "null" byte. So we can use it as terminator
     // instead of prefixing the length.
     buffer.push(0x00);
     buffer.extend_from_slice(content);
     // Same note as above goes for content of a symbolic link.
     buffer.push(0x00);
+
+    // We put the counter bytes at the end which allows us to use them for
+    // hashing while skipping them when writing on the disk.
+    buffer.push((counter & 0xff) as u8);
+    buffer.push(((counter >> 8) & 0xff) as u8);
 }
 
 /// Hash a buffer written by [`write_entry_hash`] using blake3.
