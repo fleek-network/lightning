@@ -15,10 +15,10 @@ resolver = "2"
 # Add triples corresponding to platforms commonly used by developers here.
 # https://doc.rust-lang.org/rustc/platform-support.html
 platforms = [
-    "x86_64-unknown-linux-gnu",
-    # "x86_64-apple-darwin",
-    "aarch64-apple-darwin",
-    # "x86_64-pc-windows-msvc",
+  "x86_64-unknown-linux-gnu",
+  # "x86_64-apple-darwin",
+  "aarch64-apple-darwin",
+  # "x86_64-pc-windows-msvc",
 ]
 
 # Write out exact versions rather than a semver range. (Defaults to false.)
@@ -43,26 +43,28 @@ third-party = [
 # Crates to remove at the end of computation.
 [final-excludes]
 workspace-members = [
-    # These workspace/lib crates intentionally do not depend on workspace-hack.
-    "affair",
-    "atomo",
-    "atomo-rocks",
-    "better-shutdown",
-    "blake3-tree",
-    "blake3-wasm",
-    "cdk-rust",
-    "fast-sri",
-    "fdi",
-    "fleek-crypto",
-    "fleek-ipld",
-    "fn-sdk",
-    "hp-fixed",
-    "ink-quill",
-    "merklize",
-    "once-ptr",
-    "panic-report",
-    "resolved-pathbuf",
-    "safetensors-ndarray",
-    "simulon",
-    "b3fs",
+  # These workspace/lib crates intentionally do not depend on workspace-hack.
+  "affair",
+  "atomo",
+  "atomo-rocks",
+  "better-shutdown",
+  "blake3-tree",
+  "blake3-wasm",
+  "cdk-rust",
+  "fast-sri",
+  "fdi",
+  "fleek-crypto",
+  "fleek-ipld",
+  "fn-sdk",
+  "hp-fixed",
+  "ink-quill",
+  "merklize",
+  "merklize-test-utils",
+  "once-ptr",
+  "panic-report",
+  "resolved-pathbuf",
+  "safetensors-ndarray",
+  "simulon",
+  "b3fs",
+  "fleek-service-sgx-enclave",
 ]
