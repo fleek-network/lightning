@@ -1,15 +1,11 @@
-use std::io::{BufRead, BufReader, Write};
-use std::net::TcpStream;
+extern crate bytes;
 
 fn main() -> std::io::Result<()> {
-    let mut stream = BufReader::new(TcpStream::connect("cat")?);
+    // - startup local load balancer with a wasm runtime on each thread
+    // - bind to userspace address for incoming requests from handshake:
+    //   - read and verify blockstore content
+    //   - submit content and request params to load balancer
+    //   - wait for response, sign, and send it
 
-    stream.get_mut().write_all(b"Hello, world!\n")?;
-
-    let mut echo = String::new();
-    let mut b = BufReader::new(stream);
-    b.read_line(&mut echo)?;
-    println!("{}", echo);
-
-    Ok(())
+    unimplemented!()
 }
