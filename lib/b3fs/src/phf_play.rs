@@ -1488,17 +1488,26 @@ fn xxx() {
         "bstr-1.9.1",
     ];
 
-    let mut hist = [0u32; 256];
-
     const FIXED_SEED: u64 = 1234567890;
-    let len = 1000;
+    let len = 1400;
+    let mut sum: u64 = 0;
+
+    // this averages to 218 which means we do 218 iteration per key when trying to find a
+    // displacement value.
+
     for (i, key) in SmallRng::seed_from_u64(FIXED_SEED)
         .sample_iter(Standard)
         .enumerate()
     {
         if let Some(state) = try_generate_hash(&entries[..len], key) {
-            dbg!(state.disps);
-            break;
+            let iters = state
+                .disps
+                .iter()
+                .map(|(a, b)| a * len as u32 + b)
+                .sum::<u32>();
+
+            sum += (iters / len as u32) as u64;
+            dbg!(sum / (i as u64 + 1));
         } else {
             eprintln!("None: {i}");
         }
