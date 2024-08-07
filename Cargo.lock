@@ -4505,7 +4505,11 @@ dependencies = [
 name = "fleek-service-sgx-enclave"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "arrayref",
+ "blake3-tree",
  "bytes 1.7.1",
+ "hex",
 ]
 
 [[package]]
