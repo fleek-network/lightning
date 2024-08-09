@@ -12616,6 +12616,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "sgxkit"
+version = "0.1.0"
+dependencies = [
+ "sgxkit-sys",
+]
+
+[[package]]
+name = "sgxkit-sys"
+version = "0.1.0"
+dependencies = [
+ "futures 0.3.30",
+ "tokio",
+]
+
+[[package]]
 name = "sgxs"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
