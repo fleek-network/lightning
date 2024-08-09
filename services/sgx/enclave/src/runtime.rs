@@ -1,13 +1,6 @@
 use bytes::{Bytes, BytesMut};
 use wasmi::{Config, Engine, Linker, Module, Store};
 
-/// Runtime state
-#[derive(Default)]
-struct HostState {
-    input: Bytes,
-    output: BytesMut,
-}
-
 pub fn execute_module(
     module: impl AsRef<[u8]>,
     entry: &str,
@@ -24,7 +17,7 @@ pub fn execute_module(
 
     // Setup linker and define the host functions
     let mut linker = <Linker<HostState>>::new(&engine);
-    fn0::define(&mut store, &mut linker).expect("failed to define host functions");
+    define(&mut store, &mut linker).expect("failed to define host functions");
 
     store.data_mut().input = request.into();
     let module = Module::new(&engine, module.as_ref())?;
@@ -37,35 +30,42 @@ pub fn execute_module(
     Ok(store.data_mut().output.split().freeze())
 }
 
+/// Runtime state
+#[derive(Default)]
+struct HostState {
+    input: Bytes,
+    output: BytesMut,
+}
+
+macro_rules! impl_define {
+    [ $( $module:tt::$name:tt ),+ ] => {
+        /// Define a set of host functions on a given linker and store
+        fn define(
+            store: &mut wasmi::Store<HostState>,
+            linker: &mut wasmi::Linker<HostState>
+        ) -> Result<(), wasmi::errors::LinkerError> {
+            use std::borrow::BorrowMut;
+            linker$(.define(
+                stringify!($module), stringify!($name),
+                wasmi::Func::wrap(store.borrow_mut(), $module::$name),
+            )?)+;
+            Ok(())
+        }
+    };
+}
+
+impl_define![
+    fn0::input_data_size,
+    fn0::input_data_copy,
+    fn0::output_data_append
+];
+
 /// V0 Runtime APIs
 mod fn0 {
     use bytes::BufMut;
     use wasmi::{AsContextMut, Caller, Extern};
 
     use super::HostState;
-
-    /// Implement a function to define a set of host functions on a linker.
-    macro_rules! impl_define {
-        [ $( $module:tt::$name:tt ),+ ] => {
-            pub fn define(
-                store: &mut wasmi::Store<HostState>,
-                linker: &mut wasmi::Linker<HostState>
-            ) -> Result<(), wasmi::errors::LinkerError> {
-                use std::borrow::BorrowMut;
-                linker$(.define(
-                    stringify!($module), stringify!($name),
-                    wasmi::Func::wrap(store.borrow_mut(), $name),
-                )?)+;
-                Ok(())
-            }
-        };
-    }
-
-    impl_define![
-        fn0::output_data_write,
-        fn0::input_data_size,
-        fn0::input_data_copy
-    ];
 
     /// Alias for the caller context
     type Ctx<'a> = Caller<'a, HostState>;
@@ -116,7 +116,7 @@ mod fn0 {
         0
     }
 
-    /// Copy some bytes from memory into the output buffer, appending to previous data.
+    /// Copy some bytes from memory and append them into the output buffer.
     ///
     /// # Parameters
     ///
@@ -129,7 +129,7 @@ mod fn0 {
     /// * `-1`: memory not found
     /// * `-2`: out of bounds
     /// * `-3`: unexpected error
-    pub fn output_data_write(mut caller: Ctx, ptr: u32, len: u32) -> i32 {
+    pub fn output_data_append(mut caller: Ctx, ptr: u32, len: u32) -> i32 {
         let ptr = ptr as usize;
         let len = len as usize;
 
