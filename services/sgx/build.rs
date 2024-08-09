@@ -1,9 +1,9 @@
 use std::path::Path;
 
 /// Heap size for enclave
-const HEAP_SIZE: &str = "0x20000";
+const HEAP_SIZE: &str = "0x400000";
 /// Stack size for enclave
-const STACK_SIZE: &str = "0x20000";
+const STACK_SIZE: &str = "0x400000";
 /// Number of threads to support in enclave
 const THREADS: &str = "6";
 
