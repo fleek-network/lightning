@@ -1,0 +1,15 @@
+[package]
+name = "sgxkit"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sgxkit-sys = { path = "../sgxkit-sys" }
+
+[[example]]
+name = "sgx-wasm-hello"
+path = "./examples/hello.rs"
+
+[[example]]
+name = "sgx-wasm-echo"
+path = "./examples/echo.rs"
