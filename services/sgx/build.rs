@@ -19,7 +19,7 @@ fn main() {
 
     assert!(
         std::process::Command::new("cargo")
-            .args(["build", "--release"])
+            .args(["build", "--release", "--locked"])
             .current_dir("./enclave")
             .env_clear()
             .env("PATH", std::env::var("PATH").unwrap())
