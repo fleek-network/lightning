@@ -7664,6 +7664,7 @@ dependencies = [
  "num-integer",
  "num-iter",
  "num-traits",
+ "once_cell",
  "openssl",
  "openssl-sys",
  "opentelemetry_api",
@@ -7720,7 +7721,6 @@ dependencies = [
  "tokio-tungstenite",
  "tokio-util 0.7.11",
  "toml_datetime",
- "toml_edit 0.20.2",
  "tower",
  "tower-http 0.3.5",
  "tracing",
@@ -13830,8 +13830,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "396e4d48bbb2b7554c944bde63101b5ae446cff6ec4a24227428f15eb72ef338"
 dependencies = [
  "indexmap 2.3.0",
- "serde",
- "serde_spanned",
  "toml_datetime",
  "winnow 0.5.40",
 ]
