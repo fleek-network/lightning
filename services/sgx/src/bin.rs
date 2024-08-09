@@ -29,10 +29,9 @@ impl UsercallExtension for ExternalService {
     {
         async move {
             // Connect the enclave to a blockstore content-stream
-            if let Some(hash) = addr.strip_suffix(".blockstore.fleek") {
+            if let Some(hash) = addr.strip_suffix(".blockstore.fleek.network") {
                 let hash = hex::decode(hash).expect("valid blake3 hex");
-                let hash = array_ref![hash, 0, 32];
-                let stream = Box::new(VerifiedStream::new(hash).await?);
+                let stream = Box::new(VerifiedStream::new(array_ref![hash, 0, 32]).await?);
                 return Ok(Some(stream as _));
             }
 
@@ -53,7 +52,7 @@ impl UsercallExtension for ExternalService {
         >,
     > {
         async move {
-            if addr == "requests.fleek" {
+            if addr == "requests.fleek.network" {
                 // Bind to request listener. Can only be used once (when enclave starts up).
                 static STARTED: AtomicBool = AtomicBool::new(false);
                 if STARTED.swap(true, std::sync::atomic::Ordering::Relaxed) {
@@ -83,7 +82,6 @@ fn main() {
     enclave_builder.dummy_signature();
 
     let enclave = enclave_builder.build(&mut device).unwrap();
-
     if let Err(e) = enclave.run() {
         eprintln!("Error while executing SGX enclave: {e}");
         std::process::exit(1)
