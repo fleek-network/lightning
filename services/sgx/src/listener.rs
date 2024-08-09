@@ -5,6 +5,9 @@ use fn_sdk::connection::{Connection, ConnectionListener};
 use futures::ready;
 use tokio::sync::mpsc::Receiver;
 
+/// Simple wrapper around the sdk channel for incoming connections,
+/// which in turn implement async read + write. Used to expose request
+/// connections to the service.
 pub struct RequestListener {
     rx: Receiver<std::io::Result<Connection>>,
 }
@@ -25,9 +28,7 @@ impl AsyncListener for RequestListener {
         _peer_addr: Option<&mut String>,
     ) -> std::task::Poll<tokio::io::Result<Option<Box<dyn enclave_runner::usercalls::AsyncStream>>>>
     {
-        let res = ready!(self.rx.poll_recv(cx))
-            .transpose()
-            .map(|v| v.map(|c| Box::new(c) as _));
-        Poll::Ready(res)
+        let res = ready!(self.rx.poll_recv(cx));
+        Poll::Ready(res.transpose().map(|v| v.map(|c| Box::new(c) as _)))
     }
 }
