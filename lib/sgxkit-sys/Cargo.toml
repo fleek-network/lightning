@@ -1,0 +1,9 @@
+[package]
+name = "sgxkit-sys"
+version = "0.1.0"
+edition = "2021"
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+tokio.workspace = true
+futures.workspace = true
+

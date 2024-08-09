@@ -118,6 +118,8 @@ Nix (with flakes enabled) can be easily installed with https://github.com/Determ
 curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix | sh -s -- install
 ```
 
+Cache is provided via [garnix.io](https://garnix.io).
+
 ## Development shell
 
 A development environment can be used with:
@@ -143,8 +145,6 @@ nix build .
 ## Shell environment
 
 A shell can also be spawned with the `lightning-node` binary provided in the path:
-
-> Note: until we provide a cachix cache from ci, the node will be built locally before entering the shell
 
 ```bash
 nix shell github:fleek-network/lightning
