@@ -66,4 +66,6 @@ workspace-members = [
   "simulon",
   "b3fs",
   "fleek-service-sgx-enclave",
+  "sgxkit",
+  "sgxkit-sys"
 ]
