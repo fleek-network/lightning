@@ -117,6 +117,7 @@ dependencies = [
  "hex",
  "serde",
  "serde_json",
+ "thiserror",
  "wasmi",
 ]
 
