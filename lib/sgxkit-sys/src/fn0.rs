@@ -25,7 +25,9 @@ macro_rules! _fn0_module_ret {
 }
 
 macro_rules! fn0_module {
-    ( $(     fn0. $name: ident : ( $( $argname: ident : $argtype: ty ),* ) -> $rettype: tt ; )+ ) => {
+    ( $(
+        fn0. $name:ident : ( $( $argname:ident : $argtype:ty ),* ) -> $rettype:tt;
+    )+ ) => {
         #[allow(improper_ctypes)]
         #[cfg(target_family = "wasm")]
         #[link(wasm_import_module = "fn0")]
@@ -140,7 +142,10 @@ macro_rules! fn0_module {
             /// The Fn0CallHandler on the main thread.
             pub trait Fn0CallHandlerProxy {
                 $(
-                fn $name(&mut self, $($argname: $argtype,)*) -> Result<_fn0_module_ret!($rettype), String>;
+                fn $name(
+                    &mut self,
+                    $($argname: $argtype,)*
+                ) -> Result<_fn0_module_ret!($rettype), String>;
                 )*
             }
 
