@@ -1,9 +1,10 @@
-use std::io::Read;
+use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 
 use serde::Deserialize;
 
 mod blockstore;
+mod runtime;
 
 #[derive(Deserialize)]
 struct Request {
@@ -40,7 +41,11 @@ fn handle_connection(conn: &mut TcpStream) -> anyhow::Result<()> {
     // fetch content from blockstore
     let content = blockstore::get_verified_content(&hash)?;
 
+    // run wasm module
+    let response = runtime::execute_module(content, &function, input)?;
+
     // TODO: sign and return data in some format
+    conn.write_all(&response)?;
 
     Ok(())
 }
