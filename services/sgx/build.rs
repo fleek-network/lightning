@@ -1,11 +1,11 @@
 use std::path::Path;
 
 /// Heap size for enclave
-const HEAP_SIZE: &str = "0x400000";
+const HEAP_SIZE: &str = "0x20000000"; // 512 MiB
 /// Stack size for enclave
-const STACK_SIZE: &str = "0x400000";
+const STACK_SIZE: &str = "0x1000000"; // 10 MiB
 /// Number of threads to support in enclave
-const THREADS: &str = "6";
+const THREADS: &str = "8";
 
 /// Output binary path from build
 const CARGO_OUTPUT: &str =
@@ -41,7 +41,7 @@ fn main() {
                 THREADS,
             ])
             .status()
-            .unwrap()
+            .expect("failed to find ftxsgx-elf2sgxs binary")
             .success(),
         "failed to convert elf to sgxs"
     );
