@@ -14,35 +14,39 @@ use tokio::io::{AsyncRead, AsyncWrite};
 trait ReadFut: Future<Output = Result<Vec<u8>, std::io::Error>> + Send + Sync {}
 impl<T: Future<Output = Result<Vec<u8>, std::io::Error>> + Send + Sync> ReadFut for T {}
 
+/// Leading bit for flagging proofs and chunks.
+/// Payloads are either a proof segment (max ~4MiB initial proof),
+/// or a chunk (256KiB), so this bit should be safe to use.
+const LEADING_BIT: u32 = 1 << 31;
+
 /// Owned blockstore request stream. Responsible for writing a verified
 /// stream of blockstore content to `AsyncRead` calls. Drops all writes.
 pub struct VerifiedStream {
     current: usize,
     handle: Arc<ContentHandle>,
     read_fut: Option<Pin<Box<dyn ReadFut>>>,
-    read_buf: BytesMut,
+    write_buf: BytesMut,
 }
 
 impl VerifiedStream {
     pub async fn new(hash: &[u8; 32]) -> Result<Self, std::io::Error> {
-        fn_sdk::blockstore::ContentHandle::load(hash)
-            .await
-            .map(|handle| {
-                let mut read_buf = BytesMut::new();
+        let handle = fn_sdk::blockstore::ContentHandle::load(hash).await?;
 
-                // write starting proof to the buffer
-                let proof = ProofBuf::new(handle.tree.as_ref(), 0);
-                read_buf.put_u8(0);
-                read_buf.put_u32(proof.len() as u32);
-                read_buf.put_slice(proof.as_slice());
+        // TODO: Estimate and validate content length limits, based on the
+        //       number of chunk hashes in the proof.
 
-                Self {
-                    current: 0,
-                    handle: handle.into(),
-                    read_fut: None,
-                    read_buf,
-                }
-            })
+        // Create the buffer and write the starting proof to it right away
+        let mut read_buf = BytesMut::new();
+        let proof = ProofBuf::new(handle.tree.as_ref(), 0);
+        read_buf.put_u32(proof.len() as u32);
+        read_buf.put_slice(proof.as_slice());
+
+        Ok(Self {
+            current: 0,
+            handle: handle.into(),
+            read_fut: None,
+            write_buf: read_buf,
+        })
     }
 }
 
@@ -54,25 +58,26 @@ impl AsyncRead for VerifiedStream {
     ) -> Poll<IoResult<()>> {
         loop {
             // flush as many bytes as possible
-            if !self.read_buf.is_empty() {
-                let len = buf.remaining().min(self.read_buf.len());
-                let bytes = self.read_buf.split_to(len);
+            if !self.write_buf.is_empty() {
+                let len = buf.remaining().min(self.write_buf.len());
+                let bytes = self.write_buf.split_to(len);
                 buf.put_slice(&bytes);
 
                 return Poll::Ready(Ok(()));
             }
 
-            // poll pending block
+            // poll pending read call
             if let Some(fut) = self.read_fut.borrow_mut() {
                 match ready!(fut.poll_unpin(cx)) {
                     Ok(block) => {
-                        // Write block payload
-                        self.read_buf.put_u32(block.len() as u32);
-                        self.read_buf.put_u8(1);
-                        self.read_buf.put_slice(&block);
-
-                        // remove future and loop to flush read buf
+                        // remove future
                         self.read_fut = None;
+
+                        // write chunk payload (with leading bit set)
+                        self.write_buf.put_u32(block.len() as u32 | LEADING_BIT);
+                        self.write_buf.put_slice(&block);
+
+                        // flush read buffer
                         continue;
                     },
                     Err(e) => return Poll::Ready(Err(e)),
@@ -94,9 +99,10 @@ impl AsyncRead for VerifiedStream {
 
             // write next proof payload
             let proof = ProofBuf::resume(self.handle.tree.as_ref(), self.current);
-            self.read_buf.put_u32(proof.len() as u32 + 1);
-            self.read_buf.put_u8(0);
-            self.read_buf.put_slice(proof.as_slice());
+            self.write_buf.put_u32(proof.len() as u32);
+            self.write_buf.put_slice(proof.as_slice());
+
+            continue;
         }
     }
 }
