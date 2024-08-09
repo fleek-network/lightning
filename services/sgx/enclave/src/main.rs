@@ -14,11 +14,12 @@ struct Request {
     #[serde(default = "default_function_name")]
     function: String,
     /// Input data string.
+    #[serde(default)]
     input: String,
 }
 
 fn default_function_name() -> String {
-    "_start".into()
+    "main".into()
 }
 
 fn handle_connection(conn: &mut TcpStream) -> anyhow::Result<()> {
