@@ -66,6 +66,7 @@ workspace-members = [
   "safetensors-ndarray",
   "simulon",
   "b3fs",
+  "fleek-service-sgx",
   "fleek-service-sgx-enclave",
   "sgxkit",
   "sgxkit-sys"

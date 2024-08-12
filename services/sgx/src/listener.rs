@@ -1,9 +1,12 @@
 use std::task::Poll;
 
 use enclave_runner::usercalls::AsyncListener;
-use fn_sdk::connection::{Connection, ConnectionListener};
 use futures::ready;
+use tokio::net::UnixListener;
 use tokio::sync::mpsc::Receiver;
+
+use crate::connection::{Connection, ConnectionListener};
+use crate::IPC_PATH;
 
 /// Simple wrapper around the sdk channel for incoming connections,
 /// which in turn implement async read + write. Used to expose request
@@ -14,7 +17,9 @@ pub struct RequestListener {
 
 impl RequestListener {
     pub async fn bind() -> Self {
-        let ConnectionListener { rx } = fn_sdk::ipc::conn_bind().await;
+        let listener = UnixListener::bind(IPC_PATH.join("conn"))
+            .expect("failed to bind to connection socket listener");
+        let ConnectionListener { rx } = ConnectionListener::new(listener);
         Self { rx }
     }
 }
