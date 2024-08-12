@@ -147,7 +147,7 @@ sha3 = { version = "0.10" }
 simdutf8 = { version = "0.1", features = ["aarch64_neon"] }
 smallvec = { version = "1", default-features = false, features = ["const_new", "union"] }
 socket2 = { version = "0.5", default-features = false, features = ["all"] }
-spin = { version = "0.9", features = ["std"] }
+spin = { version = "0.9" }
 spki = { version = "0.7", default-features = false, features = ["pem", "std"] }
 subtle = { version = "2", default-features = false, features = ["i128"] }
 syn-f595c2ba2a3f28df = { package = "syn", version = "2", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
@@ -305,12 +305,13 @@ sha3 = { version = "0.10" }
 simdutf8 = { version = "0.1", features = ["aarch64_neon"] }
 smallvec = { version = "1", default-features = false, features = ["const_new", "union"] }
 socket2 = { version = "0.5", default-features = false, features = ["all"] }
-spin = { version = "0.9", features = ["std"] }
+spin = { version = "0.9" }
 spki = { version = "0.7", default-features = false, features = ["pem", "std"] }
 subtle = { version = "2", default-features = false, features = ["i128"] }
 syn-dff4ba8e3ae991db = { package = "syn", version = "1", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
 syn-f595c2ba2a3f28df = { package = "syn", version = "2", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
 time = { version = "0.3", features = ["formatting", "local-offset", "macros", "parsing"] }
+time-macros = { version = "0.2", default-features = false, features = ["formatting", "parsing"] }
 tokio = { version = "1", features = ["full", "test-util", "tracing"] }
 tokio-rustls = { version = "0.24" }
 tokio-stream = { version = "0.1", features = ["net", "sync"] }
@@ -332,7 +333,6 @@ zeroize = { version = "1", features = ["zeroize_derive"] }
 arrayvec = { version = "0.7", default-features = false, features = ["serde"] }
 bitflags = { version = "2", default-features = false, features = ["serde"] }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
-once_cell = { version = "1" }
 rustix = { version = "0.38", features = ["fs", "system", "termios"] }
 semver = { version = "1", features = ["serde"] }
 tokio-tungstenite = { version = "0.20", features = ["rustls-tls-webpki-roots"] }
@@ -342,7 +342,6 @@ web-sys = { version = "0.3", default-features = false, features = ["Worker"] }
 arrayvec = { version = "0.7", default-features = false, features = ["serde"] }
 bitflags = { version = "2", default-features = false, features = ["serde"] }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
-once_cell = { version = "1" }
 rustix = { version = "0.38", features = ["fs", "system", "termios"] }
 semver = { version = "1", features = ["serde"] }
 tokio-tungstenite = { version = "0.20", features = ["rustls-tls-webpki-roots"] }
@@ -355,7 +354,6 @@ core-foundation = { version = "0.9" }
 core-foundation-sys = { version = "0.8" }
 core-graphics-types = { version = "0.1" }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
-once_cell = { version = "1" }
 rustix = { version = "0.38", features = ["fs", "system", "termios"] }
 security-framework-sys = { version = "2" }
 semver = { version = "1", features = ["serde"] }
@@ -369,7 +367,6 @@ core-foundation = { version = "0.9" }
 core-foundation-sys = { version = "0.8" }
 core-graphics-types = { version = "0.1" }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
-once_cell = { version = "1" }
 rustix = { version = "0.38", features = ["fs", "system", "termios"] }
 security-framework-sys = { version = "2" }
 semver = { version = "1", features = ["serde"] }
