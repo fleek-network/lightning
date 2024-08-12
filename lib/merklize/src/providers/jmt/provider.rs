@@ -1,8 +1,9 @@
+use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 
-use anyhow::{anyhow, Result};
-use atomo::batch::Operation;
+use anyhow::Result;
+use atomo::batch::{BoxedVec, Operation, VerticalBatch};
 use atomo::{
     AtomoBuilder,
     SerdeBackend,
@@ -78,8 +79,8 @@ where
             .with_table::<KeyHash, StateKey>(KEYS_TABLE_NAME)
     }
     /// Get the state root hash of the state tree.
-    /// Since we need to read the state tree to get the proof, a table selector execution context is
-    /// needed to ensure consistency.
+    /// Since we need to read the state, a table selector execution context is needed for
+    /// consistency.
     fn get_state_root(ctx: &TableSelector<Self::Storage, Self::Serde>) -> Result<StateRootHash> {
         let span = trace_span!("get_state_root");
         let _enter = span.enter();
@@ -95,8 +96,8 @@ where
 
     /// Get an existence proof for the given key hash, if it is present in the state tree, or
     /// non-existence proof if it is not present.
-    /// Since we need to read the state tree to get the proof, a table selector execution context is
-    /// needed to ensure consistency.
+    /// Since we need to read the state, a table selector execution context is needed for
+    /// consistency.
     fn get_state_proof(
         ctx: &TableSelector<Self::Storage, Self::Serde>,
         table: &str,
@@ -127,9 +128,15 @@ where
 
     /// Apply the state tree changes based on the state changes in the atomo batch. This will update
     /// the state tree to reflect the changes in the atomo batch.
-    /// Since we need to read the state tree to get the proof, a table selector execution context is
-    /// needed to ensure consistency.
-    fn update_state_tree(ctx: &TableSelector<Self::Storage, Self::Serde>) -> Result<()> {
+    /// Since we need to read the state, a table selector execution context is needed for
+    /// consistency.
+    fn update_state_tree<I>(
+        ctx: &TableSelector<Self::Storage, Self::Serde>,
+        batch: HashMap<String, I>,
+    ) -> Result<()>
+    where
+        I: Iterator<Item = (BoxedVec, Operation)>,
+    {
         let span = trace_span!("update_state_tree");
         let _enter = span.enter();
 
@@ -139,32 +146,19 @@ where
         let adapter = Adapter::new(ctx, nodes_table.clone(), keys_table.clone());
         let tree = jmt::JellyfishMerkleTree::<_, SimpleHasherWrapper<H>>::new(&adapter);
 
-        let mut table_name_by_id = FxHashMap::default();
-        for (i, table) in ctx.tables().iter().enumerate() {
-            let table_id: TableId = i.try_into().unwrap();
-            let table_name = table.name.to_string();
-            table_name_by_id.insert(table_id, table_name);
-        }
-
         // Build a jmt value set (batch) from the atomo batch.
         let mut value_set: Vec<(jmt::KeyHash, Option<jmt::OwnedValue>)> = Default::default();
         {
             let span = trace_span!("build_value_set");
             let _enter = span.enter();
 
-            for (table_id, changes) in ctx.batch().into_raw().iter().enumerate() {
-                let table_id: TableId = table_id.try_into()?;
-                let table_name = table_name_by_id
-                    .get(&table_id)
-                    .ok_or(anyhow!("Table with index {} not found", table_id))?
-                    .as_str();
-
-                if table_name == NODES_TABLE_NAME || table_name == KEYS_TABLE_NAME {
+            for (table, changes) in batch {
+                if table == NODES_TABLE_NAME || table == KEYS_TABLE_NAME {
                     continue;
                 }
 
-                for (key, operation) in changes.iter() {
-                    let state_key = StateKey::new(table_name, key.to_vec());
+                for (key, operation) in changes {
+                    let state_key = StateKey::new(&table, key.to_vec());
                     let key_hash = jmt::KeyHash(state_key.hash::<S, H>().into());
 
                     match operation {
@@ -247,6 +241,43 @@ where
                 nodes_table.insert(node_key, node);
             }
         }
+
+        Ok(())
+    }
+
+    fn clear_state_tree(
+        db: &mut atomo::Atomo<atomo::UpdatePerm, Self::Storage, Self::Serde>,
+    ) -> Result<()> {
+        let span = trace_span!("clear_state_tree");
+        let _enter = span.enter();
+
+        let tables = db.tables();
+        let table_id_by_name = tables
+            .iter()
+            .enumerate()
+            .map(|(tid, table)| (table.clone(), tid as TableId))
+            .collect::<FxHashMap<_, _>>();
+
+        let nodes_table_id = *table_id_by_name.get(NODES_TABLE_NAME).unwrap();
+        let keys_table_id = *table_id_by_name.get(KEYS_TABLE_NAME).unwrap();
+
+        let mut batch = VerticalBatch::new(tables.len());
+        let storage = db.get_storage_backend_unsafe();
+
+        // Remove nodes table entries.
+        let nodes_table_batch = batch.get_mut(nodes_table_id as usize);
+        for key in storage.keys(nodes_table_id) {
+            nodes_table_batch.insert(key, Operation::Remove);
+        }
+
+        // Remove root table entries.
+        let keys_table_batch = batch.get_mut(keys_table_id as usize);
+        for key in storage.keys(keys_table_id) {
+            keys_table_batch.insert(key, Operation::Remove);
+        }
+
+        // Commit the batch.
+        storage.commit(batch);
 
         Ok(())
     }

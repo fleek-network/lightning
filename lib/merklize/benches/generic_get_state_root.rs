@@ -219,7 +219,7 @@ fn generic_bench_get_state_root<C: StorageBackendConstructor, M>(
             data_table.insert(format!("key{i}"), format!("value{i}"));
         }
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
 
     b.iter(|| {

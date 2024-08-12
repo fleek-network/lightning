@@ -30,7 +30,7 @@ fn test_mpt_update_state_tree_with_updates() {
 
         table.insert("key1".to_string(), "value1".to_string());
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
 
     // Check storage.
@@ -46,7 +46,7 @@ fn test_mpt_update_state_tree_with_updates() {
 
         table.insert("key2".to_string(), "value2".to_string());
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
 
     // Check storage.
@@ -62,7 +62,7 @@ fn test_mpt_update_state_tree_with_updates() {
 
         table.remove("key2".to_string());
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
 
     // Check storage.
@@ -78,7 +78,7 @@ fn test_mpt_update_state_tree_with_updates() {
 
         table.insert("key2".to_string(), "other-value2".to_string());
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
 
     // Check storage.
@@ -94,7 +94,7 @@ fn test_mpt_update_state_tree_with_updates() {
 
         table.insert("key1".to_string(), "value1".to_string());
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
 
     // Check storage.
@@ -127,7 +127,7 @@ fn test_mpt_update_state_tree_with_no_changes() {
     db.run(|ctx| {
         // Do nothing.
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
 
     // Check storage.
@@ -143,7 +143,7 @@ fn test_mpt_update_state_tree_with_no_changes() {
 
         table.insert("key2".to_string(), "value2".to_string());
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
 
     // Check storage.
@@ -197,7 +197,7 @@ fn test_mpt_get_state_root_with_updates() {
 
         table.insert("key1".to_string(), "value1".to_string());
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
 
     // Check the state root hash.
@@ -206,13 +206,17 @@ fn test_mpt_get_state_root_with_updates() {
     assert_ne!(initial_state_root, new_state_root);
     let old_state_root = new_state_root;
 
+    // Check the rebuilt state root hash.
+    // TODO(snormore): Fix this.
+    // assert_eq!(M::build_state_root(&mut db).unwrap(), new_state_root);
+
     // Insert another value.
     db.run(|ctx| {
         let mut table = ctx.get_table::<String, String>("data");
 
         table.insert("key2".to_string(), "value2".to_string());
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
 
         // Check that we can get the current root hash before the commit happens.
         let state_root = M::get_state_root(ctx).unwrap();
@@ -232,7 +236,7 @@ fn test_mpt_get_state_root_with_updates() {
 
         table.remove("key2".to_string());
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
 
     // Check the state root hash.
@@ -247,7 +251,7 @@ fn test_mpt_get_state_root_with_updates() {
 
         table.remove("key2".to_string());
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
 
     // Check the state root hash.
@@ -261,7 +265,7 @@ fn test_mpt_get_state_root_with_updates() {
 
         table.insert("key2".to_string(), "other-value2".to_string());
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
 
     // Check the state root hash.
@@ -270,13 +274,17 @@ fn test_mpt_get_state_root_with_updates() {
     assert_ne!(old_state_root, new_state_root);
     let old_state_root = new_state_root;
 
+    // Check the rebuilt state root hash.
+    // TODO(snormore): Fix this.
+    // assert_eq!(M::build_state_root(&mut db).unwrap(), new_state_root);
+
     // Insert existing key with same value.
     db.run(|ctx| {
         let mut table = ctx.get_table::<String, String>("data");
 
         table.insert("key1".to_string(), "value1".to_string());
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
 
     // Check the state root hash.
@@ -290,7 +298,7 @@ fn test_mpt_get_state_root_with_updates() {
 
         table.insert("key1".to_string(), "other-value1".to_string());
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
 
     // Check the state root hash.
@@ -304,12 +312,70 @@ fn test_mpt_get_state_root_with_updates() {
 
         table.remove("unknown".to_string());
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
 
     // Check the state root hash.
     let new_state_root = query.run(|ctx| M::get_state_root(ctx).unwrap());
     assert_eq!(old_state_root, new_state_root);
+
+    // Check the rebuilt state root hash.
+    // TODO(snormore): Fix this.
+    // assert_eq!(M::build_state_root(&mut db).unwrap(), new_state_root);
+}
+
+#[test]
+fn test_mpt_clear_and_rebuild_state_tree() {
+    type S = DefaultSerdeBackend;
+    type H = Sha256Hasher;
+    type M = MptMerklizeProvider<InMemoryStorage, S, H>;
+
+    let builder = AtomoBuilder::new(InMemoryStorage::default());
+    let mut db = M::with_tables(builder.with_table::<String, String>("data"))
+        .build()
+        .unwrap();
+    let query = db.query();
+
+    // Insert a value.
+    db.run(|ctx| {
+        let mut table = ctx.get_table::<String, String>("data");
+
+        table.insert("key1".to_string(), "value1".to_string());
+
+        M::update_state_tree_from_context(ctx).unwrap();
+    });
+
+    // Get the state root hash.
+    let state_root = query.run(|ctx| M::get_state_root(ctx).unwrap());
+
+    // Rebuild the state tree.
+    M::clear_and_rebuild_state_tree(&mut db).unwrap();
+
+    // Check that the state root hash has not changed.
+    let new_state_root = query.run(|ctx| M::get_state_root(ctx).unwrap());
+    assert_eq!(state_root, new_state_root);
+    let state_root = new_state_root;
+
+    // Insert another value.
+    db.run(|ctx| {
+        let mut table = ctx.get_table::<String, String>("data");
+
+        table.insert("key2".to_string(), "value2".to_string());
+
+        M::update_state_tree_from_context(ctx).unwrap();
+    });
+
+    // Check that the state root hash has changed.
+    let new_state_root = query.run(|ctx| M::get_state_root(ctx).unwrap());
+    assert_ne!(state_root, new_state_root);
+    let state_root = new_state_root;
+
+    // Rebuild the state tree.
+    M::clear_and_rebuild_state_tree(&mut db).unwrap();
+
+    // Check that the state root hash has not changed.
+    let new_state_root = query.run(|ctx| M::get_state_root(ctx).unwrap());
+    assert_eq!(state_root, new_state_root);
 }
 
 #[test]
@@ -341,7 +407,7 @@ fn test_mpt_get_state_proof_of_membership() {
         table.insert("key2".to_string(), "value2".to_string());
         table.insert("key3".to_string(), "value3".to_string());
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
 
     // Get state root for proof verification.
@@ -372,7 +438,7 @@ fn test_mpt_get_state_proof_of_membership() {
 
         table.remove("key2".to_string());
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
 
     // Get state root for proof verification.

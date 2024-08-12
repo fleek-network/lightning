@@ -14,7 +14,7 @@ use crate::providers::jmt::JmtMerklizeProvider;
 use crate::{MerklizeProvider, StateRootHash};
 
 #[test]
-fn test_jmt_update_state_tree_with_updates() {
+fn test_jmt_update_state_tree_from_context_with_updates() {
     type S = DefaultSerdeBackend;
     type H = Sha256Hasher;
     type M = JmtMerklizeProvider<InMemoryStorage, S, H>;
@@ -37,7 +37,7 @@ fn test_jmt_update_state_tree_with_updates() {
 
         table.insert("key1".to_string(), "value1".to_string());
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
 
     // Check storage.
@@ -53,7 +53,7 @@ fn test_jmt_update_state_tree_with_updates() {
 
         table.insert("key2".to_string(), "value2".to_string());
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
 
     // Check storage.
@@ -69,7 +69,7 @@ fn test_jmt_update_state_tree_with_updates() {
 
         table.insert("key3".to_string(), "value3".to_string());
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
 
     // Check storage.
@@ -85,7 +85,7 @@ fn test_jmt_update_state_tree_with_updates() {
 
         table.remove("key2".to_string());
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
 
     // Check storage.
@@ -101,7 +101,7 @@ fn test_jmt_update_state_tree_with_updates() {
 
         table.insert("key2".to_string(), "other-value2".to_string());
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
 
     // Check storage.
@@ -117,7 +117,7 @@ fn test_jmt_update_state_tree_with_updates() {
 
         table.insert("key1".to_string(), "value1".to_string());
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
 
     // Check storage.
@@ -133,7 +133,7 @@ fn test_jmt_update_state_tree_with_updates() {
 
         table.insert("key4".to_string(), "value4".to_string());
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
 
     // Check storage.
@@ -145,7 +145,7 @@ fn test_jmt_update_state_tree_with_updates() {
 }
 
 #[test]
-fn test_jmt_update_state_tree_with_no_changes() {
+fn test_jmt_update_state_tree_from_context_with_no_changes() {
     type S = DefaultSerdeBackend;
     type H = Sha256Hasher;
     type M = JmtMerklizeProvider<InMemoryStorage, S, H>;
@@ -166,7 +166,7 @@ fn test_jmt_update_state_tree_with_no_changes() {
     db.run(|ctx| {
         // Do nothing.
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
 
     // Check storage.
@@ -182,7 +182,7 @@ fn test_jmt_update_state_tree_with_no_changes() {
 
         table.insert("key2".to_string(), "value2".to_string());
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
 
     // Check storage.
@@ -255,9 +255,13 @@ fn test_jmt_get_state_root_with_updates() {
 
         table.insert("key1".to_string(), "value1".to_string());
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
     let state_root = assert_state_root_changed(&query, state_root);
+
+    // Check the rebuilt state root hash.
+    // TODO(snormore): Fix this.
+    // assert_eq!(M::build_state_root(&mut db).unwrap(), state_root);
 
     // Insert another value and check that the state root has changed.
     db.run(|ctx| {
@@ -265,7 +269,7 @@ fn test_jmt_get_state_root_with_updates() {
 
         table.insert("key2".to_string(), "value2".to_string());
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
     let state_root = assert_state_root_changed(&query, state_root);
 
@@ -275,9 +279,13 @@ fn test_jmt_get_state_root_with_updates() {
 
         table.remove("key2".to_string());
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
     let state_root = assert_state_root_changed(&query, state_root);
+
+    // Check the rebuilt state root hash.
+    // TODO(snormore): Fix this.
+    // assert_eq!(M::build_state_root(&mut db).unwrap(), state_root);
 
     // Insert removed key with different value and check that the state root has changed.
     db.run(|ctx| {
@@ -285,7 +293,7 @@ fn test_jmt_get_state_root_with_updates() {
 
         table.insert("key2".to_string(), "other-value2".to_string());
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
     let state_root = assert_state_root_changed(&query, state_root);
 
@@ -295,7 +303,7 @@ fn test_jmt_get_state_root_with_updates() {
 
         table.insert("key1".to_string(), "value1".to_string());
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
     let state_root = assert_state_root_unchanged(&query, state_root);
 
@@ -305,7 +313,7 @@ fn test_jmt_get_state_root_with_updates() {
 
         table.insert("key1".to_string(), "other-value1".to_string());
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
     let state_root = assert_state_root_changed(&query, state_root);
 
@@ -315,9 +323,14 @@ fn test_jmt_get_state_root_with_updates() {
 
         table.remove("unknown".to_string());
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
-    assert_state_root_unchanged(&query, state_root);
+    let state_root = assert_state_root_unchanged(&query, state_root);
+
+    // Check the rebuilt state root hash.
+    // TODO(snormore): Fix this.
+    println!("state_root: {}", state_root);
+    // assert_eq!(M::build_state_root(&mut db).unwrap(), state_root);
 }
 
 #[test]
@@ -346,7 +359,7 @@ fn test_jmt_get_state_proof_of_membership() {
 
         table.insert("key1".to_string(), "value1".to_string());
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
 
     // Get state root for proof verification.

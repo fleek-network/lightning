@@ -243,7 +243,7 @@ fn generic_merklize_bench_commit_changes<C: StorageBackendConstructor, M>(
                 data_table.insert(format!("key{i}"), format!("value{i}"));
             }
 
-            M::update_state_tree(ctx).unwrap();
+            M::update_state_tree_from_context(ctx).unwrap();
         });
     })
 }

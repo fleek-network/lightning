@@ -143,7 +143,7 @@ fn test_generic<
             data_table.insert(format!("key{i}"), format!("value{i}"));
         }
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
 
     // Check data via reader.
@@ -201,7 +201,7 @@ fn test_generic<
             data_table.insert(format!("other{i}"), format!("value{i}"));
         }
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
 
     // Check state root.
@@ -218,7 +218,7 @@ fn test_generic<
         data_table.remove("other5".to_string());
         data_table.remove("other9".to_string());
 
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
 
     // Check state root.

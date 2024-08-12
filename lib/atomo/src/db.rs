@@ -76,6 +76,16 @@ impl<O, B: StorageBackend, S: SerdeBackend> Atomo<O, B, S> {
     {
         self.inner.resolve::<K, V>(name)
     }
+
+    /// Returns the list of open tables.
+    #[inline]
+    pub fn tables(&self) -> Vec<String> {
+        self.inner
+            .tables
+            .iter()
+            .map(|table| table.name.clone())
+            .collect()
+    }
 }
 
 impl<B: StorageBackend, S: SerdeBackend> Atomo<QueryPerm, B, S> {

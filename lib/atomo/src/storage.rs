@@ -31,6 +31,9 @@ pub trait StorageBackend {
     /// Get the value associated with the given key from the provided table.
     fn get(&self, tid: u8, key: &[u8]) -> Option<Vec<u8>>;
 
+    /// Get all of the key/value pairs from the provided table.
+    fn get_all(&self, tid: u8) -> Box<dyn Iterator<Item = (BoxedVec, BoxedVec)> + '_>;
+
     /// Returns true if the table contains the provided key.
     fn contains(&self, tid: u8, key: &[u8]) -> bool;
 
@@ -87,6 +90,15 @@ impl StorageBackend for InMemoryStorage {
     #[inline]
     fn get(&self, tid: u8, key: &[u8]) -> Option<Vec<u8>> {
         self.0[tid as usize].get(key).map(|v| v.to_vec())
+    }
+
+    #[inline]
+    fn get_all(&self, tid: u8) -> Box<dyn Iterator<Item = (BoxedVec, BoxedVec)> + '_> {
+        Box::new(
+            self.0[tid as usize]
+                .iter()
+                .map(|item| (item.key().clone(), item.value().clone())),
+        )
     }
 
     #[inline]

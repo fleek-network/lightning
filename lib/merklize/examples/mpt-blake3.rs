@@ -29,7 +29,7 @@ fn run<B: StorageBackendConstructor, M: MerklizeProvider<Storage = B::Storage>>(
         table.insert("key".to_string(), "value".to_string());
 
         // Update state tree.
-        M::update_state_tree(ctx).unwrap();
+        M::update_state_tree_from_context(ctx).unwrap();
     });
 
     // Open reader context, read the data, get the state root hash, and get a proof of existence.

@@ -129,8 +129,12 @@ impl<B: StorageBackend, S: SerdeBackend> TableSelector<B, S> {
     }
 
     #[inline]
-    pub fn tables(&self) -> Vec<TableMeta> {
-        self.atomo.tables.clone()
+    pub fn tables(&self) -> Vec<String> {
+        self.atomo
+            .tables
+            .iter()
+            .map(|table| table.name.clone())
+            .collect()
     }
 
     /// Return the table reference for the table with the provided name and K, V type.

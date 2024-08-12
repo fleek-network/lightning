@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use atomo::batch::BoxedVec;
 use atomo::{InMemoryStorage, StorageBackend, StorageBackendConstructor};
 use atomo_rocks::{Options, RocksBackend, RocksBackendBuilder};
 
@@ -127,6 +128,13 @@ impl StorageBackend for AtomoStorage {
         match &self {
             AtomoStorage::InMemory(storage) => storage.get(tid, key),
             AtomoStorage::RocksDb(storage) => storage.get(tid, key),
+        }
+    }
+
+    fn get_all(&self, tid: u8) -> Box<dyn Iterator<Item = (BoxedVec, BoxedVec)> + '_> {
+        match &self {
+            AtomoStorage::InMemory(storage) => storage.get_all(tid),
+            AtomoStorage::RocksDb(storage) => storage.get_all(tid),
         }
     }
 

@@ -5,7 +5,7 @@ use std::fs::{self};
 use std::path::PathBuf;
 
 use anyhow::Result;
-use atomo::batch::Operation;
+use atomo::batch::{BoxedVec, Operation};
 use atomo::{AtomoBuilder, DefaultSerdeBackend, StorageBackend, StorageBackendConstructor};
 use fxhash::FxHashMap;
 /// Re-export of [`rocksdb::Options`].
@@ -216,6 +216,19 @@ impl StorageBackend for RocksBackend {
                     .0
             })
             .collect()
+    }
+
+    fn get_all(&self, tid: u8) -> Box<dyn Iterator<Item = (BoxedVec, BoxedVec)> + '_> {
+        let cf = self.db.cf_handle(&self.columns[tid as usize]).unwrap();
+        Box::new(
+            self.db
+                .iterator_cf(&cf, rocksdb::IteratorMode::Start)
+                .map(|res| {
+                    let (key, value) =
+                        res.expect("failed to get entry from column family iterator");
+                    (key, value)
+                }),
+        )
     }
 
     fn get(&self, tid: u8, key: &[u8]) -> Option<Vec<u8>> {

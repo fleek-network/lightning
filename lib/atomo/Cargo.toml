@@ -21,6 +21,6 @@ im = "15.1"
 once-ptr = "0.1"
 
 [features]
-default = [ "reliable-snapshot" ]
+default = ["reliable-snapshot"]
 reliable-snapshot = []
 fuzz = []
