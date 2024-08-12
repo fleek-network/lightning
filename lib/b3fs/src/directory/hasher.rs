@@ -122,7 +122,7 @@ impl DirectoryHasher {
             // file name.
             if self.counter > 0 {
                 let end = 3 + self.last_filename_size;
-                let prev_name = &self.transcript_buffer[3..end];
+                let prev_name = &self.transcript_buffer[1..end];
 
                 if prev_name == entry.name {
                     return Err(Error::FilenameNotUnique);

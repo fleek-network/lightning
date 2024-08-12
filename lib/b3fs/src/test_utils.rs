@@ -3,17 +3,17 @@ use crate::directory::hasher::DirectoryHasher;
 use crate::directory::transcript::{hash_transcript, write_entry_transcript};
 
 /// Returns the `i`-th ascii character starting from `A`.
+///
+/// `name(a) < name(b) for a < b`
 pub fn name(mut i: usize) -> String {
-    const CHARS: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    let mut bytes = Vec::new();
+    const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    let mut bytes = vec![b'A'; 14];
+    let mut j = bytes.len();
     while i > 0 {
-        bytes.push(CHARS.as_bytes()[i % CHARS.len()]);
+        j -= 1;
+        bytes[j] = CHARS[i % CHARS.len()];
         i /= CHARS.len();
     }
-    while bytes.len() < 5 {
-        bytes.push(CHARS.as_bytes()[0]);
-    }
-    bytes.reverse();
     String::from_utf8(bytes).unwrap()
 }
 
