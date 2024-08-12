@@ -4,19 +4,28 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-fn-sdk = { path = "../../lib/sdk" }
+# project libs
 blake3-tree = { path = "../../lib/blake3-tree" }
 
+# primitives
 tokio.workspace = true
 bytes.workspace = true
 futures.workspace = true
 hex = "0.4"
 arrayref = "0.3"
 
+# deps for vendored sdk code
+anyhow.workspace = true
+serde.workspace = true
+serde_cbor = "0.11.2"
+serde-big-array = "0.5"
+url = "2.5"
+arrayvec = "0.7"
+
+# deps for running sgx enclaves
 aesm-client = { version = "0.6.0", features = ["sgxs"] }
 enclave-runner = { version = "0.6.0" }
 sgxs-loaders = { version = "0.4.0" }
-lightning-workspace-hack.workspace = true
 
 [[bin]]
 name = "fn-service-3"

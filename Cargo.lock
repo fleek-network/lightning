@@ -4711,16 +4711,20 @@ name = "fleek-service-sgx"
 version = "0.1.0"
 dependencies = [
  "aesm-client",
+ "anyhow",
  "arrayref",
+ "arrayvec",
  "blake3-tree",
  "bytes 1.7.1",
  "enclave-runner",
- "fn-sdk",
  "futures 0.3.30",
  "hex",
- "lightning-workspace-hack",
+ "serde",
+ "serde-big-array",
+ "serde_cbor",
  "sgxs-loaders",
  "tokio",
+ "url",
 ]
 
 [[package]]
