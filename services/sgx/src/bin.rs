@@ -1,9 +1,10 @@
 use std::future::Future;
 use std::io::Result as IoResult;
+use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
+use std::sync::LazyLock;
 
 use aesm_client::AesmClient;
-use arrayref::array_ref;
 use enclave_runner::usercalls::{AsyncStream, UsercallExtension};
 use enclave_runner::EnclaveBuilder;
 use futures::FutureExt;
@@ -12,7 +13,19 @@ use sgxs_loaders::isgx::Device as IsgxDevice;
 use crate::blockstore::VerifiedStream;
 
 mod blockstore;
+mod connection;
 mod listener;
+
+static BLOCKSTORE_PATH: LazyLock<PathBuf> = LazyLock::new(|| {
+    std::env::var("BLOCKSTORE_PATH")
+        .expect("BLOCKSTORE_PATH env variable not found")
+        .into()
+});
+static IPC_PATH: LazyLock<PathBuf> = LazyLock::new(|| {
+    std::env::var("IPC_PATH")
+        .expect("IPC_PATH env variable not found")
+        .into()
+});
 
 const ENCLAVE: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/enclave.sgxs"));
 
@@ -31,7 +44,8 @@ impl UsercallExtension for ExternalService {
             // Connect the enclave to a blockstore content-stream
             if let Some(hash) = addr.strip_suffix(".blockstore.fleek.network") {
                 let hash = hex::decode(hash).expect("valid blake3 hex");
-                let stream = Box::new(VerifiedStream::new(array_ref![hash, 0, 32]).await?);
+                let stream =
+                    Box::new(VerifiedStream::new(arrayref::array_ref![hash, 0, 32]).await?);
                 return Ok(Some(stream as _));
             }
 
@@ -68,22 +82,22 @@ impl UsercallExtension for ExternalService {
 }
 
 fn main() {
-    fn_sdk::ipc::init_from_env();
-
     let mut device = IsgxDevice::new()
         .unwrap()
         .einittoken_provider(AesmClient::new())
         .build();
 
     let mut enclave_builder = EnclaveBuilder::new_from_memory(ENCLAVE);
-    enclave_builder.usercall_extension(ExternalService);
-
     // TODO: figure out a flow to generate a signature for the compiled enclave and committing it.
     enclave_builder.dummy_signature();
-
+    enclave_builder.usercall_extension(ExternalService);
     let enclave = enclave_builder.build(&mut device).unwrap();
-    if let Err(e) = enclave.run() {
-        eprintln!("Error while executing SGX enclave: {e}");
-        std::process::exit(1)
-    }
+
+    enclave
+        .run()
+        .map_err(|e| {
+            println!("Error while executing SGX enclave.\n{}", e);
+            std::process::exit(1)
+        })
+        .unwrap();
 }
