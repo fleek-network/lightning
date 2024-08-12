@@ -67,4 +67,6 @@ workspace-members = [
   "b3fs",
   "fleek-service-sgx",
   "fleek-service-sgx-enclave",
+  "sgxkit",
+  "sgxkit-sys"
 ]
