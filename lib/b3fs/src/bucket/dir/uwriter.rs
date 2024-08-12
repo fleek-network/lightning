@@ -1,15 +1,14 @@
 use crate::bucket::Bucket;
-use crate::directory::{DirectoryHasher, OwnedEntry};
+use crate::directory::OwnedEntry;
 
-/// A trusted
-pub struct DirWriter {
-    hasher: DirectoryHasher,
-}
+pub struct UntrustedDirWriter {}
 
-impl DirWriter {
+impl UntrustedDirWriter {
     pub fn new(bucket: &Bucket) -> Self {
         todo!()
     }
+
+    pub async fn feed_proof(&mut self, proof: &[u8]) {}
 
     pub async fn insert(&mut self, entry: OwnedEntry) {}
 }

@@ -50,59 +50,6 @@ pub mod directory;
 pub mod verifier;
 
 pub mod phf;
-pub mod phf_play;
 
 #[cfg(test)]
 pub mod test_utils;
-
-#[test]
-fn xss() {
-    fn human_size(mut s: usize) -> String {
-        let mut r = String::new();
-        for unit in ["B", "KB", "MB", "GB"] {
-            let n = s & ((1 << 10) - 1);
-            s >>= 10;
-            if n > 0 {
-                if r.is_empty() {
-                    r = format!("{n}{unit}");
-                } else {
-                    r = format!("{n}{unit} {r}");
-                }
-            }
-        }
-        if s > 0 {
-            if r.is_empty() {
-                r = format!("{s}TB");
-            } else {
-                r = format!("{s}TB {r}");
-            }
-        }
-        r
-    }
-
-    println!("Tree\t| Entries\t| Max File Size");
-    for size in [
-        96,
-        128,
-        256,
-        512,
-        1024,
-        4 * 1024,
-        8 * 1024,
-        16 * 1024,
-        32 * 1024,
-        64 * 1024,
-        256 * 1024,
-        512 * 1024,
-        1024 * 1024,
-        4 * 1024 * 1024,
-        8 * 1024 * 1024,
-        1024 * 1024 * 1024,
-    ] {
-        let hashes = size / 32;
-        let entries = (hashes + 1) / 2;
-        let fs = entries << 18;
-        let dir = entries.min(u16::MAX as usize);
-        println!("{}\t| {dir}\t\t| {}", human_size(size), human_size(fs));
-    }
-}

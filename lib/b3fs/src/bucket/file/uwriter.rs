@@ -1,15 +1,13 @@
-use fleek_blake3::tree::HashTreeBuilder;
-
 use crate::bucket::Bucket;
 
-pub struct FileWriter {
-    hasher: HashTreeBuilder,
-}
+pub struct UntrustedFileWriter {}
 
-impl FileWriter {
+impl UntrustedFileWriter {
     pub fn new(bucket: &Bucket) -> Self {
         todo!()
     }
+
+    pub async fn feed_proof(&mut self, proof: &[u8]) {}
 
     pub async fn write(&mut self, bytes: &[u8]) {}
 }

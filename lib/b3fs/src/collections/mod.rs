@@ -21,6 +21,7 @@
 
 pub mod error;
 pub mod flat;
+pub(crate) mod repr;
 pub mod tree;
 
 mod printer;
