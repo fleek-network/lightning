@@ -4,10 +4,6 @@
 // deno run --lock-write deps.js
 // ```
 //
-// > Note: Due to a difference in how deno requests the source and how esm.sh compiles for
-// >       different targets, `node_process.js` needs it's hash to be manually amended t
-// >      `3828e3230dfc99c237c7ca17bfece48967ec4a0d3e5187e6ef9ab7c0a18c1c0b`
-//
 // Polyfills are the same used by browserify and jspm:
 // - https://github.com/browserify/browserify/blob/master/lib/builtins.js
 // - https://github.com/jspm/jspm-core/blob/main/package.json

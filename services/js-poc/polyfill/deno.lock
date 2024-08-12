@@ -62,7 +62,7 @@
     "https://esm.sh/v135/minimalistic-assert@1.0.1/es2022/minimalistic-assert.mjs": "cdb52e500d4dbebb776d06cd7ef8007534f098e47be737afa507deb56b2a02fc",
     "https://esm.sh/v135/minimalistic-crypto-utils@1.0.1/es2022/minimalistic-crypto-utils.mjs": "e35caae33f2c54c801e1689f64b01dd620587449a68f3be5bbc68f8b3a4c3c2f",
     "https://esm.sh/v135/node_events.js": "b1b65598db01a0621f65bf86948381344943c6b53828c470be4caa678d5fcfd5",
-    "https://esm.sh/v135/node_process.js": "3828e3230dfc99c237c7ca17bfece48967ec4a0d3e5187e6ef9ab7c0a18c1c0b",
+    "https://esm.sh/v135/node_process.js": "13a1bd2438678b509dd68a0006c11c50c77451c9bcdeaa25c6602236ffce247c",
     "https://esm.sh/v135/object-inspect@1.13.1/es2022/object-inspect.mjs": "b7f89ac9e557a58b17c85411c5a7e0f351fe548a9aa3a19ca6e4a61b753de9ce",
     "https://esm.sh/v135/object-is@1.1.5/es2022/object-is.mjs": "765549c4b9796e84be1680cc4e3884e76dce362b2906d63fde1d6ea6c7f714cb",
     "https://esm.sh/v135/object-is@1.1.5/es2022/polyfill.js": "d491afc3fbe75221b1fd3d6f158c6a8dd2c4f2ffbc699e187bd36fbc0363b25f",
