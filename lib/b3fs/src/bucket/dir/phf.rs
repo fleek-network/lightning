@@ -1,23 +1,30 @@
+use std::hash::{BuildHasher, Hasher};
+use std::num::{NonZeroU32, Wrapping};
+
 use rand::distributions::Standard;
 use rand::rngs::SmallRng;
 use rand::{thread_rng, Rng, SeedableRng};
+use siphasher::sip128::{Hash128, Hasher128};
 
 use crate::directory::entry::InlineVec;
 
+// Offset of some entry on the file.
+pub type Offset = NonZeroU32;
+
 pub struct PhfGenerator {
-    items: Vec<InlineVec>,
+    items: Vec<(InlineVec, Offset)>,
 }
 
 pub struct HasherState {
     pub key: u64,
-    pub disps: Vec<(u32, u32)>,
-    pub map: Vec<usize>,
+    pub disps: Vec<(u16, u16)>,
+    pub map: Vec<u32>,
 }
 
-pub struct Hash {
-    g: u32,
-    f1: u32,
-    f2: u32,
+pub struct Hashes {
+    pub g: u32,
+    pub f1: u32,
+    pub f2: u32,
 }
 
 impl PhfGenerator {
@@ -27,8 +34,8 @@ impl PhfGenerator {
         }
     }
 
-    pub fn push(&mut self, entry: &[u8]) {
-        self.items.push(entry.into());
+    pub fn push(&mut self, entry: &[u8], position: Offset) {
+        self.items.push((entry.into(), position));
     }
 
     pub fn finalize(self) -> HasherState {
@@ -39,75 +46,89 @@ impl PhfGenerator {
     }
 }
 
+#[inline]
+pub fn displace(f1: u32, f2: u32, d1: u32, d2: u32) -> u32 {
+    (Wrapping(d2) + Wrapping(f1) * Wrapping(d1) + Wrapping(f2)).0
+}
+
+pub fn hash(entry: &[u8], key: u64) -> Hashes {
+    let mut hasher = siphasher::sip128::SipHasher13::new_with_keys(0, key);
+    let Hash128 {
+        h1: lower,
+        h2: upper,
+    } = hasher.hash(entry);
+    Hashes {
+        g: (lower >> 32) as u32,
+        f1: lower as u32,
+        f2: upper as u32,
+    }
+}
+
 const DEFAULT_LAMBDA: usize = 5;
-fn try_generate_hash(entries: &[InlineVec], key: u64) -> Option<HasherState> {
+fn try_generate_hash(entries: &[(InlineVec, Offset)], key: u64) -> Option<HasherState> {
     struct Bucket {
         idx: usize,
-        keys: Vec<usize>,
+        keys: Vec<(Hashes, Offset)>,
     }
 
-    let hashes: Vec<_> = entries
-        .iter()
-        .map(|entry| phf_shared::hash(entry.as_slice(), &key))
-        .collect();
+    let table_len = entries.len();
+    let buckets_len = (entries.len() + DEFAULT_LAMBDA - 1) / DEFAULT_LAMBDA;
+    assert!(table_len <= (u16::MAX as usize));
 
-    let buckets_len = (hashes.len() + DEFAULT_LAMBDA - 1) / DEFAULT_LAMBDA;
     let mut buckets = (0..buckets_len)
-        .map(|i| Bucket {
-            idx: i,
-            keys: vec![],
+        .map(|idx| Bucket {
+            idx,
+            keys: Vec::new(),
         })
         .collect::<Vec<_>>();
 
-    for (i, hash) in hashes.iter().enumerate() {
-        buckets[(hash.g % (buckets_len as u32)) as usize]
+    for (entry, offset) in entries {
+        let hashes = hash(entry.as_slice(), key);
+        buckets[(hashes.g as usize) % buckets_len]
             .keys
-            .push(i);
+            .push((hashes, *offset));
     }
 
     // Sort descending
     buckets.sort_by(|a, b| a.keys.len().cmp(&b.keys.len()).reverse());
 
-    let table_len = hashes.len();
-    let mut map = vec![None; table_len];
-    let mut disps = vec![(0u32, 0u32); buckets_len];
+    let mut map = vec![0; table_len];
+    let mut disps = vec![(0u16, 0u16); buckets_len];
 
-    // store whether an element from the bucket being placed is
-    // located at a certain position, to allow for efficient overlap
-    // checks. It works by storing the generation in each cell and
-    // each new placement-attempt is a new generation, so you can tell
-    // if this is legitimately full by checking that the generations
-    // are equal. (A u64 is far too large to overflow in a reasonable
-    // time for current hardware.)
-    let mut try_map = vec![0u64; table_len];
-    let mut generation = 0u64;
+    if entries.len() == 1 {
+        return Some(HasherState { key, map, disps });
+    }
 
     // the actual values corresponding to the markers above, as
     // (index, key) pairs, for adding to the main map once we've
     // chosen the right disps.
-    let mut values_to_add = vec![];
+    let mut values_to_clean =
+        Vec::with_capacity(buckets.iter().map(|b| b.keys.len()).max().unwrap());
 
     'buckets: for bucket in &buckets {
-        for d1 in 0..(table_len as u32) {
-            'disps: for d2 in 0..(table_len as u32) {
-                values_to_add.clear();
-                generation += 1;
+        let bucket_size = bucket.keys.len();
 
-                for &key in &bucket.keys {
-                    let idx = (phf_shared::displace(hashes[key].f1, hashes[key].f2, d1, d2)
+        for d1 in 0..(table_len as u16) {
+            'disps: for d2 in 0..(table_len as u16) {
+                values_to_clean.clear();
+
+                for (hashes, offset) in &bucket.keys {
+                    let idx = (displace(hashes.f1, hashes.f2, d1 as u32, d2 as u32)
                         % (table_len as u32)) as usize;
-                    if map[idx].is_some() || try_map[idx] == generation {
+
+                    if map[idx] != 0 {
+                        for &idx in &values_to_clean {
+                            map[idx] = 0;
+                        }
                         continue 'disps;
                     }
-                    try_map[idx] = generation;
-                    values_to_add.push((idx, key));
+
+                    map[idx] = u32::from(*offset);
+                    values_to_clean.push(idx);
                 }
 
                 // We've picked a good set of disps
                 disps[bucket.idx] = (d1, d2);
-                for &(idx, key) in &values_to_add {
-                    map[idx] = Some(key);
-                }
                 continue 'buckets;
             }
         }
@@ -116,9 +137,5 @@ fn try_generate_hash(entries: &[InlineVec], key: u64) -> Option<HasherState> {
         return None;
     }
 
-    Some(HasherState {
-        key,
-        disps,
-        map: map.into_iter().map(|i| i.unwrap()).collect(),
-    })
+    Some(HasherState { key, disps, map })
 }

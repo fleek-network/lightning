@@ -25,7 +25,8 @@ rand = { version="0.8", features=["small_rng"] }
 blake3 = "1.5"
 fleek-blake3 = "1.5"
 
-phf_shared = "0.11"
+# For PHF functionality.
+siphasher = "1.0.1"
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
