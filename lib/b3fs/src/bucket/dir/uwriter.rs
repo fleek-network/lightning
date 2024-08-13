@@ -4,7 +4,7 @@ use crate::directory::OwnedEntry;
 pub struct UntrustedDirWriter {}
 
 impl UntrustedDirWriter {
-    pub fn new(bucket: &Bucket) -> Self {
+    pub fn new(bucket: &Bucket, num_entries: usize) -> Self {
         todo!()
     }
 
