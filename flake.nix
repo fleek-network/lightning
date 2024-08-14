@@ -135,6 +135,13 @@
 
           gitRev = if (self ? rev) then self.rev else self.dirtyRev;
 
+          # SGX Service enclave
+          enclave = craneLib.buildPackage {
+            src = ./services/sgx/enclave;
+            cargoArtifacts = null;
+            doCheck = false;
+          };
+
           # Common arguments can be set here to avoid repeating them later
           commonArgs = {
             inherit src;
@@ -155,8 +162,8 @@
                 "${git}/bin/git" "$@"
               '')
               installShellFiles
-
-              # for sgx service
+            ] ++ lib.optionals (!pkgs.stdenv.isDarwin) [
+              # for sgx service, not available on mac
               fortanix-sgx-tools
               sgxs-tools
             ];
@@ -207,6 +214,9 @@
             BZIP2_LIB_DIR = "${lib.getLib pkgs.bzip2}/lib";
             SNAPPY_LIB_DIR = "${lib.getLib pkgs.snappy}/lib";
             ORT_LIB_LOCATION = "${lib.getLib pkgs.onnxruntime}/lib";
+          } // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
+            # Enclave bin, not available on mac
+            FN_ENCLAVE_BIN_PATH = "${enclave}/bin/fleek-service-sgx-enclave";
           };
 
           # Build *just* the cargo dependencies, so we can reuse all of that
@@ -300,6 +310,8 @@
                   fn-service-0
                   fn-service-1
                   fn-service-2
+                ] ++ lib.optionals (!pkgs.stdenv.isDarwin) [
+                  # sgx service, not available on mac
                   fn-service-3
                 ];
               };
@@ -307,27 +319,7 @@
               fn-service-0 = mkLightningBin "fn-service-0";
               fn-service-1 = mkLightningBin "fn-service-1";
               fn-service-2 = mkLightningBin "fn-service-2";
-              fn-service-3 =
-                let
-                  enclave = craneLib.buildPackage {
-                    src = ./services/sgx/enclave;
-                    cargoArtifacts = null;
-                    doCheck = false;
-                  };
-                in
-                craneLib.buildPackage (
-                  commonArgs
-                  // rec {
-                    inherit cargoArtifacts;
-                    pname = "fn-service-3";
-                    doCheck = false;
-                    cargoExtraArgs = lib.concatStringsSep " " [
-                      "--locked"
-                      "--bin ${pname}"
-                    ];
-                    FN_ENCLAVE_BIN_PATH = "${enclave}/bin/fleek-service-sgx-enclave";
-                  }
-                );
+              fn-service-3 = mkLightningBin "fn-service-3";
             };
 
           # Allow using `nix run` on the project
