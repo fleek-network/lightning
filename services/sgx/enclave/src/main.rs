@@ -56,6 +56,8 @@ fn main() -> anyhow::Result<()> {
     // bind to userspace address for incoming requests from handshake
     let listener = TcpListener::bind("requests.fleek.network")?;
 
+    println!("Successfully started SGX enclave");
+
     loop {
         let (mut conn, _) = listener.accept()?;
         if let Err(e) = handle_connection(&mut conn) {
