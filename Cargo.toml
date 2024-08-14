@@ -5,6 +5,7 @@ members = [
   "core/interfaces/proc",
   "etc/workspace-hack",
   "lib/*",
+  "lib/sgxkit/sys",
   "services/*",
   "services/ai/examples/rust/*",
 ]
