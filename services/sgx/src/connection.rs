@@ -150,14 +150,6 @@ impl ConnectionListener {
 
         this
     }
-
-    /// Accept a new connection
-    pub async fn accept(&mut self) -> std::io::Result<Connection> {
-        self.rx
-            .recv()
-            .await
-            .expect("Could not get new connection from the socket.")
-    }
 }
 
 impl AsyncListener for ConnectionListener {
@@ -170,7 +162,15 @@ impl AsyncListener for ConnectionListener {
     ) -> std::task::Poll<tokio::io::Result<Option<Box<dyn enclave_runner::usercalls::AsyncStream>>>>
     {
         let res = ready!(self.rx.poll_recv(cx));
-        Poll::Ready(res.transpose().map(|v| v.map(|c| Box::new(c) as _)))
+        Poll::Ready(res.transpose().map(|v| {
+            v.map(|mut c| {
+                if c.is_http_request() {
+                    // send empty header response
+                    c.write_payload(b"{}");
+                }
+                Box::new(c) as _
+            })
+        }))
     }
 }
 
