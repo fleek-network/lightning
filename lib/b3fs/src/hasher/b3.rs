@@ -97,14 +97,14 @@ impl Output {
 }
 
 #[derive(Clone)]
-struct ChunkState {
-    cv: CVWords,
-    chunk_counter: u64,
-    buf: [u8; BLOCK_LEN],
-    buf_len: u8,
-    blocks_compressed: u8,
-    flags: u8,
-    platform: Platform,
+pub struct ChunkState {
+    pub cv: CVWords,
+    pub chunk_counter: u64,
+    pub buf: [u8; BLOCK_LEN],
+    pub buf_len: u8,
+    pub blocks_compressed: u8,
+    pub flags: u8,
+    pub platform: Platform,
 }
 
 impl ChunkState {

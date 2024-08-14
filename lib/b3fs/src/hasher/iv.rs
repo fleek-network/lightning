@@ -9,8 +9,8 @@ use crate::utils;
 /// [`IV::new_keyed`] and convert it to either of these by simply using the [`Into`] trait.
 #[derive(Clone, Copy)]
 pub struct IV {
-    key: b3::CVWords,
-    flags: u8,
+    pub(crate) key: b3::CVWords,
+    pub(crate) flags: u8,
 }
 
 impl IV {
