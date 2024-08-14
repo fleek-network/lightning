@@ -142,19 +142,7 @@ impl ConnectionListener {
 
                 let tx = tx.clone();
                 tokio::spawn(async move {
-                    let conn = match Connection::new_with_info(stream).await {
-                        Ok(mut conn) => {
-                            if conn.is_http_request() {
-                                // send empty header response
-                                if let Err(e) = conn.write_payload(b"{}").await {
-                                    let _ = tx.send(Err(e)).await;
-                                    return;
-                                }
-                            }
-                            Ok(conn)
-                        },
-                        Err(e) => Err(e),
-                    };
+                    let conn = Connection::new_with_info(stream).await;
                     let _ = tx.send(conn).await;
                 });
             }

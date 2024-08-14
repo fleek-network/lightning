@@ -29,27 +29,31 @@ pub struct VerifiedStream {
     current: usize,
     handle: Arc<ContentHandle>,
     read_fut: Option<Pin<Box<dyn ReadFut>>>,
-    write_buf: BytesMut,
+    buffer: BytesMut,
 }
 
 impl VerifiedStream {
     pub async fn new(hash: &[u8; 32]) -> Result<Self, std::io::Error> {
-        let handle = ContentHandle::load(hash).await?;
+        let handle = Arc::new(ContentHandle::load(hash).await?);
 
         // TODO: Estimate and validate content length limits, based on the
         //       number of chunk hashes in the proof.
 
         // Create the buffer and write the starting proof to it right away
-        let mut read_buf = BytesMut::new();
+        let mut buffer = BytesMut::new();
         let proof = ProofBuf::new(handle.tree.as_ref(), 0);
-        read_buf.put_u32(proof.len() as u32);
-        read_buf.put_slice(proof.as_slice());
+        buffer.put_u32(proof.len() as u32);
+        buffer.put_slice(proof.as_slice());
+
+        let current = 0;
+        let handle_clone = handle.clone();
+        let read_fut = Some(Box::pin(async move { handle_clone.read(current).await }) as _);
 
         Ok(Self {
-            current: 0,
-            handle: handle.into(),
-            read_fut: None,
-            write_buf: read_buf,
+            current,
+            handle,
+            read_fut,
+            buffer,
         })
     }
 }
@@ -62,9 +66,9 @@ impl AsyncRead for VerifiedStream {
     ) -> Poll<IoResult<()>> {
         loop {
             // flush as many bytes as possible
-            if !self.write_buf.is_empty() {
-                let len = buf.remaining().min(self.write_buf.len());
-                let bytes = self.write_buf.split_to(len);
+            if !self.buffer.is_empty() {
+                let len = buf.remaining().min(self.buffer.len());
+                let bytes = self.buffer.split_to(len);
                 buf.put_slice(&bytes);
 
                 return Poll::Ready(Ok(()));
@@ -78,8 +82,8 @@ impl AsyncRead for VerifiedStream {
                         self.read_fut = None;
 
                         // write chunk payload (with leading bit set)
-                        self.write_buf.put_u32(block.len() as u32 | LEADING_BIT);
-                        self.write_buf.put_slice(&block);
+                        self.buffer.put_u32(block.len() as u32 | LEADING_BIT);
+                        self.buffer.put_slice(&block);
 
                         // flush read buffer
                         continue;
@@ -103,8 +107,10 @@ impl AsyncRead for VerifiedStream {
 
             // write next proof payload
             let proof = ProofBuf::resume(self.handle.tree.as_ref(), self.current);
-            self.write_buf.put_u32(proof.len() as u32);
-            self.write_buf.put_slice(proof.as_slice());
+            if !proof.is_empty() {
+                self.buffer.put_u32(proof.len() as u32);
+                self.buffer.put_slice(proof.as_slice());
+            }
 
             continue;
         }
