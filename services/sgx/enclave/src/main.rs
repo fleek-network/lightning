@@ -23,6 +23,7 @@ fn default_function_name() -> String {
 }
 
 fn handle_connection(conn: &mut TcpStream) -> anyhow::Result<()> {
+    println!("handling connection in enclave");
     // read length delimiter
     let mut buf = [0; 4];
     conn.read_exact(&mut buf)?;
@@ -62,7 +63,10 @@ fn main() -> anyhow::Result<()> {
         let (mut conn, _) = listener.accept()?;
         if let Err(e) = handle_connection(&mut conn) {
             // TODO: write error to stream
-            eprintln!("Failed to handle connection: {e}");
+            let error = format!("Error: {e}");
+            eprintln!("{error}");
+            let _ = conn.write_all(&(error.len() as u32).to_be_bytes());
+            let _ = conn.write_all(error.as_bytes());
         }
     }
 }

@@ -27,7 +27,9 @@ pub fn execute_module(
     let func = instance.get_typed_func::<(), ()>(&mut store, entry)?;
     func.call(&mut store, ())?;
 
-    Ok(store.data_mut().output.split().freeze())
+    let output = store.data_mut().output.split().freeze();
+    println!("wasm output: {output:?}");
+    Ok(output)
 }
 
 /// Runtime state
