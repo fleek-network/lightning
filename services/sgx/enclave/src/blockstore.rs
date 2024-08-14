@@ -36,6 +36,8 @@ pub fn get_verified_content(hash: &str) -> anyhow::Result<Vec<u8>> {
         // unset leading bit
         len &= !LEADING_BIT;
 
+        println!("reading {len} bytes proof={is_proof}");
+
         // read payload
         let mut payload = vec![0; len as usize];
         stream.read_exact(&mut payload)?;
@@ -53,6 +55,8 @@ pub fn get_verified_content(hash: &str) -> anyhow::Result<Vec<u8>> {
             block += 1;
         }
     }
+
+    println!("enclave received verified content");
 
     Ok(content)
 }
