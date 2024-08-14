@@ -6,6 +6,9 @@ builds:
   - checks.x86_64-linux.nextest
   - checks.x86_64-linux.hakari
   - packages.x86_64-linux.lightning-node-standalone
-  - packages.x86_64-linux.lightning-services
+  - packages.x86_64-linux.fn-service-0
+  - packages.x86_64-linux.fn-service-1
+  - packages.x86_64-linux.fn-service-2
+  - packages.x86_64-linux.fn-service-3
   - devShells.x86_64-linux.default
   - devShells.aarch64-darwin.default
