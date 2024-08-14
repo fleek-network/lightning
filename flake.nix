@@ -148,25 +148,28 @@
             strictDeps = true;
             pname = "lightning";
             version = "0.1.0";
-            nativeBuildInputs = with pkgs; [
-              pkg-config
-              gcc
-              perl
-              cmake
-              clang
-              protobuf
-              mold-wrapped
-              (pkgs.writeShellScriptBin "git" ''
-                # hack to fix `git rev-parse HEAD` when building in sandbox
-                [[ $NIX_ENFORCE_PURITY -eq 1 ]] && echo ${gitRev} && exit
-                "${git}/bin/git" "$@"
-              '')
-              installShellFiles
-            ] ++ lib.optionals (!pkgs.stdenv.isDarwin) [
-              # for sgx service, not available on mac
-              fortanix-sgx-tools
-              sgxs-tools
-            ];
+            nativeBuildInputs =
+              with pkgs;
+              [
+                pkg-config
+                gcc
+                perl
+                cmake
+                clang
+                protobuf
+                mold-wrapped
+                (pkgs.writeShellScriptBin "git" ''
+                  # hack to fix `git rev-parse HEAD` when building in sandbox
+                  [[ $NIX_ENFORCE_PURITY -eq 1 ]] && echo ${gitRev} && exit
+                  "${git}/bin/git" "$@"
+                '')
+                installShellFiles
+              ]
+              ++ lib.optionals (!pkgs.stdenv.isDarwin) [
+                # for sgx service, not available on mac
+                fortanix-sgx-tools
+                sgxs-tools
+              ];
             buildInputs =
               with pkgs;
               [
@@ -199,25 +202,27 @@
               ];
           } // commonVars;
 
-          commonVars = {
-            # Shared and static libraries
-            PKG_CONFIG_PATH = "${lib.getDev pkgs.fontconfig}/lib/pkgconfig";
-            RUST_FONTCONFIG_DLOPEN = "on";
-            LIBCLANG_PATH = "${lib.getLib pkgs.libclang}/lib";
-            OPENSSL_NO_VENDOR = 1;
-            OPENSSL_LIB_DIR = "${lib.getLib pkgs.openssl_3}/lib";
-            OPENSSL_INCLUDE_DIR = "${lib.getDev pkgs.openssl_3.dev}/include";
-            RUSTY_V8_ARCHIVE = "${librusty_v8}";
-            ROCKSDB_LIB_DIR = "${pkgs.rocksdb}/lib";
-            Z_LIB_DIR = "${lib.getLib pkgs.zlib}/lib";
-            ZSTD_LIB_DIR = "${lib.getLib pkgs.zstd}/lib";
-            BZIP2_LIB_DIR = "${lib.getLib pkgs.bzip2}/lib";
-            SNAPPY_LIB_DIR = "${lib.getLib pkgs.snappy}/lib";
-            ORT_LIB_LOCATION = "${lib.getLib pkgs.onnxruntime}/lib";
-          } // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
-            # Enclave bin, not available on mac
-            FN_ENCLAVE_BIN_PATH = "${enclave}/bin/fleek-service-sgx-enclave";
-          };
+          commonVars =
+            {
+              # Shared and static libraries
+              PKG_CONFIG_PATH = "${lib.getDev pkgs.fontconfig}/lib/pkgconfig";
+              RUST_FONTCONFIG_DLOPEN = "on";
+              LIBCLANG_PATH = "${lib.getLib pkgs.libclang}/lib";
+              OPENSSL_NO_VENDOR = 1;
+              OPENSSL_LIB_DIR = "${lib.getLib pkgs.openssl_3}/lib";
+              OPENSSL_INCLUDE_DIR = "${lib.getDev pkgs.openssl_3.dev}/include";
+              RUSTY_V8_ARCHIVE = "${librusty_v8}";
+              ROCKSDB_LIB_DIR = "${pkgs.rocksdb}/lib";
+              Z_LIB_DIR = "${lib.getLib pkgs.zlib}/lib";
+              ZSTD_LIB_DIR = "${lib.getLib pkgs.zstd}/lib";
+              BZIP2_LIB_DIR = "${lib.getLib pkgs.bzip2}/lib";
+              SNAPPY_LIB_DIR = "${lib.getLib pkgs.snappy}/lib";
+              ORT_LIB_LOCATION = "${lib.getLib pkgs.onnxruntime}/lib";
+            }
+            // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
+              # Enclave bin, not available on mac
+              FN_ENCLAVE_BIN_PATH = "${enclave}/bin/fleek-service-sgx-enclave";
+            };
 
           # Build *just* the cargo dependencies, so we can reuse all of that
           # work (e.g. via cachix or github artifacts) when running in CI
@@ -306,14 +311,16 @@
               # All service binaries
               lightning-services = pkgs.symlinkJoin {
                 name = "lightning-services";
-                paths = [
-                  fn-service-0
-                  fn-service-1
-                  fn-service-2
-                ] ++ lib.optionals (!pkgs.stdenv.isDarwin) [
-                  # sgx service, not available on mac
-                  fn-service-3
-                ];
+                paths =
+                  [
+                    fn-service-0
+                    fn-service-1
+                    fn-service-2
+                  ]
+                  ++ lib.optionals (!pkgs.stdenv.isDarwin) [
+                    # sgx service, not available on mac
+                    fn-service-3
+                  ];
               };
 
               fn-service-0 = mkLightningBin "fn-service-0";
@@ -336,6 +343,7 @@
                 rust-analyzer
                 wabt # wasm tools, ie wasm2wat
               ];
+              FN_ENCLAVE_BIN_PATH = "";
             }
           );
 

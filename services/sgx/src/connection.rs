@@ -142,7 +142,19 @@ impl ConnectionListener {
 
                 let tx = tx.clone();
                 tokio::spawn(async move {
-                    let conn = Connection::new_with_info(stream).await;
+                    let conn = match Connection::new_with_info(stream).await {
+                        Ok(mut conn) => {
+                            if conn.is_http_request() {
+                                // send empty header response
+                                if let Err(e) = conn.write_payload(b"{}").await {
+                                    let _ = tx.send(Err(e)).await;
+                                    return;
+                                }
+                            }
+                            Ok(conn)
+                        },
+                        Err(e) => Err(e),
+                    };
                     let _ = tx.send(conn).await;
                 });
             }
@@ -162,15 +174,7 @@ impl AsyncListener for ConnectionListener {
     ) -> std::task::Poll<tokio::io::Result<Option<Box<dyn enclave_runner::usercalls::AsyncStream>>>>
     {
         let res = ready!(self.rx.poll_recv(cx));
-        Poll::Ready(res.transpose().map(|v| {
-            v.map(|mut c| {
-                if c.is_http_request() {
-                    // send empty header response
-                    c.write_payload(b"{}");
-                }
-                Box::new(c) as _
-            })
-        }))
+        Poll::Ready(res.transpose().map(|v| v.map(|c| Box::new(c) as _)))
     }
 }
 
