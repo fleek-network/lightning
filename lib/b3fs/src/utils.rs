@@ -145,6 +145,51 @@ pub fn flatten<const N: usize, T>(slice: &[[T; N]]) -> &[T] {
     unsafe { std::slice::from_raw_parts(slice.as_ptr().cast(), len) }
 }
 
+// const-fn implementation.
+#[inline(always)]
+pub const fn words_from_le_bytes_32(bytes: &[u8; 32]) -> [u32; 8] {
+    #[inline(always)]
+    const fn w(bytes: &[u8; 32], offset: usize) -> u32 {
+        u32::from_le_bytes([
+            bytes[offset],
+            bytes[offset + 1],
+            bytes[offset + 2],
+            bytes[offset + 3],
+        ])
+    }
+    let mut out = [0; 8];
+    out[0] = w(bytes, 0);
+    out[1] = w(bytes, 4);
+    out[2] = w(bytes, 2 * 4);
+    out[3] = w(bytes, 3 * 4);
+    out[4] = w(bytes, 4 * 4);
+    out[5] = w(bytes, 5 * 4);
+    out[6] = w(bytes, 6 * 4);
+    out[7] = w(bytes, 7 * 4);
+    out
+}
+
+// const-fn implementation.
+#[inline(always)]
+pub const fn le_bytes_from_words_32(words: &[u32; 8]) -> [u8; 32] {
+    let mut out = [0; 32];
+    let mut i = 0;
+    let mut j = 0;
+    while i < 8 {
+        let bytes = words[i].to_le_bytes();
+        out[j] = bytes[0];
+        j += 1;
+        out[j] = bytes[1];
+        j += 1;
+        out[j] = bytes[2];
+        j += 1;
+        out[j] = bytes[3];
+        j += 1;
+        i += 1;
+    }
+    out
+}
+
 /// Used internally as a helper to pretty print hashes as hex strings.
 pub struct Digest<'d>(pub &'d [u8; 32]);
 

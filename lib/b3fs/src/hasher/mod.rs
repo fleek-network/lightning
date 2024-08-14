@@ -7,5 +7,8 @@ pub(crate) mod join;
 
 pub mod byte_hasher;
 pub mod dir_hasher;
+pub mod iv;
 
-pub trait HashTreeCapture {}
+pub trait HashTreeBuilder {
+    fn push(&mut self, hash: [u8; 32]);
+}
