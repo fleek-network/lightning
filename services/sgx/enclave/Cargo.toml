@@ -3,16 +3,23 @@ name = "fleek-service-sgx-enclave"
 version = "0.1.0"
 edition = "2021"
 
-[dependencies]
-blake3-tree = { path = "../../../lib/blake3-tree" }
 
-serde = { version = "=1.0.205", features = [ "derive" ] }
-serde_json = "=1.0.122"
+[dependencies]
+# In house libraries
+blake3-tree = "=0.1.0"
+
+# Error stuffs
 anyhow = "=1.0.86"
 thiserror = "=1.0.63"
 
-bytes = "=1.7.1"
+# IO
 arrayref = "=0.3.8"
-hex = "=0.4.3"
+bytes = "=1.7.1"
 
+# Encodings
+hex = "=0.4.3"
+serde = { version = "=1.0.205", features = ["derive"] }
+serde_json = "=1.0.122"
+
+# WASM Runtime
 wasmi = "=0.36.0"
