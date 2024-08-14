@@ -7,12 +7,16 @@ edition = "2021"
 # project libs
 blake3-tree = { path = "../../lib/blake3-tree" }
 
-# primitives
+# async
 tokio.workspace = true
-bytes.workspace = true
 futures.workspace = true
-hex = "0.4"
+
+# io
+bytes.workspace = true
 arrayref = "0.3"
+
+# encodings
+hex = "0.4"
 
 # deps for vendored sdk code
 anyhow.workspace = true
