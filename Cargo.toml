@@ -37,7 +37,7 @@ console-subscriber = { version = "0.4.0" }
 ethers = "2.0.10"
 num-bigint = "0.4.0"
 base64 = "0.21"
-bytes = "1.4"
+bytes = { version = "1.7", features = ["serde"] }
 futures = "0.3"
 lru = "0.10.0"
 multihash = "0.19"

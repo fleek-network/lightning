@@ -5,7 +5,7 @@ edition = "2021"
 
 
 [dependencies]
-# In house libraries
+# Project libs (release only)
 blake3-tree = "=0.1.0"
 
 # Error stuffs
