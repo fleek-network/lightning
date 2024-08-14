@@ -2,6 +2,7 @@ use std::io::Write;
 
 use sgxkit::io::OutputWriter;
 
+#[no_mangle]
 fn main() {
     let mut writer = OutputWriter::new();
     writer
