@@ -5,9 +5,9 @@ use std::ops::Index;
 
 use super::error::CollectionTryFromError;
 use super::flat::FlatHashSlice;
-use crate::proof::buffer::ProofBuf;
+use crate::stream::buffer::ProofBuf;
+use crate::stream::walker::Mode;
 use crate::utils::{is_valid_tree_len, tree_index};
-use crate::walker::Mode;
 
 /// A wrapper around a list of hashes that provides access only to the leaf nodes in the tree.
 #[derive(Clone, Copy)]

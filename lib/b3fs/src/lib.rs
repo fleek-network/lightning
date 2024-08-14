@@ -31,25 +31,18 @@
 // 8MB     | 65535         | 32GB
 // 1GB     | 65535         | 4TB
 
-pub mod capture;
-
 pub mod bucket;
 
-pub mod proof;
+pub mod stream;
 
 /// A set of common utility functions.
 pub mod utils;
-
-/// Provides [TreeWalker](walker::TreeWalker) to iterate a tree.
-pub mod walker;
 
 pub mod collections;
 
 pub mod directory;
 
-pub mod verifier;
-
-pub mod phf;
+pub mod hasher;
 
 #[cfg(test)]
 pub mod test_utils;

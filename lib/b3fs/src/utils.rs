@@ -21,6 +21,12 @@ pub const fn previous_pow_of_two(n: usize) -> usize {
     n.next_power_of_two() / 2
 }
 
+/// The largest power of two less than or equal to `n`,.
+#[inline]
+pub fn largest_power_of_two_leq(n: usize) -> usize {
+    ((n / 2) + 1).next_power_of_two()
+}
+
 /// Compute the index of the n-th leaf in the array representation of the tree.
 /// see: <https://oeis.org/A005187>
 #[inline(always)]

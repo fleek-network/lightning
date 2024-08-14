@@ -3,8 +3,8 @@ use fleek_blake3::tree::IV;
 use smallvec::{Array, SmallVec};
 use thiserror::Error;
 
+use super::ProofBufIter;
 use crate::directory::merge::iv;
-use crate::proof::ProofBufIter;
 use crate::utils::{is_valid_proof_len, Digest, OwnedDigest};
 
 /// An incremental verifier can be used to verify a stream of proofs and content. It can also be
@@ -345,10 +345,10 @@ where
 
 #[cfg(test)]
 mod tests {
+    use super::super::walker::Mode;
+    use super::{CollectToVec, IncrementalVerifier};
     use crate::collections::HashTree;
     use crate::test_utils::*;
-    use crate::verifier::{CollectToVec, IncrementalVerifier};
-    use crate::walker::Mode;
 
     #[test]
     fn demo() {

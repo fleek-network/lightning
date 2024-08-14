@@ -4,11 +4,11 @@ use std::fmt::Debug;
 use thiserror::Error;
 
 use super::encoder::ProofEncoder;
+use super::iter::ProofBufIter;
 use super::pretty::ProofBufPrettyPrinter;
+use super::walker::{Mode, TreeWalker};
 use crate::collections::HashTree;
-use crate::proof::ProofBufIter;
 use crate::utils::is_valid_proof_len;
-use crate::walker::{Mode, TreeWalker};
 
 /// A buffer containing a proof for a block of data. This allows us to have a pre-allocated vec
 /// and insert from right to left and still deref to the correct slice on the right bounds.

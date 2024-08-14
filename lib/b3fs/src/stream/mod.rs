@@ -57,6 +57,9 @@ pub mod encoder;
 pub mod iter;
 /// A pretty printer for a proof buffer slice that displays each hex value properly.
 pub mod pretty;
+pub mod verifier;
+/// Provides [TreeWalker](walker::TreeWalker) to iterate a tree.
+pub mod walker;
 
 pub use buffer::ProofBuf;
 pub use encoder::ProofEncoder;

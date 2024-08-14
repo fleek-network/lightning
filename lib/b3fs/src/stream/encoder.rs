@@ -1,5 +1,5 @@
 use super::buffer::ProofBuf;
-use crate::walker::Direction;
+use super::walker::Direction;
 
 /// An encoder that manages a reverse buffer which can be used to convert the
 /// root-to-leaf ordering of the [`TreeWalker`] to the proper stack ordering.

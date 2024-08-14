@@ -17,8 +17,10 @@ smallvec = "1.11"
 triomphe = "0.1.9"
 bytes = "1.5"
 
-# IO
+# IO / multi-threading
 tokio = { version = "1.28", features = ["fs"] }
+rayon = "1.10"
+rayon-core = "1.12"
 
 # Randomnness and hashing
 rand = { version="0.8", features=["small_rng"] }

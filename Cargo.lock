@@ -1137,6 +1137,8 @@ dependencies = [
  "criterion",
  "fleek-blake3",
  "rand 0.8.5",
+ "rayon",
+ "rayon-core",
  "siphasher 1.0.1",
  "smallvec",
  "smol_str",
