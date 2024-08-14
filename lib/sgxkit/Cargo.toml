@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-sgxkit-sys = { path = "../sgxkit-sys" }
+sgxkit-sys = { path = "./sys" }
 
 [[example]]
 name = "sgx-wasm-hello"
