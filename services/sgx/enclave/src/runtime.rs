@@ -29,9 +29,12 @@ pub fn execute_module(
     let module = Module::new(&engine, module.as_ref())?;
     let instance = linker.instantiate(&mut store, &module)?.start(&mut store)?;
 
-    // Get entrypoint function. Should return (reference, length) of raw wasm memory to return
-    let func = instance.get_typed_func::<(), ()>(&mut store, entry)?;
-    func.call(&mut store, ())?;
+    // Get entrypoint function.
+    // TODO(oz): Should we support calling the function with `int argc, *argv[]`?
+    //           We could expose an "args" request parameter with a vec of strings.
+    //           If not, how can we eliminate needing to satisfy this signature?
+    let func = instance.get_typed_func::<(i32, i32), i32>(&mut store, entry)?;
+    func.call(&mut store, (0, 0))?;
 
     let output = store.data_mut().output.split().freeze();
     println!("wasm output: {output:?}");
