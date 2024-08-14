@@ -7,32 +7,37 @@ const STACK_SIZE: &str = "0x1000000"; // 10 MiB
 /// Number of threads to support in enclave
 const THREADS: &str = "8";
 
-/// Output binary path from build
-const CARGO_OUTPUT: &str =
-    "../../target/x86_64-fortanix-unknown-sgx/release/fleek-service-sgx-enclave";
-
 fn main() {
     println!("cargo::rerun-if-changed=build.rs");
     println!("cargo::rerun-if-changed=enclave/*");
+    println!("cargo::rerun-if-env-changed=FN_ENCLAVE_BIN_PATH");
 
-    let out_dir = std::env::var("OUT_DIR").unwrap();
+    let path = std::env::var("FN_ENCLAVE_BIN_PATH").unwrap_or_else(|_| {
+        // local build for the enclave bin
+        assert!(
+            std::process::Command::new("cargo")
+                .args(["build", "--release", "--locked"])
+                .current_dir("./enclave")
+                .env_clear()
+                .env("PATH", std::env::var("PATH").unwrap())
+                .status()
+                .unwrap()
+                .success(),
+            "failed to build enclave module"
+        );
 
-    assert!(
-        std::process::Command::new("cargo")
-            .args(["build", "--release", "--locked"])
-            .current_dir("./enclave")
-            .env_clear()
-            .env("PATH", std::env::var("PATH").unwrap())
-            .status()
-            .unwrap()
-            .success(),
-        "failed to build enclave module"
-    );
+        // cargo output path
+        "../../target/x86_64-fortanix-unknown-sgx/release/fleek-service-sgx-enclave".into()
+    });
 
+    let new_path = Path::new(&std::env::var("OUT_DIR").unwrap()).join("enclave");
+    std::fs::copy(&path, &new_path).expect("failed to move sgxs to output directory");
+
+    // convert `enclave` to `enclave.sgxs`
     assert!(
         std::process::Command::new("ftxsgx-elf2sgxs")
+            .arg(&new_path)
             .args([
-                CARGO_OUTPUT,
                 "--heap-size",
                 HEAP_SIZE,
                 "--stack-size",
@@ -45,10 +50,4 @@ fn main() {
             .success(),
         "failed to convert elf to sgxs"
     );
-
-    std::fs::rename(
-        Path::new(CARGO_OUTPUT).with_extension("sgxs"),
-        Path::new(&out_dir).join("enclave.sgxs"),
-    )
-    .expect("failed to move sgxs to output directory");
 }
