@@ -40,23 +40,63 @@
             import nixpkgs {
               inherit system;
               overlays = [
-                (final: prev: {
-                  # update cargo-hakari until this makes it to nixpkgs-unstable:
-                  # https://github.com/NixOS/nixpkgs/pull/331820
-                  cargo-hakari = prev.cargo-hakari.overrideAttrs (old: rec {
-                    version = "0.9.30";
-                    src = final.fetchFromGitHub {
-                      owner = "guppy-rs";
-                      repo = "guppy";
-                      rev = "cargo-hakari-${version}";
-                      sha256 = "sha256-fwqMV8oTEYqS0Y/IXar1DSZ0Gns1qJ9oGhbdehScrgw=";
+                (
+                  final: prev:
+                  let
+                    # Build a released package from `github.com/fortanix/rust-sgx`
+                    mkRustSgxPackage = (
+                      {
+                        pname,
+                        version,
+                        hash,
+                        cargoHash,
+                      }:
+                      prev.rustPlatform.buildRustPackage rec {
+                        inherit pname version cargoHash;
+                        nativeBuildInputs = with prev; [
+                          pkg-config
+                          protobuf
+                        ];
+                        buildInputs = with prev; [ openssl_3 ];
+                        src = prev.fetchzip {
+                          inherit hash;
+                          url = "https://crates.io/api/v1/crates/${pname}/${version}/download";
+                          extension = "tar.gz";
+                        };
+                      }
+                    );
+                  in
+                  {
+                    # todo(oz): contribute these to upstream nixpkgs
+                    fortanix-sgx-tools = mkRustSgxPackage {
+                      pname = "fortanix-sgx-tools";
+                      version = "0.5.1";
+                      hash = "sha256-F0lZG1neAPVvyOxUtDPv0t7o+ZC+aQRtpFeq55QwcmE=";
+                      cargoHash = "sha256-jYfsmPwhvt+ccUr4Vwq5q1YzNlxA+Vnpxd4KpWZrYo8=";
                     };
-                    cargoDeps = old.cargoDeps.overrideAttrs {
-                      inherit src;
-                      outputHash = "sha256-zGW5+5dGHZmIrFo+kj3P2Vvn+IfzQB74pymve+YlpqQ=";
+                    sgxs-tools = mkRustSgxPackage {
+                      pname = "sgxs-tools";
+                      version = "0.8.6";
+                      hash = "sha256-24lUhi4IPv+asM51/BfufkOUYVellXoXsbWXWN/zoBw=";
+                      cargoHash = "sha256-vtuOCLo7qBOfqMynykqf9folmlETx3or35+CuTurh3s=";
                     };
-                  });
-                })
+                    # update cargo-hakari until this makes it to nixpkgs-unstable:
+                    # https://github.com/NixOS/nixpkgs/pull/331820
+                    cargo-hakari = prev.cargo-hakari.overrideAttrs (old: rec {
+                      version = "0.9.30";
+                      src = final.fetchFromGitHub {
+                        owner = "guppy-rs";
+                        repo = "guppy";
+                        rev = "cargo-hakari-${version}";
+                        sha256 = "sha256-fwqMV8oTEYqS0Y/IXar1DSZ0Gns1qJ9oGhbdehScrgw=";
+                      };
+                      cargoDeps = old.cargoDeps.overrideAttrs {
+                        inherit src;
+                        outputHash = "sha256-zGW5+5dGHZmIrFo+kj3P2Vvn+IfzQB74pymve+YlpqQ=";
+                      };
+                    });
+                  }
+                )
               ];
             }
           );
@@ -115,25 +155,33 @@
                 "${git}/bin/git" "$@"
               '')
               installShellFiles
+
+              # for sgx service
+              fortanix-sgx-tools
+              sgxs-tools
             ];
             buildInputs =
               with pkgs;
               [
-                cacert # needed for nextests
                 libclang
                 fontconfig
                 freetype
                 protobufc
                 openssl_3
-                (rocksdb.override { enableShared = true; })
-                (snappy.override { static = true; })
                 zstd
                 zlib
                 bzip2
                 lz4
+                (rocksdb.override { enableShared = true; })
+                (snappy.override { static = true; })
+
+                # For running nextest
+                cacert
+
+                # For ai service
                 onnxruntime
 
-                # ebpf deps needed at runtime for debug builds via `admin ebpf build`
+                # Ebpf deps needed at runtime for debug builds via `admin ebpf build`
                 rust-bindgen
                 bpf-linker
               ]
@@ -215,48 +263,72 @@
           };
 
           # Expose the node and services as packages
-          packages = rec {
-            default = lightning-node;
+          packages =
+            let
+              # Helper to build a derivation for a single binary in the project
+              mkLightningBin =
+                name:
+                craneLib.buildPackage (
+                  commonArgs
+                  // {
+                    inherit cargoArtifacts;
+                    pname = name;
+                    doCheck = false;
+                    cargoExtraArgs = "--locked --bin ${name}";
+                  }
+                );
+            in
+            rec {
+              default = lightning-node;
 
-            # Unified package with the node and all services
-            lightning-node = pkgs.symlinkJoin {
-              name = "lightning-node";
-              paths = [
-                lightning-node-standalone
-                lightning-services
-              ];
+              # Unified package with the node and all services
+              lightning-node = pkgs.symlinkJoin {
+                name = "lightning-node";
+                paths = [
+                  lightning-node-standalone
+                  lightning-services
+                ];
+              };
+
+              # Core node binary
+              lightning-node-standalone = mkLightningBin "lightning-node";
+
+              # All service binaries
+              lightning-services = pkgs.symlinkJoin {
+                name = "lightning-services";
+                paths = [
+                  fn-service-0
+                  fn-service-1
+                  fn-service-2
+                  fn-service-3
+                ];
+              };
+
+              fn-service-0 = mkLightningBin "fn-service-0";
+              fn-service-1 = mkLightningBin "fn-service-1";
+              fn-service-2 = mkLightningBin "fn-service-2";
+              fn-service-3 =
+                let
+                  enclave = craneLib.buildPackage {
+                    src = ./services/sgx/enclave;
+                    cargoArtifacts = null;
+                    doCheck = false;
+                  };
+                in
+                craneLib.buildPackage (
+                  commonArgs
+                  // rec {
+                    inherit cargoArtifacts;
+                    pname = "fn-service-3";
+                    doCheck = false;
+                    cargoExtraArgs = lib.concatStringsSep " " [
+                      "--locked"
+                      "--bin ${pname}"
+                    ];
+                    FN_ENCLAVE_BIN_PATH = "${enclave}/bin/fleek-service-sgx-enclave";
+                  }
+                );
             };
-
-            # Core node binary
-            lightning-node-standalone = craneLib.buildPackage (
-              commonArgs
-              // {
-                inherit cargoArtifacts;
-                pname = "lightning-node";
-                doCheck = false;
-                cargoExtraArgs = lib.concatStringsSep " " [
-                  "--locked"
-                  "--bin lightning-node"
-                ];
-              }
-            );
-
-            # Service binaries
-            lightning-services = craneLib.buildPackage (
-              commonArgs
-              // {
-                inherit cargoArtifacts;
-                pname = "lightning-services";
-                doCheck = false;
-                cargoExtraArgs = lib.concatStringsSep " " [
-                  "--locked"
-                  "--bin fn-service-0"
-                  "--bin fn-service-1"
-                  "--bin fn-service-2"
-                ];
-              }
-            );
-          };
 
           # Allow using `nix run` on the project
           apps.default = flake-utils.lib.mkApp { drv = self.packages.${system}.default; };
