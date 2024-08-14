@@ -14,7 +14,6 @@ use crate::blockstore::VerifiedStream;
 
 mod blockstore;
 mod connection;
-mod listener;
 
 static BLOCKSTORE_PATH: LazyLock<PathBuf> = LazyLock::new(|| {
     std::env::var("BLOCKSTORE_PATH")
@@ -69,8 +68,10 @@ impl UsercallExtension for ExternalService {
             if addr == "requests.fleek.network" {
                 // Bind to request listener. Can only be used once (when enclave starts up).
                 static STARTED: AtomicBool = AtomicBool::new(false);
-                if STARTED.swap(true, std::sync::atomic::Ordering::Relaxed) {
-                    return Ok(Some(Box::new(listener::RequestListener::bind().await) as _));
+                if !STARTED.swap(true, std::sync::atomic::Ordering::Relaxed) {
+                    return Ok(Some(
+                        Box::new(connection::ConnectionListener::bind().await) as _
+                    ));
                 }
             }
 
