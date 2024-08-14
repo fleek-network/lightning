@@ -2,15 +2,20 @@
 
 use std::collections::HashMap;
 use std::pin::Pin;
+use std::task::Poll;
 
 use anyhow::Result;
 use bytes::{Bytes, BytesMut};
+use enclave_runner::usercalls::AsyncListener;
+use futures::ready;
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::mpsc;
 use url::Url;
+
+use crate::IPC_PATH;
 
 /// A utility function to read a U32 big-endian length delimited payload from an async reader.
 ///
@@ -106,6 +111,13 @@ pub struct ConnectionListener {
 }
 
 impl ConnectionListener {
+    pub async fn bind() -> Self {
+        let listener = UnixListener::bind(IPC_PATH.join("conn"))
+            .expect("failed to bind to connection socket listener");
+        let ConnectionListener { rx } = ConnectionListener::new(listener);
+        Self { rx }
+    }
+
     /// Create a new connection listener from the provided unix socket.
     pub fn new(listener: UnixListener) -> Self {
         let (tx, rx) = mpsc::channel(32);
@@ -145,6 +157,20 @@ impl ConnectionListener {
             .recv()
             .await
             .expect("Could not get new connection from the socket.")
+    }
+}
+
+impl AsyncListener for ConnectionListener {
+    fn poll_accept(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context,
+        _local_addr: Option<&mut String>,
+        // TODO: set client pubkey?
+        _peer_addr: Option<&mut String>,
+    ) -> std::task::Poll<tokio::io::Result<Option<Box<dyn enclave_runner::usercalls::AsyncStream>>>>
+    {
+        let res = ready!(self.rx.poll_recv(cx));
+        Poll::Ready(res.transpose().map(|v| v.map(|c| Box::new(c) as _)))
     }
 }
 
