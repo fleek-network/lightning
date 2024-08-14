@@ -19,7 +19,7 @@ anyhow.workspace = true
 serde.workspace = true
 serde_cbor = "0.11.2"
 serde-big-array = "0.5"
-url = "2.5"
+url = { version = "2.5", features = ["serde"] }
 arrayvec = "0.7"
 
 # deps for running sgx enclaves
