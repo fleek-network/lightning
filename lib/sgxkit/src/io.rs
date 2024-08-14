@@ -2,17 +2,21 @@ use std::io::ErrorKind;
 use std::sync::atomic::AtomicBool;
 
 use sgxkit_sys::fn0;
+use sgxkit_sys::types::IOError;
 
 /// Get the input data string (request).
-pub fn get_input_data() -> Option<String> {
-    unsafe {
-        let len = fn0::input_data_size();
-        (len > 0).then(|| {
-            let buf = String::with_capacity(len as usize);
-            fn0::input_data_copy(buf.as_ptr() as usize, 0, len);
-            buf
-        })
+pub fn get_input_data() -> Result<String, IOError> {
+    let len = unsafe { fn0::input_data_size() };
+    let buf = String::with_capacity(len as usize);
+
+    if len > 0 {
+        unsafe {
+            let res = fn0::input_data_copy(buf.as_ptr() as usize, 0, len);
+            IOError::result(res)?;
+        }
     }
+
+    Ok(buf)
 }
 
 static IS_WRITER_OPEN: AtomicBool = AtomicBool::new(false);
