@@ -45,7 +45,8 @@ fn handle_connection(conn: &mut TcpStream) -> anyhow::Result<()> {
     // run wasm module
     let response = runtime::execute_module(content, &function, input)?;
 
-    // TODO: sign and return data in some format
+    // write length delimiter and wasm output
+    conn.write_all(&(response.len() as u32).to_be_bytes())?;
     conn.write_all(&response)?;
 
     Ok(())
