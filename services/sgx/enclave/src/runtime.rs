@@ -6,11 +6,17 @@ pub fn execute_module(
     entry: &str,
     request: impl Into<Bytes>,
 ) -> anyhow::Result<Bytes> {
-    let config = Config::default();
+    let mut config = Config::default();
 
-    // TODO:
-    //   - should we use fuel tracking for payments/execution limits
-    //   - configure stack/heap limits
+    // Configure wasm engine
+    // TODO(oz): should we use fuel tracking for payments/execution limits
+    config
+        .compilation_mode(wasmi::CompilationMode::LazyTranslation)
+        .set_stack_limits(wasmi::StackLimits {
+            initial_value_stack_height: 512 << 10, // 512 KiB
+            maximum_value_stack_height: 5 << 20,   // 5 MiB
+            maximum_recursion_depth: 65535,
+        });
 
     let engine = Engine::new(&config);
     let mut store = Store::new(&engine, HostState::default());
@@ -101,9 +107,11 @@ mod fn0 {
         let offset = offset as usize;
         let size = len as usize;
 
+        // TODO: perform this validation ahead of time when loading the wasm, before calling main
         let Some(Extern::Memory(memory)) = ctx.get_export("memory") else {
             return -1;
         };
+
         let ctx = ctx.as_context_mut();
         let (memory, state) = memory.data_and_store_mut(ctx);
 
@@ -113,6 +121,7 @@ mod fn0 {
         let Some(buffer) = state.input.get(offset..(offset + size)) else {
             return -2;
         };
+
         region.copy_from_slice(buffer);
 
         0
@@ -135,15 +144,18 @@ mod fn0 {
         let ptr = ptr as usize;
         let len = len as usize;
 
+        // TODO: perform this validation ahead of time when loading the wasm, before calling main
         let Some(Extern::Memory(memory)) = caller.get_export("memory") else {
             return -1;
         };
+
         let ctx = caller.as_context_mut();
         let (memory, state) = memory.data_and_store_mut(ctx);
 
         let Some(region) = memory.get(ptr..(ptr + len)) else {
             return -2;
         };
+
         state.output.put_slice(region);
 
         // TODO: hash output as we write it for signing
