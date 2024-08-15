@@ -343,6 +343,7 @@ mod tests {
     use super::super::walker::Mode;
     use super::{IncrementalVerifier, WithHashTreeCollector};
     use crate::collections::HashTree;
+    use crate::directory::hash_transcript;
     use crate::hasher::iv::IV;
     use crate::test_utils::*;
 
@@ -360,6 +361,45 @@ mod tests {
         assert!(verifier.is_finished());
         assert!(verifier.storage.tree.is_empty());
         assert_eq!(verifier.finalize(), vec![IV::dir().empty_hash()]);
+    }
+
+    #[test]
+    fn verify_from_middle() {
+        for n in [3, 6, 12, 21, 27] {
+            let tree = dir_hash_tree(n);
+            let hashtree = HashTree::try_from(&tree).unwrap();
+
+            let mut verifier = IncrementalVerifier::<()>::dir();
+            verifier.set_root_hash(*hashtree.root());
+
+            let mid = (n + 1) / 2;
+            verifier
+                .feed_proof(hashtree.generate_proof(Mode::Initial, mid).as_slice())
+                .unwrap();
+            verifier.verify_hash(hashtree[mid]).unwrap();
+            assert!(!verifier.is_root());
+
+            for i in mid + 1..n {
+                assert!(!verifier.is_finished());
+
+                // test against a wrong proof string.
+                assert!(
+                    verifier
+                        .feed_proof(hashtree.generate_proof(Mode::Initial, i).as_slice())
+                        .is_err()
+                );
+
+                verifier
+                    .feed_proof(hashtree.generate_proof(Mode::Proceeding, i).as_slice())
+                    .unwrap();
+
+                // test against a wrong hash.
+                assert!(verifier.verify_hash(hashtree[i - 1]).is_err());
+                verifier.verify_hash(hashtree[i]).unwrap();
+            }
+
+            assert!(verifier.is_finished());
+        }
     }
 
     #[test]
