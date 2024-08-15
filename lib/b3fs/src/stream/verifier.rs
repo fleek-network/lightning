@@ -132,7 +132,7 @@ impl<S: VerifierCollector> IncrementalVerifier<S> {
     where
         S: Default,
     {
-        Self::new_with_storage(IV::dir(), S::default())
+        Self::new_with_storage(IV::DIR, S::default())
     }
 
     /// Set the root hash of the content that is to be verified. This must be called as part
@@ -334,7 +334,7 @@ where
     S: Default,
 {
     fn default() -> Self {
-        Self::new(IV::new())
+        Self::new(IV::DEFAULT)
     }
 }
 
@@ -360,7 +360,7 @@ mod tests {
         verifier.set_root_hash(*empty_hashtree.root());
         assert!(verifier.is_finished());
         assert!(verifier.storage.tree.is_empty());
-        assert_eq!(verifier.finalize(), vec![*IV::dir().empty_hash()]);
+        assert_eq!(verifier.finalize(), vec![*IV::DIR.empty_hash()]);
     }
 
     #[test]

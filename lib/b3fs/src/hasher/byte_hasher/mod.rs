@@ -55,10 +55,10 @@ pub struct BlockHasher {
 impl<T: HashTreeCollector> Blake3Hasher<T> {
     /// Create a new [Blake3Hasher`] with the default IV.
     pub fn new(tree: T) -> Self {
-        Self::new_with_iv(tree, IV::default())
+        Self::new_with_iv(tree, &IV::DEFAULT)
     }
 
-    pub fn new_with_iv(tree: T, iv: IV) -> Self {
+    pub fn new_with_iv(tree: T, iv: &IV) -> Self {
         Self {
             block_state: iv.into(),
             cv_stack: Default::default(),
@@ -249,7 +249,7 @@ impl<T: HashTreeCollector> Blake3Hasher<T> {
 impl BlockHasher {
     /// Create a new block hasher using the default `IV`
     pub fn new() -> Self {
-        IV::new().into()
+        From::from(&IV::DEFAULT)
     }
 
     pub fn update(&mut self, input: &[u8]) {
@@ -525,15 +525,15 @@ impl Default for BlockHasher {
     }
 }
 
-impl From<IV> for BlockHasher {
+impl From<&IV> for BlockHasher {
     #[inline]
-    fn from(value: IV) -> Self {
+    fn from(value: &IV) -> Self {
         BlockHasher {
             key: value.key,
             chunk_state: b3::ChunkState::new(
                 &value.key,
                 0,
-                value.flags,
+                value.flags(),
                 platform::Platform::detect(),
             ),
             cv_stack: ArrayVec::new(),

@@ -1,7 +1,56 @@
+use std::ops::Deref;
+
 use super::b3::{platform, ROOT};
 use super::{b3, dir_hasher, join};
 use crate::hasher::b3::{CHUNK_END, CHUNK_START};
 use crate::utils;
+
+/// A small IV which fits into one memory word for when we have a static reference to the [IV].
+struct SmallIV {
+    iv: *const IV,
+}
+
+impl SmallIV {
+    pub const DEFAULT: Self = Self::from_static_ref(&IV::DEFAULT);
+    pub const DIR: Self = Self::from_static_ref(&IV::DIR);
+
+    pub const fn from_static_ref(iv: &'static IV) -> Self {
+        debug_assert!(iv.flags_internal & 1 == 0);
+        Self {
+            // Safety: The `iv` param has a static lifetime which means the pointer will be valid
+            // for the rest of the duration of the program. And also given the debug assertion above
+            // and the program invariant we have the last bit of the flag is set to 0. Which means
+            // the Drop implementation will skip over trying to deallocate the memory.
+            iv: unsafe { iv as *const IV },
+        }
+    }
+
+    pub fn new(mut iv: IV) -> Self {
+        debug_assert!(iv.flags_internal & 1 == 0);
+        // Set the last bit to 1 so that Drop knows it has to dealloc the memory.
+        iv.flags_internal |= 1;
+        Self {
+            iv: Box::into_raw(Box::new(iv)),
+        }
+    }
+}
+
+impl Deref for SmallIV {
+    type Target = IV;
+    fn deref(&self) -> &Self::Target {
+        unsafe { &*self.iv }
+    }
+}
+
+impl Drop for SmallIV {
+    fn drop(&mut self) {
+        if self.flags_internal & 1 == 1 {
+            // Safety: Program invariant if the last bit is set to one we have gotten this
+            // IV using [SmallIV::new] and not via an static reference.
+            unsafe { Box::from_raw(self.iv as *mut IV) };
+        }
+    }
+}
 
 /// Initialization vector for a Blake3 hasher, if `BlockHasher::new()` or `HashTreeBuilder::new()`
 /// are not sufficient for you and you need more customization on the IV, such as keyed hash
@@ -10,28 +59,29 @@ use crate::utils;
 #[derive(Clone, Copy)]
 pub struct IV {
     pub(crate) key: b3::CVWords,
-    pub(crate) flags: u8,
+    /// The first bit is never meant to be used for blake3 itself and we always clear it out
+    /// when it is read using the [IV::flags] method.
+    flags_internal: u8,
     empty: [u8; 32],
 }
 
 impl IV {
+    pub const DEFAULT: Self = IV::new_internal(b3::IV, 0);
+    pub const DIR: Self = IV::new_keyed(&dir_hasher::KEY);
+
     const fn new_internal(key: &b3::CVWords, flags: u8) -> Self {
+        debug_assert!(flags & 1 == 0);
+
         Self {
             key: *key,
-            flags,
+            flags_internal: flags,
             empty: empty_hash(key, flags),
         }
     }
 
-    /// Create a new `IV` from the default configurations. This is the equivalent
-    /// IV of creating a `Hasher::new()`.
-    pub const fn new() -> Self {
-        Self::new_internal(b3::IV, 0)
-    }
-
-    /// Create a new `IV`
-    pub const fn dir() -> Self {
-        Self::new_keyed(&dir_hasher::KEY)
+    /// Returns the flag for this IV.
+    pub const fn flags(&self) -> u8 {
+        self.flags_internal & (u8::MAX - 1)
     }
 
     /// The keyed hash function.
@@ -84,7 +134,7 @@ impl IV {
             left,
             right,
             &self.key,
-            self.flags,
+            self.flags(),
             platform::Platform::detect(),
         );
         if is_root {
@@ -96,18 +146,18 @@ impl IV {
 
     /// Returns the hash of all of the input data at once.
     pub fn hash_all_at_once(&self, input: &[u8]) -> [u8; 32] {
-        b3::hash_all_at_once::<join::SerialJoin>(input, &self.key, self.flags).root_hash()
+        b3::hash_all_at_once::<join::SerialJoin>(input, &self.key, self.flags()).root_hash()
     }
 
     /// Returns the hash of all of the input data at once using rayon for parallelization.
     pub fn hash_all_at_once_rayon(&self, input: &[u8]) -> [u8; 32] {
-        b3::hash_all_at_once::<join::RayonJoin>(input, &self.key, self.flags).root_hash()
+        b3::hash_all_at_once::<join::RayonJoin>(input, &self.key, self.flags()).root_hash()
     }
 }
 
 impl Default for IV {
     fn default() -> Self {
-        Self::new()
+        Self::DEFAULT
     }
 }
 
@@ -189,8 +239,8 @@ mod tests {
 
     #[test]
     fn empty_hash() {
-        assert_eq!(*IV::dir().empty_hash(), dir_hasher::EMPTY_HASH);
-        assert_eq!(*IV::dir().empty_hash(), IV::dir().hash_all_at_once(&[]));
+        assert_eq!(*IV::DIR.empty_hash(), dir_hasher::EMPTY_HASH);
+        assert_eq!(*IV::DIR.empty_hash(), IV::DIR.hash_all_at_once(&[]));
         assert_eq!(
             *IV::default().empty_hash(),
             IV::default().hash_all_at_once(&[])
