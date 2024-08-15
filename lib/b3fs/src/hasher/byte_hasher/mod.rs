@@ -5,7 +5,7 @@ use arrayvec::ArrayVec;
 
 use super::b3::platform;
 use super::iv::IV;
-use super::{b3, join};
+use super::{b3, join, HashTreeCollector};
 use crate::utils;
 
 /// Block size for Fleek's proof of delivery. Which is 256KiB. This number is in Blake3
@@ -37,11 +37,11 @@ const TREE_MAX_TREE_DEPTH: usize = b3::MAX_DEPTH - TREE_BLOCK_SIZE_IN_CHUNK_LOG_
 /// 0     1 3     4
 /// ```
 #[derive(Clone)]
-pub struct Blake3Hasher {
-    tree: Vec<[u8; 32]>,
+pub struct Blake3Hasher<T: HashTreeCollector = Vec<[u8; 32]>> {
     block_state: BlockHasher,
     cv_stack: ArrayVec<b3::CVBytes, { TREE_MAX_TREE_DEPTH + 1 }>,
     block_counter: u64,
+    pub tree: T,
 }
 
 /// Incremental hasher for a single block, this can only be used to hash only one block.
@@ -52,10 +52,19 @@ pub struct BlockHasher {
     cv_stack: ArrayVec<b3::CVBytes, { TREE_BLOCK_SIZE_IN_CHUNK_LOG_2 + 1 }>,
 }
 
-impl Blake3Hasher {
-    /// Create a new [`HashTreeBuilder`] with the default IV.
-    pub fn new() -> Self {
-        IV::new().into()
+impl<T: HashTreeCollector> Blake3Hasher<T> {
+    /// Create a new [Blake3Hasher`] with the default IV.
+    pub fn new(tree: T) -> Self {
+        Self::new_with_iv(tree, IV::default())
+    }
+
+    pub fn new_with_iv(tree: T, iv: IV) -> Self {
+        Self {
+            block_state: iv.into(),
+            cv_stack: Default::default(),
+            block_counter: 0,
+            tree,
+        }
     }
 
     /// Input some more bytes to this hasher, this function is always single-threaded
@@ -495,9 +504,12 @@ impl BlockHasher {
     }
 }
 
-impl Default for Blake3Hasher {
+impl<T: HashTreeCollector> Default for Blake3Hasher<T>
+where
+    T: Default,
+{
     fn default() -> Self {
-        Self::new()
+        Self::new(T::default())
     }
 }
 
@@ -519,18 +531,6 @@ impl From<IV> for BlockHasher {
                 platform::Platform::detect(),
             ),
             cv_stack: ArrayVec::new(),
-        }
-    }
-}
-
-impl From<IV> for Blake3Hasher {
-    #[inline]
-    fn from(value: IV) -> Self {
-        Blake3Hasher {
-            tree: Vec::new(),
-            block_state: value.into(),
-            cv_stack: ArrayVec::new(),
-            block_counter: 0,
         }
     }
 }

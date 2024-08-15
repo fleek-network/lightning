@@ -9,6 +9,19 @@ pub mod byte_hasher;
 pub mod dir_hasher;
 pub mod iv;
 
-pub trait HashTreeBuilder {
+/// Any object that can intercept the intermediary hash tree and collect it.
+pub trait HashTreeCollector {
     fn push(&mut self, hash: [u8; 32]);
+}
+
+impl HashTreeCollector for Vec<[u8; 32]> {
+    fn push(&mut self, hash: [u8; 32]) {
+        Vec::push(self, hash)
+    }
+}
+
+impl HashTreeCollector for Vec<u8> {
+    fn push(&mut self, hash: [u8; 32]) {
+        Vec::extend_from_slice(self, &hash)
+    }
 }
