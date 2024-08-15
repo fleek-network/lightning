@@ -1,15 +1,16 @@
 use arrayvec::ArrayVec;
-use fleek_blake3::tree::IV;
 use smallvec::{Array, SmallVec};
 use thiserror::Error;
 
 use super::ProofBufIter;
 use crate::directory::merge::iv;
+use crate::hasher::iv::IV;
+use crate::hasher::HashTreeCollector;
 use crate::utils::{is_valid_proof_len, Digest, OwnedDigest};
 
 /// An incremental verifier can be used to verify a stream of proofs and content. It can also be
 /// used to capture the entire hash tree using a collector.
-pub struct IncrementalVerifier<S: CollectorStorage = ()> {
+pub struct IncrementalVerifier<S: VerifierCollector = ()> {
     iv: IV,
     /// Number of items in the stack that are a result of a merge, which is basically
     /// the current depth of the tree.
@@ -20,7 +21,9 @@ pub struct IncrementalVerifier<S: CollectorStorage = ()> {
     storage: S,
 }
 
-pub trait CollectorStorage {
+/// An abstraction over how the [IncrementalVerifier] is supposed to collect the nodes in the hash
+/// tree as it comes across them.
+pub trait VerifierCollector {
     type Array: Array<Item = [u8; 32]>;
     const COLLECT: bool;
 
@@ -31,16 +34,13 @@ pub trait CollectorStorage {
 
 /// A collector that can work along-side an [`IncrementalVerifier`] to collect the entire hash tree
 /// into a vector.
-///
-/// The boolean generic [`MANUAL_RESERVE`] determines if the implementation should skip trying to
-/// reserve more space explicitly.
 #[derive(Default)]
-pub struct CollectToVec<const MANUAL_RESERVE: bool = false> {
+pub struct WithHashTreeCollector<T: HashTreeCollector = Vec<[u8; 32]>> {
     counter: usize,
-    tree: Vec<[u8; 32]>,
+    pub tree: T,
 }
 
-impl CollectorStorage for () {
+impl VerifierCollector for () {
     type Array = [[u8; 32]; 6];
     const COLLECT: bool = false;
     #[inline(always)]
@@ -55,15 +55,16 @@ impl CollectorStorage for () {
     }
 }
 
-impl<const MANUAL_RESERVE: bool> CollectorStorage for CollectToVec<MANUAL_RESERVE> {
+impl<T: HashTreeCollector> VerifierCollector for WithHashTreeCollector<T> {
     type Array = [[u8; 32]; 12];
     const COLLECT: bool = true;
+
     #[inline(always)]
     fn advance(&mut self, mut pc: u8, stack: &mut SmallVec<Self::Array>) -> u8 {
         // reserve enough space for the smallest possible hash tree with the given tree depth.
-        if !MANUAL_RESERVE && self.tree.capacity() == 0 {
-            let add = (1 << (pc.saturating_sub(1) as usize)) + 1;
-            self.tree.reserve_exact(add);
+        if self.counter == 0 {
+            // TODO(qti3e): Figure this out.
+            // self.tree.reserve(add);
         }
 
         // move the counter forward.
@@ -101,7 +102,18 @@ pub enum VerificationError {
     Terminated,
 }
 
-impl<S: CollectorStorage> IncrementalVerifier<S> {
+impl<S: VerifierCollector> IncrementalVerifier<S> {
+    #[inline]
+    pub fn new_with_storage(iv: IV, storage: S) -> Self {
+        Self {
+            iv,
+            stack: SmallVec::new(),
+            parent_count: 0,
+            storage,
+        }
+    }
+
+    #[inline]
     pub fn new(iv: IV) -> Self
     where
         S: Default,
@@ -114,21 +126,13 @@ impl<S: CollectorStorage> IncrementalVerifier<S> {
         }
     }
 
-    pub fn new_with_storage(iv: IV, storage: S) -> Self {
-        Self {
-            iv,
-            stack: SmallVec::new(),
-            parent_count: 0,
-            storage,
-        }
-    }
-
     /// Create a new incremental verifier for a directory.
+    #[inline]
     pub fn dir() -> Self
     where
         S: Default,
     {
-        Self::new(iv())
+        Self::new_with_storage(IV::dir(), S::default())
     }
 
     /// Set the root hash of the content that is to be verified. This must be called as part
@@ -138,8 +142,18 @@ impl<S: CollectorStorage> IncrementalVerifier<S> {
     /// # Panics
     ///
     /// If called more than once.
+    #[inline]
     pub fn set_root_hash(&mut self, hash: [u8; 32]) {
         assert_eq!(self.parent_count, 0);
+        if hash == self.iv.empty_hash() {
+            if S::COLLECT {
+                // So that is_finished works and that finalize has access to the empty
+                // hash in the stack.
+                self.parent_count = 1;
+            } else {
+                return;
+            }
+        }
         self.stack.push(hash);
     }
 
@@ -278,7 +292,6 @@ impl<S: CollectorStorage> IncrementalVerifier<S> {
     /// Currently, this method will return `false` even if the root hash is the hash of an empty
     /// content under the provided *IV*.
     pub fn is_finished(&self) -> bool {
-        // TODO(qti3e): Handle hash of an empty content.
         if S::COLLECT {
             self.stack.len() == self.parent_count as usize
         } else {
@@ -292,49 +305,31 @@ impl<S: CollectorStorage> IncrementalVerifier<S> {
     }
 }
 
-// TODO(qti3e): Put this in a trait? trait CollectorStorageVecApi?
-impl<const MANUAL_RESERVE: bool> IncrementalVerifier<CollectToVec<MANUAL_RESERVE>> {
+impl<T: HashTreeCollector> IncrementalVerifier<WithHashTreeCollector<T>> {
     /// Finalize the verifier if it is finished and returns the captured hash tree.
     ///
     /// # Panics
     ///
     /// If the hasher is not terminated.
-    pub fn finalize(mut self) -> Vec<[u8; 32]> {
+    pub fn finalize(mut self) -> T {
         assert!(self.is_finished());
-        self.storage.tree.reserve_exact(self.stack.len());
+        self.storage.tree.reserve(self.stack.len());
         while let Some(hash) = self.stack.pop() {
             self.storage.tree.push(hash);
         }
         self.storage.tree
     }
 
-    /// Returns the remaining capacity of the buffer that is being used to capture the tree.
-    pub fn remaining_capacity(&self) -> usize {
-        self.storage.tree.capacity() - self.storage.tree.len()
+    pub fn get_tree(&self) -> &T {
+        &self.storage.tree
     }
 
-    /// Returns the captured hash tree up to this point. This can be used if the captured hash tree
-    /// can incrementally be moved to another place. (e.g., be written to the file system)
-    pub fn flush(&mut self) -> Vec<[u8; 32]> {
-        let mut tree = Vec::with_capacity(self.storage.tree.capacity() - self.storage.tree.len());
-        std::mem::swap(&mut self.storage.tree, &mut tree);
-        tree
-    }
-
-    /// Reserve exactly enough space for additional given hashes. Should be preferred if no future
-    /// allocation is going to be requested.
-    pub fn reserve_exact(&mut self, additional: usize) {
-        self.storage.tree.reserve_exact(additional * 2 - 1);
-    }
-
-    /// Reserves enough space to capture the tree of additional new nodes. This may allocate more
-    /// space if necessary to avoid the future need for further allocations.
-    pub fn reserve(&mut self, additional: usize) {
-        self.storage.tree.reserve(additional * 2 - 1);
+    pub fn get_tree_mut(&mut self) -> &mut T {
+        &mut self.storage.tree
     }
 }
 
-impl<S: CollectorStorage> Default for IncrementalVerifier<S>
+impl<S: VerifierCollector> Default for IncrementalVerifier<S>
 where
     S: Default,
 {
@@ -346,9 +341,26 @@ where
 #[cfg(test)]
 mod tests {
     use super::super::walker::Mode;
-    use super::{CollectToVec, IncrementalVerifier};
+    use super::{IncrementalVerifier, WithHashTreeCollector};
     use crate::collections::HashTree;
+    use crate::hasher::iv::IV;
     use crate::test_utils::*;
+
+    #[test]
+    fn empty_checker() {
+        let empty_tree = dir_hash_tree(0);
+        let empty_hashtree = HashTree::try_from(&empty_tree).unwrap();
+
+        let mut verifier = IncrementalVerifier::<()>::dir();
+        verifier.set_root_hash(*empty_hashtree.root());
+        assert!(verifier.is_finished());
+
+        let mut verifier = IncrementalVerifier::<WithHashTreeCollector>::dir();
+        verifier.set_root_hash(*empty_hashtree.root());
+        assert!(verifier.is_finished());
+        assert!(verifier.storage.tree.is_empty());
+        assert_eq!(verifier.finalize(), vec![IV::dir().empty_hash()]);
+    }
 
     #[test]
     fn demo() {
@@ -372,9 +384,9 @@ mod tests {
                 assert!(verifier.is_finished());
             }
 
-            let mut verifier = IncrementalVerifier::<CollectToVec>::dir();
+            let mut verifier = IncrementalVerifier::<WithHashTreeCollector>::dir();
             verifier.set_root_hash(*example_hashtree.root());
-            verifier.reserve_exact(n);
+            verifier.storage.tree.reserve_exact(n * 2 - 1);
 
             let mut reallocation = 0;
 
@@ -389,6 +401,7 @@ mod tests {
                     reallocation += 1;
                 }
             }
+
             assert!(verifier.is_finished());
 
             // check the captured tree and over allocations.
@@ -415,7 +428,7 @@ mod tests {
     fn is_root() {
         let tree_buffer = dir_hash_tree(1);
         let hashtree = HashTree::try_from(&tree_buffer).unwrap();
-        let mut verifier = IncrementalVerifier::<CollectToVec>::dir();
+        let mut verifier = IncrementalVerifier::<WithHashTreeCollector>::dir();
         verifier.set_root_hash(*hashtree.root());
         verifier
             .feed_proof(hashtree.generate_proof(Mode::Initial, 0).as_slice())
@@ -433,7 +446,7 @@ mod tests {
 
         let tree_buffer = dir_hash_tree(2);
         let hashtree = HashTree::try_from(&tree_buffer).unwrap();
-        let mut verifier = IncrementalVerifier::<CollectToVec>::dir();
+        let mut verifier = IncrementalVerifier::<WithHashTreeCollector>::dir();
         verifier.set_root_hash(*hashtree.root());
         verifier
             .feed_proof(hashtree.generate_proof(Mode::Initial, 0).as_slice())

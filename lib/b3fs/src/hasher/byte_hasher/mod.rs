@@ -238,6 +238,12 @@ impl<T: HashTreeCollector> Blake3Hasher<T> {
     pub fn finalize(mut self) -> [u8; 32] {
         self.final_output().root_hash()
     }
+
+    /// Like [Self::finalize]
+    pub fn finalize_tree(mut self) -> (T, [u8; 32]) {
+        let hash = self.final_output().root_hash();
+        (self.tree, hash)
+    }
 }
 
 impl BlockHasher {
