@@ -11,11 +11,16 @@ use crate::utils;
 pub struct IV {
     pub(crate) key: b3::CVWords,
     pub(crate) flags: u8,
+    empty: [u8; 32],
 }
 
 impl IV {
     const fn new_internal(key: &b3::CVWords, flags: u8) -> Self {
-        Self { key: *key, flags }
+        Self {
+            key: *key,
+            flags,
+            empty: empty_hash(key, flags),
+        }
     }
 
     /// Create a new `IV` from the default configurations. This is the equivalent
@@ -68,8 +73,8 @@ impl IV {
 
 impl IV {
     /// Returns the hash of an empty input.
-    pub const fn empty_hash(&self) -> [u8; 32] {
-        empty_hash(&self.key, self.flags)
+    pub const fn empty_hash(&self) -> &[u8; 32] {
+        &self.empty
     }
 
     /// Merge two children into the parent hash, the `is_root` determines if the result
@@ -184,17 +189,17 @@ mod tests {
 
     #[test]
     fn empty_hash() {
-        assert_eq!(IV::dir().empty_hash(), dir_hasher::EMPTY_HASH);
-        assert_eq!(IV::dir().empty_hash(), IV::dir().hash_all_at_once(&[]));
+        assert_eq!(*IV::dir().empty_hash(), dir_hasher::EMPTY_HASH);
+        assert_eq!(*IV::dir().empty_hash(), IV::dir().hash_all_at_once(&[]));
         assert_eq!(
-            IV::default().empty_hash(),
+            *IV::default().empty_hash(),
             IV::default().hash_all_at_once(&[])
         );
         let mut rng = thread_rng();
         for _ in 0..32 {
             let key = rng.gen();
             let iv = IV::new_keyed(&key);
-            assert_eq!(iv.empty_hash(), iv.hash_all_at_once(&[]));
+            assert_eq!(*iv.empty_hash(), iv.hash_all_at_once(&[]));
         }
     }
 }

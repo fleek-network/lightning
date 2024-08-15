@@ -145,7 +145,7 @@ impl<S: VerifierCollector> IncrementalVerifier<S> {
     #[inline]
     pub fn set_root_hash(&mut self, hash: [u8; 32]) {
         assert_eq!(self.parent_count, 0);
-        if hash == self.iv.empty_hash() {
+        if &hash == self.iv.empty_hash() {
             if S::COLLECT {
                 // So that is_finished works and that finalize has access to the empty
                 // hash in the stack.
@@ -360,7 +360,7 @@ mod tests {
         verifier.set_root_hash(*empty_hashtree.root());
         assert!(verifier.is_finished());
         assert!(verifier.storage.tree.is_empty());
-        assert_eq!(verifier.finalize(), vec![IV::dir().empty_hash()]);
+        assert_eq!(verifier.finalize(), vec![*IV::dir().empty_hash()]);
     }
 
     #[test]
