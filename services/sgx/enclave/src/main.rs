@@ -8,6 +8,10 @@ use serde::Deserialize;
 mod blockstore;
 mod runtime;
 
+pub(crate) mod config {
+    pub const MAX_OUTPUT_SIZE: usize = 16 << 20; // 16 MiB
+}
+
 /// TODO: Dummy shared key, to be replaced with the key sharing protocol.
 /// Public key: 27fjvoWaGcupCpT9ZMfok4gAHGcUhuFt1wgpoVjb4Bhka
 static SHARED_KEY: LazyLock<SecretKey> =

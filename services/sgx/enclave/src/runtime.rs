@@ -93,8 +93,8 @@ mod fn0 {
     /// # Returns
     ///
     /// Length of the input data slice.
-    pub fn input_data_size(caller: Ctx) -> u32 {
-        caller.data().input.len() as u32
+    pub fn input_data_size(ctx: Ctx) -> u32 {
+        ctx.data().input.len() as u32
     }
 
     /// Copies data from the input into a memory location. Use
@@ -161,6 +161,10 @@ mod fn0 {
 
         let ctx = caller.as_context_mut();
         let (memory, state) = memory.data_and_store_mut(ctx);
+
+        if state.output.len() > crate::config::MAX_OUTPUT_SIZE {
+            return -2;
+        }
 
         let Some(region) = memory.get(ptr..(ptr + len)) else {
             return -2;
