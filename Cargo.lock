@@ -1576,6 +1576,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3280efcf6d66bc77c2cf9b67dc8acee47a217d9be67dd590b3230dffe663724d"
 dependencies = [
  "bpaf_derive",
+ "owo-colors",
+ "supports-color",
 ]
 
 [[package]]
@@ -3521,14 +3523,15 @@ version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e0206e602d2645ec8b24ed8307fadbc6c3110e2b11ab2f806fc02fee49327079"
 dependencies = [
+ "aes-gcm",
  "getrandom",
  "hkdf",
  "libsecp256k1",
  "once_cell",
- "openssl",
  "parking_lot",
  "rand_core 0.6.4",
  "sha2 0.10.8",
+ "typenum",
  "wasm-bindgen",
 ]
 
@@ -5958,6 +5961,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "is_ci"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7655c9839580ee829dfacba1d1278c2b7883e50a277ff7541299489d6bdfdc45"
+
+[[package]]
 name = "is_terminal_polyfill"
 version = "1.70.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6555,6 +6564,7 @@ dependencies = [
  "libsecp256k1-gen-genmult",
  "rand 0.8.5",
  "serde",
+ "sha2 0.9.9",
 ]
 
 [[package]]
@@ -10010,6 +10020,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
 
 [[package]]
+name = "owo-colors"
+version = "4.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "caff54706df99d2a78a5a4e3455ff45448d81ef1bb63c22cd14052ca0e993a3f"
+
+[[package]]
 name = "p256"
 version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12690,7 +12706,7 @@ dependencies = [
 
 [[package]]
 name = "sgxencrypt"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "anyhow",
  "bpaf",
@@ -13594,6 +13610,15 @@ dependencies = [
 name = "sui-types"
 version = "0.1.0"
 source = "git+https://github.com/daltoncoder/narwhal-hack.git#c8bbc1641949a266a26c223431a94a59365c6b53"
+
+[[package]]
+name = "supports-color"
+version = "3.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9829b314621dfc575df4e409e79f9d6a66a3bd707ab73f23cb4aa3a854ac854f"
+dependencies = [
+ "is_ci",
+]
 
 [[package]]
 name = "svm-rs"
