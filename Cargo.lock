@@ -8167,6 +8167,8 @@ dependencies = [
 name = "lightning-workspace-hack"
 version = "0.1.0"
 dependencies = [
+ "aead",
+ "aes-gcm",
  "ahash 0.8.11",
  "arc-swap",
  "arrayvec",
@@ -8209,6 +8211,7 @@ dependencies = [
  "data-encoding",
  "der 0.7.9",
  "digest 0.10.7",
+ "digest 0.9.0",
  "ecdsa",
  "either",
  "elliptic-curve",
@@ -8285,7 +8288,6 @@ dependencies = [
  "quote 1.0.36",
  "rand 0.8.5",
  "rand_chacha",
- "rand_core 0.6.4",
  "regex",
  "regex-automata 0.4.7",
  "regex-syntax 0.8.4",
@@ -8310,6 +8312,7 @@ dependencies = [
  "serde_with 2.3.3",
  "sha1",
  "sha2 0.10.8",
+ "sha2 0.9.9",
  "sha3 0.10.8",
  "simdutf8",
  "similar",
