@@ -1,5 +1,6 @@
 [package]
 name = "sgxencrypt"
+description = "Cli tool for encrypting content for fleek network sgx enclaves"
 version.workspace = true
 edition.workspace = true
 
