@@ -4,14 +4,14 @@ use thiserror::Error;
 
 use super::ProofBufIter;
 use crate::directory::merge::iv;
-use crate::hasher::iv::IV;
+use crate::hasher::iv::{SmallIV, IV};
 use crate::hasher::HashTreeCollector;
 use crate::utils::{is_valid_proof_len, Digest, OwnedDigest};
 
 /// An incremental verifier can be used to verify a stream of proofs and content. It can also be
 /// used to capture the entire hash tree using a collector.
 pub struct IncrementalVerifier<S: VerifierCollector = ()> {
-    iv: IV,
+    iv: SmallIV,
     /// Number of items in the stack that are a result of a merge, which is basically
     /// the current depth of the tree.
     parent_count: u8,
@@ -104,7 +104,7 @@ pub enum VerificationError {
 
 impl<S: VerifierCollector> IncrementalVerifier<S> {
     #[inline]
-    pub fn new_with_storage(iv: IV, storage: S) -> Self {
+    pub fn new_with_storage(iv: SmallIV, storage: S) -> Self {
         Self {
             iv,
             stack: SmallVec::new(),
@@ -114,7 +114,7 @@ impl<S: VerifierCollector> IncrementalVerifier<S> {
     }
 
     #[inline]
-    pub fn new(iv: IV) -> Self
+    pub fn new(iv: SmallIV) -> Self
     where
         S: Default,
     {
@@ -132,7 +132,7 @@ impl<S: VerifierCollector> IncrementalVerifier<S> {
     where
         S: Default,
     {
-        Self::new_with_storage(IV::DIR, S::default())
+        Self::new_with_storage(SmallIV::DIR, S::default())
     }
 
     /// Set the root hash of the content that is to be verified. This must be called as part
@@ -286,11 +286,6 @@ impl<S: VerifierCollector> IncrementalVerifier<S> {
     }
 
     /// Returns true if the verifier has met all the content and is in a terminating state.
-    ///
-    /// # Limitation
-    ///
-    /// Currently, this method will return `false` even if the root hash is the hash of an empty
-    /// content under the provided *IV*.
     pub fn is_finished(&self) -> bool {
         if S::COLLECT {
             self.stack.len() == self.parent_count as usize
@@ -334,7 +329,7 @@ where
     S: Default,
 {
     fn default() -> Self {
-        Self::new(IV::DEFAULT)
+        Self::new(SmallIV::DEFAULT)
     }
 }
 
@@ -344,7 +339,7 @@ mod tests {
     use super::{IncrementalVerifier, WithHashTreeCollector};
     use crate::collections::HashTree;
     use crate::directory::hash_transcript;
-    use crate::hasher::iv::IV;
+    use crate::hasher::iv::SmallIV;
     use crate::test_utils::*;
 
     #[test]
@@ -360,7 +355,7 @@ mod tests {
         verifier.set_root_hash(*empty_hashtree.root());
         assert!(verifier.is_finished());
         assert!(verifier.storage.tree.is_empty());
-        assert_eq!(verifier.finalize(), vec![*IV::DIR.empty_hash()]);
+        assert_eq!(verifier.finalize(), vec![*SmallIV::DIR.empty_hash()]);
     }
 
     #[test]

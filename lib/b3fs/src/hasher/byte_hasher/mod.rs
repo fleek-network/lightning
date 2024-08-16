@@ -4,7 +4,7 @@ use arrayref::array_ref;
 use arrayvec::ArrayVec;
 
 use super::b3::platform;
-use super::iv::IV;
+use super::iv::{SmallIV, IV};
 use super::{b3, join, HashTreeCollector};
 use crate::utils;
 
@@ -47,7 +47,7 @@ pub struct Blake3Hasher<T: HashTreeCollector = Vec<[u8; 32]>> {
 /// Incremental hasher for a single block, this can only be used to hash only one block.
 #[derive(Clone)]
 pub struct BlockHasher {
-    key: b3::CVWords,
+    iv: SmallIV,
     chunk_state: b3::ChunkState,
     cv_stack: ArrayVec<b3::CVBytes, { TREE_BLOCK_SIZE_IN_CHUNK_LOG_2 + 1 }>,
 }
@@ -55,10 +55,10 @@ pub struct BlockHasher {
 impl<T: HashTreeCollector> Blake3Hasher<T> {
     /// Create a new [Blake3Hasher`] with the default IV.
     pub fn new(tree: T) -> Self {
-        Self::new_with_iv(tree, &IV::DEFAULT)
+        Self::new_with_iv(tree, SmallIV::DEFAULT)
     }
 
-    pub fn new_with_iv(tree: T, iv: &IV) -> Self {
+    pub fn new_with_iv(tree: T, iv: SmallIV) -> Self {
         Self {
             block_state: iv.into(),
             cv_stack: Default::default(),
@@ -111,7 +111,7 @@ impl<T: HashTreeCollector> Blake3Hasher<T> {
             // block size, we will only ever reach this loop in the code which is super fast.
             let cv_pair = b3::compress_subtree_to_parent_node::<J>(
                 &input[..2 * TREE_BLOCK_SIZE_BYTES],
-                &self.block_state.key,
+                self.block_state.iv.key(),
                 self.block_state.chunk_state.chunk_counter,
                 self.block_state.chunk_state.flags,
                 self.block_state.chunk_state.platform,
@@ -136,7 +136,7 @@ impl<T: HashTreeCollector> Blake3Hasher<T> {
         if input_larger_than_one_block || is_non_first_block {
             let cv_pair = b3::compress_subtree_to_parent_node::<J>(
                 &input[..TREE_BLOCK_SIZE_BYTES],
-                &self.block_state.key,
+                self.block_state.iv.key(),
                 self.block_state.chunk_state.chunk_counter,
                 self.block_state.chunk_state.flags,
                 self.block_state.chunk_state.platform,
@@ -147,7 +147,7 @@ impl<T: HashTreeCollector> Blake3Hasher<T> {
             let parent_output = b3::parent_node_output(
                 left_cv,
                 right_cv,
-                &self.block_state.key,
+                self.block_state.iv.key(),
                 self.block_state.chunk_state.flags,
                 self.block_state.chunk_state.platform,
             )
@@ -174,7 +174,7 @@ impl<T: HashTreeCollector> Blake3Hasher<T> {
             let parent_cv = b3::parent_node_output(
                 &left_child,
                 &right_child,
-                &self.block_state.key,
+                self.block_state.iv.key(),
                 self.block_state.chunk_state.flags,
                 self.block_state.chunk_state.platform,
             )
@@ -214,7 +214,7 @@ impl<T: HashTreeCollector> Blake3Hasher<T> {
             output = b3::parent_node_output(
                 &self.cv_stack[num_cvs_remaining - 2],
                 &self.cv_stack[num_cvs_remaining - 1],
-                &self.block_state.key,
+                self.block_state.iv.key(),
                 self.block_state.chunk_state.flags,
                 self.block_state.chunk_state.platform,
             );
@@ -225,7 +225,7 @@ impl<T: HashTreeCollector> Blake3Hasher<T> {
             output = b3::parent_node_output(
                 &self.cv_stack[num_cvs_remaining - 1],
                 &output.chaining_value(),
-                &self.block_state.key,
+                self.block_state.iv.key(),
                 self.block_state.chunk_state.flags,
                 self.block_state.chunk_state.platform,
             );
@@ -285,7 +285,7 @@ impl BlockHasher {
 
             // Reset the chunk state and move the chunk_counter forward.
             self.chunk_state = b3::ChunkState::new(
-                &self.key,
+                self.iv.key(),
                 self.chunk_state.chunk_counter + 1,
                 self.chunk_state.flags,
                 self.chunk_state.platform,
@@ -327,7 +327,7 @@ impl BlockHasher {
                 debug_assert_eq!(subtree_len, b3::CHUNK_LEN);
                 self.push_cv(
                     &b3::ChunkState::new(
-                        &self.key,
+                        self.iv.key(),
                         self.chunk_state.chunk_counter,
                         self.chunk_state.flags,
                         self.chunk_state.platform,
@@ -342,7 +342,7 @@ impl BlockHasher {
                 // depends on the caller giving us a long enough input.
                 let cv_pair = b3::compress_subtree_to_parent_node::<J>(
                     &input[..subtree_len],
-                    &self.key,
+                    self.iv.key(),
                     self.chunk_state.chunk_counter,
                     self.chunk_state.flags,
                     self.chunk_state.platform,
@@ -386,7 +386,7 @@ impl BlockHasher {
             let parent_output = b3::parent_node_output(
                 &left_child,
                 &right_child,
-                &self.key,
+                self.iv.key(),
                 self.chunk_state.flags,
                 self.chunk_state.platform,
             );
@@ -405,7 +405,7 @@ impl BlockHasher {
     pub(crate) fn move_to_next_block(&mut self) {
         self.cv_stack.clear();
         self.chunk_state = b3::ChunkState::new(
-            &self.key,
+            self.iv.key(),
             self.chunk_state.chunk_counter + 1,
             self.chunk_state.flags,
             self.chunk_state.platform,
@@ -479,7 +479,7 @@ impl BlockHasher {
             output = b3::parent_node_output(
                 &self.cv_stack[num_cvs_remaining - 2],
                 &self.cv_stack[num_cvs_remaining - 1],
-                &self.key,
+                self.iv.key(),
                 self.chunk_state.flags,
                 self.chunk_state.platform,
             );
@@ -489,7 +489,7 @@ impl BlockHasher {
             output = b3::parent_node_output(
                 &self.cv_stack[num_cvs_remaining - 1],
                 &output.chaining_value(),
-                &self.key,
+                self.iv.key(),
                 self.chunk_state.flags,
                 self.chunk_state.platform,
             );
@@ -525,17 +525,30 @@ impl Default for BlockHasher {
     }
 }
 
-impl From<&IV> for BlockHasher {
+impl From<&'static IV> for BlockHasher {
     #[inline]
-    fn from(value: &IV) -> Self {
+    fn from(value: &'static IV) -> Self {
         BlockHasher {
-            key: value.key,
+            iv: SmallIV::from_static_ref(value),
             chunk_state: b3::ChunkState::new(
-                &value.key,
+                value.key(),
                 0,
                 value.flags(),
                 platform::Platform::detect(),
             ),
+            cv_stack: ArrayVec::new(),
+        }
+    }
+}
+
+impl From<SmallIV> for BlockHasher {
+    #[inline]
+    fn from(value: SmallIV) -> Self {
+        let chunk_state =
+            b3::ChunkState::new(value.key(), 0, value.flags(), platform::Platform::detect());
+        BlockHasher {
+            iv: value,
+            chunk_state,
             cv_stack: ArrayVec::new(),
         }
     }

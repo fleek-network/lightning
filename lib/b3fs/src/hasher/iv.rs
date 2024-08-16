@@ -6,29 +6,32 @@ use crate::hasher::b3::{CHUNK_END, CHUNK_START};
 use crate::utils;
 
 /// A small IV which fits into one memory word for when we have a static reference to the [IV].
-struct SmallIV {
+pub struct SmallIV {
     iv: *const IV,
 }
 
 impl SmallIV {
+    /// Blake3's default IV.
     pub const DEFAULT: Self = Self::from_static_ref(&IV::DEFAULT);
+    /// IV used for hashing directory structures.
     pub const DIR: Self = Self::from_static_ref(&IV::DIR);
 
+    /// Create a new [SmallIV] from a static pointer to an [IV] without performing any allocations.
     pub const fn from_static_ref(iv: &'static IV) -> Self {
-        debug_assert!(iv.flags_internal & 1 == 0);
+        debug_assert!(!iv.is_owned);
         Self {
             // Safety: The `iv` param has a static lifetime which means the pointer will be valid
             // for the rest of the duration of the program. And also given the debug assertion above
-            // and the program invariant we have the last bit of the flag is set to 0. Which means
-            // the Drop implementation will skip over trying to deallocate the memory.
+            // and the program invariants if the is_owned is set to false there will be no attempt
+            // in deallocating the memory.
             iv: unsafe { iv as *const IV },
         }
     }
 
+    /// Create a new inline [SmallIV].
     pub fn new(mut iv: IV) -> Self {
-        debug_assert!(iv.flags_internal & 1 == 0);
-        // Set the last bit to 1 so that Drop knows it has to dealloc the memory.
-        iv.flags_internal |= 1;
+        debug_assert!(!iv.is_owned);
+        iv.is_owned = true;
         Self {
             iv: Box::into_raw(Box::new(iv)),
         }
@@ -42,12 +45,23 @@ impl Deref for SmallIV {
     }
 }
 
+impl Clone for SmallIV {
+    fn clone(&self) -> Self {
+        if self.is_owned {
+            let mut iv: IV = *self.deref();
+            iv.is_owned = false;
+            Self::new(iv)
+        } else {
+            // it's from an static reference we can just copy the same ptr.
+            Self { iv: self.iv }
+        }
+    }
+}
+
 impl Drop for SmallIV {
     fn drop(&mut self) {
-        if self.flags_internal & 1 == 1 {
-            // Safety: Program invariant if the last bit is set to one we have gotten this
-            // IV using [SmallIV::new] and not via an static reference.
-            unsafe { Box::from_raw(self.iv as *mut IV) };
+        if self.is_owned {
+            drop(unsafe { Box::from_raw(self.iv as *mut IV) });
         }
     }
 }
@@ -58,10 +72,11 @@ impl Drop for SmallIV {
 /// [`IV::new_keyed`] and convert it to either of these by simply using the [`Into`] trait.
 #[derive(Clone, Copy)]
 pub struct IV {
-    pub(crate) key: b3::CVWords,
-    /// The first bit is never meant to be used for blake3 itself and we always clear it out
-    /// when it is read using the [IV::flags] method.
-    flags_internal: u8,
+    // only used by SmallIV to indicate if the SmallIV used a memory allocation during its
+    // construction.
+    is_owned: bool,
+    flags: u8,
+    key: b3::CVWords,
     empty: [u8; 32],
 }
 
@@ -70,18 +85,22 @@ impl IV {
     pub const DIR: Self = IV::new_keyed(&dir_hasher::KEY);
 
     const fn new_internal(key: &b3::CVWords, flags: u8) -> Self {
-        debug_assert!(flags & 1 == 0);
-
         Self {
+            is_owned: false,
             key: *key,
-            flags_internal: flags,
+            flags,
             empty: empty_hash(key, flags),
         }
     }
 
     /// Returns the flag for this IV.
     pub const fn flags(&self) -> u8 {
-        self.flags_internal & (u8::MAX - 1)
+        self.flags
+    }
+
+    /// Returns the key for this IV.
+    pub const fn key(&self) -> &[u32; 8] {
+        &self.key
     }
 
     /// The keyed hash function.
@@ -251,5 +270,39 @@ mod tests {
             let iv = IV::new_keyed(&key);
             assert_eq!(*iv.empty_hash(), iv.hash_all_at_once(&[]));
         }
+    }
+
+    #[test]
+    fn small_iv() {
+        let owned = SmallIV::new(IV::DIR);
+        assert!(owned.is_owned);
+        assert_eq!(owned.empty_hash(), IV::DIR.empty_hash());
+        drop(owned);
+
+        let static_iv = SmallIV::from_static_ref(&IV::DIR);
+        assert!(!static_iv.is_owned);
+        assert_eq!(static_iv.empty_hash(), IV::DIR.empty_hash());
+        drop(static_iv);
+    }
+
+    #[test]
+    fn small_iv_clone() {
+        let iv = SmallIV::new(IV::DIR);
+        let iv2 = iv.clone();
+        assert!(iv2.is_owned);
+        assert_ne!(iv.iv, iv2.iv);
+        assert_eq!(iv.key(), iv2.key());
+        drop(iv2);
+        assert_eq!(iv.key(), IV::DIR.key());
+        drop(iv);
+        // static ref
+        let iv = SmallIV::from_static_ref(&IV::DIR);
+        let iv2 = iv.clone();
+        assert!(!iv2.is_owned);
+        assert_eq!(iv.iv, iv2.iv);
+        assert_eq!(iv.key(), iv2.key());
+        drop(iv2);
+        assert_eq!(iv.key(), IV::DIR.key());
+        drop(iv);
     }
 }
