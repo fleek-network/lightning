@@ -5,18 +5,17 @@ use sgxkit_sys::fn0;
 use sgxkit_sys::types::IOError;
 
 /// Get the input data string (request).
-pub fn get_input_data() -> Result<String, IOError> {
+pub fn get_input_data_string() -> Result<String, std::io::Error> {
     let len = unsafe { fn0::input_data_size() };
-    let buf = String::with_capacity(len as usize);
+    let mut buf = vec![0u8; len as usize];
 
     if len > 0 {
-        unsafe {
-            let res = fn0::input_data_copy(buf.as_ptr() as usize, 0, len);
-            IOError::result(res)?;
-        }
+        // SAFETY: we initialized the string with the length that will be written
+        let res = unsafe { fn0::input_data_copy(buf.as_mut_ptr() as usize, 0, len) };
+        IOError::result(res)?;
     }
 
-    Ok(buf)
+    String::from_utf8(buf).map_err(|e| std::io::Error::new(ErrorKind::InvalidData, e.to_string()))
 }
 
 static IS_WRITER_OPEN: AtomicBool = AtomicBool::new(false);
@@ -54,19 +53,8 @@ impl Drop for OutputWriter {
 impl std::io::Write for OutputWriter {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         let res = unsafe { fn0::output_data_append(buf.as_ptr() as usize, buf.len() as u32) };
-        match res {
-            0 => Ok(buf.len()),
-            -1 => Err(std::io::Error::new(
-                ErrorKind::Other,
-                "memory export not found",
-            )),
-            -2 => Err(std::io::Error::new(
-                ErrorKind::InvalidInput,
-                "out of bounds",
-            )),
-            -3 => Err(std::io::Error::new(ErrorKind::Other, "unexpected error")),
-            _ => unreachable!("unknown response code"),
-        }
+        IOError::result(res)?;
+        Ok(buf.len())
     }
 
     /// no-op
