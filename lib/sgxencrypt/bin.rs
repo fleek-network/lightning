@@ -7,7 +7,7 @@ use anyhow::{anyhow, Context};
 use bpaf::Bpaf;
 use ecies::PublicKey;
 
-/// Output modes
+/// Output modes:
 #[derive(Debug, Clone, Bpaf)]
 enum Output {
     File {
@@ -21,7 +21,7 @@ enum Output {
 }
 
 #[derive(Debug, Bpaf)]
-#[bpaf(options)]
+#[bpaf(options, version, descr(env!("CARGO_PKG_DESCRIPTION")))]
 struct Args {
     /// Base58 shared network public key. Should be in compressed format.
     #[bpaf(

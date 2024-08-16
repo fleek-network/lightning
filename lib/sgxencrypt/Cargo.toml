@@ -1,14 +1,16 @@
 [package]
 name = "sgxencrypt"
 description = "Cli tool for encrypting content for fleek network sgx enclaves"
-version.workspace = true
-edition.workspace = true
+version = "0.0.1"
+edition = "2021"
+authors = ["ozwaldorf <self@ossian.dev>"]
+license = "MIT"
 
 [dependencies]
 anyhow.workspace = true
-bpaf = { version = "0.9.12", features = ["derive"] } # cli parsing
+bpaf = { version = "0.9.12", features = ["derive", "dull-color"] } # cli parsing
 bs58 = "0.5.1" # encoding/decoding public keys
-ecies = "0.2.7" # encrypting content for the sgx enclave
+ecies = { version = "0.2.7", default-features = false, features = ["pure", "std"] } # encrypting content for the sgx enclave
 
 [[bin]]
 name = "sgxencrypt"
