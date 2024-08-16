@@ -6,38 +6,45 @@ pub fn execute_module(
     entry: &str,
     request: impl Into<Bytes>,
 ) -> anyhow::Result<Bytes> {
-    let mut config = Config::default();
+    let input = request.into();
+    println!("input data: {input:?}");
 
     // Configure wasm engine
-    // TODO(oz): should we use fuel tracking for payments/execution limits
+    let mut config = Config::default();
     config
+        // TODO(oz): should we use fuel tracking for payments/execution limits?
         .compilation_mode(wasmi::CompilationMode::LazyTranslation)
         .set_stack_limits(wasmi::StackLimits {
             initial_value_stack_height: 512 << 10, // 512 KiB
             maximum_value_stack_height: 5 << 20,   // 5 MiB
             maximum_recursion_depth: 65535,
         });
-
     let engine = Engine::new(&config);
-    let mut store = Store::new(&engine, HostState::default());
+    let mut store = Store::new(
+        &engine,
+        HostState {
+            input,
+            output: BytesMut::new(),
+        },
+    );
 
     // Setup linker and define the host functions
     let mut linker = <Linker<HostState>>::new(&engine);
     define(&mut store, &mut linker).expect("failed to define host functions");
 
-    store.data_mut().input = request.into();
+    // Initialize the module
     let module = Module::new(&engine, module.as_ref())?;
     let instance = linker.instantiate(&mut store, &module)?.start(&mut store)?;
 
-    // Get entrypoint function.
+    // Get entrypoint function and call it
     // TODO(oz): Should we support calling the function with `int argc, *argv[]`?
     //           We could expose an "args" request parameter with a vec of strings.
     //           If not, how can we eliminate needing to satisfy this signature?
     let func = instance.get_typed_func::<(i32, i32), i32>(&mut store, entry)?;
     func.call(&mut store, (0, 0))?;
-
     let output = store.data_mut().output.split().freeze();
     println!("wasm output: {output:?}");
+
     Ok(output)
 }
 
