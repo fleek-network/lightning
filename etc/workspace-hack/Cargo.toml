@@ -16,6 +16,8 @@ publish = false
 
 ### BEGIN HAKARI SECTION
 [dependencies]
+aead = { version = "0.5", default-features = false, features = ["alloc", "getrandom"] }
+aes-gcm = { version = "0.10" }
 ahash = { version = "0.8" }
 arc-swap = { version = "1", default-features = false, features = ["serde"] }
 arrayvec = { version = "0.7" }
@@ -52,7 +54,8 @@ crypto-common = { version = "0.1", default-features = false, features = ["getran
 curve25519-dalek-ng = { version = "4", features = ["serde"] }
 data-encoding = { version = "2" }
 der = { version = "0.7", default-features = false, features = ["derive", "oid", "pem", "std"] }
-digest = { version = "0.10", features = ["mac", "oid", "std"] }
+digest-274715c4dabd11b0 = { package = "digest", version = "0.9", default-features = false, features = ["std"] }
+digest-93f6ce9d446188ac = { package = "digest", version = "0.10", features = ["mac", "oid", "std"] }
 ecdsa = { version = "0.16", features = ["pem", "signing", "std", "verifying"] }
 either = { version = "1" }
 elliptic-curve = { version = "0.13", features = ["ecdh", "hash2curve", "hazmat", "pem", "std"] }
@@ -124,7 +127,6 @@ quinn-udp = { version = "0.4", default-features = false, features = ["log"] }
 quote = { version = "1" }
 rand = { version = "0.8", features = ["small_rng"] }
 rand_chacha = { version = "0.3" }
-rand_core = { version = "0.6", default-features = false, features = ["std"] }
 regex = { version = "1" }
 regex-automata = { version = "0.4", default-features = false, features = ["dfa-onepass", "dfa-search", "hybrid", "meta", "nfa-backtrack", "perf-inline", "perf-literal", "unicode"] }
 regex-syntax = { version = "0.8" }
@@ -145,7 +147,8 @@ serde = { version = "1", features = ["alloc", "derive", "rc"] }
 serde_json = { version = "1", features = ["alloc", "arbitrary_precision", "float_roundtrip", "preserve_order", "raw_value", "unbounded_depth"] }
 serde_with = { version = "2", features = ["hex"] }
 sha1 = { version = "0.10", features = ["oid"] }
-sha2 = { version = "0.10", features = ["oid"] }
+sha2-274715c4dabd11b0 = { package = "sha2", version = "0.9", default-features = false, features = ["std"] }
+sha2-93f6ce9d446188ac = { package = "sha2", version = "0.10", features = ["oid"] }
 sha3 = { version = "0.10" }
 simdutf8 = { version = "0.1", features = ["aarch64_neon"] }
 smallvec = { version = "1", default-features = false, features = ["const_new", "union"] }
@@ -173,6 +176,8 @@ web-sys = { version = "0.3", default-features = false, features = ["AbortControl
 zeroize = { version = "1", features = ["zeroize_derive"] }
 
 [build-dependencies]
+aead = { version = "0.5", default-features = false, features = ["alloc", "getrandom"] }
+aes-gcm = { version = "0.10" }
 ahash = { version = "0.8" }
 arc-swap = { version = "1", default-features = false, features = ["serde"] }
 arrayvec = { version = "0.7" }
@@ -210,7 +215,8 @@ crypto-common = { version = "0.1", default-features = false, features = ["getran
 curve25519-dalek-ng = { version = "4", features = ["serde"] }
 data-encoding = { version = "2" }
 der = { version = "0.7", default-features = false, features = ["derive", "oid", "pem", "std"] }
-digest = { version = "0.10", features = ["mac", "oid", "std"] }
+digest-274715c4dabd11b0 = { package = "digest", version = "0.9", default-features = false, features = ["std"] }
+digest-93f6ce9d446188ac = { package = "digest", version = "0.10", features = ["mac", "oid", "std"] }
 ecdsa = { version = "0.16", features = ["pem", "signing", "std", "verifying"] }
 either = { version = "1" }
 elliptic-curve = { version = "0.13", features = ["ecdh", "hash2curve", "hazmat", "pem", "std"] }
@@ -285,7 +291,6 @@ quinn-udp = { version = "0.4", default-features = false, features = ["log"] }
 quote = { version = "1" }
 rand = { version = "0.8", features = ["small_rng"] }
 rand_chacha = { version = "0.3" }
-rand_core = { version = "0.6", default-features = false, features = ["std"] }
 regex = { version = "1" }
 regex-automata = { version = "0.4", default-features = false, features = ["dfa-onepass", "dfa-search", "hybrid", "meta", "nfa-backtrack", "perf-inline", "perf-literal", "unicode"] }
 regex-syntax = { version = "0.8" }
@@ -306,7 +311,8 @@ serde = { version = "1", features = ["alloc", "derive", "rc"] }
 serde_json = { version = "1", features = ["alloc", "arbitrary_precision", "float_roundtrip", "preserve_order", "raw_value", "unbounded_depth"] }
 serde_with = { version = "2", features = ["hex"] }
 sha1 = { version = "0.10", features = ["oid"] }
-sha2 = { version = "0.10", features = ["oid"] }
+sha2-274715c4dabd11b0 = { package = "sha2", version = "0.9", default-features = false, features = ["std"] }
+sha2-93f6ce9d446188ac = { package = "sha2", version = "0.10", features = ["oid"] }
 sha3 = { version = "0.10" }
 simdutf8 = { version = "0.1", features = ["aarch64_neon"] }
 smallvec = { version = "1", default-features = false, features = ["const_new", "union"] }
