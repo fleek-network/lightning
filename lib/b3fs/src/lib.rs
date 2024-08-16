@@ -35,12 +35,14 @@ pub mod bucket;
 
 pub mod stream;
 
+pub mod entry;
+
 /// A set of common utility functions.
 pub mod utils;
 
 pub mod collections;
 
-pub mod directory;
+// pub mod directory;
 
 pub mod hasher;
 

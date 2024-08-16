@@ -110,7 +110,7 @@ pub const fn is_valid_filename_len(n: usize) -> bool {
 /// content may not execeed 1023 bytes.
 #[inline(always)]
 pub const fn is_valid_symlink_len(n: usize) -> bool {
-    n < 1024
+    n > 0 && n < 1024
 }
 
 /// Check the given byte and returns true if it can be a valid file name. This checks the validity

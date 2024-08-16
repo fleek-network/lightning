@@ -1,6 +1,6 @@
 use super::iter::DirEntriesIter;
 use crate::collections::HashTree;
-use crate::directory::BorrowedEntry;
+use crate::entry::BorrowedEntry;
 
 pub struct Dir {}
 

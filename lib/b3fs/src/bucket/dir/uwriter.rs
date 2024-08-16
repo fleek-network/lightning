@@ -1,5 +1,5 @@
 use crate::bucket::Bucket;
-use crate::directory::OwnedEntry;
+use crate::entry::OwnedEntry;
 
 pub struct UntrustedDirWriter {}
 

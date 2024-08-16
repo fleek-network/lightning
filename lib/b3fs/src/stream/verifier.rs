@@ -3,7 +3,6 @@ use smallvec::{Array, SmallVec};
 use thiserror::Error;
 
 use super::ProofBufIter;
-use crate::directory::merge::iv;
 use crate::hasher::iv::{SmallIV, IV};
 use crate::hasher::HashTreeCollector;
 use crate::utils::{is_valid_proof_len, Digest, OwnedDigest};
@@ -338,7 +337,7 @@ mod tests {
     use super::super::walker::Mode;
     use super::{IncrementalVerifier, WithHashTreeCollector};
     use crate::collections::HashTree;
-    use crate::directory::hash_transcript;
+    use crate::hasher::dir_hasher::hash_transcript;
     use crate::hasher::iv::SmallIV;
     use crate::test_utils::*;
 

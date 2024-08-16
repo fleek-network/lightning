@@ -6,7 +6,7 @@ use rand::rngs::SmallRng;
 use rand::{thread_rng, Rng, SeedableRng};
 use siphasher::sip128::{Hash128, Hasher128};
 
-use crate::directory::entry::InlineVec;
+use crate::entry::InlineVec;
 
 // Offset of some entry on the file.
 pub type Offset = NonZeroU32;

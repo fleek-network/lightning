@@ -1,10 +1,8 @@
 use crate::bucket::Bucket;
-use crate::directory::{DirectoryHasher, OwnedEntry};
+use crate::entry::OwnedEntry;
 
 /// A trusted
-pub struct DirWriter {
-    hasher: DirectoryHasher,
-}
+pub struct DirWriter {}
 
 impl DirWriter {
     pub fn new(bucket: &Bucket, num_entries: usize) -> Self {

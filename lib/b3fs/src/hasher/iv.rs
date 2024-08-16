@@ -1,9 +1,15 @@
 use std::ops::Deref;
 
 use super::b3::{platform, ROOT};
-use super::{b3, dir_hasher, join};
+use super::{b3, join};
 use crate::hasher::b3::{CHUNK_END, CHUNK_START};
 use crate::utils;
+
+/// Blake3 hash of the word `"DIRECTORY"` used as the key for the hashing.
+const DIR_KEY: [u8; 32] = [
+    139, 88, 112, 131, 96, 138, 152, 197, 238, 63, 142, 210, 224, 88, 97, 183, 244, 210, 116, 213,
+    84, 215, 9, 16, 21, 175, 61, 72, 251, 174, 76, 21,
+];
 
 /// A small IV which fits into one memory word for when we have a static reference to the [IV].
 pub struct SmallIV {
@@ -82,7 +88,7 @@ pub struct IV {
 
 impl IV {
     pub const DEFAULT: Self = IV::new_internal(b3::IV, 0);
-    pub const DIR: Self = IV::new_keyed(&dir_hasher::KEY);
+    pub const DIR: Self = IV::new_keyed(&DIR_KEY);
 
     const fn new_internal(key: &b3::CVWords, flags: u8) -> Self {
         Self {
@@ -258,7 +264,6 @@ mod tests {
 
     #[test]
     fn empty_hash() {
-        assert_eq!(*IV::DIR.empty_hash(), dir_hasher::EMPTY_HASH);
         assert_eq!(*IV::DIR.empty_hash(), IV::DIR.hash_all_at_once(&[]));
         assert_eq!(
             *IV::default().empty_hash(),

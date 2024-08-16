@@ -14,3 +14,11 @@ pub enum Error {
     #[error("Too many directory items.")]
     TooManyEntries,
 }
+
+#[derive(Error, Debug)]
+pub enum FromTranscriptError {
+    #[error("Transcript data is too small")]
+    TranscriptTooSmall,
+    #[error("Transcript is invalid")]
+    InvalidTranscript,
+}

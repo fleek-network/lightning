@@ -14,8 +14,7 @@ pub struct OwnedEntry {
 
 #[derive(Clone, Debug)]
 pub enum OwnedLink {
-    File([u8; 32]),
-    Directory([u8; 32]),
+    Content([u8; 32]),
     Link(InlineVec),
 }
 
@@ -27,9 +26,8 @@ pub struct BorrowedEntry<'a> {
 
 #[derive(Clone, Copy, Debug)]
 pub enum BorrowedLink<'a> {
-    File(&'a [u8; 32]),
-    Directory(&'a [u8; 32]),
-    Link(&'a [u8]),
+    Content(&'a [u8; 32]),
+    Path(&'a [u8]),
 }
 
 impl<'a> From<&'a OwnedEntry> for BorrowedEntry<'a> {
@@ -46,9 +44,8 @@ impl<'a> From<&'a OwnedLink> for BorrowedLink<'a> {
     #[inline(always)]
     fn from(value: &'a OwnedLink) -> Self {
         match value {
-            OwnedLink::File(hash) => BorrowedLink::File(hash),
-            OwnedLink::Directory(hash) => BorrowedLink::Directory(hash),
-            OwnedLink::Link(link) => BorrowedLink::Link(link),
+            OwnedLink::Content(hash) => BorrowedLink::Content(hash),
+            OwnedLink::Link(link) => BorrowedLink::Path(link),
         }
     }
 }
@@ -67,9 +64,8 @@ impl<'a> From<BorrowedLink<'a>> for OwnedLink {
     #[inline(always)]
     fn from(value: BorrowedLink<'a>) -> Self {
         match value {
-            BorrowedLink::File(hash) => OwnedLink::File(*hash),
-            BorrowedLink::Directory(hash) => OwnedLink::Directory(*hash),
-            BorrowedLink::Link(link) => OwnedLink::Link(link.into()),
+            BorrowedLink::Content(hash) => OwnedLink::Content(*hash),
+            BorrowedLink::Path(link) => OwnedLink::Link(link.into()),
         }
     }
 }
