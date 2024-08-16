@@ -1,0 +1,14 @@
+[package]
+name = "sgxencrypt"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+bpaf = { version = "0.9.12", features = ["derive"] } # cli parsing
+bs58 = "0.5.1" # encoding/decoding public keys
+ecies = "0.2.7" # encrypting content for the sgx enclave
+
+[[bin]]
+name = "sgxencrypt"
+path = "./bin.rs"
