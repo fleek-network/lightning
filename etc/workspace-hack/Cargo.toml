@@ -32,6 +32,7 @@ blake2 = { version = "0.10" }
 blake3 = { version = "1" }
 block-buffer = { version = "0.9", default-features = false, features = ["block-padding"] }
 block-padding = { version = "0.3", default-features = false, features = ["std"] }
+bs58 = { version = "0.5", features = ["check"] }
 bytemuck = { version = "1", default-features = false, features = ["extern_crate_alloc"] }
 byteorder = { version = "1", features = ["i128"] }
 bytes = { version = "1", features = ["serde"] }
@@ -90,6 +91,7 @@ k256 = { version = "0.13" }
 lalrpop-util = { version = "0.20", features = ["lexer"] }
 lazy_static = { version = "1", default-features = false, features = ["spin_no_std"] }
 libc = { version = "0.2", features = ["extra_traits"] }
+libsecp256k1-core = { version = "0.3" }
 log = { version = "0.4", default-features = false, features = ["kv_unstable", "std"] }
 matrixmultiply = { version = "0.3", features = ["cgemm"] }
 memchr = { version = "2" }
@@ -103,6 +105,7 @@ num-complex = { version = "0.4", default-features = false, features = ["std"] }
 num-integer = { version = "0.1", features = ["i128"] }
 num-iter = { version = "0.1", features = ["i128"] }
 num-traits = { version = "0.2", features = ["i128", "libm"] }
+once_cell = { version = "1", features = ["critical-section"] }
 openssl = { version = "0.10", features = ["vendored"] }
 openssl-sys = { version = "0.9", default-features = false, features = ["vendored"] }
 p256 = { version = "0.13", features = ["ecdh"] }
@@ -122,6 +125,7 @@ quinn-udp = { version = "0.4", default-features = false, features = ["log"] }
 quote = { version = "1" }
 rand = { version = "0.8", features = ["small_rng"] }
 rand_chacha = { version = "0.3" }
+rand_core = { version = "0.6", default-features = false, features = ["std"] }
 regex = { version = "1" }
 regex-automata = { version = "0.4", default-features = false, features = ["dfa-onepass", "dfa-search", "hybrid", "meta", "nfa-backtrack", "perf", "unicode"] }
 regex-syntax = { version = "0.8" }
@@ -148,9 +152,9 @@ simdutf8 = { version = "0.1", features = ["aarch64_neon"] }
 similar = { version = "2", features = ["inline"] }
 smallvec = { version = "1", default-features = false, features = ["const_new", "union"] }
 socket2 = { version = "0.5", default-features = false, features = ["all"] }
-spin = { version = "0.9", features = ["std"] }
+spin = { version = "0.9" }
 spki = { version = "0.7", default-features = false, features = ["pem", "std"] }
-subtle = { version = "2", default-features = false, features = ["i128"] }
+subtle = { version = "2", default-features = false, features = ["i128", "std"] }
 syn-f595c2ba2a3f28df = { package = "syn", version = "2", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
 time = { version = "0.3", features = ["formatting", "local-offset", "macros", "parsing"] }
 tiny-keccak = { version = "2", features = ["keccak", "sha3"] }
@@ -190,6 +194,7 @@ blake2 = { version = "0.10" }
 blake3 = { version = "1" }
 block-buffer = { version = "0.9", default-features = false, features = ["block-padding"] }
 block-padding = { version = "0.3", default-features = false, features = ["std"] }
+bs58 = { version = "0.5", features = ["check"] }
 bytemuck = { version = "1", default-features = false, features = ["extern_crate_alloc"] }
 byteorder = { version = "1", features = ["i128"] }
 bytes = { version = "1", features = ["serde"] }
@@ -250,6 +255,7 @@ k256 = { version = "0.13" }
 lalrpop-util = { version = "0.20", features = ["lexer"] }
 lazy_static = { version = "1", default-features = false, features = ["spin_no_std"] }
 libc = { version = "0.2", features = ["extra_traits"] }
+libsecp256k1-core = { version = "0.3" }
 log = { version = "0.4", default-features = false, features = ["kv_unstable", "std"] }
 matrixmultiply = { version = "0.3", features = ["cgemm"] }
 memchr = { version = "2" }
@@ -263,6 +269,7 @@ num-complex = { version = "0.4", default-features = false, features = ["std"] }
 num-integer = { version = "0.1", features = ["i128"] }
 num-iter = { version = "0.1", features = ["i128"] }
 num-traits = { version = "0.2", features = ["i128", "libm"] }
+once_cell = { version = "1", features = ["critical-section"] }
 openssl = { version = "0.10", features = ["vendored"] }
 openssl-sys = { version = "0.9", default-features = false, features = ["vendored"] }
 p256 = { version = "0.13", features = ["ecdh"] }
@@ -284,6 +291,7 @@ quinn-udp = { version = "0.4", default-features = false, features = ["log"] }
 quote = { version = "1" }
 rand = { version = "0.8", features = ["small_rng"] }
 rand_chacha = { version = "0.3" }
+rand_core = { version = "0.6", default-features = false, features = ["std"] }
 regex = { version = "1" }
 regex-automata = { version = "0.4", default-features = false, features = ["dfa-onepass", "dfa-search", "hybrid", "meta", "nfa-backtrack", "perf", "unicode"] }
 regex-syntax = { version = "0.8" }
@@ -310,12 +318,13 @@ simdutf8 = { version = "0.1", features = ["aarch64_neon"] }
 similar = { version = "2", features = ["inline"] }
 smallvec = { version = "1", default-features = false, features = ["const_new", "union"] }
 socket2 = { version = "0.5", default-features = false, features = ["all"] }
-spin = { version = "0.9", features = ["std"] }
+spin = { version = "0.9" }
 spki = { version = "0.7", default-features = false, features = ["pem", "std"] }
-subtle = { version = "2", default-features = false, features = ["i128"] }
+subtle = { version = "2", default-features = false, features = ["i128", "std"] }
 syn-dff4ba8e3ae991db = { package = "syn", version = "1", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
 syn-f595c2ba2a3f28df = { package = "syn", version = "2", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
 time = { version = "0.3", features = ["formatting", "local-offset", "macros", "parsing"] }
+time-macros = { version = "0.2", default-features = false, features = ["formatting", "parsing"] }
 tiny-keccak = { version = "2", features = ["keccak", "sha3"] }
 tokio = { version = "1", features = ["full", "test-util", "tracing"] }
 tokio-rustls = { version = "0.24" }
@@ -341,7 +350,6 @@ arrayvec = { version = "0.7", default-features = false, features = ["serde"] }
 bitflags = { version = "2", default-features = false, features = ["serde"] }
 event-listener = { version = "5" }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
-once_cell = { version = "1" }
 rustix = { version = "0.38", features = ["event", "fs", "net", "pipe", "process", "system", "termios", "time"] }
 semver = { version = "1", features = ["serde"] }
 tokio-tungstenite = { version = "0.20", features = ["rustls-tls-webpki-roots"] }
@@ -352,7 +360,6 @@ arrayvec = { version = "0.7", default-features = false, features = ["serde"] }
 bitflags = { version = "2", default-features = false, features = ["serde"] }
 event-listener = { version = "5" }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
-once_cell = { version = "1" }
 rustix = { version = "0.38", features = ["event", "fs", "net", "pipe", "process", "system", "termios", "time"] }
 semver = { version = "1", features = ["serde"] }
 tokio-tungstenite = { version = "0.20", features = ["rustls-tls-webpki-roots"] }
@@ -366,7 +373,6 @@ core-foundation-sys = { version = "0.8" }
 core-graphics-types = { version = "0.1" }
 event-listener = { version = "5" }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
-once_cell = { version = "1" }
 rustix = { version = "0.38", features = ["event", "fs", "net", "pipe", "process", "system", "termios", "time"] }
 security-framework-sys = { version = "2" }
 semver = { version = "1", features = ["serde"] }
@@ -381,7 +387,6 @@ core-foundation-sys = { version = "0.8" }
 core-graphics-types = { version = "0.1" }
 event-listener = { version = "5" }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
-once_cell = { version = "1" }
 rustix = { version = "0.38", features = ["event", "fs", "net", "pipe", "process", "system", "termios", "time"] }
 security-framework-sys = { version = "2" }
 semver = { version = "1", features = ["serde"] }
