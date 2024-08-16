@@ -68,5 +68,6 @@ workspace-members = [
   "fleek-service-sgx",
   "fleek-service-sgx-enclave",
   "sgxkit",
-  "sgxkit-sys"
+  "sgxkit-sys",
+  "sgxencrypt"
 ]
