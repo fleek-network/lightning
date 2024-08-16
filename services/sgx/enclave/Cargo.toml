@@ -3,7 +3,6 @@ name = "fleek-service-sgx-enclave"
 version = "0.1.0"
 edition = "2021"
 
-
 [dependencies]
 # Project libs (release only)
 blake3-tree = "=0.1.0"
@@ -18,8 +17,17 @@ bytes = "=1.7.1"
 
 # Encodings
 hex = "=0.4.3"
-serde = { version = "=1.0.205", features = ["derive"] }
-serde_json = "=1.0.122"
+bs58 = "=0.5.1"
+serde = { version = "=1.0.208", features = ["derive"] }
+serde_json = "=1.0.125"
 
 # WASM Runtime
 wasmi = "=0.36.0"
+
+[dependencies.ecies]
+# Notes about cryptography dependencies:
+#   - `aes-gcm`: pure rust, has been audited
+#   - `libsecp256k1`: pure rust, from paritytech
+version = "=0.2.7"
+default-features = false
+features = ["pure", "std"]
