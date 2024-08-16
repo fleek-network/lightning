@@ -1,10 +1,24 @@
 //! Encrypt a file for a shared network public key
 
+use std::io::{stdout, Write};
 use std::path::PathBuf;
 
 use anyhow::{anyhow, Context};
 use bpaf::Bpaf;
 use ecies::PublicKey;
+
+/// Output modes
+#[derive(Debug, Clone, Bpaf)]
+enum Output {
+    File {
+        /// Optional path to write encrypted output to. [default: *.cipher]
+        #[bpaf(short('o'), long("output"), argument("PATH"))]
+        path: Option<PathBuf>,
+    },
+    /// Enable writing output directly to stdout.
+    #[bpaf(long)]
+    Stdout,
+}
 
 #[derive(Debug, Bpaf)]
 #[bpaf(options)]
@@ -13,7 +27,7 @@ struct Args {
     #[bpaf(
         short,
         long,
-        argument::<String>,
+        argument::<String>("PUBKEY"),
         fallback("27fjvoWaGcupCpT9ZMfok4gAHGcUhuFt1wgpoVjb4Bhka".into()),
         display_fallback,
         parse(|s| {
@@ -29,9 +43,8 @@ struct Args {
     )]
     pubkey: PublicKey,
 
-    /// Optional path to write encrypted output to. [default: *.cipher]
-    #[bpaf(short, long)]
-    output: Option<PathBuf>,
+    #[bpaf(external)]
+    output: Output,
 
     /// Path to input file to encrypt.
     #[bpaf(
@@ -58,6 +71,13 @@ fn main() -> anyhow::Result<()> {
         .map_err(|e| anyhow!("failed to encrypt data: {e}"))?;
 
     // Write the file
-    std::fs::write(output.unwrap_or(input.with_extension("cipher")), cipher)
-        .context("failed to write file")
+    match output {
+        Output::Stdout => stdout().write_all(&cipher)?,
+        Output::File { path } => {
+            let path = path.unwrap_or(input.with_extension("cipher"));
+            std::fs::write(path, cipher).context("failed to write file")?;
+        },
+    }
+
+    Ok(())
 }
