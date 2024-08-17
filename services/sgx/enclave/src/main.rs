@@ -57,21 +57,27 @@ fn handle_connection(conn: &mut TcpStream) -> anyhow::Result<()> {
     } = serde_json::from_slice(&payload)?;
 
     // fetch content from blockstore
-    let content = {
-        let bytes = blockstore::get_verified_content(&hash)?;
-        if decrypt {
-            ecies::decrypt(&SHARED_KEY.serialize(), &bytes)?
-        } else {
-            bytes
-        }
-    };
+    let mut module = blockstore::get_verified_content(&hash)?;
+
+    // optionally decrypt the module
+    if decrypt {
+        module = ecies::decrypt(&SHARED_KEY.serialize(), &module)?;
+    }
 
     // run wasm module
-    let response = runtime::execute_module(content, &function, input)?;
+    let output = runtime::execute_module(module, &function, input)?;
 
-    // write length delimiter and wasm output
-    conn.write_all(&(response.len() as u32).to_be_bytes())?;
-    conn.write_all(&response)?;
+    // TODO: Response encodings
+    //       - For http: send hash, proof, signature via headers, stream payload in response body.
+    //         Should we also allow setting the content-type header from the wasm module?
+    //         - X-FLEEK-SGX-OUTPUT-HASH: hex encoded
+    //         - X-FLEEK-SGX-OUTPUT-TREE: base64
+    //         - X-FLEEK-SGX-OUTPUT-SIGNATURE: base64
+    //       - For all others: send hash, signature, then verified b3 stream of content
+
+    // temporary: write wasm output directly
+    conn.write_all(&(output.payload.len() as u32).to_be_bytes())?;
+    conn.write_all(&output.payload)?;
 
     Ok(())
 }
