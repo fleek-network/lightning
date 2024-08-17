@@ -1,11 +1,27 @@
+use std::ops::Deref;
+
+use blake3_tree::blake3::tree::{HashTree, HashTreeBuilder};
+use blake3_tree::blake3::Hash;
 use bytes::{Bytes, BytesMut};
+use libsecp256k1::Signature;
 use wasmi::{Config, Engine, Linker, Module, Store};
+
+use crate::SHARED_KEY;
+
+/// Verified wasm runtime output
+#[allow(unused)]
+pub struct WasmOutput {
+    pub payload: Bytes,
+    pub hash: Hash,
+    pub tree: Vec<[u8; 32]>,
+    pub signature: [u8; 65],
+}
 
 pub fn execute_module(
     module: impl AsRef<[u8]>,
     entry: &str,
     request: impl Into<Bytes>,
-) -> anyhow::Result<Bytes> {
+) -> anyhow::Result<WasmOutput> {
     let input = request.into();
     println!("input data: {input:?}");
 
@@ -25,6 +41,7 @@ pub fn execute_module(
         HostState {
             input,
             output: BytesMut::new(),
+            hasher: HashTreeBuilder::new(),
         },
     );
 
@@ -42,17 +59,37 @@ pub fn execute_module(
     //           If not, how can we eliminate needing to satisfy this signature?
     let func = instance.get_typed_func::<(i32, i32), i32>(&mut store, entry)?;
     func.call(&mut store, (0, 0))?;
-    let output = store.data_mut().output.split().freeze();
-    println!("wasm output: {output:?}");
 
-    Ok(output)
+    let HostState { output, hasher, .. } = store.into_data();
+    let HashTree { hash, tree } = hasher.finalize();
+
+    // Sign output
+    let (Signature { r, s }, v) = libsecp256k1::sign(
+        &libsecp256k1::Message::parse(hash.as_bytes()),
+        SHARED_KEY.deref(),
+    );
+
+    // Encode signature, ethereum style
+    let mut signature = [0u8; 65];
+    signature[0..32].copy_from_slice(&r.b32());
+    signature[32..64].copy_from_slice(&s.b32());
+    signature[64] = v.into();
+
+    println!("wasm output: {hash}: {output:?}");
+
+    Ok(WasmOutput {
+        payload: output.freeze(),
+        hash,
+        tree,
+        signature,
+    })
 }
 
 /// Runtime state
-#[derive(Default)]
 struct HostState {
     input: Bytes,
     output: BytesMut,
+    hasher: HashTreeBuilder,
 }
 
 macro_rules! impl_define {
@@ -170,9 +207,9 @@ mod fn0 {
             return -2;
         };
 
+        // hash and store the data
+        state.hasher.update(region);
         state.output.put_slice(region);
-
-        // TODO: hash output as we write it for signing
 
         0
     }
