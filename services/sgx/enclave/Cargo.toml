@@ -31,3 +31,6 @@ wasmi = "=0.36.0"
 version = "=0.2.7"
 default-features = false
 features = ["pure", "std"]
+
+[dependencies.libsecp256k1]
+version = "0.7.1"
