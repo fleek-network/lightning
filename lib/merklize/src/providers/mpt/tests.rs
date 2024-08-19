@@ -36,7 +36,7 @@ fn test_mpt_update_state_tree_with_updates() {
     // Check storage.
     {
         let storage = db.get_storage_backend_unsafe();
-        assert_eq!(storage.keys(1).len(), 3); // nodes
+        assert_eq!(storage.keys(1).len(), 1); // nodes
         assert_eq!(storage.keys(2).len(), 1); // root
     }
 
@@ -52,7 +52,7 @@ fn test_mpt_update_state_tree_with_updates() {
     // Check storage.
     {
         let storage = db.get_storage_backend_unsafe();
-        assert_eq!(storage.keys(1).len(), 4); // nodes
+        assert_eq!(storage.keys(1).len(), 3); // nodes
         assert_eq!(storage.keys(2).len(), 1); // root
     }
 
@@ -68,7 +68,7 @@ fn test_mpt_update_state_tree_with_updates() {
     // Check storage.
     {
         let storage = db.get_storage_backend_unsafe();
-        assert_eq!(storage.keys(1).len(), 3); // nodes
+        assert_eq!(storage.keys(1).len(), 1); // nodes
         assert_eq!(storage.keys(2).len(), 1); // root
     }
 
@@ -84,7 +84,7 @@ fn test_mpt_update_state_tree_with_updates() {
     // Check storage.
     {
         let storage = db.get_storage_backend_unsafe();
-        assert_eq!(storage.keys(1).len(), 4); // nodes
+        assert_eq!(storage.keys(1).len(), 3); // nodes
         assert_eq!(storage.keys(2).len(), 1); // root
     }
 
@@ -100,7 +100,7 @@ fn test_mpt_update_state_tree_with_updates() {
     // Check storage.
     {
         let storage = db.get_storage_backend_unsafe();
-        assert_eq!(storage.keys(1).len(), 4); // nodes
+        assert_eq!(storage.keys(1).len(), 3); // nodes
         assert_eq!(storage.keys(2).len(), 1); // root
     }
 }
@@ -133,7 +133,7 @@ fn test_mpt_update_state_tree_with_no_changes() {
     // Check storage.
     {
         let storage = db.get_storage_backend_unsafe();
-        assert_eq!(storage.keys(1).len(), 1); // nodes
+        assert_eq!(storage.keys(1).len(), 0); // nodes
         assert_eq!(storage.keys(2).len(), 1); // root
     }
 
@@ -149,7 +149,7 @@ fn test_mpt_update_state_tree_with_no_changes() {
     // Check storage.
     {
         let storage = db.get_storage_backend_unsafe();
-        assert_eq!(storage.keys(1).len(), 3); // nodes
+        assert_eq!(storage.keys(1).len(), 1); // nodes
         assert_eq!(storage.keys(2).len(), 1); // root
     }
 }
@@ -224,80 +224,92 @@ fn test_mpt_get_state_root_with_updates() {
     let new_state_root = query.run(|ctx| M::get_state_root(ctx).unwrap());
     assert_ne!(new_state_root, StateRootHash::default());
     assert_ne!(old_state_root, new_state_root);
-    let _old_state_root = new_state_root;
+    let old_state_root = new_state_root;
 
     // Remove a key.
-    // db.run(|ctx| {
-    //     let mut table = ctx.get_table::<String, String>("data");
+    db.run(|ctx| {
+        let mut table = ctx.get_table::<String, String>("data");
 
-    //     table.remove("key2".to_string());
-    // });
+        table.remove("key2".to_string());
 
-    // // Check the state root hash.
-    // let new_state_root = query.run(|ctx| M::get_state_root(ctx).unwrap());
-    // assert_ne!(new_state_root, StateRootHash::default());
-    // assert_ne!(old_state_root, new_state_root);
-    // let old_state_root = new_state_root;
+        M::update_state_tree(ctx).unwrap();
+    });
 
-    // // Remove same key.
-    // db.run(|ctx| {
-    //     let mut table = ctx.get_table::<String, String>("data");
+    // Check the state root hash.
+    let new_state_root = query.run(|ctx| M::get_state_root(ctx).unwrap());
+    assert_ne!(new_state_root, StateRootHash::default());
+    assert_ne!(old_state_root, new_state_root);
+    let old_state_root = new_state_root;
 
-    //     table.remove("key2".to_string());
-    // });
+    // Remove same key.
+    db.run(|ctx| {
+        let mut table = ctx.get_table::<String, String>("data");
 
-    // // Check the state root hash.
-    // let new_state_root = query.run(|ctx| M::get_state_root(ctx).unwrap());
-    // assert_eq!(old_state_root, new_state_root);
-    // let old_state_root = new_state_root;
+        table.remove("key2".to_string());
 
-    // // Insert removed key with different value.
-    // db.run(|ctx| {
-    //     let mut table = ctx.get_table::<String, String>("data");
+        M::update_state_tree(ctx).unwrap();
+    });
 
-    //     table.insert("key2".to_string(), "other-value2".to_string());
-    // });
+    // Check the state root hash.
+    let new_state_root = query.run(|ctx| M::get_state_root(ctx).unwrap());
+    assert_eq!(old_state_root, new_state_root);
+    let old_state_root = new_state_root;
 
-    // // Check the state root hash.
-    // let new_state_root = query.run(|ctx| M::get_state_root(ctx).unwrap());
-    // assert_ne!(new_state_root, StateRootHash::default());
-    // assert_ne!(old_state_root, new_state_root);
-    // let old_state_root = new_state_root;
+    // Insert removed key with different value.
+    db.run(|ctx| {
+        let mut table = ctx.get_table::<String, String>("data");
 
-    // // Insert existing key with same value.
-    // db.run(|ctx| {
-    //     let mut table = ctx.get_table::<String, String>("data");
+        table.insert("key2".to_string(), "other-value2".to_string());
 
-    //     table.insert("key1".to_string(), "value1".to_string());
-    // });
+        M::update_state_tree(ctx).unwrap();
+    });
 
-    // // Check the state root hash.
-    // let new_state_root = query.run(|ctx| M::get_state_root(ctx).unwrap());
-    // assert_eq!(old_state_root, new_state_root);
-    // let old_state_root = new_state_root;
+    // Check the state root hash.
+    let new_state_root = query.run(|ctx| M::get_state_root(ctx).unwrap());
+    assert_ne!(new_state_root, StateRootHash::default());
+    assert_ne!(old_state_root, new_state_root);
+    let old_state_root = new_state_root;
 
-    // // Insert existing key with different value.
-    // db.run(|ctx| {
-    //     let mut table = ctx.get_table::<String, String>("data");
+    // Insert existing key with same value.
+    db.run(|ctx| {
+        let mut table = ctx.get_table::<String, String>("data");
 
-    //     table.insert("key1".to_string(), "other-value1".to_string());
-    // });
+        table.insert("key1".to_string(), "value1".to_string());
 
-    // // Check the state root hash.
-    // let new_state_root = query.run(|ctx| M::get_state_root(ctx).unwrap());
-    // assert_ne!(old_state_root, new_state_root);
-    // let old_state_root = new_state_root;
+        M::update_state_tree(ctx).unwrap();
+    });
 
-    // // Remove non-existent key.
-    // db.run(|ctx| {
-    //     let mut table = ctx.get_table::<String, String>("data");
+    // Check the state root hash.
+    let new_state_root = query.run(|ctx| M::get_state_root(ctx).unwrap());
+    assert_eq!(old_state_root, new_state_root);
+    let old_state_root = new_state_root;
 
-    //     table.remove("unknown".to_string());
-    // });
+    // Insert existing key with different value.
+    db.run(|ctx| {
+        let mut table = ctx.get_table::<String, String>("data");
 
-    // // Check the state root hash.
-    // let new_state_root = query.run(|ctx| M::get_state_root(ctx).unwrap());
-    // assert_eq!(old_state_root, new_state_root);
+        table.insert("key1".to_string(), "other-value1".to_string());
+
+        M::update_state_tree(ctx).unwrap();
+    });
+
+    // Check the state root hash.
+    let new_state_root = query.run(|ctx| M::get_state_root(ctx).unwrap());
+    assert_ne!(old_state_root, new_state_root);
+    let old_state_root = new_state_root;
+
+    // Remove non-existent key.
+    db.run(|ctx| {
+        let mut table = ctx.get_table::<String, String>("data");
+
+        table.remove("unknown".to_string());
+
+        M::update_state_tree(ctx).unwrap();
+    });
+
+    // Check the state root hash.
+    let new_state_root = query.run(|ctx| M::get_state_root(ctx).unwrap());
+    assert_eq!(old_state_root, new_state_root);
 }
 
 #[test]

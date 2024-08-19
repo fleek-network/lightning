@@ -194,6 +194,11 @@ where
                 .get(&table_id)
                 .ok_or(anyhow!("Table with index {} not found", table_id))?
                 .as_str();
+
+            if table_name == NODES_TABLE_NAME || table_name == ROOT_TABLE_NAME {
+                continue;
+            }
+
             for (key, operation) in changes.iter() {
                 let state_key = StateKey::new(table_name, key.to_vec());
                 let key_hash = state_key.hash::<S, H>();
