@@ -2,10 +2,11 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 
-use anyhow::Result;
+use anyhow::{ensure, Result};
 use atomo::batch::{BoxedVec, Operation, VerticalBatch};
 use atomo::{
     AtomoBuilder,
+    InMemoryStorage,
     SerdeBackend,
     StorageBackend,
     StorageBackendConstructor,
@@ -22,7 +23,7 @@ use super::adapter::Adapter;
 use super::hasher::SimpleHasherWrapper;
 use super::layout::TrieLayoutWrapper;
 use super::MptStateProof;
-use crate::{MerklizeProvider, SimpleHasher, StateKey, StateRootHash};
+use crate::{MerklizeProvider, SimpleHasher, StateKey, StateRootHash, VerifyStateTreeError};
 
 pub(crate) const NODES_TABLE_NAME: &str = "%state_tree_nodes";
 pub(crate) const ROOT_TABLE_NAME: &str = "%state_tree_root";
@@ -223,6 +224,7 @@ where
         Ok(())
     }
 
+    /// Clear the state tree by removing all nodes and keys from the atomo database.
     fn clear_state_tree(
         db: &mut atomo::Atomo<atomo::UpdatePerm, Self::Storage, Self::Serde>,
     ) -> Result<()> {
@@ -256,6 +258,48 @@ where
 
         // Commit the batch.
         storage.commit(batch);
+
+        Ok(())
+    }
+
+    /// Verify that the state in the given atomo database instance, when used to build a new,
+    /// temporary state tree from scratch, matches the stored state tree root hash.
+    fn verify_state_tree(
+        db: &mut atomo::Atomo<atomo::UpdatePerm, Self::Storage, Self::Serde>,
+    ) -> Result<()> {
+        let span = trace_span!("verify_state_tree");
+        let _enter = span.enter();
+
+        // Build batch of all state data.
+        let tables = db.tables();
+        let mut batch = HashMap::new();
+        for (i, table) in tables.clone().into_iter().enumerate() {
+            let tid = i as u8;
+
+            let mut changes = Vec::new();
+            for (key, value) in db.get_storage_backend_unsafe().get_all(tid) {
+                changes.push((key, Operation::Insert(value)));
+            }
+            batch.insert(table, changes.into_iter());
+        }
+
+        // Build a new, temporary state tree from the batch.
+        let builder = AtomoBuilder::<_, S>::new(InMemoryStorage::default());
+        type TempDbProvider<S, H> = MptMerklizeProvider<InMemoryStorage, S, H>;
+        let mut tmp_db = TempDbProvider::<S, H>::with_tables(builder).build()?;
+        tmp_db.run(|ctx| TempDbProvider::<S, H>::update_state_tree(ctx, batch))?;
+
+        // Get and return the state root hash from the temporary state tree.
+        let tmp_state_root = tmp_db
+            .query()
+            .run(|ctx| TempDbProvider::<S, H>::get_state_root(ctx))?;
+
+        // Check that the state root hash matches the stored state root hash.
+        let stored_state_root = db.query().run(|ctx| Self::get_state_root(ctx))?;
+        ensure!(
+            tmp_state_root == stored_state_root,
+            VerifyStateTreeError::StateRootMismatch(stored_state_root, tmp_state_root)
+        );
 
         Ok(())
     }

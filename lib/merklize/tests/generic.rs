@@ -193,6 +193,9 @@ fn test_generic<
             .unwrap();
     });
 
+    // Verify state tree.
+    M::verify_state_tree(&mut db).unwrap();
+
     // Insert more data.
     db.run(|ctx: _| {
         let mut data_table = ctx.get_table::<String, String>("data");
@@ -210,6 +213,9 @@ fn test_generic<
     assert_ne!(new_state_root, StateRootHash::default());
     let old_state_root = new_state_root;
 
+    // Verify state tree.
+    M::verify_state_tree(&mut db).unwrap();
+
     // Remove some data.
     db.run(|ctx: _| {
         let mut data_table = ctx.get_table::<String, String>("data");
@@ -225,6 +231,9 @@ fn test_generic<
     let new_state_root = query.run(|ctx| M::get_state_root(ctx).unwrap());
     assert_ne!(new_state_root, old_state_root);
     assert_ne!(new_state_root, StateRootHash::default());
+
+    // Verify state tree.
+    M::verify_state_tree(&mut db).unwrap();
 
     // Check non-membership proofs for removed data.
     query.run(|ctx| {
@@ -246,4 +255,10 @@ fn test_generic<
             .verify_non_membership::<String, M>("data", "other9".to_string(), new_state_root)
             .unwrap();
     });
+
+    // Clear and rebuild state tree.
+    M::clear_and_rebuild_state_tree(&mut db).unwrap();
+
+    // Verify state tree.
+    M::verify_state_tree(&mut db).unwrap();
 }

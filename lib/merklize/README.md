@@ -36,7 +36,6 @@ fn run<B: StorageBackendConstructor, M: MerklizeProvider<Storage = B::Storage>>(
         table.insert("key".to_string(), "value".to_string());
 
         // Update state tree.
-        // TODO(snormore): Update READMEs to reflect this change.
         M::update_state_tree_from_context(ctx).unwrap();
     });
 

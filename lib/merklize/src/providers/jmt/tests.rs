@@ -259,9 +259,8 @@ fn test_jmt_get_state_root_with_updates() {
     });
     let state_root = assert_state_root_changed(&query, state_root);
 
-    // Check the rebuilt state root hash.
-    // TODO(snormore): Fix this.
-    // assert_eq!(M::build_state_root(&mut db).unwrap(), state_root);
+    // Verify the state tree by rebuilding it and comparing the root hashes.
+    M::verify_state_tree(&mut db).unwrap();
 
     // Insert another value and check that the state root has changed.
     db.run(|ctx| {
@@ -283,9 +282,8 @@ fn test_jmt_get_state_root_with_updates() {
     });
     let state_root = assert_state_root_changed(&query, state_root);
 
-    // Check the rebuilt state root hash.
-    // TODO(snormore): Fix this.
-    // assert_eq!(M::build_state_root(&mut db).unwrap(), state_root);
+    // Verify the state tree by rebuilding it and comparing the root hashes.
+    M::verify_state_tree(&mut db).unwrap();
 
     // Insert removed key with different value and check that the state root has changed.
     db.run(|ctx| {
@@ -325,12 +323,64 @@ fn test_jmt_get_state_root_with_updates() {
 
         M::update_state_tree_from_context(ctx).unwrap();
     });
-    let state_root = assert_state_root_unchanged(&query, state_root);
+    assert_state_root_unchanged(&query, state_root);
 
-    // Check the rebuilt state root hash.
-    // TODO(snormore): Fix this.
-    println!("state_root: {}", state_root);
-    // assert_eq!(M::build_state_root(&mut db).unwrap(), state_root);
+    // Verify the state tree by rebuilding it and comparing the root hashes.
+    M::verify_state_tree(&mut db).unwrap();
+}
+
+#[test]
+fn test_jmt_clear_and_rebuild_state_tree() {
+    type S = DefaultSerdeBackend;
+    type H = Sha256Hasher;
+    type M = JmtMerklizeProvider<InMemoryStorage, S, H>;
+
+    let builder = AtomoBuilder::new(InMemoryStorage::default());
+    let mut db = M::with_tables(builder.with_table::<String, String>("data"))
+        .build()
+        .unwrap();
+    let query = db.query();
+
+    // Insert a value.
+    db.run(|ctx| {
+        let mut table = ctx.get_table::<String, String>("data");
+
+        table.insert("key1".to_string(), "value1".to_string());
+
+        M::update_state_tree_from_context(ctx).unwrap();
+    });
+
+    // Get the state root hash.
+    let state_root = query.run(|ctx| M::get_state_root(ctx).unwrap());
+
+    // Rebuild the state tree.
+    M::clear_and_rebuild_state_tree(&mut db).unwrap();
+
+    // Check that the state root hash has not changed.
+    let new_state_root = query.run(|ctx| M::get_state_root(ctx).unwrap());
+    assert_eq!(state_root, new_state_root);
+    let state_root = new_state_root;
+
+    // Insert another value.
+    db.run(|ctx| {
+        let mut table = ctx.get_table::<String, String>("data");
+
+        table.insert("key2".to_string(), "value2".to_string());
+
+        M::update_state_tree_from_context(ctx).unwrap();
+    });
+
+    // Check that the state root hash has changed.
+    let new_state_root = query.run(|ctx| M::get_state_root(ctx).unwrap());
+    assert_ne!(state_root, new_state_root);
+    let state_root = new_state_root;
+
+    // Rebuild the state tree.
+    M::clear_and_rebuild_state_tree(&mut db).unwrap();
+
+    // Check that the state root hash has not changed.
+    let new_state_root = query.run(|ctx| M::get_state_root(ctx).unwrap());
+    assert_eq!(state_root, new_state_root);
 }
 
 #[test]
