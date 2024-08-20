@@ -14,6 +14,7 @@ use crate::blockstore::VerifiedStream;
 
 mod blockstore;
 mod connection;
+mod tls;
 
 static BLOCKSTORE_PATH: LazyLock<PathBuf> = LazyLock::new(|| {
     std::env::var("BLOCKSTORE_PATH")

@@ -4543,6 +4543,7 @@ dependencies = [
  "enclave-runner",
  "futures 0.3.30",
  "hex",
+ "rcgen 0.13.1",
  "serde",
  "serde-big-array",
  "serde_cbor",
