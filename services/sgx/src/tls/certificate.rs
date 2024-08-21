@@ -1,6 +1,27 @@
+use std::sync::Arc;
+
 use anyhow::Result;
 use rcgen::CustomExtension;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
+use rustls::{ClientConfig, ServerConfig};
+
+use crate::tls::verifier::RemoteAttestationVerifier;
+
+pub fn make_client_config() -> Result<ClientConfig> {
+    Ok(ClientConfig::builder()
+        .dangerous()
+        .with_custom_certificate_verifier(Arc::new(RemoteAttestationVerifier::new()))
+        .with_no_client_auth())
+}
+
+pub fn make_server_config() -> Result<ServerConfig> {
+    let (cert, pk) = generate(vec![])?;
+
+    ServerConfig::builder()
+        .with_no_client_auth()
+        .with_single_cert(vec![cert], pk)
+        .map_err(Into::into)
+}
 
 pub fn generate(_: Vec<u8>) -> Result<(CertificateDer, PrivateKeyDer)> {
     let certificate_keypair = rcgen::KeyPair::generate_for(&rcgen::PKCS_ECDSA_P256_SHA256)?;
@@ -14,7 +35,7 @@ pub fn generate(_: Vec<u8>) -> Result<(CertificateDer, PrivateKeyDer)> {
         params.self_signed(&certificate_keypair)?
     };
 
-    let rustls_certificate = CertificateDer(certificate.serialize_der()?);
+    let rustls_certificate: CertificateDer = certificate.serialize_der().try_into()?;
 
     Ok((rustls_certificate, rustls_key))
 }
