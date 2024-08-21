@@ -33,6 +33,7 @@ sgxs-loaders = { version = "0.4.0" }
 
 # TLS-related deps.
 rcgen = "0.13"
+rustls = { version = "0.23", default-features = false }
 
 [[bin]]
 name = "fn-service-3"

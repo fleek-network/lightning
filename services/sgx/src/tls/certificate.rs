@@ -1,6 +1,25 @@
 use anyhow::Result;
 use rcgen::CustomExtension;
+use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 
+pub fn generate(_: Vec<u8>) -> Result<(CertificateDer, PrivateKeyDer)> {
+    let certificate_keypair = rcgen::KeyPair::generate_for(&rcgen::PKCS_ECDSA_P256_SHA256)?;
+    let rustls_key: PrivateKeyDer = certificate_keypair.serialize_der().try_into()?;
+
+    let certificate = {
+        let mut params = rcgen::CertificateParams::new(vec![])?;
+        params.distinguished_name = rcgen::DistinguishedName::new();
+        params.custom_extensions =
+            extensions(vec![], vec![], vec![], vec![], vec![], vec![], vec![])?;
+        params.self_signed(&certificate_keypair)?
+    };
+
+    let rustls_certificate = CertificateDer(certificate.serialize_der()?);
+
+    Ok((rustls_certificate, rustls_key))
+}
+
+// Todo: Choose appropriate OIDs.
 pub fn extensions(
     quote: Vec<u8>,
     tcb_info: Vec<u8>,
