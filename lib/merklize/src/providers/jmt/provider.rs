@@ -43,13 +43,17 @@ const TREE_VERSION: Version = 1;
 /// A merklize provider that uses a Jellyfish Merkle Tree (JMT) implementation ([`jmt`]) to manage
 /// the database-backed state tree.
 pub struct JmtMerklizeProvider<B: StorageBackend, S: SerdeBackend, H: SimpleHasher> {
-    _phantom: PhantomData<(B, S, H)>,
+    _storage: PhantomData<B>,
+    _serde: PhantomData<S>,
+    _hasher: PhantomData<H>,
 }
 
 impl<B: StorageBackend, S: SerdeBackend, H: SimpleHasher> JmtMerklizeProvider<B, S, H> {
     pub fn new() -> Self {
         Self {
-            _phantom: PhantomData,
+            _storage: PhantomData,
+            _serde: PhantomData,
+            _hasher: PhantomData,
         }
     }
 }

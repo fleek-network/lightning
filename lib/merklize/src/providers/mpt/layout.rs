@@ -9,7 +9,7 @@ use crate::SimpleHasher;
 /// A wrapper around a `[trie_db::TrieLayout]` that uses a given `[SimpleHasher]` as the layout
 /// hasher.
 pub(crate) struct TrieLayoutWrapper<H: SimpleHasher> {
-    _phantom: PhantomData<H>,
+    _hasher: PhantomData<H>,
 }
 
 impl<H> TrieLayout for TrieLayoutWrapper<H>

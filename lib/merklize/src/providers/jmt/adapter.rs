@@ -1,4 +1,3 @@
-use std::marker::PhantomData;
 use std::num::NonZeroUsize;
 use std::sync::{Arc, Mutex};
 
@@ -20,7 +19,6 @@ pub(crate) struct Adapter<'a, B: StorageBackend, S: SerdeBackend> {
     nodes_table: SharedNodesTableRef<'a, B, S>,
     keys_table: SharedKeysTableRef<'a, B, S>,
     keys_cache: Arc<Mutex<LruCache<KeyHash, StateKey>>>,
-    _phantom: PhantomData<()>,
 }
 
 impl<'a, B: StorageBackend, S: SerdeBackend> Adapter<'a, B, S> {
@@ -34,7 +32,6 @@ impl<'a, B: StorageBackend, S: SerdeBackend> Adapter<'a, B, S> {
             nodes_table,
             keys_table,
             keys_cache: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(512).unwrap()))),
-            _phantom: PhantomData,
         }
     }
 

@@ -1,5 +1,3 @@
-use std::marker::PhantomData;
-
 use atomo::{SerdeBackend, StorageBackend};
 use hash_db::{AsHashDB, HashDB, HashDBRef, Prefix};
 use tracing::{trace, trace_span};
@@ -21,7 +19,6 @@ where
     nodes_table: SharedNodesTableRef<'a, B, S, H>,
     hashed_null_node: <SimpleHasherWrapper<H> as hash_db::Hasher>::Out,
     null_node_data: DBValue,
-    _phantom: PhantomData<()>,
 }
 
 impl<'a, B, S, H> Adapter<'a, B, S, H>
@@ -36,7 +33,6 @@ where
             nodes_table,
             hashed_null_node: H::hash(null),
             null_node_data: null.into(),
-            _phantom: PhantomData,
         }
     }
 }

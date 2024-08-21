@@ -37,7 +37,9 @@ type SharedRootTable<'a, B, S> = Arc<Mutex<RootTable<'a, B, S>>>;
 /// A merklize provider that uses a Merkle Patricia Trie (MPT) implementation ([`mpt`]) to manage
 /// the database-backed state tree.
 pub struct MptMerklizeProvider<B: StorageBackend, S: SerdeBackend, H: SimpleHasher> {
-    _phantom: PhantomData<(B, S, H)>,
+    _storage: PhantomData<B>,
+    _serde: PhantomData<S>,
+    _hasher: PhantomData<H>,
 }
 
 impl<B, S, H> MptMerklizeProvider<B, S, H>
@@ -48,7 +50,9 @@ where
 {
     pub fn new() -> Self {
         Self {
-            _phantom: PhantomData,
+            _storage: PhantomData,
+            _serde: PhantomData,
+            _hasher: PhantomData,
         }
     }
 
