@@ -1079,16 +1079,16 @@ async fn test_admin_client_can_call(port: u16, _node: &TestNode, secret: &[u8; 3
     let client = RpcClient::new(&address, Some(secret)).await?;
 
     for _ in 0..5 {
-        if let Err(e) = AdminApiClient::test(&client).await {
+        if let Err(e) = AdminApiClient::ping(&client).await {
             panic!("Expected OK got Error: {:?}", e);
         };
     }
 
     let regular_client = RpcClient::new_no_auth(&address)?;
 
-    println!("{:?}", AdminApiClient::test(&regular_client).await);
+    println!("{:?}", AdminApiClient::ping(&regular_client).await);
 
-    assert!(AdminApiClient::test(&regular_client).await.is_err());
+    assert!(AdminApiClient::ping(&regular_client).await.is_err());
 
     Ok(())
 }
