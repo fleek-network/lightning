@@ -34,6 +34,8 @@ sgxs-loaders = { version = "0.4.0" }
 # TLS-related deps.
 rcgen = "0.13"
 rustls = { version = "0.23", default-features = false }
+x509-parser = "0.16"
+webpki = { version = "0.22", features = ["std"] }
 
 [[bin]]
 name = "fn-service-3"

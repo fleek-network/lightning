@@ -4551,6 +4551,8 @@ dependencies = [
  "sgxs-loaders",
  "tokio",
  "url",
+ "webpki",
+ "x509-parser 0.16.0",
 ]
 
 [[package]]
