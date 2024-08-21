@@ -7,6 +7,8 @@ use serde::Deserialize;
 
 mod blockstore;
 mod runtime;
+mod tls;
+
 
 pub(crate) mod config {
     pub const MAX_OUTPUT_SIZE: usize = 16 << 20; // 16 MiB
