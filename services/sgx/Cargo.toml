@@ -31,12 +31,6 @@ aesm-client = { version = "0.6.0", features = ["sgxs"] }
 enclave-runner = { version = "0.6.0" }
 sgxs-loaders = { version = "0.4.0" }
 
-# TLS-related deps.
-rcgen = "0.13"
-rustls = { version = "0.23", default-features = false }
-x509-parser = "0.16"
-webpki = { version = "0.22", features = ["std"] }
-
 [[bin]]
 name = "fn-service-3"
 path = "src/bin.rs"

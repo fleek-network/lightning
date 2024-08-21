@@ -4543,16 +4543,12 @@ dependencies = [
  "enclave-runner",
  "futures 0.3.30",
  "hex",
- "rcgen 0.13.1",
- "rustls 0.23.12",
  "serde",
  "serde-big-array",
  "serde_cbor",
  "sgxs-loaders",
  "tokio",
  "url",
- "webpki",
- "x509-parser 0.16.0",
 ]
 
 [[package]]
