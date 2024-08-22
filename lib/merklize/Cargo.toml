@@ -54,8 +54,6 @@ tracing-subscriber.workspace = true
 # Lightning dependencies
 atomo.workspace = true
 atomo-rocks.workspace = true
-merklize-test-utils = { path = "../merklize-test-utils" }
-
 
 [features]
 default = ["hashers", "strategies"]

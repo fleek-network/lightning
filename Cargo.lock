@@ -7967,7 +7967,6 @@ dependencies = [
  "jmt",
  "keccak-hasher",
  "lru 0.12.4",
- "merklize-test-utils",
  "opentelemetry 0.24.0",
  "opentelemetry-otlp 0.17.0",
  "opentelemetry-semantic-conventions 0.16.0",
@@ -7985,20 +7984,6 @@ dependencies = [
  "tracing-opentelemetry 0.25.0",
  "tracing-subscriber",
  "trie-db",
-]
-
-[[package]]
-name = "merklize-test-utils"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "atomo",
- "atomo-rocks",
- "futures",
- "merklize",
- "rand 0.8.5",
- "tempfile",
- "tokio",
 ]
 
 [[package]]

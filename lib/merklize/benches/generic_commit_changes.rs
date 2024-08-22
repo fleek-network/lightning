@@ -1,19 +1,16 @@
 #![feature(test)]
 extern crate test;
 
+mod generic_utils;
+
 use atomo::{AtomoBuilder, DefaultSerdeBackend, StorageBackendConstructor};
+use generic_utils::{rocksdb_builder, DATA_COUNT_COMPLEX, DATA_COUNT_MEDIUM, DATA_COUNT_SIMPLE};
 use merklize::hashers::blake3::Blake3Hasher;
 use merklize::hashers::keccak::KeccakHasher;
 use merklize::hashers::sha2::Sha256Hasher;
 use merklize::providers::jmt::JmtMerklizeProvider;
 use merklize::providers::mpt::MptMerklizeProvider;
 use merklize::MerklizeProvider;
-use merklize_test_utils::generic::{
-    rocksdb_builder,
-    DATA_COUNT_COMPLEX,
-    DATA_COUNT_MEDIUM,
-    DATA_COUNT_SIMPLE,
-};
 use tempfile::tempdir;
 use test::Bencher;
 
