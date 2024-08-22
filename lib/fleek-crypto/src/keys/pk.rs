@@ -255,6 +255,23 @@ impl schemars::JsonSchema for ConsensusSignature {
     }
 }
 
+impl schemars::JsonSchema for ClientPublicKey {
+    fn schema_name() -> String {
+        "ClientPublicKey".to_string()
+    }
+
+    fn schema_id() -> std::borrow::Cow<'static, str> {
+        std::borrow::Cow::Borrowed(concat!(module_path!(), "::ClientPublicKey"))
+    }
+
+    fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        let key = ClientPublicKey::from_str("F5tV4PLSzx1Lt4mYBe13aYQ8hsLMTCfjgY2pLr82AumH")
+            .expect("valid node public key for example");
+
+        schemars::schema_for_value!(key).schema.into()
+    }
+}
+
 impl schemars::JsonSchema for NodePublicKey {
     fn schema_name() -> String {
         "NodePublicKey".to_string()
