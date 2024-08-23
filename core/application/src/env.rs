@@ -1,17 +1,15 @@
-use std::collections::BTreeSet;
 use std::path::Path;
 use std::time::Duration;
 
 use affair::AsyncWorker as WorkerTrait;
 use anyhow::{Context, Result};
-use atomo::{Atomo, AtomoBuilder, DefaultSerdeBackend, QueryPerm, StorageBackend, UpdatePerm};
+use atomo::{AtomoBuilder, DefaultSerdeBackend, SerdeBackend, StorageBackend};
 use atomo_rocks::{Cache as RocksCache, Env as RocksEnv, Options};
 use fleek_crypto::{ClientPublicKey, ConsensusPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
     AccountInfo,
-    Blake3Hash,
     Block,
     BlockExecutionResponse,
     Committee,
@@ -24,14 +22,11 @@ use lightning_interfaces::types::{
     NodeInfo,
     NodeServed,
     ProtocolParams,
-    ReportedReputationMeasurements,
     Service,
     ServiceId,
-    ServiceRevenue,
     TotalServed,
     TransactionReceipt,
     TransactionResponse,
-    TxHash,
     Value,
 };
 use lightning_metrics::increment_counter;
@@ -39,16 +34,16 @@ use tracing::warn;
 
 use crate::config::{Config, StorageConfig};
 use crate::genesis::GenesisPrices;
-use crate::query_runner::QueryRunner;
-use crate::state::State;
+use crate::state::{ApplicationState, QueryRunner};
 use crate::storage::{AtomoStorage, AtomoStorageBuilder};
-use crate::table::StateTables;
 
-pub struct Env<P, B: StorageBackend> {
-    pub inner: Atomo<P, B>,
+pub struct Env<B: StorageBackend, S: SerdeBackend> {
+    pub inner: ApplicationState<B, S>,
 }
 
-impl Env<UpdatePerm, AtomoStorage> {
+pub type ApplicationEnv = Env<AtomoStorage, DefaultSerdeBackend>;
+
+impl ApplicationEnv {
     pub fn new(config: &Config, checkpoint: Option<([u8; 32], &[u8])>) -> Result<Self> {
         let storage = match config.storage {
             StorageConfig::RocksDb => {
@@ -83,60 +78,17 @@ impl Env<UpdatePerm, AtomoStorage> {
             StorageConfig::InMemory => AtomoStorageBuilder::new::<&Path>(None),
         };
 
-        let mut atomo = AtomoBuilder::<AtomoStorageBuilder, DefaultSerdeBackend>::new(storage);
-        atomo = atomo
-            .with_table::<Metadata, Value>("metadata")
-            .with_table::<EthAddress, AccountInfo>("account")
-            .with_table::<ClientPublicKey, EthAddress>("client_keys")
-            .with_table::<NodeIndex, NodeInfo>("node")
-            .with_table::<ConsensusPublicKey, NodeIndex>("consensus_key_to_index")
-            .with_table::<NodePublicKey, NodeIndex>("pub_key_to_index")
-            .with_table::<(NodeIndex, NodeIndex), Duration>("latencies")
-            .with_table::<Epoch, Committee>("committee")
-            .with_table::<ServiceId, Service>("service")
-            .with_table::<ProtocolParams, u128>("parameter")
-            .with_table::<NodeIndex, Vec<ReportedReputationMeasurements>>("rep_measurements")
-            .with_table::<NodeIndex, u8>("rep_scores")
-            .with_table::<NodeIndex, u8>("submitted_rep_measurements")
-            .with_table::<NodeIndex, NodeServed>("current_epoch_served")
-            .with_table::<NodeIndex, NodeServed>("last_epoch_served")
-            .with_table::<Epoch, TotalServed>("total_served")
-            .with_table::<CommodityTypes, HpUfixed<6>>("commodity_prices")
-            .with_table::<ServiceId, ServiceRevenue>("service_revenue")
-            .with_table::<TxHash, ()>("executed_digests")
-            .with_table::<NodeIndex, u8>("uptime")
-            .with_table::<Blake3Hash, BTreeSet<NodeIndex>>("uri_to_node")
-            .with_table::<NodeIndex, BTreeSet<Blake3Hash>>("node_to_uri")
-            .enable_iter("current_epoch_served")
-            .enable_iter("rep_measurements")
-            .enable_iter("submitted_rep_measurements")
-            .enable_iter("rep_scores")
-            .enable_iter("latencies")
-            .enable_iter("node")
-            .enable_iter("executed_digests")
-            .enable_iter("uptime")
-            .enable_iter("service_revenue")
-            .enable_iter("uri_to_node")
-            .enable_iter("node_to_uri");
-
-        #[cfg(debug_assertions)]
-        {
-            atomo = atomo
-                .enable_iter("consensus_key_to_index")
-                .enable_iter("pub_key_to_index");
-        }
+        let atomo = AtomoBuilder::<AtomoStorageBuilder, DefaultSerdeBackend>::new(storage);
 
         Ok(Self {
-            inner: atomo.build()?,
+            inner: ApplicationState::build(atomo)?,
         })
     }
 
     pub fn query_runner(&self) -> QueryRunner {
-        QueryRunner::new(self.inner.query())
+        self.inner.query()
     }
-}
 
-impl<B: StorageBackend> Env<UpdatePerm, B> {
     #[autometrics::autometrics]
     async fn run<F, P>(&mut self, mut block: Block, get_putter: F) -> BlockExecutionResponse
     where
@@ -145,10 +97,7 @@ impl<B: StorageBackend> Env<UpdatePerm, B> {
     {
         let response = self.inner.run(move |ctx| {
             // Create the app/execution environment
-            let backend = StateTables {
-                table_selector: ctx,
-            };
-            let app = State::new(backend);
+            let app = ApplicationState::executor(ctx);
             let last_block_hash = app.get_block_hash();
 
             let block_number = app.get_block_number() + 1;
@@ -199,14 +148,14 @@ impl<B: StorageBackend> Env<UpdatePerm, B> {
                 response.txn_receipts.push(receipt);
             }
 
+            // Set the last executed block hash and sub dag index
             // if epoch changed a new committee starts and subdag starts back at 0
             let (new_sub_dag_index, new_sub_dag_round) = if response.change_epoch {
                 (0, 0)
             } else {
                 (block.sub_dag_index, block.sub_dag_round)
             };
-            // Set the last executed block hash and sub dag index
-            app.set_last_block(block.digest, new_sub_dag_index, new_sub_dag_round);
+            app.set_last_block(response.block_hash, new_sub_dag_index, new_sub_dag_round);
 
             // Return the response
             response
@@ -241,13 +190,6 @@ impl<B: StorageBackend> Env<UpdatePerm, B> {
         }
 
         response
-    }
-
-    /// Returns an identical environment but with query permissions
-    pub fn query_socket(&self) -> Env<QueryPerm, B> {
-        Env {
-            inner: self.inner.query(),
-        }
     }
 
     /// Tries to seeds the application state with the genesis block
@@ -461,24 +403,21 @@ impl<B: StorageBackend> Env<UpdatePerm, B> {
                 }
             }
 
-        metadata_table.insert(Metadata::Epoch, Value::Epoch(0));
-        Ok(true)
+            metadata_table.insert(Metadata::Epoch, Value::Epoch(0));
+            Ok(true)
         })
     }
 
     // Should only be called after saving or loading from an epoch checkpoint
     pub fn update_last_epoch_hash(&mut self, state_hash: [u8; 32]) {
         self.inner.run(move |ctx| {
-            let backend = StateTables {
-                table_selector: ctx,
-            };
-            let app = State::new(backend);
+            let app = ApplicationState::executor(ctx);
             app.set_last_epoch_hash(state_hash);
         })
     }
 }
 
-impl Default for Env<UpdatePerm, AtomoStorage> {
+impl Default for ApplicationEnv {
     fn default() -> Self {
         Self::new(&Config::default(), None).unwrap()
     }
@@ -486,12 +425,12 @@ impl Default for Env<UpdatePerm, AtomoStorage> {
 
 /// The socket that receives all update transactions
 pub struct UpdateWorker<C: Collection> {
-    env: Env<UpdatePerm, AtomoStorage>,
+    env: ApplicationEnv,
     blockstore: C::BlockstoreInterface,
 }
 
 impl<C: Collection> UpdateWorker<C> {
-    pub fn new(env: Env<UpdatePerm, AtomoStorage>, blockstore: C::BlockstoreInterface) -> Self {
+    pub fn new(env: ApplicationEnv, blockstore: C::BlockstoreInterface) -> Self {
         Self { env, blockstore }
     }
 }
@@ -518,7 +457,7 @@ mod env_tests {
             .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
             .unwrap();
         let config = Config::test(genesis_path);
-        let mut env = Env::<_, AtomoStorage>::new(&config, None).unwrap();
+        let mut env = ApplicationEnv::new(&config, None).unwrap();
 
         assert!(env.apply_genesis_block(&config).unwrap());
 

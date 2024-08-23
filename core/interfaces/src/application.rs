@@ -4,28 +4,15 @@ use std::time::Duration;
 
 use affair::Socket;
 use anyhow::Result;
-use atomo::{
-    Atomo,
-    AtomoBuilder,
-    InMemoryStorage,
-    KeyIterator,
-    QueryPerm,
-    SerdeBackend,
-    StorageBackend,
-    StorageBackendConstructor,
-};
+use atomo::{Atomo, InMemoryStorage, KeyIterator, QueryPerm, StorageBackend};
 use fdi::BuildGraph;
-use fleek_crypto::{ClientPublicKey, ConsensusPublicKey, EthAddress, NodePublicKey};
-use hp_fixed::unsigned::HpUfixed;
+use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
 use lightning_types::{
     AccountInfo,
     Blake3Hash,
     ChainId,
     Committee,
-    CommodityTypes,
-    Metadata,
     NodeIndex,
-    ServiceRevenue,
     TransactionRequest,
     TxHash,
     Value,
@@ -110,34 +97,6 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     ) -> Result<Atomo<QueryPerm, Self::Backend>>;
 
     fn atomo_from_path(path: impl AsRef<Path>) -> Result<Atomo<QueryPerm, Self::Backend>>;
-
-    fn register_tables<B: StorageBackendConstructor, S: SerdeBackend>(
-        builder: AtomoBuilder<B, S>,
-    ) -> AtomoBuilder<B, S> {
-        builder
-            .with_table::<Metadata, Value>("metadata")
-            .with_table::<EthAddress, AccountInfo>("account")
-            .with_table::<ClientPublicKey, EthAddress>("client_keys")
-            .with_table::<NodeIndex, NodeInfo>("node")
-            .with_table::<ConsensusPublicKey, NodeIndex>("consensus_key_to_index")
-            .with_table::<NodePublicKey, NodeIndex>("pub_key_to_index")
-            .with_table::<(NodeIndex, NodeIndex), Duration>("latencies")
-            .with_table::<Epoch, Committee>("committee")
-            .with_table::<ServiceId, Service>("service")
-            .with_table::<ProtocolParams, u128>("parameter")
-            .with_table::<NodeIndex, Vec<ReportedReputationMeasurements>>("rep_measurements")
-            .with_table::<NodeIndex, u8>("rep_scores")
-            .with_table::<NodeIndex, u8>("submitted_rep_measurements")
-            .with_table::<NodeIndex, NodeServed>("current_epoch_served")
-            .with_table::<NodeIndex, NodeServed>("last_epoch_served")
-            .with_table::<Epoch, TotalServed>("total_served")
-            .with_table::<CommodityTypes, HpUfixed<6>>("commodity_prices")
-            .with_table::<ServiceId, ServiceRevenue>("service_revenue")
-            .with_table::<TxHash, ()>("executed_digests")
-            .with_table::<NodeIndex, u8>("uptime")
-            .with_table::<Blake3Hash, BTreeSet<NodeIndex>>("uri_to_node")
-            .with_table::<NodeIndex, BTreeSet<Blake3Hash>>("node_to_uri")
-    }
 
     /// Query Metadata Table
     fn get_metadata(&self, key: &lightning_types::Metadata) -> Option<Value>;

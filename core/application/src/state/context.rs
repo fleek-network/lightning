@@ -26,11 +26,11 @@ pub trait TableRef<K, V> {
     fn remove(&self, key: &K);
 }
 
-pub struct StateTables<'selector, B: StorageBackend, S: SerdeBackend> {
+pub struct StateContext<'selector, B: StorageBackend, S: SerdeBackend> {
     pub table_selector: &'selector TableSelector<B, S>,
 }
 
-impl<'selector, B: StorageBackend, S: SerdeBackend> Backend for StateTables<'selector, B, S> {
+impl<'selector, B: StorageBackend, S: SerdeBackend> Backend for StateContext<'selector, B, S> {
     type Ref<
         K: Eq + Hash + Send + Serialize + DeserializeOwned + 'static,
         V: Clone + Send + Serialize + DeserializeOwned + 'static,

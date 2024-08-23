@@ -68,7 +68,7 @@ use rand::rngs::StdRng;
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
 
-use crate::table::{Backend, TableRef};
+use super::context::{Backend, TableRef};
 
 /// Reported measurements are weighted by the reputation score of the reporting node.
 /// If there is no reputation score for the reporting node, we use a quantile from the array
@@ -96,11 +96,11 @@ lazy_static! {
     static ref BIG_HUNDRED: HpUfixed<18> = HpUfixed::<18>::from(100_u64);
 }
 
-/// The state of the Application
+/// The state executor encapsuates the logic for executing transactions.
 ///
 /// The functions implemented on this struct are the "Smart Contracts" of the application layer
 /// All state changes come from Transactions and start at execute_transaction
-pub struct State<B: Backend> {
+pub struct StateExecutor<B: Backend> {
     pub metadata: B::Ref<Metadata, Value>,
     pub account_info: B::Ref<EthAddress, AccountInfo>,
     pub client_keys: B::Ref<ClientPublicKey, EthAddress>,
@@ -126,7 +126,7 @@ pub struct State<B: Backend> {
     pub backend: B,
 }
 
-impl<B: Backend> State<B> {
+impl<B: Backend> StateExecutor<B> {
     pub fn new(backend: B) -> Self {
         Self {
             metadata: backend.get_table_reference("metadata"),
@@ -155,6 +155,7 @@ impl<B: Backend> State<B> {
         }
     }
 
+    /// Executes a generic transaction.
     pub fn execute_transaction(&self, txn: TransactionRequest) -> TransactionResponse {
         let hash = txn.hash();
         let (sender, response) = match txn {
@@ -173,9 +174,8 @@ impl<B: Backend> State<B> {
         response
     }
 
-    /// This function is the entry point of a transaction
+    /// Executes a fleek transaction.
     fn execute_fleek_transaction(&self, txn: UpdateRequest) -> TransactionResponse {
-        // Execute transaction
         let response = match txn.payload.method {
             UpdateMethod::SubmitDeliveryAcknowledgmentAggregation {
                 commodity,
@@ -274,6 +274,7 @@ impl<B: Backend> State<B> {
         response
     }
 
+    /// Executes an ethereum transaction.
     fn execute_ethereum_transaction(&self, txn: EthersTransaction) -> TransactionResponse {
         let to_address = match txn.to {
             Some(address) => address,

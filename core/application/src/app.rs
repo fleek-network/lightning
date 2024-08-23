@@ -10,8 +10,8 @@ use lightning_interfaces::types::{ChainId, NodeInfo};
 use tracing::{error, info};
 
 use crate::config::{Config, StorageConfig};
-use crate::env::{Env, UpdateWorker};
-use crate::query_runner::QueryRunner;
+use crate::env::{ApplicationEnv, Env, UpdateWorker};
+use crate::state::QueryRunner;
 pub struct Application<C: Collection> {
     update_socket: Mutex<Option<ExecutionEngineSocket>>,
     query_runner: QueryRunner,
@@ -102,7 +102,7 @@ impl<C: Collection> ApplicationInterface<C> for Application<C> {
         let mut counter = 0;
 
         loop {
-            match Env::new(config, Some((checkpoint_hash, &checkpoint))) {
+            match ApplicationEnv::new(config, Some((checkpoint_hash, &checkpoint))) {
                 Ok(mut env) => {
                     info!(
                         "Successfully built database from checkpoint with hash {checkpoint_hash:?}"

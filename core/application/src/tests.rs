@@ -61,7 +61,7 @@ use tempfile::{tempdir, TempDir};
 use crate::app::Application;
 use crate::config::Config;
 use crate::genesis::{Genesis, GenesisAccount, GenesisNode, GenesisPrices, GenesisService};
-use crate::query_runner::QueryRunner;
+use crate::state::QueryRunner;
 
 partial!(TestBinding {
     ConfigProviderInterface = JsonConfigProvider;

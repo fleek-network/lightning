@@ -14,7 +14,7 @@ use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
 use lightning_application::app::Application;
 use lightning_application::config::Config as AppConfig;
 use lightning_application::genesis::{Genesis, GenesisAccount, GenesisNode, GenesisNodeServed};
-use lightning_application::query_runner::QueryRunner;
+use lightning_application::state::QueryRunner;
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_blockstore_server::BlockstoreServer;

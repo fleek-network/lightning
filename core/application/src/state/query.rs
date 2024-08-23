@@ -9,6 +9,7 @@ use atomo::{
     KeyIterator,
     QueryPerm,
     ResolvedTableReference,
+    TableSelector,
 };
 use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
@@ -35,9 +36,8 @@ use lightning_interfaces::types::{
 };
 use lightning_interfaces::SyncQueryRunnerInterface;
 
-use crate::state::State;
+use crate::state::ApplicationState;
 use crate::storage::{AtomoStorage, AtomoStorageBuilder};
-use crate::table::StateTables;
 
 #[derive(Clone)]
 pub struct QueryRunner {
@@ -62,6 +62,15 @@ pub struct QueryRunner {
     uptime_table: ResolvedTableReference<NodeIndex, u8>,
     uri_to_node: ResolvedTableReference<Blake3Hash, BTreeSet<NodeIndex>>,
     node_to_uri: ResolvedTableReference<NodeIndex, BTreeSet<Blake3Hash>>,
+}
+
+impl QueryRunner {
+    pub fn run<F, R>(&self, query: F) -> R
+    where
+        F: FnOnce(&mut TableSelector<AtomoStorage, DefaultSerdeBackend>) -> R,
+    {
+        self.inner.run(query)
+    }
 }
 
 impl SyncQueryRunnerInterface for QueryRunner {
@@ -103,9 +112,10 @@ impl SyncQueryRunnerInterface for QueryRunner {
             .from_checkpoint(hash, checkpoint)
             .read_only();
 
-        let atomo = Self::register_tables(
-            AtomoBuilder::<AtomoStorageBuilder, DefaultSerdeBackend>::new(backend),
-        )
+        let atomo = ApplicationState::register_tables(AtomoBuilder::<
+            AtomoStorageBuilder,
+            DefaultSerdeBackend,
+        >::new(backend))
         .build()?
         .query();
 
@@ -115,9 +125,10 @@ impl SyncQueryRunnerInterface for QueryRunner {
     fn atomo_from_path(path: impl AsRef<Path>) -> anyhow::Result<Atomo<QueryPerm, Self::Backend>> {
         let backend = AtomoStorageBuilder::new(Some(path.as_ref())).read_only();
 
-        let atomo = Self::register_tables(
-            AtomoBuilder::<AtomoStorageBuilder, DefaultSerdeBackend>::new(backend),
-        )
+        let atomo = ApplicationState::register_tables(AtomoBuilder::<
+            AtomoStorageBuilder,
+            DefaultSerdeBackend,
+        >::new(backend))
         .build()?
         .query();
 
@@ -231,11 +242,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
 
     fn simulate_txn(&self, txn: TransactionRequest) -> TransactionResponse {
         self.inner.run(|ctx| {
-            // Create the app/execution environment
-            let backend = StateTables {
-                table_selector: ctx,
-            };
-            let app = State::new(backend);
+            let app = ApplicationState::executor(ctx);
             app.execute_transaction(txn)
         })
     }
