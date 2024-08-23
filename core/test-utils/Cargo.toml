@@ -6,17 +6,23 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+atomo.workspace = true
+atomo-rocks.workspace = true
 fdi = { path = "../../lib/fdi" }
+lightning-application.workspace = true
+lightning-types.workspace = true
 lightning-interfaces = { path = "../interfaces" }
 lightning-utils = { path = "../utils" }
 fleek-crypto.workspace = true
 affair.workspace = true
 axum.workspace = true
 anyhow.workspace = true
+merklize.workspace = true
 rand.workspace = true
 serde.workspace = true
 tokio.workspace = true
 hp-fixed.workspace = true
+ink-quill.workspace = true
 ethers.workspace = true
 tracing.workspace = true
 futures.workspace = true
@@ -30,6 +36,7 @@ plotters = "0.3"
 rand_distr = "0.4"
 rand_chacha = "0.3"
 resolved-pathbuf = { path = "../../lib/resolved-pathbuf" }
+tempfile.workspace = true
 tui-logger = "0.11"
 lightning-workspace-hack.workspace = true
 lazy_static.workspace = true

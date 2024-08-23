@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use affair::AsyncWorker as WorkerTrait;
 use anyhow::{Context, Result};
-use atomo::{AtomoBuilder, DefaultSerdeBackend, SerdeBackend, StorageBackend};
+use atomo::{AtomoBuilder, DefaultSerdeBackend, StorageBackend};
 use atomo_rocks::{Cache as RocksCache, Env as RocksEnv, Options};
 use fleek_crypto::{ClientPublicKey, ConsensusPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
@@ -30,20 +30,24 @@ use lightning_interfaces::types::{
     Value,
 };
 use lightning_metrics::increment_counter;
+use merklize::MerklizeProvider;
 use tracing::warn;
 
 use crate::config::{Config, StorageConfig};
 use crate::genesis::GenesisPrices;
-use crate::state::{ApplicationState, QueryRunner};
+use crate::state::{ApplicationMerklizeProvider, ApplicationState, QueryRunner};
 use crate::storage::{AtomoStorage, AtomoStorageBuilder};
 
-pub struct Env<B: StorageBackend, S: SerdeBackend> {
-    pub inner: ApplicationState<B, S>,
+pub struct Env<StateTree: MerklizeProvider> {
+    pub inner: ApplicationState<StateTree>,
 }
 
-pub type ApplicationEnv = Env<AtomoStorage, DefaultSerdeBackend>;
+pub type ApplicationEnv = Env<ApplicationMerklizeProvider>;
 
-impl ApplicationEnv {
+impl<StateTree: MerklizeProvider> Env<StateTree>
+where
+    StateTree: MerklizeProvider<Storage = AtomoStorage, Serde = DefaultSerdeBackend>,
+{
     pub fn new(config: &Config, checkpoint: Option<([u8; 32], &[u8])>) -> Result<Self> {
         let storage = match config.storage {
             StorageConfig::RocksDb => {
@@ -81,7 +85,7 @@ impl ApplicationEnv {
         let atomo = AtomoBuilder::<AtomoStorageBuilder, DefaultSerdeBackend>::new(storage);
 
         Ok(Self {
-            inner: ApplicationState::build(atomo)?,
+            inner: ApplicationState::<StateTree>::build(atomo)?,
         })
     }
 
@@ -90,76 +94,82 @@ impl ApplicationEnv {
     }
 
     #[autometrics::autometrics]
-    async fn run<F, P>(&mut self, mut block: Block, get_putter: F) -> BlockExecutionResponse
+    pub async fn run<F, P>(
+        &mut self,
+        mut block: Block,
+        get_putter: F,
+    ) -> Result<BlockExecutionResponse>
     where
         F: FnOnce() -> P,
         P: IncrementalPutInterface,
     {
-        let response = self.inner.run(move |ctx| {
-            // Create the app/execution environment
-            let app = ApplicationState::executor(ctx);
-            let last_block_hash = app.get_block_hash();
+        let response = self
+            .inner
+            .run(move |ctx| {
+                let app = ApplicationState::<StateTree>::executor(ctx);
+                let last_block_hash = app.get_block_hash();
 
-            let block_number = app.get_block_number() + 1;
+                let block_number = app.get_block_number() + 1;
 
-            // Create block response
-            let mut response = BlockExecutionResponse {
-                block_hash: block.digest,
-                parent_hash: last_block_hash,
-                change_epoch: false,
-                node_registry_delta: Vec::new(),
-                txn_receipts: Vec::with_capacity(block.transactions.len()),
-                block_number,
-            };
-
-            // Execute each transaction and add the results to the block response
-            for (index, txn) in &mut block.transactions.iter_mut().enumerate() {
-                let results = match app.verify_transaction(txn) {
-                    Ok(_) => app.execute_transaction(txn.clone()),
-                    Err(err) => TransactionResponse::Revert(err),
-                };
-
-                // If the transaction moved the epoch forward, acknowledge that in the block
-                // response
-                if let TransactionResponse::Success(ExecutionData::EpochChange) = results {
-                    response.change_epoch = true;
-                }
-
-                let mut event = None;
-                if let TransactionResponse::Success(_) = results {
-                    if let Some(e) = txn.event() {
-                        event = Some(e);
-                    }
-                }
-
-                let receipt = TransactionReceipt {
+                // Create block response
+                let mut response = BlockExecutionResponse {
                     block_hash: block.digest,
+                    parent_hash: last_block_hash,
+                    change_epoch: false,
+                    node_registry_delta: Vec::new(),
+                    txn_receipts: Vec::with_capacity(block.transactions.len()),
                     block_number,
-                    transaction_index: index as u64,
-                    transaction_hash: txn.hash(),
-                    from: txn.sender(),
-                    to: txn.to(),
-                    response: results,
-                    event,
                 };
-                /* Todo(dalton): Check if the transaction resulted in the committee change(Like a current validator getting slashed)
-                    if so acknowledge that in the block response
-                */
-                response.txn_receipts.push(receipt);
-            }
 
-            // Set the last executed block hash and sub dag index
-            // if epoch changed a new committee starts and subdag starts back at 0
-            let (new_sub_dag_index, new_sub_dag_round) = if response.change_epoch {
-                (0, 0)
-            } else {
-                (block.sub_dag_index, block.sub_dag_round)
-            };
-            app.set_last_block(response.block_hash, new_sub_dag_index, new_sub_dag_round);
+                // Execute each transaction and add the results to the block response
+                for (index, txn) in &mut block.transactions.iter_mut().enumerate() {
+                    let results = match app.verify_transaction(txn) {
+                        Ok(_) => app.execute_transaction(txn.clone()),
+                        Err(err) => TransactionResponse::Revert(err),
+                    };
 
-            // Return the response
-            response
-        });
+                    // If the transaction moved the epoch forward, acknowledge that in the block
+                    // response
+                    if let TransactionResponse::Success(ExecutionData::EpochChange) = results {
+                        response.change_epoch = true;
+                    }
+
+                    let mut event = None;
+                    if let TransactionResponse::Success(_) = results {
+                        if let Some(e) = txn.event() {
+                            event = Some(e);
+                        }
+                    }
+
+                    let receipt = TransactionReceipt {
+                        block_hash: block.digest,
+                        block_number,
+                        transaction_index: index as u64,
+                        transaction_hash: txn.hash(),
+                        from: txn.sender(),
+                        to: txn.to(),
+                        response: results,
+                        event,
+                    };
+                    /* Todo(dalton): Check if the transaction resulted in the committee change(Like a current validator getting slashed)
+                        if so acknowledge that in the block response
+                    */
+                    response.txn_receipts.push(receipt);
+                }
+
+                // Set the last executed block hash and sub dag index
+                // if epoch changed a new committee starts and subdag starts back at 0
+                let (new_sub_dag_index, new_sub_dag_round) = if response.change_epoch {
+                    (0, 0)
+                } else {
+                    (block.sub_dag_index, block.sub_dag_round)
+                };
+                app.set_last_block(response.block_hash, new_sub_dag_index, new_sub_dag_round);
+
+                // Return the response
+                response
+            })
+            .context("Failed to execute block")?;
 
         if response.change_epoch {
             increment_counter!(
@@ -189,7 +199,7 @@ impl ApplicationEnv {
             }
         }
 
-        response
+        Ok(response)
     }
 
     /// Tries to seeds the application state with the genesis block
@@ -405,15 +415,17 @@ impl ApplicationEnv {
 
             metadata_table.insert(Metadata::Epoch, Value::Epoch(0));
             Ok(true)
-        })
+        }).context("Failed to apply genesis block")?
     }
 
     // Should only be called after saving or loading from an epoch checkpoint
     pub fn update_last_epoch_hash(&mut self, state_hash: [u8; 32]) {
-        self.inner.run(move |ctx| {
-            let app = ApplicationState::executor(ctx);
-            app.set_last_epoch_hash(state_hash);
-        })
+        self.inner
+            .run(move |ctx| {
+                let app = ApplicationState::<StateTree>::executor(ctx);
+                app.set_last_epoch_hash(state_hash);
+            })
+            .expect("Failed to update last epoch hash");
     }
 }
 
@@ -438,8 +450,12 @@ impl<C: Collection> UpdateWorker<C> {
 impl<C: Collection> WorkerTrait for UpdateWorker<C> {
     type Request = Block;
     type Response = BlockExecutionResponse;
+
     async fn handle(&mut self, req: Self::Request) -> Self::Response {
-        self.env.run(req, || self.blockstore.put(None)).await
+        self.env
+            .run(req, || self.blockstore.put(None))
+            .await
+            .expect("Failed to execute block")
     }
 }
 
@@ -461,30 +477,34 @@ mod env_tests {
 
         assert!(env.apply_genesis_block(&config).unwrap());
 
-        env.inner.run(|ctx| {
-            let mut param_table = ctx.get_table::<ProtocolParams, u128>("parameter");
-            assert!(
-                param_table
-                    .get(ProtocolParams::MinNumMeasurements)
-                    .is_some(),
-            );
-            param_table.remove(ProtocolParams::MinNumMeasurements);
-            assert!(
-                param_table
-                    .get(ProtocolParams::MinNumMeasurements)
-                    .is_none(),
-            );
-        });
+        env.inner
+            .run(|ctx| {
+                let mut param_table = ctx.get_table::<ProtocolParams, u128>("parameter");
+                assert!(
+                    param_table
+                        .get(ProtocolParams::MinNumMeasurements)
+                        .is_some(),
+                );
+                param_table.remove(ProtocolParams::MinNumMeasurements);
+                assert!(
+                    param_table
+                        .get(ProtocolParams::MinNumMeasurements)
+                        .is_none(),
+                );
+            })
+            .unwrap();
 
         assert!(!env.apply_genesis_block(&config).unwrap());
 
-        env.inner.run(|ctx| {
-            let param_table = ctx.get_table::<ProtocolParams, u128>("parameter");
-            assert!(
-                param_table
-                    .get(ProtocolParams::MinNumMeasurements)
-                    .is_some(),
-            );
-        });
+        env.inner
+            .run(|ctx| {
+                let param_table = ctx.get_table::<ProtocolParams, u128>("parameter");
+                assert!(
+                    param_table
+                        .get(ProtocolParams::MinNumMeasurements)
+                        .is_some(),
+                );
+            })
+            .unwrap();
     }
 }

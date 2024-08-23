@@ -31,7 +31,6 @@ blake2 = { version = "0.10" }
 blake3 = { version = "1" }
 block-buffer = { version = "0.9", default-features = false, features = ["block-padding"] }
 block-padding = { version = "0.3", default-features = false, features = ["std"] }
-borsh = { version = "1", features = ["de_strict_order", "derive"] }
 bytemuck = { version = "1", default-features = false, features = ["extern_crate_alloc"] }
 byteorder = { version = "1", features = ["i128"] }
 bytes = { version = "1", features = ["serde"] }
@@ -184,7 +183,6 @@ blake2 = { version = "0.10" }
 blake3 = { version = "1" }
 block-buffer = { version = "0.9", default-features = false, features = ["block-padding"] }
 block-padding = { version = "0.3", default-features = false, features = ["std"] }
-borsh = { version = "1", features = ["de_strict_order", "derive"] }
 bytemuck = { version = "1", default-features = false, features = ["extern_crate_alloc"] }
 byteorder = { version = "1", features = ["i128"] }
 bytes = { version = "1", features = ["serde"] }

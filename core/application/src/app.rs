@@ -12,6 +12,7 @@ use tracing::{error, info};
 use crate::config::{Config, StorageConfig};
 use crate::env::{ApplicationEnv, Env, UpdateWorker};
 use crate::state::QueryRunner;
+
 pub struct Application<C: Collection> {
     update_socket: Mutex<Option<ExecutionEngineSocket>>,
     query_runner: QueryRunner,
@@ -41,7 +42,7 @@ impl<C: Collection> Application<C> {
             info!("Genesis block already exists exist in application state.");
         }
 
-        let query_runner = env.query_runner();
+        let query_runner = env.inner.query();
         let worker = UpdateWorker::<C>::new(env, blockstore.clone());
         let update_socket = spawn_worker!(worker, "APPLICATION", waiter, crucial);
 

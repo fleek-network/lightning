@@ -4,6 +4,7 @@ use fleek_crypto::{EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 use jsonrpsee::core::{RpcResult, SubscriptionResult};
 use jsonrpsee::proc_macros::rpc;
+use lightning_application::state::ApplicationMerklizeProvider;
 use lightning_interfaces::types::{
     AccountInfo,
     Blake3Hash,
@@ -23,6 +24,8 @@ use lightning_interfaces::types::{
 };
 use lightning_interfaces::PagingParams;
 use lightning_openrpc_macros::open_rpc;
+use lightning_types::{StateProofKey, StateProofValue};
+use merklize::{MerklizeProvider, StateRootHash};
 
 #[open_rpc(namespace = "flk", tag = "1.0.0")]
 #[rpc(client, server, namespace = "flk")]
@@ -187,6 +190,19 @@ pub trait FleekApi {
 
     #[method(name = "send_txn")]
     async fn send_txn(&self, tx: TransactionRequest) -> RpcResult<()>;
+
+    #[method(name = "get_state_root")]
+    async fn get_state_root(&self, epoch: Option<u64>) -> RpcResult<StateRootHash>;
+
+    #[method(name = "get_state_proof")]
+    async fn get_state_proof(
+        &self,
+        key: StateProofKey,
+        epoch: Option<u64>,
+    ) -> RpcResult<(
+        Option<StateProofValue>,
+        <ApplicationMerklizeProvider as MerklizeProvider>::Proof,
+    )>;
 
     #[method(name = "put")]
     async fn put(&self, data: Vec<u8>) -> RpcResult<Blake3Hash>;

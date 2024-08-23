@@ -16,6 +16,7 @@ toml = "0.7.4"
 multiaddr = "0.17.1"
 lightning-interfaces = { path = "../interfaces" }
 lightning-reputation = { path = "../reputation" }
+lightning-types = { path = "../types" }
 lightning-utils = { path = "../utils" }
 lightning-metrics = { path = "../metrics" }
 num-traits.workspace = true
@@ -32,11 +33,14 @@ hp-fixed.workspace = true
 atomo-rocks.workspace = true
 resolved-pathbuf.workspace = true
 lightning-workspace-hack.workspace = true
+merklize.workspace = true
 serde_with = "3.8.1"
 
 
 [dev-dependencies]
 lightning-test-utils = { path = "../test-utils" }
+lightning-types = { path = "../types" }
+futures.workspace = true
 tokio.workspace = true
 rand.workspace = true
 tempfile.workspace = true

@@ -75,6 +75,8 @@ where
     type Hasher = H;
     type Proof = JmtStateProof;
 
+    const NAME: &'static str = "jmt";
+
     /// Augment the provided atomo builder with the necessary tables for the merklize provider.
     fn register_tables<C: StorageBackendConstructor>(
         builder: AtomoBuilder<C, S>,

@@ -106,6 +106,8 @@ where
     type Hasher = H;
     type Proof = MptStateProof;
 
+    const NAME: &'static str = "mpt";
+
     /// Augment the provided atomo builder with the necessary tables for the merklize provider.
     fn register_tables<C: StorageBackendConstructor>(
         builder: AtomoBuilder<C, S>,

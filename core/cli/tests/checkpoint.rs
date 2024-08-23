@@ -7,7 +7,7 @@ use fleek_blake3 as blake3;
 use fleek_crypto::{AccountOwnerSecretKey, ConsensusSecretKey, NodeSecretKey, SecretKey};
 use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, StorageConfig};
-use lightning_application::env::Env;
+use lightning_application::env::ApplicationEnv;
 use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_archive::archive::Archive;
 use lightning_archive::config::Config as ArchiveConfig;
@@ -227,7 +227,7 @@ async fn node_checkpointing() -> Result<()> {
         db_options: None,
         dev: None,
     };
-    let mut env = Env::new(&app_config_temp, None)?;
+    let mut env = ApplicationEnv::new(&app_config_temp, None)?;
     env.apply_genesis_block(&app_config_temp)?;
 
     let storage = env.inner.get_storage_backend_unsafe();

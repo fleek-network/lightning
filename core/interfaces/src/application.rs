@@ -13,10 +13,14 @@ use lightning_types::{
     ChainId,
     Committee,
     NodeIndex,
+    StateProofKey,
+    StateProofValue,
     TransactionRequest,
     TxHash,
     Value,
 };
+use merklize::providers::mpt::MptStateProof;
+use merklize::StateRootHash;
 use serde::{Deserialize, Serialize};
 
 use crate::collection::Collection;
@@ -86,7 +90,7 @@ pub trait ApplicationInterface<C: Collection>:
 #[interfaces_proc::blank]
 pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     #[blank(InMemoryStorage)]
-    type Backend: StorageBackend;
+    type Backend: StorageBackend + Send + Sync;
 
     fn new(atomo: Atomo<QueryPerm, Self::Backend>) -> Self;
 
@@ -100,6 +104,16 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
 
     /// Query Metadata Table
     fn get_metadata(&self, key: &lightning_types::Metadata) -> Option<Value>;
+
+    /// Get the state root hash.
+    fn get_state_root(&self) -> Result<StateRootHash>;
+
+    /// Get a state proof for a given key.
+    fn get_state_proof(
+        &self,
+        key: StateProofKey,
+    ) -> Result<(Option<StateProofValue>, MptStateProof)>;
+    // TODO(snormore): Can we do better here?
 
     /// Query Account Table
     /// Returns information about an account.

@@ -6,8 +6,6 @@ use atomo::{
     Atomo,
     AtomoBuilder,
     DefaultSerdeBackend,
-    SerdeBackend,
-    StorageBackend,
     StorageBackendConstructor,
     TableSelector,
     UpdatePerm,
@@ -34,18 +32,28 @@ use lightning_interfaces::types::{
     Value,
 };
 use lightning_interfaces::SyncQueryRunnerInterface;
+use merklize::hashers::keccak::KeccakHasher;
+use merklize::providers::mpt::MptMerklizeProvider;
+use merklize::MerklizeProvider;
 
 use super::context::StateContext;
 use super::executor::StateExecutor;
 use super::query::QueryRunner;
 use crate::storage::AtomoStorage;
 
+/// A canonical application state tree implementation.
+pub type ApplicationMerklizeProvider =
+    MptMerklizeProvider<AtomoStorage, DefaultSerdeBackend, KeccakHasher>;
+
 /// The shared application state accumulates by executing transactions.
-pub struct ApplicationState<B: StorageBackend, S: SerdeBackend> {
-    db: Atomo<UpdatePerm, B, S>,
+pub struct ApplicationState<StateTree: MerklizeProvider> {
+    db: Atomo<UpdatePerm, StateTree::Storage, StateTree::Serde>,
 }
 
-impl ApplicationState<AtomoStorage, DefaultSerdeBackend> {
+impl<StateTree> ApplicationState<StateTree>
+where
+    StateTree: MerklizeProvider<Storage = AtomoStorage, Serde = DefaultSerdeBackend>,
+{
     /// Creates a new application state.
     pub(crate) fn new(db: Atomo<UpdatePerm, AtomoStorage, DefaultSerdeBackend>) -> Self {
         Self { db }
@@ -56,7 +64,7 @@ impl ApplicationState<AtomoStorage, DefaultSerdeBackend> {
     where
         C: StorageBackendConstructor<Storage = AtomoStorage>,
     {
-        let atomo = Self::register_tables(atomo);
+        let atomo = ApplicationState::<StateTree>::register_tables(atomo);
 
         let db = atomo
             .build()
@@ -89,17 +97,23 @@ impl ApplicationState<AtomoStorage, DefaultSerdeBackend> {
     }
 
     /// Runs a mutation on the state.
-    pub fn run<F, R>(&mut self, mutation: F) -> R
+    pub fn run<F, R>(&mut self, mutation: F) -> Result<R>
     where
         F: FnOnce(&mut TableSelector<AtomoStorage, DefaultSerdeBackend>) -> R,
     {
-        self.db.run(mutation)
+        self.db.run(|ctx| {
+            let result = mutation(ctx);
+
+            StateTree::update_state_tree_from_context(ctx)?;
+
+            Ok(result)
+        })
     }
 
     /// Registers and configures the application state tables with the atomo database builder.
-    pub fn register_tables<B: StorageBackendConstructor, S: SerdeBackend>(
-        builder: AtomoBuilder<B, S>,
-    ) -> AtomoBuilder<B, S> {
+    pub fn register_tables<B: StorageBackendConstructor>(
+        builder: AtomoBuilder<B, StateTree::Serde>,
+    ) -> AtomoBuilder<B, StateTree::Serde> {
         let mut builder = builder
             .with_table::<Metadata, Value>("metadata")
             .with_table::<EthAddress, AccountInfo>("account")
@@ -141,6 +155,8 @@ impl ApplicationState<AtomoStorage, DefaultSerdeBackend> {
                 .enable_iter("consensus_key_to_index")
                 .enable_iter("pub_key_to_index");
         }
+
+        builder = StateTree::register_tables(builder);
 
         builder
     }

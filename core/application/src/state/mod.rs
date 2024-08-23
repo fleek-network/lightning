@@ -4,4 +4,4 @@ mod query;
 mod writer;
 
 pub use query::QueryRunner;
-pub use writer::ApplicationState;
+pub use writer::{ApplicationMerklizeProvider, ApplicationState};
