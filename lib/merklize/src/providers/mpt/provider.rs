@@ -107,7 +107,7 @@ where
     type Proof = MptStateProof;
 
     /// Augment the provided atomo builder with the necessary tables for the merklize provider.
-    fn with_tables<C: StorageBackendConstructor>(
+    fn register_tables<C: StorageBackendConstructor>(
         builder: AtomoBuilder<C, S>,
     ) -> AtomoBuilder<C, S> {
         builder
@@ -290,7 +290,7 @@ where
         // Build a new, temporary state tree from the batch.
         let builder = AtomoBuilder::<_, S>::new(InMemoryStorage::default());
         type TempDbProvider<S, H> = MptMerklizeProvider<InMemoryStorage, S, H>;
-        let mut tmp_db = TempDbProvider::<S, H>::with_tables(builder).build()?;
+        let mut tmp_db = TempDbProvider::<S, H>::register_tables(builder).build()?;
         tmp_db.run(|ctx| TempDbProvider::<S, H>::update_state_tree(ctx, batch))?;
 
         // Get and return the state root hash from the temporary state tree.

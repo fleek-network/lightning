@@ -228,9 +228,10 @@ fn generic_merklize_bench_commit_changes<C: StorageBackendConstructor, M>(
 ) where
     M: MerklizeProvider<Storage = C::Storage>,
 {
-    let mut db = M::with_tables(AtomoBuilder::new(builder).with_table::<String, String>("data"))
-        .build()
-        .unwrap();
+    let mut db =
+        M::register_tables(AtomoBuilder::new(builder).with_table::<String, String>("data"))
+            .build()
+            .unwrap();
 
     b.iter(|| {
         db.run(|ctx| {

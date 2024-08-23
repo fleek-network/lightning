@@ -34,7 +34,7 @@ pub trait MerklizeProvider {
     ///
     /// Arguments:
     /// - `builder`: The atomo builder to augment.
-    fn with_tables<C: StorageBackendConstructor>(
+    fn register_tables<C: StorageBackendConstructor>(
         builder: AtomoBuilder<C, Self::Serde>,
     ) -> AtomoBuilder<C, Self::Serde>;
 

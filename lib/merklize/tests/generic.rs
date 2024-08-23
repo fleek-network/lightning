@@ -121,7 +121,7 @@ fn test_generic<
 >(
     builder: C,
 ) {
-    let builder = M::with_tables(
+    let builder = M::register_tables(
         AtomoBuilder::new(builder)
             .with_table::<String, String>("data")
             .enable_iter("data")

@@ -206,9 +206,10 @@ fn generic_bench_verify_proof<C: StorageBackendConstructor, M>(
 ) where
     M: MerklizeProvider<Storage = C::Storage>,
 {
-    let mut db = M::with_tables(AtomoBuilder::new(builder).with_table::<String, String>("data"))
-        .build()
-        .unwrap();
+    let mut db =
+        M::register_tables(AtomoBuilder::new(builder).with_table::<String, String>("data"))
+            .build()
+            .unwrap();
 
     db.run(|ctx| {
         let mut data_table = ctx.get_table::<String, String>("data");

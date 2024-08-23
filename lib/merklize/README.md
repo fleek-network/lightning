@@ -23,7 +23,7 @@ pub fn main() {
 }
 
 fn run<B: StorageBackendConstructor, M: MerklizeProvider<Storage = B::Storage>>(builder: B) {
-    let mut db = M::with_tables(AtomoBuilder::new(builder).with_table::<String, String>("data"))
+    let mut db = M::register_tables(AtomoBuilder::new(builder).with_table::<String, String>("data"))
         .build()
         .unwrap();
     let query = db.query();

@@ -20,7 +20,7 @@ fn test_jmt_update_state_tree_from_context_with_updates() {
     type M = JmtMerklizeProvider<InMemoryStorage, S, H>;
 
     let builder = AtomoBuilder::new(InMemoryStorage::default());
-    let mut db = M::with_tables(builder.with_table::<String, String>("data"))
+    let mut db = M::register_tables(builder.with_table::<String, String>("data"))
         .build()
         .unwrap();
 
@@ -151,7 +151,7 @@ fn test_jmt_update_state_tree_from_context_with_no_changes() {
     type M = JmtMerklizeProvider<InMemoryStorage, S, H>;
 
     let builder = AtomoBuilder::new(InMemoryStorage::default());
-    let mut db = M::with_tables(builder.with_table::<String, String>("data"))
+    let mut db = M::register_tables(builder.with_table::<String, String>("data"))
         .build()
         .unwrap();
 
@@ -200,7 +200,7 @@ fn test_jmt_get_state_root_with_empty_state() {
     type M = JmtMerklizeProvider<InMemoryStorage, S, H>;
 
     let builder = AtomoBuilder::new(InMemoryStorage::default());
-    let db = M::with_tables(builder.with_table::<String, String>("data"))
+    let db = M::register_tables(builder.with_table::<String, String>("data"))
         .build()
         .unwrap();
     let query = db.query();
@@ -220,7 +220,7 @@ fn test_jmt_get_state_root_with_updates() {
     type M = JmtMerklizeProvider<InMemoryStorage, S, H>;
 
     let builder = AtomoBuilder::new(InMemoryStorage::default());
-    let mut db = M::with_tables(builder.with_table::<String, String>("data"))
+    let mut db = M::register_tables(builder.with_table::<String, String>("data"))
         .build()
         .unwrap();
     let query = db.query();
@@ -336,7 +336,7 @@ fn test_jmt_clear_and_rebuild_state_tree() {
     type M = JmtMerklizeProvider<InMemoryStorage, S, H>;
 
     let builder = AtomoBuilder::new(InMemoryStorage::default());
-    let mut db = M::with_tables(builder.with_table::<String, String>("data"))
+    let mut db = M::register_tables(builder.with_table::<String, String>("data"))
         .build()
         .unwrap();
     let query = db.query();
@@ -390,7 +390,7 @@ fn test_jmt_get_state_proof_of_membership() {
     type M = JmtMerklizeProvider<InMemoryStorage, S, H>;
 
     let builder = AtomoBuilder::new(InMemoryStorage::default());
-    let mut db = M::with_tables(builder.with_table::<String, String>("data"))
+    let mut db = M::register_tables(builder.with_table::<String, String>("data"))
         .build()
         .unwrap();
     let query = db.query();
