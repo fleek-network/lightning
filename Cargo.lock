@@ -4344,7 +4344,13 @@ dependencies = [
 name = "fleek-ipld"
 version = "0.0.0"
 dependencies = [
+ "anyhow",
+ "libipld",
+ "libipld-cbor",
+ "libipld-cbor-derive",
  "quick-protobuf",
+ "reqwest",
+ "tokio",
 ]
 
 [[package]]

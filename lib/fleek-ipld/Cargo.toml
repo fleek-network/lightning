@@ -7,4 +7,13 @@ homepage = "https://github.com/fleek-network/lightning"
 description = "The Fleek IPLD crate"
 
 [dependencies]
+anyhow.workspace = true
 quick-protobuf = "0.8"
+libipld = "0.16.0"
+libipld-cbor = "0.16.0"
+libipld-cbor-derive = "0.16.0"
+tokio.workspace = true
+reqwest.workspace = true
+
+[[example]]
+name = "download"
