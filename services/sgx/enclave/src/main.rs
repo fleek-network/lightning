@@ -5,6 +5,7 @@ use std::sync::LazyLock;
 use ecies::{PublicKey, SecretKey};
 use serde::Deserialize;
 
+mod attest;
 mod blockstore;
 mod runtime;
 
@@ -91,6 +92,9 @@ fn main() -> anyhow::Result<()> {
         "Shared enclave public key: {}",
         bs58::encode(PublicKey::from_secret_key(&SHARED_KEY).serialize_compressed()).into_string()
     );
+
+    // TODO: spin up http server
+    // TODO: spin up RA-TLS server
 
     loop {
         let (mut conn, _) = listener.accept()?;
