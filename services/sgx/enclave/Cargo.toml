@@ -15,11 +15,16 @@ thiserror = "=1.0.63"
 arrayref = "=0.3.8"
 bytes = "=1.7.1"
 
+
 # Encodings
 hex = "=0.4.3"
 bs58 = "=0.5.1"
 serde = { version = "=1.0.208", features = ["derive"] }
 serde_json = "=1.0.125"
+
+# Networking
+# rouille = "=3.6.2"
+rouille = {git = "https://github.com/mithril-security/rouille-sgx.git", rev = "ff83153bb5870efdcf6401511f844713af6828db"}
 
 # WASM Runtime
 wasmi = "=0.36.0"
