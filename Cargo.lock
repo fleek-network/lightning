@@ -4721,6 +4721,7 @@ dependencies = [
  "serde",
  "serde-big-array",
  "serde_cbor",
+ "sgx-isa",
  "sgxs-loaders",
  "tokio",
  "url",
