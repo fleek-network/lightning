@@ -93,7 +93,7 @@ impl AsyncWrite for AttestationEndpoint {
 
             // set handler future to be polled from `AsyncRead`
             let req = match self.method.as_ref() {
-                "get_quote" => Request::Quote(self.buffer.split().to_vec()),
+                "quote" => Request::Quote(self.buffer.split().to_vec()),
                 "collateral" => Request::Collateral(self.buffer.split().to_vec()),
                 _ => unreachable!(),
             };
@@ -124,15 +124,18 @@ impl AsyncRead for AttestationEndpoint {
         cx: &mut std::task::Context<'_>,
         buf: &mut ReadBuf,
     ) -> std::task::Poll<std::io::Result<()>> {
+        // flush all output
         if let Some(output) = self.output.as_mut() {
             let len = buf.remaining().min(output.len());
             buf.put_slice(&output.split_to(len));
             return std::task::Poll::Ready(Ok(()));
         }
 
+        // poll handler future if active
         match &mut self.fut {
             Some(fut) => match ready!(fut.poll_unpin(cx)) {
                 Ok(mut output) => {
+                    // write as much as possible, storing the rest for later
                     let len = buf.remaining().min(output.len());
                     buf.put_slice(&output.split_to(len));
                     self.output = Some(output);
