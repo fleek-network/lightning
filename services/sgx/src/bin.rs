@@ -109,10 +109,12 @@ fn main() {
         .einittoken_provider(AesmClient::new())
         .build();
 
-    // setup attestation state
-    let attest_state = Arc::new(attest::EndpointState {});
-
     let mut enclave_builder = EnclaveBuilder::new_from_memory(ENCLAVE);
+
+    // setup attestation state
+    let attest_state =
+        Arc::new(attest::EndpointState::init().expect("failed to initialize attestation endpoint"));
+
     // TODO: figure out a flow to generate a signature for the compiled enclave and committing it.
     enclave_builder.dummy_signature();
     enclave_builder.usercall_extension(ExternalService { attest_state });

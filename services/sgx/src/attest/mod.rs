@@ -2,30 +2,102 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 
+use aesm_client::AesmClient;
+use anyhow::{ensure, Context};
 use arrayref::array_ref;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use futures::{ready, FutureExt};
 use serde::{Deserialize, Serialize};
+use sgx_isa::Targetinfo;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
-/// TODO: replace with something real
+const SGX_QL_ALG_ECDSA_P256: u32 = 2;
+
 #[derive(Debug)]
-pub struct EndpointState {}
+pub struct EndpointState {
+    aesm_client: AesmClient,
+    target_info: Targetinfo,
+    ecdsa_key_id: Vec<u8>,
+}
+
+fn get_algorithm_id(key_id: &[u8]) -> u32 {
+    const ALGORITHM_OFFSET: usize = 154;
+    let mut bytes: [u8; 4] = Default::default();
+    bytes.copy_from_slice(&key_id[ALGORITHM_OFFSET..ALGORITHM_OFFSET + 4]);
+    u32::from_le_bytes(bytes)
+}
 
 impl EndpointState {
+    pub fn init() -> anyhow::Result<Self> {
+        let aesm_client = AesmClient::new();
+        let key_ids = aesm_client.get_supported_att_key_ids().unwrap();
+
+        let ecdsa_key_ids: Vec<_> = key_ids
+            .into_iter()
+            .filter(|id| SGX_QL_ALG_ECDSA_P256 == get_algorithm_id(id))
+            .collect();
+        ensure!(
+            ecdsa_key_ids.len() == 1,
+            "Expected exactly one ECDSA attestation key, got {} key(s) instead",
+            ecdsa_key_ids.len()
+        );
+        let ecdsa_key_id = ecdsa_key_ids[0].to_vec();
+        let quote_info = aesm_client.init_quote_ex(ecdsa_key_id.clone())?;
+        let target_info =
+            Targetinfo::try_copy_from(quote_info.target_info()).context("Invalid target info")?;
+        Ok(EndpointState {
+            aesm_client,
+            target_info,
+            ecdsa_key_id,
+        })
+    }
+
     /// Handle an incoming request from the enclave
     async fn handle(self: Arc<Self>, request: Request) -> std::io::Result<Bytes> {
         match request {
-            Request::TargetInfo => {
-                todo!("fetch target info")
-            },
-            Request::Quote(_report) => {
-                todo!("get quote")
-            },
+            Request::TargetInfo => self.handle_target_info(),
+            Request::Quote(report) => self.handle_quote(report),
             Request::Collateral(_quote) => {
                 todo!("get collateral")
             },
         }
+    }
+
+    /// Handle getting the target info
+    pub fn handle_target_info(&self) -> std::io::Result<Bytes> {
+        let output = serde_json::to_vec(&self.target_info)?;
+        Ok(output.into())
+    }
+
+    /// Handle getting a quote from a report
+    ///
+    /// # Security
+    ///
+    /// The nonce is set to 0. While in some instances reusing nonces can lead to security
+    /// vulnerability, this is not the case here.
+    ///
+    /// Here is an extract from Intel code [1]
+    /// > The caller can request a REPORT from the QE using a supplied nonce. This will allow
+    /// > the enclave requesting the quote to verify the QE used to generate the quote. This
+    /// > makes it more difficult for something to spoof a QE and allows the app enclave to
+    /// > catch it earlier. But since the authenticity of the QE lies in the knowledge of the
+    /// > Quote signing key, such spoofing will ultimately be detected by the quote verifier.
+    /// > QE REPORT.ReportData = SHA256(*p_{nonce}||*p_{quote})||0x00)
+    ///
+    /// Since setting a nonce would add no measurable security benefit in our threat model,
+    /// we chose not to do so, because it would only add complexity.
+    ///
+    /// [1] <https://github.com/intel/linux-sgx/blob/26c458905b72e66db7ac1feae04b43461ce1b76f/common/inc/sgx_uae_quote_ex.h#L158>
+    pub fn handle_quote(&self, report: Vec<u8>) -> std::io::Result<Bytes> {
+        self.aesm_client
+            .get_quote_ex(self.ecdsa_key_id.clone(), report, None, vec![0; 16])
+            .map(|res| res.quote().to_vec().into())
+            .map_err(|e| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("failed to generate quote: {e}"),
+                )
+            })
     }
 }
 
@@ -71,7 +143,7 @@ impl AsyncWrite for AttestationEndpoint {
         _cx: &mut std::task::Context<'_>,
         buf: &[u8],
     ) -> std::task::Poll<std::io::Result<usize>> {
-        if self.method.as_ref() != "target_info" {
+        if self.method.as_ref() != "target_info" && self.fut.is_none() && self.output.is_none() {
             // push bytes into buffer
             self.buffer.put_slice(buf);
 
@@ -99,6 +171,7 @@ impl AsyncWrite for AttestationEndpoint {
             };
             self.fut = Some(Box::pin(self.state.clone().handle(req)));
         }
+
         std::task::Poll::Ready(Ok(buf.len()))
     }
 
