@@ -30,6 +30,7 @@ arrayvec = "0.7"
 aesm-client = { version = "0.6.0", features = ["sgxs"] }
 enclave-runner = { version = "0.6.0" }
 sgxs-loaders = { version = "0.4.0" }
+sgx-isa = "0.4.1"
 
 [[bin]]
 name = "fn-service-3"
