@@ -57,7 +57,7 @@ impl UsercallExtension for ExternalService {
                 // Attestation APIs
                 if let Some(method) = subdomain.strip_suffix(".attest") {
                     match method {
-                        "target_info" | "get_quote" | "collateral" => {
+                        "target_info" | "quote" | "collateral" => {
                             let stream = Box::new(AttestationEndpoint::new(
                                 method,
                                 self.attest_state.clone(),
