@@ -2,14 +2,13 @@ use std::io::{Read, Write};
 use std::net::TcpStream;
 
 use fleek_remote_attestation::types::collateral::SgxCollateral;
-use sgx_isa::Report;
-
-pub type TargetInfo = ();
+use sgx_isa::{Report, Targetinfo};
 
 /// Get the target info from the runner
-pub fn get_target_info() -> std::io::Result<TargetInfo> {
-    let bytes = request("target_info", None)?;
-    todo!("parse bytes into target info")
+pub fn get_target_info() -> std::io::Result<Targetinfo> {
+    let res = request("target_info", None)?;
+    let ti = serde_json::from_slice(&res)?;
+    Ok(ti)
 }
 
 /// Get a quote from the runner
