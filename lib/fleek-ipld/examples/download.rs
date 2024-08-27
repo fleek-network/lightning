@@ -1,4 +1,4 @@
-use fleek_ipld::dag_cbor::download;
+use fleek_ipld::dag_pb::download;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

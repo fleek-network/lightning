@@ -8,12 +8,13 @@ description = "The Fleek IPLD crate"
 
 [dependencies]
 anyhow.workspace = true
+async-trait.workspace = true
+ipld-core = "0.4.1"
+ipld-dagpb = "0.2.1"
 quick-protobuf = "0.8"
-libipld = "0.16.0"
-libipld-cbor = "0.16.0"
-libipld-cbor-derive = "0.16.0"
-tokio.workspace = true
 reqwest.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
 
 [[example]]
 name = "download"

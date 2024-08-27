@@ -4345,11 +4345,12 @@ name = "fleek-ipld"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "libipld",
- "libipld-cbor",
- "libipld-cbor-derive",
+ "async-trait",
+ "ipld-core",
+ "ipld-dagpb",
  "quick-protobuf",
  "reqwest",
+ "thiserror",
  "tokio",
 ]
 
@@ -5779,6 +5780,29 @@ dependencies = [
  "widestring",
  "windows-sys 0.48.0",
  "winreg",
+]
+
+[[package]]
+name = "ipld-core"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b4ede82a79e134f179f4b29b5fdb1eb92bd1b38c4dfea394c539051150a21b9b"
+dependencies = [
+ "cid 0.11.1",
+ "serde",
+ "serde_bytes",
+]
+
+[[package]]
+name = "ipld-dagpb"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c5eb3c08f1508fa62ffe1a805aafa116d2eb034b3542c85596db132f279abc47"
+dependencies = [
+ "bytes",
+ "ipld-core",
+ "quick-protobuf",
+ "thiserror",
 ]
 
 [[package]]

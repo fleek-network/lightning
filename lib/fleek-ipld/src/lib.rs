@@ -1,2 +1,3 @@
-pub mod dag_cbor;
+pub mod dag_pb;
+pub mod processor;
 pub mod unixfs;
