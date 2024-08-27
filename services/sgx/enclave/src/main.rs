@@ -3,10 +3,12 @@ use std::net::{TcpListener, TcpStream};
 use std::sync::LazyLock;
 
 use ecies::{PublicKey, SecretKey};
+use http::start_http_thread;
 use serde::Deserialize;
 
 mod attest;
 mod blockstore;
+mod http;
 mod runtime;
 
 pub(crate) mod config {
@@ -84,18 +86,28 @@ fn handle_connection(conn: &mut TcpStream) -> anyhow::Result<()> {
 }
 
 fn main() -> anyhow::Result<()> {
+    println!("Successfully started SGX enclave!");
+
+    // TODO: - read a list of input node ips
+    //       - attempt to fetch the key via RA-TLS from any node
+
+    let shared_key = PublicKey::from_secret_key(&SHARED_KEY).serialize_compressed();
+    println!(
+        "Shared enclave public key: {}",
+        bs58::encode(&shared_key).into_string()
+    );
+
+    // Report data [0..33] contains the shared public key
+    let mut report_data = [0u8; 64];
+    report_data[..33].copy_from_slice(&shared_key);
+    start_http_thread(6969, report_data);
+
+    // TODO: spin up RA-TLS server
+
     // bind to userspace address for incoming requests from handshake
     let listener = TcpListener::bind("requests.fleek.network")?;
 
-    println!("Successfully started SGX enclave!");
-    println!(
-        "Shared enclave public key: {}",
-        bs58::encode(PublicKey::from_secret_key(&SHARED_KEY).serialize_compressed()).into_string()
-    );
-
-    // TODO: spin up http server
-    // TODO: spin up RA-TLS server
-
+    // Handle incoming handshake connections
     loop {
         let (mut conn, _) = listener.accept()?;
         if let Err(e) = handle_connection(&mut conn) {
