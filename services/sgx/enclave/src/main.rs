@@ -90,8 +90,14 @@ pub fn start_http_thread(port: u16, report_data: [u8; 64]) {
     let (quote, collateral) = crate::attest::generate_for_report_data(report_data)
         .expect("failed to generate http report data");
 
+    println!(
+        "got collat {}",
+        serde_json::to_string_pretty(&collateral).unwrap()
+    );
+
     std::thread::spawn(move || {
         rouille::start_server(("0.0.0.0", port), move |req: &Request| {
+            println!("got req {req:?}");
             rouille::router!(req,
                 (GET)(/quote) => {
                     Response::from_data("raw", quote.clone())
@@ -123,7 +129,7 @@ fn main() -> anyhow::Result<()> {
     // The rest of the bytes are padding.
     let mut report_data = [0u8; 64];
     report_data[64 - 33..].copy_from_slice(&shared_key);
-    start_http_thread(6969, report_data);
+    start_http_thread(4200, report_data);
 
     // TODO: spin up RA-TLS server
 
