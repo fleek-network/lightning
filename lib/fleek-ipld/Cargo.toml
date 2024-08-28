@@ -9,12 +9,14 @@ description = "The Fleek IPLD crate"
 [dependencies]
 anyhow.workspace = true
 async-trait.workspace = true
+futures.workspace = true
 ipld-core = "0.4.1"
 ipld-dagpb = "0.2.1"
 quick-protobuf = "0.8"
 reqwest.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+tokio-stream.workspace = true
 
 [[example]]
 name = "download"

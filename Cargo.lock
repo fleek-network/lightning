@@ -4346,12 +4346,14 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "futures",
  "ipld-core",
  "ipld-dagpb",
  "quick-protobuf",
  "reqwest",
  "thiserror",
  "tokio",
+ "tokio-stream",
 ]
 
 [[package]]
