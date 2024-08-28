@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 use std::path::Path;
 use std::time::Duration;
 
+use anyhow::Result;
 use atomo::{
     Atomo,
     AtomoBuilder,
@@ -35,7 +36,9 @@ use lightning_interfaces::types::{
     Value,
 };
 use lightning_interfaces::SyncQueryRunnerInterface;
+use merklize::{StateRootHash, StateTree};
 
+use crate::env::ApplicationStateTree;
 use crate::state::ApplicationState;
 use crate::storage::{AtomoStorage, AtomoStorageBuilder};
 
@@ -259,5 +262,10 @@ impl SyncQueryRunnerInterface for QueryRunner {
     fn get_content_registry(&self, node_index: &NodeIndex) -> Option<BTreeSet<Blake3Hash>> {
         self.inner
             .run(|ctx| self.node_to_uri.get(ctx).get(node_index))
+    }
+
+    /// Returns the state tree root hash from the application state.
+    fn get_state_root(&self) -> Result<StateRootHash> {
+        self.run(|ctx| ApplicationStateTree::get_state_root(ctx))
     }
 }

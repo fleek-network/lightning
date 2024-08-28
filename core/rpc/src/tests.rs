@@ -1143,3 +1143,41 @@ async fn test_rpc_events() -> Result<()> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn test_rpc_get_state_root() -> Result<()> {
+    let temp_dir = tempdir()?;
+
+    // Create keys
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    let owner_public_key = owner_secret_key.to_pk();
+
+    // Init application service
+    let mut genesis = Genesis::default();
+    genesis.account.push(GenesisAccount {
+        public_key: owner_public_key.into(),
+        flk_balance: 1000u64.into(),
+        stables_balance: 0,
+        bandwidth_balance: 0,
+    });
+
+    let genesis_path = genesis
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
+
+    let port = 30024;
+    let node = init_rpc(&temp_dir, genesis_path, port).await;
+
+    wait_for_server_start(port).await?;
+
+    let client = RpcClient::new_no_auth(&format!("http://127.0.0.1:{port}/rpc/v0"))?;
+    let root_hash = FleekApiClient::get_state_root(&client, None)
+        .await?
+        .to_string();
+
+    assert_eq!(root_hash.len(), 64);
+    assert!(root_hash.chars().all(|c| c.is_ascii_hexdigit()));
+
+    node.shutdown().await;
+    Ok(())
+}

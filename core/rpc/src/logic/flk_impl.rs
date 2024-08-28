@@ -30,6 +30,7 @@ use lightning_interfaces::types::{
 };
 use lightning_interfaces::PagingParams;
 use lightning_utils::application::QueryRunnerExt;
+use merklize::StateRootHash;
 
 use crate::api::FleekApiServer;
 use crate::error::RPCError;
@@ -385,6 +386,15 @@ impl<C: Collection> FleekApiServer for FleekApi<C> {
             _ => 0,
         };
         Ok((sub_dag_index, self.data.query_runner.get_epoch_info().epoch))
+    }
+
+    async fn get_state_root(&self, epoch: Option<u64>) -> RpcResult<StateRootHash> {
+        Ok(self
+            .data
+            .query_runner(epoch)
+            .await?
+            .get_state_root()
+            .map_err(|e| RPCError::custom(e.to_string()))?)
     }
 
     async fn send_txn(&self, tx: TransactionRequest) -> RpcResult<()> {

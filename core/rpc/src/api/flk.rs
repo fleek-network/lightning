@@ -23,6 +23,7 @@ use lightning_interfaces::types::{
 };
 use lightning_interfaces::PagingParams;
 use lightning_openrpc_macros::open_rpc;
+use merklize::StateRootHash;
 
 #[open_rpc(namespace = "flk", tag = "1.0.0")]
 #[rpc(client, server, namespace = "flk")]
@@ -184,6 +185,9 @@ pub trait FleekApi {
 
     #[method(name = "get_sub_dag_index")]
     async fn get_sub_dag_index(&self) -> RpcResult<(u64, Epoch)>;
+
+    #[method(name = "get_state_root")]
+    async fn get_state_root(&self, epoch: Option<u64>) -> RpcResult<StateRootHash>;
 
     #[method(name = "send_txn")]
     async fn send_txn(&self, tx: TransactionRequest) -> RpcResult<()>;

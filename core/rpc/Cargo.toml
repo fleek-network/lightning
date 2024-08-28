@@ -38,6 +38,7 @@ lightning-interfaces = { path = "../interfaces" }
 lightning-openrpc = { path = "../rpc-openrpc" }
 lightning-openrpc-macros = { path = "../rpc-openrpc-macros" }
 lightning-utils = { path = "../utils" }
+merklize.workspace = true
 alloy-primitives = "0.5.2"
 resolved-pathbuf = { path = "../../lib/resolved-pathbuf" }
 
