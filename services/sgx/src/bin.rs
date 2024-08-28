@@ -1,4 +1,5 @@
 use std::future::Future;
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io::Result as IoResult;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
@@ -58,6 +59,7 @@ impl UsercallExtension for ExternalService {
                 if let Some(method) = subdomain.strip_suffix(".attest") {
                     match method {
                         "target_info" | "quote" | "collateral" => {
+                            println!("handle {method} endpoint");
                             let stream = Box::new(AttestationEndpoint::new(
                                 method,
                                 self.attest_state.clone(),
@@ -104,16 +106,43 @@ impl UsercallExtension for ExternalService {
 }
 
 fn main() {
+    // Extracting platform and uid from whoami
+    let sgx_mode = if cfg!(target_env = "sgx") { "HW" } else { "SW" };
+    let platform = format!("{} - {}", whoami::platform(), sgx_mode);
+    let uid = {
+        let mut hasher = DefaultHasher::new();
+        whoami::username().hash(&mut hasher);
+        whoami::fallible::hostname().unwrap().hash(&mut hasher);
+        platform.hash(&mut hasher);
+        format!("{:X}", hasher.finish())
+    };
+    let custom_agent_id = std::env::var("CUSTOM_AGENT_ID").unwrap_or_default();
+
+    // Running the enclave
+    let aesm_client = AesmClient::new();
     let mut device = IsgxDevice::new()
         .unwrap()
-        .einittoken_provider(AesmClient::new())
+        .einittoken_provider(aesm_client)
         .build();
 
     let mut enclave_builder = EnclaveBuilder::new_from_memory(ENCLAVE);
 
+    fn make_arg(arg_name: &str, arg_value: &str) -> Vec<u8> {
+        let mut arg = arg_name.as_bytes().to_vec();
+        arg.push(b'=');
+        arg.extend_from_slice(arg_value.as_bytes());
+        arg
+    }
+    enclave_builder.args([
+        make_arg("--uid", &uid),
+        make_arg("--platform", &platform),
+        make_arg("--custom_agent_id", &custom_agent_id),
+    ]);
+
     // setup attestation state
     let attest_state =
         Arc::new(attest::EndpointState::init().expect("failed to initialize attestation endpoint"));
+    println!("initialized attestation endpoint");
 
     // TODO: figure out a flow to generate a signature for the compiled enclave and committing it.
     enclave_builder.dummy_signature();
