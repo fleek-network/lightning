@@ -33,6 +33,7 @@ atomo-rocks.workspace = true
 resolved-pathbuf.workspace = true
 lightning-workspace-hack.workspace = true
 serde_with = "3.8.1"
+merklize.workspace = true
 
 
 [dev-dependencies]

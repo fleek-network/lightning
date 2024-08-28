@@ -6407,6 +6407,7 @@ dependencies = [
  "lightning-test-utils",
  "lightning-utils",
  "lightning-workspace-hack",
+ "merklize",
  "multiaddr",
  "num-traits",
  "rand 0.8.5",

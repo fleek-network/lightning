@@ -109,7 +109,7 @@ impl<C: Collection> ApplicationInterface<C> for Application<C> {
                     );
 
                     // Update the last epoch hash on state
-                    env.update_last_epoch_hash(checkpoint_hash);
+                    env.update_last_epoch_hash(checkpoint_hash)?;
 
                     return Ok(());
                 },
