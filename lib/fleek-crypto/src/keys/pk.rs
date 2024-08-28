@@ -265,8 +265,7 @@ impl schemars::JsonSchema for ClientPublicKey {
     }
 
     fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
-        let key = ClientPublicKey::from_str("F5tV4PLSzx1Lt4mYBe13aYQ8hsLMTCfjgY2pLr82AumH")
-            .expect("valid node public key for example");
+        let key = ClientPublicKey::from_str("u76G7q22Qc5nRC5Fi6dzbNE7FQxqRKEtTS9qjDftWFwhBKmoozGLv8wFiFmGnYDFMEKyYxozWRdM3wgjs1Na3fvxDARxi9CSNJUZJfPXC2WUu3uLnUw96jPBRp7rtHEzS5H").expect("valid client public key for example");
 
         schemars::schema_for_value!(key).schema.into()
     }
