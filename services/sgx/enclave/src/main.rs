@@ -97,7 +97,7 @@ pub fn start_http_thread(port: u16, report_data: [u8; 64]) {
                     Response::from_data("raw", quote.clone())
                 },
                 (GET)(/collateral) => {
-                    Response::from_data("application/json", serde_json::to_vec(&collateral).unwrap())
+                    Response::json(&collateral)
                 },
                 _ => {
                     Response::empty_404()
