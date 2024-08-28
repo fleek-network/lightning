@@ -27,8 +27,8 @@ fn test_jmt_update_state_tree_from_context_with_updates() {
     // Check storage.
     {
         let storage = db.get_storage_backend_unsafe();
-        assert_eq!(storage.keys(1).len(), 0); // nodes
-        assert_eq!(storage.keys(2).len(), 0); // keys
+        assert_eq!(storage.keys(1).count(), 0); // nodes
+        assert_eq!(storage.keys(2).count(), 0); // keys
     }
 
     // Insert a value.
@@ -43,8 +43,8 @@ fn test_jmt_update_state_tree_from_context_with_updates() {
     // Check storage.
     {
         let storage = db.get_storage_backend_unsafe();
-        assert_eq!(storage.keys(1).len(), 2); // nodes
-        assert_eq!(storage.keys(2).len(), 1); // keys
+        assert_eq!(storage.keys(1).count(), 2); // nodes
+        assert_eq!(storage.keys(2).count(), 1); // keys
     }
 
     // Insert another value.
@@ -59,8 +59,8 @@ fn test_jmt_update_state_tree_from_context_with_updates() {
     // Check storage.
     {
         let storage = db.get_storage_backend_unsafe();
-        assert_eq!(storage.keys(1).len(), 4); // nodes
-        assert_eq!(storage.keys(2).len(), 2); // keys
+        assert_eq!(storage.keys(1).count(), 4); // nodes
+        assert_eq!(storage.keys(2).count(), 2); // keys
     }
 
     // Insert another value.
@@ -75,8 +75,8 @@ fn test_jmt_update_state_tree_from_context_with_updates() {
     // Check storage.
     {
         let storage = db.get_storage_backend_unsafe();
-        assert_eq!(storage.keys(1).len(), 5); // nodes
-        assert_eq!(storage.keys(2).len(), 3); // keys
+        assert_eq!(storage.keys(1).count(), 5); // nodes
+        assert_eq!(storage.keys(2).count(), 3); // keys
     }
 
     // Remove a value.
@@ -91,8 +91,8 @@ fn test_jmt_update_state_tree_from_context_with_updates() {
     // Check storage.
     {
         let storage = db.get_storage_backend_unsafe();
-        assert_eq!(storage.keys(1).len(), 4); // nodes
-        assert_eq!(storage.keys(2).len(), 2); // keys
+        assert_eq!(storage.keys(1).count(), 4); // nodes
+        assert_eq!(storage.keys(2).count(), 2); // keys
     }
 
     // Insert removed key with different value.
@@ -107,8 +107,8 @@ fn test_jmt_update_state_tree_from_context_with_updates() {
     // Check storage.
     {
         let storage = db.get_storage_backend_unsafe();
-        assert_eq!(storage.keys(1).len(), 5); // nodes
-        assert_eq!(storage.keys(2).len(), 3); // keys
+        assert_eq!(storage.keys(1).count(), 5); // nodes
+        assert_eq!(storage.keys(2).count(), 3); // keys
     }
 
     // Insert existing key with same value.
@@ -123,8 +123,8 @@ fn test_jmt_update_state_tree_from_context_with_updates() {
     // Check storage.
     {
         let storage = db.get_storage_backend_unsafe();
-        assert_eq!(storage.keys(1).len(), 5); // nodes
-        assert_eq!(storage.keys(2).len(), 3); // keys
+        assert_eq!(storage.keys(1).count(), 5); // nodes
+        assert_eq!(storage.keys(2).count(), 3); // keys
     }
 
     // Insert another value.
@@ -139,8 +139,8 @@ fn test_jmt_update_state_tree_from_context_with_updates() {
     // Check storage.
     {
         let storage = db.get_storage_backend_unsafe();
-        assert_eq!(storage.keys(1).len(), 8); // nodes
-        assert_eq!(storage.keys(2).len(), 4); // keys
+        assert_eq!(storage.keys(1).count(), 8); // nodes
+        assert_eq!(storage.keys(2).count(), 4); // keys
     }
 }
 
@@ -150,6 +150,8 @@ fn test_jmt_update_state_tree_from_context_with_no_changes() {
     type H = Sha256Hasher;
     type T = JmtStateTree<InMemoryStorage, S, H>;
 
+    let _ = tracing_subscriber::fmt::try_init();
+
     let builder = AtomoBuilder::new(InMemoryStorage::default());
     let mut db = T::register_tables(builder.with_table::<String, String>("data"))
         .build()
@@ -158,8 +160,8 @@ fn test_jmt_update_state_tree_from_context_with_no_changes() {
     // Check storage.
     {
         let storage = db.get_storage_backend_unsafe();
-        assert_eq!(storage.keys(1).len(), 0); // nodes
-        assert_eq!(storage.keys(2).len(), 0); // keys
+        assert_eq!(storage.keys(1).count(), 0); // nodes
+        assert_eq!(storage.keys(2).count(), 0); // keys
     }
 
     // Open run context and apply state tree changes, but don't make any state changes before.
@@ -172,8 +174,8 @@ fn test_jmt_update_state_tree_from_context_with_no_changes() {
     // Check storage.
     {
         let storage = db.get_storage_backend_unsafe();
-        assert_eq!(storage.keys(1).len(), 2); // nodes
-        assert_eq!(storage.keys(2).len(), 0); // keys
+        assert_eq!(storage.keys(1).count(), 2); // nodes
+        assert_eq!(storage.keys(2).count(), 0); // keys
     }
 
     // Insert another value.
@@ -188,8 +190,8 @@ fn test_jmt_update_state_tree_from_context_with_no_changes() {
     // Check storage.
     {
         let storage = db.get_storage_backend_unsafe();
-        assert_eq!(storage.keys(1).len(), 2); // nodes
-        assert_eq!(storage.keys(2).len(), 1); // keys
+        assert_eq!(storage.keys(1).count(), 2); // nodes
+        assert_eq!(storage.keys(2).count(), 1); // keys
     }
 }
 
@@ -260,7 +262,7 @@ fn test_jmt_get_state_root_with_updates() {
     let state_root = assert_state_root_changed(&query, state_root);
 
     // Verify the state tree by rebuilding it and comparing the root hashes.
-    T::verify_state_tree_unsafe(&mut db).unwrap();
+    T::verify_state_tree_unsafe(&mut db.query()).unwrap();
 
     // Insert another value and check that the state root has changed.
     db.run(|ctx| {
@@ -283,7 +285,7 @@ fn test_jmt_get_state_root_with_updates() {
     let state_root = assert_state_root_changed(&query, state_root);
 
     // Verify the state tree by rebuilding it and comparing the root hashes.
-    T::verify_state_tree_unsafe(&mut db).unwrap();
+    T::verify_state_tree_unsafe(&mut db.query()).unwrap();
 
     // Insert removed key with different value and check that the state root has changed.
     db.run(|ctx| {
@@ -326,7 +328,7 @@ fn test_jmt_get_state_root_with_updates() {
     assert_state_root_unchanged(&query, state_root);
 
     // Verify the state tree by rebuilding it and comparing the root hashes.
-    T::verify_state_tree_unsafe(&mut db).unwrap();
+    T::verify_state_tree_unsafe(&mut db.query()).unwrap();
 }
 
 #[test]

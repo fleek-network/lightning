@@ -232,7 +232,7 @@ where
     fn clear_state_tree_unsafe(
         db: &mut atomo::Atomo<atomo::UpdatePerm, Self::Storage, Self::Serde>,
     ) -> Result<()> {
-        let span = trace_span!("clear_state_tree");
+        let span = trace_span!("clear_state_tree_unsafe");
         let _enter = span.enter();
 
         let tables = db.tables();
@@ -269,9 +269,9 @@ where
     /// Verify that the state in the given atomo database instance, when used to build a new,
     /// temporary state tree from scratch, matches the stored state tree root hash.
     fn verify_state_tree_unsafe(
-        db: &mut atomo::Atomo<atomo::UpdatePerm, Self::Storage, Self::Serde>,
+        db: &mut atomo::Atomo<atomo::QueryPerm, Self::Storage, Self::Serde>,
     ) -> Result<()> {
-        let span = trace_span!("verify_state_tree");
+        let span = trace_span!("verify_state_tree_unsafe");
         let _enter = span.enter();
 
         // Build batch of all state data.
@@ -306,6 +306,27 @@ where
         );
 
         Ok(())
+    }
+
+    /// Returns true if the state tree is empty, and false otherwise.
+    fn is_empty_state_tree_unsafe(
+        db: &mut atomo::Atomo<atomo::QueryPerm, Self::Storage, Self::Serde>,
+    ) -> Result<bool> {
+        let span = trace_span!("is_empty_state_tree_unsafe");
+        let _enter = span.enter();
+
+        let tables = db.tables();
+        let table_id_by_name = tables
+            .iter()
+            .enumerate()
+            .map(|(tid, table)| (table.clone(), tid as TableId))
+            .collect::<FxHashMap<_, _>>();
+
+        let nodes_table_id = *table_id_by_name.get(NODES_TABLE_NAME).unwrap();
+
+        let storage = db.get_storage_backend_unsafe();
+
+        Ok(storage.keys(nodes_table_id).next().is_none())
     }
 }
 

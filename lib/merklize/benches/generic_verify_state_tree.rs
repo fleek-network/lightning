@@ -225,6 +225,6 @@ fn generic_bench_verify_state_tree<C: StorageBackendConstructor, T>(
     });
 
     b.iter(|| {
-        T::verify_state_tree_unsafe(&mut db).unwrap();
+        T::verify_state_tree_unsafe(&mut db.query()).unwrap();
     })
 }

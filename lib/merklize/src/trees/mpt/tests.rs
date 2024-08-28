@@ -20,8 +20,8 @@ fn test_mpt_update_state_tree_with_updates() {
     // Check storage.
     {
         let storage = db.get_storage_backend_unsafe();
-        assert_eq!(storage.keys(1).len(), 0); // nodes
-        assert_eq!(storage.keys(2).len(), 0); // root
+        assert_eq!(storage.keys(1).count(), 0); // nodes
+        assert_eq!(storage.keys(2).count(), 0); // root
     }
 
     // Insert a value.
@@ -36,8 +36,8 @@ fn test_mpt_update_state_tree_with_updates() {
     // Check storage.
     {
         let storage = db.get_storage_backend_unsafe();
-        assert_eq!(storage.keys(1).len(), 1); // nodes
-        assert_eq!(storage.keys(2).len(), 1); // root
+        assert_eq!(storage.keys(1).count(), 1); // nodes
+        assert_eq!(storage.keys(2).count(), 1); // root
     }
 
     // Insert another value.
@@ -52,8 +52,8 @@ fn test_mpt_update_state_tree_with_updates() {
     // Check storage.
     {
         let storage = db.get_storage_backend_unsafe();
-        assert_eq!(storage.keys(1).len(), 3); // nodes
-        assert_eq!(storage.keys(2).len(), 1); // root
+        assert_eq!(storage.keys(1).count(), 3); // nodes
+        assert_eq!(storage.keys(2).count(), 1); // root
     }
 
     // Remove a value.
@@ -68,8 +68,8 @@ fn test_mpt_update_state_tree_with_updates() {
     // Check storage.
     {
         let storage = db.get_storage_backend_unsafe();
-        assert_eq!(storage.keys(1).len(), 1); // nodes
-        assert_eq!(storage.keys(2).len(), 1); // root
+        assert_eq!(storage.keys(1).count(), 1); // nodes
+        assert_eq!(storage.keys(2).count(), 1); // root
     }
 
     // Insert removed key with different value.
@@ -84,8 +84,8 @@ fn test_mpt_update_state_tree_with_updates() {
     // Check storage.
     {
         let storage = db.get_storage_backend_unsafe();
-        assert_eq!(storage.keys(1).len(), 3); // nodes
-        assert_eq!(storage.keys(2).len(), 1); // root
+        assert_eq!(storage.keys(1).count(), 3); // nodes
+        assert_eq!(storage.keys(2).count(), 1); // root
     }
 
     // Insert existing key with same value.
@@ -100,8 +100,8 @@ fn test_mpt_update_state_tree_with_updates() {
     // Check storage.
     {
         let storage = db.get_storage_backend_unsafe();
-        assert_eq!(storage.keys(1).len(), 3); // nodes
-        assert_eq!(storage.keys(2).len(), 1); // root
+        assert_eq!(storage.keys(1).count(), 3); // nodes
+        assert_eq!(storage.keys(2).count(), 1); // root
     }
 }
 
@@ -119,8 +119,8 @@ fn test_mpt_update_state_tree_with_no_changes() {
     // Check storage.
     {
         let storage = db.get_storage_backend_unsafe();
-        assert_eq!(storage.keys(1).len(), 0); // nodes
-        assert_eq!(storage.keys(2).len(), 0); // root
+        assert_eq!(storage.keys(1).count(), 0); // nodes
+        assert_eq!(storage.keys(2).count(), 0); // root
     }
 
     // Open run context and apply state tree changes, but don't make any state changes before.
@@ -133,8 +133,8 @@ fn test_mpt_update_state_tree_with_no_changes() {
     // Check storage.
     {
         let storage = db.get_storage_backend_unsafe();
-        assert_eq!(storage.keys(1).len(), 0); // nodes
-        assert_eq!(storage.keys(2).len(), 1); // root
+        assert_eq!(storage.keys(1).count(), 0); // nodes
+        assert_eq!(storage.keys(2).count(), 1); // root
     }
 
     // Insert another value.
@@ -149,8 +149,8 @@ fn test_mpt_update_state_tree_with_no_changes() {
     // Check storage.
     {
         let storage = db.get_storage_backend_unsafe();
-        assert_eq!(storage.keys(1).len(), 1); // nodes
-        assert_eq!(storage.keys(2).len(), 1); // root
+        assert_eq!(storage.keys(1).count(), 1); // nodes
+        assert_eq!(storage.keys(2).count(), 1); // root
     }
 }
 
@@ -207,7 +207,7 @@ fn test_mpt_get_state_root_with_updates() {
     let old_state_root = new_state_root;
 
     // Verify the state tree by rebuilding it and comparing the root hashes.
-    T::verify_state_tree_unsafe(&mut db).unwrap();
+    T::verify_state_tree_unsafe(&mut db.query()).unwrap();
 
     // Insert another value.
     db.run(|ctx| {
@@ -274,7 +274,7 @@ fn test_mpt_get_state_root_with_updates() {
     let old_state_root = new_state_root;
 
     // Verify the state tree by rebuilding it and comparing the root hashes.
-    T::verify_state_tree_unsafe(&mut db).unwrap();
+    T::verify_state_tree_unsafe(&mut db.query()).unwrap();
 
     // Insert existing key with same value.
     db.run(|ctx| {
@@ -318,7 +318,7 @@ fn test_mpt_get_state_root_with_updates() {
     assert_eq!(old_state_root, new_state_root);
 
     // Verify the state tree by rebuilding it and comparing the root hashes.
-    T::verify_state_tree_unsafe(&mut db).unwrap();
+    T::verify_state_tree_unsafe(&mut db.query()).unwrap();
 }
 
 #[test]

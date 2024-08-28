@@ -5,6 +5,7 @@ use atomo::batch::Operation;
 use atomo::{
     Atomo,
     AtomoBuilder,
+    QueryPerm,
     SerdeBackend,
     StorageBackend,
     StorageBackendConstructor,
@@ -73,7 +74,7 @@ pub trait StateTree {
     /// bypassing the normal atomo update and batching mechanisms. It should only be used with
     /// caution in isolation for use cases such as performing an integrity check at startup.
     fn verify_state_tree_unsafe(
-        db: &mut Atomo<UpdatePerm, Self::Storage, Self::Serde>,
+        db: &mut Atomo<QueryPerm, Self::Storage, Self::Serde>,
     ) -> Result<()>;
 
     /// Applies the pending changes in the given context to the state tree.
@@ -118,7 +119,7 @@ pub trait StateTree {
     fn clear_and_rebuild_state_tree_unsafe(
         db: &mut Atomo<UpdatePerm, Self::Storage, Self::Serde>,
     ) -> Result<()> {
-        let span = trace_span!("clear_and_rebuild_state_tree");
+        let span = trace_span!("clear_and_rebuild_state_tree_unsafe");
         let _enter = span.enter();
 
         Self::clear_state_tree_unsafe(db)?;
@@ -137,4 +138,13 @@ pub trait StateTree {
 
         db.run(|ctx| Self::update_state_tree(ctx, batch))
     }
+
+    /// Returns true if the state tree is empty, and false otherwise.
+    ///
+    /// This method is suffixed as unsafe because it reads directly from the storage backend,
+    /// bypassing the normal atomo update and batching mechanisms. It should only be used with
+    /// caution in isolation for use cases such as performing checks at startup.
+    fn is_empty_state_tree_unsafe(
+        db: &mut Atomo<QueryPerm, Self::Storage, Self::Serde>,
+    ) -> Result<bool>;
 }

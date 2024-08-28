@@ -130,9 +130,15 @@ fn test_generic<
     let mut db = builder.build().unwrap();
     let query = db.query();
 
+    // Check that the state tree is empty.
+    assert!(T::is_empty_state_tree_unsafe(&mut db.query()).unwrap());
+
     // Check state root.
     let initial_state_root = query.run(|ctx| T::get_state_root(ctx).unwrap());
     let mut old_state_root = initial_state_root;
+
+    // Check that the state tree is still empty.
+    assert!(T::is_empty_state_tree_unsafe(&mut db.query()).unwrap());
 
     // Insert initial data.
     let data_insert_count = 10;
@@ -145,6 +151,9 @@ fn test_generic<
 
         T::update_state_tree_from_context_changes(ctx).unwrap();
     });
+
+    // Check that the state tree is not empty.
+    assert!(!T::is_empty_state_tree_unsafe(&mut db.query()).unwrap());
 
     // Check data via reader.
     query.run(|ctx| {
@@ -194,7 +203,7 @@ fn test_generic<
     });
 
     // Verify state tree.
-    T::verify_state_tree_unsafe(&mut db).unwrap();
+    T::verify_state_tree_unsafe(&mut db.query()).unwrap();
 
     // Insert more data.
     db.run(|ctx: _| {
@@ -213,8 +222,11 @@ fn test_generic<
     assert_ne!(new_state_root, StateRootHash::default());
     let old_state_root = new_state_root;
 
+    // Check that the state tree is not empty.
+    assert!(!T::is_empty_state_tree_unsafe(&mut db.query()).unwrap());
+
     // Verify state tree.
-    T::verify_state_tree_unsafe(&mut db).unwrap();
+    T::verify_state_tree_unsafe(&mut db.query()).unwrap();
 
     // Remove some data.
     db.run(|ctx: _| {
@@ -233,7 +245,10 @@ fn test_generic<
     assert_ne!(new_state_root, StateRootHash::default());
 
     // Verify state tree.
-    T::verify_state_tree_unsafe(&mut db).unwrap();
+    T::verify_state_tree_unsafe(&mut db.query()).unwrap();
+
+    // Check that the state tree is not empty.
+    assert!(!T::is_empty_state_tree_unsafe(&mut db.query()).unwrap());
 
     // Check non-membership proofs for removed data.
     query.run(|ctx| {
@@ -260,5 +275,8 @@ fn test_generic<
     T::clear_and_rebuild_state_tree_unsafe(&mut db).unwrap();
 
     // Verify state tree.
-    T::verify_state_tree_unsafe(&mut db).unwrap();
+    T::verify_state_tree_unsafe(&mut db.query()).unwrap();
+
+    // Check that the state tree is not empty.
+    assert!(!T::is_empty_state_tree_unsafe(&mut db.query()).unwrap());
 }
