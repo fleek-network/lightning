@@ -1,15 +1,15 @@
-use std::future::Future;
-use std::pin::Pin;
 use std::sync::Arc;
+use std::task::Waker;
 
 use aesm_client::AesmClient;
 use anyhow::{ensure, Context};
 use arrayref::array_ref;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use futures::{ready, FutureExt};
 use serde::{Deserialize, Serialize};
 use sgx_isa::Targetinfo;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+
+mod collateral;
 
 const SGX_QL_ALG_ECDSA_P256: u32 = 2;
 
@@ -31,7 +31,7 @@ impl EndpointState {
     pub fn init() -> anyhow::Result<Self> {
         let aesm_client = AesmClient::new();
         let key_ids = aesm_client.get_supported_att_key_ids().unwrap();
-
+        println!("got key ids");
         let ecdsa_key_ids: Vec<_> = key_ids
             .into_iter()
             .filter(|id| SGX_QL_ALG_ECDSA_P256 == get_algorithm_id(id))
@@ -43,8 +43,11 @@ impl EndpointState {
         );
         let ecdsa_key_id = ecdsa_key_ids[0].to_vec();
         let quote_info = aesm_client.init_quote_ex(ecdsa_key_id.clone())?;
+        println!("got quote info");
+
         let target_info =
             Targetinfo::try_copy_from(quote_info.target_info()).context("Invalid target info")?;
+        println!("got target info");
         Ok(EndpointState {
             aesm_client,
             target_info,
@@ -53,13 +56,11 @@ impl EndpointState {
     }
 
     /// Handle an incoming request from the enclave
-    async fn handle(self: Arc<Self>, request: Request) -> std::io::Result<Bytes> {
+    fn handle(self: Arc<Self>, request: Request) -> std::io::Result<Bytes> {
         match request {
             Request::TargetInfo => self.handle_target_info(),
             Request::Quote(report) => self.handle_quote(report),
-            Request::Collateral(_quote) => {
-                todo!("get collateral")
-            },
+            Request::Collateral(quote) => self.handle_collateral(quote),
         }
     }
 
@@ -99,6 +100,12 @@ impl EndpointState {
                 )
             })
     }
+
+    pub fn handle_collateral(&self, quote: Vec<u8>) -> std::io::Result<Bytes> {
+        let collat = collateral::get_quote_verification_collateral(&quote)?;
+        let bytes = serde_json::to_vec(&collat)?;
+        Ok(bytes.into())
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -112,25 +119,30 @@ pub struct AttestationEndpoint {
     method: Box<str>,
     // input buffer
     buffer: BytesMut,
-    // response future
-    fut: Option<Pin<Box<dyn HandleFut>>>,
     // output buffer
     output: Option<Bytes>,
     // quote provider stuff
     state: Arc<EndpointState>,
+    waker: Option<Waker>,
 }
 
-trait HandleFut: Future<Output = Result<Bytes, std::io::Error>> + Send + Sync {}
-impl<T: Future<Output = Result<Bytes, std::io::Error>> + Send + Sync> HandleFut for T {}
-
 impl AttestationEndpoint {
-    pub fn new(method: &str, provider: Arc<EndpointState>) -> Self {
+    pub fn new(method: &str, state: Arc<EndpointState>) -> Self {
+        let mut output = None;
+        if method == "target_info" {
+            println!("handling target info");
+            match state.handle_target_info() {
+                Ok(b) => output = Some(b),
+                Err(_) => unreachable!(),
+            }
+        }
+
         Self {
             method: method.into(),
-            state: provider,
+            state,
             buffer: BytesMut::new(),
-            fut: None,
-            output: None,
+            output,
+            waker: None,
         }
     }
 }
@@ -143,7 +155,9 @@ impl AsyncWrite for AttestationEndpoint {
         _cx: &mut std::task::Context<'_>,
         buf: &[u8],
     ) -> std::task::Poll<std::io::Result<usize>> {
-        if self.method.as_ref() != "target_info" && self.fut.is_none() && self.output.is_none() {
+        println!("got write for {} bytes", buf.len());
+        if self.output.is_none() {
+            println!("got write");
             // push bytes into buffer
             self.buffer.put_slice(buf);
 
@@ -169,7 +183,14 @@ impl AsyncWrite for AttestationEndpoint {
                 "collateral" => Request::Collateral(self.buffer.split().to_vec()),
                 _ => unreachable!(),
             };
-            self.fut = Some(Box::pin(self.state.clone().handle(req)));
+            println!("handling req");
+            match self.state.clone().handle(req) {
+                Ok(b) => self.output = Some(b),
+                Err(e) => println!("failed to handle: {e}"),
+            }
+            if let Some(waker) = self.waker.take() {
+                waker.wake()
+            }
         }
 
         std::task::Poll::Ready(Ok(buf.len()))
@@ -199,24 +220,14 @@ impl AsyncRead for AttestationEndpoint {
     ) -> std::task::Poll<std::io::Result<()>> {
         // flush all output
         if let Some(output) = self.output.as_mut() {
+            println!("flushing bytes");
             let len = buf.remaining().min(output.len());
             buf.put_slice(&output.split_to(len));
-            return std::task::Poll::Ready(Ok(()));
-        }
-
-        // poll handler future if active
-        match &mut self.fut {
-            Some(fut) => match ready!(fut.poll_unpin(cx)) {
-                Ok(mut output) => {
-                    // write as much as possible, storing the rest for later
-                    let len = buf.remaining().min(output.len());
-                    buf.put_slice(&output.split_to(len));
-                    self.output = Some(output);
-                    std::task::Poll::Ready(Ok(()))
-                },
-                Err(e) => std::task::Poll::Ready(Err(e)),
-            },
-            None => std::task::Poll::Pending,
+            std::task::Poll::Ready(Ok(()))
+        } else {
+            println!("waiting");
+            self.waker = Some(cx.waker().clone());
+            std::task::Poll::Pending
         }
     }
 }

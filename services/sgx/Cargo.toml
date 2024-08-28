@@ -32,6 +32,17 @@ aesm-client = { version = "0.6.0", features = ["sgxs"] }
 enclave-runner = { version = "0.6.0" }
 sgxs-loaders = { version = "0.4.0" }
 sgx-isa = { version = "0.4.1", features = ["serde"]}
+whoami = "1.5.1"
+
+# collateral
+base16 = "0.2.1"
+der-parser = "8.1.0"
+pem = "2.0.1"
+x509-parser = "0.15.0"
+dcap-ql = "0.3.4"
+sgx_pkix = "0.2.1"
+ureq = "2.6.1"
+
 
 [[bin]]
 name = "fn-service-3"

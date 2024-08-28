@@ -27,8 +27,7 @@ pub fn get_target_info() -> std::io::Result<Targetinfo> {
 
 /// Get a quote from the runner
 pub fn get_quote(report: Report) -> std::io::Result<Vec<u8>> {
-    let body = serde_json::to_string(&report)?;
-    request("quote", Some(body.as_bytes()))
+    request("quote", Some(report.as_ref()))
 }
 
 /// Get collateral from the runner
@@ -41,12 +40,15 @@ pub fn get_collateral(quote: &[u8]) -> std::io::Result<SgxCollateral> {
 /// Request from the runner's attestation endpoint
 fn request(method: &str, body: Option<&[u8]>) -> std::io::Result<Vec<u8>> {
     let mut conn = TcpStream::connect(method.to_string() + ".attest.fleek.network")?;
+    println!("connected to {method}");
     if let Some(body) = body {
         conn.write_all(&(body.len() as u32).to_be_bytes())?;
         conn.write_all(body)?;
     }
+    println!("sent req");
 
     let mut buf = Vec::new();
     conn.read_to_end(&mut buf)?;
+    println!("recv res");
     Ok(buf)
 }
