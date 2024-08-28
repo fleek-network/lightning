@@ -164,6 +164,7 @@
                   "${git}/bin/git" "$@"
                 '')
                 installShellFiles
+
               ]
               ++ lib.optionals (!pkgs.stdenv.isDarwin) [
                 # for sgx service, not available on mac
@@ -194,6 +195,9 @@
                 # Ebpf deps needed at runtime for debug builds via `admin ebpf build`
                 rust-bindgen
                 bpf-linker
+
+                # For sgx service
+                sgx-azure-dcap-client
               ]
               ++ lib.optionals pkgs.stdenv.isDarwin [
                 # MacOS specific packages
