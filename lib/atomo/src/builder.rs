@@ -123,7 +123,7 @@ impl<B: StorageBackendConstructor, S: SerdeBackend> AtomoBuilder<B, S> {
                 // TODO(qti3e): The extend method here does not do anything smart and just does
                 // several inserts and each insert is O(log n). And we know this is the initial
                 // change and nothing is referring to this im instance. So.. we can do better.
-                value.extend(storage.keys(tid).into_iter())
+                value.extend(storage.keys(tid))
             });
         }
 

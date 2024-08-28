@@ -117,7 +117,7 @@ impl StorageBackend for AtomoStorage {
         }
     }
 
-    fn keys(&self, tid: u8) -> Vec<atomo::batch::BoxedVec> {
+    fn keys(&self, tid: u8) -> Box<dyn Iterator<Item = BoxedVec> + '_> {
         match &self {
             AtomoStorage::InMemory(storage) => storage.keys(tid),
             AtomoStorage::RocksDb(storage) => storage.keys(tid),

@@ -26,7 +26,7 @@ pub trait StorageBackend {
     fn commit(&self, batch: VerticalBatch);
 
     /// Return all of the keys from a table.
-    fn keys(&self, tid: u8) -> Vec<BoxedVec>;
+    fn keys(&self, tid: u8) -> Box<dyn Iterator<Item = BoxedVec> + '_>;
 
     /// Get the value associated with the given key from the provided table.
     fn get(&self, tid: u8, key: &[u8]) -> Option<Vec<u8>>;
@@ -79,12 +79,12 @@ impl StorageBackend for InMemoryStorage {
     }
 
     #[inline]
-    fn keys(&self, tid: u8) -> Vec<BoxedVec> {
+    fn keys(&self, tid: u8) -> Box<dyn Iterator<Item = BoxedVec> + '_> {
         let mut collection = Vec::new();
         for item in self.0[tid as usize].iter() {
             collection.push(item.key().clone());
         }
-        collection
+        Box::new(collection.into_iter())
     }
 
     #[inline]

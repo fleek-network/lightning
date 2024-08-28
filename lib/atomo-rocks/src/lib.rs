@@ -207,15 +207,16 @@ impl StorageBackend for RocksBackend {
             .expect("failed to commit batch to rocksdb");
     }
 
-    fn keys(&self, tid: u8) -> Vec<atomo::batch::BoxedVec> {
+    fn keys(&self, tid: u8) -> Box<dyn Iterator<Item = BoxedVec> + '_> {
         let cf = self.db.cf_handle(&self.columns[tid as usize]).unwrap();
-        self.db
-            .iterator_cf(&cf, rocksdb::IteratorMode::Start)
-            .map(|res| {
-                res.expect("failed to get entry from column family iterator")
-                    .0
-            })
-            .collect()
+        Box::new(
+            self.db
+                .iterator_cf(&cf, rocksdb::IteratorMode::Start)
+                .map(|res| {
+                    res.expect("failed to get entry from column family iterator")
+                        .0
+                }),
+        )
     }
 
     fn get_all(&self, tid: u8) -> Box<dyn Iterator<Item = (BoxedVec, BoxedVec)> + '_> {
