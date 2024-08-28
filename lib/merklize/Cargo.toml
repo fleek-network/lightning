@@ -56,19 +56,19 @@ atomo.workspace = true
 atomo-rocks.workspace = true
 
 [features]
-default = ["hashers", "strategies"]
+default = ["hashers", "trees"]
 hashers = ["hasher-sha2", "hasher-keccak", "hasher-blake3"]
-strategies = ["provider-jmt", "provider-mpt"]
+trees = ["tree-jmt", "tree-mpt"]
 
 hasher-blake3 = ["dep:blake3"] # Compile with blake3 hashers
 hasher-sha2 = ["dep:sha2"] # Compile with sha2/sha2 hashers
 hasher-keccak = ["dep:tiny-keccak"] # Compile with keccak hashers
-provider-jmt = ["dep:fxhash", "dep:jmt", "dep:lru"] # Compile with JMT provider
-provider-mpt = [
+tree-jmt = ["dep:fxhash", "dep:jmt", "dep:lru"] # Compile with JMT
+tree-mpt = [
     "dep:fxhash",
     "dep:hash-db",
     "dep:hash256-std-hasher",
     "dep:reference-trie",
     "dep:trie-db",
     "dep:keccak-hasher",
-] # Compile with MPT provider
+] # Compile with MPT

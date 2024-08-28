@@ -1,6 +1,6 @@
 # Merklize
 
-The `merklize` crate wraps [atomo](../atomo) to provide a database-backed Merkle state tree, enabling efficiently verifiable state storage.
+The `merklize` crate builds on [atomo](../atomo) to provide a database-backed Merkle state tree, enabling efficiently verifiable state storage.
 
 ## Usage
 
@@ -13,19 +13,20 @@ use atomo::{
     StorageBackendConstructor,
 };
 use merklize::hashers::keccak::KeccakHasher;
-use merklize::providers::mpt::MptMerklizeProvider;
-use merklize::{MerklizeProvider, StateProof};
+use merklize::trees::mpt::MptStateTree;
+use merklize::{StateProof, StateTree};
 
 pub fn main() {
     let builder = InMemoryStorage::default();
 
-    run::<_, MptMerklizeProvider<_, DefaultSerdeBackend, KeccakHasher>>(builder);
+    run::<_, MptStateTree<_, DefaultSerdeBackend, KeccakHasher>>(builder);
 }
 
-fn run<B: StorageBackendConstructor, M: MerklizeProvider<Storage = B::Storage>>(builder: B) {
-    let mut db = M::register_tables(AtomoBuilder::new(builder).with_table::<String, String>("data"))
-        .build()
-        .unwrap();
+fn run<B: StorageBackendConstructor, T: StateTree<Storage = B::Storage>>(builder: B) {
+    let mut db =
+        T::register_tables(AtomoBuilder::new(builder).with_table::<String, String>("data"))
+            .build()
+            .unwrap();
     let query = db.query();
 
     // Open writer context and insert some data.
@@ -36,7 +37,7 @@ fn run<B: StorageBackendConstructor, M: MerklizeProvider<Storage = B::Storage>>(
         table.insert("key".to_string(), "value".to_string());
 
         // Update state tree.
-        M::update_state_tree_from_context(ctx).unwrap();
+        T::update_state_tree_from_context_changes(ctx).unwrap();
     });
 
     // Open reader context, read the data, get the state root hash, and get a proof of existence.
@@ -48,16 +49,16 @@ fn run<B: StorageBackendConstructor, M: MerklizeProvider<Storage = B::Storage>>(
         println!("value: {:?}", value);
 
         // Get the state root hash.
-        let state_root = M::get_state_root(ctx).unwrap();
+        let state_root = T::get_state_root(ctx).unwrap();
         println!("state root: {:?}", state_root);
 
         // Get a proof of existence for some value in the state.
-        let proof = M::get_state_proof(ctx, "data", M::Serde::serialize(&"key")).unwrap();
+        let proof = T::get_state_proof(ctx, "data", T::Serde::serialize(&"key")).unwrap();
         println!("proof: {:?}", proof);
 
         // Verify the proof.
         proof
-            .verify_membership::<String, String, M>(
+            .verify_membership::<String, String, T>(
                 "data",
                 "key".to_string(),
                 "value".to_string(),

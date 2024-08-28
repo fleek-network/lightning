@@ -17,42 +17,28 @@ use tracing::trace_span;
 
 use crate::{SimpleHasher, StateProof, StateRootHash};
 
-/// A trait for a merklize provider used to maintain and interact with the state tree.
+/// A trait for maintaining and interacting with a state tree.
 ///
 /// ## Examples
 ///
 /// ```rust
 #[doc = include_str!("../examples/jmt-sha256.rs")]
 /// ```
-pub trait MerklizeProvider {
+pub trait StateTree {
     type Storage: StorageBackend;
     type Serde: SerdeBackend;
     type Hasher: SimpleHasher;
     type Proof: StateProof;
 
-    /// Augment the provided atomo builder with the necessary tables for the merklize provider.
-    ///
-    /// Arguments:
-    /// - `builder`: The atomo builder to augment.
+    /// Registers the necessary tables for the state tree on the given atomo builder.
     fn register_tables<C: StorageBackendConstructor>(
         builder: AtomoBuilder<C, Self::Serde>,
     ) -> AtomoBuilder<C, Self::Serde>;
 
     /// Returns the root hash of the state tree.
-    ///
-    /// Arguments:
-    /// - `ctx`: The atomo execution context that will be used to get the root hash of the state
-    ///   tree.
     fn get_state_root(ctx: &TableSelector<Self::Storage, Self::Serde>) -> Result<StateRootHash>;
 
     /// Generates and returns a merkle proof for the given key in the state.
-    ///
-    /// This method uses an atomo execution context, so it is safe to use concurrently.
-    ///
-    /// Arguments:
-    /// - `ctx`: The atomo execution context that will be used to generate the proof.
-    /// - `table`: The name of the table to generate the proof for.
-    /// - `serialized_key`: The serialized key to generate the proof for.
     fn get_state_proof(
         ctx: &TableSelector<Self::Storage, Self::Serde>,
         table: &str,
@@ -62,10 +48,6 @@ pub trait MerklizeProvider {
     /// Applies the changes in the given batch of updates to the state tree.
     ///
     /// This method uses an atomo execution context, so it is safe to use concurrently.
-    ///
-    /// Arguments:
-    /// - `ctx`: The atomo execution context that will be used to apply the changes.
-    /// - `batch`: The batch of pending changes to apply to the state tree.
     fn update_state_tree<I>(
         ctx: &TableSelector<Self::Storage, Self::Serde>,
         batch: HashMap<String, I>,
@@ -76,36 +58,32 @@ pub trait MerklizeProvider {
     /// Clears the existing state tree data. This does not delete or modify any of the state data,
     /// just the tree structure and tables related to it.
     ///
-    /// This method acts directly on the atomo database instance, so it should only be used with
-    /// caution in isolation for use cases such as backfilling the state tree during rollout or
-    /// corruption recovery.
-    ///
-    /// Arguments:
-    /// - `db`: The atomo database instance to use for clearing the state tree.
-    fn clear_state_tree(db: &mut Atomo<UpdatePerm, Self::Storage, Self::Serde>) -> Result<()>;
+    /// This method is suffixed as unsafe because it reads and writes directly to the storage
+    /// backend, bypassing the normal atomo update and batching mechanisms. It should only be used
+    /// with caution in isolation for use cases such as performing backfills or recovering from
+    /// corruption.
+    fn clear_state_tree_unsafe(
+        db: &mut Atomo<UpdatePerm, Self::Storage, Self::Serde>,
+    ) -> Result<()>;
 
     /// Verifies that the state in the given atomo database instance, when used to build a
     /// new, temporary state tree from scratch, matches the stored state tree root hash.
     ///
-    /// This method reads directly from the atomo database instance, so may lack consistency if
-    /// concurrently accessed. It should only be used with caution in isolation for use cases such
-    /// as performing an integrity check at startup.
-    ///
-    /// Arguments:
-    /// - `db`: The atomo database instance to verify.
-    fn verify_state_tree(db: &mut Atomo<UpdatePerm, Self::Storage, Self::Serde>) -> Result<()>;
+    /// This method is suffixed as unsafe because it reads directly from the storage backend,
+    /// bypassing the normal atomo update and batching mechanisms. It should only be used with
+    /// caution in isolation for use cases such as performing an integrity check at startup.
+    fn verify_state_tree_unsafe(
+        db: &mut Atomo<UpdatePerm, Self::Storage, Self::Serde>,
+    ) -> Result<()>;
 
     /// Applies the pending changes in the given context to the state tree.
+    ///
     /// This is an implementation that makes use of the `update_state_tree` method, passing it the
     /// batch of pending changes from the context.
-    ///
-    /// Arguments:
-    /// - `ctx`: The atomo execution context that will be used to get the pending changes and apply
-    ///   them to the state tree.
-    fn update_state_tree_from_context(
+    fn update_state_tree_from_context_changes(
         ctx: &TableSelector<Self::Storage, Self::Serde>,
     ) -> Result<()> {
-        let span = trace_span!("update_state_tree_from_context");
+        let span = trace_span!("update_state_tree_from_context_changes");
         let _enter = span.enter();
 
         let mut table_name_by_id = FxHashMap::default();
@@ -133,19 +111,17 @@ pub trait MerklizeProvider {
     /// of the state data, just the tree structure and tables related to it. The tree is then
     /// rebuilt by applying all of the state data in the atomo context to the new tree.
     ///
-    /// This method acts directly on the atomo database instance, so it should only be used with
-    /// caution in isolation for use cases such as backfilling the state tree during rollout or
-    /// corruption recovery.
-    ///
-    /// Arguments:
-    /// - `db`: The atomo database instance to use for clearing and rebuilding the state tree.
-    fn clear_and_rebuild_state_tree(
+    /// This method is suffixed as unsafe because it reads and writes directly to the storage
+    /// backend, bypassing the normal atomo update and batching mechanisms. It should only be used
+    /// with caution in isolation for use cases such as performing backfills or recovering from
+    /// corruption.
+    fn clear_and_rebuild_state_tree_unsafe(
         db: &mut Atomo<UpdatePerm, Self::Storage, Self::Serde>,
     ) -> Result<()> {
         let span = trace_span!("clear_and_rebuild_state_tree");
         let _enter = span.enter();
 
-        Self::clear_state_tree(db)?;
+        Self::clear_state_tree_unsafe(db)?;
 
         // Build batch of all state data.
         let mut batch = HashMap::new();

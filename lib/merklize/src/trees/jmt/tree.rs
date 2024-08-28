@@ -21,8 +21,8 @@ use tracing::{trace, trace_span};
 use super::adapter::Adapter;
 use super::hasher::SimpleHasherWrapper;
 use super::proof::JmtStateProof;
-use crate::providers::jmt::proof::ics23_proof_spec;
-use crate::{MerklizeProvider, SimpleHasher, StateKey, StateRootHash, VerifyStateTreeError};
+use crate::trees::jmt::proof::ics23_proof_spec;
+use crate::{SimpleHasher, StateKey, StateRootHash, StateTree, VerifyStateTreeError};
 
 pub(crate) const NODES_TABLE_NAME: &str = "%state_tree_nodes";
 pub(crate) const KEYS_TABLE_NAME: &str = "%state_tree_keys";
@@ -40,15 +40,15 @@ pub(crate) type SharedNodesTableRef<'a, B, S> =
 const TREE_VERSION: Version = 1;
 
 #[derive(Debug, Clone)]
-/// A merklize provider that uses a Jellyfish Merkle Tree (JMT) implementation ([`jmt`]) to manage
-/// the database-backed state tree.
-pub struct JmtMerklizeProvider<B: StorageBackend, S: SerdeBackend, H: SimpleHasher> {
+/// A merklize state tree that uses a Jellyfish Merkle Tree (JMT) implementation ([`jmt`]) to
+/// manage the database-backed state tree.
+pub struct JmtStateTree<B: StorageBackend, S: SerdeBackend, H: SimpleHasher> {
     _storage: PhantomData<B>,
     _serde: PhantomData<S>,
     _hasher: PhantomData<H>,
 }
 
-impl<B: StorageBackend, S: SerdeBackend, H: SimpleHasher> JmtMerklizeProvider<B, S, H> {
+impl<B: StorageBackend, S: SerdeBackend, H: SimpleHasher> JmtStateTree<B, S, H> {
     pub fn new() -> Self {
         Self {
             _storage: PhantomData,
@@ -58,13 +58,13 @@ impl<B: StorageBackend, S: SerdeBackend, H: SimpleHasher> JmtMerklizeProvider<B,
     }
 }
 
-impl<B: StorageBackend, S: SerdeBackend, H: SimpleHasher> Default for JmtMerklizeProvider<B, S, H> {
+impl<B: StorageBackend, S: SerdeBackend, H: SimpleHasher> Default for JmtStateTree<B, S, H> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<B, S, H> MerklizeProvider for JmtMerklizeProvider<B, S, H>
+impl<B, S, H> StateTree for JmtStateTree<B, S, H>
 where
     B: StorageBackend,
     S: SerdeBackend,
@@ -75,7 +75,7 @@ where
     type Hasher = H;
     type Proof = JmtStateProof;
 
-    /// Augment the provided atomo builder with the necessary tables for the merklize provider.
+    /// Register the tables for the state tree on the given atomo builder.
     fn register_tables<C: StorageBackendConstructor>(
         builder: AtomoBuilder<C, S>,
     ) -> AtomoBuilder<C, S> {
@@ -101,6 +101,7 @@ where
 
     /// Get an existence proof for the given key hash, if it is present in the state tree, or
     /// non-existence proof if it is not present.
+    ///
     /// Since we need to read the state, a table selector execution context is needed for
     /// consistency.
     fn get_state_proof(
@@ -133,6 +134,7 @@ where
 
     /// Apply the state tree changes based on the state changes in the atomo batch. This will update
     /// the state tree to reflect the changes in the atomo batch.
+    ///
     /// Since we need to read the state, a table selector execution context is needed for
     /// consistency.
     fn update_state_tree<I>(
@@ -251,7 +253,7 @@ where
     }
 
     /// Clear the state tree by removing all nodes and keys from the atomo database.
-    fn clear_state_tree(
+    fn clear_state_tree_unsafe(
         db: &mut atomo::Atomo<atomo::UpdatePerm, Self::Storage, Self::Serde>,
     ) -> Result<()> {
         let span = trace_span!("clear_state_tree");
@@ -290,7 +292,7 @@ where
 
     /// Verify that the state in the given atomo database instance, when used to build a new,
     /// temporary state tree from scratch, matches the stored state tree root hash.
-    fn verify_state_tree(
+    fn verify_state_tree_unsafe(
         db: &mut atomo::Atomo<atomo::UpdatePerm, Self::Storage, Self::Serde>,
     ) -> Result<()> {
         let span = trace_span!("verify_state_tree");
@@ -311,7 +313,7 @@ where
 
         // Build a new, temporary state tree from the batch.
         let builder = AtomoBuilder::<_, S>::new(InMemoryStorage::default());
-        type TempDbProvider<S, H> = JmtMerklizeProvider<InMemoryStorage, S, H>;
+        type TempDbProvider<S, H> = JmtStateTree<InMemoryStorage, S, H>;
         let mut tmp_db = TempDbProvider::<S, H>::register_tables(builder).build()?;
         tmp_db.run(|ctx| TempDbProvider::<S, H>::update_state_tree(ctx, batch))?;
 

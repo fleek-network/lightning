@@ -7,8 +7,8 @@ use atomo::{
     StorageBackendConstructor,
 };
 use merklize::hashers::keccak::KeccakHasher;
-use merklize::providers::jmt::JmtMerklizeProvider;
-use merklize::MerklizeProvider;
+use merklize::trees::jmt::JmtStateTree;
+use merklize::StateTree;
 use opentelemetry::trace::{TraceError, TracerProvider};
 use opentelemetry::KeyValue;
 use opentelemetry_otlp::WithExportConfig;
@@ -34,18 +34,18 @@ async fn main() -> Result<()> {
         let _enter = span.enter();
 
         let builder = InMemoryStorage::default();
-        run::<_, JmtMerklizeProvider<_, DefaultSerdeBackend, KeccakHasher>>(builder, 100);
+        run::<_, JmtStateTree<_, DefaultSerdeBackend, KeccakHasher>>(builder, 100);
     });
 
     Ok(())
 }
 
-fn run<B: StorageBackendConstructor, M: MerklizeProvider<Storage = B::Storage>>(
+fn run<B: StorageBackendConstructor, T: StateTree<Storage = B::Storage>>(
     builder: B,
     data_count: usize,
 ) {
     let mut db =
-        M::register_tables(AtomoBuilder::new(builder).with_table::<String, String>("data"))
+        T::register_tables(AtomoBuilder::new(builder).with_table::<String, String>("data"))
             .build()
             .unwrap();
 
@@ -59,7 +59,7 @@ fn run<B: StorageBackendConstructor, M: MerklizeProvider<Storage = B::Storage>>(
         }
 
         // Update state tree.
-        M::update_state_tree_from_context(ctx).unwrap();
+        T::update_state_tree_from_context_changes(ctx).unwrap();
     });
 
     // Open writer context and insert some data.
@@ -72,7 +72,7 @@ fn run<B: StorageBackendConstructor, M: MerklizeProvider<Storage = B::Storage>>(
         }
 
         // Update state tree.
-        M::update_state_tree_from_context(ctx).unwrap();
+        T::update_state_tree_from_context_changes(ctx).unwrap();
     });
 
     // Open reader context, read the data, get the state root hash, and get a proof of existence.
@@ -84,11 +84,11 @@ fn run<B: StorageBackendConstructor, M: MerklizeProvider<Storage = B::Storage>>(
         println!("value(key1): {:?}", value);
 
         // Get the state root hash.
-        let root_hash = M::get_state_root(ctx).unwrap();
+        let root_hash = T::get_state_root(ctx).unwrap();
         println!("state root: {:?}", root_hash);
 
         // Get a proof of existence for some value in the state.
-        let proof = M::get_state_proof(ctx, "data", M::Serde::serialize(&"key1")).unwrap();
+        let proof = T::get_state_proof(ctx, "data", T::Serde::serialize(&"key1")).unwrap();
         println!("proof: {:?}", proof);
     });
 }

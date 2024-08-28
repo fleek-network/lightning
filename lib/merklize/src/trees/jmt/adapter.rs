@@ -8,12 +8,12 @@ use jmt::{KeyHash, OwnedValue, Version};
 use lru::LruCache;
 use tracing::trace;
 
-use super::provider::{SharedKeysTableRef, SharedNodesTableRef};
+use super::tree::{SharedKeysTableRef, SharedNodesTableRef};
 use crate::StateKey;
 
 /// A `[jmt::TreeReader]` and `[jmt::HasPreImage]` implementation that uses a given table selector
-/// execution context to read from the database. This acts as an adapter between a merklize provider
-/// functionality and the implementation using `[jmt::JellyfishMerkleTree]`.
+/// execution context to read from the database. This acts as an adapter between a merklize state
+/// tree interface functionality and the implementation using `[jmt::JellyfishMerkleTree]`.
 pub(crate) struct Adapter<'a, B: StorageBackend, S: SerdeBackend> {
     ctx: &'a TableSelector<B, S>,
     nodes_table: SharedNodesTableRef<'a, B, S>,

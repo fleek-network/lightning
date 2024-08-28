@@ -5,13 +5,13 @@ use atomo::SerdeBackend;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::{MerklizeProvider, SimpleHasher, StateKey, StateProof, StateRootHash};
+use crate::{SimpleHasher, StateKey, StateProof, StateRootHash, StateTree};
 
 const SPARSE_MERKLE_PLACEHOLDER_HASH: [u8; 32] = *b"SPARSE_MERKLE_PLACEHOLDER_HASH__";
 const LEAF_DOMAIN_SEPARATOR: &[u8] = b"JMT::LeafNode";
 const INTERNAL_DOMAIN_SEPARATOR: &[u8] = b"JMT::IntrnalNode";
 
-/// Return the ICS23 proof spec for the merklize provider, customized to the specific hasher.
+/// Return the ICS23 proof spec for the merklize state tree, customized to the specific hasher.
 pub fn ics23_proof_spec(hash_op: ics23::HashOp) -> ics23::ProofSpec {
     ics23::ProofSpec {
         leaf_spec: Some(ics23::LeafOp {
@@ -53,7 +53,7 @@ impl StateProof for JmtStateProof {
     /// This is used to verify that a key exists in the state tree and has the given value. It
     /// encapsulates the serialization of the key and value, and relies on the ics23 crate to
     /// verify the proof from there.
-    fn verify_membership<K, V, M: MerklizeProvider>(
+    fn verify_membership<K, V, T: StateTree>(
         &self,
         table: impl AsRef<str>,
         key: impl Borrow<K>,
@@ -64,12 +64,12 @@ impl StateProof for JmtStateProof {
         K: Serialize,
         V: Serialize,
     {
-        let state_key = StateKey::new(table, M::Serde::serialize(&key.borrow()));
-        let serialized_key = M::Serde::serialize(&state_key);
-        let serialized_value = M::Serde::serialize(value.borrow());
+        let state_key = StateKey::new(table, T::Serde::serialize(&key.borrow()));
+        let serialized_key = T::Serde::serialize(&state_key);
+        let serialized_value = T::Serde::serialize(value.borrow());
         let verified = ics23::verify_membership::<ics23::HostFunctionsManager>(
             &self.0,
-            &ics23_proof_spec(<M::Hasher as SimpleHasher>::ICS23_HASH_OP),
+            &ics23_proof_spec(<T::Hasher as SimpleHasher>::ICS23_HASH_OP),
             &root.as_ref().to_vec(),
             &serialized_key,
             serialized_value.as_slice(),
@@ -84,7 +84,7 @@ impl StateProof for JmtStateProof {
     /// Verify the non-membership of a key in the state tree.
     /// This is used to verify that a key does not exist in the state tree. It encapsulates the
     /// serialization of the key, and relies on the ics23 crate to verify the proof from there.
-    fn verify_non_membership<K, M: MerklizeProvider>(
+    fn verify_non_membership<K, T: StateTree>(
         self,
         table: impl AsRef<str>,
         key: impl Borrow<K>,
@@ -93,11 +93,11 @@ impl StateProof for JmtStateProof {
     where
         K: Serialize,
     {
-        let state_key = StateKey::new(table, M::Serde::serialize(&key.borrow()));
-        let serialized_key = M::Serde::serialize(&state_key);
+        let state_key = StateKey::new(table, T::Serde::serialize(&key.borrow()));
+        let serialized_key = T::Serde::serialize(&state_key);
         let verified = ics23::verify_non_membership::<ics23::HostFunctionsManager>(
             &self.0,
-            &ics23_proof_spec(<M::Hasher as SimpleHasher>::ICS23_HASH_OP),
+            &ics23_proof_spec(<T::Hasher as SimpleHasher>::ICS23_HASH_OP),
             &root.as_ref().to_vec(),
             &serialized_key,
         );

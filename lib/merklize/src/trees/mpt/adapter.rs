@@ -4,7 +4,7 @@ use tracing::{trace, trace_span};
 use trie_db::DBValue;
 
 use super::hasher::SimpleHasherWrapper;
-use super::provider::SharedNodesTableRef;
+use super::tree::SharedNodesTableRef;
 use crate::SimpleHasher;
 
 /// A HashDB implementation that uses a given atomo state tree nodes table to read and write nodes

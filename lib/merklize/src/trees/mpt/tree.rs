@@ -23,7 +23,7 @@ use super::adapter::Adapter;
 use super::hasher::SimpleHasherWrapper;
 use super::layout::TrieLayoutWrapper;
 use super::MptStateProof;
-use crate::{MerklizeProvider, SimpleHasher, StateKey, StateRootHash, VerifyStateTreeError};
+use crate::{SimpleHasher, StateKey, StateRootHash, StateTree, VerifyStateTreeError};
 
 pub(crate) const NODES_TABLE_NAME: &str = "%state_tree_nodes";
 pub(crate) const ROOT_TABLE_NAME: &str = "%state_tree_root";
@@ -34,15 +34,15 @@ pub(crate) type SharedNodesTableRef<'a, B, S, H> =
 type SharedRootTable<'a, B, S> = Arc<Mutex<RootTable<'a, B, S>>>;
 
 #[derive(Debug, Clone)]
-/// A merklize provider that uses a Merkle Patricia Trie (MPT) implementation ([`mpt`]) to manage
-/// the database-backed state tree.
-pub struct MptMerklizeProvider<B: StorageBackend, S: SerdeBackend, H: SimpleHasher> {
+/// A merklize state tree that uses a Merkle Patricia Trie (MPT) implementation ([`mpt`]) to
+/// manage the database-backed state tree.
+pub struct MptStateTree<B: StorageBackend, S: SerdeBackend, H: SimpleHasher> {
     _storage: PhantomData<B>,
     _serde: PhantomData<S>,
     _hasher: PhantomData<H>,
 }
 
-impl<B, S, H> MptMerklizeProvider<B, S, H>
+impl<B, S, H> MptStateTree<B, S, H>
 where
     B: StorageBackend + Send + Sync,
     S: SerdeBackend + Send + Sync,
@@ -84,7 +84,7 @@ where
     }
 }
 
-impl<B, S, H> Default for MptMerklizeProvider<B, S, H>
+impl<B, S, H> Default for MptStateTree<B, S, H>
 where
     B: StorageBackend + Send + Sync,
     S: SerdeBackend + Send + Sync,
@@ -95,7 +95,7 @@ where
     }
 }
 
-impl<B, S, H> MerklizeProvider for MptMerklizeProvider<B, S, H>
+impl<B, S, H> StateTree for MptStateTree<B, S, H>
 where
     B: StorageBackend + Send + Sync,
     S: SerdeBackend + Send + Sync,
@@ -106,7 +106,7 @@ where
     type Hasher = H;
     type Proof = MptStateProof;
 
-    /// Augment the provided atomo builder with the necessary tables for the merklize provider.
+    /// Register the tables for the state tree on the given atomo builder.
     fn register_tables<C: StorageBackendConstructor>(
         builder: AtomoBuilder<C, S>,
     ) -> AtomoBuilder<C, S> {
@@ -229,7 +229,7 @@ where
     }
 
     /// Clear the state tree by removing all nodes and keys from the atomo database.
-    fn clear_state_tree(
+    fn clear_state_tree_unsafe(
         db: &mut atomo::Atomo<atomo::UpdatePerm, Self::Storage, Self::Serde>,
     ) -> Result<()> {
         let span = trace_span!("clear_state_tree");
@@ -268,7 +268,7 @@ where
 
     /// Verify that the state in the given atomo database instance, when used to build a new,
     /// temporary state tree from scratch, matches the stored state tree root hash.
-    fn verify_state_tree(
+    fn verify_state_tree_unsafe(
         db: &mut atomo::Atomo<atomo::UpdatePerm, Self::Storage, Self::Serde>,
     ) -> Result<()> {
         let span = trace_span!("verify_state_tree");
@@ -289,7 +289,7 @@ where
 
         // Build a new, temporary state tree from the batch.
         let builder = AtomoBuilder::<_, S>::new(InMemoryStorage::default());
-        type TempDbProvider<S, H> = MptMerklizeProvider<InMemoryStorage, S, H>;
+        type TempDbProvider<S, H> = MptStateTree<InMemoryStorage, S, H>;
         let mut tmp_db = TempDbProvider::<S, H>::register_tables(builder).build()?;
         tmp_db.run(|ctx| TempDbProvider::<S, H>::update_state_tree(ctx, batch))?;
 
