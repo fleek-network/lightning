@@ -117,7 +117,7 @@ plotters = { version = "0.3" }
 portable-atomic = { version = "1", features = ["require-cas"] }
 prettyplease = { version = "0.2", default-features = false, features = ["verbatim"] }
 primitive-types = { version = "0.12", features = ["byteorder", "rlp", "rustc-hex", "scale-info", "serde_no_std"] }
-proc-macro2 = { version = "1", features = ["span-locations"] }
+proc-macro2-dff4ba8e3ae991db = { package = "proc-macro2", version = "1", features = ["span-locations"] }
 prost-5ef9efb8ec2df382 = { package = "prost", version = "0.12", features = ["prost-derive"] }
 prost-a6292c17cd707f01 = { package = "prost", version = "0.11" }
 prost-types = { version = "0.12" }
@@ -125,7 +125,7 @@ protobuf = { version = "2", default-features = false, features = ["with-bytes"] 
 quinn = { version = "0.10", features = ["futures-io"] }
 quinn-proto = { version = "0.10", features = ["native-certs"] }
 quinn-udp = { version = "0.4", default-features = false, features = ["log"] }
-quote = { version = "1" }
+quote-dff4ba8e3ae991db = { package = "quote", version = "1" }
 rand = { version = "0.8", features = ["small_rng"] }
 rand_chacha = { version = "0.3" }
 regex = { version = "1" }
@@ -282,7 +282,8 @@ portable-atomic = { version = "1", features = ["require-cas"] }
 prettyplease = { version = "0.2", default-features = false, features = ["verbatim"] }
 primitive-types = { version = "0.12", features = ["byteorder", "rlp", "rustc-hex", "scale-info", "serde_no_std"] }
 proc-macro-error = { version = "1" }
-proc-macro2 = { version = "1", features = ["span-locations"] }
+proc-macro2-9fbad63c4bcf4a8f = { package = "proc-macro2", version = "0.4" }
+proc-macro2-dff4ba8e3ae991db = { package = "proc-macro2", version = "1", features = ["span-locations"] }
 prost-5ef9efb8ec2df382 = { package = "prost", version = "0.12", features = ["prost-derive"] }
 prost-a6292c17cd707f01 = { package = "prost", version = "0.11" }
 prost-types = { version = "0.12" }
@@ -290,7 +291,8 @@ protobuf = { version = "2", default-features = false, features = ["with-bytes"] 
 quinn = { version = "0.10", features = ["futures-io"] }
 quinn-proto = { version = "0.10", features = ["native-certs"] }
 quinn-udp = { version = "0.4", default-features = false, features = ["log"] }
-quote = { version = "1" }
+quote-3b31131e45eafb45 = { package = "quote", version = "0.6" }
+quote-dff4ba8e3ae991db = { package = "quote", version = "1" }
 rand = { version = "0.8", features = ["small_rng"] }
 rand_chacha = { version = "0.3" }
 regex = { version = "1" }
@@ -322,10 +324,10 @@ socket2 = { version = "0.5", default-features = false, features = ["all"] }
 spin = { version = "0.9" }
 spki = { version = "0.7", default-features = false, features = ["pem", "std"] }
 subtle = { version = "2", default-features = false, features = ["i128", "std"] }
+syn-3575ec1268b04181 = { package = "syn", version = "0.15", features = ["extra-traits", "full", "visit"] }
 syn-dff4ba8e3ae991db = { package = "syn", version = "1", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
 syn-f595c2ba2a3f28df = { package = "syn", version = "2", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
 time = { version = "0.3", features = ["formatting", "local-offset", "macros", "parsing"] }
-time-macros = { version = "0.2", default-features = false, features = ["formatting", "parsing"] }
 tokio = { version = "1", features = ["full", "test-util", "tracing"] }
 tokio-rustls = { version = "0.24" }
 tokio-stream = { version = "0.1", features = ["net", "sync"] }
