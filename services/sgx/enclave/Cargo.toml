@@ -32,7 +32,7 @@ wasmi = "=0.36.0"
 # SGX Utilities
 sgx-isa = {version = "0.4.0", features = ["serde"] }
 
-fleek-remote-attestation = { path = "/home/ubuntu/fleek-remote-attestation" }
+fleek-remote-attestation = { git = "https://github.com/fleek-network/fleek-remote-attestation" }
 
 [dependencies.ecies]
 # Notes about cryptography dependencies:
