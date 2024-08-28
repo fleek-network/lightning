@@ -44,7 +44,9 @@ use super::query::QueryRunner;
 use crate::env::ApplicationStateTree;
 use crate::storage::AtomoStorage;
 
-/// The application state that accumulates by executing transactions.
+/// The application state encapsulates the atomo database and merklized state tree, and represents
+/// the accumulated state over the applied history of transactions. Application state should only
+/// be updated through the execution of transactions.
 pub struct ApplicationState<B: StorageBackend, S: SerdeBackend, T: StateTree> {
     db: Atomo<UpdatePerm, B, S>,
     _tree: PhantomData<T>,
@@ -111,7 +113,10 @@ impl ApplicationState<AtomoStorage, DefaultSerdeBackend, ApplicationStateTree> {
         })
     }
 
-    /// Resets the state tree to an empty state.
+    /// Resets the state tree by clearing it and rebuilding it from the full state.
+    ///
+    /// This is an unsafe because it acts directly on the underlying storage backend. It should
+    /// only be used in isolation (not while the node is running).
     pub fn reset_state_tree_unsafe(&mut self) -> Result<()> {
         info!("Resetting state tree...");
 
@@ -128,7 +133,8 @@ impl ApplicationState<AtomoStorage, DefaultSerdeBackend, ApplicationStateTree> {
 
     /// Runs a mutation on the state.
     ///
-    /// This is a wrapper around `Atomo.run` that also updates the state tree after the mutation.
+    /// This is a wrapper around atomo's `run` that also updates the state tree based on state
+    /// changes accumulated during the mutation.
     ///
     /// Returns the result of the mutation, wrapped in a `Result` that includes an error if the
     /// state tree update fails.
