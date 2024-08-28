@@ -46,7 +46,7 @@ impl FromStr for DocId {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DocDir {
     id: DocId,
     links: Vec<PbLink>,
@@ -60,6 +60,13 @@ impl DocDir {
         }
     }
 
+    pub fn from_pb_node(id: impl Into<DocId>, node: ipld_dagpb::PbNode) -> Self {
+        Self {
+            id: id.into(),
+            links: node.links,
+        }
+    }
+
     pub fn id(&self) -> &DocId {
         &self.id
     }
@@ -69,7 +76,13 @@ impl DocDir {
     }
 }
 
-#[derive(Clone)]
+impl From<DocDir> for IpldItem {
+    fn from(dir: DocDir) -> Self {
+        IpldItem::Dir(dir)
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct DocFile {
     id: DocId,
     name: Option<String>,
@@ -114,10 +127,19 @@ pub enum IpldItem {
     File(DocFile),
 }
 
+/// A trait for processing IPLD data.
+///
+/// This trait is used to retrieve IPLD data from a storage backend.
+///
+/// The associated type `Codec` is the IPLD codec used to encode and decode the data.
+///
+/// `IpldItem` is the type of item that will be returned by the processor and it is specific to
+/// `Dir` and `File` types because, those are going to be used for `b3fs` backend.
 #[async_trait]
 pub trait Processor {
     type Codec;
 
+    /// Get IpldItem from the storage backend.
     async fn get(&self, id: DocId) -> Result<Option<IpldItem>, IpldError>;
 }
 
@@ -130,7 +152,10 @@ pub struct IpldStream<P: Processor + Unpin + Send + Sync> {
     pending_future: Option<BoxFuture<'static, Result<Option<IpldItem>, IpldError>>>,
 }
 
-impl<P: Processor + Unpin + Send + Sync> IpldStream<P> {
+impl<P> IpldStream<P>
+where
+    P: Processor + Unpin + Send + Sync,
+{
     pub fn new(processor: P, id: DocId) -> Self {
         Self {
             processor,
@@ -143,7 +168,11 @@ impl<P: Processor + Unpin + Send + Sync> IpldStream<P> {
     }
 }
 
-impl<P: Processor + Unpin + Send + Sync + Clone + 'static> Stream for IpldStream<P> {
+/// Implementing Stream for IpldStream in order to traverse all the links associated to a given Cid
+impl<P> Stream for IpldStream<P>
+where
+    P: Processor + Unpin + Send + Sync + Clone + 'static,
+{
     type Item = Result<IpldItem, IpldError>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -163,8 +192,11 @@ impl<P: Processor + Unpin + Send + Sync + Clone + 'static> Stream for IpldStream
                         Ok(Some(IpldItem::File(file))) => {
                             return Poll::Ready(Some(Ok(IpldItem::File(file))));
                         },
-                        Ok(None) | Err(_) => {
+                        Ok(None) => {
                             return Poll::Ready(None);
+                        },
+                        Err(e) => {
+                            return Poll::Ready(Some(Err(e)));
                         },
                     }
                 },
@@ -287,11 +319,9 @@ mod tests {
             let fixtures = &*FIXTURES;
             let data = fixtures.get(&*id).cloned();
             if let Some(vc) = data {
-                let r = DagPbCodec::decode_from_slice(&vc).map(|node: PbNode| {
-                    let dir = DocDir::new(id, node.links);
-                    IpldItem::Dir(dir)
-                })?;
-                Ok(Some(r))
+                let data = DagPbCodec::decode_from_slice(&vc)
+                    .map(|node: PbNode| Some(DocDir::from_pb_node(id, node).into()))?;
+                Ok(data)
             } else {
                 Ok(None)
             }

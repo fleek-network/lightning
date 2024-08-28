@@ -1,28 +1,36 @@
-#![allow(dependency_on_unit_never_type_fallback)]
-
-use ipld_core::cid::Cid;
+use async_trait::async_trait;
 use ipld_core::codec::Codec;
 use ipld_dagpb::{DagPbCodec, PbNode};
+use reqwest::Url;
 
-pub async fn download() -> anyhow::Result<()> {
-    // Replace with the CID of the IPLD file
-    let cid_str = "QmSnuWmxptJZdLJpKRarxBMS2Ju2oANVrgbr2xWbie9b2D";
-    //let cid_str = "bafybeiaysi4s6lnjev27ln5icwm6tueaw2vdykrtjkwiphwekaywqhcjze";
-    let cid = Cid::try_from(cid_str).expect("Invalid CID");
+use crate::processor::errors::IpldError;
+use crate::processor::{DocDir, DocId, IpldItem, Processor};
 
-    // Construct the URL to fetch the IPLD data
-    let url = format!("https://ipfs.io/ipfs/{}/?format=raw", cid);
+#[derive(Clone)]
+pub struct IpldDagPbProcessor {
+    ipfs_url: Url,
+}
 
-    println!("URL: {}", url);
+impl IpldDagPbProcessor {
+    pub fn new(ipfs_url: &str) -> Self {
+        Self {
+            ipfs_url: Url::parse(ipfs_url)
+                .unwrap_or_else(|_| panic!("Invalid IPFS URL {}", ipfs_url)),
+        }
+    }
+}
 
-    // Download the file
-    let response = reqwest::get(&url).await?;
-    let bytes = response.bytes().await?;
+#[async_trait]
+impl Processor for IpldDagPbProcessor {
+    type Codec = DagPbCodec;
 
-    // Decode the CBOR-encoded data
-    let data: PbNode = DagPbCodec::decode_from_slice(&bytes).expect("Failed to decode PB data");
-
-    println!("Data: {:?}", data);
-
-    Ok(())
+    async fn get(&self, cid: DocId) -> Result<Option<IpldItem>, IpldError> {
+        let url = self.ipfs_url.clone();
+        let url = url.join(&format!("ipfs/{}/?format=raw", *cid))?;
+        let response = reqwest::get(url).await?;
+        let bytes = response.bytes().await?;
+        let data = DagPbCodec::decode_from_slice(&bytes)
+            .map(|node: PbNode| Some(DocDir::from_pb_node(cid, node).into()))?;
+        Ok(data)
+    }
 }

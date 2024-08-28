@@ -17,6 +17,7 @@ reqwest.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tokio-stream.workspace = true
+url = "2.5.0"
 
 [[example]]
 name = "download"
