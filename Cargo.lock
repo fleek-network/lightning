@@ -7994,6 +7994,7 @@ dependencies = [
  "prettyplease 0.2.20",
  "primitive-types 0.12.2",
  "proc-macro-error",
+ "proc-macro2 0.4.30",
  "proc-macro2 1.0.86",
  "prost 0.11.9",
  "prost 0.12.6",
@@ -8002,6 +8003,7 @@ dependencies = [
  "quinn",
  "quinn-proto",
  "quinn-udp",
+ "quote 0.6.13",
  "quote 1.0.36",
  "rand 0.8.5",
  "rand_chacha",
@@ -8037,10 +8039,10 @@ dependencies = [
  "spin 0.9.8",
  "spki 0.7.3",
  "subtle",
+ "syn 0.15.44",
  "syn 1.0.109",
  "syn 2.0.72",
  "time 0.3.36",
- "time-macros",
  "tokio",
  "tokio-rustls 0.24.1",
  "tokio-stream",
@@ -15752,11 +15754,11 @@ dependencies = [
 
 [[package]]
 name = "whoami"
-version = "1.5.1"
+version = "1.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a44ab49fad634e88f55bf8f9bb3abd2f27d7204172a112c7c9987e01c1c94ea9"
+checksum = "372d5b87f58ec45c384ba03563b03544dc5fadc3983e434b286913f5b4a9bb6d"
 dependencies = [
- "redox_syscall 0.4.1",
+ "redox_syscall 0.5.3",
  "wasite",
  "web-sys",
 ]
