@@ -14,7 +14,7 @@ use self::errors::IpldError;
 
 pub mod errors;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DocId(Cid);
 
 impl Deref for DocId {
@@ -69,6 +69,7 @@ impl DocDir {
     }
 }
 
+#[derive(Clone)]
 pub struct DocFile {
     id: DocId,
     name: Option<String>,
@@ -184,8 +185,7 @@ impl<P: Processor + Unpin + Send + Sync + Clone + 'static> Stream for IpldStream
             if this.current_index < this.current_links.len() {
                 let link = &this.current_links[this.current_index];
                 this.current_index += 1;
-                let id = link.cid.clone();
-                this.current_id = Some(id.into());
+                this.current_id = Some(link.cid.into());
                 return Poll::Ready(Some(Ok(IpldItem::Dir(dir.clone()))));
             } else {
                 this.current_dir = None;
@@ -199,9 +199,19 @@ impl<P: Processor + Unpin + Send + Sync + Clone + 'static> Stream for IpldStream
 }
 
 mod tests {
+    use std::collections::HashMap;
+    use std::fs;
+    use std::sync::LazyLock;
+
+    use ipld_core::cid::Cid;
+    use ipld_core::codec::Codec;
+    use ipld_dagpb::{DagPbCodec, PbNode};
+    #[allow(unused_imports)]
     use tokio_stream::StreamExt as _;
 
     use super::*;
+
+    static FIXTURES: LazyLock<HashMap<Cid, Vec<u8>>> = LazyLock::new(load_fixtures);
 
     #[derive(Clone)]
     struct MyProcessor;
@@ -218,14 +228,37 @@ mod tests {
         }
     }
 
+    fn load_fixtures() -> HashMap<Cid, Vec<u8>> {
+        fs::read_dir("fixtures")
+            .unwrap()
+            .filter_map(|file| {
+                // Filter out invalid files.
+                let file = file.ok()?;
+
+                let path = file.path();
+                let cid = path
+                    .file_stem()
+                    .expect("Filename must have a name")
+                    .to_os_string()
+                    .into_string()
+                    .expect("Filename must be valid UTF-8");
+                let bytes = fs::read(&path).expect("File must be able to be read");
+
+                Some((
+                    Cid::try_from(cid.clone()).expect("Filename must be a valid Cid"),
+                    bytes,
+                ))
+            })
+            .collect()
+    }
+
     #[tokio::test]
-    async fn test_ipld_stream() {
-        let processor = MyProcessor;
+    async fn test_ipld_stream_get_one_file() {
         let doc_id = "QmSnuWmxptJZdLJpKRarxBMS2Ju2oANVrgbr2xWbie9b2D"
             .try_into()
             .unwrap();
 
-        let mut stream = IpldStream::new(processor, doc_id);
+        let mut stream = IpldStream::new(MyProcessor, doc_id);
 
         while let Some(item) = stream.next().await {
             match item {
@@ -238,6 +271,63 @@ mod tests {
                 Err(e) => {
                     eprintln!("Error: {:?}", e);
                     break;
+                },
+            }
+        }
+    }
+
+    #[derive(Clone)]
+    struct FixturesProcessor;
+
+    #[async_trait]
+    impl Processor for FixturesProcessor {
+        type Codec = ipld_dagpb::DagPbCodec;
+
+        async fn get(&self, id: DocId) -> Result<Option<IpldItem>, IpldError> {
+            let fixtures = &*FIXTURES;
+            let data = fixtures.get(&*id).cloned();
+            if let Some(vc) = data {
+                let r = DagPbCodec::decode_from_slice(&vc).map(|node: PbNode| {
+                    let dir = DocDir::new(id, node.links);
+                    IpldItem::Dir(dir)
+                })?;
+                Ok(Some(r))
+            } else {
+                Ok(None)
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_ipld_stream_fixtures() {
+        let docs_id = [
+            "bafybeibfhhww5bpsu34qs7nz25wp7ve36mcc5mxd5du26sr45bbnjhpkei",
+            "bafybeibh647pmxyksmdm24uad6b5f7tx4dhvilzbg2fiqgzll4yek7g7y4",
+            "bafybeie7xh3zqqmeedkotykfsnj2pi4sacvvsjq6zddvcff4pq7dvyenhu",
+            "bafybeigcsevw74ssldzfwhiijzmg7a35lssfmjkuoj2t5qs5u5aztj47tq",
+            "bafybeihyivpglm6o6wrafbe36fp5l67abmewk7i2eob5wacdbhz7as5obe",
+        ]
+        .iter()
+        .map(|s| <DocId as TryFrom<&str>>::try_from(*s).unwrap())
+        .collect::<Vec<DocId>>();
+
+        for doc_id in docs_id.iter() {
+            test_ipld_stream_get_fixture(doc_id.clone()).await;
+        }
+    }
+
+    #[allow(unused)]
+    async fn test_ipld_stream_get_fixture(doc_id: DocId) {
+        let mut stream = IpldStream::new(FixturesProcessor, doc_id);
+
+        while let Some(item) = stream.next().await {
+            match item {
+                Ok(IpldItem::File(_)) => {
+                    panic!("Expected directory, got file");
+                },
+                Ok(IpldItem::Dir(_)) => {},
+                Err(e) => {
+                    panic!("Error: {:?}", e);
                 },
             }
         }
