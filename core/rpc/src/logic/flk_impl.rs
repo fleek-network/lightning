@@ -5,6 +5,7 @@ use fleek_crypto::{EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 use jsonrpsee::core::{RpcResult, SubscriptionResult};
 use jsonrpsee::{PendingSubscriptionSink, SubscriptionMessage};
+use lightning_application::env::ApplicationStateTree;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
     AccountInfo,
@@ -29,8 +30,9 @@ use lightning_interfaces::types::{
     Value,
 };
 use lightning_interfaces::PagingParams;
+use lightning_types::{StateProofKey, StateProofValue};
 use lightning_utils::application::QueryRunnerExt;
-use merklize::StateRootHash;
+use merklize::{StateRootHash, StateTree};
 
 use crate::api::FleekApiServer;
 use crate::error::RPCError;
@@ -388,6 +390,7 @@ impl<C: Collection> FleekApiServer for FleekApi<C> {
         Ok((sub_dag_index, self.data.query_runner.get_epoch_info().epoch))
     }
 
+    /// Returns the state root for the given epoch.
     async fn get_state_root(&self, epoch: Option<u64>) -> RpcResult<StateRootHash> {
         Ok(self
             .data
@@ -395,6 +398,24 @@ impl<C: Collection> FleekApiServer for FleekApi<C> {
             .await?
             .get_state_root()
             .map_err(|e| RPCError::custom(e.to_string()))?)
+    }
+
+    /// Returns the state proof for a given key and epoch.
+    async fn get_state_proof(
+        &self,
+        key: StateProofKey,
+        epoch: Option<u64>,
+    ) -> RpcResult<(
+        Option<StateProofValue>,
+        <ApplicationStateTree as StateTree>::Proof,
+    )> {
+        let (value, proof) = self
+            .data
+            .query_runner(epoch)
+            .await?
+            .get_state_proof(key)
+            .map_err(|e| RPCError::custom(e.to_string()))?;
+        Ok((value, proof))
     }
 
     async fn send_txn(&self, tx: TransactionRequest) -> RpcResult<()> {

@@ -37,13 +37,13 @@ impl Tokens {
     }
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default, schemars::JsonSchema)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Default, schemars::JsonSchema)]
 pub struct NodeServed {
     pub served: CommodityServed,
     pub stables_revenue: HpUfixed<6>,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default, schemars::JsonSchema)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Default, schemars::JsonSchema)]
 pub struct TotalServed {
     pub served: CommodityServed,
     pub reward_pool: HpUfixed<6>,
@@ -75,14 +75,14 @@ pub enum CommodityTypes {
     Gpu = 2,
 }
 
-#[derive(Clone, Debug, Hash, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct ReportedReputationMeasurements {
     pub reporting_node: NodeIndex,
     pub measurements: ReputationMeasurements,
 }
 
 /// Metadata, state stored in the blockchain that applies to the current block
-#[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, schemars::JsonSchema)]
 pub enum Metadata {
     ChainId,
     Epoch,
@@ -100,7 +100,7 @@ pub enum Metadata {
 }
 
 /// The Value enum is a data type used to represent values in a key-value pair for a metadata table
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub enum Value {
     ChainId(u32),
     Epoch(u64),
@@ -378,7 +378,19 @@ pub struct Service {
     pub slashing: (),
 }
 
-#[derive(Debug, Hash, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize, Clone, Default)]
+#[derive(
+    Debug,
+    Hash,
+    PartialEq,
+    PartialOrd,
+    Ord,
+    Eq,
+    Serialize,
+    Deserialize,
+    Clone,
+    Default,
+    schemars::JsonSchema,
+)]
 pub struct Committee {
     pub members: Vec<NodeIndex>,
     pub ready_to_change: Vec<NodeIndex>,

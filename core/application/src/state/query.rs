@@ -29,6 +29,8 @@ use lightning_interfaces::types::{
     Service,
     ServiceId,
     ServiceRevenue,
+    StateProofKey,
+    StateProofValue,
     TotalServed,
     TransactionRequest,
     TransactionResponse,
@@ -267,5 +269,25 @@ impl SyncQueryRunnerInterface for QueryRunner {
     /// Returns the state tree root hash from the application state.
     fn get_state_root(&self) -> Result<StateRootHash> {
         self.run(|ctx| ApplicationStateTree::get_state_root(ctx))
+    }
+
+    /// Returns the state proof for a given key from the application state using the state tree.
+    fn get_state_proof(
+        &self,
+        key: StateProofKey,
+    ) -> Result<(
+        Option<StateProofValue>,
+        <ApplicationStateTree as StateTree>::Proof,
+    )> {
+        type Serde = <ApplicationStateTree as StateTree>::Serde;
+
+        self.run(|ctx| {
+            let (table, serialized_key) = key.raw::<Serde>();
+            let proof = ApplicationStateTree::get_state_proof(ctx, &table, serialized_key.clone())?;
+            let value = self
+                .run(|ctx| ctx.get_raw_value(table, &serialized_key))
+                .map(|value| key.value::<Serde>(value));
+            Ok((value, proof))
+        })
     }
 }

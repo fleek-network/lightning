@@ -13,6 +13,7 @@ use hp_fixed::unsigned::HpUfixed;
 use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
 use lightning_application::app::Application;
 use lightning_application::config::Config as AppConfig;
+use lightning_application::env::ApplicationStateTree;
 use lightning_application::genesis::{Genesis, GenesisAccount, GenesisNode, GenesisNodeServed};
 use lightning_application::state::QueryRunner;
 use lightning_blockstore::blockstore::Blockstore;
@@ -38,8 +39,9 @@ use lightning_rep_collector::ReputationAggregator;
 use lightning_signer::Signer;
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
-use lightning_types::FirewallConfig;
+use lightning_types::{AccountInfo, FirewallConfig, StateProofKey, StateProofValue};
 use lightning_utils::application::QueryRunnerExt;
+use merklize::StateProof;
 use reqwest::Client;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
@@ -1177,6 +1179,71 @@ async fn test_rpc_get_state_root() -> Result<()> {
 
     assert_eq!(root_hash.len(), 64);
     assert!(root_hash.chars().all(|c| c.is_ascii_hexdigit()));
+
+    node.shutdown().await;
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_rpc_get_state_proof() -> Result<()> {
+    let temp_dir = tempdir()?;
+
+    // Create keys
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    let owner_public_key = owner_secret_key.to_pk();
+    let owner_eth_address: EthAddress = owner_public_key.into();
+
+    // Init application service
+    let mut genesis = Genesis::default();
+    genesis.account.push(GenesisAccount {
+        public_key: owner_public_key.into(),
+        flk_balance: 1000u64.into(),
+        stables_balance: 0,
+        bandwidth_balance: 0,
+    });
+
+    let genesis_path = genesis
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
+
+    let port = 30025;
+    let node = init_rpc(&temp_dir, genesis_path, port).await;
+
+    wait_for_server_start(port).await?;
+
+    let client = RpcClient::new_no_auth(&format!("http://127.0.0.1:{port}/rpc/v0"))?;
+    let state_key = StateProofKey::Accounts(owner_eth_address);
+    let (value, proof) =
+        FleekApiClient::get_state_proof(&client, StateProofKey::Accounts(owner_eth_address), None)
+            .await?;
+
+    assert!(value.is_some());
+    let value = value.unwrap();
+    assert_eq!(
+        value.clone(),
+        StateProofValue::Accounts(AccountInfo {
+            flk_balance: 1000u64.into(),
+            stables_balance: HpUfixed::zero(),
+            bandwidth_balance: 0,
+            nonce: 0,
+        })
+    );
+
+    // Verify proof.
+    let root_hash = FleekApiClient::get_state_root(&client, None).await?;
+    proof
+        .verify_membership::<_, _, ApplicationStateTree>(
+            state_key.table(),
+            owner_eth_address,
+            AccountInfo {
+                flk_balance: 1000u64.into(),
+                stables_balance: HpUfixed::zero(),
+                bandwidth_balance: 0,
+                nonce: 0,
+            },
+            root_hash,
+        )
+        .unwrap();
 
     node.shutdown().await;
     Ok(())
