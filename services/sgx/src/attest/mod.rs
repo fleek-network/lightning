@@ -130,7 +130,6 @@ impl AttestationEndpoint {
     pub fn new(method: &str, state: Arc<EndpointState>) -> Self {
         let mut output = None;
         if method == "target_info" {
-            println!("handling target info");
             match state.handle_target_info() {
                 Ok(b) => output = Some(b),
                 Err(_) => unreachable!(),
@@ -155,9 +154,7 @@ impl AsyncWrite for AttestationEndpoint {
         _cx: &mut std::task::Context<'_>,
         buf: &[u8],
     ) -> std::task::Poll<std::io::Result<usize>> {
-        println!("got write for {} bytes", buf.len());
         if self.output.is_none() {
-            println!("got write");
             // push bytes into buffer
             self.buffer.put_slice(buf);
 
@@ -181,15 +178,18 @@ impl AsyncWrite for AttestationEndpoint {
             let req = match self.method.as_ref() {
                 "quote" => Request::Quote(self.buffer.split().to_vec()),
                 "collateral" => Request::Collateral(self.buffer.split().to_vec()),
-                _ => unreachable!(),
+                _ => unreachable!("handler checks methods, target info already set output"),
             };
-            println!("handling req");
+
             match self.state.clone().handle(req) {
-                Ok(b) => self.output = Some(b),
-                Err(e) => println!("failed to handle: {e}"),
-            }
-            if let Some(waker) = self.waker.take() {
-                waker.wake()
+                Ok(b) => {
+                    self.output = Some(b);
+                    if let Some(waker) = self.waker.take() {
+                        // wake reader if it's already been polled
+                        waker.wake()
+                    }
+                },
+                Err(e) => eprintln!("failed to handle attestation request: {e}"),
             }
         }
 
@@ -204,6 +204,7 @@ impl AsyncWrite for AttestationEndpoint {
         std::task::Poll::Ready(Ok(()))
     }
 
+    /// no-op
     fn poll_shutdown(
         self: std::pin::Pin<&mut Self>,
         _cx: &mut std::task::Context<'_>,
@@ -220,12 +221,10 @@ impl AsyncRead for AttestationEndpoint {
     ) -> std::task::Poll<std::io::Result<()>> {
         // flush all output
         if let Some(output) = self.output.as_mut() {
-            println!("flushing bytes");
             let len = buf.remaining().min(output.len());
             buf.put_slice(&output.split_to(len));
             std::task::Poll::Ready(Ok(()))
         } else {
-            println!("waiting");
             self.waker = Some(cx.waker().clone());
             std::task::Poll::Pending
         }
