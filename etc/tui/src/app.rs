@@ -1,6 +1,7 @@
 use anyhow::Result;
 use crossterm::event::KeyEvent;
-use lightning_guard::ConfigSource;
+use lightning_guard::{ConfigSource, map};
+use lightning_guard::map::{FileRule, PacketFilterRule};
 use log::debug;
 use ratatui::prelude::{Constraint, Direction, Layout, Rect};
 #[cfg(feature = "logger")]
@@ -22,6 +23,7 @@ use crate::components::summary::Summary;
 use crate::components::Component;
 use crate::config::Config;
 use crate::mode::Mode;
+use crate::state::State;
 use crate::tui;
 use crate::tui::Frame;
 #[cfg(feature = "logger")]
@@ -33,6 +35,7 @@ pub struct App {
     pub frame_rate: f64,
     pub should_quit: bool,
     pub should_suspend: bool,
+    pub state: State,
     pub mode: Mode,
     pub last_tick_key_events: Vec<KeyEvent>,
     // Components.
@@ -77,7 +80,13 @@ impl App {
             config,
             mode,
             last_tick_key_events: Vec::new(),
+            state: State::default(),
         })
+    }
+
+    async fn create_state(&mut self) {
+        let firewall_rules = self.config.get_
+        self.state.firewall_rules
     }
 
     fn update_components(&mut self, action: Action) -> Result<Option<Action>> {
@@ -289,7 +298,7 @@ impl App {
 
             while let Ok(action) = action_rx.try_recv() {
                 if action != Action::Tick && action != Action::Render {
-                    log::debug!("{action:?}");
+                    debug!("{action:?}");
                 }
                 match &action {
                     Action::Tick => {
