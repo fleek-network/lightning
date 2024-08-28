@@ -40,8 +40,8 @@ pub struct SgxQlQveCollateral {
 /// * The TCBInfo structure
 /// * The QEIdentity structure
 pub fn get_quote_verification_collateral(quote: &[u8]) -> std::io::Result<SgxQlQveCollateral> {
-    let (fmspc, ca_from_quote) = get_fmspc_ca_from_quote(quote)?;
-    sgx_get_quote_verification_collateral(&fmspc, &ca_from_quote)
+    let (fmspc, ca) = get_fmspc_ca_from_quote(quote)?;
+    sgx_get_quote_verification_collateral(&fmspc, &ca)
 }
 
 // Linking with dcap prov
@@ -265,8 +265,7 @@ pub fn sgx_get_quote_verification_collateral(
         serde_json::from_slice(slice).map_err(std::io::Error::other)?
     };
 
-    // let version = unsafe { (*p_quote_collateral).version };
-    let version = 1;
+    let version = unsafe { (*p_quote_collateral).version };
 
     let pck_crl_issuer_chain = pcs_crl_to_pem(&pck_crl_issuer_chain);
     let root_ca_crl = pcs_crl_to_pem(&root_ca_crl);
