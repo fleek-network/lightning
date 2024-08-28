@@ -12,6 +12,7 @@ use der_parser::der::{
 use der_parser::error::{BerError, BerResult};
 use der_parser::nom::combinator::map;
 use serde::Serialize;
+use serde_json::value::RawValue;
 use x509_parser::oid_registry::Oid;
 use x509_parser::prelude::{FromDer, X509Certificate};
 
@@ -22,9 +23,9 @@ pub struct SgxQlQveCollateral {
     pub root_ca_crl: String,           // Root CA CRL in PEM format
     pub pck_crl: String,               // PCK Cert CRL in PEM format
     pub tcb_info_issuer_chain: String, // PEM
-    pub tcb_info: String,              // TCB Info structure
+    pub tcb_info: Box<RawValue>,       // TCB Info structure
     pub qe_identity_issuer_chain: String, // PEM
-    pub qe_identity: String,           // QE Identity Structure
+    pub qe_identity: Box<RawValue>,    // QE Identity Structure
 }
 
 /// Get SGX ECDSA attestation collateral from an SGX quote
@@ -239,9 +240,7 @@ pub fn sgx_get_quote_verification_collateral(
                 (*p_quote_collateral).tcb_info_size as usize - 1,
             )
         };
-        str::from_utf8(slice)
-            .map_err(std::io::Error::other)?
-            .to_owned()
+        serde_json::from_slice(slice).map_err(std::io::Error::other)?
     };
 
     let qe_identity_issuer_chain = {
@@ -263,9 +262,7 @@ pub fn sgx_get_quote_verification_collateral(
                 (*p_quote_collateral).qe_identity_size as usize - 1,
             )
         };
-        str::from_utf8(slice)
-            .map_err(std::io::Error::other)?
-            .to_owned()
+        serde_json::from_slice(slice).map_err(std::io::Error::other)?
     };
 
     // let version = unsafe { (*p_quote_collateral).version };

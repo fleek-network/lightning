@@ -582,6 +582,7 @@ dependencies = [
 [[package]]
 name = "fleek-remote-attestation"
 version = "0.1.0"
+source = "git+https://github.com/fleek-network/fleek-remote-attestation#2b7fbacac5c8aaff5b898cbaa3b80d976a4e2567"
 dependencies = [
  "anyhow",
  "asn1",
