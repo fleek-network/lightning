@@ -3,12 +3,11 @@ use std::net::{TcpListener, TcpStream};
 use std::sync::LazyLock;
 
 use ecies::{PublicKey, SecretKey};
-use http::start_http_thread;
+use rouille::{Request, Response};
 use serde::Deserialize;
 
 mod attest;
 mod blockstore;
-mod http;
 mod runtime;
 
 pub(crate) mod config {
@@ -21,7 +20,7 @@ static SHARED_KEY: LazyLock<SecretKey> =
     LazyLock::new(|| SecretKey::parse(b"_fleek_dummy_global_network_key_").unwrap());
 
 #[derive(Deserialize)]
-struct Request {
+struct ServiceRequest {
     /// Blake3 hash of the wasm module.
     hash: String,
     /// Optionally enable decrypting the wasm file
@@ -52,7 +51,7 @@ fn handle_connection(conn: &mut TcpStream) -> anyhow::Result<()> {
     conn.read_exact(&mut payload)?;
 
     // parse payload
-    let Request {
+    let ServiceRequest {
         hash,
         function,
         input,
@@ -85,6 +84,29 @@ fn handle_connection(conn: &mut TcpStream) -> anyhow::Result<()> {
     Ok(())
 }
 
+pub fn start_http_thread(port: u16, report_data: [u8; 64]) {
+    println!("Binding http attestation debug server to 0.0.0.0:{port}");
+
+    let (quote, collateral) = crate::attest::generate_for_report_data(report_data)
+        .expect("failed to generate http report data");
+
+    std::thread::spawn(move || {
+        rouille::start_server(("0.0.0.0", port), move |req: &Request| {
+            rouille::router!(req,
+                (GET)(/quote) => {
+                    Response::from_data("raw", quote.clone())
+                },
+                (GET)(/collateral) => {
+                    Response::from_data("application/json", serde_json::to_string(&collateral).unwrap())
+                },
+                _ => {
+                    Response::empty_404()
+                }
+            )
+        });
+    });
+}
+
 fn main() -> anyhow::Result<()> {
     println!("Successfully started SGX enclave!");
 
@@ -97,9 +119,10 @@ fn main() -> anyhow::Result<()> {
         bs58::encode(&shared_key).into_string()
     );
 
-    // Report data [0..33] contains the shared public key
+    // The last 33 bytes of the report data contains the compressed shared public key.
+    // The rest of the bytes are padding.
     let mut report_data = [0u8; 64];
-    report_data[..33].copy_from_slice(&shared_key);
+    report_data[64 - 33..].copy_from_slice(&shared_key);
     start_http_thread(6969, report_data);
 
     // TODO: spin up RA-TLS server
@@ -111,7 +134,6 @@ fn main() -> anyhow::Result<()> {
     loop {
         let (mut conn, _) = listener.accept()?;
         if let Err(e) = handle_connection(&mut conn) {
-            // TODO: write error to stream
             let error = format!("Error: {e}");
             eprintln!("{error}");
             let _ = conn.write_all(&(error.len() as u32).to_be_bytes());
