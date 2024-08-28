@@ -78,7 +78,8 @@ impl ApplicationState<AtomoStorage, DefaultSerdeBackend, ApplicationStateTree> {
         if ApplicationStateTree::is_empty_state_tree_unsafe(&mut query)? {
             info!("State tree is empty, backfilling...");
             ApplicationStateTree::clear_and_rebuild_state_tree_unsafe(&mut db)?;
-            info!("State tree backfilled");
+            let root_hash = query.run(|ctx| ApplicationStateTree::get_state_root(ctx))?;
+            info!("State tree backfilled. Root hash is {root_hash}");
         }
 
         // Verify state tree consistency with the full state.
@@ -108,6 +109,21 @@ impl ApplicationState<AtomoStorage, DefaultSerdeBackend, ApplicationStateTree> {
         StateExecutor::new(StateContext {
             table_selector: ctx,
         })
+    }
+
+    /// Resets the state tree to an empty state.
+    pub fn reset_state_tree_unsafe(&mut self) -> Result<()> {
+        info!("Resetting state tree...");
+
+        ApplicationStateTree::clear_and_rebuild_state_tree_unsafe(&mut self.db)?;
+
+        let root_hash = self
+            .db
+            .query()
+            .run(|ctx| ApplicationStateTree::get_state_root(ctx))?;
+        info!("State tree reset. Root hash is {root_hash}");
+
+        Ok(())
     }
 
     /// Runs a mutation on the state.

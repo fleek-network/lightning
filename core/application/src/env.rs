@@ -1,10 +1,8 @@
-use std::path::Path;
 use std::time::Duration;
 
 use affair::AsyncWorker as WorkerTrait;
 use anyhow::{Context, Result};
-use atomo::{AtomoBuilder, DefaultSerdeBackend, SerdeBackend, StorageBackend};
-use atomo_rocks::{Cache as RocksCache, Env as RocksEnv, Options};
+use atomo::{DefaultSerdeBackend, SerdeBackend, StorageBackend};
 use fleek_crypto::{ClientPublicKey, ConsensusPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::prelude::*;
@@ -35,10 +33,10 @@ use merklize::trees::mpt::MptStateTree;
 use merklize::StateTree;
 use tracing::warn;
 
-use crate::config::{Config, StorageConfig};
+use crate::config::Config;
 use crate::genesis::GenesisPrices;
 use crate::state::{ApplicationState, QueryRunner};
-use crate::storage::{AtomoStorage, AtomoStorageBuilder};
+use crate::storage::AtomoStorage;
 
 pub struct Env<B: StorageBackend, S: SerdeBackend, T: StateTree> {
     pub inner: ApplicationState<B, S, T>,
@@ -52,43 +50,10 @@ pub type ApplicationEnv = Env<AtomoStorage, DefaultSerdeBackend, ApplicationStat
 
 impl ApplicationEnv {
     pub fn new(config: &Config, checkpoint: Option<([u8; 32], &[u8])>) -> Result<Self> {
-        let storage = match config.storage {
-            StorageConfig::RocksDb => {
-                let db_path = config
-                    .db_path
-                    .as_ref()
-                    .context("db_path must be specified for RocksDb backend")?;
-                let mut db_options = if let Some(db_options) = config.db_options.as_ref() {
-                    let (options, _) = Options::load_latest(
-                        db_options,
-                        RocksEnv::new().context("Failed to create rocks db env.")?,
-                        false,
-                        // TODO(matthias): I set this lru cache size arbitrarily
-                        RocksCache::new_lru_cache(100),
-                    )
-                    .context("Failed to create rocks db options.")?;
-                    options
-                } else {
-                    Options::default()
-                };
-                db_options.create_if_missing(true);
-                db_options.create_missing_column_families(true);
-                match checkpoint {
-                    Some((hash, checkpoint)) => AtomoStorageBuilder::new(Some(db_path.as_path()))
-                        .with_options(db_options)
-                        .from_checkpoint(hash, checkpoint),
-                    None => {
-                        AtomoStorageBuilder::new(Some(db_path.as_path())).with_options(db_options)
-                    },
-                }
-            },
-            StorageConfig::InMemory => AtomoStorageBuilder::new::<&Path>(None),
-        };
-
-        let atomo = AtomoBuilder::<AtomoStorageBuilder, DefaultSerdeBackend>::new(storage);
+        let builder = config.atomo_builder(checkpoint)?;
 
         Ok(Self {
-            inner: ApplicationState::build(atomo)?,
+            inner: ApplicationState::build(builder)?,
         })
     }
 
@@ -455,7 +420,7 @@ impl<C: Collection> WorkerTrait for UpdateWorker<C> {
         self.env
             .run(req, || self.blockstore.put(None))
             .await
-            .expect("Failed to handle block")
+            .expect("Failed to execute block")
     }
 }
 

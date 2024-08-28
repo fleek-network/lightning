@@ -16,6 +16,7 @@ where
         DevSubCmd::DepGraph => dep_graph::<C>().await,
         DevSubCmd::Store { input } => store::<C>(config_path, input).await,
         DevSubCmd::Fetch { remote, hash } => fetch::<C>(config_path, hash, remote).await,
+        DevSubCmd::ResetStateTree => reset_state_tree::<C>(config_path).await,
     }
 }
 
@@ -24,6 +25,16 @@ async fn dep_graph<C: Collection>() -> Result<()> {
     let mermaid = graph.viz("Lightning Dependency Graph");
     println!("{mermaid}");
     Ok(())
+}
+
+async fn reset_state_tree<C>(config_path: ResolvedPathBuf) -> Result<()>
+where
+    C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>,
+{
+    let config = TomlConfigProvider::<C>::load(config_path)?;
+    let app_config = config.get::<<C as Collection>::ApplicationInterface>();
+
+    C::ApplicationInterface::reset_state_tree_unsafe(&app_config)
 }
 
 async fn store<C>(config_path: ResolvedPathBuf, input: Vec<PathBuf>) -> Result<()>

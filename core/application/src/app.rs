@@ -139,4 +139,13 @@ impl<C: Collection> ApplicationInterface<C> for Application<C> {
             .map(NodeInfo::from)
             .collect())
     }
+
+    /// Resets the state tree to an empty state.
+    ///
+    /// This method is unsafe because it acts on the underlying state storage directly,
+    /// clears all of the tree data, and rebuilds it from scratch.
+    fn reset_state_tree_unsafe(config: &Config) -> Result<()> {
+        let mut env = ApplicationEnv::new(config, None)?;
+        env.inner.reset_state_tree_unsafe()
+    }
 }
