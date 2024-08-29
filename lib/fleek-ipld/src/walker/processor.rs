@@ -9,9 +9,7 @@ use ipld_core::cid::Cid;
 use ipld_dagpb::PbLink;
 use tokio_stream::Stream;
 
-use self::errors::IpldError;
-
-pub mod errors;
+use super::errors::IpldError;
 
 #[derive(Clone, Debug)]
 pub struct DocId {
@@ -35,6 +33,12 @@ impl DocId {
 
     pub fn size(&self) -> &Option<u64> {
         &self.size
+    }
+}
+
+impl From<PbLink> for DocId {
+    fn from(link: PbLink) -> Self {
+        Self::new(link.cid, link.name, link.size)
     }
 }
 
@@ -80,10 +84,22 @@ impl From<DocDir> for IpldItem {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct DocFile {
     id: DocId,
     data: Option<Bytes>,
+}
+
+impl std::fmt::Debug for DocFile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DocFile")
+            .field("id", &self.id)
+            .field(
+                "data-length",
+                &self.data.as_ref().map(|d| d.len()).unwrap_or(0),
+            )
+            .finish()
+    }
 }
 
 impl From<DocFile> for IpldItem {
@@ -94,10 +110,7 @@ impl From<DocFile> for IpldItem {
 
 impl DocFile {
     pub fn new(id: DocId, data: Option<Bytes>) -> Self {
-        Self {
-            id: id.into(),
-            data,
-        }
+        Self { id, data }
     }
 
     pub fn from_pb_node(id: DocId, node: ipld_dagpb::PbNode) -> Self {
@@ -119,6 +132,16 @@ pub enum IpldItem {
     File(DocFile),
 }
 
+impl IpldItem {
+    pub fn from_pb_node(id: DocId, node: ipld_dagpb::PbNode) -> Self {
+        if node.links.is_empty() {
+            DocFile::from_pb_node(id, node).into()
+        } else {
+            DocDir::from_pb_node(id, node).into()
+        }
+    }
+}
+
 /// A trait for processing IPLD data.
 ///
 /// This trait is used to retrieve IPLD data from a storage backend.
@@ -135,11 +158,7 @@ pub trait Processor {
 
 pub struct IpldStream<P: Processor + Unpin + Send + Sync> {
     processor: P,
-    current_id: Option<DocId>,
-    next_link: Option<PbLink>,
-    current_dir: Option<DocDir>,
-    current_links: Vec<PbLink>,
-    current_index: usize,
+    stack: Vec<(Option<DocDir>, Vec<PbLink>, usize)>,
     pending_future: Option<BoxFuture<'static, Result<Option<IpldItem>, IpldError>>>,
 }
 
@@ -148,22 +167,15 @@ where
     P: Processor + Unpin + Send + Sync,
 {
     pub fn new(processor: P, id: DocId) -> Self {
+        let pb_link = PbLink {
+            cid: *id.cid(),
+            name: id.name().clone(),
+            size: *id.size(),
+        };
         Self {
             processor,
-            current_id: Some(id),
-            current_dir: None,
-            next_link: None,
-            current_links: Vec::new(),
-            current_index: 0,
+            stack: vec![(None, vec![pb_link], 0)],
             pending_future: None,
-        }
-    }
-
-    pub fn current_id(&self) -> Option<DocId> {
-        if let Some(link) = &self.next_link {
-            Some(DocId::new(link.cid, link.name.clone(), link.size))
-        } else {
-            self.current_id.clone()
         }
     }
 }
@@ -184,15 +196,8 @@ where
                     this.pending_future = None;
                     match result {
                         Ok(Some(IpldItem::Dir(dir))) => {
-                            this.current_dir = Some(dir.clone());
-                            this.current_links = dir.links.clone();
-                            this.current_index = 0;
-                            if !this.current_links.is_empty() {
-                                let link = &this.current_links[this.current_index];
-                                this.next_link = Some(link.clone());
-                                this.current_id = this.current_id();
-                                this.current_index += 1;
-                            }
+                            let links = dir.links.clone();
+                            this.stack.push((Some(dir.clone()), links, 0));
                             return Poll::Ready(Some(Ok(IpldItem::Dir(dir))));
                         },
                         Ok(Some(IpldItem::File(file))) => {
@@ -212,25 +217,17 @@ where
             }
         }
 
-        if let Some(id) = this.current_id.take() {
-            let processor = this.processor.clone();
-            this.pending_future = Some(Box::pin(async move { processor.get(id).await }));
-            cx.waker().wake_by_ref();
-            return Poll::Pending;
-        }
-
-        if let Some(dir) = &this.current_dir {
-            if this.current_index < this.current_links.len() {
-                let link = &this.current_links[this.current_index];
-                this.next_link = Some(link.clone());
-                this.current_id = this.current_id();
-                this.current_index += 1;
-                return Poll::Ready(Some(Ok(IpldItem::Dir(dir.clone()))));
+        while let Some((_current_dir, current_links, current_index)) = this.stack.last_mut() {
+            if *current_index < current_links.len() {
+                let link = &current_links[*current_index];
+                *current_index += 1;
+                let processor = this.processor.clone();
+                let doc_id = link.clone().into();
+                this.pending_future = Some(Box::pin(async move { processor.get(doc_id).await }));
+                cx.waker().wake_by_ref();
+                return Poll::Pending;
             } else {
-                this.current_dir = None;
-                this.current_links.clear();
-                this.next_link = None;
-                this.current_index = 0;
+                this.stack.pop();
             }
         }
 

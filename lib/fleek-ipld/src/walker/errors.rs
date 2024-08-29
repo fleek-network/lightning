@@ -9,6 +9,9 @@ pub enum IpldError {
     #[error("IPLD error: Error Decoding DAG-PB data {0}")]
     DagPbError(#[from] ipld_dagpb::Error),
 
+    #[error("IPLD error: Cannot decode DAG-PB data {0}")]
+    CannotDecodeDagPbData(String),
+
     #[error("IPLD error: Error fetching data from IPFS {0}")]
     IpfsError(#[from] reqwest::Error),
 
