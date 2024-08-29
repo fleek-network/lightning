@@ -9,9 +9,9 @@ use unicode_width::UnicodeWidthStr;
 
 use super::{Component, Frame};
 use crate::action::Action;
-use crate::components::profile::forms::RuleForm;
 use crate::config::Config;
 use crate::mode::Mode;
+use crate::state::State;
 use crate::widgets::table::Table;
 
 const COLUMN_COUNT: usize = 2;
@@ -20,7 +20,6 @@ pub struct ProfileView {
     command_tx: Option<UnboundedSender<Action>>,
     longest_item_per_column: [u16; COLUMN_COUNT],
     table: Table<FileRule>,
-    form: RuleForm,
     profile: Option<Profile>,
     src: ConfigSource,
     config: Config,
@@ -32,7 +31,6 @@ impl ProfileView {
             command_tx: None,
             longest_item_per_column: [0; COLUMN_COUNT],
             table: Table::new(),
-            form: RuleForm::new(),
             profile: None,
             src,
             config: Config::default(),
@@ -42,10 +40,6 @@ impl ProfileView {
     pub fn load_profile(&mut self, profile: Profile) {
         self.table.load_records(profile.file_rules.clone());
         self.profile = Some(profile);
-    }
-
-    pub fn rule_form(&mut self) -> &mut RuleForm {
-        &mut self.form
     }
 
     fn space_between_columns(&self) -> [u16; COLUMN_COUNT] {
@@ -63,16 +57,6 @@ impl ProfileView {
             .unwrap_or(0);
 
         [name as u16, permissions as u16]
-    }
-
-    fn update_rules_from_input(&mut self) {
-        if let Some(rule) = self.form.yank_input() {
-            // Update the profile in view.
-            let profile = self.profile.as_mut().expect("Profile to be initialized");
-            profile.file_rules.push(rule.clone());
-            // Update the rule table.
-            self.table.add_record(rule);
-        }
     }
 
     fn restore(&mut self) {
@@ -113,7 +97,7 @@ impl Component for ProfileView {
         Ok(())
     }
 
-    fn update(&mut self, action: Action) -> Result<Option<Action>> {
+    fn update(&mut self, action: Action, ctx: &mut State) -> Result<Option<Action>> {
         match action {
             Action::Edit => Ok(Some(Action::UpdateMode(Mode::ProfileViewEdit))),
             Action::Add => Ok(Some(Action::UpdateMode(Mode::ProfileRuleForm))),
@@ -130,7 +114,10 @@ impl Component for ProfileView {
                 Ok(Some(Action::UpdateMode(Mode::ProfileView)))
             },
             Action::UpdateMode(Mode::ProfileViewEdit) => {
-                self.update_rules_from_input();
+                let profile = ctx
+                    .get_selected_profile()
+                    .expect("A profile to have been selected");
+                self.load_profile(profile.clone());
                 Ok(None)
             },
             Action::Back => {

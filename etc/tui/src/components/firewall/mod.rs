@@ -1,6 +1,7 @@
-pub mod form;
+mod form;
 
 use anyhow::Result;
+pub use form::FirewallForm;
 use lightning_guard::map::PacketFilterRule;
 use lightning_guard::ConfigSource;
 use ratatui::prelude::{Color, Constraint, Modifier, Rect, Style, Text};
@@ -10,9 +11,9 @@ use unicode_width::UnicodeWidthStr;
 
 use super::{Component, Frame};
 use crate::action::Action;
-use crate::components::firewall::form::FirewallForm;
 use crate::config::Config;
 use crate::mode::Mode;
+use crate::state::State;
 use crate::widgets::table::Table;
 
 const COLUMN_COUNT: usize = 6;
@@ -22,7 +23,6 @@ pub struct FireWall {
     command_tx: Option<UnboundedSender<Action>>,
     table: Table<PacketFilterRule>,
     longest_item_per_column: [u16; COLUMN_COUNT],
-    form: FirewallForm,
     src: ConfigSource,
     config: Config,
 }
@@ -34,22 +34,12 @@ impl FireWall {
             table: Table::new(),
             command_tx: None,
             longest_item_per_column: [0; COLUMN_COUNT],
-            form: FirewallForm::new(),
             config: Config::default(),
         }
     }
 
-    pub async fn read_state_from_storage(&mut self) -> Result<()> {
-        // If it's an error, there is no file and thus there is nothing to do.
-        if let Ok(filters) = self.src.read_packet_filters().await {
-            self.table.load_records(filters);
-        }
-
-        Ok(())
-    }
-
-    pub fn form(&mut self) -> &mut FirewallForm {
-        &mut self.form
+    pub fn load_list(&mut self, filters: Vec<PacketFilterRule>) {
+        self.table.load_records(filters);
     }
 
     fn save(&mut self) {
@@ -127,7 +117,7 @@ impl Component for FireWall {
         Ok(())
     }
 
-    fn update(&mut self, action: Action) -> Result<Option<Action>> {
+    fn update(&mut self, action: Action, ctx: &mut State) -> Result<Option<Action>> {
         match action {
             Action::Edit => Ok(Some(Action::UpdateMode(Mode::FirewallEdit))),
             Action::Add => Ok(Some(Action::UpdateMode(Mode::FirewallForm))),
@@ -152,10 +142,8 @@ impl Component for FireWall {
                 Ok(Some(Action::Render))
             },
             Action::UpdateMode(Mode::FirewallEdit) => {
-                // It's possible that the form sent this so we try to yank a new input value.
-                if let Some(rule) = self.form.yank_input() {
-                    self.table.add_record(rule);
-                }
+                let filters = ctx.get_filters().to_vec();
+                self.load_list(filters);
                 Ok(None)
             },
             _ => Ok(None),

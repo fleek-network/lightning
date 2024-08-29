@@ -9,6 +9,7 @@ use tui_logger::{TuiLoggerLevelOutput, TuiLoggerSmartWidget, TuiWidgetEvent, Tui
 use crate::action::Action;
 use crate::components::Component;
 use crate::config::Config;
+use crate::state::State;
 use crate::tui::Frame;
 
 #[derive(Default)]
@@ -55,7 +56,7 @@ impl Component for Logger {
         Ok(())
     }
 
-    fn update(&mut self, action: Action) -> anyhow::Result<Option<Action>> {
+    fn update(&mut self, action: Action, ctx: &mut State) -> anyhow::Result<Option<Action>> {
         let state = self.selected_state();
         match action {
             Action::Up => state.transition(TuiWidgetEvent::UpKey),

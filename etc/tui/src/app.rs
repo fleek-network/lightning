@@ -1,7 +1,7 @@
 use anyhow::Result;
 use crossterm::event::KeyEvent;
-use lightning_guard::{ConfigSource, map};
 use lightning_guard::map::{FileRule, PacketFilterRule};
+use lightning_guard::{map, ConfigSource};
 use log::debug;
 use ratatui::prelude::{Constraint, Direction, Layout, Rect};
 #[cfg(feature = "logger")]
@@ -11,13 +11,12 @@ use tokio::net::UnixListener;
 use tokio::sync::mpsc;
 
 use crate::action::Action;
-use crate::components::firewall::form::FirewallForm;
-use crate::components::firewall::FireWall;
+use crate::components::firewall::{FireWall, FirewallForm};
 use crate::components::home::Home;
 #[cfg(feature = "logger")]
 use crate::components::logger::Logger;
 use crate::components::navigator::Navigator;
-use crate::components::profile::Profile;
+use crate::components::profile::{Profile, ProfileForm, ProfileView, RuleForm};
 use crate::components::prompt::Prompt;
 use crate::components::summary::Summary;
 use crate::components::Component;
@@ -46,6 +45,10 @@ pub struct App {
     pub firewall: FireWall,
     pub firewall_form: FirewallForm,
     pub profiles: Profile,
+    pub profile_view: ProfileView,
+    pub profile_form: ProfileForm,
+    pub profile_rule_form: RuleForm,
+    pub filter_form: FirewallForm,
     #[cfg(feature = "logger")]
     pub logger: Logger,
 }
@@ -61,7 +64,7 @@ impl App {
         let summary = Summary::new();
         let prompt = Prompt::new();
         let navigator = Navigator::new();
-        let profiles = Profile::new(src);
+        let profiles = Profile::new(src.clone());
         let config = Config::new()?;
         Ok(Self {
             tick_rate,
@@ -75,59 +78,66 @@ impl App {
             firewall,
             firewall_form,
             profiles,
+            profile_view: ProfileView::new(src.clone()),
+            profile_form: ProfileForm::new(),
+            profile_rule_form: RuleForm::new(),
             should_quit: false,
             should_suspend: false,
             config,
             mode,
             last_tick_key_events: Vec::new(),
-            state: State::default(),
+            state: State::new(src),
+            filter_form: Default::default(),
         })
     }
 
-    async fn create_state(&mut self) {
-        let firewall_rules = self.config.get_
-        self.state.firewall_rules
+    async fn load_state(&mut self) -> Result<()> {
+        self.state.load_profiles().await?;
+        self.state.load_packet_filter_rules().await?;
+        Ok(())
     }
 
     fn update_components(&mut self, action: Action) -> Result<Option<Action>> {
+        let ctx = &mut self.state;
         let maybe_action = match self.mode {
-            Mode::Home => self.home.update(action.clone())?,
-            Mode::Firewall => self.firewall.update(action.clone())?,
-            Mode::FirewallEdit => self.firewall.update(action.clone())?,
-            Mode::FirewallForm => self.firewall.form().update(action.clone())?,
-            Mode::Profiles => self.profiles.update(action.clone())?,
-            Mode::ProfilesEdit => self.profiles.update(action.clone())?,
-            Mode::ProfileView => self.profiles.view().update(action.clone())?,
-            Mode::ProfileViewEdit => self.profiles.view().update(action.clone())?,
-            Mode::ProfileForm => self.profiles.form().update(action.clone())?,
-            Mode::ProfileRuleForm => self.profiles.view().rule_form().update(action.clone())?,
+            Mode::Home => self.home.update(action.clone(), ctx)?,
+            Mode::Firewall => self.firewall.update(action.clone(), ctx)?,
+            Mode::FirewallEdit => self.firewall.update(action.clone(), ctx)?,
+            Mode::FirewallForm => self.filter_form.update(action.clone(), ctx)?,
+            Mode::Profiles => self.profiles.update(action.clone(), ctx)?,
+            Mode::ProfilesEdit => self.profiles.update(action.clone(), ctx)?,
+            Mode::ProfileView => self.profile_view.update(action.clone(), ctx)?,
+            Mode::ProfileViewEdit => self.profile_view.update(action.clone(), ctx)?,
+            Mode::ProfileForm => self.profile_form.update(action.clone(), ctx)?,
+            Mode::ProfileRuleForm => self.profile_rule_form.update(action.clone(), ctx)?,
             #[cfg(feature = "logger")]
-            Mode::Logger => self.logger.update(action.clone())?,
+            Mode::Logger => self.logger.update(action.clone(), ctx)?,
             #[cfg(not(feature = "logger"))]
             Mode::Logger => None,
         };
 
         if maybe_action.is_none() {
-            self.navigator.update(action)
+            self.navigator.update(action, ctx)
         } else {
             Ok(maybe_action)
         }
     }
 
     fn handle_event(&mut self, event: tui::Event) -> Result<Option<Action>> {
+        let ctx = &mut self.state;
         match self.mode {
-            Mode::Home => self.home.handle_events(Some(event)),
-            Mode::Firewall => self.firewall.handle_events(Some(event)),
-            Mode::FirewallEdit => self.firewall.handle_events(Some(event)),
-            Mode::FirewallForm => self.firewall.form().handle_events(Some(event)),
-            Mode::Profiles => self.profiles.handle_events(Some(event)),
-            Mode::ProfilesEdit => self.profiles.handle_events(Some(event)),
-            Mode::ProfileView => self.profiles.view().handle_events(Some(event)),
-            Mode::ProfileViewEdit => self.profiles.view().handle_events(Some(event)),
-            Mode::ProfileForm => self.profiles.form().handle_events(Some(event)),
-            Mode::ProfileRuleForm => self.profiles.view().rule_form().handle_events(Some(event)),
+            Mode::Home => self.home.handle_events(Some(event), ctx),
+            Mode::Firewall => self.firewall.handle_events(Some(event), ctx),
+            Mode::FirewallEdit => self.firewall.handle_events(Some(event), ctx),
+            Mode::FirewallForm => self.filter_form.handle_events(Some(event), ctx),
+            Mode::Profiles => self.profiles.handle_events(Some(event), ctx),
+            Mode::ProfilesEdit => self.profiles.handle_events(Some(event), ctx),
+            Mode::ProfileView => self.profile_view.handle_events(Some(event), ctx),
+            Mode::ProfileViewEdit => self.profile_view.handle_events(Some(event), ctx),
+            Mode::ProfileForm => self.profile_form.handle_events(Some(event), ctx),
+            Mode::ProfileRuleForm => self.profile_rule_form.handle_events(Some(event), ctx),
             #[cfg(feature = "logger")]
-            Mode::Logger => self.logger.handle_events(Some(event)),
+            Mode::Logger => self.logger.handle_events(Some(event), ctx),
             #[cfg(not(feature = "logger"))]
             Mode::Logger => Ok(None),
         }
@@ -172,19 +182,19 @@ impl App {
                 self.firewall.draw(f, content[0])?;
             },
             Mode::FirewallForm => {
-                self.firewall.form().draw(f, content[0])?;
+                self.filter_form.draw(f, content[0])?;
             },
             Mode::Profiles | Mode::ProfilesEdit => {
                 self.profiles.draw(f, content[0])?;
             },
             Mode::ProfileView | Mode::ProfileViewEdit => {
-                self.profiles.view().draw(f, content[0])?;
+                self.profile_view.draw(f, content[0])?;
             },
             Mode::ProfileForm => {
-                self.profiles.form().draw(f, content[0])?;
+                self.profile_form.draw(f, content[0])?;
             },
             Mode::ProfileRuleForm => {
-                self.profiles.view().rule_form().draw(f, content[0])?;
+                self.profile_rule_form.draw(f, content[0])?;
             },
             #[cfg(feature = "logger")]
             Mode::Logger => {
@@ -250,7 +260,11 @@ impl App {
         self.firewall.register_action_handler(action_tx.clone())?;
         self.firewall.register_config_handler(self.config.clone())?;
         self.firewall.init(tui.size()?)?;
-        self.firewall.read_state_from_storage().await?;
+
+        // If it's an error, there is no file and thus there is nothing to do.
+        self.state.load_packet_filter_rules().await?;
+        let filters = self.state.get_filters();
+        self.firewall.load_list(filters.to_vec());
 
         self.firewall_form
             .register_action_handler(action_tx.clone())?;
@@ -262,6 +276,9 @@ impl App {
         self.profiles.register_config_handler(self.config.clone())?;
         self.profiles.init(tui.size()?)?;
         self.profiles.get_profile_list_from_storage().await?;
+
+        // Load the state.
+        self.load_state().await?;
 
         loop {
             if let Some(e) = tui.next().await {

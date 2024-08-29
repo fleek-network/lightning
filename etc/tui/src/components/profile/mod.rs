@@ -4,16 +4,17 @@ mod view;
 use std::collections::HashSet;
 
 use anyhow::Result;
+pub use forms::{ProfileForm, RuleForm};
 use lightning_guard::{map, ConfigSource};
 use ratatui::prelude::Rect;
 use tokio::sync::mpsc::UnboundedSender;
+pub use view::ProfileView;
 
 use super::{Component, Frame};
 use crate::action::Action;
-use crate::components::profile::forms::ProfileForm;
-use crate::components::profile::view::ProfileView;
 use crate::config::Config;
 use crate::mode::Mode;
+use crate::state::State;
 use crate::widgets::list::List;
 
 /// Component that displaying and managing security profiles.
@@ -22,8 +23,6 @@ pub struct Profile {
     profiles_to_update: Option<Vec<map::Profile>>,
     src: ConfigSource,
     list: List<map::Profile>,
-    view: ProfileView,
-    form: ProfileForm,
     config: Config,
 }
 
@@ -34,8 +33,6 @@ impl Profile {
             profiles_to_update: None,
             command_tx: None,
             list: List::new("Profiles"),
-            view: ProfileView::new(src),
-            form: ProfileForm::new(),
             config: Config::default(),
         }
     }
@@ -46,14 +43,6 @@ impl Profile {
             self.list.load_records(profiles);
         }
         Ok(())
-    }
-
-    pub fn view(&mut self) -> &mut ProfileView {
-        &mut self.view
-    }
-
-    pub fn form(&mut self) -> &mut ProfileForm {
-        &mut self.form
     }
 
     fn add_profile(&mut self, profile: map::Profile) {
@@ -97,14 +86,8 @@ impl Profile {
         });
     }
 
-    fn load_profile_into_view(&mut self) -> Result<()> {
-        if let Some(selected) = self.list.get() {
-            let profile = self
-                .src
-                .blocking_read_profile(selected.name.as_ref().and_then(|name| name.file_stem()))?;
-            self.view.load_profile(profile);
-        }
-        Ok(())
+    fn get_selected_profile(&mut self) -> Option<map::Profile> {
+        self.list.get().map(Clone::clone)
     }
 
     fn restore_state(&mut self) {
@@ -116,15 +99,15 @@ impl Profile {
 impl Component for Profile {
     fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
         self.command_tx = Some(tx.clone());
-        self.view.register_action_handler(tx)
+        Ok(())
     }
 
     fn register_config_handler(&mut self, config: Config) -> Result<()> {
         self.config = config.clone();
-        self.view.register_config_handler(config)
+        Ok(())
     }
 
-    fn update(&mut self, action: Action) -> Result<Option<Action>> {
+    fn update(&mut self, action: Action, ctx: &mut State) -> Result<Option<Action>> {
         match action {
             Action::Edit => Ok(Some(Action::UpdateMode(Mode::ProfilesEdit))),
             Action::Save => {
@@ -149,16 +132,13 @@ impl Component for Profile {
                 Ok(Some(Action::Render))
             },
             Action::Select => {
-                if let Err(e) = self.load_profile_into_view() {
-                    return Ok(Some(Action::Error(e.to_string())));
+                // Todo: We should use some type of unique dentification
+                // to maintain consistency.
+                if let Some(profile) = self.list.get() {
+                    ctx.select_profile(profile.clone());
                 }
+
                 Ok(Some(Action::UpdateMode(Mode::ProfileView)))
-            },
-            Action::UpdateMode(Mode::ProfilesEdit) => {
-                if let Some(new) = self.form.yank_input() {
-                    self.add_profile(new);
-                }
-                Ok(None)
             },
             _ => Ok(None),
         }

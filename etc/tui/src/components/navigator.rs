@@ -7,6 +7,7 @@ use tokio::sync::mpsc::UnboundedSender;
 use super::{Component, Frame};
 use crate::action::Action;
 use crate::config::Config;
+use crate::state::State;
 
 /// Component for switching between tabs.
 #[derive(Default)]
@@ -46,7 +47,7 @@ impl Component for Navigator {
         Ok(())
     }
 
-    fn update(&mut self, action: Action) -> Result<Option<Action>> {
+    fn update(&mut self, action: Action, _: &mut State) -> Result<Option<Action>> {
         let last_selected_tab = self.selected_tab;
         match action {
             Action::NavLeft => {

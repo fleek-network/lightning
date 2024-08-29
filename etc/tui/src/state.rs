@@ -1,68 +1,107 @@
-use lightning_guard::{ConfigSource, map};
-use lightning_guard::map::{FileRule, PacketFilterRule, Profile};
-use crate::action::Action;
 use anyhow::Result;
+use lightning_guard::map::{FileRule, PacketFilterRule, Profile};
+use lightning_guard::ConfigSource;
+
+use crate::action::Action;
 
 pub struct State {
     next_action: Option<Action>,
     filters: Vec<PacketFilterRule>,
     profiles: Vec<Profile>,
+    selected_profile: Option<Profile>,
     src: ConfigSource,
 }
 
 impl State {
-    fn new(src: ConfigSource) -> Self {
+    pub fn new(src: ConfigSource) -> Self {
         Self {
             next_action: None,
             filters: Vec::new(),
             profiles: Vec::new(),
+            selected_profile: None,
             src,
         }
     }
 
-    fn load_packet_filter_rules(&mut self) -> Result<()> {
-        self.filters = self.src.read_packet_filters()?;
+    pub async fn load_packet_filter_rules(&mut self) -> Result<()> {
+        self.filters = self.src.read_packet_filters().await?;
         Ok(())
     }
 
-    fn update_packet_filters(&mut self, filters: Vec<PacketFilterRule>) {
+    pub fn update_packet_filters(&mut self, filters: Vec<PacketFilterRule>) {
         self.filters = filters;
     }
 
-    fn commit_packet_filters(&mut self) -> Result<()> {
-        self.src.write_packet_filters(self.filters.clone())
+    pub fn update_filters(&mut self, filter: PacketFilterRule) {
+        self.filters.push(filter);
     }
 
-    fn load_profiles(&mut self) -> Result<()> {
-        self.profiles = self.src.get_profiles()?;
+    pub async fn commit_packet_filters(&mut self) -> Result<()> {
+        self.src.write_packet_filters(self.filters.clone()).await
+    }
+
+    pub fn get_filters(&self) -> &[PacketFilterRule] {
+        self.filters.as_slice()
+    }
+
+    pub async fn load_profiles(&mut self) -> Result<()> {
+        self.profiles = self.src.get_profiles().await?;
         Ok(())
     }
 
-    fn update_profiles(&mut self, profiles: Vec<Profile>) {
-        self.profiles = profiles;
+    pub fn update_profiles(&mut self, profiles: Profile) {
+        self.profiles.push(profiles);
     }
 
-    fn commit_profiles(&mut self) -> Result<()> {
-        self.src.write_profiles(self.profiles.clone())
+    pub async fn commit_profiles(&mut self) -> Result<()> {
+        self.src.write_profiles(self.profiles.clone()).await
     }
 
     /// Note: Panics if profile with `name` does not exist in state.
-    fn update_profile_rules(&mut self, name: String, rules: Vec<FileRule>) {
-        let profile = self.profiles.iter_mut()
-            .find(|p| p.name.as_ref().map(|buf| buf.display().to_string() == name)
-                .unwrap_or(false)).unwrap();
-        profile.file_rules =  rules;
+    pub fn update_profile_rules(&mut self, name: String, rule: FileRule) {
+        let profile = self
+            .profiles
+            .iter_mut()
+            .find(|p| {
+                p.name
+                    .as_ref()
+                    .map(|buf| buf.display().to_string() == name)
+                    .unwrap_or(false)
+            })
+            .unwrap();
+        profile.file_rules.push(rule);
     }
 
-    fn get_profile_rules(&self, name: String) -> Vec<FileRule> {
+    pub fn get_profile_rules(&self, name: String) -> Vec<FileRule> {
         // Todo: we need to rework the handling of paths.
-        match self.profiles.iter()
-            .find(|p| p.name.as_ref().map(|buf| buf.display().to_string() == name)
-                .unwrap_or(false)) {
+        match self.profiles.iter().find(|p| {
+            p.name
+                .as_ref()
+                .map(|buf| buf.display().to_string() == name)
+                .unwrap_or(false)
+        }) {
             None => Vec::new(),
-            Some(profile) => {
-                profile.file_rules.clone()
-            }
+            Some(profile) => profile.file_rules.clone(),
         }
+    }
+
+    pub fn get_selected_profile(&self) -> Option<&Profile> {
+        self.selected_profile.as_ref()
+    }
+
+    pub fn selected_profile(&self) -> Option<String> {
+        self.selected_profile
+            .as_ref()
+            .map(|p| p.name.as_ref())
+            .flatten()
+            .map(|path| path.display().to_string())
+    }
+
+    pub fn select_profile(&mut self, profile: Profile) -> Option<String> {
+        self.selected_profile
+            .as_ref()
+            .map(|p| p.name.as_ref())
+            .flatten()
+            .map(|path| path.display().to_string())
     }
 }

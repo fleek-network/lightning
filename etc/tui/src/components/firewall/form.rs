@@ -13,6 +13,7 @@ use super::{Component, Frame};
 use crate::action::Action;
 use crate::config::Config;
 use crate::mode::Mode;
+use crate::state::State;
 use crate::widgets::utils;
 use crate::widgets::utils::InputField;
 
@@ -91,6 +92,7 @@ impl FirewallForm {
                 },
             }
         };
+
         let port: u16 = self.input_fields[1]
             .area
             .yank_text()
@@ -135,7 +137,7 @@ impl FirewallForm {
         Ok(())
     }
 
-    pub fn yank_input(&mut self) -> Option<PacketFilterRule> {
+    fn yank_input(&mut self) -> Option<PacketFilterRule> {
         self.buf.take()
     }
 }
@@ -156,7 +158,7 @@ impl Component for FirewallForm {
         Ok(None)
     }
 
-    fn update(&mut self, action: Action) -> Result<Option<Action>> {
+    fn update(&mut self, action: Action, ctx: &mut State) -> Result<Option<Action>> {
         match action {
             Action::Cancel => {
                 self.clear_input();
@@ -166,6 +168,10 @@ impl Component for FirewallForm {
                 if let Err(e) = self.update_filters_from_input() {
                     Ok(Some(Action::Error(e.to_string())))
                 } else {
+                    let filter = self
+                        .yank_input()
+                        .expect("We already verified that the input is valid");
+                    ctx.update_filters(filter);
                     Ok(Some(Action::UpdateMode(Mode::FirewallEdit)))
                 }
             },
