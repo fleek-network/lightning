@@ -1,9 +1,8 @@
-use std::ops::Deref;
 use std::pin::Pin;
-use std::str::FromStr;
 use std::task::{Context, Poll};
 
 use async_trait::async_trait;
+use bytes::Bytes;
 use futures::future::BoxFuture;
 use futures::TryFuture;
 use ipld_core::cid::Cid;
@@ -15,34 +14,33 @@ use self::errors::IpldError;
 pub mod errors;
 
 #[derive(Clone, Debug)]
-pub struct DocId(Cid);
+pub struct DocId {
+    cid: Cid,
+    name: Option<String>,
+    size: Option<u64>,
+}
 
-impl Deref for DocId {
-    type Target = Cid;
+impl DocId {
+    pub fn new(cid: Cid, name: Option<String>, size: Option<u64>) -> Self {
+        Self { cid, name, size }
+    }
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
+    pub fn cid(&self) -> &Cid {
+        &self.cid
+    }
+
+    pub fn name(&self) -> &Option<String> {
+        &self.name
+    }
+
+    pub fn size(&self) -> &Option<u64> {
+        &self.size
     }
 }
 
 impl From<Cid> for DocId {
     fn from(cid: Cid) -> Self {
-        Self(cid)
-    }
-}
-
-impl TryFrom<&str> for DocId {
-    type Error = IpldError;
-    fn try_from(t: &str) -> Result<Self, Self::Error> {
-        DocId::from_str(t)
-    }
-}
-
-impl FromStr for DocId {
-    type Err = IpldError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self(Cid::from_str(s)?))
+        Self::new(cid, None, None)
     }
 }
 
@@ -85,43 +83,37 @@ impl From<DocDir> for IpldItem {
 #[derive(Clone, Debug)]
 pub struct DocFile {
     id: DocId,
-    name: Option<String>,
-    data: Vec<u8>,
-    size: Option<u64>,
+    data: Option<Bytes>,
+}
+
+impl From<DocFile> for IpldItem {
+    fn from(file: DocFile) -> Self {
+        IpldItem::File(file)
+    }
 }
 
 impl DocFile {
-    pub fn new(
-        id: impl Into<DocId>,
-        name: Option<String>,
-        data: Vec<u8>,
-        size: Option<u64>,
-    ) -> Self {
+    pub fn new(id: DocId, data: Option<Bytes>) -> Self {
         Self {
             id: id.into(),
-            name,
             data,
-            size,
         }
+    }
+
+    pub fn from_pb_node(id: DocId, node: ipld_dagpb::PbNode) -> Self {
+        Self::new(id, node.data)
     }
 
     pub fn id(&self) -> &DocId {
         &self.id
     }
 
-    pub fn name(&self) -> &Option<String> {
-        &self.name
-    }
-
-    pub fn data(&self) -> &[u8] {
+    pub fn data(&self) -> &Option<Bytes> {
         &self.data
-    }
-
-    pub fn size(&self) -> &Option<u64> {
-        &self.size
     }
 }
 
+#[derive(Clone, Debug)]
 pub enum IpldItem {
     Dir(DocDir),
     File(DocFile),
@@ -137,8 +129,6 @@ pub enum IpldItem {
 /// `Dir` and `File` types because, those are going to be used for `b3fs` backend.
 #[async_trait]
 pub trait Processor {
-    type Codec;
-
     /// Get IpldItem from the storage backend.
     async fn get(&self, id: DocId) -> Result<Option<IpldItem>, IpldError>;
 }
@@ -146,6 +136,7 @@ pub trait Processor {
 pub struct IpldStream<P: Processor + Unpin + Send + Sync> {
     processor: P,
     current_id: Option<DocId>,
+    next_link: Option<PbLink>,
     current_dir: Option<DocDir>,
     current_links: Vec<PbLink>,
     current_index: usize,
@@ -161,9 +152,18 @@ where
             processor,
             current_id: Some(id),
             current_dir: None,
+            next_link: None,
             current_links: Vec::new(),
             current_index: 0,
             pending_future: None,
+        }
+    }
+
+    pub fn current_id(&self) -> Option<DocId> {
+        if let Some(link) = &self.next_link {
+            Some(DocId::new(link.cid, link.name.clone(), link.size))
+        } else {
+            self.current_id.clone()
         }
     }
 }
@@ -187,6 +187,12 @@ where
                             this.current_dir = Some(dir.clone());
                             this.current_links = dir.links.clone();
                             this.current_index = 0;
+                            if !this.current_links.is_empty() {
+                                let link = &this.current_links[this.current_index];
+                                this.next_link = Some(link.clone());
+                                this.current_id = this.current_id();
+                                this.current_index += 1;
+                            }
                             return Poll::Ready(Some(Ok(IpldItem::Dir(dir))));
                         },
                         Ok(Some(IpldItem::File(file))) => {
@@ -216,12 +222,14 @@ where
         if let Some(dir) = &this.current_dir {
             if this.current_index < this.current_links.len() {
                 let link = &this.current_links[this.current_index];
+                this.next_link = Some(link.clone());
+                this.current_id = this.current_id();
                 this.current_index += 1;
-                this.current_id = Some(link.cid.into());
                 return Poll::Ready(Some(Ok(IpldItem::Dir(dir.clone()))));
             } else {
                 this.current_dir = None;
                 this.current_links.clear();
+                this.next_link = None;
                 this.current_index = 0;
             }
         }
@@ -250,12 +258,9 @@ mod tests {
 
     #[async_trait]
     impl Processor for MyProcessor {
-        type Codec = ipld_dagpb::DagPbCodec;
-
         async fn get(&self, id: DocId) -> Result<Option<IpldItem>, IpldError> {
-            let data = b"Hello, world!".to_vec();
-            let size = Some(data.len() as u64);
-            let file = DocFile::new(id, None, data, size);
+            let data: Bytes = b"Hello, world!".to_vec().into();
+            let file = DocFile::new(id, Some(data));
             Ok(Some(IpldItem::File(file)))
         }
     }
@@ -286,16 +291,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_ipld_stream_get_one_file() {
-        let doc_id = "QmSnuWmxptJZdLJpKRarxBMS2Ju2oANVrgbr2xWbie9b2D"
+        let doc_id: Cid = "QmSnuWmxptJZdLJpKRarxBMS2Ju2oANVrgbr2xWbie9b2D"
             .try_into()
             .unwrap();
+        let doc_id = doc_id.into();
 
         let mut stream = IpldStream::new(MyProcessor, doc_id);
 
         while let Some(item) = stream.next().await {
             match item {
                 Ok(IpldItem::File(file)) => {
-                    assert_eq!(file.data(), b"Hello, world!");
+                    assert_eq!(file.data(), &Some(Bytes::from_static(b"Hello, world!")));
                 },
                 Ok(IpldItem::Dir(_)) => {
                     panic!("Expected file, got directory");
@@ -313,11 +319,9 @@ mod tests {
 
     #[async_trait]
     impl Processor for FixturesProcessor {
-        type Codec = ipld_dagpb::DagPbCodec;
-
         async fn get(&self, id: DocId) -> Result<Option<IpldItem>, IpldError> {
             let fixtures = &*FIXTURES;
-            let data = fixtures.get(&*id).cloned();
+            let data = fixtures.get(id.cid()).cloned();
             if let Some(vc) = data {
                 let data = DagPbCodec::decode_from_slice(&vc)
                     .map(|node: PbNode| Some(DocDir::from_pb_node(id, node).into()))?;
@@ -338,17 +342,17 @@ mod tests {
             "bafybeihyivpglm6o6wrafbe36fp5l67abmewk7i2eob5wacdbhz7as5obe",
         ]
         .iter()
-        .map(|s| <DocId as TryFrom<&str>>::try_from(*s).unwrap())
-        .collect::<Vec<DocId>>();
+        .map(|s| <Cid as TryFrom<&str>>::try_from(*s).unwrap())
+        .collect::<Vec<Cid>>();
 
-        for doc_id in docs_id.iter() {
-            test_ipld_stream_get_fixture(doc_id.clone()).await;
+        for &doc_id in docs_id.iter() {
+            test_ipld_stream_get_fixture(doc_id).await;
         }
     }
 
     #[allow(unused)]
-    async fn test_ipld_stream_get_fixture(doc_id: DocId) {
-        let mut stream = IpldStream::new(FixturesProcessor, doc_id);
+    async fn test_ipld_stream_get_fixture(doc_id: Cid) {
+        let mut stream = IpldStream::new(FixturesProcessor, doc_id.into());
 
         while let Some(item) = stream.next().await {
             match item {

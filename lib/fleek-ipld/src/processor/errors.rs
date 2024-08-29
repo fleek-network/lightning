@@ -17,4 +17,7 @@ pub enum IpldError {
 
     #[error("IPLD error: Error traversing stream {0}")]
     TraverseError(String),
+
+    #[error("IPLD error: Missing link")]
+    MissingLink,
 }
