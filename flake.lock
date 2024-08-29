@@ -59,6 +59,22 @@
         "type": "github"
       }
     },
+    "fleek-remote-attestation": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1724878548,
+        "narHash": "sha256-Hg30GqO3wRKaGtvNmn7SU32DEsZCcQeEc3023FJ/dXs=",
+        "owner": "fleek-network",
+        "repo": "fleek-remote-attestation",
+        "rev": "c0bf7aaa41ede2e456f7503c9032dd820b2c717e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "fleek-network",
+        "repo": "fleek-remote-attestation",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1722415718,
@@ -80,6 +96,7 @@
         "crane": "crane",
         "fenix": "fenix",
         "flake-utils": "flake-utils",
+        "fleek-remote-attestation": "fleek-remote-attestation",
         "nixpkgs": "nixpkgs"
       }
     },

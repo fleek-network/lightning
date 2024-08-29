@@ -12,6 +12,12 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     flake-utils.url = "github:numtide/flake-utils";
+
+    # Private source
+    fleek-remote-attestation = {
+      url = "github:fleek-network/fleek-remote-attestation";
+      flake = false;
+    };
   };
 
   nixConfig = {
@@ -26,6 +32,7 @@
       crane,
       fenix,
       flake-utils,
+      fleek-remote-attestation,
       ...
     }:
     flake-utils.lib.eachSystem
@@ -108,7 +115,28 @@
             }
           );
 
-          src = craneLib.path ./.;
+          # SGX Service enclave
+          enclave = craneLib.buildPackage rec {
+            src = ./services/sgx/enclave;
+            cargoVendorDir = craneLib.vendorCargoDeps ({
+              inherit src;
+              # Patch private repo with flake input
+              overrideVendorGitCheckout =
+                ps: drv:
+                if
+                  lib.any (
+                    p: (lib.hasPrefix "git+https://github.com/fleek-network/fleek-remote-attestation.git" p.source)
+                  ) ps
+                then
+                  drv.overrideAttrs (_old: {
+                    src = fleek-remote-attestation;
+                  })
+                else
+                  drv;
+            });
+            cargoArtifacts = null;
+            doCheck = false;
+          };
 
           librusty_v8 = (
             let
@@ -135,12 +163,7 @@
 
           gitRev = if (self ? rev) then self.rev else self.dirtyRev;
 
-          # SGX Service enclave
-          enclave = craneLib.buildPackage {
-            src = ./services/sgx/enclave;
-            cargoArtifacts = null;
-            doCheck = false;
-          };
+          src = craneLib.path ./.;
 
           # Common arguments can be set here to avoid repeating them later
           commonArgs = {
@@ -204,6 +227,7 @@
                 pkgs.libiconv
                 pkgs.darwin.apple_sdk.frameworks.QuartzCore
               ];
+
           } // commonVars;
 
           commonVars =
@@ -327,10 +351,14 @@
                   ];
               };
 
+              # Individual services
               fn-service-0 = mkLightningBin "fn-service-0";
               fn-service-1 = mkLightningBin "fn-service-1";
               fn-service-2 = mkLightningBin "fn-service-2";
               fn-service-3 = mkLightningBin "fn-service-3";
+
+              # Enclave binary (pre-sgxs)
+              fn-sgx-enclave = enclave;
             };
 
           # Allow using `nix run` on the project
