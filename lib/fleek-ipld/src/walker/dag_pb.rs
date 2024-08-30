@@ -1,6 +1,5 @@
 use async_trait::async_trait;
 use bytes::Bytes;
-use ipld_core::cid::Cid;
 use ipld_core::codec::Codec;
 use ipld_core::ipld::Ipld;
 use ipld_dagpb::{DagPbCodec, PbNode};
@@ -25,11 +24,7 @@ impl IpldDagPbProcessor {
 
 #[async_trait]
 impl Processor for IpldDagPbProcessor {
-    async fn get(
-        &self,
-        doc_id: DocId,
-        parent: Option<DirItem>,
-    ) -> Result<Option<IpldItem>, IpldError> {
+    async fn get(&self, doc_id: DocId) -> Result<Option<IpldItem>, IpldError> {
         let url = self.ipfs_url.clone();
         let url = url.join(&format!("ipfs/{}/?format=raw", doc_id.cid()))?;
         let response = reqwest::get(url).await?;
@@ -39,14 +34,14 @@ impl Processor for IpldDagPbProcessor {
         if let Ipld::Map(map) = ipld {
             if let Some(Ipld::Bytes(ty)) = map.get("Data") {
                 if *ty == [8, 1] {
-                    let item = IpldItem::from_dir(doc_id, node, parent);
+                    let item = IpldItem::from_dir(doc_id, node);
                     return Ok(Some(item));
                 } else if node.links.is_empty() {
-                    let item = IpldItem::from_file(doc_id, node.data, parent);
+                    let item = IpldItem::from_file(doc_id, node.data);
                     return Ok(Some(item));
                 } else {
                     let data: Bytes = self.get_file_link_data(&doc_id, node).await?;
-                    let item = IpldItem::from_file(doc_id, Some(data), parent);
+                    let item = IpldItem::from_file(doc_id, Some(data));
                     return Ok(Some(item));
                 }
             } else {

@@ -50,10 +50,13 @@ impl DocId {
         let cid = link.cid;
         let name = link.name.clone();
         let size = link.size;
-        let path = parent
+        let mut path = parent
             .as_ref()
             .map(|dir| dir.id.path.clone())
             .unwrap_or_default();
+        if let Some(n) = name.as_ref() {
+            path.push(n.clone())
+        }
         Self::new(cid, name, size, path)
     }
 }
@@ -86,10 +89,19 @@ impl DirItem {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct FileItem {
     id: DocId,
     data: Bytes,
+}
+
+impl std::fmt::Debug for FileItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FileItem")
+            .field("id", &self.id)
+            .field("data-length", &self.data.len())
+            .finish()
+    }
 }
 
 impl From<FileItem> for IpldItem {
@@ -115,20 +127,17 @@ pub enum IpldItem {
 }
 
 impl IpldItem {
-    pub fn from_dir(id: DocId, node: ipld_dagpb::PbNode, parent: Option<DirItem>) -> Self {
+    pub fn from_dir(id: DocId, node: ipld_dagpb::PbNode) -> Self {
         let dir = DirItem {
-            id: Self::to_doc_id(id, parent),
+            id,
             links: node.links,
         };
         Self::Dir(dir)
     }
 
-    pub fn from_file(id: DocId, data: Option<Bytes>, parent: Option<DirItem>) -> Self {
-        let data = data.unwrap_or_else(|| Bytes::new());
-        let file = FileItem {
-            id: Self::to_doc_id(id, parent),
-            data,
-        };
+    pub fn from_file(id: DocId, data: Option<Bytes>) -> Self {
+        let data = data.unwrap_or_default();
+        let file = FileItem { id, data };
         Self::File(file)
     }
 
@@ -145,20 +154,6 @@ impl IpldItem {
             Self::File(file) => &file.id,
         }
     }
-
-    fn to_doc_id(id: DocId, parent: Option<DirItem>) -> DocId {
-        let mut doc_id = id.clone();
-        if let Some(dir) = parent {
-            let mut path_parent = dir.id.path.clone();
-            path_parent.push(id.path);
-            doc_id.path = path_parent;
-        } else {
-            doc_id
-                .path
-                .push(id.name().as_ref().unwrap_or(&"".to_owned()));
-        }
-        doc_id
-    }
 }
 
 /// A trait for processing IPLD data.
@@ -172,7 +167,7 @@ impl IpldItem {
 #[async_trait]
 pub trait Processor {
     /// Get IpldItem from the storage backend.
-    async fn get(&self, id: DocId, parent: Option<DirItem>) -> Result<Option<IpldItem>, IpldError>;
+    async fn get(&self, id: DocId) -> Result<Option<IpldItem>, IpldError>;
 }
 
 pub struct IpldStream<P: Processor + Unpin + Send + Sync> {
@@ -241,12 +236,8 @@ where
                 let link = &current_links[*current_index];
                 *current_index += 1;
                 let processor = this.processor.clone();
-                let parent_dir = current_dir.clone();
-                let cid = DocId::from_link(link, &parent_dir);
-                this.pending_future =
-                    Some(Box::pin(
-                        async move { processor.get(cid, parent_dir).await },
-                    ));
+                let cid = DocId::from_link(link, &current_dir);
+                this.pending_future = Some(Box::pin(async move { processor.get(cid).await }));
                 cx.waker().wake_by_ref();
                 return Poll::Pending;
             } else {
@@ -278,13 +269,9 @@ mod tests {
 
     #[async_trait]
     impl Processor for MyProcessor {
-        async fn get(
-            &self,
-            id: DocId,
-            parent: Option<DirItem>,
-        ) -> Result<Option<IpldItem>, IpldError> {
+        async fn get(&self, id: DocId) -> Result<Option<IpldItem>, IpldError> {
             let data: Bytes = b"Hello, world!".to_vec().into();
-            let file = IpldItem::from_file(id, Some(data), parent);
+            let file = IpldItem::from_file(id, Some(data));
             Ok(Some(file))
         }
     }
@@ -343,16 +330,12 @@ mod tests {
 
     #[async_trait]
     impl Processor for FixturesProcessor {
-        async fn get(
-            &self,
-            id: DocId,
-            parent: Option<DirItem>,
-        ) -> Result<Option<IpldItem>, IpldError> {
+        async fn get(&self, id: DocId) -> Result<Option<IpldItem>, IpldError> {
             let fixtures = &*FIXTURES;
             let data = fixtures.get(&id.cid).cloned();
             if let Some(vc) = data {
                 let data = DagPbCodec::decode_from_slice(&vc)
-                    .map(|node: PbNode| Some(IpldItem::from_dir(id, node, parent)))?;
+                    .map(|node: PbNode| Some(IpldItem::from_dir(id, node)))?;
                 Ok(data)
             } else {
                 Ok(None)
