@@ -1,5 +1,7 @@
 use async_trait::async_trait;
+use bytes::Bytes;
 use ipld_core::codec::Codec;
+use ipld_core::ipld::Ipld;
 use ipld_dagpb::{DagPbCodec, PbNode};
 use reqwest::Url;
 
@@ -28,25 +30,40 @@ impl Processor for IpldDagPbProcessor {
         let response = reqwest::get(url).await?;
         let bytes = response.bytes().await?;
         let node: PbNode = DagPbCodec::decode_from_slice(&bytes)?;
-        Ok(Some(IpldItem::from_pb_node(cid, node)))
-        //let ipld = node.clone().into();
-        //if let Ipld::Map(map) = ipld {
-        //    if let Some(Ipld::Bytes(ty)) = map.get("Data") {
-        //        if *ty == [8, 1] {
-        //            Ok(Some(DocDir::from_pb_node(cid, node).into()))
-        //        } else {
-        //            Ok(Some(DocFile::from_pb_node(cid, node)))
-        //        }
-        //    } else {
-        //        Err(IpldError::CannotDecodeDagPbData(
-        //            "Ipld object does not contain a Data field to identify type".to_string(),
-        //        ))
-        //    }
-        //} else {
-        //    Err(IpldError::CannotDecodeDagPbData(format(
-        //        "Ipld object does not contain a map {}",
-        //        ipld,
-        //    )))
-        //}
+        let ipld = node.clone().into();
+        if let Ipld::Map(map) = ipld {
+            if let Some(Ipld::Bytes(ty)) = map.get("Data") {
+                if *ty == [8, 1] {
+                    let item = IpldItem::from_dir(cid, node);
+                    return Ok(Some(item));
+                } else if node.links.is_empty() {
+                    let item = IpldItem::from_file(cid, node.data);
+                    return Ok(Some(item));
+                } else {
+                    let data: Bytes = self.get_file_link_data(&cid, node).await?;
+                    let item = IpldItem::from_file(cid, Some(data));
+                    return Ok(Some(item));
+                }
+            } else {
+                Err(IpldError::CannotDecodeDagPbData(
+                    "Ipld object does not contain a Data field to identify type".to_string(),
+                ))
+            }
+        } else {
+            Err(IpldError::CannotDecodeDagPbData(format!(
+                "Ipld object does not contain a map {:?}",
+                ipld,
+            )))
+        }
+    }
+}
+
+impl IpldDagPbProcessor {
+    async fn get_file_link_data(&self, cid: &DocId, node: PbNode) -> Result<Bytes, IpldError> {
+        let url = self.ipfs_url.clone();
+        let url = url.join(&format!("ipfs/{}/?format=raw", cid.cid()))?;
+        let response = reqwest::get(url).await?;
+        let bytes = response.bytes().await?;
+        Ok(bytes)
     }
 }

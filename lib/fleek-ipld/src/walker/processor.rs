@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -16,11 +17,17 @@ pub struct DocId {
     cid: Cid,
     name: Option<String>,
     size: Option<u64>,
+    path: PathBuf,
 }
 
 impl DocId {
-    pub fn new(cid: Cid, name: Option<String>, size: Option<u64>) -> Self {
-        Self { cid, name, size }
+    pub fn new(cid: Cid, name: Option<String>, size: Option<u64>, path: PathBuf) -> Self {
+        Self {
+            cid,
+            name,
+            size,
+            path,
+        }
     }
 
     pub fn cid(&self) -> &Cid {
@@ -34,41 +41,38 @@ impl DocId {
     pub fn size(&self) -> &Option<u64> {
         &self.size
     }
-}
 
-impl From<PbLink> for DocId {
-    fn from(link: PbLink) -> Self {
-        Self::new(link.cid, link.name, link.size)
+    pub fn path(&self) -> &PathBuf {
+        &self.path
+    }
+
+    pub fn from_link(link: PbLink, path: PathBuf) -> Self {
+        let cid = link.cid.into();
+        let name = link.name;
+        let size = link.size;
+        Self::new(cid, name, size, path)
     }
 }
 
 impl From<Cid> for DocId {
     fn from(cid: Cid) -> Self {
-        Self::new(cid, None, None)
+        Self::new(cid, None, None, PathBuf::new())
     }
 }
 
 #[derive(Clone, Debug)]
-pub struct DocDir {
+pub struct DirItem {
     id: DocId,
     links: Vec<PbLink>,
 }
 
-impl DocDir {
-    pub fn new(id: impl Into<DocId>, links: Vec<PbLink>) -> Self {
-        Self {
-            id: id.into(),
-            links,
-        }
+impl From<DirItem> for IpldItem {
+    fn from(dir: DirItem) -> Self {
+        Self::Dir(dir)
     }
+}
 
-    pub fn from_pb_node(id: impl Into<DocId>, node: ipld_dagpb::PbNode) -> Self {
-        Self {
-            id: id.into(),
-            links: node.links,
-        }
-    }
-
+impl DirItem {
     pub fn id(&self) -> &DocId {
         &self.id
     }
@@ -78,66 +82,60 @@ impl DocDir {
     }
 }
 
-impl From<DocDir> for IpldItem {
-    fn from(dir: DocDir) -> Self {
-        IpldItem::Dir(dir)
-    }
-}
-
-#[derive(Clone)]
-pub struct DocFile {
+#[derive(Clone, Debug)]
+pub struct FileItem {
     id: DocId,
-    data: Option<Bytes>,
+    data: Bytes,
 }
 
-impl std::fmt::Debug for DocFile {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("DocFile")
-            .field("id", &self.id)
-            .field(
-                "data-length",
-                &self.data.as_ref().map(|d| d.len()).unwrap_or(0),
-            )
-            .finish()
+impl From<FileItem> for IpldItem {
+    fn from(file: FileItem) -> Self {
+        Self::File(file)
     }
 }
 
-impl From<DocFile> for IpldItem {
-    fn from(file: DocFile) -> Self {
-        IpldItem::File(file)
-    }
-}
-
-impl DocFile {
-    pub fn new(id: DocId, data: Option<Bytes>) -> Self {
-        Self { id, data }
-    }
-
-    pub fn from_pb_node(id: DocId, node: ipld_dagpb::PbNode) -> Self {
-        Self::new(id, node.data)
-    }
-
+impl FileItem {
     pub fn id(&self) -> &DocId {
         &self.id
     }
 
-    pub fn data(&self) -> &Option<Bytes> {
+    pub fn data(&self) -> &Bytes {
         &self.data
     }
 }
 
 #[derive(Clone, Debug)]
 pub enum IpldItem {
-    Dir(DocDir),
-    File(DocFile),
+    Dir(DirItem),
+    File(FileItem),
 }
 
 impl IpldItem {
-    pub fn from_pb_node(id: DocId, node: ipld_dagpb::PbNode) -> Self {
-        if node.links.is_empty() {
-            DocFile::from_pb_node(id, node).into()
-        } else {
-            DocDir::from_pb_node(id, node).into()
+    pub fn from_dir(id: DocId, node: ipld_dagpb::PbNode) -> Self {
+        let dir = DirItem {
+            id,
+            links: node.links,
+        };
+        Self::Dir(dir)
+    }
+
+    pub fn from_file(id: DocId, data: Option<Bytes>) -> Self {
+        let data = data.unwrap_or_else(|| Bytes::new());
+        let file = FileItem { id, data };
+        Self::File(file)
+    }
+
+    pub fn is_dir(&self) -> bool {
+        match self {
+            Self::Dir(_) => true,
+            Self::File(_) => false,
+        }
+    }
+
+    pub fn id(&self) -> &DocId {
+        match self {
+            Self::Dir(dir) => &dir.id,
+            Self::File(file) => &file.id,
         }
     }
 }
@@ -158,7 +156,7 @@ pub trait Processor {
 
 pub struct IpldStream<P: Processor + Unpin + Send + Sync> {
     processor: P,
-    stack: Vec<(Option<DocDir>, Vec<PbLink>, usize)>,
+    stack: Vec<(Option<IpldItem>, Vec<PbLink>, usize)>,
     pending_future: Option<BoxFuture<'static, Result<Option<IpldItem>, IpldError>>>,
 }
 
@@ -195,13 +193,13 @@ where
                 Poll::Ready(result) => {
                     this.pending_future = None;
                     match result {
-                        Ok(Some(IpldItem::Dir(dir))) => {
-                            let links = dir.links.clone();
-                            this.stack.push((Some(dir.clone()), links, 0));
-                            return Poll::Ready(Some(Ok(IpldItem::Dir(dir))));
+                        Ok(Some(ref i @ IpldItem::Dir(ref item))) => {
+                            let links = item.links.clone();
+                            this.stack.push((Some(i.clone()), links, 0));
+                            return Poll::Ready(Some(Ok(i.clone())));
                         },
-                        Ok(Some(IpldItem::File(file))) => {
-                            return Poll::Ready(Some(Ok(IpldItem::File(file))));
+                        Ok(Some(item @ IpldItem::File(_))) => {
+                            return Poll::Ready(Some(Ok(item)));
                         },
                         Ok(None) => {
                             return Poll::Ready(None);
@@ -217,12 +215,17 @@ where
             }
         }
 
-        while let Some((_current_dir, current_links, current_index)) = this.stack.last_mut() {
+        while let Some((current_dir, current_links, current_index)) = this.stack.last_mut() {
             if *current_index < current_links.len() {
                 let link = &current_links[*current_index];
                 *current_index += 1;
                 let processor = this.processor.clone();
-                let doc_id = link.clone().into();
+                let path = if let Some(IpldItem::Dir(dir)) = current_dir.take() {
+                    dir.id.path().clone()
+                } else {
+                    PathBuf::new()
+                };
+                let doc_id = DocId::from_link(link.clone(), path);
                 this.pending_future = Some(Box::pin(async move { processor.get(doc_id).await }));
                 cx.waker().wake_by_ref();
                 return Poll::Pending;
@@ -257,8 +260,8 @@ mod tests {
     impl Processor for MyProcessor {
         async fn get(&self, id: DocId) -> Result<Option<IpldItem>, IpldError> {
             let data: Bytes = b"Hello, world!".to_vec().into();
-            let file = DocFile::new(id, Some(data));
-            Ok(Some(IpldItem::File(file)))
+            let file = IpldItem::from_file(id, Some(data));
+            Ok(Some(file))
         }
     }
 
@@ -297,11 +300,11 @@ mod tests {
 
         while let Some(item) = stream.next().await {
             match item {
-                Ok(IpldItem::File(file)) => {
-                    assert_eq!(file.data(), &Some(Bytes::from_static(b"Hello, world!")));
+                Ok(IpldItem::File(f)) => {
+                    assert_eq!(f.data(), &Bytes::from_static(b"Hello, world!"));
                 },
-                Ok(IpldItem::Dir(_)) => {
-                    panic!("Expected file, got directory");
+                Ok(_) => {
+                    panic!("Expected file, got dir");
                 },
                 Err(e) => {
                     eprintln!("Error: {:?}", e);
@@ -321,7 +324,7 @@ mod tests {
             let data = fixtures.get(id.cid()).cloned();
             if let Some(vc) = data {
                 let data = DagPbCodec::decode_from_slice(&vc)
-                    .map(|node: PbNode| Some(DocDir::from_pb_node(id, node).into()))?;
+                    .map(|node: PbNode| Some(IpldItem::from_dir(id, node).into()))?;
                 Ok(data)
             } else {
                 Ok(None)
@@ -354,9 +357,11 @@ mod tests {
         while let Some(item) = stream.next().await {
             match item {
                 Ok(IpldItem::File(_)) => {
-                    panic!("Expected directory, got file");
+                    panic!("Expected dir, got file");
                 },
-                Ok(IpldItem::Dir(_)) => {},
+                Ok(IpldItem::Dir(dir)) => {
+                    assert_eq!(dir.id().cid(), &doc_id);
+                },
                 Err(e) => {
                     panic!("Error: {:?}", e);
                 },
