@@ -43,7 +43,6 @@ pub struct App {
     pub prompt: Prompt,
     pub navigator: Navigator,
     pub firewall: FireWall,
-    pub firewall_form: FirewallForm,
     pub profiles: Profile,
     pub profile_view: ProfileView,
     pub profile_form: ProfileForm,
@@ -58,7 +57,6 @@ impl App {
         let mode = Mode::Home;
         let home = Home::new();
         let firewall = FireWall::new(src.clone());
-        let firewall_form = FirewallForm::new();
         #[cfg(feature = "logger")]
         let logger = Logger::new();
         let summary = Summary::new();
@@ -76,7 +74,6 @@ impl App {
             prompt,
             navigator,
             firewall,
-            firewall_form,
             profiles,
             profile_view: ProfileView::new(src.clone()),
             profile_form: ProfileForm::new(),
@@ -87,7 +84,7 @@ impl App {
             mode,
             last_tick_key_events: Vec::new(),
             state: State::new(src),
-            filter_form: Default::default(),
+            filter_form: FirewallForm::new(),
         })
     }
 
@@ -182,6 +179,7 @@ impl App {
                 self.firewall.draw(f, content[0])?;
             },
             Mode::FirewallForm => {
+                log::trace!("Drawing filter form");
                 self.filter_form.draw(f, content[0])?;
             },
             Mode::Profiles | Mode::ProfilesEdit => {
@@ -266,11 +264,11 @@ impl App {
         let filters = self.state.get_filters();
         self.firewall.load_list(filters.to_vec());
 
-        self.firewall_form
+        self.filter_form
             .register_action_handler(action_tx.clone())?;
-        self.firewall_form
+        self.filter_form
             .register_config_handler(self.config.clone())?;
-        self.firewall_form.init(tui.size()?)?;
+        self.filter_form.init(tui.size()?)?;
 
         self.profiles.register_action_handler(action_tx.clone())?;
         self.profiles.register_config_handler(self.config.clone())?;
