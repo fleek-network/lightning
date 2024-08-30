@@ -74,6 +74,8 @@ impl ApplicationEnv {
             .inner
             .run(move |ctx| {
                 // Create the app/execution environment
+                let state_root =
+                    ApplicationStateTree::get_state_root(ctx).map_err(|e| anyhow::anyhow!(e))?;
                 let app = ApplicationState::executor(ctx);
                 let last_block_hash = app.get_block_hash();
 
@@ -87,6 +89,8 @@ impl ApplicationEnv {
                     node_registry_delta: Vec::new(),
                     txn_receipts: Vec::with_capacity(block.transactions.len()),
                     block_number,
+                    previous_state_root: state_root.into(),
+                    new_state_root: [0u8; 32],
                 };
 
                 // Execute each transaction and add the results to the block response
@@ -134,10 +138,17 @@ impl ApplicationEnv {
                 };
                 app.set_last_block(response.block_hash, new_sub_dag_index, new_sub_dag_round);
 
+                // Set the new state root on the response.
+                drop(app);
+                let state_root =
+                    ApplicationStateTree::get_state_root(ctx).map_err(|e| anyhow::anyhow!(e))?;
+                response.new_state_root = state_root.into();
+
                 // Return the response
-                response
+                Ok::<BlockExecutionResponse, anyhow::Error>(response)
             })
-            .context("Failed to execute block")?;
+            .context("Failed to execute block")?
+            .unwrap();
 
         if response.change_epoch {
             increment_counter!(

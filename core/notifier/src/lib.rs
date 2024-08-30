@@ -110,10 +110,18 @@ impl Emitter for NotificationsEmitter {
             .send(BlockExecutedNotification { block, response });
     }
 
-    fn epoch_changed(&self, current_epoch: u64, last_epoch_hash: [u8; 32]) {
+    fn epoch_changed(
+        &self,
+        current_epoch: u64,
+        last_epoch_hash: [u8; 32],
+        previous_state_root: [u8; 32],
+        new_state_root: [u8; 32],
+    ) {
         let _ = self.epoch_changed.send(EpochChangedNotification {
             current_epoch,
             last_epoch_hash,
+            previous_state_root,
+            new_state_root,
         });
     }
 }

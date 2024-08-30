@@ -337,6 +337,8 @@ async fn submit_batch<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
     );
 
     let change_epoch = response.change_epoch;
+    let previous_state_root = response.previous_state_root;
+    let new_state_root = response.new_state_root;
     ctx.notifier.new_block(archive_block, response);
 
     if change_epoch {
@@ -348,7 +350,12 @@ async fn submit_batch<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
             .maybe_hash()
             .expect("We should have gotten a hash, this is a bug");
 
-        ctx.notifier.epoch_changed(epoch_number, epoch_hash);
+        ctx.notifier.epoch_changed(
+            epoch_number,
+            epoch_hash,
+            previous_state_root,
+            new_state_root,
+        );
     }
 
     change_epoch

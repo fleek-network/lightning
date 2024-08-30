@@ -106,6 +106,10 @@ pub struct BlockExecutionResponse {
     pub node_registry_delta: Vec<(NodePublicKey, NodeRegistryChange)>,
     /// Receipts of all executed transactions
     pub txn_receipts: Vec<TransactionReceipt>,
+    /// The previous state root.
+    pub previous_state_root: [u8; 32],
+    /// The new state root.
+    pub new_state_root: [u8; 32],
 }
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]

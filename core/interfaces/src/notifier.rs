@@ -15,6 +15,8 @@ pub struct BlockExecutedNotification {
 pub struct EpochChangedNotification {
     pub current_epoch: u64,
     pub last_epoch_hash: [u8; 32],
+    pub previous_state_root: [u8; 32],
+    pub new_state_root: [u8; 32],
 }
 
 /// # Notifier
@@ -40,7 +42,13 @@ pub trait NotifierInterface<C: Collection>: BuildGraph + Sync + Send + Clone {
 #[interfaces_proc::blank]
 pub trait Emitter: Clone + Send + Sync + 'static {
     /// Notify the waiters about epoch change.
-    fn epoch_changed(&self, epoch: u64, hash: [u8; 32]);
+    fn epoch_changed(
+        &self,
+        epoch: u64,
+        hash: [u8; 32],
+        previous_state_root: [u8; 32],
+        new_state_root: [u8; 32],
+    );
 
     /// Notify the waiters about new block.
     fn new_block(&self, block: Block, response: BlockExecutionResponse);
