@@ -6,7 +6,7 @@ use ipld_dagpb::{DagPbCodec, PbNode};
 use reqwest::Url;
 
 use super::errors::IpldError;
-use super::processor::{DirItem, DocId, IpldItem, Processor};
+use super::processor::{DocId, IpldItem, Processor};
 
 #[derive(Clone)]
 pub struct IpldDagPbProcessor {
@@ -20,15 +20,19 @@ impl IpldDagPbProcessor {
                 .unwrap_or_else(|_| panic!("Invalid IPFS URL {}", ipfs_url)),
         }
     }
+
+    pub async fn request(&self, doc_id: &DocId) -> Result<Bytes, IpldError> {
+        let url = self.ipfs_url.clone();
+        let url = url.join(&format!("ipfs/{}/?format=raw", doc_id.cid()))?;
+        let response = reqwest::get(url).await?;
+        response.bytes().await.map_err(Into::into)
+    }
 }
 
 #[async_trait]
 impl Processor for IpldDagPbProcessor {
     async fn get(&self, doc_id: DocId) -> Result<Option<IpldItem>, IpldError> {
-        let url = self.ipfs_url.clone();
-        let url = url.join(&format!("ipfs/{}/?format=raw", doc_id.cid()))?;
-        let response = reqwest::get(url).await?;
-        let bytes = response.bytes().await?;
+        let bytes = self.request(&doc_id).await?;
         let node: PbNode = DagPbCodec::decode_from_slice(&bytes)?;
         let ipld = node.clone().into();
         if let Ipld::Map(map) = ipld {
@@ -60,10 +64,7 @@ impl Processor for IpldDagPbProcessor {
 
 impl IpldDagPbProcessor {
     async fn get_file_link_data(&self, cid: &DocId, node: PbNode) -> Result<Bytes, IpldError> {
-        let url = self.ipfs_url.clone();
-        let url = url.join(&format!("ipfs/{}/?format=raw", cid.cid()))?;
-        let response = reqwest::get(url).await?;
-        let bytes = response.bytes().await?;
+        let bytes = self.request(&cid).await?;
         Ok(bytes)
     }
 }
