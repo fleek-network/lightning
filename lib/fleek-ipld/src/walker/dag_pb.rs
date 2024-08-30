@@ -1,5 +1,9 @@
+use std::pin::Pin;
+
 use async_trait::async_trait;
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
+use futures::{Future, FutureExt};
+use ipld_core::cid::Cid;
 use ipld_core::codec::Codec;
 use ipld_core::ipld::Ipld;
 use ipld_dagpb::{DagPbCodec, PbNode};
@@ -21,9 +25,9 @@ impl IpldDagPbProcessor {
         }
     }
 
-    pub async fn request(&self, doc_id: &DocId) -> Result<Bytes, IpldError> {
+    pub async fn request(&self, cid: &Cid) -> Result<Bytes, IpldError> {
         let url = self.ipfs_url.clone();
-        let url = url.join(&format!("ipfs/{}/?format=raw", doc_id.cid()))?;
+        let url = url.join(&format!("ipfs/{}/?format=raw", cid))?;
         let response = reqwest::get(url).await?;
         response.bytes().await.map_err(Into::into)
     }
@@ -32,7 +36,7 @@ impl IpldDagPbProcessor {
 #[async_trait]
 impl Processor for IpldDagPbProcessor {
     async fn get(&self, doc_id: DocId) -> Result<Option<IpldItem>, IpldError> {
-        let bytes = self.request(&doc_id).await?;
+        let bytes = self.request(&doc_id.cid()).await?;
         let node: PbNode = DagPbCodec::decode_from_slice(&bytes)?;
         let ipld = node.clone().into();
         if let Ipld::Map(map) = ipld {
@@ -64,7 +68,18 @@ impl Processor for IpldDagPbProcessor {
 
 impl IpldDagPbProcessor {
     async fn get_file_link_data(&self, cid: &DocId, node: PbNode) -> Result<Bytes, IpldError> {
-        let bytes = self.request(&cid).await?;
-        Ok(bytes)
+        let mut buf = BytesMut::with_capacity(cid.size().unwrap_or(1024 * 10) as usize);
+        for link in &node.links {
+            let bytes = self.request(&link.cid).await?;
+            let node: PbNode = DagPbCodec::decode_from_slice(&bytes)?;
+            if node.links.is_empty() {
+                buf.extend_from_slice(&node.data.unwrap_or_default());
+            } else {
+                let data = Box::pin(self.get_file_link_data(cid, node));
+                let data = data.await?;
+                buf.extend_from_slice(&data);
+            }
+        }
+        Ok(buf.freeze())
     }
 }
