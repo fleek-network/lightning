@@ -1,20 +1,58 @@
-use std::pin::Pin;
+use std::ops::Deref;
 
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
-use futures::{Future, FutureExt};
 use ipld_core::cid::Cid;
-use ipld_core::codec::Codec;
 use ipld_core::ipld::Ipld;
-use ipld_dagpb::{DagPbCodec, PbNode};
+use ipld_dagpb::PbNode;
 use reqwest::Url;
 
 use super::errors::IpldError;
-use super::processor::{DocId, IpldItem, Processor};
+use super::processor::{DocId, IpldItem, Link, Processor};
 
 #[derive(Clone)]
 pub struct IpldDagPbProcessor {
     ipfs_url: Url,
+}
+
+struct PbNodeWrapper(PbNode);
+
+impl From<PbNode> for PbNodeWrapper {
+    fn from(node: PbNode) -> Self {
+        Self(node)
+    }
+}
+
+impl From<PbNodeWrapper> for Vec<Link> {
+    fn from(node: PbNodeWrapper) -> Self {
+        node.0
+            .links
+            .into_iter()
+            .map(|x| Link::new(x.cid, x.name, x.size))
+            .collect()
+    }
+}
+
+impl Deref for PbNodeWrapper {
+    type Target = PbNode;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl PbNodeWrapper {
+    pub fn data(&self) -> Option<Bytes> {
+        self.0
+            .data
+            .clone()
+            .map(|data| data.slice(5..data.len() - 3))
+    }
+
+    pub fn from_bytes(bytes: Bytes) -> Result<Self, IpldError> {
+        let node = PbNode::from_bytes(bytes)?;
+        Ok(node.into())
+    }
 }
 
 impl IpldDagPbProcessor {
@@ -36,16 +74,16 @@ impl IpldDagPbProcessor {
 #[async_trait]
 impl Processor for IpldDagPbProcessor {
     async fn get(&self, doc_id: DocId) -> Result<Option<IpldItem>, IpldError> {
-        let bytes = self.request(&doc_id.cid()).await?;
-        let node: PbNode = DagPbCodec::decode_from_slice(&bytes)?;
+        let bytes = self.request(doc_id.cid()).await?;
+        let node = PbNodeWrapper::from_bytes(bytes)?;
         let ipld = node.clone().into();
         if let Ipld::Map(map) = ipld {
             if let Some(Ipld::Bytes(ty)) = map.get("Data") {
                 if *ty == [8, 1] {
-                    let item = IpldItem::from_dir(doc_id, node);
+                    let item = IpldItem::from_dir(doc_id, node.into());
                     return Ok(Some(item));
                 } else if node.links.is_empty() {
-                    let item = IpldItem::from_file(doc_id, node.data);
+                    let item = IpldItem::from_file(doc_id, node.data());
                     return Ok(Some(item));
                 } else {
                     let data: Bytes = self.get_file_link_data(&doc_id, node).await?;
@@ -67,13 +105,19 @@ impl Processor for IpldDagPbProcessor {
 }
 
 impl IpldDagPbProcessor {
-    async fn get_file_link_data(&self, cid: &DocId, node: PbNode) -> Result<Bytes, IpldError> {
-        let mut buf = BytesMut::with_capacity(cid.size().unwrap_or(1024 * 10) as usize);
+    async fn get_file_link_data(
+        &self,
+        cid: &DocId,
+        node: PbNodeWrapper,
+    ) -> Result<Bytes, IpldError> {
+        let mut buf = BytesMut::new();
         for link in &node.links {
             let bytes = self.request(&link.cid).await?;
-            let node: PbNode = DagPbCodec::decode_from_slice(&bytes)?;
+            let node = PbNodeWrapper::from_bytes(bytes)?;
             if node.links.is_empty() {
-                buf.extend_from_slice(&node.data.unwrap_or_default());
+                if let Some(data) = node.data() {
+                    buf.extend_from_slice(&data);
+                }
             } else {
                 let data = Box::pin(self.get_file_link_data(cid, node));
                 let data = data.await?;

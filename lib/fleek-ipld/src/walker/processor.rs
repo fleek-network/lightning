@@ -7,27 +7,26 @@ use bytes::Bytes;
 use futures::future::BoxFuture;
 use futures::TryFuture;
 use ipld_core::cid::Cid;
-use ipld_dagpb::PbLink;
 use tokio_stream::Stream;
 
 use super::errors::IpldError;
 
 #[derive(Clone, Debug)]
-pub struct DocId {
+pub struct Link {
     cid: Cid,
     name: Option<String>,
     size: Option<u64>,
-    path: PathBuf,
 }
 
-impl DocId {
-    pub fn new(cid: Cid, name: Option<String>, size: Option<u64>, path: PathBuf) -> Self {
-        Self {
-            cid,
-            name,
-            size,
-            path,
-        }
+impl From<Cid> for Link {
+    fn from(cid: Cid) -> Self {
+        Self::new(cid, None, None)
+    }
+}
+
+impl Link {
+    pub fn new(cid: Cid, name: Option<String>, size: Option<u64>) -> Self {
+        Self { cid, name, size }
     }
 
     pub fn cid(&self) -> &Cid {
@@ -41,36 +40,53 @@ impl DocId {
     pub fn size(&self) -> &Option<u64> {
         &self.size
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct DocId {
+    link: Link,
+    path: PathBuf,
+}
+
+impl DocId {
+    pub fn new(link: Link, path: PathBuf) -> Self {
+        Self { link, path }
+    }
+
+    pub fn cid(&self) -> &Cid {
+        self.link.cid()
+    }
+
+    pub fn link(&self) -> &Link {
+        &self.link
+    }
 
     pub fn path(&self) -> &PathBuf {
         &self.path
     }
 
-    pub fn from_link(link: &PbLink, parent: &Option<DirItem>) -> Self {
-        let cid = link.cid;
-        let name = link.name.clone();
-        let size = link.size;
+    pub fn from_link(link: &Link, parent: &Option<DirItem>) -> Self {
         let mut path = parent
             .as_ref()
             .map(|dir| dir.id.path.clone())
             .unwrap_or_default();
-        if let Some(n) = name.as_ref() {
+        if let Some(n) = link.name.as_ref() {
             path.push(n.clone())
         }
-        Self::new(cid, name, size, path)
+        Self::new(link.clone(), path)
     }
 }
 
 impl From<Cid> for DocId {
     fn from(cid: Cid) -> Self {
-        Self::new(cid, None, None, PathBuf::new())
+        Self::new(cid.into(), PathBuf::new())
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct DirItem {
     id: DocId,
-    links: Vec<PbLink>,
+    links: Vec<Link>,
 }
 
 impl From<DirItem> for IpldItem {
@@ -84,7 +100,7 @@ impl DirItem {
         &self.id
     }
 
-    pub fn links(&self) -> &Vec<PbLink> {
+    pub fn links(&self) -> &Vec<Link> {
         &self.links
     }
 }
@@ -127,11 +143,8 @@ pub enum IpldItem {
 }
 
 impl IpldItem {
-    pub fn from_dir(id: DocId, node: ipld_dagpb::PbNode) -> Self {
-        let dir = DirItem {
-            id,
-            links: node.links,
-        };
+    pub fn from_dir(id: DocId, links: Vec<Link>) -> Self {
+        let dir = DirItem { id, links };
         Self::Dir(dir)
     }
 
@@ -172,7 +185,7 @@ pub trait Processor {
 
 pub struct IpldStream<P: Processor + Unpin + Send + Sync> {
     processor: P,
-    stack: Vec<(Option<DirItem>, Vec<PbLink>, usize)>,
+    stack: Vec<(Option<DirItem>, Vec<Link>, usize)>,
     pending_future: Option<BoxFuture<'static, Result<Option<IpldItem>, IpldError>>>,
 }
 
@@ -181,14 +194,9 @@ where
     P: Processor + Unpin + Send + Sync,
 {
     pub fn new(processor: P, id: DocId) -> Self {
-        let pb_link = PbLink {
-            cid: *id.cid(),
-            name: id.name().clone(),
-            size: *id.size(),
-        };
         Self {
             processor,
-            stack: vec![(None, vec![pb_link], 0)],
+            stack: vec![(None, vec![id.link().clone()], 0)],
             pending_future: None,
         }
     }
@@ -264,7 +272,7 @@ mod tests {
 
     static FIXTURES: LazyLock<HashMap<Cid, Vec<u8>>> = LazyLock::new(load_fixtures);
 
-    #[derive(Clone)]
+    #[derive(Clone, Default)]
     struct MyProcessor;
 
     #[async_trait]
@@ -306,7 +314,6 @@ mod tests {
             .try_into()
             .unwrap();
         let doc_id = doc_id.into();
-
         let mut stream = IpldStream::new(MyProcessor, doc_id);
 
         while let Some(item) = stream.next().await {
@@ -332,10 +339,16 @@ mod tests {
     impl Processor for FixturesProcessor {
         async fn get(&self, id: DocId) -> Result<Option<IpldItem>, IpldError> {
             let fixtures = &*FIXTURES;
-            let data = fixtures.get(&id.cid).cloned();
+            let data = fixtures.get(&id.cid()).cloned();
             if let Some(vc) = data {
-                let data = DagPbCodec::decode_from_slice(&vc)
-                    .map(|node: PbNode| Some(IpldItem::from_dir(id, node)))?;
+                let data = DagPbCodec::decode_from_slice(&vc).map(|node: PbNode| {
+                    let links = node
+                        .links
+                        .into_iter()
+                        .map(|link| Link::new(link.cid, link.name, link.size))
+                        .collect();
+                    Some(IpldItem::from_dir(id, links))
+                })?;
                 Ok(data)
             } else {
                 Ok(None)
