@@ -5,10 +5,12 @@ use bytes::{Bytes, BytesMut};
 use ipld_core::cid::Cid;
 use ipld_core::ipld::Ipld;
 use ipld_dagpb::PbNode;
+use quick_protobuf::{BytesReader, MessageRead};
 use reqwest::Url;
 
 use super::errors::IpldError;
 use super::processor::{DocId, IpldItem, Link, Processor};
+use crate::unixfs::{Data, DataType};
 
 #[derive(Clone)]
 pub struct IpldDagPbProcessor {
@@ -42,15 +44,8 @@ impl Deref for PbNodeWrapper {
 }
 
 impl PbNodeWrapper {
-    pub fn data(&self) -> Option<Bytes> {
-        self.0
-            .data
-            .clone()
-            .map(|data| data.slice(5..data.len() - 3))
-    }
-
-    pub fn from_bytes(bytes: Bytes) -> Result<Self, IpldError> {
-        let node = PbNode::from_bytes(bytes)?;
+    pub fn from_bytes(bytes: &Bytes) -> Result<Self, IpldError> {
+        let node = PbNode::from_bytes(bytes.clone())?;
         Ok(node.into())
     }
 }
@@ -75,15 +70,28 @@ impl IpldDagPbProcessor {
 impl Processor for IpldDagPbProcessor {
     async fn get(&self, doc_id: DocId) -> Result<Option<IpldItem>, IpldError> {
         let bytes = self.request(doc_id.cid()).await?;
-        let node = PbNodeWrapper::from_bytes(bytes)?;
+        let node = PbNodeWrapper::from_bytes(&bytes)?;
         let ipld = node.clone().into();
+        //println!("Ipld: {:?}", data);
         if let Ipld::Map(map) = ipld {
             if let Some(Ipld::Bytes(ty)) = map.get("Data") {
                 if *ty == [8, 1] {
                     let item = IpldItem::from_dir(doc_id, node.into());
                     return Ok(Some(item));
                 } else if node.links.is_empty() {
-                    let item = IpldItem::from_file(doc_id, node.data());
+                    let data = node.data.clone().ok_or_else(|| {
+                        IpldError::CannotDecodeDagPbData(
+                            "Ipld object does not contain a Data field to identify type"
+                                .to_string(),
+                        )
+                    })?;
+
+                    let data = data.to_vec();
+                    let data = data.as_slice();
+                    let data = Data::try_from(data)
+                        .map_err(|e| IpldError::IpfsDataError(e.to_string()))?;
+                    let item =
+                        IpldItem::from_file(doc_id, Some(Bytes::copy_from_slice(&data.Data)));
                     return Ok(Some(item));
                 } else {
                     let data: Bytes = self.get_file_link_data(&doc_id, node).await?;
@@ -113,11 +121,11 @@ impl IpldDagPbProcessor {
         let mut buf = BytesMut::new();
         for link in &node.links {
             let bytes = self.request(&link.cid).await?;
-            let node = PbNodeWrapper::from_bytes(bytes)?;
+            let node = PbNodeWrapper::from_bytes(&bytes)?;
             if node.links.is_empty() {
-                if let Some(data) = node.data() {
-                    buf.extend_from_slice(&data);
-                }
+                let mut bytes_reader = BytesReader::from_bytes(&bytes);
+                let data = Data::from_reader(&mut bytes_reader, &bytes)?;
+                buf.extend_from_slice(&data.Data);
             } else {
                 let data = Box::pin(self.get_file_link_data(cid, node));
                 let data = data.await?;
