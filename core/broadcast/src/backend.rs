@@ -37,7 +37,7 @@ pub trait BroadcastBackend: 'static {
     fn sleep(duration: Duration) -> impl Future<Output = ()> + Send;
 }
 
-pub struct LightningBackend<C: Collection> {
+pub struct LightningBackend<C: NodeComponents> {
     sqr: c![C::ApplicationInterface::SyncExecutor],
     rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
     event_handler: c![C::PoolInterface::EventHandler],
@@ -45,7 +45,7 @@ pub struct LightningBackend<C: Collection> {
     pk: NodePublicKey,
 }
 
-impl<C: Collection> LightningBackend<C> {
+impl<C: NodeComponents> LightningBackend<C> {
     pub fn new(
         sqr: c![C::ApplicationInterface::SyncExecutor],
         rep_reporter: c![C::ReputationAggregatorInterface::ReputationReporter],
@@ -63,7 +63,7 @@ impl<C: Collection> LightningBackend<C> {
     }
 }
 
-impl<C: Collection> BroadcastBackend for LightningBackend<C> {
+impl<C: NodeComponents> BroadcastBackend for LightningBackend<C> {
     type Pk = NodePublicKey;
 
     fn send_to_all<F: Fn(NodeIndex) -> bool + Send + Sync + 'static>(

@@ -33,7 +33,7 @@ const TIMEOUT: Duration = Duration::from_secs(3);
 // Maximum number of times we will resend a transaction.
 const MAX_RETRIES: u8 = 3;
 
-pub struct Signer<C: Collection> {
+pub struct Signer<C: NodeComponents> {
     socket: Socket<UpdateMethod, u64>,
     worker: SignerWorker,
     _c: PhantomData<C>,
@@ -60,7 +60,7 @@ struct LazyNodeIndex {
     node_index: Option<NodeIndex>,
 }
 
-impl<C: Collection> Signer<C> {
+impl<C: NodeComponents> Signer<C> {
     pub fn init(
         keystore: &C::KeystoreInterface,
         forwarder: &C::ForwarderInterface,
@@ -117,7 +117,7 @@ impl<C: Collection> Signer<C> {
     }
 }
 
-impl<C: Collection> SignerInterface<C> for Signer<C> {
+impl<C: NodeComponents> SignerInterface<C> for Signer<C> {
     /// Returns a socket that can be used to submit transactions to the mempool, these
     /// transactions are signed by the node and a proper nonce is assigned by the
     /// implementation.
@@ -294,7 +294,7 @@ impl AsyncWorker for SignerWorker {
     }
 }
 
-impl<C: Collection> BuildGraph for Signer<C> {
+impl<C: NodeComponents> BuildGraph for Signer<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::new().with_infallible(
             Self::init.with_event_handler("start", Self::start.wrap_with_block_on()),

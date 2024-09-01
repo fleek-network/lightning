@@ -435,18 +435,18 @@ impl Default for ApplicationEnv {
 }
 
 /// The socket that receives all update transactions
-pub struct UpdateWorker<C: Collection> {
+pub struct UpdateWorker<C: NodeComponents> {
     env: Arc<Mutex<ApplicationEnv>>,
     blockstore: C::BlockstoreInterface,
 }
 
-impl<C: Collection> UpdateWorker<C> {
+impl<C: NodeComponents> UpdateWorker<C> {
     pub fn new(env: Arc<Mutex<ApplicationEnv>>, blockstore: C::BlockstoreInterface) -> Self {
         Self { env, blockstore }
     }
 }
 
-impl<C: Collection> WorkerTrait for UpdateWorker<C> {
+impl<C: NodeComponents> WorkerTrait for UpdateWorker<C> {
     type Request = Block;
     type Response = BlockExecutionResponse;
 

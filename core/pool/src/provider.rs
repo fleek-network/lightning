@@ -26,7 +26,7 @@ use crate::{http, muxer, tls};
 
 pub struct PoolProvider<C, M = QuinnMuxer>
 where
-    C: Collection,
+    C: NodeComponents,
     M: MuxerInterface,
 {
     #[allow(clippy::type_complexity)]
@@ -37,7 +37,7 @@ where
     ready: PoolReadyWaiter,
 }
 
-impl<C: Collection> PoolProvider<C, QuinnMuxer> {
+impl<C: NodeComponents> PoolProvider<C, QuinnMuxer> {
     fn init(
         config: &C::ConfigProviderInterface,
         keystore: &C::KeystoreInterface,
@@ -153,13 +153,13 @@ impl<C: Collection> PoolProvider<C, QuinnMuxer> {
 
 impl<C> ConfigConsumer for PoolProvider<C, QuinnMuxer>
 where
-    C: Collection,
+    C: NodeComponents,
 {
     const KEY: &'static str = "pool";
     type Config = Config;
 }
 
-impl<C: Collection> BuildGraph for PoolProvider<C, QuinnMuxer> {
+impl<C: NodeComponents> BuildGraph for PoolProvider<C, QuinnMuxer> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::new()
             .with(Self::init.with_event_handler("start", Self::start.wrap_with_spawn_named("POOL")))
@@ -168,7 +168,7 @@ impl<C: Collection> BuildGraph for PoolProvider<C, QuinnMuxer> {
 
 // Todo: An improvement would be to pass a `Muxer` in `init`.
 // See comments in `MuxerInterface`.
-impl<C: Collection> PoolInterface<C> for PoolProvider<C, QuinnMuxer> {
+impl<C: NodeComponents> PoolInterface<C> for PoolProvider<C, QuinnMuxer> {
     type EventHandler = EventHandler;
     type Requester = Requester;
     type Responder = Responder;

@@ -16,39 +16,39 @@ lazy_static! {
 }
 
 /// The implementation of a configuration loader that uses the `toml` backend.
-pub struct TomlConfigProvider<C: Collection> {
+pub struct TomlConfigProvider<C: NodeComponents> {
     /// The [`ConfigProviderInterface`] does not put any constraints on the
     /// format of the document, except that we need a `[key: string]->any`
     /// mapping. The [`Table`] is that map.
     table: Mutex<Table>,
-    collection: PhantomData<C>,
+    _components: PhantomData<C>,
 }
 
-impl<C: Collection> Clone for TomlConfigProvider<C> {
+impl<C: NodeComponents> Clone for TomlConfigProvider<C> {
     fn clone(&self) -> Self {
         let guard = self.table.lock().expect("Failed to lock.");
         let table = guard.clone();
         Self {
             table: Mutex::new(table),
-            collection: PhantomData,
+            _components: PhantomData,
         }
     }
 }
 
-impl<C: Collection> Default for TomlConfigProvider<C> {
+impl<C: NodeComponents> Default for TomlConfigProvider<C> {
     fn default() -> Self {
         Self {
             table: Default::default(),
-            collection: PhantomData,
+            _components: PhantomData,
         }
     }
 }
 
-impl<C: Collection> TomlConfigProvider<C> {
+impl<C: NodeComponents> TomlConfigProvider<C> {
     pub fn new() -> Self {
         Self {
             table: Table::new().into(),
-            collection: PhantomData,
+            _components: PhantomData,
         }
     }
 
@@ -85,7 +85,7 @@ impl<C: Collection> TomlConfigProvider<C> {
 
         Ok(Self {
             table,
-            collection: PhantomData,
+            _components: PhantomData,
         })
     }
 
@@ -103,7 +103,7 @@ impl<C: Collection> TomlConfigProvider<C> {
     }
 }
 
-impl<C: Collection> ConfigProviderInterface<C> for TomlConfigProvider<C> {
+impl<C: NodeComponents> ConfigProviderInterface<C> for TomlConfigProvider<C> {
     fn get<S: lightning_interfaces::ConfigConsumer>(&self) -> S::Config {
         debug!("Getting the config for {}", std::any::type_name::<S>());
 
@@ -126,7 +126,7 @@ impl<C: Collection> ConfigProviderInterface<C> for TomlConfigProvider<C> {
     }
 }
 
-impl<C: Collection> BuildGraph for TomlConfigProvider<C> {
+impl<C: NodeComponents> BuildGraph for TomlConfigProvider<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::new().with(|| Self::load("./config.toml"))
     }

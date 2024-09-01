@@ -22,7 +22,7 @@ use types::NodeIndex;
 
 use crate::local::{LocalTaskSocket, LocalTaskWorker};
 
-pub struct TaskBroker<C: Collection> {
+pub struct TaskBroker<C: NodeComponents> {
     socket: Arc<RwLock<Option<LocalTaskSocket>>>,
     requester: Arc<<C::PoolInterface as PoolInterface<C>>::Requester>,
     topology: tokio::sync::watch::Receiver<Arc<Vec<Vec<NodePublicKey>>>>,
@@ -33,7 +33,7 @@ pub struct TaskBroker<C: Collection> {
     temp: Option<RequestWorkerInner<C>>,
 }
 
-struct RequestWorkerInner<C: Collection> {
+struct RequestWorkerInner<C: NodeComponents> {
     sk: NodeSecretKey,
     responder: c!(C::PoolInterface::Responder),
     config: TaskBrokerConfig,
@@ -63,7 +63,7 @@ impl Default for TaskBrokerConfig {
     }
 }
 
-impl<C: Collection> Clone for TaskBroker<C> {
+impl<C: NodeComponents> Clone for TaskBroker<C> {
     fn clone(&self) -> Self {
         Self {
             socket: self.socket.clone(),
@@ -78,7 +78,7 @@ impl<C: Collection> Clone for TaskBroker<C> {
     }
 }
 
-impl<C: Collection> TaskBroker<C> {
+impl<C: NodeComponents> TaskBroker<C> {
     fn init(
         config: &C::ConfigProviderInterface,
         keystore: &C::KeystoreInterface,
@@ -288,19 +288,19 @@ impl<C: Collection> TaskBroker<C> {
     }
 }
 
-impl<C: Collection> fdi::BuildGraph for TaskBroker<C> {
+impl<C: NodeComponents> fdi::BuildGraph for TaskBroker<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::default()
             .with(Self::init.with_event_handler("_post", Self::post_init))
     }
 }
 
-impl<C: Collection> ConfigConsumer for TaskBroker<C> {
+impl<C: NodeComponents> ConfigConsumer for TaskBroker<C> {
     const KEY: &'static str = "task_broker";
     type Config = TaskBrokerConfig;
 }
 
-impl<C: Collection> TaskBrokerInterface<C> for TaskBroker<C> {
+impl<C: NodeComponents> TaskBrokerInterface<C> for TaskBroker<C> {
     async fn run(
         &self,
         depth: u8,
@@ -355,7 +355,7 @@ fn task_failed_metric(scope: TaskScope) {
 }
 
 /// Worker for handling incoming tasks
-pub struct RequestWorker<C: Collection> {
+pub struct RequestWorker<C: NodeComponents> {
     // Receive incoming tasks
     responder: c!(C::PoolInterface::Responder),
     rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
@@ -367,7 +367,7 @@ pub struct RequestWorker<C: Collection> {
     pending_tasks: JoinSet<()>,
 }
 
-impl<C: Collection> RequestWorker<C> {
+impl<C: NodeComponents> RequestWorker<C> {
     pub fn spawn(
         _sk: NodeSecretKey,
         responder: c!(C::PoolInterface::Responder),

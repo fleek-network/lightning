@@ -45,7 +45,7 @@ impl JsonConfigProvider {
     }
 }
 
-impl<C: Collection> ConfigProviderInterface<C> for JsonConfigProvider {
+impl<C: NodeComponents> ConfigProviderInterface<C> for JsonConfigProvider {
     fn get<S: ConfigConsumer>(&self) -> S::Config {
         let mut guard = self.value.lock().unwrap();
         match guard.entry(S::KEY.to_string()) {

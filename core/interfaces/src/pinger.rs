@@ -1,6 +1,6 @@
 use fdi::BuildGraph;
 
-use crate::collection::Collection;
+use crate::components::NodeComponents;
 
 #[interfaces_proc::blank]
-pub trait PingerInterface<C: Collection>: BuildGraph + Sized + Send + Sync {}
+pub trait PingerInterface<C: NodeComponents>: BuildGraph + Sized + Send + Sync {}

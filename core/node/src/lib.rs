@@ -11,7 +11,7 @@ use tokio::task::JoinHandle;
 use tokio::time::timeout;
 
 /// A single [Node] instance that has ownership over its tokio runtime.
-pub struct ContainedNode<C: Collection> {
+pub struct ContainedNode<C: NodeComponents> {
     /// The name of this contained node.
     name: String,
 
@@ -25,10 +25,10 @@ pub struct ContainedNode<C: Collection> {
     /// A handle to the tokio runtime.
     runtime: Option<Runtime>,
 
-    collection: PhantomData<C>,
+    _components: PhantomData<C>,
 }
 
-impl<C: Collection> ContainedNode<C> {
+impl<C: NodeComponents> ContainedNode<C> {
     pub fn new(provider: fdi::MultiThreadedProvider, name: Option<String>) -> Self {
         let name = name.unwrap_or_else(|| "LIGHTNING".into());
 
@@ -73,7 +73,7 @@ impl<C: Collection> ContainedNode<C> {
             provider,
             runtime: Some(runtime),
             shutdown,
-            collection: PhantomData,
+            _components: PhantomData,
         }
     }
 
@@ -186,13 +186,13 @@ impl<C: Collection> ContainedNode<C> {
     }
 }
 
-impl<C: Collection> Default for ContainedNode<C> {
+impl<C: NodeComponents> Default for ContainedNode<C> {
     fn default() -> Self {
         Self::new(fdi::MultiThreadedProvider::default(), None)
     }
 }
 
-impl<C: Collection> Drop for ContainedNode<C> {
+impl<C: NodeComponents> Drop for ContainedNode<C> {
     fn drop(&mut self) {
         // if runtime doesn't exist it means `shutdown` has been called before.
         if let Some(runtime) = self.runtime.take() {

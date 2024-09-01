@@ -5,7 +5,7 @@ use resolved_pathbuf::ResolvedPathBuf;
 
 use crate::args::KeySubCmd;
 
-pub async fn exec<C: Collection>(cmd: KeySubCmd, config_path: ResolvedPathBuf) -> Result<()> {
+pub async fn exec<C: NodeComponents>(cmd: KeySubCmd, config_path: ResolvedPathBuf) -> Result<()> {
     let config_provider = TomlConfigProvider::<C>::load(config_path)?;
     let config = config_provider.get::<C::KeystoreInterface>();
 

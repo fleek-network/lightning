@@ -495,24 +495,24 @@
 <polygon fill="#7f7f7f" stroke="#7f7f7f" points="381.44,-1023.37 376.33,-1032.64 386.11,-1028.58 381.44,-1023.37"/>
 <text text-anchor="middle" x="457.59" y="-915.02" font-family="monospace" font-size="10.00">uses</text>
 </g>
-<!-- lightning_interfaces::collection::Collection -->
+<!-- lightning_interfaces::collection::NodeComponents -->
 <g id="node30" class="node">
-<title>lightning_interfaces::collection::Collection</title>
+<title>lightning_interfaces::collection::NodeComponents</title>
 <polygon fill="#81c169" stroke="black" points="169.19,-982.12 169.19,-1020.12 318.19,-1020.12 318.19,-982.12 169.19,-982.12"/>
 <text text-anchor="middle" x="243.69" y="-1008.12" font-family="monospace" font-size="10.00">pub trait</text>
 <polyline fill="none" stroke="black" points="169.19,-1001.12 318.19,-1001.12 "/>
-<text text-anchor="middle" x="243.69" y="-989.12" font-family="monospace" font-size="10.00">collection::Collection</text>
+<text text-anchor="middle" x="243.69" y="-989.12" font-family="monospace" font-size="10.00">collection::NodeComponents</text>
 </g>
-<!-- lightning_interfaces&#45;&gt;lightning_interfaces::collection::Collection -->
+<!-- lightning_interfaces&#45;&gt;lightning_interfaces::collection::NodeComponents -->
 <g id="edge43" class="edge">
-<title>lightning_interfaces&#45;&gt;lightning_interfaces::collection::Collection</title>
+<title>lightning_interfaces&#45;&gt;lightning_interfaces::collection::NodeComponents</title>
 <path fill="none" stroke="#000000" d="M494.44,-797.98C419.01,-838.81 297.93,-927.2 256.85,-973.93"/>
 <polygon fill="#000000" stroke="#000000" points="253.97,-971.92 250.34,-981.87 259.38,-976.35 253.97,-971.92"/>
 <text text-anchor="middle" x="363.14" y="-888.95" font-family="monospace" font-size="10.00">owns</text>
 </g>
-<!-- lightning_interfaces&#45;&gt;lightning_interfaces::collection::Collection -->
+<!-- lightning_interfaces&#45;&gt;lightning_interfaces::collection::NodeComponents -->
 <g id="edge44" class="edge">
-<title>lightning_interfaces&#45;&gt;lightning_interfaces::collection::Collection</title>
+<title>lightning_interfaces&#45;&gt;lightning_interfaces::collection::NodeComponents</title>
 <path fill="none" stroke="#7f7f7f" stroke-dasharray="5,2" d="M549.94,-798.15C518.4,-840.32 395.69,-931.48 315.19,-976.91"/>
 <polygon fill="#7f7f7f" stroke="#7f7f7f" points="313.13,-974.05 306.08,-981.95 316.52,-980.17 313.13,-974.05"/>
 <text text-anchor="middle" x="420.07" y="-890.53" font-family="monospace" font-size="10.00">uses</text>

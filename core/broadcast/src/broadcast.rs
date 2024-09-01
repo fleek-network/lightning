@@ -11,12 +11,12 @@ use crate::db::Database;
 use crate::ev::Context;
 use crate::pubsub::PubSubI;
 
-pub struct Broadcast<C: Collection> {
+pub struct Broadcast<C: NodeComponents> {
     command_sender: CommandSender,
     ctx: Option<Context<LightningBackend<C>>>,
 }
 
-impl<C: Collection> Broadcast<C> {
+impl<C: NodeComponents> Broadcast<C> {
     pub fn new(
         keystore: &C::KeystoreInterface,
         rep_aggregator: &C::ReputationAggregatorInterface,
@@ -42,14 +42,14 @@ impl<C: Collection> Broadcast<C> {
     }
 }
 
-impl<C: Collection> BuildGraph for Broadcast<C> {
+impl<C: NodeComponents> BuildGraph for Broadcast<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::new()
             .with_infallible(Self::new.with_event_handler("start", Self::start))
     }
 }
 
-impl<C: Collection> BroadcastInterface<C> for Broadcast<C> {
+impl<C: NodeComponents> BroadcastInterface<C> for Broadcast<C> {
     type Message = Frame;
     type PubSub<T: LightningMessage + Clone> = PubSubI<T>;
 

@@ -4,14 +4,14 @@ use fdi::BuildGraph;
 use lightning_types::{PeerRequestError, ServerRequest};
 use tokio::sync::broadcast;
 
-use crate::collection::Collection;
+use crate::components::NodeComponents;
 use crate::ConfigConsumer;
 
 pub type BlockstoreServerSocket =
     Socket<ServerRequest, broadcast::Receiver<Result<(), PeerRequestError>>>;
 
 #[interfaces_proc::blank]
-pub trait BlockstoreServerInterface<C: Collection>:
+pub trait BlockstoreServerInterface<C: NodeComponents>:
     BuildGraph + Sized + Send + Sync + ConfigConsumer
 {
     #[socket]

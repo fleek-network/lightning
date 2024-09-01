@@ -11,12 +11,12 @@ use reqwest::{Client, ClientBuilder, Url};
 
 pub use crate::config::Config;
 
-pub struct HttpOrigin<C: Collection> {
+pub struct HttpOrigin<C: NodeComponents> {
     client: Client,
     blockstore: C::BlockstoreInterface,
 }
 
-impl<C: Collection> Clone for HttpOrigin<C> {
+impl<C: NodeComponents> Clone for HttpOrigin<C> {
     fn clone(&self) -> Self {
         Self {
             client: self.client.clone(),
@@ -25,7 +25,7 @@ impl<C: Collection> Clone for HttpOrigin<C> {
     }
 }
 
-impl<C: Collection> HttpOrigin<C> {
+impl<C: NodeComponents> HttpOrigin<C> {
     pub fn new(_: Config, blockstore: C::BlockstoreInterface) -> anyhow::Result<Self> {
         let client = ClientBuilder::new()
             .use_rustls_tls()

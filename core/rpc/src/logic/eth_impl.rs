@@ -31,18 +31,18 @@ const FLEEK_CONTRACT_BYTES: &[u8; 172] = b"7300000000000000000000000000000000000
 
 use lightning_interfaces::types::{Metadata, Value};
 
-pub struct EthApi<C: Collection> {
+pub struct EthApi<C: NodeComponents> {
     data: Arc<Data<C>>,
 }
 
-impl<C: Collection> EthApi<C> {
+impl<C: NodeComponents> EthApi<C> {
     pub(crate) fn new(data: Arc<Data<C>>) -> Self {
         Self { data }
     }
 }
 
 #[async_trait::async_trait]
-impl<C: Collection> EthApiServer for EthApi<C> {
+impl<C: NodeComponents> EthApiServer for EthApi<C> {
     async fn block_number(&self) -> RpcResult<U256> {
         trace!(target: "rpc::eth", "Serving eth_blockNumber");
 

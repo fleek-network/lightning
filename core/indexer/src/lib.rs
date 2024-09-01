@@ -8,7 +8,7 @@ use fleek_crypto::NodePublicKey;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Blake3Hash, ContentUpdate, NodeIndex, UpdateMethod};
 use lightning_interfaces::SubmitTxSocket;
-pub struct Indexer<C: Collection> {
+pub struct Indexer<C: NodeComponents> {
     pk: NodePublicKey,
     local_index: Arc<OnceLock<NodeIndex>>,
     submit_tx: SubmitTxSocket,
@@ -16,7 +16,7 @@ pub struct Indexer<C: Collection> {
     _marker: PhantomData<C>,
 }
 
-impl<C: Collection> Clone for Indexer<C> {
+impl<C: NodeComponents> Clone for Indexer<C> {
     fn clone(&self) -> Self {
         Self {
             pk: self.pk,
@@ -28,7 +28,7 @@ impl<C: Collection> Clone for Indexer<C> {
     }
 }
 
-impl<C: Collection> Indexer<C> {
+impl<C: NodeComponents> Indexer<C> {
     fn init(
         keystore: &C::KeystoreInterface,
         signer: &C::SignerInterface,
@@ -64,13 +64,13 @@ impl<C: Collection> Indexer<C> {
     }
 }
 
-impl<C: Collection> BuildGraph for Indexer<C> {
+impl<C: NodeComponents> BuildGraph for Indexer<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::default().with(Self::init)
     }
 }
 
-impl<C: Collection> IndexerInterface<C> for Indexer<C> {
+impl<C: NodeComponents> IndexerInterface<C> for Indexer<C> {
     async fn register(&self, uri: Blake3Hash) {
         if let Some(index) = self.get_index() {
             if self

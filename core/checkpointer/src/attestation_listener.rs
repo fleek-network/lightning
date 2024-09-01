@@ -16,14 +16,14 @@ use crate::rocks::RocksCheckpointerDatabase;
 /// When a supermajority of attestations for epochs are consistent, it aggregates the BLS
 /// signatures to create a canonical aggregate checkpoint, which is saves to the local
 /// database for sharing with other nodes and clients in the future.
-pub struct AttestationListener<C: Collection> {
+pub struct AttestationListener<C: NodeComponents> {
     db: RocksCheckpointerDatabase,
     aggregate: AggregateCheckpointBuilder<C>,
     pubsub: c!(C::BroadcastInterface::PubSub<CheckpointBroadcastMessage>),
     app_query: c!(C::ApplicationInterface::SyncExecutor),
 }
 
-impl<C: Collection> AttestationListener<C> {
+impl<C: NodeComponents> AttestationListener<C> {
     pub fn new(
         db: RocksCheckpointerDatabase,
         pubsub: c!(C::BroadcastInterface::PubSub<CheckpointBroadcastMessage>),

@@ -78,13 +78,13 @@ impl ContainerizedNode {
     pub fn take_syncronizer(&self) -> fdi::Ref<c!(FinalTypes::SyncronizerInterface)> {
         self.node
             .provider()
-            .get::<<FinalTypes as Collection>::SyncronizerInterface>()
+            .get::<<FinalTypes as NodeComponents>::SyncronizerInterface>()
     }
 
     pub fn take_blockstore(&self) -> Blockstore<FinalTypes> {
         self.node
             .provider()
-            .get::<<FinalTypes as Collection>::BlockstoreInterface>()
+            .get::<<FinalTypes as NodeComponents>::BlockstoreInterface>()
             .clone()
     }
 

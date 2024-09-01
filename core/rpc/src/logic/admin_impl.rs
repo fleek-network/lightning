@@ -9,18 +9,18 @@ use crate::api::AdminApiServer;
 use crate::error::RPCError;
 use crate::Data;
 
-pub struct AdminApi<C: Collection> {
+pub struct AdminApi<C: NodeComponents> {
     data: Arc<Data<C>>,
 }
 
-impl<C: Collection> AdminApi<C> {
+impl<C: NodeComponents> AdminApi<C> {
     pub(crate) fn new(data: Arc<Data<C>>) -> Self {
         Self { data }
     }
 }
 
 #[async_trait::async_trait]
-impl<C: Collection> AdminApiServer for AdminApi<C> {
+impl<C: NodeComponents> AdminApiServer for AdminApi<C> {
     async fn store(&self, path: String) -> RpcResult<Blake3Hash> {
         let file = tokio::fs::read(path)
             .await

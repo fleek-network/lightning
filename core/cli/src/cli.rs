@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser};
 use lightning_final_bindings::{FinalTypes, UseMockConsensus};
-use lightning_interfaces::Collection;
+use lightning_interfaces::NodeComponents;
 use lightning_utils::config::TomlConfigProvider;
 use resolved_pathbuf::ResolvedPathBuf;
 use tracing::{info, warn};
@@ -41,7 +41,7 @@ impl Cli {
 
     async fn run<C>(self, config_path: ResolvedPathBuf) -> Result<()>
     where
-        C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>,
+        C: NodeComponents<ConfigProviderInterface = TomlConfigProvider<C>>,
     {
         match self.args.cmd {
             Command::Run => run::exec::<C>(config_path).await,

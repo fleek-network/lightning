@@ -30,7 +30,7 @@ impl<C> ConfigConsumer for Keystore<C> {
     type Config = KeystoreConfig;
 }
 
-impl<C: Collection> Keystore<C> {
+impl<C: NodeComponents> Keystore<C> {
     /// Initialize the keystore
     pub fn init(config: &C::ConfigProviderInterface) -> anyhow::Result<Self> {
         let config = config.get::<Self>();
@@ -65,13 +65,13 @@ impl<C: Collection> Keystore<C> {
     }
 }
 
-impl<C: Collection> BuildGraph for Keystore<C> {
+impl<C: NodeComponents> BuildGraph for Keystore<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::default().with(Self::init)
     }
 }
 
-impl<C: Collection> KeystoreInterface<C> for Keystore<C> {
+impl<C: NodeComponents> KeystoreInterface<C> for Keystore<C> {
     fn get_ed25519_pk(&self) -> NodePublicKey {
         self.node.0
     }

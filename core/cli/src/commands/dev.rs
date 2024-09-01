@@ -10,7 +10,7 @@ use crate::args::DevSubCmd;
 
 pub async fn exec<C>(cmd: DevSubCmd, config_path: ResolvedPathBuf) -> Result<()>
 where
-    C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>,
+    C: NodeComponents<ConfigProviderInterface = TomlConfigProvider<C>>,
 {
     match cmd {
         DevSubCmd::DepGraph => dep_graph::<C>().await,
@@ -20,7 +20,7 @@ where
     }
 }
 
-async fn dep_graph<C: Collection>() -> Result<()> {
+async fn dep_graph<C: NodeComponents>() -> Result<()> {
     let graph = C::build_graph();
     let mermaid = graph.viz("Lightning Dependency Graph");
     println!("{mermaid}");
@@ -29,17 +29,17 @@ async fn dep_graph<C: Collection>() -> Result<()> {
 
 async fn reset_state_tree<C>(config_path: ResolvedPathBuf) -> Result<()>
 where
-    C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>,
+    C: NodeComponents<ConfigProviderInterface = TomlConfigProvider<C>>,
 {
     let config = TomlConfigProvider::<C>::load(config_path)?;
-    let app_config = config.get::<<C as Collection>::ApplicationInterface>();
+    let app_config = config.get::<<C as NodeComponents>::ApplicationInterface>();
 
     C::ApplicationInterface::reset_state_tree_unsafe(&app_config)
 }
 
 async fn store<C>(config_path: ResolvedPathBuf, input: Vec<PathBuf>) -> Result<()>
 where
-    C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>,
+    C: NodeComponents<ConfigProviderInterface = TomlConfigProvider<C>>,
 {
     let provider = TomlConfigProvider::<C>::load(config_path)?;
     let config = provider.get::<C::RpcInterface>();
@@ -64,7 +64,7 @@ where
     Ok(())
 }
 
-async fn fetch<C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>>(
+async fn fetch<C: NodeComponents<ConfigProviderInterface = TomlConfigProvider<C>>>(
     config_path: ResolvedPathBuf,
     hash_string: String,
     peer: u32,

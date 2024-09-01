@@ -75,7 +75,7 @@ fn build_node(temp_dir: &TempDir, transactions_to_lose: &[u32]) -> Node<TestBind
     .expect("Failed to init node.")
 }
 
-fn get_our_nonce<C: Collection>(node: &Node<C>) -> u64 {
+fn get_our_nonce<C: NodeComponents>(node: &Node<C>) -> u64 {
     let query_runner = node.provider.get::<C::ApplicationInterface>().sync_query();
     let node_public_key = node.provider.get::<C::KeystoreInterface>().get_ed25519_pk();
     let node_idx = query_runner.pubkey_to_index(&node_public_key).unwrap();

@@ -4,12 +4,12 @@ use fdi::BuildGraph;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use crate::collection::Collection;
+use crate::components::NodeComponents;
 
 /// An implementer of this trait should handle providing the configurations from
 /// the loaded configuration file.
 #[interfaces_proc::blank]
-pub trait ConfigProviderInterface<C: Collection>: BuildGraph + Send + Sync {
+pub trait ConfigProviderInterface<C: NodeComponents>: BuildGraph + Send + Sync {
     /// Returns the configuration for the given object. If the key is not present
     /// in the loaded file we should return the default object.
     fn get<S: ConfigConsumer>(&self) -> S::Config;

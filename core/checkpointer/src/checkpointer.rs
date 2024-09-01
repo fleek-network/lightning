@@ -24,7 +24,7 @@ use crate::CheckpointerQuery;
 /// reached, and saving the aggregate checkpoint to the database as the canonical checkpoint for the
 /// epoch. The aggregate checkpoint contains a state root that can be used by clients to verify the
 /// blockchain state using merkle proofs.
-pub struct Checkpointer<C: Collection> {
+pub struct Checkpointer<C: NodeComponents> {
     db: RocksCheckpointerDatabase,
     keystore: C::KeystoreInterface,
     pubsub: <C::BroadcastInterface as BroadcastInterface<C>>::PubSub<CheckpointBroadcastMessage>,
@@ -34,7 +34,7 @@ pub struct Checkpointer<C: Collection> {
     _collection: PhantomData<C>,
 }
 
-impl<C: Collection> Checkpointer<C> {
+impl<C: NodeComponents> Checkpointer<C> {
     pub fn new(
         db: RocksCheckpointerDatabase,
         keystore: &C::KeystoreInterface,
@@ -145,7 +145,7 @@ impl<C: Collection> Checkpointer<C> {
 
 /// The checkpointer has a configuration within the node's configuration, which is declared by this
 /// implementation.
-impl<C: Collection> ConfigConsumer for Checkpointer<C> {
+impl<C: NodeComponents> ConfigConsumer for Checkpointer<C> {
     const KEY: &'static str = "checkpointer";
 
     type Config = CheckpointerConfig;
@@ -153,13 +153,13 @@ impl<C: Collection> ConfigConsumer for Checkpointer<C> {
 
 /// The checkpointer is a top-level node component, so it must implement `BuildGraph` to integrate
 /// with the node's dependency injection framework.
-impl<C: Collection> fdi::BuildGraph for Checkpointer<C> {
+impl<C: NodeComponents> fdi::BuildGraph for Checkpointer<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::new().with(Self::init.with_event_handler("start", Self::spawn))
     }
 }
 
-impl<C: Collection> CheckpointerInterface<C> for Checkpointer<C> {
+impl<C: NodeComponents> CheckpointerInterface<C> for Checkpointer<C> {
     type ReadyState = ();
     type Query = CheckpointerQuery;
 

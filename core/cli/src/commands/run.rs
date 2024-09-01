@@ -12,13 +12,13 @@ use tracing::warn;
 
 pub async fn exec<C>(config_path: ResolvedPathBuf) -> Result<()>
 where
-    C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>,
+    C: NodeComponents<ConfigProviderInterface = TomlConfigProvider<C>>,
 {
     let shutdown_controller = ShutdownController::default();
     shutdown_controller.install_handlers();
 
     let config = TomlConfigProvider::<C>::load(config_path)?;
-    let app_config = config.get::<<C as Collection>::ApplicationInterface>();
+    let app_config = config.get::<<C as NodeComponents>::ApplicationInterface>();
 
     let provider = MultiThreadedProvider::default();
     provider.insert(config.clone());
@@ -34,7 +34,7 @@ where
     loop {
         let syncronizer = node
             .provider()
-            .get::<<C as Collection>::SyncronizerInterface>();
+            .get::<<C as NodeComponents>::SyncronizerInterface>();
 
         let checkpoint_fut = syncronizer.next_checkpoint_hash();
 
@@ -44,7 +44,7 @@ where
                 // get the checkpoint from the blockstore
                 let checkpoint = node
                     .provider()
-                    .get::<<C as Collection>::BlockstoreInterface>()
+                    .get::<<C as NodeComponents>::BlockstoreInterface>()
                     .read_all_to_vec(&checkpoint_hash).await.expect("Failed to read checkpoint from blockstore");
 
                 // shutdown the node

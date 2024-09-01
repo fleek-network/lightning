@@ -15,17 +15,17 @@ const B3_TO_URI: &str = "b3_to_uri";
 const URI_TO_B3: &str = "uri_to_b3";
 
 #[derive(Clone)]
-pub struct Resolver<C: Collection> {
+pub struct Resolver<C: NodeComponents> {
     inner: Arc<ResolverInner<C>>,
 }
 
-impl<C: Collection> ConfigConsumer for Resolver<C> {
+impl<C: NodeComponents> ConfigConsumer for Resolver<C> {
     const KEY: &'static str = "resolver";
 
     type Config = Config;
 }
 
-impl<C: Collection> Resolver<C> {
+impl<C: NodeComponents> Resolver<C> {
     /// Initialize and return the resolver service.
     fn init(
         config: &C::ConfigProviderInterface,
@@ -70,7 +70,7 @@ impl<C: Collection> Resolver<C> {
     }
 }
 
-impl<C: Collection> BuildGraph for Resolver<C> {
+impl<C: NodeComponents> BuildGraph for Resolver<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::default().with(
             Self::init.with_event_handler("start", Self::start.wrap_with_spawn_named("RESOLVER")),
@@ -78,7 +78,7 @@ impl<C: Collection> BuildGraph for Resolver<C> {
     }
 }
 
-impl<C: Collection> ResolverInterface<C> for Resolver<C> {
+impl<C: NodeComponents> ResolverInterface<C> for Resolver<C> {
     type OriginFinder = OriginFinder;
 
     /// Publish new records into the resolver global hash table about us witnessing
@@ -105,7 +105,7 @@ impl<C: Collection> ResolverInterface<C> for Resolver<C> {
     }
 }
 
-struct ResolverInner<C: Collection> {
+struct ResolverInner<C: NodeComponents> {
     pubsub: c!(C::BroadcastInterface::PubSub<ResolvedImmutablePointerRecord>),
     node_sk: NodeSecretKey,
     node_index: OnceCell<NodeIndex>,
@@ -113,7 +113,7 @@ struct ResolverInner<C: Collection> {
     query_runner: c!(C::ApplicationInterface::SyncExecutor),
 }
 
-impl<C: Collection> ResolverInner<C> {
+impl<C: NodeComponents> ResolverInner<C> {
     async fn start(&self) {
         let mut pubsub = self.pubsub.clone();
         let db = self.db.clone();

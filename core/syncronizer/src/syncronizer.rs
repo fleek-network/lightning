@@ -20,16 +20,16 @@ use tracing::error;
 use crate::config::Config;
 use crate::{rpc, utils};
 
-pub struct Syncronizer<C: Collection> {
+pub struct Syncronizer<C: NodeComponents> {
     state: State<C>,
 }
 
-enum State<C: Collection> {
+enum State<C: NodeComponents> {
     Initialized(SyncronizerInner<C>),
     Running(async_channel::Receiver<Blake3Hash>),
 }
 
-struct SyncronizerInner<C: Collection> {
+struct SyncronizerInner<C: NodeComponents> {
     our_public_key: NodePublicKey,
     query_runner: c![C::ApplicationInterface::SyncExecutor],
     notifier: C::NotifierInterface,
@@ -38,7 +38,7 @@ struct SyncronizerInner<C: Collection> {
     epoch_change_delta: Duration,
 }
 
-impl<C: Collection> Syncronizer<C> {
+impl<C: NodeComponents> Syncronizer<C> {
     /// Create a syncronizer service for quickly syncronizing the node state with the chain
     fn init(
         config: &C::ConfigProviderInterface,
@@ -147,13 +147,13 @@ impl<C: Collection> Syncronizer<C> {
     }
 }
 
-impl<C: Collection> fdi::BuildGraph for Syncronizer<C> {
+impl<C: NodeComponents> fdi::BuildGraph for Syncronizer<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::new().with(Self::init.with_event_handler("start", Self::start))
     }
 }
 
-impl<C: Collection> SyncronizerInterface<C> for Syncronizer<C> {
+impl<C: NodeComponents> SyncronizerInterface<C> for Syncronizer<C> {
     /// Returns a socket that will send accross the blake3hash of the checkpoint
     /// Will send it after it has already downloaded from the blockstore server
     async fn next_checkpoint_hash(&self) -> Option<Blake3Hash> {
@@ -164,7 +164,7 @@ impl<C: Collection> SyncronizerInterface<C> for Syncronizer<C> {
     }
 }
 
-impl<C: Collection> SyncronizerInner<C> {
+impl<C: NodeComponents> SyncronizerInner<C> {
     fn new(
         our_public_key: NodePublicKey,
         genesis_committee: Vec<(NodeIndex, NodeInfo)>,
@@ -325,7 +325,7 @@ impl<C: Collection> SyncronizerInner<C> {
     }
 }
 
-impl<C: Collection> ConfigConsumer for Syncronizer<C> {
+impl<C: NodeComponents> ConfigConsumer for Syncronizer<C> {
     const KEY: &'static str = "syncronizer";
 
     type Config = Config;

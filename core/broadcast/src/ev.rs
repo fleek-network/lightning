@@ -548,7 +548,7 @@ impl<B: BroadcastBackend> Context<B> {
     }
 }
 
-impl<C: Collection> Context<LightningBackend<C>> {
+impl<C: NodeComponents> Context<LightningBackend<C>> {
     /// Spawn the event loop returning a oneshot sender which can be used by the caller,
     /// when it is time for us to shutdown and exit the event loop.
     ///

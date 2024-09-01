@@ -12,17 +12,17 @@ use lightning_interfaces::spawn_worker;
 
 pub use crate::config::Config;
 
-pub struct OriginDemuxer<C: Collection> {
+pub struct OriginDemuxer<C: NodeComponents> {
     socket: OriginProviderSocket,
-    _collection: PhantomData<C>,
+    _components: PhantomData<C>,
 }
 
-impl<C: Collection> ConfigConsumer for OriginDemuxer<C> {
+impl<C: NodeComponents> ConfigConsumer for OriginDemuxer<C> {
     const KEY: &'static str = "origin-demuxer";
     type Config = Config;
 }
 
-impl<C: Collection> OriginDemuxer<C> {
+impl<C: NodeComponents> OriginDemuxer<C> {
     pub fn new(
         config: &C::ConfigProviderInterface,
         blockstore: &C::BlockstoreInterface,
@@ -33,18 +33,18 @@ impl<C: Collection> OriginDemuxer<C> {
         let socket = spawn_worker!(demuxer, "ORIGIN-DEMUXER", waiter, crucial);
         Ok(Self {
             socket,
-            _collection: PhantomData,
+            _components: PhantomData,
         })
     }
 }
 
-impl<C: Collection> OriginProviderInterface<C> for OriginDemuxer<C> {
+impl<C: NodeComponents> OriginProviderInterface<C> for OriginDemuxer<C> {
     fn get_socket(&self) -> OriginProviderSocket {
         self.socket.clone()
     }
 }
 
-impl<C: Collection> BuildGraph for OriginDemuxer<C> {
+impl<C: NodeComponents> BuildGraph for OriginDemuxer<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::default().with(Self::new)
     }

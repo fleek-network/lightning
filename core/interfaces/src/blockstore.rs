@@ -8,7 +8,7 @@ use blake3_tree::utils::HashTree;
 use fdi::BuildGraph;
 use thiserror::Error;
 
-use crate::collection::Collection;
+use crate::components::NodeComponents;
 use crate::config::ConfigConsumer;
 use crate::types::{Blake3Hash, CompressionAlgoSet, CompressionAlgorithm};
 
@@ -83,7 +83,7 @@ pub struct ContentChunk {
 /// we use it at the chunk level, we don't compress the entire file and then perform the chunking,
 /// we chunk first, and compress each chunk later for obvious technical reasons.
 #[interfaces_proc::blank]
-pub trait BlockstoreInterface<C: Collection>:
+pub trait BlockstoreInterface<C: NodeComponents>:
     BuildGraph + Clone + Send + Sync + ConfigConsumer
 {
     /// The block store has the ability to use a smart pointer to avoid duplicating

@@ -19,11 +19,11 @@ use lightning_utils::application::QueryRunnerExt;
 use tokio::sync::watch;
 use tracing::error;
 
-pub struct Topology<C: Collection> {
+pub struct Topology<C: NodeComponents> {
     inner: Arc<TopologyInner<C>>,
 }
 
-struct TopologyInner<C: Collection> {
+struct TopologyInner<C: NodeComponents> {
     query: c!(C::ApplicationInterface::SyncExecutor),
     notifier: C::NotifierInterface,
     topology_tx: watch::Sender<Arc<Vec<Vec<NodePublicKey>>>>,
@@ -33,7 +33,7 @@ struct TopologyInner<C: Collection> {
     min_nodes: usize,
 }
 
-impl<C: Collection> TopologyInner<C> {
+impl<C: NodeComponents> TopologyInner<C> {
     async fn suggest_connections(&self) -> anyhow::Result<Vec<Vec<NodePublicKey>>> {
         let epoch = self.query.get_current_epoch();
         let our_public_key = self.our_public_key;
@@ -89,13 +89,13 @@ impl<C: Collection> TopologyInner<C> {
     }
 }
 
-impl<C: Collection> TopologyInterface<C> for Topology<C> {
+impl<C: NodeComponents> TopologyInterface<C> for Topology<C> {
     fn get_receiver(&self) -> watch::Receiver<Arc<Vec<Vec<NodePublicKey>>>> {
         self.inner.topology_rx.clone()
     }
 }
 
-impl<C: Collection> Topology<C> {
+impl<C: NodeComponents> Topology<C> {
     fn init(
         config: &C::ConfigProviderInterface,
         signer: &C::KeystoreInterface,
@@ -129,7 +129,7 @@ impl<C: Collection> Topology<C> {
     }
 }
 
-impl<C: Collection> BuildGraph for Topology<C> {
+impl<C: NodeComponents> BuildGraph for Topology<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::default().with(
             Self::init.with_event_handler("start", Self::start.wrap_with_spawn_named("TOPOLOGY")),
@@ -137,7 +137,7 @@ impl<C: Collection> BuildGraph for Topology<C> {
     }
 }
 
-impl<C: Collection> ConfigConsumer for Topology<C> {
+impl<C: NodeComponents> ConfigConsumer for Topology<C> {
     type Config = Config;
 
     const KEY: &'static str = "topology";

@@ -22,7 +22,7 @@ use tracing::instrument;
 use triomphe::Arc;
 
 /// The shared object with every service.
-pub struct Context<C: Collection> {
+pub struct Context<C: NodeComponents> {
     pub blockstore_path: PathBuf,
     pub ipc_path: PathBuf,
     pub fetcher_socket: FetcherSocket,
@@ -31,7 +31,7 @@ pub struct Context<C: Collection> {
     pub our_public_key: NodePublicKey,
 }
 
-impl<C: Collection> Context<C> {
+impl<C: NodeComponents> Context<C> {
     pub async fn run(&self, request: ipc_types::Request) -> ipc_types::Response {
         match request {
             ipc_types::Request::QueryClientBandwidth { pk } => {
@@ -157,7 +157,7 @@ impl<C: Collection> Context<C> {
     }
 }
 
-/// Collection of every service that we have.
+/// NodeComponents of every service that we have.
 #[derive(Clone, Default)]
 pub struct ServiceCollection {
     services: Arc<DashMap<u32, ServiceHandle, fxhash::FxBuildHasher>>,
@@ -179,7 +179,7 @@ impl ServiceCollection {
 pub struct ServiceHandle {}
 
 #[allow(unused)]
-pub async fn spawn_service<C: Collection>(
+pub async fn spawn_service<C: NodeComponents>(
     id: u32,
     cx: Arc<Context<C>>,
     waiter: ShutdownWaiter,
@@ -248,7 +248,7 @@ pub async fn spawn_service<C: Collection>(
     ServiceHandle {}
 }
 
-async fn run_ctrl_loop<C: Collection>(
+async fn run_ctrl_loop<C: NodeComponents>(
     ipc_path: &Path,
     ctx: Arc<Context<C>>,
     cmd_permit: Arc<Notify>,
@@ -284,7 +284,7 @@ async fn run_ctrl_loop<C: Collection>(
 }
 
 #[instrument(skip(stream, ctx))]
-async fn handle_stream<C: Collection>(
+async fn handle_stream<C: NodeComponents>(
     stream: UnixStream,
     ctx: Arc<Context<C>>,
 ) -> Result<(), Box<dyn Error>> {
@@ -496,7 +496,9 @@ async fn run_command(
 // as a dependency and hit some sort of conflict with forttanix runner package We only need the sdk
 // for two pieces of information: This nodes node index, and a list of peers we might be able to
 // fetch the shared secret from for now we will just pass them in as env variables.
-async fn get_sgx_enclave_args<C: Collection>(ctx: &Arc<Context<C>>) -> (Option<u32>, Vec<String>) {
+async fn get_sgx_enclave_args<C: NodeComponents>(
+    ctx: &Arc<Context<C>>,
+) -> (Option<u32>, Vec<String>) {
     let node_index = match ctx.run(ipc_types::Request::FetchNodeIndex {}).await {
         Response::FetchNodeIndex { node_index } => node_index,
         _ => unreachable!(),

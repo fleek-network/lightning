@@ -38,18 +38,18 @@ type ServerRequestTask = Task<ServerRequest, broadcast::Receiver<Result<(), Peer
 
 const REQUEST_TIMEOUT: Duration = Duration::from_millis(1000);
 
-pub struct BlockstoreServer<C: Collection> {
+pub struct BlockstoreServer<C: NodeComponents> {
     inner: Option<BlockstoreServerInner<C>>,
     socket: BlockstoreServerSocket,
 }
 
-impl<C: Collection> BlockstoreServerInterface<C> for BlockstoreServer<C> {
+impl<C: NodeComponents> BlockstoreServerInterface<C> for BlockstoreServer<C> {
     fn get_socket(&self) -> BlockstoreServerSocket {
         self.socket.clone()
     }
 }
 
-impl<C: Collection> BlockstoreServer<C> {
+impl<C: NodeComponents> BlockstoreServer<C> {
     fn init(
         config: &C::ConfigProviderInterface,
         blockstore: &C::BlockstoreInterface,
@@ -83,7 +83,7 @@ impl<C: Collection> BlockstoreServer<C> {
     }
 }
 
-impl<C: Collection> BuildGraph for BlockstoreServer<C> {
+impl<C: NodeComponents> BuildGraph for BlockstoreServer<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::default().with(Self::init.with_event_handler(
             "start",
@@ -93,7 +93,7 @@ impl<C: Collection> BuildGraph for BlockstoreServer<C> {
 }
 
 #[allow(clippy::type_complexity)]
-pub struct BlockstoreServerInner<C: Collection> {
+pub struct BlockstoreServerInner<C: NodeComponents> {
     blockstore: C::BlockstoreInterface,
     request_rx: mpsc::Receiver<ServerRequestTask>,
     max_conc_req: usize,
@@ -104,7 +104,7 @@ pub struct BlockstoreServerInner<C: Collection> {
     rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
 }
 
-impl<C: Collection> BlockstoreServerInner<C> {
+impl<C: NodeComponents> BlockstoreServerInner<C> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         blockstore: C::BlockstoreInterface,
@@ -347,7 +347,7 @@ impl std::fmt::Display for ErrorResponse {
     }
 }
 
-async fn handle_request<C: Collection>(
+async fn handle_request<C: NodeComponents>(
     peer: NodeIndex,
     peer_request: PeerRequest,
     blockstore: C::BlockstoreInterface,
@@ -406,7 +406,7 @@ async fn handle_request<C: Collection>(
     num_responses.fetch_sub(1, Ordering::Release);
 }
 
-async fn send_request<C: Collection>(
+async fn send_request<C: NodeComponents>(
     peer: NodeIndex,
     request: PeerRequest,
     blockstore: C::BlockstoreInterface,
@@ -485,7 +485,7 @@ async fn send_request<C: Collection>(
     }
 }
 
-impl<C: Collection> ConfigConsumer for BlockstoreServer<C> {
+impl<C: NodeComponents> ConfigConsumer for BlockstoreServer<C> {
     const KEY: &'static str = "blockstore-server";
 
     type Config = Config;

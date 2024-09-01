@@ -27,7 +27,7 @@ use resolved_pathbuf::ResolvedPathBuf;
 
 use crate::args::OptSubCmd;
 
-pub async fn exec<C: Collection>(cmd: OptSubCmd, config_path: ResolvedPathBuf) -> Result<()> {
+pub async fn exec<C: NodeComponents>(cmd: OptSubCmd, config_path: ResolvedPathBuf) -> Result<()> {
     match cmd {
         OptSubCmd::In => opt_in::<C>(config_path).await,
         OptSubCmd::Out => opt_out::<C>(config_path).await,
@@ -35,14 +35,14 @@ pub async fn exec<C: Collection>(cmd: OptSubCmd, config_path: ResolvedPathBuf) -
     }
 }
 
-async fn opt_in<C: Collection>(config_path: ResolvedPathBuf) -> Result<()> {
+async fn opt_in<C: NodeComponents>(config_path: ResolvedPathBuf) -> Result<()> {
     println!(
         "After sending the OptIn transaction, you are expected to start your node immediately. Is your node built and ready to start? (y/N)"
     );
     get_user_confirmation();
 
     let config = TomlConfigProvider::<C>::load(config_path)?;
-    let app_config = config.get::<<C as Collection>::ApplicationInterface>();
+    let app_config = config.get::<<C as NodeComponents>::ApplicationInterface>();
 
     let (public_key, secret_key) = load_secret_key::<C>(config).await?;
 
@@ -94,14 +94,14 @@ async fn opt_in<C: Collection>(config_path: ResolvedPathBuf) -> Result<()> {
     Ok(())
 }
 
-async fn opt_out<C: Collection>(config_path: ResolvedPathBuf) -> Result<()> {
+async fn opt_out<C: NodeComponents>(config_path: ResolvedPathBuf) -> Result<()> {
     println!(
         "Even after sending the OptOut transaction, your node is expected to stay online until the end of the current epoch. Do you want to continue? (y/N)"
     );
     get_user_confirmation();
 
     let config = TomlConfigProvider::<C>::load(config_path)?;
-    let app_config = config.get::<<C as Collection>::ApplicationInterface>();
+    let app_config = config.get::<<C as NodeComponents>::ApplicationInterface>();
 
     let (public_key, secret_key) = load_secret_key::<C>(config).await?;
 
@@ -143,9 +143,9 @@ async fn opt_out<C: Collection>(config_path: ResolvedPathBuf) -> Result<()> {
     Ok(())
 }
 
-async fn status<C: Collection>(config_path: ResolvedPathBuf) -> Result<()> {
+async fn status<C: NodeComponents>(config_path: ResolvedPathBuf) -> Result<()> {
     let config = TomlConfigProvider::<C>::load(config_path)?;
-    let app_config = config.get::<<C as Collection>::ApplicationInterface>();
+    let app_config = config.get::<<C as NodeComponents>::ApplicationInterface>();
 
     let (public_key, _secret_key) = load_secret_key::<C>(config).await?;
 
@@ -205,7 +205,7 @@ async fn get_epoch_end_delta(genesis_committee: &[NodeInfo]) -> Result<Duration>
     Ok(Duration::from_millis(delta))
 }
 
-async fn load_secret_key<C: Collection>(
+async fn load_secret_key<C: NodeComponents>(
     config: TomlConfigProvider<C>,
 ) -> Result<(NodePublicKey, NodeSecretKey)> {
     let mut provider = fdi::Provider::default().with(config);

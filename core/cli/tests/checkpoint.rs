@@ -248,7 +248,7 @@ async fn node_checkpointing() -> Result<()> {
 
     // Now that we have a checkpoint, we initialize the node.
     let config = build_config(&temp_dir, genesis_path, signer_config, node_ports);
-    let app_config = config.get::<<FinalTypes as Collection>::ApplicationInterface>();
+    let app_config = config.get::<<FinalTypes as NodeComponents>::ApplicationInterface>();
 
     let mut node = Node::<FinalTypes>::init(config.clone())
         .map_err(|e| anyhow::anyhow!("Node Initialization failed: {e:?}"))
@@ -276,7 +276,7 @@ async fn node_checkpointing() -> Result<()> {
                 std::mem::drop(node);
 
                 // start local env in checkpoint mode to seed database with the new checkpoint
-                <FinalTypes as Collection>::ApplicationInterface::load_from_checkpoint(
+                <FinalTypes as NodeComponents>::ApplicationInterface::load_from_checkpoint(
                     &app_config, checkpoint.clone(), *checkpoint_hash.as_bytes()).await?;
 
                 node = Node::<FinalTypes>::init(config.clone())

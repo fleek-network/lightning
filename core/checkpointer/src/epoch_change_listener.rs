@@ -23,11 +23,11 @@ use crate::rocks::RocksCheckpointerDatabase;
 /// epoch if a supermajority of eligible nodes have attested to the checkpoint attestation for the
 /// epoch. We need to do this here as well because other nodes may have already received their
 /// epoch change notification and broadcasted checkpoint attestations for the new epoch.
-pub struct EpochChangeListener<C: Collection> {
+pub struct EpochChangeListener<C: NodeComponents> {
     _collection: PhantomData<C>,
 }
 
-impl<C: Collection> EpochChangeListener<C> {
+impl<C: NodeComponents> EpochChangeListener<C> {
     /// Spawn task starting the epoch change listener.
     ///
     /// This method spawns a new task and returns immediately. It does not block
@@ -65,7 +65,7 @@ impl<C: Collection> EpochChangeListener<C> {
         (handle, ready)
     }
 }
-struct Task<C: Collection> {
+struct Task<C: NodeComponents> {
     node_id: NodeIndex,
     db: RocksCheckpointerDatabase,
     aggregate: AggregateCheckpointBuilder<C>,
@@ -74,7 +74,7 @@ struct Task<C: Collection> {
     notifier: C::NotifierInterface,
 }
 
-impl<C: Collection> Task<C> {
+impl<C: NodeComponents> Task<C> {
     pub fn new(
         node_id: NodeIndex,
         db: RocksCheckpointerDatabase,

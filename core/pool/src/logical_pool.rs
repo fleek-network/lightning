@@ -21,7 +21,7 @@ use crate::provider::Response;
 use crate::state::NodeInfo;
 
 /// Pool that handles logical connections.
-pub struct LogicalPool<C: Collection> {
+pub struct LogicalPool<C: NodeComponents> {
     /// Peers that we are currently connected to.
     pub(crate) pool: HashMap<NodeIndex, ConnectionInfo>,
     /// Query Runner.
@@ -36,7 +36,7 @@ pub struct LogicalPool<C: Collection> {
 
 impl<C> LogicalPool<C>
 where
-    C: Collection,
+    C: NodeComponents,
 {
     pub fn new(sync_query: c!(C::ApplicationInterface::SyncExecutor), pk: NodePublicKey) -> Self {
         Self {

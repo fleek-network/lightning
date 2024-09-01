@@ -52,12 +52,12 @@ fn create_content() -> Vec<u8> {
         .collect()
 }
 
-struct Peer<C: Collection> {
+struct Peer<C: NodeComponents> {
     inner: Node<C>,
     node_public_key: NodePublicKey,
 }
 
-impl<C: Collection> Peer<C> {
+impl<C: NodeComponents> Peer<C> {
     fn blockstore(&self) -> fdi::Ref<C::BlockstoreInterface> {
         self.inner.provider.get::<C::BlockstoreInterface>()
     }
