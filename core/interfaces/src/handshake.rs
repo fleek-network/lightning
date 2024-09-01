@@ -1,6 +1,6 @@
 use fdi::BuildGraph;
 
-use crate::collection::Collection;
+use crate::components::NodeComponents;
 
 #[interfaces_proc::blank]
-pub trait HandshakeInterface<C: Collection>: BuildGraph + Sized + Send + Sync {}
+pub trait HandshakeInterface<C: NodeComponents>: BuildGraph + Sized + Send + Sync {}

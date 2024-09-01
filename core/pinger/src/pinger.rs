@@ -21,11 +21,11 @@ use crate::config::Config;
 /// The duration after which a ping will be reported as unanswered
 const TIMEOUT: Duration = Duration::from_secs(15);
 
-pub struct Pinger<C: Collection> {
+pub struct Pinger<C: NodeComponents> {
     inner: Option<PingerInner<C>>,
 }
 
-impl<C: Collection> Pinger<C> {
+impl<C: NodeComponents> Pinger<C> {
     pub fn new(
         config_provider: &C::ConfigProviderInterface,
         app: &C::ApplicationInterface,
@@ -60,9 +60,9 @@ impl<C: Collection> Pinger<C> {
     }
 }
 
-impl<C: Collection> PingerInterface<C> for Pinger<C> {}
+impl<C: NodeComponents> PingerInterface<C> for Pinger<C> {}
 
-impl<C: Collection> BuildGraph for Pinger<C> {
+impl<C: NodeComponents> BuildGraph for Pinger<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::new().with(
             Self::new.with_event_handler("start", Self::start.wrap_with_spawn_named("PINGER")),
@@ -70,7 +70,7 @@ impl<C: Collection> BuildGraph for Pinger<C> {
     }
 }
 
-struct PingerInner<C: Collection> {
+struct PingerInner<C: NodeComponents> {
     config: Config,
     node_pk: NodePublicKey,
     query_runner: c!(C::ApplicationInterface::SyncExecutor),
@@ -79,7 +79,7 @@ struct PingerInner<C: Collection> {
     shutdown_waiter: ShutdownWaiter,
 }
 
-impl<C: Collection> PingerInner<C> {
+impl<C: NodeComponents> PingerInner<C> {
     fn new(
         config: Config,
         node_pk: NodePublicKey,
@@ -247,7 +247,7 @@ impl<C: Collection> PingerInner<C> {
     }
 }
 
-impl<C: Collection> ConfigConsumer for Pinger<C> {
+impl<C: NodeComponents> ConfigConsumer for Pinger<C> {
     const KEY: &'static str = "pinger";
 
     type Config = Config;

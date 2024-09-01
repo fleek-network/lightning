@@ -16,13 +16,13 @@ use tracing::error;
 
 use crate::config::Config;
 
-pub struct DeliveryAcknowledgmentAggregator<C: Collection> {
+pub struct DeliveryAcknowledgmentAggregator<C: NodeComponents> {
     inner: Option<AggregatorInner>,
     socket: DeliveryAcknowledgmentSocket,
     _marker: PhantomData<C>,
 }
 
-impl<C: Collection> DeliveryAcknowledgmentAggregator<C> {
+impl<C: NodeComponents> DeliveryAcknowledgmentAggregator<C> {
     /// Initialize a new delivery acknowledgment aggregator.
     fn init(
         config: &C::ConfigProviderInterface,
@@ -51,7 +51,7 @@ impl<C: Collection> DeliveryAcknowledgmentAggregator<C> {
     }
 }
 
-impl<C: Collection> BuildGraph for DeliveryAcknowledgmentAggregator<C> {
+impl<C: NodeComponents> BuildGraph for DeliveryAcknowledgmentAggregator<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::default().with(Self::init.with_event_handler(
             "start",
@@ -60,7 +60,7 @@ impl<C: Collection> BuildGraph for DeliveryAcknowledgmentAggregator<C> {
     }
 }
 
-impl<C: Collection> DeliveryAcknowledgmentAggregatorInterface<C>
+impl<C: NodeComponents> DeliveryAcknowledgmentAggregatorInterface<C>
     for DeliveryAcknowledgmentAggregator<C>
 {
     fn socket(&self) -> DeliveryAcknowledgmentSocket {
@@ -184,7 +184,7 @@ impl AggregatorInner {
     }
 }
 
-impl<C: Collection> ConfigConsumer for DeliveryAcknowledgmentAggregator<C> {
+impl<C: NodeComponents> ConfigConsumer for DeliveryAcknowledgmentAggregator<C> {
     const KEY: &'static str = "dack-aggregator";
 
     type Config = Config;

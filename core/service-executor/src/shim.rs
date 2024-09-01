@@ -15,7 +15,7 @@ use triomphe::Arc;
 use crate::service::{spawn_service, Context, ServiceCollection};
 
 #[derive(Clone)]
-pub struct ServiceExecutor<C: Collection> {
+pub struct ServiceExecutor<C: NodeComponents> {
     config: Arc<ServiceExecutorConfig>,
     collection: ServiceCollection,
     ctx: Arc<Context<C>>,
@@ -61,7 +61,7 @@ pub struct Provider {
     collection: ServiceCollection,
 }
 
-impl<C: Collection> ServiceExecutor<C> {
+impl<C: NodeComponents> ServiceExecutor<C> {
     /// Initialize the service executor.
     fn init(
         config: &C::ConfigProviderInterface,
@@ -110,14 +110,14 @@ impl<C: Collection> ServiceExecutor<C> {
     }
 }
 
-impl<C: Collection> BuildGraph for ServiceExecutor<C> {
+impl<C: NodeComponents> BuildGraph for ServiceExecutor<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::default()
             .with(Self::init.with_event_handler("start", Self::start.wrap_with_block_on()))
     }
 }
 
-impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
+impl<C: NodeComponents> ServiceExecutorInterface<C> for ServiceExecutor<C> {
     type Provider = Provider;
 
     fn get_provider(&self) -> Self::Provider {
@@ -149,7 +149,7 @@ impl<C: Collection> ServiceExecutorInterface<C> for ServiceExecutor<C> {
     }
 }
 
-impl<C: Collection> ConfigConsumer for ServiceExecutor<C> {
+impl<C: NodeComponents> ConfigConsumer for ServiceExecutor<C> {
     const KEY: &'static str = "service-executor";
     type Config = ServiceExecutorConfig;
 }

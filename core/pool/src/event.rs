@@ -68,7 +68,7 @@ pub enum Event {
 }
 
 /// Event receiver.
-pub struct EventReceiver<C: Collection> {
+pub struct EventReceiver<C: NodeComponents> {
     /// Queue of events.
     event_queue: Receiver<Event>,
     /// Main handler of events.
@@ -89,7 +89,7 @@ pub struct EventReceiver<C: Collection> {
 
 impl<C> EventReceiver<C>
 where
-    C: Collection,
+    C: NodeComponents,
 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(

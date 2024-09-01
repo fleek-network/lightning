@@ -1,15 +1,15 @@
-/// The macro to make a collection. This is only used internally in collection.rs. And is not meant
-/// to be exported.
+/// The macro to make the node components. This is only used internally in components.rs. And is not
+/// meant to be exported.
 #[doc(hidden)]
 #[macro_export]
-macro_rules! collection {
+macro_rules! node_components {
     ([$($service:tt),* $(,)?]) => {
-        pub trait Collection: Clone + Send + Sync + Sized + 'static {
+        pub trait NodeComponents: Clone + Send + Sync + Sized + 'static {
         $(
             type $service: $service<Self> + 'static;
          )*
 
-            /// Build the `fdi` dependency graph of this collection.
+            /// Build the `fdi` dependency graph of this node component.
             fn build_graph() -> fdi::DependencyGraph {
                 use $crate::prelude::*;
 
@@ -21,20 +21,22 @@ macro_rules! collection {
                     .with_value(shutdown)
                     .with_value(waiter)
                     .with_value($crate::_hacks::Blanket::default())
-                    .with_infallible(|this: &<Self as Collection>::ApplicationInterface|
+                    .with_infallible(|this: &<Self as NodeComponents>::ApplicationInterface|
                         ApplicationInterface::sync_query(this)
                     )
-                    .with_infallible(|this: &<Self as Collection>::CheckpointerInterface|
+                    .with_infallible(|this: &<Self as NodeComponents>::CheckpointerInterface|
                         CheckpointerInterface::query(this)
                     )
-                    .with_infallible(|this: &<Self as Collection>::ReputationAggregatorInterface|
+                    .with_infallible(
+                        |this: &<Self as NodeComponents>::ReputationAggregatorInterface|
                         ReputationAggregatorInterface::get_reporter(this)
                     )
-                    .with_infallible(|this: &<Self as Collection>::ReputationAggregatorInterface|
+                    .with_infallible(
+                        |this: &<Self as NodeComponents>::ReputationAggregatorInterface|
                         ReputationAggregatorInterface::get_query(this)
                     )
                     $(
-                    .with_module::<<Self as Collection>::$service>()
+                    .with_module::<<Self as NodeComponents>::$service>()
                     )*
             }
 
@@ -47,24 +49,24 @@ macro_rules! collection {
     }
 }
 
-/// This macro is useful for accessing members from a collection trait.
+/// This macro is useful for accessing members from a node component trait.
 #[macro_export]
 macro_rules! c {
     [$collection:tt :: $name:tt] => {
-        <$collection as $crate::Collection>::$name
+        <$collection as $crate::NodeComponents>::$name
     };
 
     [$collection:tt :: $name:tt :: $sub:ident] => {
-        <<$collection as $crate::Collection>::$name as $name<$collection>>::$sub
+        <<$collection as $crate::NodeComponents>::$name as $name<$collection>>::$sub
     };
 
     [$collection:tt :: $name:tt :: $sub:ident < $($g:ty),* >] => {
-        <<$collection as $crate::Collection>::$name as $name<$collection>>::$sub<$($g),*>
+        <<$collection as $crate::NodeComponents>::$name as $name<$collection>>::$sub<$($g),*>
     };
 }
 
-/// Generate a partial implementation of a collection this uses the provided types to assign the
-/// associated types on the collection while filling every other member with the blanket.
+/// Generate a partial implementation of node components this uses the provided types to assign the
+/// associated types on the node components while filling every other member with the blanket.
 ///
 /// This is a workaround on the fact that trait associated types do not have support for default
 /// types (yet).
@@ -119,7 +121,7 @@ macro_rules! partial {
         #[derive(Clone)]
         pub struct $struct;
 
-        impl $crate::Collection for $struct {
+        impl $crate::NodeComponents for $struct {
             $(type $name = $ty;)*
             $crate::partial!(@gen_missing { $($name),* });
             $crate::partial!(@gen_body { $($name = $ty;)* });
@@ -130,7 +132,7 @@ macro_rules! partial {
         #[derive(Clone)]
         pub struct $struct;
 
-        impl $crate::Collection for $struct {
+        impl $crate::NodeComponents for $struct {
             $(type $name = $ty;)*
             $crate::partial!(@gen_body { $($name = $ty;)* });
         }
@@ -208,7 +210,7 @@ mod tests {
     // This test only has to be compiled in order to be considered passing.
     #[test]
     fn test_partial_no_missing_member() {
-        fn expect_collection<C: crate::Collection>() {}
+        fn expect_collection<C: crate::NodeComponents>() {}
         expect_collection::<BlanketCollection>();
     }
 

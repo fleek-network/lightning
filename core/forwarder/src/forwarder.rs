@@ -12,7 +12,7 @@ pub struct Forwarder<C> {
     _p: PhantomData<C>,
 }
 
-impl<C: Collection> ForwarderInterface<C> for Forwarder<C> {
+impl<C: NodeComponents> ForwarderInterface<C> for Forwarder<C> {
     fn mempool_socket(&self) -> MempoolSocket {
         self.socket.clone()
     }
@@ -23,7 +23,7 @@ impl<C> ConfigConsumer for Forwarder<C> {
     type Config = ForwarderConfig;
 }
 
-impl<C: Collection> BuildGraph for Forwarder<C> {
+impl<C: NodeComponents> BuildGraph for Forwarder<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::new().with_infallible(
             |keystore: &C::KeystoreInterface,

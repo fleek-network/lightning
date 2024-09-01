@@ -35,7 +35,7 @@ pub async fn exec<C>(
     handshake_http_address: Option<SocketAddr>,
 ) -> Result<()>
 where
-    C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>,
+    C: NodeComponents<ConfigProviderInterface = TomlConfigProvider<C>>,
 {
     // Error if the configuration file already exists.
     if config_path.exists() {
@@ -54,7 +54,7 @@ where
 
     // Initialize a new configuration with defaults.
     let config = TomlConfigProvider::<C>::new();
-    <C as Collection>::capture_configs(&config);
+    <C as NodeComponents>::capture_configs(&config);
 
     // Validate that either network or dev are set, and assign network if dev is set.
     if !dev && network.is_none() {
@@ -126,7 +126,7 @@ where
 
 fn build_local_devnet_genesis<C>(config: TomlConfigProvider<C>) -> Result<Genesis>
 where
-    C: Collection<ConfigProviderInterface = TomlConfigProvider<C>>,
+    C: NodeComponents<ConfigProviderInterface = TomlConfigProvider<C>>,
 {
     // Get the node keys from the keystore.
     let keystore = Keystore::<C>::init(&config).expect("failed to load keystore");

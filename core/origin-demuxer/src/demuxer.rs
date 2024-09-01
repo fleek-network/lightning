@@ -1,17 +1,17 @@
 use affair::AsyncWorkerUnordered;
 use lightning_interfaces::types::{Blake3Hash, ImmutablePointer, OriginProvider};
-use lightning_interfaces::Collection;
+use lightning_interfaces::NodeComponents;
 use lightning_origin_http::HttpOrigin;
 use lightning_origin_ipfs::IPFSOrigin;
 
 use crate::Config;
 
-pub struct Demuxer<C: Collection> {
+pub struct Demuxer<C: NodeComponents> {
     http: HttpOrigin<C>,
     ipfs: IPFSOrigin<C>,
 }
 
-impl<C: Collection> AsyncWorkerUnordered for Demuxer<C> {
+impl<C: NodeComponents> AsyncWorkerUnordered for Demuxer<C> {
     type Request = ImmutablePointer;
     type Response = anyhow::Result<Blake3Hash>;
 
@@ -24,7 +24,7 @@ impl<C: Collection> AsyncWorkerUnordered for Demuxer<C> {
     }
 }
 
-impl<C: Collection> Demuxer<C> {
+impl<C: NodeComponents> Demuxer<C> {
     pub fn new(config: Config, blockstore: C::BlockstoreInterface) -> anyhow::Result<Self> {
         Ok(Self {
             http: HttpOrigin::<C>::new(config.http, blockstore.clone())?,

@@ -5,7 +5,7 @@ use fdi::BuildGraph;
 use ready::ReadyWaiterState;
 use tokio::sync::broadcast;
 
-use crate::collection::Collection;
+use crate::components::NodeComponents;
 use crate::types::Event;
 use crate::ConfigConsumer;
 
@@ -39,7 +39,9 @@ impl Events {
 /// The interface for the *RPC* server. Which is supposed to be opening a public
 /// port (possibly an HTTP server) and accepts queries or updates from the user.
 #[interfaces_proc::blank]
-pub trait RpcInterface<C: Collection>: ConfigConsumer + BuildGraph + Sized + Send + Sync {
+pub trait RpcInterface<C: NodeComponents>:
+    ConfigConsumer + BuildGraph + Sized + Send + Sync
+{
     type ReadyState: ReadyWaiterState;
 
     /// Panics if the event handler is not available.

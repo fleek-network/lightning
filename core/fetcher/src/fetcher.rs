@@ -21,12 +21,12 @@ use crate::origin::{OriginError, OriginFetcher, OriginRequest};
 
 pub(crate) type Uri = Vec<u8>;
 
-pub struct Fetcher<C: Collection> {
+pub struct Fetcher<C: NodeComponents> {
     socket: FetcherSocket,
-    _collection: PhantomData<C>,
+    _components: PhantomData<C>,
 }
 
-impl<C: Collection> Fetcher<C> {
+impl<C: NodeComponents> Fetcher<C> {
     /// Initialize the fetcher.
     pub fn new(
         config: &C::ConfigProviderInterface,
@@ -71,18 +71,18 @@ impl<C: Collection> Fetcher<C> {
 
         Ok(Self {
             socket,
-            _collection: PhantomData,
+            _components: PhantomData,
         })
     }
 }
 
-impl<C: Collection> FetcherInterface<C> for Fetcher<C> {
+impl<C: NodeComponents> FetcherInterface<C> for Fetcher<C> {
     fn get_socket(&self) -> FetcherSocket {
         self.socket.clone()
     }
 }
 
-struct FetcherWorker<C: Collection> {
+struct FetcherWorker<C: NodeComponents> {
     origin_tx: mpsc::Sender<OriginRequest>,
     blockstore: C::BlockstoreInterface,
     blockstore_server_socket: BlockstoreServerSocket,
@@ -90,7 +90,7 @@ struct FetcherWorker<C: Collection> {
     query_runner: c!(C::ApplicationInterface::SyncExecutor),
 }
 
-impl<C: Collection> FetcherWorker<C> {
+impl<C: NodeComponents> FetcherWorker<C> {
     /// Fetches the data from the corresponding origin, puts it in the blockstore,
     /// and stores the mapping using the resolver. If pulling a origin fails, it will not ,
     /// the data will not be fetched from origin again.
@@ -264,18 +264,18 @@ impl<C: Collection> FetcherWorker<C> {
     }
 }
 
-impl<C: Collection> ConfigConsumer for Fetcher<C> {
+impl<C: NodeComponents> ConfigConsumer for Fetcher<C> {
     const KEY: &'static str = "fetcher";
     type Config = Config;
 }
 
-impl<C: Collection> fdi::BuildGraph for Fetcher<C> {
+impl<C: NodeComponents> fdi::BuildGraph for Fetcher<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::new().with(Self::new)
     }
 }
 
-impl<C: Collection> AsyncWorkerUnordered for FetcherWorker<C> {
+impl<C: NodeComponents> AsyncWorkerUnordered for FetcherWorker<C> {
     type Request = FetcherRequest;
     type Response = FetcherResponse;
 

@@ -12,7 +12,7 @@ use crate::blockstore::BLOCK_SIZE;
 use crate::config::{BLOCK_DIR, INTERNAL_DIR};
 use crate::store::Store;
 
-pub struct Putter<S, C: Collection> {
+pub struct Putter<S, C: NodeComponents> {
     invalidated: bool,
     buffer: BytesMut,
     mode: PutterMode,
@@ -35,7 +35,7 @@ enum PutterMode {
 
 impl<C, S> Putter<S, C>
 where
-    C: Collection,
+    C: NodeComponents,
     S: Store + 'static,
 {
     pub fn verifier(store: S, root: [u8; 32], indexer: C::IndexerInterface) -> Self {
@@ -123,7 +123,7 @@ where
 
 impl<C, S> IncrementalPutInterface for Putter<S, C>
 where
-    C: Collection,
+    C: NodeComponents,
     S: Store + 'static,
 {
     fn feed_proof(&mut self, proof: &[u8]) -> Result<(), PutFeedProofError> {

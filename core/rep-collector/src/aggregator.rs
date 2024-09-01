@@ -22,7 +22,7 @@ const BEFORE_EPOCH_CHANGE: Duration = Duration::from_secs(300);
 #[cfg(any(test, debug_assertions))]
 const BEFORE_EPOCH_CHANGE: Duration = Duration::from_secs(3);
 
-pub struct ReputationAggregator<C: Collection> {
+pub struct ReputationAggregator<C: NodeComponents> {
     reporter: MyReputationReporter,
     query: MyReputationQuery,
     measurement_manager: Mutex<MeasurementManager>,
@@ -31,7 +31,7 @@ pub struct ReputationAggregator<C: Collection> {
     report_rx: buffered_mpsc::BufferedReceiver<ReportMessage>,
 }
 
-impl<C: Collection> ReputationAggregator<C> {
+impl<C: NodeComponents> ReputationAggregator<C> {
     /// Create a new reputation
     pub fn new(
         config: &C::ConfigProviderInterface,
@@ -207,7 +207,7 @@ impl<C: Collection> ReputationAggregator<C> {
     }
 }
 
-impl<C: Collection> BuildGraph for ReputationAggregator<C> {
+impl<C: NodeComponents> BuildGraph for ReputationAggregator<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::new().with(
             Self::new.with_event_handler(
@@ -220,7 +220,7 @@ impl<C: Collection> BuildGraph for ReputationAggregator<C> {
     }
 }
 
-impl<C: Collection> ReputationAggregatorInterface<C> for ReputationAggregator<C> {
+impl<C: NodeComponents> ReputationAggregatorInterface<C> for ReputationAggregator<C> {
     /// The reputation reporter can be used by our system to report the reputation of other
     type ReputationReporter = MyReputationReporter;
 
@@ -240,7 +240,7 @@ impl<C: Collection> ReputationAggregatorInterface<C> for ReputationAggregator<C>
     }
 }
 
-impl<C: Collection> ConfigConsumer for ReputationAggregator<C> {
+impl<C: NodeComponents> ConfigConsumer for ReputationAggregator<C> {
     const KEY: &'static str = "rep-collector";
 
     type Config = Config;

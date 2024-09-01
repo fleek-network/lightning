@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 use affair::{AsyncWorkerUnordered, Socket};
 use fdi::BuildGraph;
 
-use crate::{Collection, ConfigConsumer, ConfigProviderInterface};
+use crate::{ConfigConsumer, ConfigProviderInterface, NodeComponents};
 
 /// The magical type that implements all of the traits.
 #[derive(Clone, Default, Copy)]
@@ -37,15 +37,15 @@ impl<T> Default for AsValue<T> {
 
 pub trait ConfigConsumerProxy {
     /// Request the config of Self if Self: ConfigConsumer.
-    fn request_config<C: Collection>(&self, provider: &impl ConfigProviderInterface<C>);
+    fn request_config<C: NodeComponents>(&self, provider: &impl ConfigProviderInterface<C>);
 }
 
 impl<T> ConfigConsumerProxy for &AsValue<T> {
-    fn request_config<C: Collection>(&self, _: &impl ConfigProviderInterface<C>) {}
+    fn request_config<C: NodeComponents>(&self, _: &impl ConfigProviderInterface<C>) {}
 }
 
 impl<T: ConfigConsumer> ConfigConsumerProxy for AsValue<T> {
-    fn request_config<C: Collection>(&self, provider: &impl ConfigProviderInterface<C>) {
+    fn request_config<C: NodeComponents>(&self, provider: &impl ConfigProviderInterface<C>) {
         provider.get::<T>();
     }
 }

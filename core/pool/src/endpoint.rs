@@ -35,7 +35,7 @@ const CONN_GRACE_PERIOD: Duration = Duration::from_secs(30);
 
 pub struct Endpoint<C, M>
 where
-    C: Collection,
+    C: NodeComponents,
     M: MuxerInterface,
 {
     /// Pool of connections.
@@ -76,7 +76,7 @@ where
 
 impl<C, M> Endpoint<C, M>
 where
-    C: Collection,
+    C: NodeComponents,
     M: MuxerInterface,
 {
     pub fn new(

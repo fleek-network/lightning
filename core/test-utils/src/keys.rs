@@ -35,13 +35,13 @@ impl<C> Default for EphemeralKeystore<C> {
     }
 }
 
-impl<C: Collection> BuildGraph for EphemeralKeystore<C> {
+impl<C: NodeComponents> BuildGraph for EphemeralKeystore<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::default().with_infallible(Self::default)
     }
 }
 
-impl<C: Collection> KeystoreInterface<C> for EphemeralKeystore<C> {
+impl<C: NodeComponents> KeystoreInterface<C> for EphemeralKeystore<C> {
     fn get_ed25519_pk(&self) -> NodePublicKey {
         self.node_sk.to_pk()
     }

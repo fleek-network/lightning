@@ -3,10 +3,10 @@ use std::time::Duration;
 use fdi::BuildGraph;
 use lightning_types::NodeIndex;
 
-use crate::collection::Collection;
+use crate::components::NodeComponents;
 
 #[interfaces_proc::blank]
-pub trait ReputationAggregatorInterface<C: Collection>: BuildGraph {
+pub trait ReputationAggregatorInterface<C: NodeComponents>: BuildGraph {
     /// The reputation reporter can be used by our system to report the reputation of other
     type ReputationReporter: ReputationReporterInterface;
 

@@ -9,7 +9,7 @@ use tracing::error;
 
 use crate::fetcher::Uri;
 
-pub struct OriginFetcher<C: Collection> {
+pub struct OriginFetcher<C: NodeComponents> {
     tasks: JoinSet<Result<SuccessResponse, ErrorResponse>>,
     queue: VecDeque<ImmutablePointer>,
     rx: mpsc::Receiver<OriginRequest>,
@@ -18,7 +18,7 @@ pub struct OriginFetcher<C: Collection> {
     capacity: usize,
 }
 
-impl<C: Collection> OriginFetcher<C> {
+impl<C: NodeComponents> OriginFetcher<C> {
     pub fn new(
         capacity: usize,
         origin_socket: OriginProviderSocket,

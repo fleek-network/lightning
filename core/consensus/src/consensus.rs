@@ -34,7 +34,7 @@ use crate::execution::state::FilteredConsensusOutput;
 use crate::execution::worker::ExecutionWorker;
 use crate::narwhal::{NarwhalArgs, NarwhalService};
 
-pub struct Consensus<C: Collection> {
+pub struct Consensus<C: NodeComponents> {
     /// Inner state of the consensus
     #[allow(clippy::type_complexity)]
     epoch_state: Option<
@@ -327,7 +327,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
     }
 }
 
-impl<C: Collection> Consensus<C> {
+impl<C: NodeComponents> Consensus<C> {
     /// Start the system, should not do anything if the system is already
     /// started.
     fn start(
@@ -385,12 +385,12 @@ impl<C: Collection> Consensus<C> {
     }
 }
 
-impl<C: Collection> ConfigConsumer for Consensus<C> {
+impl<C: NodeComponents> ConfigConsumer for Consensus<C> {
     const KEY: &'static str = "consensus";
     type Config = Config;
 }
 
-impl<C: Collection> BuildGraph for Consensus<C> {
+impl<C: NodeComponents> BuildGraph for Consensus<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::new().with(
             Self::init
@@ -400,11 +400,11 @@ impl<C: Collection> BuildGraph for Consensus<C> {
     }
 }
 
-impl<C: Collection> ConsensusInterface<C> for Consensus<C> {
+impl<C: NodeComponents> ConsensusInterface<C> for Consensus<C> {
     type Certificate = PubSubMsg;
 }
 
-impl<C: Collection> Consensus<C> {
+impl<C: NodeComponents> Consensus<C> {
     /// Create a new consensus service with the provided config and executor.
     fn init(
         config_provider: &C::ConfigProviderInterface,

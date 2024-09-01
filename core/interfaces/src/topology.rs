@@ -4,7 +4,7 @@ use fdi::BuildGraph;
 use fleek_crypto::NodePublicKey;
 use tokio::sync::watch;
 
-use crate::collection::Collection;
+use crate::components::NodeComponents;
 use crate::ConfigConsumer;
 
 /// The algorithm used for clustering our network and dynamically creating a network topology.
@@ -12,7 +12,7 @@ use crate::ConfigConsumer;
 /// is required. The gossip layer is an example of a component that can feed the data this
 /// algorithm generates.
 #[interfaces_proc::blank]
-pub trait TopologyInterface<C: Collection>:
+pub trait TopologyInterface<C: NodeComponents>:
     BuildGraph + ConfigConsumer + Sized + Send + Sync
 {
     /// Get a receiver that will periodically receive the new list of connections that our current

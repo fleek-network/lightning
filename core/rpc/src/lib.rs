@@ -104,7 +104,7 @@ pub fn load_hmac_secret(secret_dir_path: Option<PathBuf>) -> anyhow::Result<[u8;
 }
 
 /// The data shared with every request the rpc methods.
-pub(crate) struct Data<C: Collection> {
+pub(crate) struct Data<C: NodeComponents> {
     pub query_runner: c!(C::ApplicationInterface::SyncExecutor),
     pub checkpointer_query: c!(C::CheckpointerInterface::Query),
     pub mempool_socket: MempoolSocket,
@@ -116,7 +116,7 @@ pub(crate) struct Data<C: Collection> {
     pub events: Events,
 }
 
-impl<C: Collection> Data<C> {
+impl<C: NodeComponents> Data<C> {
     pub(crate) async fn query_runner(
         &self,
         epoch: Option<u64>,
@@ -133,7 +133,7 @@ impl<C: Collection> Data<C> {
     }
 }
 
-pub struct Rpc<C: Collection> {
+pub struct Rpc<C: NodeComponents> {
     config: Config,
     /// The final RPCModule containting selected methods
     module: RpcModule<()>,
@@ -155,7 +155,7 @@ pub async fn metrics() -> (StatusCode, String) {
     }
 }
 
-impl<C: Collection> Rpc<C> {
+impl<C: NodeComponents> Rpc<C> {
     /// Initialize the RPC-server, with the given parameters.
     #[allow(clippy::too_many_arguments)]
     fn init(
@@ -289,7 +289,7 @@ impl<C: Collection> Rpc<C> {
     }
 }
 
-impl<C: Collection> RpcInterface<C> for Rpc<C> {
+impl<C: NodeComponents> RpcInterface<C> for Rpc<C> {
     type ReadyState = RpcReadyState;
 
     fn event_tx(&self) -> Events {
@@ -318,13 +318,13 @@ impl<C: Collection> RpcInterface<C> for Rpc<C> {
     }
 }
 
-impl<C: Collection> ConfigConsumer for Rpc<C> {
+impl<C: NodeComponents> ConfigConsumer for Rpc<C> {
     type Config = crate::config::Config;
 
     const KEY: &'static str = "rpc";
 }
 
-impl<C: Collection> fdi::BuildGraph for Rpc<C> {
+impl<C: NodeComponents> fdi::BuildGraph for Rpc<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::default().with(Self::init.with_event_handler("start", Self::start))
     }

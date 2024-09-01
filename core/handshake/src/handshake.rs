@@ -25,22 +25,22 @@ use crate::transports::{
     TransportSender,
 };
 
-pub struct Handshake<C: Collection> {
+pub struct Handshake<C: NodeComponents> {
     status: Option<Run<C>>,
     config: HandshakeConfig,
     pk: NodePublicKey,
 }
 
-struct Run<C: Collection> {
+struct Run<C: NodeComponents> {
     ctx: Context<c![C::ServiceExecutorInterface::Provider]>,
     // The axum_server Server API (TLS server) does not have a `with_graceful_shutdown`
     // similarly to axum Server. The only way to shut it down gracefully is via its Handle API.
     handle: Handle,
 }
 
-impl<C: Collection> HandshakeInterface<C> for Handshake<C> {}
+impl<C: NodeComponents> HandshakeInterface<C> for Handshake<C> {}
 
-impl<C: Collection> Handshake<C> {
+impl<C: NodeComponents> Handshake<C> {
     pub fn new(
         config: &C::ConfigProviderInterface,
         keystore: &C::KeystoreInterface,
@@ -114,7 +114,7 @@ impl<C: Collection> Handshake<C> {
     }
 }
 
-impl<C: Collection> BuildGraph for Handshake<C> {
+impl<C: NodeComponents> BuildGraph for Handshake<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::new().with_infallible(
             Self::new.with_event_handler("start", Self::start.wrap_with_spawn_named("HANDSHAKE")),
@@ -122,7 +122,7 @@ impl<C: Collection> BuildGraph for Handshake<C> {
     }
 }
 
-impl<C: Collection> ConfigConsumer for Handshake<C> {
+impl<C: NodeComponents> ConfigConsumer for Handshake<C> {
     const KEY: &'static str = "handshake";
     type Config = HandshakeConfig;
 }

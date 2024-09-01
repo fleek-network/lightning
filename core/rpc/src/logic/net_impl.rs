@@ -1,24 +1,24 @@
 use std::sync::Arc;
 
 use jsonrpsee::core::RpcResult;
-use lightning_interfaces::Collection;
+use lightning_interfaces::NodeComponents;
 use tracing::trace;
 
 use crate::api::NetApiServer;
 use crate::{Data, VERSION};
 
-pub struct NetApi<C: Collection> {
+pub struct NetApi<C: NodeComponents> {
     _data: Arc<Data<C>>,
 }
 
-impl<C: Collection> NetApi<C> {
+impl<C: NodeComponents> NetApi<C> {
     pub(crate) fn new(data: Arc<Data<C>>) -> Self {
         Self { _data: data }
     }
 }
 
 #[async_trait::async_trait]
-impl<C: Collection> NetApiServer for NetApi<C> {
+impl<C: NodeComponents> NetApiServer for NetApi<C> {
     /// todo!()
     async fn peer_count(&self) -> RpcResult<Option<String>> {
         trace!(target: "rpc::eth", "Serving eth_chainId");

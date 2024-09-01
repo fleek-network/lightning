@@ -13,14 +13,14 @@ use types::Genesis;
 use crate::config::{ApplicationConfig, StorageConfig};
 use crate::env::{ApplicationEnv, Env, UpdateWorker};
 use crate::state::QueryRunner;
-pub struct Application<C: Collection> {
+pub struct Application<C: NodeComponents> {
     env: Arc<tokio::sync::Mutex<ApplicationEnv>>,
     update_socket: Mutex<Option<ExecutionEngineSocket>>,
     query_runner: QueryRunner,
-    collection: PhantomData<C>,
+    _components: PhantomData<C>,
 }
 
-impl<C: Collection> Application<C> {
+impl<C: NodeComponents> Application<C> {
     /// Create a new instance of the application layer using the provided configuration.
     fn init(
         config: &C::ConfigProviderInterface,
@@ -51,24 +51,24 @@ impl<C: Collection> Application<C> {
             env,
             query_runner,
             update_socket: Mutex::new(Some(update_socket)),
-            collection: PhantomData,
+            _components: PhantomData,
         })
     }
 }
 
-impl<C: Collection> ConfigConsumer for Application<C> {
+impl<C: NodeComponents> ConfigConsumer for Application<C> {
     const KEY: &'static str = "application";
 
     type Config = ApplicationConfig;
 }
 
-impl<C: Collection> fdi::BuildGraph for Application<C> {
+impl<C: NodeComponents> fdi::BuildGraph for Application<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::new().with(Self::init)
     }
 }
 
-impl<C: Collection> ApplicationInterface<C> for Application<C> {
+impl<C: NodeComponents> ApplicationInterface<C> for Application<C> {
     /// The type for the sync query executor.
     type SyncExecutor = QueryRunner;
 

@@ -1,13 +1,13 @@
 use fdi::BuildGraph;
 use lightning_schema::broadcast::ResolvedImmutablePointerRecord;
 
-use crate::collection::Collection;
+use crate::components::NodeComponents;
 use crate::types::{Blake3Hash, ImmutablePointer};
 
 /// The resolver is responsible to resolve an FNIP (Fleek Network Immutable Pointer),
 /// into a Blake3 hash of the content.
 #[interfaces_proc::blank]
-pub trait ResolverInterface<C: Collection>: BuildGraph + Sized + Send + Sync + Clone {
+pub trait ResolverInterface<C: NodeComponents>: BuildGraph + Sized + Send + Sync + Clone {
     type OriginFinder: OriginFinderAsyncIter;
 
     /// Publish new records into the resolver global hash table about us witnessing

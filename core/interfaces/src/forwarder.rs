@@ -2,7 +2,7 @@ use affair::Socket;
 use fdi::BuildGraph;
 use lightning_types::TransactionRequest;
 
-use crate::collection::Collection;
+use crate::components::NodeComponents;
 
 /// A socket that gives services and other sub-systems the required functionality to
 /// submit messages/transactions to the consensus.
@@ -15,7 +15,7 @@ use crate::collection::Collection;
 pub type MempoolSocket = Socket<TransactionRequest, ()>;
 
 #[interfaces_proc::blank]
-pub trait ForwarderInterface<C: Collection>: BuildGraph + Sized + Send + 'static {
+pub trait ForwarderInterface<C: NodeComponents>: BuildGraph + Sized + Send + 'static {
     /// Get the socket for forwarding new transaction requests to the mempool.
     #[socket]
     fn mempool_socket(&self) -> MempoolSocket;

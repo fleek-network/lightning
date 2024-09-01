@@ -1,7 +1,7 @@
 use fdi::BuildGraph;
 use tokio::net::UnixStream;
 
-use crate::collection::Collection;
+use crate::components::NodeComponents;
 use crate::types::ServiceId;
 
 /// The service executor interface is responsible for loading the services and executing
@@ -10,7 +10,7 @@ use crate::types::ServiceId;
 /// Currently, we are hard coding some services and there is no API on this interface to
 /// load services.
 #[interfaces_proc::blank]
-pub trait ServiceExecutorInterface<C: Collection>: BuildGraph + Sized + Send + Sync {
+pub trait ServiceExecutorInterface<C: NodeComponents>: BuildGraph + Sized + Send + Sync {
     /// The provider which can be used to get a handle on a service during runtime.
     type Provider: ExecutorProviderInterface;
 

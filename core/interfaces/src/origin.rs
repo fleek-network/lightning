@@ -2,7 +2,7 @@ use affair::Socket;
 use fdi::BuildGraph;
 use lightning_types::ImmutablePointer;
 
-use crate::collection::Collection;
+use crate::components::NodeComponents;
 use crate::types::Blake3Hash;
 
 /// A socket for submitting a fetch request to an origin.
@@ -12,7 +12,7 @@ pub type OriginProviderSocket = Socket<ImmutablePointer, anyhow::Result<Blake3Ha
 /// a modular way, and [`OriginProvider`] can be something like a provider for resolving
 /// *IPFS* files.
 #[interfaces_proc::blank]
-pub trait OriginProviderInterface<C: Collection>: BuildGraph + Sized + Send + Sync {
+pub trait OriginProviderInterface<C: NodeComponents>: BuildGraph + Sized + Send + Sync {
     /// Returns a socket for submitting a fetch request to an origin.
     #[socket]
     fn get_socket(&self) -> OriginProviderSocket;

@@ -1,11 +1,11 @@
 use fdi::BuildGraph;
 use fleek_crypto::{ConsensusPublicKey, ConsensusSecretKey, NodePublicKey, NodeSecretKey};
 
-use crate::collection::Collection;
+use crate::components::NodeComponents;
 use crate::ConfigConsumer;
 
 #[interfaces_proc::blank]
-pub trait KeystoreInterface<C: Collection>:
+pub trait KeystoreInterface<C: NodeComponents>:
     BuildGraph + ConfigConsumer + Clone + Sized + Send + Sync
 {
     /// Returns the Ed25519 public key

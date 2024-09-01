@@ -26,18 +26,18 @@ const MISC: &str = "misc";
 const LATEST: &str = "latest";
 const EARLIEST: &str = "earliest";
 
-pub struct Archive<C: Collection> {
+pub struct Archive<C: NodeComponents> {
     inner: Option<Arc<ArchiveInner<C>>>,
 }
 
-struct ArchiveInner<C: Collection> {
+struct ArchiveInner<C: NodeComponents> {
     db: DB,
     blockstore: c!(C::BlockstoreInterface),
     /// Handles the rocks db storage for each epoch
     historical_state_dir: ResolvedPathBuf,
 }
 
-impl<C: Collection> BuildGraph for Archive<C> {
+impl<C: NodeComponents> BuildGraph for Archive<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::new().with_infallible(Self::new.with_event_handler(
             "start",
@@ -46,7 +46,7 @@ impl<C: Collection> BuildGraph for Archive<C> {
     }
 }
 
-impl<C: Collection> Archive<C> {
+impl<C: NodeComponents> Archive<C> {
     pub fn new(
         config_provider: &C::ConfigProviderInterface,
         blockstore: &C::BlockstoreInterface,
@@ -84,7 +84,7 @@ impl<C: Collection> Archive<C> {
     }
 }
 
-impl<C: Collection> ArchiveInterface<C> for Archive<C> {
+impl<C: NodeComponents> ArchiveInterface<C> for Archive<C> {
     fn is_active(&self) -> bool {
         self.inner.is_some()
     }
@@ -146,7 +146,7 @@ impl<C: Collection> ArchiveInterface<C> for Archive<C> {
     }
 }
 
-impl<C: Collection> Clone for Archive<C> {
+impl<C: NodeComponents> Clone for Archive<C> {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
@@ -155,7 +155,7 @@ impl<C: Collection> Clone for Archive<C> {
 }
 
 /// Main logic to handle archive requests
-impl<C: Collection> ArchiveInner<C> {
+impl<C: NodeComponents> ArchiveInner<C> {
     fn new(
         db: DB,
         historical_state_dir: ResolvedPathBuf,
@@ -325,7 +325,7 @@ impl<C: Collection> ArchiveInner<C> {
 }
 
 /// The main loop that listens to notifier events and inserts the data into the db.
-async fn insertion_task<C: Collection>(
+async fn insertion_task<C: NodeComponents>(
     fdi::Cloned(waiter): fdi::Cloned<ShutdownWaiter>,
     fdi::Cloned(notifier): fdi::Cloned<C::NotifierInterface>,
     fdi::Cloned(archive): fdi::Cloned<Archive<C>>,
@@ -403,7 +403,7 @@ impl TryFrom<Vec<u8>> for BlockInfo {
     }
 }
 
-impl<C: Collection> ConfigConsumer for Archive<C> {
+impl<C: NodeComponents> ConfigConsumer for Archive<C> {
     const KEY: &'static str = "archive";
 
     type Config = Config;

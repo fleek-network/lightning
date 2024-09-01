@@ -11,12 +11,12 @@ use types::NodeInfo;
 
 use crate::database::{CheckpointerDatabase, CheckpointerDatabaseQuery};
 use crate::rocks::RocksCheckpointerDatabase;
-pub struct AggregateCheckpointBuilder<C: Collection> {
+pub struct AggregateCheckpointBuilder<C: NodeComponents> {
     db: RocksCheckpointerDatabase,
     app_query: c!(C::ApplicationInterface::SyncExecutor),
 }
 
-impl<C: Collection> AggregateCheckpointBuilder<C> {
+impl<C: NodeComponents> AggregateCheckpointBuilder<C> {
     pub fn new(
         db: RocksCheckpointerDatabase,
         app_query: c!(C::ApplicationInterface::SyncExecutor),

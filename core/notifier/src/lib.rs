@@ -17,13 +17,13 @@ use tokio::time::sleep;
 #[cfg(test)]
 mod tests;
 
-pub struct Notifier<C: Collection> {
+pub struct Notifier<C: NodeComponents> {
     query_runner: c![C::ApplicationInterface::SyncExecutor],
     notify: NotificationsEmitter,
     waiter: ShutdownWaiter,
 }
 
-impl<C: Collection> Clone for Notifier<C> {
+impl<C: NodeComponents> Clone for Notifier<C> {
     fn clone(&self) -> Self {
         Self {
             query_runner: self.query_runner.clone(),
@@ -33,7 +33,7 @@ impl<C: Collection> Clone for Notifier<C> {
     }
 }
 
-impl<C: Collection> Notifier<C> {
+impl<C: NodeComponents> Notifier<C> {
     fn new(
         app: &c![C::ApplicationInterface],
         fdi::Cloned(waiter): fdi::Cloned<ShutdownWaiter>,
@@ -46,13 +46,13 @@ impl<C: Collection> Notifier<C> {
     }
 }
 
-impl<C: Collection> BuildGraph for Notifier<C> {
+impl<C: NodeComponents> BuildGraph for Notifier<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::new().with_infallible(Self::new)
     }
 }
 
-impl<C: Collection> NotifierInterface<C> for Notifier<C> {
+impl<C: NodeComponents> NotifierInterface<C> for Notifier<C> {
     type Emitter = NotificationsEmitter;
 
     fn get_emitter(&self) -> Self::Emitter {

@@ -39,18 +39,18 @@ use crate::api::FleekApiServer;
 use crate::error::RPCError;
 use crate::Data;
 
-pub struct FleekApi<C: Collection> {
+pub struct FleekApi<C: NodeComponents> {
     data: Arc<Data<C>>,
 }
 
-impl<C: Collection> FleekApi<C> {
+impl<C: NodeComponents> FleekApi<C> {
     pub(crate) fn new(data: Arc<Data<C>>) -> Self {
         Self { data }
     }
 }
 
 #[async_trait::async_trait]
-impl<C: Collection> FleekApiServer for FleekApi<C> {
+impl<C: NodeComponents> FleekApiServer for FleekApi<C> {
     async fn ping(&self) -> RpcResult<String> {
         Ok("pong".to_string())
     }

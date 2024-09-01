@@ -7,10 +7,10 @@ use tokio::time::sleep;
 
 use super::*;
 
-// Define the collection of every top-level trait in the system. The collections is basically
-// a trait with a bunch of associated types called members. Each of them taking the entire
-// collection as input.
-collection!([
+// Define the node components of every top-level trait in the system. The node components is
+// basically a trait with a bunch of associated types called members. Each of them taking the entire
+// node components as input.
+node_components!([
     ConfigProviderInterface,
     KeystoreInterface,
     ApplicationInterface,
@@ -40,13 +40,13 @@ collection!([
 ]);
 
 /// The Fleek Network node.
-pub struct Node<C: Collection> {
+pub struct Node<C: NodeComponents> {
     pub provider: Provider,
     pub shutdown: Option<ShutdownController>,
     _p: PhantomData<C>,
 }
 
-impl<C: Collection> Node<C> {
+impl<C: NodeComponents> Node<C> {
     #[inline(always)]
     pub fn init(config: C::ConfigProviderInterface) -> Result<Self> {
         let provider = Provider::default();

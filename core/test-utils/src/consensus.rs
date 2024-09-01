@@ -80,12 +80,12 @@ impl Clone for MockConsensusGroup {
     }
 }
 
-pub struct MockForwarder<C: Collection> {
+pub struct MockForwarder<C: NodeComponents> {
     socket: MempoolSocket,
     c: PhantomData<C>,
 }
 
-impl<C: Collection> MockForwarder<C> {
+impl<C: NodeComponents> MockForwarder<C> {
     fn new(sender: mpsc::Sender<TransactionRequest>, waiter: ShutdownWaiter) -> Self {
         struct ProxyWorker(mpsc::Sender<TransactionRequest>);
         impl AsyncWorkerUnordered for ProxyWorker {
@@ -104,7 +104,7 @@ impl<C: Collection> MockForwarder<C> {
     }
 }
 
-impl<C: Collection> BuildGraph for MockForwarder<C> {
+impl<C: NodeComponents> BuildGraph for MockForwarder<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::new().with_infallible(
             |mut group: fdi::RefMut<MockConsensusGroup>,
@@ -115,7 +115,7 @@ impl<C: Collection> BuildGraph for MockForwarder<C> {
     }
 }
 
-impl<C: Collection> ForwarderInterface<C> for MockForwarder<C> {
+impl<C: NodeComponents> ForwarderInterface<C> for MockForwarder<C> {
     fn mempool_socket(&self) -> MempoolSocket {
         self.socket.clone()
     }
@@ -123,13 +123,13 @@ impl<C: Collection> ForwarderInterface<C> for MockForwarder<C> {
 
 /// Provides a controlled and mocked version of the consensus. Should be used in a collection with
 /// [MockForwarder].
-pub struct MockConsensus<C: Collection> {
+pub struct MockConsensus<C: NodeComponents> {
     group: broadcast::Receiver<Block>,
     execution_socket: ExecutionEngineSocket,
     notifier: c![C::NotifierInterface::Emitter],
 }
 
-impl<C: Collection> MockConsensus<C> {
+impl<C: NodeComponents> MockConsensus<C> {
     pub fn new(
         app: &C::ApplicationInterface,
         notifier: &c!(C::NotifierInterface),
@@ -166,11 +166,11 @@ impl<C: Collection> MockConsensus<C> {
     }
 }
 
-impl<C: Collection> ConsensusInterface<C> for MockConsensus<C> {
+impl<C: NodeComponents> ConsensusInterface<C> for MockConsensus<C> {
     type Certificate = ();
 }
 
-impl<C: Collection> BuildGraph for MockConsensus<C> {
+impl<C: NodeComponents> BuildGraph for MockConsensus<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::new()
             .with_infallible(|config: fdi::Ref<C::ConfigProviderInterface>| {
@@ -185,7 +185,7 @@ impl<C: Collection> BuildGraph for MockConsensus<C> {
     }
 }
 
-impl<C: Collection> ConfigConsumer for MockConsensus<C> {
+impl<C: NodeComponents> ConfigConsumer for MockConsensus<C> {
     const KEY: &'static str = "mock_consensus";
     type Config = Config;
 }

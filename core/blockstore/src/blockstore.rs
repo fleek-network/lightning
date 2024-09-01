@@ -28,28 +28,28 @@ use crate::store::{Block, Store};
 
 pub const BLOCK_SIZE: usize = 256 << 10;
 
-pub struct Blockstore<C: Collection> {
+pub struct Blockstore<C: NodeComponents> {
     root: PathBuf,
     indexer: Arc<OnceLock<C::IndexerInterface>>,
-    collection: PhantomData<C>,
+    _components: PhantomData<C>,
 }
 
-impl<C: Collection> Clone for Blockstore<C> {
+impl<C: NodeComponents> Clone for Blockstore<C> {
     fn clone(&self) -> Self {
         Self {
             root: self.root.clone(),
             indexer: self.indexer.clone(),
-            collection: PhantomData,
+            _components: PhantomData,
         }
     }
 }
 
-impl<C: Collection> ConfigConsumer for Blockstore<C> {
+impl<C: NodeComponents> ConfigConsumer for Blockstore<C> {
     const KEY: &'static str = "fsstore";
     type Config = Config;
 }
 
-impl<C: Collection> BuildGraph for Blockstore<C> {
+impl<C: NodeComponents> BuildGraph for Blockstore<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::new().with(Self::new.with_event_handler(
             "_post",
@@ -61,7 +61,7 @@ impl<C: Collection> BuildGraph for Blockstore<C> {
     }
 }
 
-impl<C: Collection> Blockstore<C> {
+impl<C: NodeComponents> Blockstore<C> {
     fn new(config_provider: &C::ConfigProviderInterface) -> anyhow::Result<Self> {
         Self::init(config_provider.get::<Self>())
     }
@@ -80,7 +80,7 @@ impl<C: Collection> Blockstore<C> {
         Ok(Self {
             root,
             indexer: Arc::new(OnceLock::new()),
-            collection: PhantomData,
+            _components: PhantomData,
         })
     }
 
@@ -91,7 +91,7 @@ impl<C: Collection> Blockstore<C> {
     }
 }
 
-impl<C: Collection> BlockstoreInterface<C> for Blockstore<C> {
+impl<C: NodeComponents> BlockstoreInterface<C> for Blockstore<C> {
     type SharedPointer<T: ?Sized + Send + Sync> = Arc<T>;
     type Put = Putter<Self, C>;
     type DirPut = lightning_interfaces::_hacks::Blanket;
@@ -154,7 +154,7 @@ impl<C: Collection> BlockstoreInterface<C> for Blockstore<C> {
 
 impl<C> Store for Blockstore<C>
 where
-    C: Collection,
+    C: NodeComponents,
 {
     async fn fetch(&self, location: &str, key: &Blake3Hash, tag: Option<usize>) -> Option<Block> {
         let filename = match tag {

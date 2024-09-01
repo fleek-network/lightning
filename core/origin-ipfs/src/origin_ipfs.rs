@@ -22,14 +22,14 @@ use crate::config::Gateway;
 use crate::error::Error;
 use crate::{decoder, Config};
 
-pub struct IPFSOrigin<C: Collection> {
+pub struct IPFSOrigin<C: NodeComponents> {
     client: Arc<Client<HttpsConnector<HttpConnector>, Body>>,
     gateways: Arc<Vec<Gateway>>,
     gateway_timeout: Duration,
     blockstore: C::BlockstoreInterface,
 }
 
-impl<C: Collection> Clone for IPFSOrigin<C> {
+impl<C: NodeComponents> Clone for IPFSOrigin<C> {
     fn clone(&self) -> Self {
         Self {
             client: self.client.clone(),
@@ -40,7 +40,7 @@ impl<C: Collection> Clone for IPFSOrigin<C> {
     }
 }
 
-impl<C: Collection> IPFSOrigin<C> {
+impl<C: NodeComponents> IPFSOrigin<C> {
     pub fn new(config: Config, blockstore: C::BlockstoreInterface) -> Result<Self> {
         // Prepare the TLS client config
         let tls = rustls::ClientConfig::builder()
