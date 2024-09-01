@@ -33,13 +33,13 @@ pub fn entry(i: usize) -> OwnedEntry {
 
 /// Create a mock hash tree for a directory with `n` files.
 pub fn dir_hash_tree(n: usize) -> Vec<[u8; 32]> {
-    let mut hasher = DirectoryHasher::new(true);
+    let mut hasher = DirectoryHasher::default();
     hasher.reserve(n);
     for i in 0..n {
         let e = entry(i);
         hasher.insert(BorrowedEntry::from(&e)).unwrap();
     }
-    hasher.finalize().tree.unwrap()
+    hasher.finalize().1
 }
 
 /// Return the hash of the i-th mock directory entry.
