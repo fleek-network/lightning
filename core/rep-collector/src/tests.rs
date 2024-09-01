@@ -33,7 +33,7 @@ use crate::config::Config;
 use crate::measurement_manager::Interactions;
 use crate::{MyReputationQuery, MyReputationReporter};
 
-partial!(TestBinding {
+partial_node_components!(TestBinding {
     ConfigProviderInterface = JsonConfigProvider;
     ReputationAggregatorInterface = ReputationAggregator<Self>;
     ApplicationInterface = Application<Self>;

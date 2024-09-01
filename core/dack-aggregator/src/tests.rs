@@ -24,7 +24,7 @@ use tempfile::{tempdir, TempDir};
 
 use crate::{Config, DeliveryAcknowledgmentAggregator};
 
-partial!(TestBinding {
+partial_node_components!(TestBinding {
     ConfigProviderInterface = JsonConfigProvider;
     KeystoreInterface = EphemeralKeystore<Self>;
     ApplicationInterface = Application<Self>;

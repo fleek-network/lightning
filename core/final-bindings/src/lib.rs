@@ -9,7 +9,7 @@ use lightning_fetcher::fetcher::Fetcher;
 use lightning_forwarder::Forwarder;
 use lightning_handshake::handshake::Handshake;
 use lightning_indexer::Indexer;
-use lightning_interfaces::partial;
+use lightning_interfaces::partial_node_components;
 use lightning_keystore::Keystore;
 use lightning_notifier::Notifier;
 use lightning_origin_demuxer::OriginDemuxer;
@@ -26,7 +26,7 @@ use lightning_test_utils::consensus::{MockConsensus, MockForwarder};
 use lightning_topology::Topology;
 use lightning_utils::config::TomlConfigProvider;
 
-partial!(FinalTypes require full {
+partial_node_components!(FinalTypes require full {
     ForwarderInterface = Forwarder<Self>;
     ConsensusInterface = Consensus<Self>;
     CheckpointerInterface = Checkpointer<Self>;
@@ -55,7 +55,7 @@ partial!(FinalTypes require full {
     DeliveryAcknowledgmentAggregatorInterface = lightning_interfaces::_hacks::Blanket;
 });
 
-partial!(UseMockConsensus require full {
+partial_node_components!(UseMockConsensus require full {
     ConsensusInterface = MockConsensus<Self>;
     ForwarderInterface = MockForwarder<Self>;
     ConfigProviderInterface = TomlConfigProvider<Self>;

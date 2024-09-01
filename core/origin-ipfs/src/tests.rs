@@ -20,7 +20,7 @@ use tempfile::{tempdir, TempDir};
 use crate::config::{Config, Gateway, Protocol, RequestFormat};
 use crate::IPFSOrigin;
 
-partial!(TestBinding {
+partial_node_components!(TestBinding {
     ConfigProviderInterface = JsonConfigProvider;
     ApplicationInterface = Application<Self>;
     BlockstoreInterface = Blockstore<Self>;

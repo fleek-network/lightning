@@ -45,7 +45,7 @@ use tokio::sync::oneshot;
 use crate::config::Config;
 use crate::fetcher::Fetcher;
 
-partial!(TestBinding {
+partial_node_components!(TestBinding {
     ConfigProviderInterface = JsonConfigProvider;
     FetcherInterface = Fetcher<Self>;
     ForwarderInterface = MockForwarder<Self>;

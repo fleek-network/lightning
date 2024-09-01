@@ -14,7 +14,7 @@ use lightning_test_utils::logging;
 use lightning_topology::Topology;
 use resolved_pathbuf::ResolvedPathBuf;
 
-partial!(PartialBinding {
+partial_node_components!(PartialBinding {
     ApplicationInterface = Application<Self>;
     TopologyInterface = Topology<Self>;
     ServiceExecutorInterface = ServiceExecutor<Self>;

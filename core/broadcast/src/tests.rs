@@ -19,7 +19,7 @@ use tokio::sync::oneshot;
 
 use crate::Broadcast;
 
-partial!(TestBinding {
+partial_node_components!(TestBinding {
     ConfigProviderInterface = JsonConfigProvider;
     ApplicationInterface = Application<Self>;
     PoolInterface = PoolProvider<Self>;

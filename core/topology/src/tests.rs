@@ -20,7 +20,7 @@ use tempfile::tempdir;
 use crate::core::build_latency_matrix;
 use crate::Topology;
 
-partial!(TestBinding {
+partial_node_components!(TestBinding {
     ConfigProviderInterface = JsonConfigProvider;
     TopologyInterface = Topology<Self>;
     ApplicationInterface = Application<Self>;

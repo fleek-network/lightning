@@ -22,6 +22,7 @@ pub trait KeystoreInterface<C: NodeComponents>:
 
     /// Standalone utility to generate keys from a given config.
     /// If accept_partial is false, then all keys MUST NOT exist for this method to return ok.
-    /// Otherwise if true, partial keys will be preserved and only missing ones will be generated.
+    /// Otherwise if true, partial_node_components keys will be preserved and only missing ones will
+    /// be generated.
     fn generate_keys(provider: Self::Config, accept_partial: bool) -> anyhow::Result<()>;
 }

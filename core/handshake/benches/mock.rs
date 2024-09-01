@@ -20,7 +20,7 @@ use tokio::task::JoinHandle;
 
 static MB: usize = 1024 * 1024;
 
-partial!(TestBinding {
+partial_node_components!(TestBinding {
     KeystoreInterface = EphemeralKeystore<Self>;
     SignerInterface = Signer<Self>;
     BlockstoreInterface = Blockstore<Self>;

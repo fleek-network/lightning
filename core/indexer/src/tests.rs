@@ -16,7 +16,7 @@ use tempfile::tempdir;
 
 use crate::Indexer;
 
-partial!(TestBinding {
+partial_node_components!(TestBinding {
     ConfigProviderInterface = JsonConfigProvider;
     ApplicationInterface = Application<Self>;
     KeystoreInterface = EphemeralKeystore<Self>;

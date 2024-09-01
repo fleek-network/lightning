@@ -29,7 +29,7 @@ use crate::endpoint::EndpointTask;
 use crate::event::{Event, EventReceiver};
 use crate::{provider, Config, PoolProvider};
 
-partial!(TestBinding {
+partial_node_components!(TestBinding {
     ConfigProviderInterface = JsonConfigProvider;
     ApplicationInterface = Application<Self>;
     PoolInterface = PoolProvider<Self>;

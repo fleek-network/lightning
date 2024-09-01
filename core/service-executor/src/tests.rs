@@ -23,7 +23,7 @@ use tempfile::{tempdir, TempDir};
 
 use crate::shim::{ServiceExecutor, ServiceExecutorConfig};
 
-partial!(TestBinding {
+partial_node_components!(TestBinding {
     ConfigProviderInterface = JsonConfigProvider;
     ServiceExecutorInterface = ServiceExecutor<Self>;
     NotifierInterface = Notifier<Self>;
