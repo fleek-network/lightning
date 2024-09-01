@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 lightning-interfaces = { path = "../interfaces" }
 lightning-node = { path = "../node" }
-lightning-final-bindings = { path = "../final-bindings" }
+lightning-node-bindings = { path = "../node-bindings" }
 lightning-rpc = { path = "../rpc" }
 lightning-application = { path = "../application" }
 lightning-checkpointer.workspace = true
@@ -51,4 +51,4 @@ clap = { version = "4.2", features = ["derive"] }
 lightning-workspace-hack.workspace = true
 
 [features]
-services = ["lightning-final-bindings/services"]
+services = ["lightning-node-bindings/services"]

@@ -1,11 +1,11 @@
 use fleek_crypto::AccountOwnerSecretKey;
 use futures::Future;
 use lightning_blockstore::blockstore::Blockstore;
-use lightning_final_bindings::FullNodeComponents;
 use lightning_interfaces::fdi::MultiThreadedProvider;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{NodePorts, Staking};
 use lightning_node::ContainedNode;
+use lightning_node_bindings::FullNodeComponents;
 use lightning_rpc::Rpc;
 use lightning_utils::config::TomlConfigProvider;
 

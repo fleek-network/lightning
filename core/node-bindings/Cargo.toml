@@ -1,5 +1,5 @@
 [package]
-name = "lightning-final-bindings"
+name = "lightning-node-bindings"
 version.workspace = true
 edition.workspace = true
 

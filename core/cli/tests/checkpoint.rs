@@ -20,13 +20,13 @@ use lightning_dack_aggregator::{
     Config as DeliveryAcknowledgmentConfig,
     DeliveryAcknowledgmentAggregator,
 };
-use lightning_final_bindings::FullNodeComponents;
 use lightning_handshake::config::{HandshakeConfig, TransportConfig};
 use lightning_handshake::handshake::Handshake;
 use lightning_handshake::transports::webrtc::WebRtcConfig;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Genesis, GenesisNode, HandshakePorts, NodePorts};
 use lightning_keystore::{Keystore, KeystoreConfig};
+use lightning_node_bindings::FullNodeComponents;
 use lightning_pinger::{Config as PingerConfig, Pinger};
 use lightning_pool::{Config as PoolConfig, PoolProvider};
 use lightning_rep_collector::config::Config as RepAggConfig;
