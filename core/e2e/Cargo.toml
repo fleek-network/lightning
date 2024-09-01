@@ -11,6 +11,7 @@ lightning-node = { path = "../node" }
 lightning-final-bindings = { path = "../final-bindings" }
 lightning-rpc = { path = "../rpc" }
 lightning-application = { path = "../application" }
+lightning-checkpointer.workspace = true
 lightning-syncronizer = { path = "../syncronizer" }
 lightning-broadcast = { path = "../broadcast" }
 lightning-consensus = { path = "../consensus" }

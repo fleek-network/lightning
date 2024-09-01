@@ -1,0 +1,43 @@
+[package]
+name = "lightning-checkpointer"
+version = "0.0.0"
+edition = "2021"
+
+
+[dependencies]
+anyhow.workspace = true
+atomo.workspace = true
+atomo-rocks.workspace = true
+bit-set.workspace = true
+fleek-crypto.workspace = true
+lightning-interfaces.workspace = true
+lightning-utils.workspace = true
+lightning-workspace-hack.workspace = true
+ready.workspace = true
+resolved-pathbuf.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+
+
+[dev-dependencies]
+futures.workspace = true
+hp-fixed.workspace = true
+lightning-application.workspace = true
+lightning-blockstore.workspace = true
+lightning-blockstore-server.workspace = true
+lightning-broadcast.workspace = true
+lightning-forwarder.workspace = true
+lightning-notifier.workspace = true
+lightning-pool.workspace = true
+lightning-rep-collector.workspace = true
+lightning-signer.workspace = true
+lightning-syncronizer.workspace = true
+lightning-resolver.workspace = true
+lightning-test-utils.workspace = true
+lightning-topology.workspace = true
+pretty_assertions.workspace = true
+rand.workspace = true
+tempfile.workspace = true
+tracing-subscriber.workspace = true

@@ -3,6 +3,7 @@ use lightning_archive::archive::Archive;
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore_server::BlockstoreServer;
 use lightning_broadcast::Broadcast;
+use lightning_checkpointer::Checkpointer;
 use lightning_consensus::consensus::Consensus;
 use lightning_fetcher::fetcher::Fetcher;
 use lightning_forwarder::Forwarder;
@@ -28,6 +29,7 @@ use lightning_utils::config::TomlConfigProvider;
 partial!(FinalTypes require full {
     ForwarderInterface = Forwarder<Self>;
     ConsensusInterface = Consensus<Self>;
+    CheckpointerInterface = Checkpointer<Self>;
     ConfigProviderInterface = TomlConfigProvider<Self>;
     ApplicationInterface = Application<Self>;
     BlockstoreInterface = Blockstore<Self>;
@@ -60,6 +62,7 @@ partial!(UseMockConsensus require full {
     ApplicationInterface = Application<Self>;
     BlockstoreInterface = Blockstore<Self>;
     BlockstoreServerInterface = BlockstoreServer<Self>;
+    CheckpointerInterface = Checkpointer<Self>;
     SyncronizerInterface = Syncronizer<Self>;
     BroadcastInterface = Broadcast<Self>;
     TopologyInterface = Topology<Self>;

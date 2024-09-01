@@ -74,6 +74,7 @@ macro_rules! partial {
             ApplicationInterface,
             BlockstoreInterface,
             BlockstoreServerInterface,
+            CheckpointerInterface,
             SyncronizerInterface,
             BroadcastInterface,
             TopologyInterface,
