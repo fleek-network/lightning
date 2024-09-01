@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser};
-use lightning_final_bindings::{FinalTypes, UseMockConsensus};
+use lightning_final_bindings::{FullNodeComponents, UseMockConsensus};
 use lightning_interfaces::NodeComponents;
 use lightning_utils::config::TomlConfigProvider;
 use resolved_pathbuf::ResolvedPathBuf;
@@ -35,7 +35,7 @@ impl Cli {
                 info!("Using MockConsensus");
                 self.run::<UseMockConsensus>(config_path).await
             },
-            false => self.run::<FinalTypes>(config_path).await,
+            false => self.run::<FullNodeComponents>(config_path).await,
         }
     }
 

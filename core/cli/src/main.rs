@@ -4,7 +4,7 @@ use anyhow::Result;
 use clap::Parser;
 use lightning_cli::args::Args;
 use lightning_cli::cli::Cli;
-use lightning_final_bindings::FinalTypes;
+use lightning_final_bindings::FullNodeComponents;
 use lightning_interfaces::prelude::*;
 
 fn main() -> Result<()> {
@@ -16,7 +16,7 @@ fn main() -> Result<()> {
         // instead run the code for that service. We avoid using a runtime so that a service can use
         // its own.
         cli.setup_logging(true);
-        <c!(FinalTypes::ServiceExecutorInterface)>::run_service(
+        <c!(FullNodeComponents::ServiceExecutorInterface)>::run_service(
             service_id.parse().expect("SERVICE_ID to be a number"),
         );
         std::process::exit(0);
