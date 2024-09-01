@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser};
-use lightning_final_bindings::{FullNodeComponents, UseMockConsensus};
 use lightning_interfaces::NodeComponents;
+use lightning_node_bindings::{FullNodeComponents, UseMockConsensus};
 use lightning_utils::config::TomlConfigProvider;
 use resolved_pathbuf::ResolvedPathBuf;
 use tracing::{info, warn};

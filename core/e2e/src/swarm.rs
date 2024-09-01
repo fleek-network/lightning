@@ -22,13 +22,13 @@ use lightning_blockstore_server::{BlockstoreServer, Config as BlockstoreServerCo
 use lightning_checkpointer::{Checkpointer, CheckpointerConfig, CheckpointerDatabaseConfig};
 use lightning_consensus::config::Config as ConsensusConfig;
 use lightning_consensus::consensus::Consensus;
-use lightning_final_bindings::FullNodeComponents;
 use lightning_handshake::config::{HandshakeConfig, TransportConfig};
 use lightning_handshake::handshake::Handshake;
 use lightning_handshake::transports::http::Config;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Genesis, GenesisNode, NodePorts, ServiceId, Staking};
 use lightning_keystore::{Keystore, KeystoreConfig};
+use lightning_node_bindings::FullNodeComponents;
 use lightning_pinger::{Config as PingerConfig, Pinger};
 use lightning_pool::{Config as PoolConfig, PoolProvider};
 use lightning_rep_collector::config::Config as RepAggConfig;

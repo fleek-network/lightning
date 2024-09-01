@@ -12,12 +12,12 @@ use fleek_crypto::{
 use lightning_application::app::Application;
 use lightning_application::config::ApplicationConfig;
 use lightning_application::network::Network;
-use lightning_final_bindings::UseMockConsensus;
 use lightning_handshake::config::HandshakeConfig;
 use lightning_handshake::handshake::Handshake;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Genesis, GenesisNode};
 use lightning_keystore::Keystore;
+use lightning_node_bindings::UseMockConsensus;
 use lightning_rpc::{Config as RpcConfig, Rpc};
 use lightning_test_utils::consensus::MockConsensus;
 use lightning_utils::config::TomlConfigProvider;
