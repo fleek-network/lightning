@@ -7,7 +7,7 @@ use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::Genesis;
-use lightning_interfaces::{partial, Ref};
+use lightning_interfaces::{partial_node_components, Ref};
 use lightning_notifier::Notifier;
 use lightning_test_utils::consensus::{
     Config as MockConsensusConfig,
@@ -21,7 +21,7 @@ use tempfile::tempdir;
 use crate::archive::Archive;
 use crate::config::Config as ArchiveConfig;
 
-partial!(TestBinding {
+partial_node_components!(TestBinding {
     ApplicationInterface = Application<Self>;
     ArchiveInterface = Archive<Self>;
     BlockstoreInterface = Blockstore<Self>;

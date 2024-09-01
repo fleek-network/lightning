@@ -18,7 +18,7 @@ use tempfile::{tempdir, TempDir};
 
 use crate::{get_url_and_sri, HttpOrigin};
 
-partial!(TestBinding {
+partial_node_components!(TestBinding {
     ConfigProviderInterface = JsonConfigProvider;
     ApplicationInterface = Application<Self>;
     BlockstoreInterface = Blockstore<Self>;

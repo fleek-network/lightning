@@ -20,7 +20,7 @@ use types::NodePorts;
 
 use crate::{TaskBroker, TaskBrokerConfig};
 
-partial!(TestBinding {
+partial_node_components!(TestBinding {
     ConfigProviderInterface = JsonConfigProvider;
     ApplicationInterface = Application<Self>;
     KeystoreInterface = EphemeralKeystore<Self>;

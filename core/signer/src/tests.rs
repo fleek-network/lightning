@@ -14,7 +14,7 @@ use tempfile::{tempdir, TempDir};
 
 use crate::Signer;
 
-partial!(TestBinding {
+partial_node_components!(TestBinding {
     ConfigProviderInterface = JsonConfigProvider;
     KeystoreInterface = EphemeralKeystore<Self>;
     SignerInterface = Signer<Self>;

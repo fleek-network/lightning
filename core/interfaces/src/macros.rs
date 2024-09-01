@@ -2,11 +2,11 @@
 /// meant to be exported.
 #[doc(hidden)]
 #[macro_export]
-macro_rules! node_components {
-    ([$($service:tt),* $(,)?]) => {
+macro_rules! define_node_components {
+    ([$($component:tt),* $(,)?]) => {
         pub trait NodeComponents: Clone + Send + Sync + Sized + 'static {
         $(
-            type $service: $service<Self> + 'static;
+            type $component: $component<Self> + 'static;
          )*
 
             /// Build the `fdi` dependency graph of this node component.
@@ -36,14 +36,14 @@ macro_rules! node_components {
                         ReputationAggregatorInterface::get_query(this)
                     )
                     $(
-                    .with_module::<<Self as NodeComponents>::$service>()
+                    .with_module::<<Self as NodeComponents>::$component>()
                     )*
             }
 
             /// The implementation should call `provider.get::<ty>` for every member that
             /// implements ConfigConsumer.
             ///
-            /// An implementation is provided when using the partial macro.
+            /// An implementation is provided when using the partial_node_components macro.
             fn capture_configs(provider: &impl $crate::ConfigProviderInterface<Self>);
         }
     }
@@ -65,13 +65,14 @@ macro_rules! c {
     };
 }
 
-/// Generate a partial implementation of node components this uses the provided types to assign the
-/// associated types on the node components while filling every other member with the blanket.
+/// Generate a partial_node_components implementation of node components this uses the provided
+/// types to assign the associated types on the node components while filling every other member
+/// with the blanket.
 ///
 /// This is a workaround on the fact that trait associated types do not have support for default
 /// types (yet).
 #[macro_export]
-macro_rules! partial {
+macro_rules! partial_node_components {
     (@gen_missing { $($name:ident),* }) => {
         $crate::proc::__gen_missing_assignments!({
             ConfigProviderInterface,
@@ -123,8 +124,8 @@ macro_rules! partial {
 
         impl $crate::NodeComponents for $struct {
             $(type $name = $ty;)*
-            $crate::partial!(@gen_missing { $($name),* });
-            $crate::partial!(@gen_body { $($name = $ty;)* });
+            $crate::partial_node_components!(@gen_missing { $($name),* });
+            $crate::partial_node_components!(@gen_body { $($name = $ty;)* });
         }
     };
     // In this case we don't provide the missing types.
@@ -134,7 +135,7 @@ macro_rules! partial {
 
         impl $crate::NodeComponents for $struct {
             $(type $name = $ty;)*
-            $crate::partial!(@gen_body { $($name = $ty;)* });
+            $crate::partial_node_components!(@gen_body { $($name = $ty;)* });
         }
     };
 }
@@ -205,7 +206,7 @@ mod tests {
     use std::time::Duration;
 
     use affair::AsyncWorkerUnordered;
-    partial!(BlanketCollection {});
+    partial_node_components!(BlanketCollection {});
 
     // This test only has to be compiled in order to be considered passing.
     #[test]

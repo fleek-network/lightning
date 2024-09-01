@@ -17,7 +17,7 @@ use tempfile::tempdir;
 use crate::config::Config;
 use crate::resolver::Resolver;
 
-partial!(TestBinding {
+partial_node_components!(TestBinding {
     ConfigProviderInterface = JsonConfigProvider;
     KeystoreInterface = EphemeralKeystore<Self>;
     ApplicationInterface = Application<Self>;

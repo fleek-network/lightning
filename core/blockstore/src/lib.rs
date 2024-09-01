@@ -18,7 +18,7 @@ mod tests {
     use crate::blockstore::{Blockstore, BLOCK_SIZE};
     use crate::config::Config;
 
-    partial!(TestBinding {
+    partial_node_components!(TestBinding {
         BlockstoreInterface = Blockstore<Self>;
     });
 

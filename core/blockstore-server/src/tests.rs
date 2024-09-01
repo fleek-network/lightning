@@ -31,7 +31,7 @@ use super::BlockstoreServer;
 use crate::blockstore_server::Frame;
 use crate::config::Config;
 
-partial!(TestBinding {
+partial_node_components!(TestBinding {
     ConfigProviderInterface = JsonConfigProvider;
     BlockstoreInterface = Blockstore<Self>;
     BlockstoreServerInterface = BlockstoreServer<Self>;

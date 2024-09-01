@@ -12,8 +12,8 @@ use serde_json::Value;
 use versions::Versioning;
 
 /// OPEN-RPC documentation following the OpenRPC specification <https://spec.open-rpc.org>
-/// The implementation is partial, only required fields and subset of optional fields
-/// in the specification are implemented catered to Sui's need.
+/// The implementation is partial_node_components, only required fields and subset of optional
+/// fields in the specification are implemented catered to Sui's need.
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Project {
     openrpc: String,

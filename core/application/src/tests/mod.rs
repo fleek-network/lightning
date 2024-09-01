@@ -1,4 +1,4 @@
-use lightning_interfaces::partial;
+use lightning_interfaces::partial_node_components;
 use lightning_test_utils::json_config::JsonConfigProvider;
 
 use crate::Application;
@@ -15,7 +15,7 @@ mod reputation;
 mod staking;
 mod utils;
 
-partial!(TestBinding {
+partial_node_components!(TestBinding {
     ConfigProviderInterface = JsonConfigProvider;
     ApplicationInterface = Application<Self>;
 });

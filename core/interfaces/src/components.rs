@@ -10,7 +10,7 @@ use super::*;
 // Define the node components of every top-level trait in the system. The node components is
 // basically a trait with a bunch of associated types called members. Each of them taking the entire
 // node components as input.
-node_components!([
+define_node_components!([
     ConfigProviderInterface,
     KeystoreInterface,
     ApplicationInterface,
