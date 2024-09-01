@@ -26,7 +26,7 @@ use lightning_test_utils::consensus::{MockConsensus, MockForwarder};
 use lightning_topology::Topology;
 use lightning_utils::config::TomlConfigProvider;
 
-partial_node_components!(FinalTypes require full {
+partial_node_components!(FullNodeComponents require full {
     ForwarderInterface = Forwarder<Self>;
     ConsensusInterface = Consensus<Self>;
     CheckpointerInterface = Checkpointer<Self>;

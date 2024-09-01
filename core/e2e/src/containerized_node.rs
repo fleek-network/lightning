@@ -1,7 +1,7 @@
 use fleek_crypto::AccountOwnerSecretKey;
 use futures::Future;
 use lightning_blockstore::blockstore::Blockstore;
-use lightning_final_bindings::FinalTypes;
+use lightning_final_bindings::FullNodeComponents;
 use lightning_interfaces::fdi::MultiThreadedProvider;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{NodePorts, Staking};
@@ -10,9 +10,9 @@ use lightning_rpc::Rpc;
 use lightning_utils::config::TomlConfigProvider;
 
 pub struct ContainerizedNode {
-    config: TomlConfigProvider<FinalTypes>,
+    config: TomlConfigProvider<FullNodeComponents>,
     owner_secret_key: AccountOwnerSecretKey,
-    node: ContainedNode<FinalTypes>,
+    node: ContainedNode<FullNodeComponents>,
     index: usize,
     genesis_stake: Staking,
     ports: NodePorts,
@@ -21,7 +21,7 @@ pub struct ContainerizedNode {
 
 impl ContainerizedNode {
     pub fn new(
-        config: TomlConfigProvider<FinalTypes>,
+        config: TomlConfigProvider<FullNodeComponents>,
         owner_secret_key: AccountOwnerSecretKey,
         ports: NodePorts,
         index: usize,
@@ -30,7 +30,8 @@ impl ContainerizedNode {
     ) -> Self {
         let provider = MultiThreadedProvider::default();
         provider.insert(config.clone());
-        let node = ContainedNode::<FinalTypes>::new(provider, Some(format!("NODE-{index}")));
+        let node =
+            ContainedNode::<FullNodeComponents>::new(provider, Some(format!("NODE-{index}")));
         Self {
             config,
             owner_secret_key,
@@ -59,7 +60,7 @@ impl ContainerizedNode {
     }
 
     pub fn get_rpc_address(&self) -> String {
-        let config = self.config.get::<Rpc<FinalTypes>>();
+        let config = self.config.get::<Rpc<FullNodeComponents>>();
         format!("http://{}", config.addr())
     }
 
@@ -75,16 +76,16 @@ impl ContainerizedNode {
         self.genesis_stake.clone()
     }
 
-    pub fn take_syncronizer(&self) -> fdi::Ref<c!(FinalTypes::SyncronizerInterface)> {
+    pub fn take_syncronizer(&self) -> fdi::Ref<c!(FullNodeComponents::SyncronizerInterface)> {
         self.node
             .provider()
-            .get::<<FinalTypes as NodeComponents>::SyncronizerInterface>()
+            .get::<<FullNodeComponents as NodeComponents>::SyncronizerInterface>()
     }
 
-    pub fn take_blockstore(&self) -> Blockstore<FinalTypes> {
+    pub fn take_blockstore(&self) -> Blockstore<FullNodeComponents> {
         self.node
             .provider()
-            .get::<<FinalTypes as NodeComponents>::BlockstoreInterface>()
+            .get::<<FullNodeComponents as NodeComponents>::BlockstoreInterface>()
             .clone()
     }
 

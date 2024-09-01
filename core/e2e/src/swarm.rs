@@ -22,7 +22,7 @@ use lightning_blockstore_server::{BlockstoreServer, Config as BlockstoreServerCo
 use lightning_checkpointer::{Checkpointer, CheckpointerConfig, CheckpointerDatabaseConfig};
 use lightning_consensus::config::Config as ConsensusConfig;
 use lightning_consensus::consensus::Consensus;
-use lightning_final_bindings::FinalTypes;
+use lightning_final_bindings::FullNodeComponents;
 use lightning_handshake::config::{HandshakeConfig, TransportConfig};
 use lightning_handshake::handshake::Handshake;
 use lightning_handshake::transports::http::Config;
@@ -144,7 +144,7 @@ impl Swarm {
         &self,
     ) -> Vec<(
         NodePublicKey,
-        fdi::Ref<c!(FinalTypes::SyncronizerInterface)>,
+        fdi::Ref<c!(FullNodeComponents::SyncronizerInterface)>,
     )> {
         self.nodes
             .iter()
@@ -153,14 +153,14 @@ impl Swarm {
             .collect()
     }
 
-    pub fn get_blockstores(&self) -> Vec<Blockstore<FinalTypes>> {
+    pub fn get_blockstores(&self) -> Vec<Blockstore<FullNodeComponents>> {
         self.nodes
             .values()
             .map(|node| node.take_blockstore())
             .collect()
     }
 
-    pub fn get_blockstore(&self, node: &NodePublicKey) -> Option<Blockstore<FinalTypes>> {
+    pub fn get_blockstore(&self, node: &NodePublicKey) -> Option<Blockstore<FullNodeComponents>> {
         self.nodes.get(node).map(|node| node.take_blockstore())
     }
 
@@ -395,7 +395,7 @@ impl SwarmBuilder {
             } else {
                 StorageConfig::InMemory
             };
-            config.inject::<Application<FinalTypes>>(ApplicationConfig {
+            config.inject::<Application<FullNodeComponents>>(ApplicationConfig {
                 network: None,
                 genesis_path: Some(genesis_path.clone()),
                 storage,
@@ -453,28 +453,28 @@ fn build_config(
     archiver: bool,
     syncronizer_delta: Duration,
     services: &[ServiceId],
-) -> TomlConfigProvider<FinalTypes> {
-    let config = TomlConfigProvider::<FinalTypes>::default();
+) -> TomlConfigProvider<FullNodeComponents> {
+    let config = TomlConfigProvider::<FullNodeComponents>::default();
 
-    config.inject::<Resolver<FinalTypes>>(ResolverConfig {
+    config.inject::<Resolver<FullNodeComponents>>(ResolverConfig {
         store_path: root
             .join("data/resolver_store")
             .try_into()
             .expect("Failed to resolve path"),
     });
-    config.inject::<Rpc<FinalTypes>>(RpcConfig {
+    config.inject::<Rpc<FullNodeComponents>>(RpcConfig {
         hmac_secret_dir: root.to_path_buf().into(),
         ..RpcConfig::default_with_port(ports.rpc)
     });
 
-    config.inject::<Consensus<FinalTypes>>(ConsensusConfig {
+    config.inject::<Consensus<FullNodeComponents>>(ConsensusConfig {
         store_path: root
             .join("data/narwhal_store")
             .try_into()
             .expect("Failed to resolve path"),
     });
 
-    config.inject::<Keystore<FinalTypes>>(KeystoreConfig {
+    config.inject::<Keystore<FullNodeComponents>>(KeystoreConfig {
         node_key_path: root
             .join("keys/node.pem")
             .try_into()
@@ -485,41 +485,41 @@ fn build_config(
             .expect("Failed to resolve path"),
     });
 
-    config.inject::<Blockstore<FinalTypes>>(BlockstoreConfig {
+    config.inject::<Blockstore<FullNodeComponents>>(BlockstoreConfig {
         root: root
             .join("data/blockstore")
             .try_into()
             .expect("Failed to resolve path"),
     });
 
-    config.inject::<BlockstoreServer<FinalTypes>>(BlockstoreServerConfig::default());
+    config.inject::<BlockstoreServer<FullNodeComponents>>(BlockstoreServerConfig::default());
 
-    config.inject::<Handshake<FinalTypes>>(HandshakeConfig {
+    config.inject::<Handshake<FullNodeComponents>>(HandshakeConfig {
         // TODO: figure out how to have e2e testing for the different transports (browser oriented)
         transports: vec![TransportConfig::Http(Config {})],
         http_address: ([0, 0, 0, 0], ports.handshake.http).into(),
         ..Default::default()
     });
 
-    config.inject::<ServiceExecutor<FinalTypes>>(ServiceExecutorConfig {
+    config.inject::<ServiceExecutor<FullNodeComponents>>(ServiceExecutorConfig {
         services: services.iter().copied().collect(),
         ipc_path: root.join("ipc").try_into().expect("Failed to resolve path"),
     });
 
-    config.inject::<ReputationAggregator<FinalTypes>>(RepAggConfig {
+    config.inject::<ReputationAggregator<FullNodeComponents>>(RepAggConfig {
         reporter_buffer_size: 1,
     });
 
-    config.inject::<PoolProvider<FinalTypes>>(PoolConfig {
+    config.inject::<PoolProvider<FullNodeComponents>>(PoolConfig {
         address: format!("127.0.0.1:{}", ports.pool).parse().unwrap(),
         ..Default::default()
     });
 
-    config.inject::<Syncronizer<FinalTypes>>(SyncronizerConfig {
+    config.inject::<Syncronizer<FullNodeComponents>>(SyncronizerConfig {
         epoch_change_delta: syncronizer_delta,
     });
 
-    config.inject::<Archive<FinalTypes>>(ArchiveConfig {
+    config.inject::<Archive<FullNodeComponents>>(ArchiveConfig {
         is_archive: archiver,
         store_path: root
             .join("data/archive")
@@ -527,12 +527,12 @@ fn build_config(
             .expect("Failed to resolve path"),
     });
 
-    config.inject::<Pinger<FinalTypes>>(PingerConfig {
+    config.inject::<Pinger<FullNodeComponents>>(PingerConfig {
         address: format!("127.0.0.1:{}", ports.pinger).parse().unwrap(),
         ping_interval: Duration::from_millis(1000),
     });
 
-    config.inject::<Checkpointer<FinalTypes>>(CheckpointerConfig {
+    config.inject::<Checkpointer<FullNodeComponents>>(CheckpointerConfig {
         database: CheckpointerDatabaseConfig {
             path: root
                 .join("data/checkpointer")
@@ -549,11 +549,14 @@ fn build_config(
 ///
 /// Returns the public keys of the generated keys.
 fn generate_and_store_node_secret(
-    config: &TomlConfigProvider<FinalTypes>,
+    config: &TomlConfigProvider<FullNodeComponents>,
 ) -> (NodePublicKey, ConsensusPublicKey) {
-    Keystore::<FinalTypes>::generate_keys(config.get::<Keystore<FinalTypes>>(), true)
-        .expect("failed to ensure keys are generated");
-    let keystore = Keystore::<FinalTypes>::init(config).expect("failed to load keystore");
+    Keystore::<FullNodeComponents>::generate_keys(
+        config.get::<Keystore<FullNodeComponents>>(),
+        true,
+    )
+    .expect("failed to ensure keys are generated");
+    let keystore = Keystore::<FullNodeComponents>::init(config).expect("failed to load keystore");
     (keystore.get_ed25519_pk(), keystore.get_bls_pk())
 }
 

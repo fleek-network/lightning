@@ -20,7 +20,7 @@ use lightning_dack_aggregator::{
     Config as DeliveryAcknowledgmentConfig,
     DeliveryAcknowledgmentAggregator,
 };
-use lightning_final_bindings::FinalTypes;
+use lightning_final_bindings::FullNodeComponents;
 use lightning_handshake::config::{HandshakeConfig, TransportConfig};
 use lightning_handshake::handshake::Handshake;
 use lightning_handshake::transports::webrtc::WebRtcConfig;
@@ -52,12 +52,12 @@ fn build_config(
     genesis_path: ResolvedPathBuf,
     keystore_config: KeystoreConfig,
     ports: NodePorts,
-) -> TomlConfigProvider<FinalTypes> {
+) -> TomlConfigProvider<FullNodeComponents> {
     let path = temp_dir.path().to_path_buf();
 
-    let config = TomlConfigProvider::<FinalTypes>::default();
+    let config = TomlConfigProvider::<FullNodeComponents>::default();
 
-    config.inject::<Application<FinalTypes>>(ApplicationConfig {
+    config.inject::<Application<FullNodeComponents>>(ApplicationConfig {
         network: None,
         genesis_path: Some(genesis_path),
         storage: StorageConfig::RocksDb,
@@ -66,25 +66,25 @@ fn build_config(
         dev: None,
     });
 
-    config.inject::<Resolver<FinalTypes>>(ResolverConfig {
+    config.inject::<Resolver<FullNodeComponents>>(ResolverConfig {
         store_path: path
             .join("data/resolver_store")
             .try_into()
             .expect("Failed to resolve path"),
     });
-    config.inject::<Rpc<FinalTypes>>(RpcConfig {
+    config.inject::<Rpc<FullNodeComponents>>(RpcConfig {
         hmac_secret_dir: Some(temp_dir.path().to_path_buf()),
         ..RpcConfig::default_with_port(ports.rpc)
     });
 
-    config.inject::<Consensus<FinalTypes>>(ConsensusConfig {
+    config.inject::<Consensus<FullNodeComponents>>(ConsensusConfig {
         store_path: path
             .join("data/narwhal_store")
             .try_into()
             .expect("Failed to resolve path"),
     });
 
-    //config.inject::<Signer<FinalTypes>>(SignerConfig {
+    //config.inject::<Signer<FullNodeComponents>>(SignerConfig {
     //    node_key_path: path
     //        .join("keys/node.pem")
     //        .try_into()
@@ -95,18 +95,18 @@ fn build_config(
     //        .expect("Failed to resolve path"),
     //});
 
-    config.inject::<Keystore<FinalTypes>>(keystore_config);
+    config.inject::<Keystore<FullNodeComponents>>(keystore_config);
 
-    config.inject::<Blockstore<FinalTypes>>(BlockstoreConfig {
+    config.inject::<Blockstore<FullNodeComponents>>(BlockstoreConfig {
         root: path
             .join("data/blockstore")
             .try_into()
             .expect("Failed to resolve path"),
     });
 
-    config.inject::<BlockstoreServer<FinalTypes>>(BlockstoreServerConfig::default());
+    config.inject::<BlockstoreServer<FullNodeComponents>>(BlockstoreServerConfig::default());
 
-    config.inject::<Handshake<FinalTypes>>(HandshakeConfig {
+    config.inject::<Handshake<FullNodeComponents>>(HandshakeConfig {
         // TODO: figure out how to have e2e testing for the different transports (browser oriented)
         transports: vec![TransportConfig::WebRTC(WebRtcConfig {
             address: ([0, 0, 0, 0], ports.handshake.webrtc).into(),
@@ -115,25 +115,25 @@ fn build_config(
         ..Default::default()
     });
 
-    config.inject::<ServiceExecutor<FinalTypes>>(ServiceExecutorConfig {
+    config.inject::<ServiceExecutor<FullNodeComponents>>(ServiceExecutorConfig {
         services: Default::default(),
         ..Default::default()
     });
 
-    config.inject::<ReputationAggregator<FinalTypes>>(RepAggConfig {
+    config.inject::<ReputationAggregator<FullNodeComponents>>(RepAggConfig {
         reporter_buffer_size: 1,
     });
 
-    config.inject::<PoolProvider<FinalTypes>>(PoolConfig {
+    config.inject::<PoolProvider<FullNodeComponents>>(PoolConfig {
         address: format!("127.0.0.1:{}", ports.pool).parse().unwrap(),
         ..Default::default()
     });
 
-    config.inject::<Syncronizer<FinalTypes>>(SyncronizerConfig {
+    config.inject::<Syncronizer<FullNodeComponents>>(SyncronizerConfig {
         epoch_change_delta: Duration::from_secs(500),
     });
 
-    config.inject::<Archive<FinalTypes>>(ArchiveConfig {
+    config.inject::<Archive<FullNodeComponents>>(ArchiveConfig {
         is_archive: true,
         store_path: path
             .join("data/archive")
@@ -141,20 +141,22 @@ fn build_config(
             .expect("Failed to resolve path"),
     });
 
-    config.inject::<Pinger<FinalTypes>>(PingerConfig {
+    config.inject::<Pinger<FullNodeComponents>>(PingerConfig {
         address: format!("127.0.0.1:{}", ports.pinger).parse().unwrap(),
         ping_interval: Duration::from_secs(5),
     });
 
-    config.inject::<DeliveryAcknowledgmentAggregator<FinalTypes>>(DeliveryAcknowledgmentConfig {
-        db_path: path
-            .join("data/dack_aggregator")
-            .try_into()
-            .expect("Failed to resolve path"),
-        ..Default::default()
-    });
+    config.inject::<DeliveryAcknowledgmentAggregator<FullNodeComponents>>(
+        DeliveryAcknowledgmentConfig {
+            db_path: path
+                .join("data/dack_aggregator")
+                .try_into()
+                .expect("Failed to resolve path"),
+            ..Default::default()
+        },
+    );
 
-    config.inject::<Checkpointer<FinalTypes>>(CheckpointerConfig {
+    config.inject::<Checkpointer<FullNodeComponents>>(CheckpointerConfig {
         database: CheckpointerDatabaseConfig {
             path: path
                 .join("data/checkpointer")
@@ -248,9 +250,9 @@ async fn node_checkpointing() -> Result<()> {
 
     // Now that we have a checkpoint, we initialize the node.
     let config = build_config(&temp_dir, genesis_path, signer_config, node_ports);
-    let app_config = config.get::<<FinalTypes as NodeComponents>::ApplicationInterface>();
+    let app_config = config.get::<<FullNodeComponents as NodeComponents>::ApplicationInterface>();
 
-    let mut node = Node::<FinalTypes>::init(config.clone())
+    let mut node = Node::<FullNodeComponents>::init(config.clone())
         .map_err(|e| anyhow::anyhow!("Node Initialization failed: {e:?}"))
         .context("Could not start the node.")?;
 
@@ -276,10 +278,10 @@ async fn node_checkpointing() -> Result<()> {
                 std::mem::drop(node);
 
                 // start local env in checkpoint mode to seed database with the new checkpoint
-                <FinalTypes as NodeComponents>::ApplicationInterface::load_from_checkpoint(
+                <FullNodeComponents as NodeComponents>::ApplicationInterface::load_from_checkpoint(
                     &app_config, checkpoint.clone(), *checkpoint_hash.as_bytes()).await?;
 
-                node = Node::<FinalTypes>::init(config.clone())
+                node = Node::<FullNodeComponents>::init(config.clone())
                     .map_err(|e| anyhow::anyhow!("Could not start the node: {e:?}"))?;
 
                 node.start().await;
