@@ -13,6 +13,7 @@ use lightning_archive::config::Config as ArchiveConfig;
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_blockstore_server::{BlockstoreServer, Config as BlockstoreServerConfig};
+use lightning_checkpointer::{Checkpointer, CheckpointerConfig, CheckpointerDatabaseConfig};
 use lightning_consensus::config::Config as ConsensusConfig;
 use lightning_consensus::consensus::Consensus;
 use lightning_dack_aggregator::{
@@ -151,6 +152,15 @@ fn build_config(
             .try_into()
             .expect("Failed to resolve path"),
         ..Default::default()
+    });
+
+    config.inject::<Checkpointer<FinalTypes>>(CheckpointerConfig {
+        database: CheckpointerDatabaseConfig {
+            path: path
+                .join("data/checkpointer")
+                .try_into()
+                .expect("Failed to resolve path"),
+        },
     });
 
     config

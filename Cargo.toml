@@ -30,6 +30,7 @@ anyhow = "1.0"
 async-trait = "0.1"
 axum = { version = "0.6.18", features = ["tokio"] }
 bincode = "1.3.3"
+bit-set = { version = "0.8.0", features = ["serde"] }
 cid = "0.10.1"
 console-subscriber = { version = "0.2.0" }
 ethers = "2.0.10"
@@ -80,6 +81,7 @@ lightning-application = { path = "core/application" }
 lightning-blockstore = { path = "core/blockstore" }
 lightning-blockstore-server = { path = "core/blockstore-server" }
 lightning-broadcast = { path = "core/broadcast" }
+lightning-checkpointer = { path = "core/checkpointer" }
 lightning-consensus = { path = "core/consensus" }
 lightning-firewall = { path = "core/firewall" }
 lightning-forwarder = { path = "core/forwarder" }
@@ -94,8 +96,8 @@ lightning-rpc = { path = "core/rpc" }
 lightning-service-executor = { path = "core/service-executor" }
 lightning-signer = { path = "core/signer" }
 lightning-syncronizer = { path = "core/syncronizer" }
-lightning-topology = { path = "core/topology" }
 lightning-test-utils = { path = "core/test-utils" }
+lightning-topology = { path = "core/topology" }
 lightning-types = { path = "core/types" }
 lightning-utils = { path = "core/utils" }
 affair = { path = "lib/affair" }

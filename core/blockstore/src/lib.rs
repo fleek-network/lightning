@@ -3,6 +3,8 @@ pub mod config;
 pub mod put;
 mod store;
 
+pub use blockstore::Blockstore;
+
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;

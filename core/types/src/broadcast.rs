@@ -19,6 +19,8 @@ pub enum Topic {
     Debug = 0x02,
     /// The gossip topic for the task broker
     TaskBroker,
+    /// The gossip topic for checkpoints messages
+    Checkpoint,
 }
 
 impl ink_quill::TranscriptBuilderInput for Topic {

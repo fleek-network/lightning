@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 anyhow.workspace = true
 atomo.workspace = true
+bit-set.workspace = true
 cid.workspace = true
 serde.workspace = true
 ink-quill.workspace = true

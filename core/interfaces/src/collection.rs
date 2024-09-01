@@ -16,6 +16,7 @@ collection!([
     ApplicationInterface,
     BlockstoreInterface,
     BlockstoreServerInterface,
+    CheckpointerInterface,
     SyncronizerInterface,
     BroadcastInterface,
     TopologyInterface,

@@ -42,7 +42,9 @@ pub struct Context<B: BroadcastBackend> {
     /// Our digest interner.
     interner: Interner,
     /// Managers of incoming message queue for each topic.
-    incoming_messages: [RecvBuffer; 4],
+    ///
+    /// NOTE: If a topic is added, this size needs to be updated.
+    incoming_messages: [RecvBuffer; 5],
     /// The state related to the connected peers that we have right now. Currently
     /// we only store the interned id mapping of us to their interned id.
     peers: im::HashMap<NodeIndex, im::HashMap<MessageInternedId, RemoteInternedId>>,
@@ -60,6 +62,22 @@ pub struct Context<B: BroadcastBackend> {
     backend: B,
 }
 
+/// Map each topic to a fixed size number.
+///
+/// NOTE: If a topic is added, the `incoming_messages` array size needs to be updated.
+/// Compilation will NOT fail if this is not updated, but the node will panic at runtime with an
+/// index out of bounds error.
+#[inline(always)]
+fn topic_to_index(topic: Topic) -> usize {
+    match topic {
+        Topic::Consensus => 0,
+        Topic::Resolver => 1,
+        Topic::Debug => 2,
+        Topic::TaskBroker => 3,
+        Topic::Checkpoint => 4,
+    }
+}
+
 impl<B: BroadcastBackend> Context<B> {
     pub fn new(db: Database, backend: B) -> Self {
         let (command_tx, command_rx) = mpsc::unbounded_channel();
@@ -71,6 +89,7 @@ impl<B: BroadcastBackend> Context<B> {
                 MessageRing::new(32).into(),
                 MessageRing::new(1024).into(),
                 MessageRing::new(1).into(),
+                MessageRing::new(123).into(),
             ],
             peers: im::HashMap::default(),
             stats: Stats::default(),
@@ -547,17 +566,6 @@ impl<C: Collection> Context<LightningBackend<C>> {
             "BROADCAST",
             crucial(panic_waiter)
         );
-    }
-}
-
-/// Map each topic to a fixed size number.
-#[inline(always)]
-fn topic_to_index(topic: Topic) -> usize {
-    match topic {
-        Topic::Consensus => 0,
-        Topic::Resolver => 1,
-        Topic::Debug => 2,
-        Topic::TaskBroker => 3,
     }
 }
 

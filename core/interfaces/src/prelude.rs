@@ -41,6 +41,7 @@ pub use crate::{
     BlockstoreServerInterface,
     BroadcastEventInterface,
     BroadcastInterface,
+    CheckpointerInterface,
     Collection,
     ConfigConsumer,
     ConfigProviderInterface,

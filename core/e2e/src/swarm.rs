@@ -19,6 +19,7 @@ use lightning_archive::config::Config as ArchiveConfig;
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_blockstore_server::{BlockstoreServer, Config as BlockstoreServerConfig};
+use lightning_checkpointer::{Checkpointer, CheckpointerConfig, CheckpointerDatabaseConfig};
 use lightning_consensus::config::Config as ConsensusConfig;
 use lightning_consensus::consensus::Consensus;
 use lightning_final_bindings::FinalTypes;
@@ -530,6 +531,16 @@ fn build_config(
         address: format!("127.0.0.1:{}", ports.pinger).parse().unwrap(),
         ping_interval: Duration::from_millis(1000),
     });
+
+    config.inject::<Checkpointer<FinalTypes>>(CheckpointerConfig {
+        database: CheckpointerDatabaseConfig {
+            path: root
+                .join("data/checkpointer")
+                .try_into()
+                .expect("Failed to resolve path"),
+        },
+    });
+
     config
 }
 
