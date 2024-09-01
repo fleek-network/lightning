@@ -9,6 +9,7 @@ use crate::entry::{BorrowedEntry, BorrowedLink};
 use crate::utils::{flatten, is_valid_filename, is_valid_symlink, Digest};
 
 mod error;
+mod reference;
 mod transcript;
 
 use arrayvec::ArrayVec;
