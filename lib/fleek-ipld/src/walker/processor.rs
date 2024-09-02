@@ -244,7 +244,7 @@ where
                 let link = &current_links[*current_index];
                 *current_index += 1;
                 let processor = this.processor.clone();
-                let cid = DocId::from_link(link, &current_dir);
+                let cid = DocId::from_link(link, current_dir);
                 this.pending_future = Some(Box::pin(async move { processor.get(cid).await }));
                 cx.waker().wake_by_ref();
                 return Poll::Pending;
@@ -339,7 +339,7 @@ mod tests {
     impl Processor for FixturesProcessor {
         async fn get(&self, id: DocId) -> Result<Option<IpldItem>, IpldError> {
             let fixtures = &*FIXTURES;
-            let data = fixtures.get(&id.cid()).cloned();
+            let data = fixtures.get(id.cid()).cloned();
             if let Some(vc) = data {
                 let data = DagPbCodec::decode_from_slice(&vc).map(|node: PbNode| {
                     let links = node
