@@ -8,6 +8,8 @@ use std::sync::{Arc, LazyLock};
 use aesm_client::AesmClient;
 use enclave_runner::usercalls::{AsyncStream, UsercallExtension};
 use enclave_runner::EnclaveBuilder;
+use fn_sdk::api::{fetch_node_index, fetch_peer_ips};
+use futures::executor::block_on;
 use futures::FutureExt;
 use req_res::AttestationEndpoint;
 use sgxs_loaders::isgx::Device as IsgxDevice;
@@ -123,7 +125,8 @@ fn main() {
 
     let mut enclave_builder = EnclaveBuilder::new_from_memory(ENCLAVE);
 
-    enclave_builder.args(get_enclave_args());
+    let enclave_args = block_on(get_enclave_args());
+    enclave_builder.args(enclave_args);
 
     // setup attestation state
     let attest_state = Arc::new(
@@ -145,7 +148,10 @@ fn main() {
         .unwrap();
 }
 
-fn get_enclave_args() -> Vec<Vec<u8>> {
+async fn get_enclave_args() -> Vec<Vec<u8>> {
+    let node_index = fetch_node_index()
+        .await
+        .expect("Unable to start sgx service, node does not have a node index yet");
     // First arg is either the sealed key or a list of peers to get it from
     let first_arg = {
         // todo: make a specific spot for this file
@@ -154,10 +160,16 @@ fn get_enclave_args() -> Vec<Vec<u8>> {
             format!("--encoded-secret-key={hex_encoded}")
                 .as_bytes()
                 .to_vec()
+        } else if node_index == 0 {
+            // We are the first node to start, so we should generate a new key if we dont have one
+            // on disk
+            "--initial-node".as_bytes().to_vec()
         } else {
             // We dont have a sealed key saved to disk so we should pass in a list of peers to get
             // it from
-            let peers = get_peer_ips();
+
+            // This returns a random sample of peers shuffled
+            let peers = fetch_peer_ips(10).await;
             let mut arg = "--peer-ips=".as_bytes().to_vec();
             arg.extend_from_slice(peers.join(",").as_bytes());
             arg
@@ -170,9 +182,4 @@ fn get_enclave_args() -> Vec<Vec<u8>> {
     our_ip_arg.extend_from_slice(our_ip.as_bytes());
 
     vec![first_arg, our_ip_arg]
-}
-
-fn get_peer_ips() -> Vec<String> {
-    // todo: get this using query runner
-    vec!["127.0.0.1".to_string(), "127.0.0.2".to_string()]
 }
