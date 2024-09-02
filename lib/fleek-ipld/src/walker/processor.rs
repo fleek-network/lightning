@@ -291,7 +291,7 @@ mod tests {
     }
 
     fn load_fixtures() -> HashMap<Cid, Vec<u8>> {
-        fs::read_dir("fixtures")
+        fs::read_dir("tests/fixtures")
             .unwrap()
             .filter_map(|file| {
                 // Filter out invalid files.

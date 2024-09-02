@@ -75,7 +75,7 @@ impl IpldDagPbProcessor {
 
     async fn request(&self, cid: &Cid) -> Result<Bytes, IpldError> {
         let url = self.ipfs_url.clone();
-        let url = url.join(&format!("ipfs/{}/?format=raw", cid))?;
+        let url = url.join(&format!("ipfs/{}?format=raw", cid))?;
         let response = reqwest::get(url).await?;
         response.bytes().await.map_err(Into::into)
     }
@@ -185,5 +185,45 @@ impl IpldDagPbProcessor {
             }
         }
         Ok(buf.freeze())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use httpmock::prelude::*;
+    #[allow(unused_imports)]
+    use ipld_core::cid::Cid;
+    #[allow(unused_imports)]
+    use tokio_stream::StreamExt as _;
+
+    #[allow(unused_imports)]
+    use super::*;
+
+    #[tokio::test]
+    async fn test_get() {
+        let file = "bafybeigcsevw74ssldzfwhiijzmg7a35lssfmjkuoj2t5qs5u5aztj47tq.dag-pb";
+        let file_bytes = tokio::fs::read(format!("tests/fixtures/{}", file))
+            .await
+            .unwrap();
+        let mock_server = MockServer::start_async().await;
+
+        let mock = mock_server.mock(|when, then| {
+            when.method(GET)
+                .path("/ipfs/QmSnuWmxptJZdLJpKRarxBMS2Ju2oANVrgbr2xWbie9b2D")
+                .query_param("format", "raw");
+            then.status(200)
+                .header("accept", "application/vnd.ipld.raw")
+                .header("content-type", "application/vnd.ipld.raw")
+                .body(file_bytes);
+        });
+
+        let host = mock_server.base_url();
+        let cid: Cid = "QmSnuWmxptJZdLJpKRarxBMS2Ju2oANVrgbr2xWbie9b2D"
+            .try_into()
+            .unwrap();
+        let processor = IpldDagPbProcessor::new(&host);
+        let item = processor.get(cid.into()).await.unwrap();
+        mock.assert();
+        assert!(item.is_some());
     }
 }
