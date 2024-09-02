@@ -12,20 +12,20 @@ use tokio_stream::Stream;
 use crate::errors::IpldError;
 
 #[derive(Clone, Debug)]
-pub struct Link {
-    cid: Cid,
-    name: Option<String>,
+pub struct Link<'a> {
+    cid: &'a Cid,
+    name: Option<&'a str>,
     size: Option<u64>,
 }
 
-impl From<Cid> for Link {
+impl<'a> From<Cid> for Link<'a> {
     fn from(cid: Cid) -> Self {
-        Self::new(cid, None, None)
+        Self::new(&cid, None, None)
     }
 }
 
-impl Link {
-    pub fn new(cid: Cid, name: Option<String>, size: Option<u64>) -> Self {
+impl<'a> Link<'a> {
+    pub fn new(cid: &'a Cid, name: Option<&'a str>, size: Option<u64>) -> Self {
         Self { cid, name, size }
     }
 
@@ -33,8 +33,8 @@ impl Link {
         &self.cid
     }
 
-    pub fn name(&self) -> &Option<String> {
-        &self.name
+    pub fn name(&self) -> Option<&'a str> {
+        self.name
     }
 
     pub fn size(&self) -> &Option<u64> {
