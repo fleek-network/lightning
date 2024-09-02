@@ -9,7 +9,7 @@ use futures::TryFuture;
 use ipld_core::cid::Cid;
 use tokio_stream::Stream;
 
-use super::errors::IpldError;
+use crate::errors::IpldError;
 
 #[derive(Clone, Debug)]
 pub struct Link {
@@ -273,6 +273,7 @@ mod tests {
     static FIXTURES: LazyLock<HashMap<Cid, Vec<u8>>> = LazyLock::new(load_fixtures);
 
     #[derive(Clone, Default)]
+    #[allow(dead_code)]
     struct MyProcessor;
 
     #[async_trait]
@@ -325,8 +326,7 @@ mod tests {
                     panic!("Expected file, got dir");
                 },
                 Err(e) => {
-                    eprintln!("Error: {:?}", e);
-                    break;
+                    panic!("Error: {:?}", e);
                 },
             }
         }

@@ -5,12 +5,11 @@ use bytes::{Bytes, BytesMut};
 use ipld_core::cid::Cid;
 use ipld_core::ipld::Ipld;
 use ipld_dagpb::PbNode;
-use quick_protobuf::{BytesReader, MessageRead};
 use reqwest::Url;
 
-use super::errors::IpldError;
 use super::processor::{DocId, IpldItem, Link, Processor};
-use crate::unixfs::{Data, DataType};
+use crate::errors::IpldError;
+use crate::unixfs::Data;
 
 #[derive(Clone)]
 pub struct IpldDagPbProcessor {
@@ -72,24 +71,14 @@ impl Processor for IpldDagPbProcessor {
         let bytes = self.request(doc_id.cid()).await?;
         let node = PbNodeWrapper::from_bytes(&bytes)?;
         let ipld = node.clone().into();
-        //println!("Ipld: {:?}", data);
+        println!("Ipld: {:?}", ipld);
         if let Ipld::Map(map) = ipld {
             if let Some(Ipld::Bytes(ty)) = map.get("Data") {
                 if *ty == [8, 1] {
                     let item = IpldItem::from_dir(doc_id, node.into());
                     return Ok(Some(item));
                 } else if node.links.is_empty() {
-                    let data = node.data.clone().ok_or_else(|| {
-                        IpldError::CannotDecodeDagPbData(
-                            "Ipld object does not contain a Data field to identify type"
-                                .to_string(),
-                        )
-                    })?;
-
-                    let data = data.to_vec();
-                    let data = data.as_slice();
-                    let data = Data::try_from(data)
-                        .map_err(|e| IpldError::IpfsDataError(e.to_string()))?;
+                    let data = Data::try_from(&node.data)?;
                     let item =
                         IpldItem::from_file(doc_id, Some(Bytes::copy_from_slice(&data.Data)));
                     return Ok(Some(item));
@@ -123,8 +112,7 @@ impl IpldDagPbProcessor {
             let bytes = self.request(&link.cid).await?;
             let node = PbNodeWrapper::from_bytes(&bytes)?;
             if node.links.is_empty() {
-                let mut bytes_reader = BytesReader::from_bytes(&bytes);
-                let data = Data::from_reader(&mut bytes_reader, &bytes)?;
+                let data = Data::try_from(&node.data)?;
                 buf.extend_from_slice(&data.Data);
             } else {
                 let data = Box::pin(self.get_file_link_data(cid, node));

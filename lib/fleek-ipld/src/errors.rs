@@ -10,7 +10,10 @@ pub enum IpldError {
     DagPbError(#[from] ipld_dagpb::Error),
 
     #[error("IPLD error: UnixFS error {0}")]
-    UnixFsError(#[from] quick_protobuf::Error),
+    UnixFsProtobufError(#[from] quick_protobuf::Error),
+
+    #[error("IPLD error: Error decoding UnixFS data {0}")]
+    UnixFsDecodingError(String),
 
     #[error("IPLD error: Error fetching data from IPFS {0}")]
     IpfsDataError(String),
