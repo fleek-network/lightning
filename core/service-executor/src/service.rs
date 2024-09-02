@@ -4,10 +4,13 @@ use std::process::Stdio;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use dashmap::DashMap;
-use fleek_crypto::ClientPublicKey;
+use fleek_crypto::{ClientPublicKey, NodePublicKey};
 use fn_sdk::ipc_types::{self, IpcMessage, IpcRequest, DELIMITER_SIZE};
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::schema::task_broker::TaskScope;
+use lightning_utils::application::QueryRunnerExt;
+use rand::seq::SliceRandom;
+use rand::thread_rng;
 use tokio::io::{self, Interest};
 use tokio::net::{UnixListener, UnixStream};
 use tokio::process::Command;
@@ -24,6 +27,7 @@ pub struct Context<C: Collection> {
     pub fetcher_socket: FetcherSocket,
     pub query_runner: c!(C::ApplicationInterface::SyncExecutor),
     pub task_broker: C::TaskBrokerInterface,
+    pub our_public_key: NodePublicKey,
 }
 
 impl<C: Collection> Context<C> {
@@ -120,6 +124,21 @@ impl<C: Collection> Context<C> {
                     responses,
                     signatures,
                 }
+            },
+            ipc_types::Request::FetchPeerIps { amount } => {
+                let mut peers = self.query_runner.get_active_nodes();
+                let mut rng = thread_rng();
+                peers.shuffle(&mut rng);
+                let peer_ips = peers
+                    .iter()
+                    .take(amount as usize)
+                    .map(|v| v.info.domain.to_string())
+                    .collect();
+                ipc_types::Response::FetchPeerIps { peer_ips }
+            },
+            ipc_types::Request::FetchNodeIndex {} => {
+                let node_index = self.query_runner.pubkey_to_index(&self.our_public_key);
+                ipc_types::Response::FetchNodeIndex { node_index }
             },
             _ => unreachable!(),
         }

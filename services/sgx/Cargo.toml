@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 # project libs
 dcap-quoteprov = { path = "../../lib/dcap-quoteprov" }
+fn-sdk = { path = "../../lib/sdk" }
 
 # async
 tokio = { version = "1.39", features = ["full"] }

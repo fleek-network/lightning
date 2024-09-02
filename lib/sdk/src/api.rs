@@ -50,6 +50,24 @@ pub async fn fetch_blake3(hash: [u8; 32]) -> bool {
     }
 }
 
+pub async fn fetch_peer_ips(amount: u32) -> Vec<String> {
+    let req = Request::FetchPeerIps { amount };
+    let res = send_and_await_response(req).await;
+    match res {
+        crate::ipc_types::Response::FetchPeerIps { peer_ips } => peer_ips,
+        _ => unreachable!(),
+    }
+}
+
+pub async fn fetch_node_index() -> Option<u32> {
+    let req = Request::FetchNodeIndex {};
+    let res = send_and_await_response(req).await;
+    match res {
+        crate::ipc_types::Response::FetchNodeIndex { node_index } => node_index,
+        _ => unreachable!(),
+    }
+}
+
 pub async fn run_task(
     depth: u8,
     scope: TaskScope,
