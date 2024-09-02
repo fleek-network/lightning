@@ -84,7 +84,7 @@ dependencies = [
  "protobuf",
  "protoc-rust",
  "sgx-isa",
- "sgxs 0.8.0",
+ "sgxs",
  "thiserror",
  "unix_socket2",
  "winapi",
@@ -619,7 +619,7 @@ dependencies = [
  "num-traits",
  "rusticata-macros",
  "thiserror",
- "time 0.3.36",
+ "time",
 ]
 
 [[package]]
@@ -635,7 +635,7 @@ dependencies = [
  "num-traits",
  "rusticata-macros",
  "thiserror",
- "time 0.3.36",
+ "time",
 ]
 
 [[package]]
@@ -1643,11 +1643,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "blake3-tree"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd6a859bd2d02b34541b01440cc3a7e398af8e999f9640bb934cb7401ee8fb88"
+dependencies = [
+ "arrayref",
+ "arrayvec",
+ "fleek-blake3",
+ "thiserror",
+]
+
+[[package]]
 name = "blake3-wasm"
 version = "0.1.0"
 dependencies = [
  "arrayref",
- "blake3-tree",
+ "blake3-tree 0.1.0",
  "wasm-bindgen",
 ]
 
@@ -3005,19 +3017,19 @@ checksum = "41b319d1b62ffbd002e057f36bebd1f42b9f97927c9577461d855f3513c4289f"
 
 [[package]]
 name = "dcap-ql"
-version = "0.3.7"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0a63d5f9b6526bb82ba697e303d9789a87849753815c84346444e94a5be2de43"
+checksum = "76ed9b9665bd34cc90125da9a72bd7c12f9adb2aca13546633a109c194e74910"
 dependencies = [
+ "anyhow",
  "byteorder",
  "dcap-ql-sys",
- "failure",
  "lazy_static",
  "libc",
  "num-derive 0.2.5",
  "num-traits",
  "sgx-isa",
- "sgxs-loaders 0.3.3",
+ "sgxs-loaders",
 ]
 
 [[package]]
@@ -3029,6 +3041,21 @@ dependencies = [
  "num-derive 0.2.5",
  "num-traits",
  "sgx-isa",
+]
+
+[[package]]
+name = "dcap-quoteprov"
+version = "0.1.0"
+dependencies = [
+ "base16",
+ "dcap-ql",
+ "der-parser 9.0.0",
+ "pem 3.0.4",
+ "serde",
+ "serde_json",
+ "sgx_pkix",
+ "ureq",
+ "x509-parser 0.16.0",
 ]
 
 [[package]]
@@ -3816,7 +3843,7 @@ dependencies = [
  "num_cpus",
  "openssl",
  "sgx-isa",
- "sgxs 0.8.0",
+ "sgxs",
  "thiserror",
  "tokio",
 ]
@@ -4326,28 +4353,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "failure"
-version = "0.1.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d32e9bd16cc02eae7db7ef620b392808b89f6a5e16bb3497d159c6b92a0f4f86"
-dependencies = [
- "backtrace",
- "failure_derive",
-]
-
-[[package]]
-name = "failure_derive"
-version = "0.1.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa4da3c766cd7a0db8242e326e9e4e081edd567072893ed320008189715366a4"
-dependencies = [
- "proc-macro2 1.0.86",
- "quote 1.0.36",
- "syn 1.0.109",
- "synstructure 0.12.6",
-]
-
-[[package]]
 name = "fast-sri"
 version = "0.0.0"
 dependencies = [
@@ -4739,7 +4744,7 @@ dependencies = [
  "anyhow",
  "arrayref",
  "base64 0.22.1",
- "blake3-tree",
+ "blake3-tree 0.1.0",
  "bytes 1.7.1",
  "cid 0.11.1",
  "deno_canvas",
@@ -4775,27 +4780,21 @@ dependencies = [
  "anyhow",
  "arrayref",
  "arrayvec",
- "base16",
- "blake3-tree",
+ "blake3-tree 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bytes 1.7.1",
- "dcap-ql",
- "der-parser 8.2.0",
+ "dcap-quoteprov",
  "enclave-runner",
  "futures 0.3.30",
  "hex",
- "pem 2.0.1",
  "serde",
  "serde-big-array",
  "serde_cbor",
  "serde_json",
  "sgx-isa",
- "sgx_pkix",
- "sgxs-loaders 0.4.0",
+ "sgxs-loaders",
  "tokio",
- "ureq",
  "url",
  "whoami",
- "x509-parser 0.15.1",
 ]
 
 [[package]]
@@ -4841,7 +4840,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "arrayvec",
- "blake3-tree",
+ "blake3-tree 0.1.0",
  "bytes 1.7.1",
  "derive_more",
  "fleek-crypto",
@@ -5195,7 +5194,7 @@ dependencies = [
  "cfg-if 1.0.0",
  "js-sys",
  "libc",
- "wasi 0.11.0+wasi-snapshot-preview1",
+ "wasi",
  "wasm-bindgen",
 ]
 
@@ -7018,7 +7017,7 @@ dependencies = [
  "anyhow",
  "arrayref",
  "bincode",
- "blake3-tree",
+ "blake3-tree 0.1.0",
  "bytes 1.7.1",
  "derive_more",
  "lightning-interfaces",
@@ -7039,7 +7038,7 @@ version = "0.0.0"
 dependencies = [
  "affair",
  "anyhow",
- "blake3-tree",
+ "blake3-tree 0.1.0",
  "bytes 1.7.1",
  "fleek-crypto",
  "futures 0.3.30",
@@ -7330,7 +7329,7 @@ version = "0.0.0"
 dependencies = [
  "affair",
  "anyhow",
- "blake3-tree",
+ "blake3-tree 0.1.0",
  "bytes 1.7.1",
  "cid 0.10.1",
  "fleek-crypto",
@@ -7498,7 +7497,7 @@ dependencies = [
  "smallvec",
  "str0m",
  "stunclient",
- "time 0.3.36",
+ "time",
  "tokio",
  "tokio-stream",
  "tokio-util 0.7.11",
@@ -7538,7 +7537,7 @@ dependencies = [
  "atomo",
  "atomo-rocks",
  "better-shutdown",
- "blake3-tree",
+ "blake3-tree 0.1.0",
  "bytes 1.7.1",
  "criterion",
  "dummy-waker",
@@ -8384,6 +8383,8 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with 2.3.3",
+ "sgx-isa",
+ "sgxs",
  "sha1",
  "sha2 0.10.8",
  "sha2 0.9.9",
@@ -8398,7 +8399,7 @@ dependencies = [
  "syn 0.15.44",
  "syn 1.0.109",
  "syn 2.0.72",
- "time 0.3.36",
+ "time",
  "tiny-keccak",
  "tokio",
  "tokio-rustls 0.24.1",
@@ -8707,7 +8708,7 @@ checksum = "a4a650543ca06a924e8b371db273b2756685faae30f8487da1b56505a8f78b0c"
 dependencies = [
  "libc",
  "log",
- "wasi 0.11.0+wasi-snapshot-preview1",
+ "wasi",
  "windows-sys 0.48.0",
 ]
 
@@ -8719,7 +8720,7 @@ checksum = "4569e456d394deccd22ce1c1913e6ea0e54519f577285001215d33557431afe4"
 dependencies = [
  "hermit-abi 0.3.9",
  "libc",
- "wasi 0.11.0+wasi-snapshot-preview1",
+ "wasi",
  "windows-sys 0.52.0",
 ]
 
@@ -10611,16 +10612,6 @@ dependencies = [
 
 [[package]]
 name = "pem"
-version = "2.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b13fe415cdf3c8e44518e18a7c95a13431d9bdf6d15367d82b23c377fdd441a"
-dependencies = [
- "base64 0.21.7",
- "serde",
-]
-
-[[package]]
-name = "pem"
 version = "3.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8e459365e590736a54c3fa561947c84837534b8e9af6fc5bf781307e82658fae"
@@ -11516,7 +11507,7 @@ dependencies = [
  "libc",
  "once_cell",
  "raw-cpuid",
- "wasi 0.11.0+wasi-snapshot-preview1",
+ "wasi",
  "web-sys",
  "winapi",
 ]
@@ -11800,7 +11791,7 @@ checksum = "6413f3de1edee53342e6138e75b56d32e7bc6e332b3bd62d497b1929d4cfbcdd"
 dependencies = [
  "pem 1.1.1",
  "ring 0.16.20",
- "time 0.3.36",
+ "time",
  "yasna 0.5.2",
 ]
 
@@ -11812,7 +11803,7 @@ checksum = "52c4f3084aa3bc7dfbba4eff4fab2a54db4324965d8872ab933565e6fbd83bc6"
 dependencies = [
  "pem 3.0.4",
  "ring 0.16.20",
- "time 0.3.36",
+ "time",
  "yasna 0.5.2",
 ]
 
@@ -11825,7 +11816,7 @@ dependencies = [
  "pem 3.0.4",
  "ring 0.17.8",
  "rustls-pki-types",
- "time 0.3.36",
+ "time",
  "yasna 0.5.2",
 ]
 
@@ -13030,7 +13021,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with_macros 2.3.3",
- "time 0.3.36",
+ "time",
 ]
 
 [[package]]
@@ -13048,7 +13039,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serde_with_macros 3.9.0",
- "time 0.3.36",
+ "time",
 ]
 
 [[package]]
@@ -13162,19 +13153,6 @@ dependencies = [
 
 [[package]]
 name = "sgxs"
-version = "0.7.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b4d614064692eaaa54b95d3754bbac42ea88f14dd8e830b25dee1859d1fe12d"
-dependencies = [
- "byteorder",
- "failure",
- "failure_derive",
- "sgx-isa",
- "time 0.1.45",
-]
-
-[[package]]
-name = "sgxs"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4687cc568ef28ebdcc1b01be6909072fee8df0f2990ea34f01ba323c8ea3603a"
@@ -13186,23 +13164,7 @@ dependencies = [
  "openssl-sys",
  "sgx-isa",
  "thiserror",
- "time 0.3.36",
-]
-
-[[package]]
-name = "sgxs-loaders"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f942b8d5bd44dbcb53e5b7851859d50fde7e986eb9b2988994955dae1eae221b"
-dependencies = [
- "bitflags 1.3.2",
- "failure",
- "failure_derive",
- "libloading 0.5.2",
- "nix 0.15.0",
- "sgx-isa",
- "sgxs 0.7.4",
- "winapi",
+ "time",
 ]
 
 [[package]]
@@ -13216,7 +13178,7 @@ dependencies = [
  "libloading 0.5.2",
  "nix 0.15.0",
  "sgx-isa",
- "sgxs 0.8.0",
+ "sgxs",
  "thiserror",
  "winapi",
 ]
@@ -13457,7 +13419,7 @@ dependencies = [
  "num-bigint 0.4.6",
  "num-traits",
  "thiserror",
- "time 0.3.36",
+ "time",
 ]
 
 [[package]]
@@ -13468,7 +13430,7 @@ checksum = "16257adbfaef1ee58b1363bdc0664c9b8e1e30aed86049635fb5f147d065a9c0"
 dependencies = [
  "log",
  "termcolor",
- "time 0.3.36",
+ "time",
 ]
 
 [[package]]
@@ -14329,17 +14291,6 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.1.45"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b797afad3f312d1c66a56d11d0316f916356d11bd158fbc6ca6389ff6bf805a"
-dependencies = [
- "libc",
- "wasi 0.10.0+wasi-snapshot-preview1",
- "winapi",
-]
-
-[[package]]
-name = "time"
 version = "0.3.36"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5dfd88e563464686c916c7e46e623e520ddc6d79fa6641390f2e3fa86e83e885"
@@ -14982,7 +14933,7 @@ checksum = "3566e8ce28cc0a3fe42519fc80e6b4c943cc4c8cef275620eb8dac2d3d4e06cf"
 dependencies = [
  "crossbeam-channel",
  "thiserror",
- "time 0.3.36",
+ "time",
  "tracing-subscriber",
 ]
 
@@ -15098,7 +15049,7 @@ dependencies = [
  "sharded-slab",
  "smallvec",
  "thread_local",
- "time 0.3.36",
+ "time",
  "tracing",
  "tracing-core",
  "tracing-log 0.2.0",
@@ -15761,12 +15712,6 @@ dependencies = [
 
 [[package]]
 name = "wasi"
-version = "0.10.0+wasi-snapshot-preview1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a143597ca7c7793eff794def352d41792a93c481eb1042423ff7ff72ba2c31f"
-
-[[package]]
-name = "wasi"
 version = "0.11.0+wasi-snapshot-preview1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c8d87e72b64a3b4db28d11ce29237c246188f4f51057d65a7eab63b7987e423"
@@ -16416,7 +16361,7 @@ dependencies = [
  "sha2 0.10.8",
  "socket2 0.5.7",
  "thiserror",
- "time 0.3.36",
+ "time",
  "tokio",
  "tracing",
  "url",
@@ -16478,7 +16423,7 @@ dependencies = [
  "oid-registry 0.6.1",
  "rusticata-macros",
  "thiserror",
- "time 0.3.36",
+ "time",
 ]
 
 [[package]]
@@ -16495,7 +16440,7 @@ dependencies = [
  "oid-registry 0.6.1",
  "rusticata-macros",
  "thiserror",
- "time 0.3.36",
+ "time",
 ]
 
 [[package]]
@@ -16512,7 +16457,7 @@ dependencies = [
  "oid-registry 0.7.0",
  "rusticata-macros",
  "thiserror",
- "time 0.3.36",
+ "time",
 ]
 
 [[package]]
@@ -16569,7 +16514,7 @@ version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e17bb3549cc1321ae1296b9cdc2698e2b6cb1992adfa19a8c72e5b7a738f44cd"
 dependencies = [
- "time 0.3.36",
+ "time",
 ]
 
 [[package]]
@@ -16661,7 +16606,7 @@ dependencies = [
  "hmac",
  "pbkdf2 0.11.0",
  "sha1",
- "time 0.3.36",
+ "time",
  "zstd",
 ]
 
