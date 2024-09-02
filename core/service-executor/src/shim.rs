@@ -67,14 +67,17 @@ impl<C: Collection> ServiceExecutor<C> {
         config: &C::ConfigProviderInterface,
         blockstore: &C::BlockstoreInterface,
         fetcher: &C::FetcherInterface,
+        keystore: &C::KeystoreInterface,
         fdi::Cloned(query_runner): fdi::Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
         fdi::Cloned(task_broker): fdi::Cloned<C::TaskBrokerInterface>,
     ) -> anyhow::Result<Self> {
         let config = Arc::new(config.get::<Self>());
 
+        let our_public_key = keystore.get_ed25519_pk();
         let ctx = Arc::new(Context {
             blockstore_path: blockstore.get_root_dir(),
             ipc_path: config.ipc_path.to_path_buf(),
+            our_public_key,
             fetcher_socket: fetcher.get_socket(),
             query_runner,
             task_broker,

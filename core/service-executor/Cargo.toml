@@ -22,6 +22,7 @@ resolved-pathbuf.workspace = true
 affair.workspace = true
 futures.workspace = true
 panic-report.workspace = true
+rand.workspace = true
 which = "5.0.0"
 
 # io stress dependencies

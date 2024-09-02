@@ -198,6 +198,20 @@ ReqRes! {
         /// Returns true if the fetch succeeded.
         succeeded: bool
     },
+    /// Fetch ips of your peers, used primarily in SGX service to pass into enclave
+    FetchPeerIps {
+        /// The amount of random peers ips you want
+        amount: u32,
+        =>
+        /// Ips of your peers. Is chosen at random from active nodes and shuffled before returning
+        peer_ips: Vec<String>,
+    },
+    /// Returns this nodes node-index
+    FetchNodeIndex {
+        =>
+        /// The node index of this node
+        node_index: Option<u32>,
+    },
     /// Submit a task
     Task {
         depth: u8,
