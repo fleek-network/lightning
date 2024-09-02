@@ -22,3 +22,6 @@ url = "2.5.0"
 
 [[example]]
 name = "download"
+
+[lib]
+doctest = false

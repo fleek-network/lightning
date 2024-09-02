@@ -51,6 +51,21 @@ impl PbNodeWrapper {
 }
 
 impl IpldDagPbProcessor {
+    /// Creates a new `IpldDagPbProcessor` with the given IPFS URL.
+    ///
+    /// # Arguments
+    ///
+    /// * `ipfs_url` - A string slice that holds the URL of the IPFS node.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the provided IPFS URL is invalid.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// let processor = IpldDagPbProcessor::new("http://localhost:5001");
+    /// ```
     pub fn new(ipfs_url: &str) -> Self {
         Self {
             ipfs_url: Url::parse(ipfs_url)
@@ -65,6 +80,51 @@ impl IpldDagPbProcessor {
         response.bytes().await.map_err(Into::into)
     }
 
+    /// Creates a new `IpldStream` for streaming the content of the given CID.
+    ///
+    /// # Arguments
+    ///
+    /// * `cid` - The CID of the content to stream.
+    ///
+    /// # Returns
+    ///
+    /// An `IpldStream` for the given CID.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use fleek_ipld::walker::dag_pb::IpldDagPbProcessor;
+    /// use ipld_core::cid::Cid;
+    /// use tokio_stream::StreamExt as _;
+    ///
+    /// let cid: Cid = "QmSnuWmxptJZdLJpKRarxBMS2Ju2oANVrgbr2xWbie9b2D"
+    ///     .try_into()
+    ///     .unwrap();
+    ///
+    /// let mut stream = IpldDagPbProcessor::new("http://localhost:5001").stream(cid);
+    ///
+    /// while let Some(item) = stream.next().await {
+    ///     match item {
+    ///         Ok(IpldItem::File(file)) => {
+    ///             let file_name = file
+    ///                 .id()
+    ///                 .link()
+    ///                 .name()
+    ///                 .clone()
+    ///                 .unwrap_or("unknown_file.jpg".to_string());
+    ///             let mut f = tokio::fs::File::create(file_name).await?;
+    ///             f.write_all(file.data()).await?;
+    ///             println!("File data: {:?} \n", file);
+    ///         },
+    ///         Ok(IpldItem::Dir(dir)) => {
+    ///             println!("Dir data: {:?} \n", dir);
+    ///         },
+    ///         Err(e) => {
+    ///             panic!("Error: {:?}", e);
+    ///         },
+    ///     }
+    /// }
+    /// ```
     pub fn stream(self, cid: impl Into<Cid>) -> IpldStream<Self> {
         IpldStream::new(self, cid.into().into())
     }
