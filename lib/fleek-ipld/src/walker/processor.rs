@@ -11,6 +11,7 @@ use tokio_stream::Stream;
 
 use crate::errors::IpldError;
 
+/// A link to another IPLD node.
 #[derive(Clone, Debug)]
 pub struct Link {
     cid: Cid,
@@ -42,6 +43,8 @@ impl Link {
     }
 }
 
+/// A unique identifier for an IPLD node, which contains a `Link` and a `PathBuf` with the path to
+/// this document. If `PathBuf` is empty, then this is the root document.
 #[derive(Clone, Debug)]
 pub struct DocId {
     link: Link,
@@ -83,6 +86,7 @@ impl From<Cid> for DocId {
     }
 }
 
+/// `DirItem` represents a directory in the IPLD UnixFS data model.
 #[derive(Clone, Debug)]
 pub struct DirItem {
     id: DocId,
@@ -105,6 +109,7 @@ impl DirItem {
     }
 }
 
+/// `FileItem` represents a file in the IPLD UnixFS data model.
 #[derive(Clone)]
 pub struct FileItem {
     id: DocId,

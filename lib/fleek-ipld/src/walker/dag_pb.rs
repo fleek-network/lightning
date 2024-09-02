@@ -7,10 +7,11 @@ use ipld_core::ipld::Ipld;
 use ipld_dagpb::PbNode;
 use reqwest::Url;
 
-use super::processor::{DocId, IpldItem, Link, Processor};
+use super::processor::{DocId, IpldItem, IpldStream, Link, Processor};
 use crate::errors::IpldError;
 use crate::unixfs::Data;
 
+/// Processor for DAG-PB nodes in IPFS with UnixFS data
 #[derive(Clone)]
 pub struct IpldDagPbProcessor {
     ipfs_url: Url,
@@ -57,11 +58,15 @@ impl IpldDagPbProcessor {
         }
     }
 
-    pub async fn request(&self, cid: &Cid) -> Result<Bytes, IpldError> {
+    async fn request(&self, cid: &Cid) -> Result<Bytes, IpldError> {
         let url = self.ipfs_url.clone();
         let url = url.join(&format!("ipfs/{}/?format=raw", cid))?;
         let response = reqwest::get(url).await?;
         response.bytes().await.map_err(Into::into)
+    }
+
+    pub fn stream(self, cid: impl Into<Cid>) -> IpldStream<Self> {
+        IpldStream::new(self, cid.into().into())
     }
 }
 
@@ -71,7 +76,6 @@ impl Processor for IpldDagPbProcessor {
         let bytes = self.request(doc_id.cid()).await?;
         let node = PbNodeWrapper::from_bytes(&bytes)?;
         let ipld = node.clone().into();
-        println!("Ipld: {:?}", ipld);
         if let Ipld::Map(map) = ipld {
             if let Some(Ipld::Bytes(ty)) = map.get("Data") {
                 if *ty == [8, 1] {

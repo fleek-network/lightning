@@ -1,18 +1,16 @@
 use fleek_ipld::walker::dag_pb::IpldDagPbProcessor;
-use fleek_ipld::walker::processor::{IpldItem, IpldStream};
+use fleek_ipld::walker::IpldItem;
 use ipld_core::cid::Cid;
 use tokio::io::AsyncWriteExt;
 use tokio_stream::StreamExt as _;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<(dyn std::error::Error + 'static)>> {
-    let processor = IpldDagPbProcessor::new("http://ipfs.io");
     //let cid: Cid = "QmSnuWmxptJZdLJpKRarxBMS2Ju2oANVrgbr2xWbie9b2D".try_into()?; // all
     let cid: Cid = "Qmc8mmzycvXnzgwBHokZQd97iWAmtdFMqX4FZUAQ5AQdQi".try_into()?; // jpg big file
     //let cid: Cid = "Qmej4L6L4UYxHF4s4QeAzkwUX8VZ45GiuZ2BLtVds5LXad".try_into()?; // css file
     //let cid: Cid = "QmbvrHYWXAU1BuxMPNRtfeF4DS2oPmo5hat7ocqAkNPr74".try_into()?; // png small
-    let doc_id = cid.into();
-    let mut stream = IpldStream::new(processor, doc_id).fuse();
+    let mut stream = IpldDagPbProcessor::new("http://ipfs.io").stream(cid).fuse();
     let mut count_files = 0;
     let mut count_dirs = 0;
     while let Some(item) = stream.next().await {

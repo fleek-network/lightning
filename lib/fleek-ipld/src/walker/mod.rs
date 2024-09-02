@@ -1,2 +1,4 @@
 pub mod dag_pb;
-pub mod processor;
+pub(crate) mod processor;
+
+pub use processor::{DocId, IpldItem, IpldStream, Link, Processor};
