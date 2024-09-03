@@ -4609,7 +4609,6 @@ dependencies = [
  "bytes 1.7.1",
  "dcap-quoteprov",
  "enclave-runner",
- "fn-sdk",
  "futures 0.3.30",
  "hex",
  "serde",
