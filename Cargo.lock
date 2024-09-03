@@ -6741,6 +6741,7 @@ dependencies = [
  "ethers",
  "fleek-blake3",
  "fleek-crypto",
+ "futures",
  "hp-fixed",
  "lazy_static",
  "lightning-interfaces",
@@ -7907,10 +7908,14 @@ dependencies = [
  "num-bigint",
  "num-derive 0.4.2",
  "num-traits",
+ "resolved-pathbuf",
  "ruint",
  "schemars",
  "serde",
+ "serde_with 3.9.0",
+ "tempfile",
  "thiserror",
+ "toml 0.7.8",
  "url",
 ]
 

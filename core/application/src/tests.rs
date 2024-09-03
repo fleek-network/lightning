@@ -30,6 +30,11 @@ use lightning_interfaces::types::{
     Epoch,
     ExecutionData,
     ExecutionError,
+    Genesis,
+    GenesisAccount,
+    GenesisNode,
+    GenesisPrices,
+    GenesisService,
     HandshakePorts,
     Metadata,
     NodeIndex,
@@ -59,8 +64,7 @@ use rand::seq::SliceRandom;
 use tempfile::{tempdir, TempDir};
 
 use crate::app::Application;
-use crate::config::Config;
-use crate::genesis::{Genesis, GenesisAccount, GenesisNode, GenesisPrices, GenesisService};
+use crate::config::{Config, StorageConfig};
 use crate::state::QueryRunner;
 
 partial!(TestBinding {
@@ -1245,6 +1249,49 @@ async fn test_genesis_configuration() {
         let balance = get_staked(&query_runner, &node.primary_public_key);
         assert_eq!(HpUfixed::<18>::from(genesis.min_stake), balance);
     }
+}
+
+#[tokio::test]
+async fn test_node_startup_without_genesis() {
+    let config = Config {
+        network: None,
+        genesis_path: None,
+        storage: StorageConfig::InMemory,
+        db_path: None,
+        db_options: None,
+        dev: None,
+    };
+    let node = Node::<TestBinding>::init_with_provider(
+        fdi::Provider::default()
+            .with(JsonConfigProvider::default().with::<Application<TestBinding>>(config)),
+    )
+    .expect("failed to initialize node");
+
+    let app = node.provider.get::<Application<TestBinding>>();
+    let query = app.sync_query();
+
+    // Check that no genesis has been applied yet.
+    query.run(|ctx| {
+        let metadata_table = ctx.get_table::<Metadata, Value>("metadata");
+        assert!(metadata_table.get(Metadata::Epoch).is_none());
+        assert!(metadata_table.get(Metadata::BlockNumber).is_none());
+    });
+
+    // Apply the genesis.
+    assert!(app.apply_genesis(test_genesis()).await.unwrap());
+
+    // Check that genesis has been applied.
+    query.run(|ctx| {
+        let metadata_table = ctx.get_table::<Metadata, Value>("metadata");
+        assert_eq!(
+            metadata_table.get(Metadata::Epoch).unwrap(),
+            Value::Epoch(0)
+        );
+        assert_eq!(
+            metadata_table.get(Metadata::BlockNumber).unwrap(),
+            Value::BlockNumber(0)
+        );
+    });
 }
 
 #[tokio::test]

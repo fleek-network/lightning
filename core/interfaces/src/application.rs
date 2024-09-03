@@ -12,6 +12,7 @@ use lightning_types::{
     Blake3Hash,
     ChainId,
     Committee,
+    Genesis,
     NodeIndex,
     StateProofKey,
     StateProofValue,
@@ -90,6 +91,9 @@ pub trait ApplicationInterface<C: Collection>:
     ///
     /// This method is unsafe because it acts directly on the underlying storage backend.
     fn reset_state_tree_unsafe(config: &Self::Config) -> Result<()>;
+
+    /// Apply genesis block to the application state, if not already applied.
+    async fn apply_genesis(&self, genesis: Genesis) -> Result<bool>;
 }
 
 #[interfaces_proc::blank]
@@ -200,6 +204,12 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
         &self,
         key: StateProofKey,
     ) -> Result<(Option<StateProofValue>, MptStateProof)>;
+
+    /// Wait for genesis block to be applied.
+    ///
+    /// Returns true if the genesis block was applied is already applied.
+    /// Returns immediately if the genesis block was already applied.
+    async fn wait_for_genesis(&self) -> bool;
 }
 
 #[derive(Clone, Debug)]

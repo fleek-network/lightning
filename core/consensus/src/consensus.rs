@@ -246,6 +246,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
                 tokio::select! {
                     biased;
                     _ = &mut shutdown_fut => {
+                        tracing::debug!("shutdown signal received, stopping");
                         break;
                     }
                     _ = time_to_sleep => {
@@ -329,7 +330,11 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
 impl<C: Collection> Consensus<C> {
     /// Start the system, should not do anything if the system is already
     /// started.
-    fn start(&mut self, fdi::Cloned(waiter): fdi::Cloned<ShutdownWaiter>) {
+    fn start(
+        &mut self,
+        app_query: fdi::Cloned<c![C::ApplicationInterface::SyncExecutor]>,
+        fdi::Cloned(waiter): fdi::Cloned<ShutdownWaiter>,
+    ) {
         let reconfigure_notify = self.reconfigure_notify.clone();
         let shutdown_notify_epoch_state = self.shutdown_notify_epoch_state.clone();
 
@@ -339,8 +344,14 @@ impl<C: Collection> Consensus<C> {
             .expect("Consensus was tried to start before initialization");
 
         let panic_waiter = waiter.clone();
+        let app_query = app_query.clone();
         spawn!(
             async move {
+                // Wait for genesis to be applied before starting the consensus.
+                if !app_query.wait_for_genesis().await {
+                    return;
+                }
+
                 let execution_worker =
                     epoch_state.spawn_execution_worker(reconfigure_notify.clone());
                 epoch_state.start_current_epoch().await;

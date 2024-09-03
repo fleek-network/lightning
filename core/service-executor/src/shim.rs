@@ -90,12 +90,23 @@ impl<C: Collection> ServiceExecutor<C> {
 
     async fn start(
         fdi::Cloned(this): fdi::Cloned<Self>,
+        fdi::Cloned(query_runner): fdi::Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
         fdi::Cloned(waiter): fdi::Cloned<ShutdownWaiter>,
     ) {
-        for &id in this.config.services.iter() {
-            let handle = spawn_service(id, this.ctx.clone(), waiter.clone()).await;
-            this.collection.insert(id, handle);
-        }
+        spawn!(
+            async move {
+                // Wait for genesis to be applied before starting the service executor.
+                if !query_runner.wait_for_genesis().await {
+                    return;
+                }
+
+                for &id in this.config.services.iter() {
+                    let handle = spawn_service(id, this.ctx.clone(), waiter.clone()).await;
+                    this.collection.insert(id, handle);
+                }
+            },
+            "SERVICE-EXECUTOR spawn services"
+        );
     }
 }
 

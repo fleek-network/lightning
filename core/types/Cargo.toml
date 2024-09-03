@@ -26,3 +26,9 @@ ruint = "1.11.1"
 url = "2.5.0"
 compile-time-run = "0.2.12"
 lightning-workspace-hack.workspace = true
+resolved-pathbuf.workspace = true
+serde_with.workspace = true
+toml.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

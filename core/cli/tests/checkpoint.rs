@@ -8,7 +8,6 @@ use fleek_crypto::{AccountOwnerSecretKey, ConsensusSecretKey, NodeSecretKey, Sec
 use lightning_application::app::Application;
 use lightning_application::config::{Config as AppConfig, StorageConfig};
 use lightning_application::env::Env;
-use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_archive::archive::Archive;
 use lightning_archive::config::Config as ArchiveConfig;
 use lightning_blockstore::blockstore::Blockstore;
@@ -25,7 +24,7 @@ use lightning_handshake::config::{HandshakeConfig, TransportConfig};
 use lightning_handshake::handshake::Handshake;
 use lightning_handshake::transports::webrtc::WebRtcConfig;
 use lightning_interfaces::prelude::*;
-use lightning_interfaces::types::{HandshakePorts, NodePorts};
+use lightning_interfaces::types::{Genesis, GenesisNode, HandshakePorts, NodePorts};
 use lightning_keystore::{Keystore, KeystoreConfig};
 use lightning_pinger::{Config as PingerConfig, Pinger};
 use lightning_pool::{Config as PoolConfig, PoolProvider};
@@ -228,7 +227,7 @@ async fn node_checkpointing() -> Result<()> {
         dev: None,
     };
     let mut env = Env::new(&app_config_temp, None)?;
-    env.apply_genesis_block(&app_config_temp)?;
+    env.apply_genesis_block(genesis)?;
 
     let storage = env.inner.get_storage_backend_unsafe();
     let checkpoint = storage.serialize().unwrap();
