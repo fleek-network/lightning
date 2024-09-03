@@ -1,6 +1,7 @@
 use anyhow::Result;
 use lightning_guard::map::{FileRule, PacketFilterRule, Profile};
 use lightning_guard::ConfigSource;
+use log::error;
 
 use crate::action::Action;
 
@@ -53,8 +54,18 @@ impl State {
         self.profiles.push(profiles);
     }
 
-    pub async fn commit_profiles(&mut self) -> Result<()> {
-        self.src.write_profiles(self.profiles.clone()).await
+    pub fn commit_profiles(&mut self) {
+        let profiles = self.profiles.clone();
+        let src = self.src.clone();
+        tokio::spawn(async move {
+            if let Err(e) = src.write_profiles(profiles).await {
+                error!("failed to write profiles to disk: {e:?}");
+            }
+        });
+    }
+
+    pub fn get_profiles(&self) -> &[Profile] {
+        self.profiles.as_slice()
     }
 
     /// Note: Panics if profile with `name` does not exist in state.

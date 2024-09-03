@@ -37,12 +37,8 @@ impl Profile {
         }
     }
 
-    pub async fn get_profile_list_from_storage(&mut self) -> Result<()> {
-        // If it's an error, there are no files and thus there is nothing to do.
-        if let Ok(profiles) = self.src.get_profiles().await {
-            self.list.load_records(profiles);
-        }
-        Ok(())
+    pub fn update_profiles(&mut self, profiles: Vec<map::Profile>) {
+        self.list.load_records(profiles);
     }
 
     fn add_profile(&mut self, profile: map::Profile) {
@@ -59,32 +55,32 @@ impl Profile {
         profiles_to_update.push(profile);
     }
 
-    fn save(&mut self) {
-        // Remove names of profiles that need to be deleted before they're gone forever.
-        let remove = self
-            .list
-            .records_to_remove_mut()
-            .map(|profile| profile.name.take())
-            .collect::<HashSet<_>>();
-        self.list.commit_changes();
-        let update = self.profiles_to_update.take();
-        let command_tx = self
-            .command_tx
-            .clone()
-            .expect("Component always has a sender");
-        let storage = self.src.clone();
-        tokio::spawn(async move {
-            // Todo: do better.
-            if let Err(e) = storage.delete_profiles(remove).await {
-                let _ = command_tx.send(Action::Error(e.to_string()));
-            }
-            if let Some(profiles) = update {
-                if let Err(e) = storage.write_profiles(profiles).await {
-                    let _ = command_tx.send(Action::Error(e.to_string()));
-                }
-            }
-        });
-    }
+    // fn save(&mut self) {
+    //     // Remove names of profiles that need to be deleted before they're gone forever.
+    //     let remove = self
+    //         .list
+    //         .records_to_remove_mut()
+    //         .map(|profile| profile.name.take())
+    //         .collect::<HashSet<_>>();
+    //     self.list.commit_changes();
+    //     let update = self.profiles_to_update.take();
+    //     let command_tx = self
+    //         .command_tx
+    //         .clone()
+    //         .expect("Component always has a sender");
+    //     let storage = self.src.clone();
+    //     tokio::spawn(async move {
+    //         // Todo: do better.
+    //         if let Err(e) = storage.delete_profiles(remove).await {
+    //             let _ = command_tx.send(Action::Error(e.to_string()));
+    //         }
+    //         if let Some(profiles) = update {
+    //             if let Err(e) = storage.write_profiles(profiles).await {
+    //                 let _ = command_tx.send(Action::Error(e.to_string()));
+    //             }
+    //         }
+    //     });
+    // }
 
     fn get_selected_profile(&mut self) -> Option<map::Profile> {
         self.list.get().map(Clone::clone)
@@ -111,7 +107,7 @@ impl Component for Profile {
         match action {
             Action::Edit => Ok(Some(Action::UpdateMode(Mode::ProfilesEdit))),
             Action::Save => {
-                self.save();
+                ctx.commit_profiles();
                 Ok(Some(Action::UpdateMode(Mode::Profiles)))
             },
             Action::Cancel => {
@@ -140,6 +136,11 @@ impl Component for Profile {
 
                 Ok(Some(Action::UpdateMode(Mode::ProfileView)))
             },
+            Action::UpdateMode(Mode::ProfilesEdit) => {
+                let profiles = ctx.get_profiles();
+                self.update_profiles(profiles.to_vec());
+                Ok(None)
+            }
             _ => Ok(None),
         }
     }

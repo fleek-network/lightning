@@ -236,6 +236,9 @@ impl App {
             .frame_rate(self.frame_rate);
         tui.enter()?;
 
+        // Load the state.
+        self.load_state().await?;
+
         self.home.register_action_handler(action_tx.clone())?;
         self.home.register_config_handler(self.config.clone())?;
         self.home.init(tui.size()?)?;
@@ -273,10 +276,7 @@ impl App {
         self.profiles.register_action_handler(action_tx.clone())?;
         self.profiles.register_config_handler(self.config.clone())?;
         self.profiles.init(tui.size()?)?;
-        self.profiles.get_profile_list_from_storage().await?;
-
-        // Load the state.
-        self.load_state().await?;
+        self.profiles.update_profiles(self.state.get_profiles().to_vec());
 
         loop {
             if let Some(e) = tui.next().await {
