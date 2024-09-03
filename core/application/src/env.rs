@@ -178,16 +178,7 @@ impl ApplicationEnv {
             let genesis = config.genesis()?;
 
             if metadata_table.get(Metadata::Epoch).is_some() {
-
-                // Backfill newly added protocol parameters from the genesis configuration.
-                let mut param_table = ctx.get_table::<ProtocolParams, u128>("parameter");
-                if param_table.get(ProtocolParams::MinNumMeasurements).is_none() {
-                    param_table.insert(
-                        ProtocolParams::MinNumMeasurements,
-                        genesis.min_num_measurements as u128
-                    );
-                }
-
+                tracing::info!("Genesis block already exists in application state.");
                 return Ok(false);
             }
 
@@ -421,55 +412,5 @@ impl<C: Collection> WorkerTrait for UpdateWorker<C> {
             .run(req, || self.blockstore.put(None))
             .await
             .expect("Failed to execute block")
-    }
-}
-
-#[cfg(test)]
-mod env_tests {
-    use tempfile::tempdir;
-
-    use super::*;
-    use crate::genesis::Genesis;
-
-    #[test]
-    fn test_apply_genesis_block_backfills_when_missing() {
-        let temp_dir = tempdir().unwrap();
-        let genesis_path = Genesis::default()
-            .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
-            .unwrap();
-        let config = Config::test(genesis_path);
-        let mut env = ApplicationEnv::new(&config, None).unwrap();
-
-        assert!(env.apply_genesis_block(&config).unwrap());
-
-        env.inner
-            .run(|ctx| {
-                let mut param_table = ctx.get_table::<ProtocolParams, u128>("parameter");
-                assert!(
-                    param_table
-                        .get(ProtocolParams::MinNumMeasurements)
-                        .is_some(),
-                );
-                param_table.remove(ProtocolParams::MinNumMeasurements);
-                assert!(
-                    param_table
-                        .get(ProtocolParams::MinNumMeasurements)
-                        .is_none(),
-                );
-            })
-            .unwrap();
-
-        assert!(!env.apply_genesis_block(&config).unwrap());
-
-        env.inner
-            .run(|ctx| {
-                let param_table = ctx.get_table::<ProtocolParams, u128>("parameter");
-                assert!(
-                    param_table
-                        .get(ProtocolParams::MinNumMeasurements)
-                        .is_some(),
-                );
-            })
-            .unwrap();
     }
 }
