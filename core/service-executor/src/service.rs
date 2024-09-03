@@ -5,7 +5,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use dashmap::DashMap;
 use fleek_crypto::{ClientPublicKey, NodePublicKey};
-use fn_sdk::ipc_types::{self, IpcMessage, IpcRequest, DELIMITER_SIZE};
+use fn_sdk::ipc_types::{self, IpcMessage, IpcRequest, Response, DELIMITER_SIZE};
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::schema::task_broker::TaskScope;
 use lightning_utils::application::QueryRunnerExt;
@@ -195,10 +195,13 @@ pub async fn spawn_service<C: Collection>(
             cmd
         },
     };
+    let (node_index, peer_ips) = get_sgx_enclave_args(&cx).await;
 
     cmd.env("SERVICE_ID", format!("{id}"))
         .env("BLOCKSTORE_PATH", &cx.blockstore_path)
-        .env("IPC_PATH", &ipc_dir);
+        .env("IPC_PATH", &ipc_dir)
+        .env("PEER_IPS", peer_ips.join(","))
+        .env("OUR_NODE_INDEX", node_index.unwrap_or(1).to_string());
 
     panic_report::add_context(format!("service_{id}"), format!("{cmd:?}"));
 
@@ -475,4 +478,25 @@ async fn run_command(
     }
 
     tracing::info!("Exiting service execution loop [sid={name}]")
+}
+
+// todo(dalton): Replace this. We are only doing this because we cannot get the fleek sdk to compile
+// as a dependency and hit some sort of conflict with forttanix runner package We only need the sdk
+// for two pieces of information: This nodes node index, and a list of peers we might be able to
+// fetch the shared secret from for now we will just pass them in as env variables.
+async fn get_sgx_enclave_args<C: Collection>(ctx: &Arc<Context<C>>) -> (Option<u32>, Vec<String>) {
+    let node_index = match ctx.run(ipc_types::Request::FetchNodeIndex {}).await {
+        Response::FetchNodeIndex { node_index } => node_index,
+        _ => unreachable!(),
+    };
+
+    let peer_ips = match ctx
+        .run(ipc_types::Request::FetchPeerIps { amount: 10 })
+        .await
+    {
+        Response::FetchPeerIps { peer_ips } => peer_ips,
+        _ => unreachable!(),
+    };
+
+    (node_index, peer_ips)
 }

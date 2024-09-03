@@ -8,7 +8,6 @@ use std::sync::{Arc, LazyLock};
 use aesm_client::AesmClient;
 use enclave_runner::usercalls::{AsyncStream, UsercallExtension};
 use enclave_runner::EnclaveBuilder;
-use fn_sdk::api::{fetch_node_index, fetch_peer_ips};
 use futures::executor::block_on;
 use futures::FutureExt;
 use req_res::AttestationEndpoint;
@@ -37,6 +36,21 @@ static SGX_SEALED_DATA_PATH: LazyLock<PathBuf> = LazyLock::new(|| {
         //.expect("SGX_SEALED_DATA_PATH env variable not found")
         .unwrap_or(String::from("./sgx_sealed_data"))
         .into()
+});
+
+static PEER_IPS: LazyLock<Vec<String>> = LazyLock::new(|| {
+    std::env::var("PEER_IPS")
+        .expect("PEER_IPS env variable not found")
+        .split(',')
+        .map(|s| s.to_string())
+        .collect()
+});
+
+static OUR_NODE_INDEX: LazyLock<u32> = LazyLock::new(|| {
+    std::env::var("OUR_NODE_INDEX")
+        .expect("OUR_NODE_INDEX env variable not found")
+        .parse()
+        .expect("OUR_NODE_INDEX must be a valid integer")
 });
 
 const ENCLAVE: &[u8] = include_bytes!("../enclave.sgxs");
@@ -149,9 +163,7 @@ fn main() {
 }
 
 async fn get_enclave_args() -> Vec<Vec<u8>> {
-    let node_index = fetch_node_index()
-        .await
-        .expect("Unable to start sgx service, node does not have a node index yet");
+    let node_index = *OUR_NODE_INDEX;
     // First arg is either the sealed key or a list of peers to get it from
     let first_arg = {
         // todo: make a specific spot for this file
@@ -169,7 +181,7 @@ async fn get_enclave_args() -> Vec<Vec<u8>> {
             // it from
 
             // This returns a random sample of peers shuffled
-            let peers = fetch_peer_ips(10).await;
+            let peers = PEER_IPS.clone();
             let mut arg = "--peer-ips=".as_bytes().to_vec();
             arg.extend_from_slice(peers.join(",").as_bytes());
             arg
