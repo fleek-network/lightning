@@ -223,7 +223,61 @@ mod tests {
             .unwrap();
         let processor = IpldDagPbProcessor::new(&host);
         let item = processor.get(cid.into()).await.unwrap();
-        mock.assert();
         assert!(item.is_some());
+        assert!(matches!(item.unwrap(), IpldItem::Dir(_)));
+        mock.assert();
+    }
+
+    #[tokio::test]
+    async fn test_get_with_links() {
+        let files = [
+            "Qmc8mmzycvXnzgwBHokZQd97iWAmtdFMqX4FZUAQ5AQdQi",
+            "QmcBLKyRHjbGeLnjnmj74FFJpGJDz4YxFqUDYqMU7Mny1p",
+            "QmddrRa6PVSnPTyMRBsPTpqnWTvc8n8kfqdt2iVGx5gv3m",
+            "QmRCYNxaJKaXEQEZYbzANjB9uCsiVYrDuY6TNqWtQQDamq",
+            "QmaNYRP83ARdjELmoQWTLoJ31vxn3zmBxK3d7vR6gAfiLZ",
+            "QmVNz2znpRpwPFafwbb6TJCN7FWrxv6eprQeJLnkA8sDqh",
+            "QmdVS3CcQMfJt8XvPcswNWgnQ2mHyk9wjvFSqrYxjFW83u",
+            "QmRP87qouYU5AewinSGvxog8d5zEuYonLtM9cTcSL8Rdr6",
+            "QmRd5xGHUtY2mNcrb8uSG8VrhcynChqJU9z3oYx2oLcdmJ",
+            "QmaEAM7XWkY9P8A4nmBK4qFDGxnEqadmevfkCpoodpjnna",
+            "QmQFWxRHjCKjPPZ92GP56cdtw7kCGwP2bNp6poHfmCuh6t",
+            "QmciHZfp2BT5yJyEW7U9w5LGPcsxpbPR5aVr4fcTVFdW97",
+            "QmWwXc53v3xS1Z8BHmKco8dTnNqQyveU5GdsF7aoRaAKka",
+            "QmYemNQVTQseKv4U5EpSbVSJHXtdt6HpHWrNFJtZmYgB4m",
+            "QmcoUbH5cDdkjbMXWWq5nw64UJbJQY7NFaGdXzoF4ptGV3",
+            "QmRQY4bwaot6wVtJiFHeK4VPYK1Z29BkDfLP9E3nLbTgVn",
+            "QmasVpGLWXGDs4aHha7DMLW3JU1b6mNF2VnHozjHiePNTq",
+            "QmQ4FawzQY28kUpRNdrCxp78D2jtf8q6n41Se6wvouBUhD",
+            "QmNbPfbbvh3qvBjZtWSzxCrx2o6Vc6iV4xvyBf29eqzZZz",
+        ];
+        let mock_server = MockServer::start_async().await;
+
+        let mocks = files
+            .iter()
+            .map(|file| {
+                let file_bytes = std::fs::read(format!("tests/fixtures/{}.dag-pb", file)).unwrap();
+                mock_server.mock(|when, then| {
+                    when.method(GET)
+                        .path(&format!("/ipfs/{}", file))
+                        .query_param("format", "raw");
+                    then.status(200)
+                        .header("accept", "application/vnd.ipld.raw")
+                        .header("content-type", "application/vnd.ipld.raw")
+                        .body(file_bytes.clone());
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let host = mock_server.base_url();
+        let cid: Cid = "Qmc8mmzycvXnzgwBHokZQd97iWAmtdFMqX4FZUAQ5AQdQi"
+            .try_into()
+            .unwrap();
+        let processor = IpldDagPbProcessor::new(&host);
+        let item = processor.get(cid.into()).await.unwrap();
+        assert!(item.is_some());
+        for mock in mocks {
+            mock.assert();
+        }
     }
 }
