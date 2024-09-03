@@ -130,9 +130,9 @@ impl Component for RuleForm {
                         .yank_input()
                         .expect("We already verified that the input is valid");
                     let profile = ctx
-                        .selected_profile()
+                        .get_selected_profile_mut()
                         .expect("A profile had to have been selected");
-                    ctx.update_profile_rules(profile, rule);
+                    profile.file_rules.push(rule);
                     Ok(Some(Action::UpdateMode(Mode::ProfileViewEdit)))
                 }
             },

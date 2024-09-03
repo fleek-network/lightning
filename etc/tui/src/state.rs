@@ -100,6 +100,10 @@ impl State {
         self.selected_profile.as_ref()
     }
 
+    pub fn get_selected_profile_mut(&mut self) -> Option<&mut Profile> {
+        self.selected_profile.as_mut()
+    }
+
     pub fn selected_profile(&self) -> Option<String> {
         self.selected_profile
             .as_ref()
@@ -108,11 +112,7 @@ impl State {
             .map(|path| path.display().to_string())
     }
 
-    pub fn select_profile(&mut self, profile: Profile) -> Option<String> {
-        self.selected_profile
-            .as_ref()
-            .map(|p| p.name.as_ref())
-            .flatten()
-            .map(|path| path.display().to_string())
+    pub fn select_profile(&mut self, profile: Profile) {
+        self.selected_profile.replace(profile);
     }
 }

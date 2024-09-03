@@ -55,33 +55,6 @@ impl Profile {
         profiles_to_update.push(profile);
     }
 
-    // fn save(&mut self) {
-    //     // Remove names of profiles that need to be deleted before they're gone forever.
-    //     let remove = self
-    //         .list
-    //         .records_to_remove_mut()
-    //         .map(|profile| profile.name.take())
-    //         .collect::<HashSet<_>>();
-    //     self.list.commit_changes();
-    //     let update = self.profiles_to_update.take();
-    //     let command_tx = self
-    //         .command_tx
-    //         .clone()
-    //         .expect("Component always has a sender");
-    //     let storage = self.src.clone();
-    //     tokio::spawn(async move {
-    //         // Todo: do better.
-    //         if let Err(e) = storage.delete_profiles(remove).await {
-    //             let _ = command_tx.send(Action::Error(e.to_string()));
-    //         }
-    //         if let Some(profiles) = update {
-    //             if let Err(e) = storage.write_profiles(profiles).await {
-    //                 let _ = command_tx.send(Action::Error(e.to_string()));
-    //             }
-    //         }
-    //     });
-    // }
-
     fn get_selected_profile(&mut self) -> Option<map::Profile> {
         self.list.get().map(Clone::clone)
     }
@@ -128,12 +101,11 @@ impl Component for Profile {
                 Ok(Some(Action::Render))
             },
             Action::Select => {
-                // Todo: We should use some type of unique dentification
+                // Todo: We should use some type of unique identification
                 // to maintain consistency.
                 if let Some(profile) = self.list.get() {
                     ctx.select_profile(profile.clone());
                 }
-
                 Ok(Some(Action::UpdateMode(Mode::ProfileView)))
             },
             Action::UpdateMode(Mode::ProfilesEdit) => {
