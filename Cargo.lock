@@ -7640,6 +7640,7 @@ dependencies = [
  "fleek-service-ai",
  "fleek-service-fetcher",
  "fleek-service-js-poc",
+ "fleek-service-sgx",
  "fn-sdk",
  "futures 0.3.30",
  "fxhash",
