@@ -26,8 +26,6 @@ fn main() {
             std::process::Command::new("cargo")
                 .args(["build", "--release"])
                 .current_dir(&path)
-                .env_clear()
-                .env("PATH", std::env::var("PATH").unwrap())
                 .status()
                 .unwrap()
                 .success(),

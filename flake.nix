@@ -208,15 +208,12 @@
             SNAPPY_LIB_DIR = "${lib.getLib pkgs.snappy}/lib";
             ORT_LIB_LOCATION = "${lib.getLib pkgs.onnxruntime}/lib";
 
-            # Enable mold linker
+            RUSTFLAGS = "--cfg tokio_unstable";
+
+            # Enable mold linker (and clang)
+            CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS = " -Clink-arg=-fuse-ld=${pkgs.mold-wrapped}/bin/mold";
             CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER = "${pkgs.clang}/bin/clang";
             CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER = "${pkgs.clang}/bin/clang";
-
-            # NOTE: mold is not fully supported on macOS yet, so we just use the default linker there.
-            # The error you would get looks like: mold: fatal: unknown command line option: -dynamic; -dynamic is a macOS linker's option. mold does not support macOS.
-            RUSTFLAGS =
-              "--cfg tokio_unstable"
-              + lib.optionalString (!pkgs.stdenv.isDarwin) " -Clink-arg=-fuse-ld=${pkgs.mold-wrapped}/bin/mold";
           };
 
           # Build *just* the cargo dependencies, so we can reuse all of that
