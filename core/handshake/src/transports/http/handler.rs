@@ -23,12 +23,15 @@ pub async fn handler<P: ExecutorProviderInterface>(
     method: Method,
     headers: HeaderMap,
     OriginalUri(uri): OriginalUri,
-    Path((service_id, _)): Path<(String, String)>,
+    Path(map): Path<HashMap<String, String>>,
     Query(params): Query<HashMap<String, String>>,
     Extension(provider): Extension<Context<P>>,
     payload: Bytes,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
-    let service_id = u32::from_str(&service_id)
+    let service_id = map
+        .get("service")
+        .ok_or((StatusCode::NOT_FOUND, "missing service id".to_string()))?;
+    let service_id = u32::from_str(service_id)
         .map_err(|_| (StatusCode::NOT_FOUND, "route not found".to_string()))
         .and_then(Service::try_from)?;
 
