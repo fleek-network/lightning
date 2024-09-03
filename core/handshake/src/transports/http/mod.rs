@@ -36,6 +36,7 @@ impl Transport for HttpTransport {
     ) -> anyhow::Result<(Self, Option<Router>)> {
         let router = Router::new()
             .route("/services/:service/*path", any(handler::handler::<P>))
+            .route("/services/:service", any(handler::handler::<P>))
             .route("/actions.json", any(handler::blink_support));
         Ok((Self {}, Some(router)))
     }
