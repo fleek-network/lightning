@@ -44,7 +44,7 @@ services = [
     "dep:fleek-service-fetcher",
     "dep:fleek-service-js-poc",
     "dep:fleek-service-ai",
-    "dep:fleek-service-sgx",
+   "dep:fleek-service-sgx",
 ]
 
 [dev-dependencies]
