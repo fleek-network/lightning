@@ -4840,6 +4840,7 @@ dependencies = [
  "sgx-isa",
  "sgxs-loaders",
  "tokio",
+ "tracing-subscriber",
  "url",
  "whoami",
 ]
