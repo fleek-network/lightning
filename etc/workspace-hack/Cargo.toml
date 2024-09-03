@@ -26,6 +26,8 @@ axum-core = { version = "0.4", default-features = false, features = ["tracing"] 
 base64-3c51e837cfc5589a = { package = "base64", version = "0.22" }
 base64-594e8ee84c453af0 = { package = "base64", version = "0.13", features = ["alloc"] }
 base64-647d43efb71741da = { package = "base64", version = "0.21" }
+bit-set = { version = "0.5" }
+bit-vec = { version = "0.6" }
 bitflags = { version = "2", default-features = false, features = ["std"] }
 blake2 = { version = "0.10" }
 blake3 = { version = "1" }
@@ -85,10 +87,12 @@ indexmap-dff4ba8e3ae991db = { package = "indexmap", version = "1", default-featu
 indexmap-f595c2ba2a3f28df = { package = "indexmap", version = "2", features = ["serde"] }
 inout = { version = "0.1", default-features = false, features = ["std"] }
 itertools-93f6ce9d446188ac = { package = "itertools", version = "0.10" }
+itertools-a6292c17cd707f01 = { package = "itertools", version = "0.11" }
 k256 = { version = "0.13" }
+lalrpop-util = { version = "0.20", features = ["lexer"] }
 lazy_static = { version = "1", default-features = false, features = ["spin_no_std"] }
 libc = { version = "0.2", features = ["extra_traits"] }
-log = { version = "0.4", default-features = false, features = ["std"] }
+log = { version = "0.4", default-features = false, features = ["kv_unstable", "std"] }
 matrixmultiply = { version = "0.3", features = ["cgemm"] }
 memchr = { version = "2" }
 miniz_oxide = { version = "0.7", features = ["simd"] }
@@ -121,7 +125,7 @@ quote = { version = "1" }
 rand = { version = "0.8", features = ["small_rng"] }
 rand_chacha = { version = "0.3" }
 regex = { version = "1" }
-regex-automata = { version = "0.4", default-features = false, features = ["dfa-onepass", "dfa-search", "hybrid", "meta", "nfa-backtrack", "perf-inline", "perf-literal", "unicode"] }
+regex-automata = { version = "0.4", default-features = false, features = ["dfa-onepass", "dfa-search", "hybrid", "meta", "nfa-backtrack", "perf", "unicode"] }
 regex-syntax = { version = "0.8" }
 reqwest = { version = "0.11", features = ["blocking", "json", "rustls-tls"] }
 ring-9067fe90e8c1f593 = { package = "ring", version = "0.17", features = ["std"] }
@@ -143,6 +147,7 @@ sha1 = { version = "0.10", features = ["oid"] }
 sha2 = { version = "0.10", features = ["oid"] }
 sha3 = { version = "0.10" }
 simdutf8 = { version = "0.1", features = ["aarch64_neon"] }
+similar = { version = "2", features = ["inline"] }
 smallvec = { version = "1", default-features = false, features = ["const_new", "union"] }
 socket2 = { version = "0.5", default-features = false, features = ["all"] }
 spin = { version = "0.9" }
@@ -150,6 +155,7 @@ spki = { version = "0.7", default-features = false, features = ["pem", "std"] }
 subtle = { version = "2", default-features = false, features = ["i128"] }
 syn-f595c2ba2a3f28df = { package = "syn", version = "2", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
 time = { version = "0.3", features = ["formatting", "local-offset", "macros", "parsing"] }
+tiny-keccak = { version = "2", features = ["keccak", "sha3"] }
 tokio = { version = "1", features = ["full", "test-util", "tracing"] }
 tokio-rustls = { version = "0.24" }
 tokio-stream = { version = "0.1", features = ["net", "sync"] }
@@ -163,6 +169,7 @@ tracing = { version = "0.1", features = ["log"] }
 tracing-core = { version = "0.1" }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "time"] }
 uint = { version = "0.9" }
+unicode-xid = { version = "0.2" }
 url = { version = "2", features = ["expose_internals", "serde"] }
 uuid = { version = "1", features = ["fast-rng", "serde", "v4"] }
 web-sys = { version = "0.3", default-features = false, features = ["AbortController", "AbortSignal", "AddEventListenerOptions", "BinaryType", "Cache", "CacheQueryOptions", "CacheStorage", "CloseEvent", "CloseEventInit", "Document", "ErrorEvent", "File", "FileReader", "FormData", "Headers", "History", "HtmlHeadElement", "Location", "MessageEvent", "ProgressEvent", "QueuingStrategy", "ReadableByteStreamController", "ReadableStream", "ReadableStreamByobReader", "ReadableStreamByobRequest", "ReadableStreamDefaultController", "ReadableStreamDefaultReader", "ReadableStreamGetReaderOptions", "ReadableStreamReadResult", "ReadableStreamReaderMode", "ReadableStreamType", "ReadableWritablePair", "Request", "RequestInit", "RequestRedirect", "Response", "ResponseInit", "StreamPipeOptions", "TransformStream", "TransformStreamDefaultController", "Transformer", "UnderlyingSink", "UnderlyingSource", "WebSocket", "Window", "WorkerGlobalScope", "WritableStream", "WritableStreamDefaultController", "WritableStreamDefaultWriter", "console"] }
@@ -179,6 +186,8 @@ axum-core = { version = "0.4", default-features = false, features = ["tracing"] 
 base64-3c51e837cfc5589a = { package = "base64", version = "0.22" }
 base64-594e8ee84c453af0 = { package = "base64", version = "0.13", features = ["alloc"] }
 base64-647d43efb71741da = { package = "base64", version = "0.21" }
+bit-set = { version = "0.5" }
+bit-vec = { version = "0.6" }
 bitflags = { version = "2", default-features = false, features = ["std"] }
 blake2 = { version = "0.10" }
 blake3 = { version = "1" }
@@ -240,10 +249,12 @@ indexmap-f595c2ba2a3f28df = { package = "indexmap", version = "2", features = ["
 inout = { version = "0.1", default-features = false, features = ["std"] }
 itertools-5ef9efb8ec2df382 = { package = "itertools", version = "0.12" }
 itertools-93f6ce9d446188ac = { package = "itertools", version = "0.10" }
+itertools-a6292c17cd707f01 = { package = "itertools", version = "0.11" }
 k256 = { version = "0.13" }
+lalrpop-util = { version = "0.20", features = ["lexer"] }
 lazy_static = { version = "1", default-features = false, features = ["spin_no_std"] }
 libc = { version = "0.2", features = ["extra_traits"] }
-log = { version = "0.4", default-features = false, features = ["std"] }
+log = { version = "0.4", default-features = false, features = ["kv_unstable", "std"] }
 matrixmultiply = { version = "0.3", features = ["cgemm"] }
 memchr = { version = "2" }
 miniz_oxide = { version = "0.7", features = ["simd"] }
@@ -278,7 +289,7 @@ quote = { version = "1" }
 rand = { version = "0.8", features = ["small_rng"] }
 rand_chacha = { version = "0.3" }
 regex = { version = "1" }
-regex-automata = { version = "0.4", default-features = false, features = ["dfa-onepass", "dfa-search", "hybrid", "meta", "nfa-backtrack", "perf-inline", "perf-literal", "unicode"] }
+regex-automata = { version = "0.4", default-features = false, features = ["dfa-onepass", "dfa-search", "hybrid", "meta", "nfa-backtrack", "perf", "unicode"] }
 regex-syntax = { version = "0.8" }
 reqwest = { version = "0.11", features = ["blocking", "json", "rustls-tls"] }
 ring-9067fe90e8c1f593 = { package = "ring", version = "0.17", features = ["std"] }
@@ -300,6 +311,7 @@ sha1 = { version = "0.10", features = ["oid"] }
 sha2 = { version = "0.10", features = ["oid"] }
 sha3 = { version = "0.10" }
 simdutf8 = { version = "0.1", features = ["aarch64_neon"] }
+similar = { version = "2", features = ["inline"] }
 smallvec = { version = "1", default-features = false, features = ["const_new", "union"] }
 socket2 = { version = "0.5", default-features = false, features = ["all"] }
 spin = { version = "0.9" }
@@ -308,6 +320,7 @@ subtle = { version = "2", default-features = false, features = ["i128"] }
 syn-dff4ba8e3ae991db = { package = "syn", version = "1", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
 syn-f595c2ba2a3f28df = { package = "syn", version = "2", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
 time = { version = "0.3", features = ["formatting", "local-offset", "macros", "parsing"] }
+tiny-keccak = { version = "2", features = ["keccak", "sha3"] }
 tokio = { version = "1", features = ["full", "test-util", "tracing"] }
 tokio-rustls = { version = "0.24" }
 tokio-stream = { version = "0.1", features = ["net", "sync"] }
@@ -321,6 +334,7 @@ tracing = { version = "0.1", features = ["log"] }
 tracing-core = { version = "0.1" }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "time"] }
 uint = { version = "0.9" }
+unicode-xid = { version = "0.2" }
 url = { version = "2", features = ["expose_internals", "serde"] }
 uuid = { version = "1", features = ["fast-rng", "serde", "v4"] }
 web-sys = { version = "0.3", default-features = false, features = ["AbortController", "AbortSignal", "AddEventListenerOptions", "BinaryType", "Cache", "CacheQueryOptions", "CacheStorage", "CloseEvent", "CloseEventInit", "Document", "ErrorEvent", "File", "FileReader", "FormData", "Headers", "History", "HtmlHeadElement", "Location", "MessageEvent", "ProgressEvent", "QueuingStrategy", "ReadableByteStreamController", "ReadableStream", "ReadableStreamByobReader", "ReadableStreamByobRequest", "ReadableStreamDefaultController", "ReadableStreamDefaultReader", "ReadableStreamGetReaderOptions", "ReadableStreamReadResult", "ReadableStreamReaderMode", "ReadableStreamType", "ReadableWritablePair", "Request", "RequestInit", "RequestRedirect", "Response", "ResponseInit", "StreamPipeOptions", "TransformStream", "TransformStreamDefaultController", "Transformer", "UnderlyingSink", "UnderlyingSource", "WebSocket", "Window", "WorkerGlobalScope", "WritableStream", "WritableStreamDefaultController", "WritableStreamDefaultWriter", "console"] }
@@ -332,7 +346,7 @@ bitflags = { version = "2", default-features = false, features = ["serde"] }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
 openssl = { version = "0.10", features = ["vendored"] }
 openssl-sys = { version = "0.9", default-features = false, features = ["vendored"] }
-rustix = { version = "0.38", features = ["fs", "system", "termios"] }
+rustix = { version = "0.38", features = ["event", "fs", "net", "pipe", "process", "system", "termios", "time"] }
 semver = { version = "1", features = ["serde"] }
 tokio-tungstenite = { version = "0.20", features = ["rustls-tls-webpki-roots"] }
 web-sys = { version = "0.3", default-features = false, features = ["Worker"] }
@@ -343,7 +357,7 @@ bitflags = { version = "2", default-features = false, features = ["serde"] }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
 openssl = { version = "0.10", features = ["vendored"] }
 openssl-sys = { version = "0.9", default-features = false, features = ["vendored"] }
-rustix = { version = "0.38", features = ["fs", "system", "termios"] }
+rustix = { version = "0.38", features = ["event", "fs", "net", "pipe", "process", "system", "termios", "time"] }
 semver = { version = "1", features = ["serde"] }
 tokio-tungstenite = { version = "0.20", features = ["rustls-tls-webpki-roots"] }
 web-sys = { version = "0.3", default-features = false, features = ["Worker"] }
@@ -355,7 +369,7 @@ core-foundation = { version = "0.9" }
 core-foundation-sys = { version = "0.8" }
 core-graphics-types = { version = "0.1" }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
-rustix = { version = "0.38", features = ["fs", "system", "termios"] }
+rustix = { version = "0.38", features = ["event", "fs", "net", "pipe", "process", "system", "termios", "time"] }
 security-framework-sys = { version = "2" }
 semver = { version = "1", features = ["serde"] }
 tokio-tungstenite = { version = "0.20", features = ["rustls-tls-webpki-roots"] }
@@ -368,7 +382,7 @@ core-foundation = { version = "0.9" }
 core-foundation-sys = { version = "0.8" }
 core-graphics-types = { version = "0.1" }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
-rustix = { version = "0.38", features = ["fs", "system", "termios"] }
+rustix = { version = "0.38", features = ["event", "fs", "net", "pipe", "process", "system", "termios", "time"] }
 security-framework-sys = { version = "2" }
 semver = { version = "1", features = ["serde"] }
 tokio-tungstenite = { version = "0.20", features = ["rustls-tls-webpki-roots"] }
