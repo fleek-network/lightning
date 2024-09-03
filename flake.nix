@@ -179,8 +179,9 @@
                 # Ebpf deps needed at runtime for debug builds via `admin ebpf build`
                 rust-bindgen
                 bpf-linker
-
-                # For sgx service
+              ]
+              ++ lib.optionals (!pkgs.stdenv.isDarwin) [
+                # For sgx service, not available on darwin
                 sgx-azure-dcap-client
               ]
               ++ lib.optionals pkgs.stdenv.isDarwin [
