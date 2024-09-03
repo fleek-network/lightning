@@ -81,9 +81,14 @@ impl Firewall {
         };
 
         let clone = this.clone();
+        let waiter = shutdown.clone();
         lightning_interfaces::spawn!(
-            clone.update_loop(command_rx),
-            "Firewall loop",
+            async move {
+                waiter
+                    .run_until_shutdown(clone.update_loop(command_rx))
+                    .await;
+            },
+            "FIREWALL: update loop",
             crucial(shutdown)
         );
 
