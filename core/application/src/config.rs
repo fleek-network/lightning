@@ -4,11 +4,11 @@ use std::time::SystemTime;
 use anyhow::{anyhow, Context, Result};
 use atomo::{AtomoBuilder, DefaultSerdeBackend};
 use atomo_rocks::{Cache as RocksCache, Env as RocksEnv, Options};
+use lightning_interfaces::types::Genesis;
 use lightning_utils::config::LIGHTNING_HOME_DIR;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
 
-use crate::genesis::Genesis;
 use crate::network::Network;
 use crate::storage::AtomoStorageBuilder;
 
@@ -51,20 +51,22 @@ impl Config {
         }
     }
 
-    pub fn genesis(&self) -> Result<Genesis> {
+    pub fn genesis(&self) -> Result<Option<Genesis>> {
         let mut genesis = match &self.network {
             Some(network) => match &self.genesis_path {
-                Some(_genesis_path) => Err(anyhow!(
-                    "Cannot specify both network and genesis_path in config"
-                )),
-                None => network.genesis(),
+                Some(_genesis_path) => {
+                    return Err(anyhow!(
+                        "Cannot specify both network and genesis_path in config"
+                    ));
+                },
+                None => Some(network.genesis()?),
             },
             None => match &self.genesis_path {
-                Some(genesis_path) => Ok(Genesis::load_from_file(genesis_path.clone())?),
-                None => Err(anyhow!("Missing network in config")),
+                Some(genesis_path) => Some(Genesis::load_from_file(genesis_path.clone())?),
+                None => None,
             },
-        }?;
-        if let Some(dev) = &self.dev {
+        };
+        if let (Some(genesis), Some(dev)) = (&mut genesis, &self.dev) {
             if dev.update_epoch_start_to_now {
                 genesis.epoch_start = SystemTime::now()
                     .duration_since(SystemTime::UNIX_EPOCH)
@@ -179,7 +181,7 @@ mod config_tests {
             genesis_path: None,
             ..Config::default()
         };
-        assert!(config.genesis().is_err());
+        assert!(config.genesis().is_ok());
     }
 
     #[test]

@@ -6,7 +6,6 @@ use blake3_tree::ProofBuf;
 use fleek_crypto::{AccountOwnerSecretKey, NodePublicKey, SecretKey};
 use lightning_application::app::Application;
 use lightning_application::config::Config as AppConfig;
-use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_blockstore::blockstore::{Blockstore, BLOCK_SIZE};
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_indexer::Indexer;
@@ -14,6 +13,8 @@ use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
     CompressionAlgoSet,
     CompressionAlgorithm,
+    Genesis,
+    GenesisNode,
     NodePorts,
     ServerRequest,
 };

@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::time::Duration;
 
 use affair::AsyncWorker as WorkerTrait;
@@ -15,6 +16,8 @@ use lightning_interfaces::types::{
     CompressionAlgorithm,
     Epoch,
     ExecutionData,
+    Genesis,
+    GenesisPrices,
     Metadata,
     NodeIndex,
     NodeInfo,
@@ -31,10 +34,10 @@ use lightning_metrics::increment_counter;
 use merklize::hashers::keccak::KeccakHasher;
 use merklize::trees::mpt::MptStateTree;
 use merklize::StateTree;
+use tokio::sync::Mutex;
 use tracing::warn;
 
 use crate::config::Config;
-use crate::genesis::GenesisPrices;
 use crate::state::{ApplicationState, QueryRunner};
 use crate::storage::AtomoStorage;
 
@@ -182,11 +185,9 @@ impl ApplicationEnv {
     /// This function will panic if the genesis file cannot be decoded into the correct types
     /// Will return true if database was empty and genesis needed to be loaded or false if there was
     /// already state loaded and it didn't load genesis
-    pub fn apply_genesis_block(&mut self, config: &Config) -> Result<bool> {
+    pub fn apply_genesis_block(&mut self, genesis: Genesis) -> Result<bool> {
         self.inner.run(|ctx| {
             let mut metadata_table = ctx.get_table::<Metadata, Value>("metadata");
-
-            let genesis = config.genesis()?;
 
             if metadata_table.get(Metadata::Epoch).is_some() {
                 tracing::info!("Genesis block already exists in application state.");
@@ -381,6 +382,8 @@ impl ApplicationEnv {
             }
 
             metadata_table.insert(Metadata::Epoch, Value::Epoch(0));
+
+            tracing::info!("Genesis block loaded into application state.");
             Ok(true)
         })?
     }
@@ -404,12 +407,12 @@ impl Default for ApplicationEnv {
 
 /// The socket that receives all update transactions
 pub struct UpdateWorker<C: Collection> {
-    env: ApplicationEnv,
+    env: Arc<Mutex<ApplicationEnv>>,
     blockstore: C::BlockstoreInterface,
 }
 
 impl<C: Collection> UpdateWorker<C> {
-    pub fn new(env: ApplicationEnv, blockstore: C::BlockstoreInterface) -> Self {
+    pub fn new(env: Arc<Mutex<ApplicationEnv>>, blockstore: C::BlockstoreInterface) -> Self {
         Self { env, blockstore }
     }
 }
@@ -420,6 +423,8 @@ impl<C: Collection> WorkerTrait for UpdateWorker<C> {
 
     async fn handle(&mut self, req: Self::Request) -> Self::Response {
         self.env
+            .lock()
+            .await
             .run(req, || self.blockstore.put(None))
             .await
             .expect("Failed to execute block")

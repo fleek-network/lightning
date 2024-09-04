@@ -4,10 +4,16 @@ use std::time::{Duration, SystemTime};
 use fleek_crypto::{AccountOwnerSecretKey, ConsensusSecretKey, NodeSecretKey, SecretKey};
 use lightning_application::app::Application;
 use lightning_application::config::Config as AppConfig;
-use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_application::state::QueryRunner;
 use lightning_interfaces::prelude::*;
-use lightning_interfaces::types::{NodePorts, UpdateMethod, UpdatePayload, UpdateRequest};
+use lightning_interfaces::types::{
+    Genesis,
+    GenesisNode,
+    NodePorts,
+    UpdateMethod,
+    UpdatePayload,
+    UpdateRequest,
+};
 use lightning_interfaces::Weight;
 use lightning_notifier::Notifier;
 use lightning_signer::Signer;

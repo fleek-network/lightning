@@ -56,8 +56,9 @@ impl<C: Collection> Syncronizer<C> {
 
         let our_public_key = keystore.get_ed25519_pk();
 
-        if !cfg!(debug_assertions) {
-            // We only run the prelude in prod mode to avoid interfering with tests.
+        // We only run the prelude in prod mode to avoid interfering with tests, and if genesis
+        // has already been applied, otherwise we skip it.
+        if !cfg!(debug_assertions) && query_runner.has_genesis() {
             Syncronizer::<C>::prelude(our_public_key, &genesis_committee);
         }
 
@@ -221,8 +222,10 @@ impl<C: Collection> SyncronizerInner<C> {
                 }
 
                 Some(_notification) = epoch_changed_sub.recv() => {
-                    if !cfg!(debug_assertions) {
-                        // We only run the prelude in prod mode to avoid interfering with tests.
+                    // We only run the prelude in prod mode to avoid interfering with tests, and if genesis
+                    // has already been applied, otherwise we skip it.
+                    // At this point the genesis should always already have been applied, but we keep the check anyway.
+                    if !cfg!(debug_assertions) && self.query_runner.has_genesis() {
                         if !self.query_runner.is_valid_node(&self.our_public_key) {
                             println!("The node doesn't have enough stake to participate in the network.");
                             std::process::exit(1);

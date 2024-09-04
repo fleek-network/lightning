@@ -1,7 +1,6 @@
 use anyhow::{Context, Result};
+use lightning_interfaces::types::Genesis;
 use serde::{Deserialize, Serialize};
-
-use crate::genesis::Genesis;
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]

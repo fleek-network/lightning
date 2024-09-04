@@ -1,5 +1,5 @@
 use std::marker::PhantomData;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use affair::AsyncWorker;
@@ -8,11 +8,13 @@ use lightning_interfaces::prelude::*;
 use lightning_interfaces::spawn_worker;
 use lightning_interfaces::types::{ChainId, NodeInfo};
 use tracing::{error, info};
+use types::Genesis;
 
 use crate::config::{Config, StorageConfig};
 use crate::env::{ApplicationEnv, Env, UpdateWorker};
 use crate::state::QueryRunner;
 pub struct Application<C: Collection> {
+    env: Arc<tokio::sync::Mutex<ApplicationEnv>>,
     update_socket: Mutex<Option<ExecutionEngineSocket>>,
     query_runner: QueryRunner,
     collection: PhantomData<C>,
@@ -35,17 +37,18 @@ impl<C: Collection> Application<C> {
 
         let mut env = Env::new(&config, None).expect("Failed to initialize environment.");
 
-        if env.apply_genesis_block(&config)? {
-            info!("Genesis block loaded into application state.");
-        } else {
-            info!("Genesis block already exists exist in application state.");
+        // Apply genesis if provided, if it hasn't been applied yet.
+        if let Some(genesis) = config.genesis()? {
+            env.apply_genesis_block(genesis)?;
         }
 
         let query_runner = env.query_runner();
-        let worker = UpdateWorker::<C>::new(env, blockstore.clone());
+        let env = Arc::new(tokio::sync::Mutex::new(env));
+        let worker = UpdateWorker::<C>::new(env.clone(), blockstore.clone());
         let update_socket = spawn_worker!(worker, "APPLICATION", waiter, crucial);
 
         Ok(Self {
+            env,
             query_runner,
             update_socket: Mutex::new(Some(update_socket)),
             collection: PhantomData,
@@ -127,12 +130,16 @@ impl<C: Collection> ApplicationInterface<C> for Application<C> {
     }
 
     fn get_chain_id(config: &Config) -> Result<ChainId> {
-        Ok(config.genesis()?.chain_id)
+        Ok(config
+            .genesis()?
+            .ok_or(anyhow!("missing genesis"))?
+            .chain_id)
     }
 
     fn get_genesis_committee(config: &Config) -> Result<Vec<NodeInfo>> {
         Ok(config
             .genesis()?
+            .ok_or(anyhow!("missing genesis"))?
             .node_info
             .iter()
             .filter(|node| node.genesis_committee)
@@ -146,5 +153,10 @@ impl<C: Collection> ApplicationInterface<C> for Application<C> {
     fn reset_state_tree_unsafe(config: &Config) -> Result<()> {
         let mut env = ApplicationEnv::new(config, None)?;
         env.inner.reset_state_tree_unsafe()
+    }
+
+    /// Apply genesis block to the application state, if not already applied.
+    async fn apply_genesis(&self, genesis: Genesis) -> Result<bool> {
+        self.env.lock().await.apply_genesis_block(genesis)
     }
 }

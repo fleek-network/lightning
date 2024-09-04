@@ -3,10 +3,10 @@ use std::time::Duration;
 use ethers::types::BlockNumber;
 use lightning_application::app::Application;
 use lightning_application::config::Config as AppConfig;
-use lightning_application::genesis::Genesis;
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_interfaces::prelude::*;
+use lightning_interfaces::types::Genesis;
 use lightning_interfaces::{partial, Ref};
 use lightning_notifier::Notifier;
 use lightning_test_utils::consensus::{

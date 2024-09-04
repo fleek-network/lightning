@@ -291,4 +291,30 @@ impl SyncQueryRunnerInterface for QueryRunner {
             Ok((value, proof))
         })
     }
+
+    /// Wait for genesis block to be applied.
+    ///
+    /// Returns true if the genesis block was applied is already applied.
+    /// Returns immediately if the genesis block was already applied.
+    async fn wait_for_genesis(&self) -> bool {
+        if !self.has_genesis() {
+            tracing::warn!(
+                "Genesis does not exist in application state, waiting for genesis block to be applied..."
+            );
+
+            let mut poll = tokio::time::interval(Duration::from_millis(100));
+
+            while !self.has_genesis() {
+                poll.tick().await;
+            }
+        }
+
+        true
+    }
+
+    /// Returns whether the genesis block has been applied.
+    fn has_genesis(&self) -> bool {
+        // This is consistent with the logic in `Env::apply_genesis_block`.
+        self.get_metadata(&Metadata::Epoch).is_some()
+    }
 }
