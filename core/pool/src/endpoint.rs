@@ -2,6 +2,7 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::future::Future;
 use std::io;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -14,6 +15,7 @@ use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::ServiceScope;
 use lightning_metrics::increment_counter;
 use lightning_utils::application::QueryRunnerExt;
+use ready::ReadyWaiter;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
@@ -26,6 +28,7 @@ use crate::event::{Event, Message};
 use crate::logical_pool::ConnectionInfo;
 use crate::muxer::{ConnectionInterface, MuxerInterface};
 use crate::provider::Response;
+use crate::ready::{PoolReadyState, PoolReadyWaiter};
 use crate::state::{DialInfo, EndpointInfo, NodeInfo, TransportConnectionInfo};
 
 const CONN_GRACE_PERIOD: Duration = Duration::from_secs(30);
@@ -742,9 +745,14 @@ where
         }
     }
 
-    async fn run(&mut self) -> anyhow::Result<()> {
+    async fn run(&mut self, ready: PoolReadyWaiter) -> anyhow::Result<()> {
         let muxer = M::init(self.config.clone())?;
         self.muxer = Some(muxer.clone());
+
+        // Notify caller that the endpoint is ready and listening.
+        ready.notify(PoolReadyState {
+            listen_address: self.listen_address(),
+        });
 
         loop {
             tokio::select! {
@@ -780,10 +788,10 @@ where
         }
     }
 
-    pub fn spawn(mut self, shutdown: ShutdownWaiter) {
+    pub fn spawn(mut self, ready: PoolReadyWaiter, shutdown: ShutdownWaiter) {
         spawn!(
             async move {
-                shutdown.run_until_shutdown(self.run()).await;
+                shutdown.run_until_shutdown(self.run(ready)).await;
 
                 for (_, handle) in self.pool.iter() {
                     let _ = handle
@@ -829,6 +837,21 @@ where
             },
             "POOL: spawn"
         );
+    }
+
+    pub fn listen_address(&self) -> Option<SocketAddr> {
+        if let Some(muxer) = &self.muxer {
+            let listen_addr = muxer.listen_address();
+            match listen_addr {
+                Ok(addr) => Some(addr),
+                Err(e) => {
+                    tracing::error!("failed to get listen address: {e:?}");
+                    None
+                },
+            }
+        } else {
+            None
+        }
     }
 }
 

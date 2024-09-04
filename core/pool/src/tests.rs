@@ -6,6 +6,7 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use fleek_crypto::{AccountOwnerSecretKey, NodePublicKey, SecretKey};
+use futures::future::join_all;
 use futures::StreamExt;
 use lightning_application::app::Application;
 use lightning_application::config::Config as AppConfig;
@@ -208,11 +209,50 @@ fn event_receiver(peer: &Peer) -> (EventReceiver<TestBinding>, EventReceiverTest
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_pool_with_random_listen_address() {
+    let temp_dir = tempdir().unwrap();
+    let (mut peers, _) = get_pools(&temp_dir, 0, 3, None).await;
+
+    // Start all peers.
+    join_all(peers.iter().map(|peer| async { peer.inner.start().await })).await;
+
+    // Check that the peer pools are ready with the correct listen address.
+    let mut listen_addrs = HashSet::new();
+    for peer in &peers {
+        let ready_state = peer.pool().wait_for_ready().await.unwrap();
+        let listen_addr = ready_state.listen_address.unwrap();
+        listen_addrs.insert(listen_addr);
+        assert_ne!(ready_state.listen_address, None);
+        assert_ne!(listen_addr.to_string(), "0.0.0.0:0");
+        assert_eq!(
+            listen_addr.to_string(),
+            peer.pool().listen_address().unwrap().to_string()
+        );
+    }
+
+    // Check that the listen address is different for each peer.
+    assert_eq!(listen_addrs.len(), peers.len());
+
+    // Clean up.
+    join_all(
+        peers
+            .iter_mut()
+            .map(|peer| async { peer.inner.shutdown().await }),
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_send_to_one() {
     // Given: two peers.
     let temp_dir = tempdir().unwrap();
-    let (peers, _) = get_pools(&temp_dir, 48000, 2, None).await;
+    let (mut peers, _) = get_pools(&temp_dir, 48000, 2, None).await;
     let query_runner = peers[0].app().sync_query();
+
+    // Check that the pool does not yet have a listen address.
+    for peer in &peers {
+        assert!(peer.pool().listen_address().is_none());
+    }
 
     let node_index1 = query_runner
         .pubkey_to_index(&peers[0].node_public_key)
@@ -224,9 +264,8 @@ async fn test_send_to_one() {
     let event_handler1 = peers[0].pool().open_event(ServiceScope::Broadcast);
     let mut event_handler2 = peers[1].pool().open_event(ServiceScope::Broadcast);
 
-    for peer in &peers {
-        peer.inner.start().await;
-    }
+    // Start all peers.
+    join_all(peers.iter().map(|peer| async { peer.inner.start().await })).await;
 
     // Since we made the topology push based, the pool will start immediately without waiting for
     // the topology to finish calculating. This means that the pool won't connect to other peers
@@ -234,6 +273,20 @@ async fn test_send_to_one() {
     // topology to send the connections, otherwise receiving the message will block, because there
     // are no connections.
     tokio::time::sleep(Duration::from_secs(2)).await;
+
+    // Check that the peer pools are ready with the correct listen address.
+    for (i, peer) in peers.iter().enumerate() {
+        let expected_listen_addr = format!("0.0.0.0:{}", 48000 + i);
+        let ready_state = peer.pool().wait_for_ready().await.unwrap();
+        assert_eq!(
+            ready_state.listen_address.unwrap().to_string(),
+            expected_listen_addr
+        );
+        assert_eq!(
+            peer.pool().listen_address().unwrap().to_string(),
+            expected_listen_addr
+        );
+    }
 
     // When: one of the peers sends a message to the other peer.
     let msg = Bytes::from("hello");
@@ -245,9 +298,12 @@ async fn test_send_to_one() {
     assert_eq!(sender, node_index1);
 
     // Clean up.
-    for mut peer in peers {
-        peer.inner.shutdown().await;
-    }
+    join_all(
+        peers
+            .iter_mut()
+            .map(|peer| async { peer.inner.shutdown().await }),
+    )
+    .await;
 }
 
 #[tokio::test]

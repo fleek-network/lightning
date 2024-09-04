@@ -33,6 +33,8 @@ pub trait _MuxerInterface: Clone + Send + Sync + 'static {
     fn init(config: Self::Config) -> io::Result<Self>;
     async fn connect(&self, peer: NodeInfo, server_name: &str) -> io::Result<Self::Connecting>;
 
+    fn listen_address(&self) -> io::Result<SocketAddr>;
+
     // The implementation must be cancel-safe.
     async fn accept(&self) -> Option<Self::Connecting>;
     async fn close(&self);

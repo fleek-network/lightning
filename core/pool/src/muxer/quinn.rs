@@ -65,6 +65,10 @@ impl MuxerInterface for QuinnMuxer {
         Ok(Connecting(connecting))
     }
 
+    fn listen_address(&self) -> io::Result<SocketAddr> {
+        self.endpoint.local_addr()
+    }
+
     async fn accept(&self) -> Option<Self::Connecting> {
         self.endpoint.accept().await.map(Connecting)
     }

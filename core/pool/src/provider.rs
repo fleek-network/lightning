@@ -1,4 +1,5 @@
 use std::io;
+use std::net::SocketAddr;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::Poll;
@@ -10,6 +11,7 @@ use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{NodeIndex, RejectReason};
 use lightning_interfaces::{RequestHeader, ServiceScope};
 use lightning_types::Param;
+use ready::ReadyWaiter;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{mpsc, oneshot};
 use types::PeerFilter;
@@ -19,6 +21,7 @@ use crate::endpoint::{Endpoint, EndpointTask};
 use crate::event::{Event, EventReceiver};
 use crate::muxer::quinn::QuinnMuxer;
 use crate::muxer::{BoxedChannel, MuxerInterface};
+use crate::ready::{PoolReadyState, PoolReadyWaiter};
 use crate::{http, muxer, tls};
 
 pub struct PoolProvider<C, M = QuinnMuxer>
@@ -31,6 +34,7 @@ where
     event_queue: Sender<Event>,
     endpoint_task_queue: Sender<EndpointTask>,
     config: Config,
+    ready: PoolReadyWaiter,
 }
 
 impl<C: Collection> PoolProvider<C, QuinnMuxer> {
@@ -67,6 +71,7 @@ impl<C: Collection> PoolProvider<C, QuinnMuxer> {
             public_key,
             dial_info.clone(),
         );
+        let ready = PoolReadyWaiter::new();
         let endpoint = Endpoint::<C, QuinnMuxer>::new(
             sync_query.clone(),
             endpoint_task_rx,
@@ -80,6 +85,7 @@ impl<C: Collection> PoolProvider<C, QuinnMuxer> {
             event_queue: event_tx,
             endpoint_task_queue: endpoint_task_tx,
             config,
+            ready,
         })
     }
 
@@ -93,6 +99,7 @@ impl<C: Collection> PoolProvider<C, QuinnMuxer> {
         let event_tx = this.event_queue.clone();
         let endpoint_task_tx = this.endpoint_task_queue.clone();
         let config = this.config.clone();
+        let ready = this.ready.clone();
         drop(this);
 
         if let Some(http_server_address) = config.http {
@@ -111,8 +118,8 @@ impl<C: Collection> PoolProvider<C, QuinnMuxer> {
             );
         }
 
-        endpoint.spawn(shutdown.clone());
-        receiver.spawn(shutdown);
+        endpoint.spawn(ready, shutdown.clone());
+        receiver.spawn(shutdown.clone());
     }
 
     fn register_broadcast_service(
@@ -165,6 +172,7 @@ impl<C: Collection> PoolInterface<C> for PoolProvider<C, QuinnMuxer> {
     type EventHandler = EventHandler;
     type Requester = Requester;
     type Responder = Responder;
+    type ReadyState = PoolReadyState;
 
     fn open_event(&self, service: ServiceScope) -> Self::EventHandler {
         let (tx, rx) = self.register_broadcast_service(service);
@@ -184,6 +192,23 @@ impl<C: Collection> PoolInterface<C> for PoolProvider<C, QuinnMuxer> {
             },
             Responder { inner: rx },
         )
+    }
+
+    /// Wait for the pool to be ready and return the ready state.
+    async fn wait_for_ready(&self) -> io::Result<Self::ReadyState> {
+        Ok(self.ready.wait().await)
+    }
+
+    /// Returns the local address the pool is listening on.
+    ///
+    /// This is useful for other services to connect to the pool, especially when
+    /// the pool is not bound to a specific address (i.e. `0.0.0.0:0` or `[::]:0`),
+    /// in which case the OS will assign a random available port.
+    fn listen_address(&self) -> Option<SocketAddr> {
+        if !self.ready.is_ready() {
+            return None;
+        }
+        self.ready.state().and_then(|state| state.listen_address)
     }
 }
 
