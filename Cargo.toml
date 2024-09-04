@@ -83,6 +83,7 @@ fleek-crypto = { path = "lib/fleek-crypto" }
 fleek-ipld = { path = "lib/fleek-ipld" }
 hp-fixed = { path = "lib/hp-fixed" }
 ink-quill = { path = "lib/ink-quill" }
+ready = { path = "lib/ready" }
 resolved-pathbuf = { path = "lib/resolved-pathbuf" }
 panic-report = { path = "lib/panic-report" }
 better-shutdown = { path = "lib/better-shutdown" }

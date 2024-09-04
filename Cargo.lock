@@ -7284,6 +7284,7 @@ dependencies = [
  "lightning-types",
  "lightning-workspace-hack",
  "merklize",
+ "ready",
  "schemars",
  "serde",
  "serde-big-array",
@@ -7528,6 +7529,7 @@ dependencies = [
  "lightning-workspace-hack",
  "quinn",
  "rcgen 0.11.3",
+ "ready",
  "ring 0.16.20",
  "rustls 0.21.12",
  "scc 1.9.1",
@@ -7539,6 +7541,7 @@ dependencies = [
  "tokio-stream",
  "tokio-util 0.7.11",
  "tracing",
+ "tracing-subscriber",
  "trait-variant",
  "webpki",
  "x509-parser 0.15.1",
@@ -11556,6 +11559,13 @@ dependencies = [
  "proc-macro2 1.0.86",
  "quote 1.0.36",
  "syn 2.0.72",
+]
+
+[[package]]
+name = "ready"
+version = "0.1.0"
+dependencies = [
+ "tokio",
 ]
 
 [[package]]

@@ -61,6 +61,7 @@ workspace-members = [
     "merklize",
     "once-ptr",
     "panic-report",
+    "ready",
     "resolved-pathbuf",
     "safetensors-ndarray",
     "simulon",
