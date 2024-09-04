@@ -7024,6 +7024,7 @@ dependencies = [
  "lightning-broadcast",
  "lightning-consensus",
  "lightning-final-bindings",
+ "lightning-firewall",
  "lightning-handshake",
  "lightning-interfaces",
  "lightning-keystore",

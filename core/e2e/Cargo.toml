@@ -14,6 +14,7 @@ lightning-application = { path = "../application" }
 lightning-syncronizer = { path = "../syncronizer" }
 lightning-broadcast = { path = "../broadcast" }
 lightning-consensus = { path = "../consensus" }
+lightning-firewall = { path = "../firewall" }
 lightning-notifier = { path = "../notifier" }
 lightning-handshake = { path = "../handshake" }
 lightning-service-executor = { path = "../service-executor" }
