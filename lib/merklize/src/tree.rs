@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use anyhow::Result;
 use atomo::batch::Operation;
 use atomo::{
     Atomo,
@@ -16,7 +15,7 @@ use atomo::{
 use fxhash::FxHashMap;
 use tracing::trace_span;
 
-use crate::{SimpleHasher, StateProof, StateRootHash};
+use crate::{SimpleHasher, StateProof, StateRootHash, StateTreeError};
 
 /// A trait for maintaining and interacting with a state tree.
 ///
@@ -37,14 +36,16 @@ pub trait StateTree {
     ) -> AtomoBuilder<C, Self::Serde>;
 
     /// Returns the root hash of the state tree.
-    fn get_state_root(ctx: &TableSelector<Self::Storage, Self::Serde>) -> Result<StateRootHash>;
+    fn get_state_root(
+        ctx: &TableSelector<Self::Storage, Self::Serde>,
+    ) -> Result<StateRootHash, StateTreeError>;
 
     /// Generates and returns a merkle proof for the given key in the state.
     fn get_state_proof(
         ctx: &TableSelector<Self::Storage, Self::Serde>,
         table: &str,
         serialized_key: Vec<u8>,
-    ) -> Result<Self::Proof>;
+    ) -> Result<Self::Proof, StateTreeError>;
 
     /// Applies the changes in the given batch of updates to the state tree.
     ///
@@ -52,7 +53,7 @@ pub trait StateTree {
     fn update_state_tree<I>(
         ctx: &TableSelector<Self::Storage, Self::Serde>,
         batch: HashMap<String, I>,
-    ) -> Result<()>
+    ) -> Result<(), StateTreeError>
     where
         I: Iterator<Item = (Box<[u8]>, Operation)>;
 
@@ -65,7 +66,7 @@ pub trait StateTree {
     /// corruption.
     fn clear_state_tree_unsafe(
         db: &mut Atomo<UpdatePerm, Self::Storage, Self::Serde>,
-    ) -> Result<()>;
+    ) -> Result<(), StateTreeError>;
 
     /// Verifies that the state in the given atomo database instance, when used to build a
     /// new, temporary state tree from scratch, matches the stored state tree root hash.
@@ -75,7 +76,7 @@ pub trait StateTree {
     /// caution in isolation for use cases such as performing an integrity check at startup.
     fn verify_state_tree_unsafe(
         db: &mut Atomo<QueryPerm, Self::Storage, Self::Serde>,
-    ) -> Result<()>;
+    ) -> Result<(), StateTreeError>;
 
     /// Applies the pending changes in the given context to the state tree.
     ///
@@ -83,7 +84,7 @@ pub trait StateTree {
     /// batch of pending changes from the context.
     fn update_state_tree_from_context_changes(
         ctx: &TableSelector<Self::Storage, Self::Serde>,
-    ) -> Result<()> {
+    ) -> Result<(), StateTreeError> {
         let span = trace_span!("update_state_tree_from_context_changes");
         let _enter = span.enter();
 
@@ -118,7 +119,7 @@ pub trait StateTree {
     /// corruption.
     fn clear_and_rebuild_state_tree_unsafe(
         db: &mut Atomo<UpdatePerm, Self::Storage, Self::Serde>,
-    ) -> Result<()> {
+    ) -> Result<(), StateTreeError> {
         let span = trace_span!("clear_and_rebuild_state_tree_unsafe");
         let _enter = span.enter();
 
@@ -146,5 +147,5 @@ pub trait StateTree {
     /// caution in isolation for use cases such as performing checks at startup.
     fn is_empty_state_tree_unsafe(
         db: &mut Atomo<QueryPerm, Self::Storage, Self::Serde>,
-    ) -> Result<bool>;
+    ) -> Result<bool, StateTreeError>;
 }

@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 
-use anyhow::{ensure, Result};
 use atomo::batch::{BoxedVec, Operation, VerticalBatch};
 use atomo::{
     AtomoBuilder,
@@ -23,7 +22,7 @@ use super::adapter::Adapter;
 use super::hasher::SimpleHasherWrapper;
 use super::layout::TrieLayoutWrapper;
 use super::MptStateProof;
-use crate::{SimpleHasher, StateKey, StateRootHash, StateTree, VerifyStateTreeError};
+use crate::{SimpleHasher, StateKey, StateRootHash, StateTree, StateTreeError};
 
 pub(crate) const NODES_TABLE_NAME: &str = "%state_tree_nodes";
 pub(crate) const ROOT_TABLE_NAME: &str = "%state_tree_root";
@@ -62,7 +61,7 @@ where
     fn state_root(
         nodes_table: SharedNodesTableRef<B, S, H>,
         root_table: SharedRootTable<B, S>,
-    ) -> Result<StateRootHash> {
+    ) -> Result<StateRootHash, StateTreeError> {
         let root = { root_table.lock().unwrap().get() };
         if let Some(root) = root {
             Ok(root)
@@ -120,7 +119,9 @@ where
     /// Get the state root hash of the state tree.
     /// Since we need to read the state, a table selector execution context is needed for
     /// consistency.
-    fn get_state_root(ctx: &TableSelector<Self::Storage, Self::Serde>) -> Result<StateRootHash> {
+    fn get_state_root(
+        ctx: &TableSelector<Self::Storage, Self::Serde>,
+    ) -> Result<StateRootHash, StateTreeError> {
         let span = trace_span!("get_state_root");
         let _enter = span.enter();
 
@@ -138,7 +139,7 @@ where
         ctx: &TableSelector<Self::Storage, Self::Serde>,
         table: &str,
         serialized_key: Vec<u8>,
-    ) -> Result<MptStateProof> {
+    ) -> Result<MptStateProof, StateTreeError> {
         let span = trace_span!("get_state_proof");
         let _enter = span.enter();
 
@@ -169,7 +170,7 @@ where
     fn update_state_tree<I>(
         ctx: &TableSelector<Self::Storage, Self::Serde>,
         batch: HashMap<String, I>,
-    ) -> Result<()>
+    ) -> Result<(), StateTreeError>
     where
         I: Iterator<Item = (BoxedVec, Operation)>,
     {
@@ -202,11 +203,13 @@ where
                 match operation {
                     Operation::Remove => {
                         trace!(?table, ?key_hash, "operation/remove");
-                        tree.remove(key_hash.as_ref())?;
+                        tree.remove(key_hash.as_ref())
+                            .map_err(|e| StateTreeError::Unknown(e.to_string()))?;
                     },
                     Operation::Insert(value) => {
                         trace!(?table, ?key_hash, ?value, "operation/insert");
-                        tree.insert(key_hash.as_ref(), &value)?;
+                        tree.insert(key_hash.as_ref(), &value)
+                            .map_err(|e| StateTreeError::Unknown(e.to_string()))?;
                     },
                 }
             }
@@ -231,7 +234,7 @@ where
     /// Clear the state tree by removing all nodes and keys from the atomo database.
     fn clear_state_tree_unsafe(
         db: &mut atomo::Atomo<atomo::UpdatePerm, Self::Storage, Self::Serde>,
-    ) -> Result<()> {
+    ) -> Result<(), StateTreeError> {
         let span = trace_span!("clear_state_tree_unsafe");
         let _enter = span.enter();
 
@@ -270,7 +273,7 @@ where
     /// temporary state tree from scratch, matches the stored state tree root hash.
     fn verify_state_tree_unsafe(
         db: &mut atomo::Atomo<atomo::QueryPerm, Self::Storage, Self::Serde>,
-    ) -> Result<()> {
+    ) -> Result<(), StateTreeError> {
         let span = trace_span!("verify_state_tree_unsafe");
         let _enter = span.enter();
 
@@ -290,7 +293,9 @@ where
         // Build a new, temporary state tree from the batch.
         let builder = AtomoBuilder::<_, S>::new(InMemoryStorage::default());
         type TempDbProvider<S, H> = MptStateTree<InMemoryStorage, S, H>;
-        let mut tmp_db = TempDbProvider::<S, H>::register_tables(builder).build()?;
+        let mut tmp_db = TempDbProvider::<S, H>::register_tables(builder)
+            .build()
+            .map_err(|e| StateTreeError::Unknown(e.to_string()))?;
         tmp_db.run(|ctx| TempDbProvider::<S, H>::update_state_tree(ctx, batch))?;
 
         // Get and return the state root hash from the temporary state tree.
@@ -300,10 +305,12 @@ where
 
         // Check that the state root hash matches the stored state root hash.
         let stored_state_root = db.query().run(|ctx| Self::get_state_root(ctx))?;
-        ensure!(
-            tmp_state_root == stored_state_root,
-            VerifyStateTreeError::StateRootMismatch(stored_state_root, tmp_state_root)
-        );
+        if tmp_state_root != stored_state_root {
+            return Err(StateTreeError::VerifyStateTreeError {
+                expected: tmp_state_root,
+                stored: stored_state_root,
+            });
+        }
 
         Ok(())
     }
@@ -311,7 +318,7 @@ where
     /// Returns true if the state tree is empty, and false otherwise.
     fn is_empty_state_tree_unsafe(
         db: &mut atomo::Atomo<atomo::QueryPerm, Self::Storage, Self::Serde>,
-    ) -> Result<bool> {
+    ) -> Result<bool, StateTreeError> {
         let span = trace_span!("is_empty_state_tree_unsafe");
         let _enter = span.enter();
 

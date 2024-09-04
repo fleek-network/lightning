@@ -275,6 +275,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
     /// Returns the state tree root hash from the application state.
     fn get_state_root(&self) -> Result<StateRootHash> {
         self.run(|ctx| ApplicationStateTree::get_state_root(ctx))
+            .map_err(From::from)
     }
 
     /// Returns the state proof for a given key from the application state using the state tree.

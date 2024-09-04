@@ -6,7 +6,7 @@ mod tree;
 pub mod trees;
 mod types;
 
-pub use errors::VerifyStateTreeError;
+pub use errors::*;
 pub use hasher::{SimpleHash, SimpleHasher};
 pub use proof::StateProof;
 pub use tree::StateTree;
