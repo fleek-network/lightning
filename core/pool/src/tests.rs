@@ -112,9 +112,13 @@ async fn get_pools(
     // Create peers.
     let mut peers = Vec::new();
     for (i, keystore) in keystores.into_iter().enumerate() {
-        let address: SocketAddr = format!("0.0.0.0:{}", port_offset + i as u16)
-            .parse()
-            .unwrap();
+        // If the port offset is 0, we want to bind to a random port.
+        let pool_port = if port_offset == 0 {
+            0
+        } else {
+            port_offset + i as u16
+        };
+        let address: SocketAddr = format!("0.0.0.0:{}", pool_port).parse().unwrap();
         let peer = create_peer(
             app_config.clone(),
             keystore,
@@ -207,7 +211,7 @@ fn event_receiver(peer: &Peer) -> (EventReceiver<TestBinding>, EventReceiverTest
     )
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn test_pool_with_random_listen_address() {
     let temp_dir = tempdir().unwrap();
     let (mut peers, _) = get_pools(&temp_dir, 0, 3, None).await;
