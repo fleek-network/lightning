@@ -1,7 +1,6 @@
 use anyhow::Result;
 use crossterm::event::KeyEvent;
-use lightning_guard::map::{FileRule, PacketFilterRule};
-use lightning_guard::{map, ConfigSource};
+use lightning_guard::ConfigSource;
 use log::debug;
 use ratatui::prelude::{Constraint, Direction, Layout, Rect};
 #[cfg(feature = "logger")]
@@ -56,13 +55,13 @@ impl App {
     pub fn new(tick_rate: f64, frame_rate: f64, src: ConfigSource) -> Result<Self> {
         let mode = Mode::Home;
         let home = Home::new();
-        let firewall = FireWall::new(src.clone());
+        let firewall = FireWall::new();
         #[cfg(feature = "logger")]
         let logger = Logger::new();
         let summary = Summary::new();
         let prompt = Prompt::new();
         let navigator = Navigator::new();
-        let profiles = Profile::new(src.clone());
+        let profiles = Profile::new();
         let config = Config::new()?;
         Ok(Self {
             tick_rate,
@@ -75,7 +74,7 @@ impl App {
             navigator,
             firewall,
             profiles,
-            profile_view: ProfileView::new(src.clone()),
+            profile_view: ProfileView::new(),
             profile_form: ProfileForm::new(),
             profile_rule_form: RuleForm::new(),
             should_quit: false,

@@ -5,10 +5,7 @@ use lightning_guard::map::{FileRule, PacketFilterRule, Profile};
 use lightning_guard::ConfigSource;
 use log::error;
 
-use crate::action::Action;
-
 pub struct State {
-    next_action: Option<Action>,
     filters: Vec<PacketFilterRule>,
     profiles: HashMap<Option<PathBuf>, Profile>,
     selected_profile: Option<PathBuf>,
@@ -18,7 +15,6 @@ pub struct State {
 impl State {
     pub fn new(src: ConfigSource) -> Self {
         Self {
-            next_action: None,
             filters: Vec::new(),
             profiles: HashMap::new(),
             selected_profile: None,
@@ -39,8 +35,14 @@ impl State {
         self.filters.push(filter);
     }
 
-    pub async fn commit_packet_filters(&mut self) -> Result<()> {
-        self.src.write_packet_filters(self.filters.clone()).await
+    pub fn commit_packet_filters(&mut self) {
+        let filters = self.filters.clone();
+        let src = self.src.clone();
+        tokio::spawn(async move {
+            if let Err(e) = src.write_packet_filters(filters).await {
+                error!("failed to write profiles to disk: {e:?}");
+            }
+        });
     }
 
     pub fn get_filters(&self) -> &[PacketFilterRule] {
@@ -98,7 +100,7 @@ impl State {
             .map(|path| path.display().to_string())
     }
 
-    pub fn select_profile(&mut self, profile: Profile) {
+    pub fn select_profile(&mut self, profile: &Profile) {
         self.selected_profile = profile.name.clone();
         debug_assert!(self.profiles.contains_key(&self.selected_profile));
     }

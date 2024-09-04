@@ -1,11 +1,9 @@
 mod forms;
 mod view;
 
-use std::collections::HashSet;
-
 use anyhow::Result;
 pub use forms::{ProfileForm, RuleForm};
-use lightning_guard::{map, ConfigSource};
+use lightning_guard::map;
 use ratatui::prelude::Rect;
 use tokio::sync::mpsc::UnboundedSender;
 pub use view::ProfileView;
@@ -21,15 +19,13 @@ use crate::widgets::list::List;
 pub struct Profile {
     command_tx: Option<UnboundedSender<Action>>,
     profiles_to_update: Option<Vec<map::Profile>>,
-    src: ConfigSource,
     list: List<map::Profile>,
     config: Config,
 }
 
 impl Profile {
-    pub fn new(src: ConfigSource) -> Self {
+    pub fn new() -> Self {
         Self {
-            src: src.clone(),
             profiles_to_update: None,
             command_tx: None,
             list: List::new("Profiles"),
@@ -39,24 +35,6 @@ impl Profile {
 
     pub fn update_profiles(&mut self, profiles: Vec<map::Profile>) {
         self.list.load_records(profiles);
-    }
-
-    fn add_profile(&mut self, profile: map::Profile) {
-        self.list.add_record(profile.clone());
-
-        if self.profiles_to_update.is_none() {
-            self.profiles_to_update = Some(Vec::new());
-        }
-
-        let profiles_to_update = self
-            .profiles_to_update
-            .as_mut()
-            .expect("Already initialized");
-        profiles_to_update.push(profile);
-    }
-
-    fn get_selected_profile(&mut self) -> Option<map::Profile> {
-        self.list.get().map(Clone::clone)
     }
 
     fn restore_state(&mut self) {
@@ -104,7 +82,7 @@ impl Component for Profile {
                 // Todo: We should use some type of unique identification
                 // to maintain consistency.
                 if let Some(profile) = self.list.get() {
-                    ctx.select_profile(profile.clone());
+                    ctx.select_profile(profile);
                 }
                 Ok(Some(Action::UpdateMode(Mode::ProfileView)))
             },

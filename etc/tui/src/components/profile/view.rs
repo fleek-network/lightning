@@ -1,7 +1,5 @@
 use anyhow::Result;
 use lightning_guard::map::{FileRule, Profile};
-use lightning_guard::ConfigSource;
-use log::error;
 use ratatui::prelude::{Color, Constraint, Modifier, Rect, Style, Text};
 use ratatui::widgets::{Cell, Row};
 use tokio::sync::mpsc::UnboundedSender;
@@ -21,18 +19,16 @@ pub struct ProfileView {
     longest_item_per_column: [u16; COLUMN_COUNT],
     table: Table<FileRule>,
     profile: Option<Profile>,
-    src: ConfigSource,
     config: Config,
 }
 
 impl ProfileView {
-    pub fn new(src: ConfigSource) -> Self {
+    pub fn new() -> Self {
         Self {
             command_tx: None,
             longest_item_per_column: [0; COLUMN_COUNT],
             table: Table::new(),
             profile: None,
-            src,
             config: Config::default(),
         }
     }
@@ -61,23 +57,6 @@ impl ProfileView {
 
     fn restore(&mut self) {
         self.table.restore_state();
-    }
-
-    fn save(&mut self) {
-        self.table.commit_changes();
-        let records = self.table.records().cloned().collect::<Vec<_>>();
-        let mut profile = self
-            .profile
-            .clone()
-            .expect("The view should laways have a profile to view");
-        // Update profile with the new rules.
-        profile.file_rules = records;
-        let src = self.src.clone();
-        tokio::spawn(async move {
-            if let Err(e) = src.write_profiles(vec![profile]).await {
-                error!("failed to write to list: {e:?}");
-            }
-        });
     }
 
     fn clear(&mut self) {

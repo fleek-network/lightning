@@ -3,7 +3,6 @@ mod form;
 use anyhow::Result;
 pub use form::FirewallForm;
 use lightning_guard::map::PacketFilterRule;
-use lightning_guard::ConfigSource;
 use ratatui::prelude::{Color, Constraint, Modifier, Rect, Style, Text};
 use ratatui::widgets::{Cell, Row};
 use tokio::sync::mpsc::UnboundedSender;
@@ -23,14 +22,12 @@ pub struct FireWall {
     command_tx: Option<UnboundedSender<Action>>,
     table: Table<PacketFilterRule>,
     longest_item_per_column: [u16; COLUMN_COUNT],
-    src: ConfigSource,
     config: Config,
 }
 
 impl FireWall {
-    pub fn new(src: ConfigSource) -> Self {
+    pub fn new() -> Self {
         Self {
-            src,
             table: Table::new(),
             command_tx: None,
             longest_item_per_column: [0; COLUMN_COUNT],
@@ -40,21 +37,6 @@ impl FireWall {
 
     pub fn load_list(&mut self, filters: Vec<PacketFilterRule>) {
         self.table.load_records(filters);
-    }
-
-    fn save(&mut self) {
-        self.table.commit_changes();
-        let command_tx = self
-            .command_tx
-            .clone()
-            .expect("Component always has a sender");
-        let config_src = self.src.clone();
-        let new = self.table.records().cloned().collect::<Vec<_>>();
-        tokio::spawn(async move {
-            if let Err(e) = config_src.write_packet_filters(new).await {
-                let _ = command_tx.send(Action::Error(e.to_string()));
-            }
-        });
     }
 
     fn space_between_columns(&self) -> [u16; COLUMN_COUNT] {
@@ -122,7 +104,7 @@ impl Component for FireWall {
             Action::Edit => Ok(Some(Action::UpdateMode(Mode::FirewallEdit))),
             Action::Add => Ok(Some(Action::UpdateMode(Mode::FirewallForm))),
             Action::Save => {
-                self.save();
+                ctx.commit_packet_filters();
                 Ok(Some(Action::UpdateMode(Mode::Firewall)))
             },
             Action::Cancel => {

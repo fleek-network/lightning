@@ -15,12 +15,10 @@ use crate::tui::Frame;
 use crate::widgets::utils;
 use crate::widgets::utils::InputField;
 
-const PROFILE_NAME: &str = "Profile Name";
 const TARGET_NAME: &str = "Target";
 const PERMISSIONS: &str = "Permissions";
 const INPUT_FORM_X: u16 = 20;
 const INPUT_FORM_Y: u16 = 40;
-const PROFILE_NAME_INPUT_FIELD_COUNT: usize = 1;
 const RULE_INPUT_FIELD_COUNT: usize = 2;
 
 #[derive(Default)]
