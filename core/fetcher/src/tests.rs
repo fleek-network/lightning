@@ -4,6 +4,7 @@ use cid::Cid;
 use fleek_crypto::{AccountOwnerSecretKey, SecretKey};
 use lightning_application::app::Application;
 use lightning_application::config::Config as AppConfig;
+use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_blockstore_server::BlockstoreServer;
@@ -13,8 +14,6 @@ use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
     FetcherRequest,
     FetcherResponse,
-    Genesis,
-    GenesisNode,
     ImmutablePointer,
     NodePorts,
     OriginProvider,

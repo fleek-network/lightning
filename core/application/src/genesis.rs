@@ -5,11 +5,7 @@ use std::net::IpAddr;
 use anyhow::{Context, Result};
 use fleek_crypto::{ClientPublicKey, ConsensusPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
-use resolved_pathbuf::ResolvedPathBuf;
-use serde::{self, Deserialize, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
-
-use crate::{
+use lightning_interfaces::types::{
     CommodityServed,
     CommodityTypes,
     Epoch,
@@ -20,6 +16,9 @@ use crate::{
     Staking,
     TotalServed,
 };
+use resolved_pathbuf::ResolvedPathBuf;
+use serde::{self, Deserialize, Serialize};
+use serde_with::{serde_as, DisplayFromStr};
 
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]

@@ -11,12 +11,12 @@ use fleek_crypto::{
 };
 use lightning_application::app::Application;
 use lightning_application::config::Config as AppConfig;
+use lightning_application::genesis::{Genesis, GenesisNode};
 use lightning_application::network::Network;
-use lightning_final_bindings::UseMockConsensus;
+use lightning_final_bindings::{FinalTypes, UseMockConsensus};
 use lightning_handshake::config::HandshakeConfig;
 use lightning_handshake::handshake::Handshake;
 use lightning_interfaces::prelude::*;
-use lightning_interfaces::types::{Genesis, GenesisNode};
 use lightning_keystore::Keystore;
 use lightning_rpc::{Config as RpcConfig, Rpc};
 use lightning_test_utils::consensus::MockConsensus;
@@ -89,13 +89,11 @@ where
     } else {
         app_config.network = network;
     }
-
-    // Inject the application config.
-    config.inject::<Application<C>>(app_config.clone());
+    config.inject::<Application<FinalTypes>>(app_config);
 
     // Update RPC address in the configuration if given.
     if let Some(addr) = rpc_address {
-        config.inject::<Rpc<C>>(RpcConfig {
+        config.inject::<Rpc<FinalTypes>>(RpcConfig {
             addr,
             ..Default::default()
         });
@@ -103,7 +101,7 @@ where
 
     // Update handshake HTTP address in the configuration if given.
     if let Some(addr) = handshake_http_address {
-        config.inject::<Handshake<C>>(HandshakeConfig {
+        config.inject::<Handshake<FinalTypes>>(HandshakeConfig {
             http_address: addr,
             ..Default::default()
         });

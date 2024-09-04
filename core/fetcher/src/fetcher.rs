@@ -48,13 +48,10 @@ impl<C: Collection> Fetcher<C> {
         );
 
         let waiter = shutdown.clone();
-        let app_query = app.sync_query();
 
         spawn!(
             async move {
-                waiter
-                    .run_until_shutdown(origin_fetcher.start(app_query))
-                    .await;
+                waiter.run_until_shutdown(origin_fetcher.start()).await;
             },
             "FETCHER: origin fetcher"
         );

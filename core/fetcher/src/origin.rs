@@ -35,12 +35,7 @@ impl<C: Collection> OriginFetcher<C> {
         }
     }
 
-    pub async fn start(mut self, app_query: c![C::ApplicationInterface::SyncExecutor]) {
-        // Wait for genesis to be applied before starting the fetcher.
-        if !app_query.wait_for_genesis().await {
-            return;
-        }
-
+    pub async fn start(mut self) {
         let mut pending_requests: HashMap<Uri, broadcast::Sender<Result<Blake3Hash, OriginError>>> =
             HashMap::new();
         loop {
