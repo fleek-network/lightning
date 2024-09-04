@@ -160,10 +160,7 @@ impl IpldItem {
     }
 
     pub fn is_dir(&self) -> bool {
-        match self {
-            Self::Dir(_) => true,
-            Self::File(_) => false,
-        }
+        matches!(self, Self::Dir(_))
     }
 
     pub fn id(&self) -> &DocId {
