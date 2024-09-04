@@ -402,7 +402,7 @@ fn test_jmt_get_state_proof_of_membership() {
     assert!(res.is_err());
     assert_eq!(
         res.err().unwrap().to_string(),
-        "Cannot manufacture nonexistence proof by exclusion for the empty tree"
+        "state tree error: Cannot manufacture nonexistence proof by exclusion for the empty tree"
     );
 
     // Insert a value.
