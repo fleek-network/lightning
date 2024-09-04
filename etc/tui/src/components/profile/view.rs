@@ -106,17 +106,18 @@ impl Component for ProfileView {
                 Ok(Some(Action::Render))
             },
             Action::Save => {
-                self.save();
+                ctx.commit_profiles();
                 Ok(Some(Action::UpdateMode(Mode::ProfileView)))
             },
             Action::Cancel => {
                 self.restore();
                 Ok(Some(Action::UpdateMode(Mode::ProfileView)))
             },
-            Action::UpdateMode(Mode::ProfileViewEdit) => {
+            Action::UpdateMode(Mode::ProfileView) | Action::UpdateMode(Mode::ProfileViewEdit) => {
                 let profile = ctx
                     .get_selected_profile()
                     .expect("A profile to have been selected");
+                self.table.clear();
                 self.load_profile(profile.clone());
                 Ok(None)
             },

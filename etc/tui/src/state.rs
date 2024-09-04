@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+use std::path::PathBuf;
 use anyhow::Result;
 use lightning_guard::map::{FileRule, PacketFilterRule, Profile};
 use lightning_guard::ConfigSource;
@@ -8,8 +10,8 @@ use crate::action::Action;
 pub struct State {
     next_action: Option<Action>,
     filters: Vec<PacketFilterRule>,
-    profiles: Vec<Profile>,
-    selected_profile: Option<Profile>,
+    profiles: HashMap<Option<PathBuf>, Profile>,
+    selected_profile: Option<PathBuf>,
     src: ConfigSource,
 }
 
@@ -18,7 +20,7 @@ impl State {
         Self {
             next_action: None,
             filters: Vec::new(),
-            profiles: Vec::new(),
+            profiles: HashMap::new(),
             selected_profile: None,
             src,
         }
@@ -46,16 +48,16 @@ impl State {
     }
 
     pub async fn load_profiles(&mut self) -> Result<()> {
-        self.profiles = self.src.get_profiles().await?;
+        self.profiles = self.src.get_profiles().await?.into_iter().map(|p| (p.name.clone(), p)).collect();
         Ok(())
     }
 
-    pub fn update_profiles(&mut self, profiles: Profile) {
-        self.profiles.push(profiles);
+    pub fn add_profile(&mut self, profiles: Profile) {
+        self.profiles.insert(profiles.name.clone(), profiles);
     }
 
     pub fn commit_profiles(&mut self) {
-        let profiles = self.profiles.clone();
+        let profiles = self.profiles.clone().into_iter().map(|(_, p)| p).collect();
         let src = self.src.clone();
         tokio::spawn(async move {
             if let Err(e) = src.write_profiles(profiles).await {
@@ -64,55 +66,40 @@ impl State {
         });
     }
 
-    pub fn get_profiles(&self) -> &[Profile] {
-        self.profiles.as_slice()
+    pub fn get_profiles(&self) -> Vec<Profile> {
+        self.profiles.values().cloned().collect()
     }
 
     /// Note: Panics if profile with `name` does not exist in state.
-    pub fn update_profile_rules(&mut self, name: String, rule: FileRule) {
+    pub fn update_profile_rules(&mut self, name: &Option<PathBuf>, rule: FileRule) {
         let profile = self
             .profiles
-            .iter_mut()
-            .find(|p| {
-                p.name
-                    .as_ref()
-                    .map(|buf| buf.display().to_string() == name)
-                    .unwrap_or(false)
-            })
-            .unwrap();
+            .get_mut(name)
+            .expect("there to be a profile with this name");
+
         profile.file_rules.push(rule);
     }
 
-    pub fn get_profile_rules(&self, name: String) -> Vec<FileRule> {
-        // Todo: we need to rework the handling of paths.
-        match self.profiles.iter().find(|p| {
-            p.name
-                .as_ref()
-                .map(|buf| buf.display().to_string() == name)
-                .unwrap_or(false)
-        }) {
-            None => Vec::new(),
-            Some(profile) => profile.file_rules.clone(),
-        }
+    pub fn get_profile_rules(&self, name: &Option<PathBuf>) -> &[FileRule] {
+        self.profiles.get(name).expect("There to be a profile").file_rules.as_slice()
     }
 
     pub fn get_selected_profile(&self) -> Option<&Profile> {
-        self.selected_profile.as_ref()
+        self.profiles.get(&self.selected_profile)
     }
 
     pub fn get_selected_profile_mut(&mut self) -> Option<&mut Profile> {
-        self.selected_profile.as_mut()
+        self.profiles.get_mut(&self.selected_profile)
     }
 
     pub fn selected_profile(&self) -> Option<String> {
         self.selected_profile
             .as_ref()
-            .map(|p| p.name.as_ref())
-            .flatten()
             .map(|path| path.display().to_string())
     }
 
     pub fn select_profile(&mut self, profile: Profile) {
-        self.selected_profile.replace(profile);
+        self.selected_profile = profile.name.clone();
+        debug_assert!(self.profiles.contains_key(&self.selected_profile));
     }
 }

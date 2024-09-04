@@ -110,7 +110,7 @@ impl Component for ProfileForm {
                     let profile = self
                         .yank_input()
                         .expect("We already verified that the input is valid");
-                    ctx.update_profiles(profile);
+                    ctx.add_profile(profile);
                     Ok(Some(Action::UpdateMode(Mode::ProfilesEdit)))
                 }
             },

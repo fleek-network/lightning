@@ -143,6 +143,7 @@ impl Component for FireWall {
             },
             Action::UpdateMode(Mode::FirewallEdit) => {
                 let filters = ctx.get_filters().to_vec();
+                self.table.clear();
                 self.load_list(filters);
                 Ok(None)
             },
