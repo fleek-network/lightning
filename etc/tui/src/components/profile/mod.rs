@@ -56,7 +56,11 @@ impl Component for Profile {
             Action::Edit => Ok(Some(Action::UpdateMode(Mode::ProfilesEdit))),
             Action::Save => {
                 // It is possible that the user deleted some entries thus we handle that here.
-                let remove = self.list.records_to_remove_mut().map(|p| p.name.clone()).collect();
+                let remove = self
+                    .list
+                    .records_to_remove_mut()
+                    .map(|p| p.name.clone())
+                    .collect();
                 ctx.commit_to_remove_profiles(remove);
 
                 self.list.commit_changes();
@@ -101,7 +105,7 @@ impl Component for Profile {
                 self.list.clear();
                 self.update_profiles(profiles.to_vec());
                 Ok(None)
-            }
+            },
             _ => Ok(None),
         }
     }

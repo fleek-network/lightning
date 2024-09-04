@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
+
 use anyhow::Result;
 use lightning_guard::map::{FileRule, PacketFilterRule, Profile};
 use lightning_guard::ConfigSource;
@@ -50,7 +51,13 @@ impl State {
     }
 
     pub async fn load_profiles(&mut self) -> Result<()> {
-        self.profiles = self.src.get_profiles().await?.into_iter().map(|p| (p.name.clone(), p)).collect();
+        self.profiles = self
+            .src
+            .get_profiles()
+            .await?
+            .into_iter()
+            .map(|p| (p.name.clone(), p))
+            .collect();
         Ok(())
     }
 
@@ -93,14 +100,17 @@ impl State {
 
     /// Note: Panics if profile with `name` does not exist in state.
     pub fn update_selected_profile_rules_list(&mut self, rules: Vec<FileRule>) {
-        let name = &self
-            .selected_profile;
+        let name = &self.selected_profile;
         let profile = self.profiles.get_mut(name).expect("Profile to exist");
         profile.file_rules = rules;
     }
 
     pub fn get_profile_rules(&self, name: &Option<PathBuf>) -> &[FileRule] {
-        self.profiles.get(name).expect("There to be a profile").file_rules.as_slice()
+        self.profiles
+            .get(name)
+            .expect("There to be a profile")
+            .file_rules
+            .as_slice()
     }
 
     pub fn get_selected_profile(&self) -> Option<&Profile> {

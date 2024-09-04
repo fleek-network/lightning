@@ -24,7 +24,6 @@ where
     }
 }
 
-
 impl<T> List<T>
 where
     T: Display,

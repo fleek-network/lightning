@@ -275,7 +275,8 @@ impl App {
         self.profiles.register_action_handler(action_tx.clone())?;
         self.profiles.register_config_handler(self.config.clone())?;
         self.profiles.init(tui.size()?)?;
-        self.profiles.update_profiles(self.state.get_profiles().to_vec());
+        self.profiles
+            .update_profiles(self.state.get_profiles().to_vec());
 
         loop {
             if let Some(e) = tui.next().await {
