@@ -2,9 +2,29 @@
 name = "fleek-ipld"
 version = "0.0.0"
 edition = "2021"
-authors = [ "M. Meier <miguel@fleek.xyz>" ]
+authors = [ "M. Meier <miguel@fleek.xyz>", "Juan Royo Sales <juansales@fleek.xyz" ]
 homepage = "https://github.com/fleek-network/lightning"
 description = "The Fleek IPLD crate"
 
 [dependencies]
+anyhow.workspace = true
+async-trait.workspace = true
+bytes.workspace = true
+futures.workspace = true
+ipld-core = "0.4.1"
+ipld-dagpb = "0.2.1"
 quick-protobuf = "0.8"
+reqwest.workspace = true
+thiserror.workspace = true
+tokio-stream.workspace = true
+tokio.workspace = true
+url = "2.5.0"
+
+[dev-dependencies]
+httpmock = "0.7.0-rc.1"
+
+[[example]]
+name = "download"
+
+[lib]
+doctest = false
