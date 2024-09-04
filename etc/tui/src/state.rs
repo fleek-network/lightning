@@ -58,11 +58,20 @@ impl State {
         self.profiles.insert(profiles.name.clone(), profiles);
     }
 
-    pub fn commit_profiles(&mut self) {
+    pub fn commit_add_profiles(&mut self) {
         let profiles = self.profiles.clone().into_iter().map(|(_, p)| p).collect();
         let src = self.src.clone();
         tokio::spawn(async move {
             if let Err(e) = src.write_profiles(profiles).await {
+                error!("failed to write profiles to disk: {e:?}");
+            }
+        });
+    }
+
+    pub fn commit_to_remove_profiles(&mut self, remove: Vec<Option<PathBuf>>) {
+        let src = self.src.clone();
+        tokio::spawn(async move {
+            if let Err(e) = src.delete_profiles(remove.into_iter().collect()).await {
                 error!("failed to write profiles to disk: {e:?}");
             }
         });
@@ -80,6 +89,14 @@ impl State {
             .expect("there to be a profile with this name");
 
         profile.file_rules.push(rule);
+    }
+
+    /// Note: Panics if profile with `name` does not exist in state.
+    pub fn update_selected_profile_rules_list(&mut self, rules: Vec<FileRule>) {
+        let name = &self
+            .selected_profile;
+        let profile = self.profiles.get_mut(name).expect("Profile to exist");
+        profile.file_rules = rules;
     }
 
     pub fn get_profile_rules(&self, name: &Option<PathBuf>) -> &[FileRule] {
@@ -103,5 +120,9 @@ impl State {
     pub fn select_profile(&mut self, profile: &Profile) {
         self.selected_profile = profile.name.clone();
         debug_assert!(self.profiles.contains_key(&self.selected_profile));
+    }
+
+    pub fn update_profiles(&mut self, profiles: Vec<Profile>) {
+        self.profiles = profiles.into_iter().map(|p| (p.name.clone(), p)).collect();
     }
 }

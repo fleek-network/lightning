@@ -18,7 +18,6 @@ use crate::widgets::list::List;
 /// Component that displaying and managing security profiles.
 pub struct Profile {
     command_tx: Option<UnboundedSender<Action>>,
-    profiles_to_update: Option<Vec<map::Profile>>,
     list: List<map::Profile>,
     config: Config,
 }
@@ -26,7 +25,6 @@ pub struct Profile {
 impl Profile {
     pub fn new() -> Self {
         Self {
-            profiles_to_update: None,
             command_tx: None,
             list: List::new("Profiles"),
             config: Config::default(),
@@ -39,7 +37,6 @@ impl Profile {
 
     fn restore_state(&mut self) {
         self.list.restore_state();
-        self.profiles_to_update.take();
     }
 }
 
@@ -58,7 +55,15 @@ impl Component for Profile {
         match action {
             Action::Edit => Ok(Some(Action::UpdateMode(Mode::ProfilesEdit))),
             Action::Save => {
-                ctx.commit_profiles();
+                // It is possible that the user deleted some entries thus we handle that here.
+                let remove = self.list.records_to_remove_mut().map(|p| p.name.clone()).collect();
+                ctx.commit_to_remove_profiles(remove);
+
+                self.list.commit_changes();
+                let profiles = self.list.records();
+                ctx.update_profiles(profiles);
+                ctx.commit_add_profiles();
+
                 Ok(Some(Action::UpdateMode(Mode::Profiles)))
             },
             Action::Cancel => {
@@ -83,11 +88,17 @@ impl Component for Profile {
                 // to maintain consistency.
                 if let Some(profile) = self.list.get() {
                     ctx.select_profile(profile);
+                    Ok(Some(Action::UpdateMode(Mode::ProfileView)))
+                } else {
+                    Ok(None)
                 }
-                Ok(Some(Action::UpdateMode(Mode::ProfileView)))
             },
             Action::UpdateMode(Mode::ProfilesEdit) => {
+                // We moved from a different mode
+                // and we assume that the current state is valid
+                // so we display what's in state.
                 let profiles = ctx.get_profiles();
+                self.list.clear();
                 self.update_profiles(profiles.to_vec());
                 Ok(None)
             }

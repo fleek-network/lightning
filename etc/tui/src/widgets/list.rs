@@ -17,6 +17,16 @@ pub struct List<T> {
 
 impl<T> List<T>
 where
+    T: Clone + Display,
+{
+    pub fn records(&self) -> Vec<T> {
+        self.records.iter().map(|(_, r)| r.clone()).collect()
+    }
+}
+
+
+impl<T> List<T>
+where
     T: Display,
 {
     pub fn new(name: &'static str) -> Self {
@@ -133,5 +143,11 @@ where
             debug_assert!(self.records.len() == 1);
             self.list_state.select(Some(0));
         }
+    }
+
+    pub fn clear(&mut self) {
+        self.records.clear();
+        self.list_state = ListState::default().with_selected(None);
+        self.removing.clear()
     }
 }

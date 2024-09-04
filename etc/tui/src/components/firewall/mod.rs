@@ -104,6 +104,11 @@ impl Component for FireWall {
             Action::Edit => Ok(Some(Action::UpdateMode(Mode::FirewallEdit))),
             Action::Add => Ok(Some(Action::UpdateMode(Mode::FirewallForm))),
             Action::Save => {
+                // It is possible that the user deleted some entries thus we handle that here.
+                let filters = self.table.records().cloned().collect();
+                // Update state.
+                ctx.update_packet_filters(filters);
+                // Commit to changes in state.
                 ctx.commit_packet_filters();
                 Ok(Some(Action::UpdateMode(Mode::Firewall)))
             },
@@ -124,6 +129,9 @@ impl Component for FireWall {
                 Ok(Some(Action::Render))
             },
             Action::UpdateMode(Mode::FirewallEdit) => {
+                // We moved from a different mode
+                // and we assume that the current state is valid
+                // so we display what's in state.
                 let filters = ctx.get_filters().to_vec();
                 self.table.clear();
                 self.load_list(filters);

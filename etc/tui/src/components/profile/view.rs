@@ -85,7 +85,13 @@ impl Component for ProfileView {
                 Ok(Some(Action::Render))
             },
             Action::Save => {
-                ctx.commit_profiles();
+                // It is possible that the user deleted some entries thus we handle that here.
+                let rules = self.table.records().cloned().collect();
+                // Update state.
+                ctx.update_selected_profile_rules_list(rules);
+                // Commit to changes in state.
+                ctx.commit_add_profiles();
+
                 Ok(Some(Action::UpdateMode(Mode::ProfileView)))
             },
             Action::Cancel => {
