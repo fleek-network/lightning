@@ -121,14 +121,6 @@ where
         config_path.to_str().unwrap()
     );
 
-    // Initialize the application state.
-    if no_generate_keys {
-        info!("Skipping node initialization because --no-generate-keys was passed");
-    } else {
-        let _node = Node::<C>::init_with_provider(fdi::Provider::default().with(config))
-            .expect("failed to initialize node");
-    }
-
     Ok(())
 }
 
