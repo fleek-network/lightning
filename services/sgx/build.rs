@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 /// Heap size for enclave
-const HEAP_SIZE: &str = "0x20000000"; // 512 MiB
+const HEAP_SIZE: &str = "0x100000000"; // 4 GiB
 /// Stack size for enclave
 const STACK_SIZE: &str = "0x1000000"; // 10 MiB
 /// Number of threads to support in enclave
