@@ -1,11 +1,11 @@
 use std::path::PathBuf;
 
-/// Heap size for enclave
+/// Max heap size for enclave
 const HEAP_SIZE: &str = "0x100000000"; // 4 GiB
-/// Stack size for enclave
-const STACK_SIZE: &str = "0x1000000"; // 10 MiB
-/// Number of threads to support in enclave
-const THREADS: &str = "16";
+/// Max stack size for enclave, we match rust std thread default
+const STACK_SIZE: &str = "0x200000"; // 2 MiB
+/// Maximum number of threads to support in enclave
+const THREADS: &str = "132";
 
 fn main() {
     println!("cargo::rerun-if-changed=build.rs");
