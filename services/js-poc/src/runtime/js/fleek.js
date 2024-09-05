@@ -6,6 +6,7 @@ const ServiceId = {
   Fetcher: 0 | 0,
   Js: 1 | 0,
   Ai: 2 | 0,
+  Sgx: 3 | 0,
 }
 
 /** Run a service task either locally, on a single node in the cluster, or replicated across the cluster.
