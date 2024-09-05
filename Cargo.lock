@@ -13135,8 +13135,8 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "bpaf",
- "bs58 0.5.1",
  "ecies",
+ "hex",
 ]
 
 [[package]]
