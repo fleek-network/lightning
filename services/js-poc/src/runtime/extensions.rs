@@ -4,9 +4,11 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::str::FromStr;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use arrayref::array_ref;
 use blake3_tree::utils::{tree_index, HashVec};
+use cid::Cid;
+use deno_core::url::Url;
 use deno_core::{extension, op2, OpState};
 use fleek_crypto::{ClientPublicKey, NodeSignature};
 use fn_sdk::blockstore::get_internal_path;
@@ -33,6 +35,7 @@ extension!(
         run_task,
         log,
         fetch_blake3,
+        fetch_from_origin,
         load_content,
         read_block,
         query_client_flk_balance,
@@ -90,6 +93,39 @@ pub async fn fetch_blake3(#[buffer(copy)] hash: Vec<u8>) -> Result<bool> {
     }
 
     Ok(fn_sdk::api::fetch_blake3(*array_ref![hash, 0, 32]).await)
+}
+
+#[op2(async)]
+#[buffer]
+pub async fn fetch_from_origin(#[string] raw_url: String) -> Result<Box<[u8]>> {
+    let url = Url::parse(&raw_url).context("failed to parse origin url")?;
+    let (origin, uri) = match url.scheme() {
+        // ipfs://bafy...
+        "ipfs" => {
+            let cid = url.host_str().context("invalid ipfs hostname")?;
+            let cid = cid.parse::<Cid>().context("invalid ipfs cid")?;
+            (fn_sdk::api::Origin::IPFS, cid.to_bytes())
+        },
+        // https://example.com/...#integrity=sha256-...
+        "http" | "https" => {
+            if !url
+                .fragment()
+                .context("missing integrity fragment")?
+                .starts_with("integrity=")
+            {
+                bail!("invalid integrity fragment")
+            }
+
+            (fn_sdk::api::Origin::HTTP, raw_url.as_bytes().to_vec())
+        },
+        _ => bail!("invalid origin scheme"),
+    };
+
+    let Some(hash) = fn_sdk::api::fetch_from_origin(origin, uri).await else {
+        bail!("failed to fetch {raw_url} from origin");
+    };
+
+    Ok(hash.to_vec().into_boxed_slice())
 }
 
 #[op2(async)]
