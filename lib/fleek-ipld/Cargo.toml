@@ -14,7 +14,7 @@ futures.workspace = true
 ipld-core = "0.4.1"
 ipld-dagpb = "0.2.1"
 quick-protobuf = "0.8"
-reqwest.workspace = true
+reqwest = { workspace = true, features = ["stream"] }
 thiserror.workspace = true
 tokio-stream.workspace = true
 tokio.workspace = true
