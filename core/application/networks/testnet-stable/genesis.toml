@@ -18,13 +18,14 @@ min_num_measurements = 4
 protocol_fund_address = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
 governance_address = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
 
+
 [[node_info]]
 owner = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
-primary_public_key = "9MwDMXsqg78qSTnQU5h6oX2EcrNmJEsDebffibkDG3Kd"
-consensus_public_key = "22dEun7hCf6u44JWgwEEduXFrcjbGDsBE9jn5GmzKHvodnxGNPB9hwHXwtAL6r1A9Vrn4yAaPrKAUHSxHEP3WYvBBBxmbCLBMybqSEsXp2NVpHsAaZiiC3x2De1MmD1q8ijS"
-worker_public_key = "9MwDMXsqg78qSTnQU5h6oX2EcrNmJEsDebffibkDG3Kd"
-primary_domain = "15.204.100.218"
-worker_domain = "15.204.100.218"
+primary_public_key = "AuKT4zYJJ5zQ5eBiZ5peUAn2HXR8HdPaQufrc4xR3ikh"
+consensus_public_key = "rZ2PghFsADqPdzgHsbqVbNQGuSqQYM2HnEPQBZk2QGghqTJczHhFnW4n4FEDo91ijBR597ixttWTVLNcwUW1af7fDr7siRFb4pTR86eA4S6qz8xC9XPW3ZXWfkDZL2uRM3q"
+worker_public_key = "AuKT4zYJJ5zQ5eBiZ5peUAn2HXR8HdPaQufrc4xR3ikh"
+primary_domain = "15.204.100.217"
+worker_domain = "15.204.100.217"
 ports.primary = 4310
 ports.worker = 4311
 ports.mempool = 4210
@@ -42,11 +43,11 @@ genesis_committee = true
 
 [[node_info]]
 owner = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
-primary_public_key = "AuKT4zYJJ5zQ5eBiZ5peUAn2HXR8HdPaQufrc4xR3ikh"
-consensus_public_key = "rZ2PghFsADqPdzgHsbqVbNQGuSqQYM2HnEPQBZk2QGghqTJczHhFnW4n4FEDo91ijBR597ixttWTVLNcwUW1af7fDr7siRFb4pTR86eA4S6qz8xC9XPW3ZXWfkDZL2uRM3q"
-worker_public_key = "AuKT4zYJJ5zQ5eBiZ5peUAn2HXR8HdPaQufrc4xR3ikh"
-primary_domain = "15.204.100.217"
-worker_domain = "15.204.100.217"
+primary_public_key = "9MwDMXsqg78qSTnQU5h6oX2EcrNmJEsDebffibkDG3Kd"
+consensus_public_key = "22dEun7hCf6u44JWgwEEduXFrcjbGDsBE9jn5GmzKHvodnxGNPB9hwHXwtAL6r1A9Vrn4yAaPrKAUHSxHEP3WYvBBBxmbCLBMybqSEsXp2NVpHsAaZiiC3x2De1MmD1q8ijS"
+worker_public_key = "9MwDMXsqg78qSTnQU5h6oX2EcrNmJEsDebffibkDG3Kd"
+primary_domain = "15.204.100.218"
+worker_domain = "15.204.100.218"
 ports.primary = 4310
 ports.worker = 4311
 ports.mempool = 4210
