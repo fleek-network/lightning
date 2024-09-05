@@ -1,10 +1,10 @@
 export const main = async () => {
-  const echoWasmHash =
-    await Fleek.fetchFromOrigin("bafkreibun52plarbynribunkylscurinox3y6z2cs5g6ydelymj4zpdu4i")
-      .then(bytes => bytes.map(v => v.toString(16).padStart(2, '0')).join('')); // convert to hex string
+  const wasmHash =
+    await Fleek.fetchFromOrigin("ipfs://bafkreibun52plarbynribunkylscurinox3y6z2cs5g6ydelymj4zpdu4i")
+      .then(bytes => Array.from(bytes).map(v => v.toString(16).padStart(2, '0')).join('')); // convert to hex string
 
   const request = {
-    hash: echoWasmHash,
+    hash: wasmHash,
     decrypt: false,
     input: "hello world from echo wasm!"
   };
