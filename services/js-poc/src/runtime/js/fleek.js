@@ -34,6 +34,13 @@ const runTask = async (service, body, scope = "local") => {
  */
 const fetchBlake3 = async (hash) => await ops.fetch_blake3(hash);
 
+/** Fetch some content from an origin and return the b3 hash
+ * @param {String} url - Origin url for the content to fetch.
+ *                       Ie, `ipfs://bafy...` or  `https://...#integrity=sha256-...`
+ * @returns {Promise<Uint8Array>} True if the fetch was successful
+ */
+const fetchFromOrigin = async (url) => await ops.fetch_from_origin(url);
+
 /** Load a blockstore handle to some blake3 content
  * @param {Uint8Array} hash - Blake3 hash of the content
  * @returns {Promise<ContentHandle>}
@@ -99,6 +106,7 @@ export const Fleek = {
   ServiceId,
   runTask,
   fetchBlake3,
+  fetchFromOrigin,
   loadContent,
   queryClientFlkBalance,
   queryClientBandwidthBalance,
