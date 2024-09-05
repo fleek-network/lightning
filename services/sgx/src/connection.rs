@@ -5,12 +5,12 @@ use std::pin::Pin;
 use std::task::Poll;
 
 use anyhow::Result;
-use bytes::{Bytes, BytesMut};
+use bytes::{BufMut, Bytes, BytesMut};
 use enclave_runner::usercalls::AsyncListener;
 use futures::ready;
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::mpsc;
 use url::Url;
@@ -169,9 +169,7 @@ impl AsyncListener for ConnectionListener {
 /// A client connection
 pub struct Connection {
     pub stream: UnixStream,
-    pub header: ConnectionHeader,
-    // TODO: Should the wrapper have a debug assertion to ensure the correct
-    //       number of bytes are written to the stream?
+    buffer: BytesMut,
 }
 
 impl Connection {
@@ -179,82 +177,12 @@ impl Connection {
         let header = read_header(&mut stream)
             .await
             .ok_or(std::io::ErrorKind::Other)?;
-        Ok(Self { stream, header })
-    }
-
-    /// Start writing a payload to the handshake server for a new payload to the client.
-    /// This function *MUST* always be called with the exact number of bytes before writing
-    /// data on the stream, otherwise behavior will be undefined.
-    ///
-    /// # Example
-    ///
-    /// ```ignore
-    /// use tokio::io::{AsyncWrite, AsyncWriteExt};
-    ///
-    /// let listener = fn_sdk::ipc::conn_bind();
-    /// let conn = listener.accept().await?;
-    ///
-    /// // Declare we're going to write a 12 byte payload
-    /// conn.start_write(12).await?;
-    ///
-    /// // Write some data
-    /// conn.write_u64(8).await?;
-    /// conn.write_u32(16).await?;
-    /// ```
-    #[inline(always)]
-    pub async fn start_write(&mut self, len: usize) -> std::io::Result<()> {
-        self.stream.write_u32(len as u32).await?;
-        Ok(())
-    }
-
-    /// Write a full service payload to the handshake server, tHe entire buffer is written as one
-    /// service payload in the proper length prepended encoding.
-    ///
-    /// # Cancel safety
-    ///
-    /// This method is not cancel safe. If it is used in a tokio select and another branch completes
-    /// first data may be partially written.
-    #[inline(always)]
-    pub async fn write_payload(&mut self, payload: &[u8]) -> std::io::Result<()> {
-        self.stream.write_u32(payload.len() as u32).await?;
-        self.stream.write_all(payload).await?;
-        Ok(())
-    }
-
-    /// Read a full payload from the handshake server.
-    ///
-    /// # Cancel safety
-    ///
-    /// This method is not cancel safe. On cancellation data may be partially read from the
-    /// handshake, leading to unexpected behavior on the subsequent call.
-    pub async fn read_payload(&mut self) -> Option<BytesMut> {
-        read_length_delimited(&mut self.stream).await
-    }
-
-    /// Returns true if this connection is an HTTP request.
-    #[inline(always)]
-    pub fn is_http_request(&self) -> bool {
-        matches!(
-            self.header.transport_detail,
-            TransportDetail::HttpRequest { .. }
-        )
-    }
-
-    /// Returns true if this connection is a task request from a node.
-    #[inline(always)]
-    pub fn is_task_request(&self) -> bool {
-        matches!(self.header.transport_detail, TransportDetail::Task { .. })
-    }
-
-    /// Returns true if this connection is an anonymous connection without a public key.
-    #[inline(always)]
-    pub fn is_anonymous(&self) -> bool {
-        self.header.pk.is_none()
-    }
-
-    /// Shutdown the connection stream.
-    pub async fn shutdown(&mut self) -> std::io::Result<()> {
-        self.stream.shutdown().await
+        let mut buffer = BytesMut::new();
+        if let TransportDetail::Task { ref payload, .. } = header.transport_detail {
+            buffer.put_u32(payload.len() as u32);
+            buffer.put_slice(payload);
+        }
+        Ok(Self { stream, buffer })
     }
 }
 
@@ -288,10 +216,16 @@ impl AsyncWrite for Connection {
 impl AsyncRead for Connection {
     #[inline(always)]
     fn poll_read(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
         buf: &mut tokio::io::ReadBuf<'_>,
     ) -> std::task::Poll<std::io::Result<()>> {
+        if !self.buffer.is_empty() {
+            let len = self.buffer.len().min(buf.remaining());
+            buf.put_slice(&self.buffer.split_to(len));
+            return std::task::Poll::Ready(Ok(()));
+        }
+
         Pin::new(&mut self.get_mut().stream).poll_read(cx, buf)
     }
 }
