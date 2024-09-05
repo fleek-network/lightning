@@ -1,5 +1,6 @@
 use std::fs::File;
 use std::io::Write;
+use std::ops::Deref;
 use std::sync::Arc;
 use std::task::Waker;
 
@@ -111,6 +112,7 @@ impl EndpointState {
     }
 
     pub fn handle_save_key(&self, data: Vec<u8>) -> std::io::Result<Bytes> {
+        std::fs::create_dir_all(SGX_SEALED_DATA_PATH.deref())?;
         let mut file = File::create(SGX_SEALED_DATA_PATH.join("sealedkey.bin"))
             .expect("Failed to create file");
         file.write_all(&data)?;
