@@ -23,22 +23,17 @@ enum Output {
 #[derive(Debug, Bpaf)]
 #[bpaf(options, version, descr(env!("CARGO_PKG_DESCRIPTION")))]
 struct Args {
-    /// Base58 shared network public key. Should be in compressed format.
+    /// Hex-encoded network sealing public key. Should be in compressed format.
     #[bpaf(
         short,
         long,
         argument::<String>("PUBKEY"),
-        fallback("27fjvoWaGcupCpT9ZMfok4gAHGcUhuFt1wgpoVjb4Bhka".into()),
+        fallback("03e1d7803dfa7e5d3ca4b4afa99073caf57b9afcede3b416ad29bb9ce9e4fe0f86".into()),
         display_fallback,
         parse(|s| {
-            let bytes = bs58::decode(&s)
-                .into_vec()
-                .context("invalid base58")?;
-            let slice = bytes.as_slice()
-                .try_into()
-                .context("invalid key length")?;
-            PublicKey::parse_compressed(&slice)
-                .map_err(|e| anyhow!("invalid public key: {e}"))
+            let bytes = hex::decode(&s).context("invalid base58")?;
+            let slice = bytes.try_into().map_err(|_| anyhow!("invalid key length"))?;
+            PublicKey::parse_compressed(&slice).map_err(|e| anyhow!("invalid public key: {e}"))
         })
     )]
     pubkey: PublicKey,
