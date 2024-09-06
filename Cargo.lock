@@ -991,11 +991,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "atomo"
+version = "0.0.5"
+source = "git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.3#043f9067d21d5eb5a4bec89e6b3ae881bc392e6e"
+dependencies = [
+ "arc-swap",
+ "bincode",
+ "dashmap",
+ "fxhash",
+ "im",
+ "once-ptr 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand 0.8.5",
+ "seize",
+ "serde",
+]
+
+[[package]]
 name = "atomo-rocks"
 version = "0.2.0"
 dependencies = [
  "anyhow",
- "atomo",
+ "atomo 0.0.5",
  "fleek-blake3",
  "fxhash",
  "rand 0.8.5",
@@ -1655,6 +1671,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "blake3-tree"
+version = "0.1.0"
+source = "git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.3#043f9067d21d5eb5a4bec89e6b3ae881bc392e6e"
+dependencies = [
+ "arrayref",
+ "arrayvec",
+ "fleek-blake3",
+ "smol_str",
+ "thiserror",
+]
+
+[[package]]
 name = "blake3-wasm"
 version = "0.1.0"
 dependencies = [
@@ -2067,9 +2095,9 @@ dependencies = [
  "arrayref",
  "async-trait",
  "bytes 1.7.1",
- "fleek-crypto",
+ "fleek-crypto 0.0.0",
  "futures 0.3.30",
- "lightning-schema",
+ "lightning-schema 0.0.0",
  "log",
  "ring 0.16.20",
  "rustls 0.21.12",
@@ -4674,6 +4702,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "fleek-crypto"
+version = "0.0.0"
+source = "git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.3#043f9067d21d5eb5a4bec89e6b3ae881bc392e6e"
+dependencies = [
+ "arrayref",
+ "derive_more",
+ "fastcrypto 0.1.8",
+ "hex",
+ "rand 0.8.5",
+ "schemars",
+ "sec1",
+ "serde",
+ "serde-big-array",
+ "zeroize",
+]
+
+[[package]]
 name = "fleek-ipld"
 version = "0.0.0"
 dependencies = [
@@ -4702,7 +4747,7 @@ dependencies = [
  "borsh",
  "bytes 1.7.1",
  "derive_more",
- "fn-sdk",
+ "fn-sdk 0.0.0",
  "hex",
  "lazy_static",
  "lightning-utils",
@@ -4727,9 +4772,9 @@ dependencies = [
  "arrayref",
  "bytes 1.7.1",
  "cid 0.11.1",
- "fn-sdk",
+ "fn-sdk 0.0.0",
  "hex",
- "lightning-schema",
+ "lightning-schema 0.0.0",
  "lightning-workspace-hack",
  "tokio",
  "tracing",
@@ -4758,10 +4803,10 @@ dependencies = [
  "deno_webgpu",
  "deno_webidl",
  "deno_websocket",
- "fleek-crypto",
- "fn-sdk",
+ "fleek-crypto 0.0.0",
+ "fn-sdk 0.0.0",
  "hex",
- "lightning-schema",
+ "lightning-schema 0.0.0",
  "lightning-workspace-hack",
  "serde",
  "serde_json",
@@ -4784,6 +4829,7 @@ dependencies = [
  "bytes 1.7.1",
  "dcap-quoteprov",
  "enclave-runner",
+ "fn-sdk 0.0.0 (git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.3)",
  "futures 0.3.30",
  "hex",
  "serde",
@@ -4844,9 +4890,9 @@ dependencies = [
  "blake3-tree 0.1.0",
  "bytes 1.7.1",
  "derive_more",
- "fleek-crypto",
- "hp-fixed",
- "lightning-schema",
+ "fleek-crypto 0.0.0",
+ "hp-fixed 0.1.0",
+ "lightning-schema 0.0.0",
  "prctl",
  "ringbuf",
  "rkyv",
@@ -4854,6 +4900,32 @@ dependencies = [
  "serde_cbor",
  "serde_json",
  "tempfile",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "triomphe",
+ "url",
+]
+
+[[package]]
+name = "fn-sdk"
+version = "0.0.0"
+source = "git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.3#043f9067d21d5eb5a4bec89e6b3ae881bc392e6e"
+dependencies = [
+ "anyhow",
+ "arrayvec",
+ "blake3-tree 0.1.0 (git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.3)",
+ "bytes 1.7.1",
+ "derive_more",
+ "fleek-crypto 0.0.0 (git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.3)",
+ "hp-fixed 0.1.0 (git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.3)",
+ "lightning-schema 0.0.0 (git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.3)",
+ "prctl",
+ "ringbuf",
+ "rkyv",
+ "serde",
+ "serde_cbor",
+ "serde_json",
  "thiserror",
  "tokio",
  "tracing",
@@ -5660,6 +5732,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "hp-fixed"
+version = "0.1.0"
+source = "git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.3#043f9067d21d5eb5a4bec89e6b3ae881bc392e6e"
+dependencies = [
+ "anyhow",
+ "num-bigint 0.4.6",
+ "num-traits",
+ "primitive-types 0.12.2",
+ "ruint",
+ "schemars",
+ "serde",
+]
+
+[[package]]
 name = "httlib-huffman"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6141,6 +6227,14 @@ dependencies = [
 [[package]]
 name = "ink-quill"
 version = "0.1.0"
+dependencies = [
+ "fleek-blake3",
+]
+
+[[package]]
+name = "ink-quill"
+version = "0.1.0"
+source = "git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.3#043f9067d21d5eb5a4bec89e6b3ae881bc392e6e"
 dependencies = [
  "fleek-blake3",
 ]
@@ -6958,14 +7052,14 @@ version = "0.0.0"
 dependencies = [
  "affair",
  "anyhow",
- "atomo",
+ "atomo 0.0.5",
  "atomo-rocks",
  "bincode",
  "ethers",
  "fleek-blake3",
- "fleek-crypto",
+ "fleek-crypto 0.0.0",
  "futures 0.3.30",
- "hp-fixed",
+ "hp-fixed 0.1.0",
  "lazy_static",
  "lightning-interfaces",
  "lightning-metrics",
@@ -6992,7 +7086,7 @@ version = "0.0.0"
 dependencies = [
  "affair",
  "anyhow",
- "atomo",
+ "atomo 0.0.5",
  "atomo-rocks",
  "bincode",
  "ethers",
@@ -7041,7 +7135,7 @@ dependencies = [
  "anyhow",
  "blake3-tree 0.1.0",
  "bytes 1.7.1",
- "fleek-crypto",
+ "fleek-crypto 0.0.0",
  "futures 0.3.30",
  "lightning-application",
  "lightning-blockstore",
@@ -7074,12 +7168,12 @@ dependencies = [
  "bytes 1.7.1",
  "dashmap",
  "derive_more",
- "fleek-crypto",
+ "fleek-crypto 0.0.0",
  "futures 0.3.30",
  "fxhash",
  "im",
  "indicatif",
- "ink-quill",
+ "ink-quill 0.1.0",
  "lightning-application",
  "lightning-interfaces",
  "lightning-metrics",
@@ -7110,13 +7204,13 @@ name = "lightning-checkpointer"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "atomo",
+ "atomo 0.0.5",
  "atomo-rocks",
  "bit-set 0.8.0",
  "console-subscriber",
- "fleek-crypto",
+ "fleek-crypto 0.0.0",
  "futures 0.3.30",
- "hp-fixed",
+ "hp-fixed 0.1.0",
  "lightning-application",
  "lightning-blockstore",
  "lightning-blockstore-server",
@@ -7152,14 +7246,14 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
- "atomo",
+ "atomo 0.0.5",
  "aya",
  "aya-log",
  "clap",
  "clap_complete",
  "console-subscriber",
  "fleek-blake3",
- "fleek-crypto",
+ "fleek-crypto 0.0.0",
  "futures 0.3.30",
  "lightning-application",
  "lightning-archive",
@@ -7216,7 +7310,7 @@ dependencies = [
  "derive_more",
  "fastcrypto 0.1.8",
  "fleek-blake3",
- "fleek-crypto",
+ "fleek-crypto 0.0.0",
  "futures 0.3.30",
  "futures-util",
  "fxhash",
@@ -7255,7 +7349,7 @@ dependencies = [
  "affair",
  "anyhow",
  "bincode",
- "fleek-crypto",
+ "fleek-crypto 0.0.0",
  "lightning-application",
  "lightning-interfaces",
  "lightning-metrics",
@@ -7279,9 +7373,9 @@ dependencies = [
  "anyhow",
  "clap",
  "fleek-blake3",
- "fleek-crypto",
+ "fleek-crypto 0.0.0",
  "futures 0.3.30",
- "hp-fixed",
+ "hp-fixed 0.1.0",
  "lightning-application",
  "lightning-archive",
  "lightning-blockstore",
@@ -7333,7 +7427,7 @@ dependencies = [
  "blake3-tree 0.1.0",
  "bytes 1.7.1",
  "cid 0.10.1",
- "fleek-crypto",
+ "fleek-crypto 0.0.0",
  "futures 0.3.30",
  "lightning-application",
  "lightning-blockstore",
@@ -7407,7 +7501,7 @@ dependencies = [
  "axum 0.6.20",
  "hyper 0.14.30",
  "lightning-interfaces",
- "lightning-types",
+ "lightning-types 0.1.0",
  "lightning-workspace-hack",
  "serde",
  "thiserror",
@@ -7423,7 +7517,7 @@ dependencies = [
  "affair",
  "anyhow",
  "fdi",
- "fleek-crypto",
+ "fleek-crypto 0.0.0",
  "futures 0.3.30",
  "lightning-interfaces",
  "lightning-test-utils",
@@ -7474,8 +7568,8 @@ dependencies = [
  "dashmap",
  "derive_more",
  "enum_dispatch",
- "fleek-crypto",
- "fn-sdk",
+ "fleek-crypto 0.0.0",
+ "fn-sdk 0.0.0",
  "futures 0.3.30",
  "fxhash",
  "hex",
@@ -7515,7 +7609,7 @@ name = "lightning-indexer"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "fleek-crypto",
+ "fleek-crypto 0.0.0",
  "lightning-application",
  "lightning-interfaces",
  "lightning-notifier",
@@ -7535,7 +7629,7 @@ version = "0.1.0"
 dependencies = [
  "affair",
  "anyhow",
- "atomo",
+ "atomo 0.0.5",
  "atomo-rocks",
  "better-shutdown",
  "blake3-tree 0.1.0",
@@ -7544,14 +7638,14 @@ dependencies = [
  "dummy-waker",
  "ethers",
  "fdi",
- "fleek-crypto",
- "fn-sdk",
+ "fleek-crypto 0.0.0",
+ "fn-sdk 0.0.0",
  "futures 0.3.30",
- "hp-fixed",
- "ink-quill",
+ "hp-fixed 0.1.0",
+ "ink-quill 0.1.0",
  "interfaces-proc",
- "lightning-schema",
- "lightning-types",
+ "lightning-schema 0.0.0",
+ "lightning-types 0.1.0",
  "lightning-workspace-hack",
  "merklize",
  "ready",
@@ -7573,7 +7667,7 @@ name = "lightning-keystore"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "fleek-crypto",
+ "fleek-crypto 0.0.0",
  "lightning-interfaces",
  "lightning-test-utils",
  "lightning-utils",
@@ -7669,7 +7763,7 @@ dependencies = [
  "anyhow",
  "cid 0.10.1",
  "derive_more",
- "fleek-crypto",
+ "fleek-crypto 0.0.0",
  "lightning-application",
  "lightning-blockstore",
  "lightning-indexer",
@@ -7702,7 +7796,7 @@ dependencies = [
  "affair",
  "anyhow",
  "fast-sri",
- "fleek-crypto",
+ "fleek-crypto 0.0.0",
  "lightning-application",
  "lightning-blockstore",
  "lightning-indexer",
@@ -7725,7 +7819,7 @@ dependencies = [
  "anyhow",
  "bytes 1.7.1",
  "cid 0.10.1",
- "fleek-crypto",
+ "fleek-crypto 0.0.0",
  "fleek-ipld",
  "futures 0.3.30",
  "humantime-serde",
@@ -7756,7 +7850,7 @@ name = "lightning-pinger"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "fleek-crypto",
+ "fleek-crypto 0.0.0",
  "humantime-serde",
  "lightning-application",
  "lightning-interfaces",
@@ -7783,9 +7877,9 @@ dependencies = [
  "bytes 1.7.1",
  "der 0.7.9",
  "fleek-blake3",
- "fleek-crypto",
+ "fleek-crypto 0.0.0",
  "futures 0.3.30",
- "hp-fixed",
+ "hp-fixed 0.1.0",
  "humantime-serde",
  "lightning-application",
  "lightning-interfaces",
@@ -7795,7 +7889,7 @@ dependencies = [
  "lightning-signer",
  "lightning-test-utils",
  "lightning-topology",
- "lightning-types",
+ "lightning-types 0.1.0",
  "lightning-utils",
  "lightning-workspace-hack",
  "quinn",
@@ -7823,8 +7917,8 @@ name = "lightning-rep-collector"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "fleek-crypto",
- "hp-fixed",
+ "fleek-crypto 0.0.0",
+ "hp-fixed 0.1.0",
  "lightning-application",
  "lightning-interfaces",
  "lightning-notifier",
@@ -7846,8 +7940,8 @@ dependencies = [
 name = "lightning-reputation"
 version = "0.0.0"
 dependencies = [
- "fleek-crypto",
- "hp-fixed",
+ "fleek-crypto 0.0.0",
+ "hp-fixed 0.1.0",
  "lightning-interfaces",
  "lightning-test-utils",
  "lightning-workspace-hack",
@@ -7861,7 +7955,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bincode",
- "fleek-crypto",
+ "fleek-crypto 0.0.0",
  "lightning-application",
  "lightning-broadcast",
  "lightning-interfaces",
@@ -7893,11 +7987,11 @@ dependencies = [
  "bit-set 0.8.0",
  "clap",
  "ethers",
- "fleek-crypto",
+ "fleek-crypto 0.0.0",
  "futures 0.3.30",
  "hex",
  "hmac",
- "hp-fixed",
+ "hp-fixed 0.1.0",
  "hyper 0.14.30",
  "jsonrpsee",
  "lightning-application",
@@ -7916,7 +8010,7 @@ dependencies = [
  "lightning-signer",
  "lightning-test-utils",
  "lightning-topology",
- "lightning-types",
+ "lightning-types 0.1.0",
  "lightning-utils",
  "lightning-workspace-hack",
  "merklize",
@@ -7944,10 +8038,26 @@ dependencies = [
  "anyhow",
  "arrayref",
  "bytes 1.7.1",
- "fleek-crypto",
+ "fleek-crypto 0.0.0",
  "flexbuffers",
- "ink-quill",
- "lightning-types",
+ "ink-quill 0.1.0",
+ "lightning-types 0.1.0",
+ "lightning-workspace-hack",
+ "serde",
+]
+
+[[package]]
+name = "lightning-schema"
+version = "0.0.0"
+source = "git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.3#043f9067d21d5eb5a4bec89e6b3ae881bc392e6e"
+dependencies = [
+ "anyhow",
+ "arrayref",
+ "bytes 1.7.1",
+ "fleek-crypto 0.0.0 (git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.3)",
+ "flexbuffers",
+ "ink-quill 0.1.0 (git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.3)",
+ "lightning-types 0.1.0 (git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.3)",
  "lightning-workspace-hack",
  "serde",
 ]
@@ -7962,15 +8072,15 @@ dependencies = [
  "bincode",
  "bytes 1.7.1",
  "dashmap",
- "fleek-crypto",
+ "fleek-crypto 0.0.0",
  "fleek-service-ai",
  "fleek-service-fetcher",
  "fleek-service-js-poc",
  "fleek-service-sgx",
- "fn-sdk",
+ "fn-sdk 0.0.0",
  "futures 0.3.30",
  "fxhash",
- "hp-fixed",
+ "hp-fixed 0.1.0",
  "lightning-application",
  "lightning-blockstore",
  "lightning-interfaces",
@@ -7997,9 +8107,9 @@ version = "0.0.0"
 dependencies = [
  "affair",
  "anyhow",
- "fleek-crypto",
+ "fleek-crypto 0.0.0",
  "futures 0.3.30",
- "hp-fixed",
+ "hp-fixed 0.1.0",
  "lightning-application",
  "lightning-interfaces",
  "lightning-notifier",
@@ -8019,7 +8129,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-channel 2.3.1",
- "fleek-crypto",
+ "fleek-crypto 0.0.0",
  "futures 0.3.30",
  "humantime-serde",
  "lightning-interfaces",
@@ -8043,8 +8153,8 @@ dependencies = [
  "anyhow",
  "bytes 1.7.1",
  "fleek-blake3",
- "fleek-crypto",
- "fn-sdk",
+ "fleek-crypto 0.0.0",
+ "fn-sdk 0.0.0",
  "futures 0.3.30",
  "humantime-serde",
  "lightning-application",
@@ -8069,15 +8179,15 @@ version = "0.0.0"
 dependencies = [
  "affair",
  "anyhow",
- "atomo",
+ "atomo 0.0.5",
  "axum 0.6.20",
  "chrono",
  "console-subscriber",
  "ethers",
  "fleek-blake3",
- "fleek-crypto",
+ "fleek-crypto 0.0.0",
  "futures 0.3.30",
- "hp-fixed",
+ "hp-fixed 0.1.0",
  "humantime-serde",
  "jsonrpsee",
  "lazy_static",
@@ -8128,7 +8238,7 @@ dependencies = [
  "bincode",
  "criterion",
  "csv",
- "fleek-crypto",
+ "fleek-crypto 0.0.0",
  "fxhash",
  "indicatif",
  "lightning-application",
@@ -8191,16 +8301,16 @@ name = "lightning-types"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "atomo",
+ "atomo 0.0.5",
  "bincode",
  "bit-set 0.8.0",
  "cid 0.10.1",
  "compile-time-run",
  "derive_more",
  "ethers",
- "fleek-crypto",
- "hp-fixed",
- "ink-quill",
+ "fleek-crypto 0.0.0",
+ "hp-fixed 0.1.0",
+ "ink-quill 0.1.0",
  "lightning-workspace-hack",
  "merklize",
  "multiaddr",
@@ -8219,12 +8329,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "lightning-types"
+version = "0.1.0"
+source = "git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.3#043f9067d21d5eb5a4bec89e6b3ae881bc392e6e"
+dependencies = [
+ "anyhow",
+ "atomo 0.0.5 (git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.3)",
+ "bincode",
+ "cid 0.10.1",
+ "compile-time-run",
+ "derive_more",
+ "ethers",
+ "fleek-crypto 0.0.0 (git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.3)",
+ "hp-fixed 0.1.0 (git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.3)",
+ "ink-quill 0.1.0 (git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.3)",
+ "lightning-workspace-hack",
+ "multiaddr",
+ "num-bigint 0.4.6",
+ "num-derive 0.4.2",
+ "num-traits",
+ "ruint",
+ "schemars",
+ "serde",
+ "thiserror",
+ "url",
+]
+
+[[package]]
 name = "lightning-utils"
 version = "0.0.0"
 dependencies = [
  "anyhow",
  "ethers",
- "fleek-crypto",
+ "fleek-crypto 0.0.0",
  "lazy_static",
  "lightning-interfaces",
  "lightning-workspace-hack",
@@ -8259,7 +8396,6 @@ dependencies = [
  "blake3",
  "block-buffer 0.9.0",
  "block-padding 0.3.3",
- "bs58 0.5.1",
  "bytemuck",
  "byteorder",
  "bytes 1.7.1",
@@ -8596,7 +8732,7 @@ name = "merklize"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "atomo",
+ "atomo 0.0.5",
  "atomo-rocks",
  "blake3",
  "digest 0.10.7",
@@ -13131,7 +13267,7 @@ dependencies = [
 
 [[package]]
 name = "sgxencrypt"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "anyhow",
  "bpaf",
