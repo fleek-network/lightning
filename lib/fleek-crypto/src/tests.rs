@@ -1,4 +1,10 @@
-use crate::{AccountOwnerSecretKey, EthAddress, SecretKey};
+use crate::{
+    AccountOwnerSecretKey,
+    ConsensusAggregateSignature,
+    ConsensusSecretKey,
+    EthAddress,
+    SecretKey,
+};
 
 #[test]
 fn account_owner_to_eth_address() {
@@ -38,6 +44,27 @@ fn test_verify_false_eth_address() {
     assert!(!eth_address.verify(&signature, &digest));
 }
 
+#[test]
+fn test_consensus_aggregate_signature_verify() {
+    let sk1 = ConsensusSecretKey::generate();
+    let sk2 = ConsensusSecretKey::generate();
+    let sk3 = ConsensusSecretKey::generate();
+
+    let sig1 = sk1.sign(&[1; 32]);
+    let sig2 = sk2.sign(&[2; 32]);
+    let sig3 = sk3.sign(&[3; 32]);
+
+    let agg_sig = ConsensusAggregateSignature::aggregate(&[&sig1, &sig2, &sig3]).unwrap();
+    assert!(
+        agg_sig
+            .verify(
+                &[sk1.to_pk(), sk2.to_pk(), sk3.to_pk()],
+                &[&[1; 32], &[2; 32], &[3; 32]],
+            )
+            .unwrap()
+    );
+}
+
 mod pem {
     use crate::{AccountOwnerSecretKey, ConsensusSecretKey, NodeSecretKey, SecretKey};
 
@@ -74,6 +101,7 @@ mod from_display {
 
     use crate::{
         AccountOwnerSecretKey,
+        ConsensusAggregateSignature,
         ConsensusSecretKey,
         EthAddress,
         NodeSecretKey,
@@ -126,6 +154,18 @@ mod from_display {
     #[test]
     fn consensus() {
         run_test::<ConsensusSecretKey>();
+
+        // Test aggregate signature.
+        let sk1 = ConsensusSecretKey::generate();
+        let sk2 = ConsensusSecretKey::generate();
+        let sk3 = ConsensusSecretKey::generate();
+
+        let sig1 = sk1.sign(&[0; 32]);
+        let sig2 = sk2.sign(&[0; 32]);
+        let sig3 = sk3.sign(&[0; 32]);
+
+        let agg_sig = ConsensusAggregateSignature::aggregate(&[&sig1, &sig2, &sig3]).unwrap();
+        from_display_should_work(agg_sig);
     }
 }
 
@@ -138,6 +178,7 @@ mod test_serde {
 
     use crate::{
         AccountOwnerSecretKey,
+        ConsensusAggregateSignature,
         ConsensusSecretKey,
         EthAddress,
         NodeSecretKey,
@@ -227,5 +268,17 @@ mod test_serde {
     #[test]
     fn consensus() {
         run_test::<ConsensusSecretKey>();
+
+        // Test aggregate signature.
+        let sk1 = ConsensusSecretKey::generate();
+        let sk2 = ConsensusSecretKey::generate();
+        let sk3 = ConsensusSecretKey::generate();
+
+        let sig1 = sk1.sign(&[0; 32]);
+        let sig2 = sk2.sign(&[0; 32]);
+        let sig3 = sk3.sign(&[0; 32]);
+
+        let agg_sig = ConsensusAggregateSignature::aggregate(&[&sig1, &sig2, &sig3]).unwrap();
+        serde_should_work(agg_sig);
     }
 }

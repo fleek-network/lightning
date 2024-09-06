@@ -3,11 +3,7 @@ use std::str::FromStr;
 
 use arrayref::array_ref;
 use derive_more::{AsRef, From};
-use fastcrypto::bls12381::min_sig::{
-    BLS12381AggregateSignature,
-    BLS12381PublicKey,
-    BLS12381Signature,
-};
+use fastcrypto::bls12381::min_sig::{BLS12381PublicKey, BLS12381Signature};
 use fastcrypto::ed25519::{Ed25519PublicKey, Ed25519Signature};
 use fastcrypto::encoding::{Base58, Encoding};
 use fastcrypto::secp256k1::recoverable::Secp256k1RecoverableSignature;
@@ -22,18 +18,16 @@ macro_rules! impl_pk_sig {
     (
         $pk_name:ident, $pk_size:expr, $pk_fc:ident,
         $sig_name:ident, $sig_size:expr, $sig_fc:ident
-        $(, $aggr_sig_name:ident, $aggr_sig_size:expr, $aggr_sig_fc:ident)?
     ) => {
         impl_pk_sig!(
             $pk_name, $pk_size, $pk_fc, $sig_name, $sig_size, $sig_fc, verify
-            $(, $aggr_sig_name, $aggr_sig_size, $aggr_sig_fc)?
         );
     };
 
     (
         $pk_name:ident, $pk_size:expr, $pk_fc:ident,
-        $sig_name:ident, $sig_size:expr, $sig_fc:ident, $verify:ident
-        $(, $aggr_sig_name:ident, $aggr_sig_size:expr, $aggr_sig_fc:ident)?
+        $sig_name:ident, $sig_size:expr, $sig_fc:ident,
+        $verify:ident
     ) => {
         #[derive(
             From, AsRef, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize,
@@ -44,14 +38,6 @@ macro_rules! impl_pk_sig {
             From, AsRef, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize, Deserialize,
         )]
         pub struct $sig_name(#[serde(with = "base58_array")] pub [u8; $sig_size]);
-
-        $(
-            #[derive(
-                From, AsRef, Hash, PartialEq, PartialOrd, Ord, Eq, Clone, Copy, Serialize,
-                Deserialize,
-            )]
-            pub struct $aggr_sig_name(#[serde(with = "base58_array")] pub [u8; $aggr_sig_size]);
-        )?
 
         impl PublicKey for $pk_name {
             type Signature = $sig_name;
@@ -72,7 +58,7 @@ macro_rules! impl_pk_sig {
             }
         }
 
-        // <-- start of string, default, and display implementation.
+        // <-- start of string and display implementation.
 
         impl Display for $pk_name {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -150,54 +136,9 @@ macro_rules! impl_pk_sig {
 
         impl Default for $sig_name {
             fn default() -> Self {
-                $sig_name([0; $sig_size])
+                Self([0u8; $sig_size])
             }
         }
-
-        $(
-            impl Display for $aggr_sig_name {
-                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                    write!(f, "{}", Base58::encode(self.0))
-                }
-            }
-
-            impl std::fmt::Debug for $aggr_sig_name {
-                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                    write!(
-                        f,
-                        concat!(stringify!($pk_name), r#"("{}")"#),
-                        Base58::encode(self.0)
-                    )
-                }
-            }
-
-            impl FromStr for $aggr_sig_name {
-                type Err = std::io::Error;
-                fn from_str(s: &str) -> Result<Self, Self::Err> {
-                    let bytes = Base58::decode(s).map_err(|_| {
-                        std::io::Error::new(
-                            std::io::ErrorKind::InvalidData,
-                            "Aggregate signature not in base58 format.",
-                        )
-                    })?;
-
-                    if bytes.len() != $aggr_sig_size {
-                        return Err(std::io::Error::new(
-                            std::io::ErrorKind::InvalidData,
-                            "Invalid aggregate signature size.",
-                        ));
-                    }
-
-                    Ok(Self(*array_ref!(bytes, 0, $aggr_sig_size)))
-                }
-            }
-
-            impl Default for $aggr_sig_name {
-                fn default() -> Self {
-                    $aggr_sig_name([0; $aggr_sig_size])
-                }
-            }
-        )?
 
         // end of string and display implementation. -->
 
@@ -229,50 +170,7 @@ macro_rules! impl_pk_sig {
             }
         }
 
-        $(
-            impl From<$aggr_sig_fc> for $aggr_sig_name {
-                fn from(value: $aggr_sig_fc) -> Self {
-                    let bytes = value.as_ref();
-                    $aggr_sig_name(*array_ref!(bytes, 0, $aggr_sig_size))
-                }
-            }
-
-            impl From<&$aggr_sig_name> for $aggr_sig_fc {
-                fn from(value: &$aggr_sig_name) -> Self {
-                    $aggr_sig_fc::from_bytes(&value.0).unwrap()
-                }
-            }
-        )?
-
         // end of fastcrypto conversions -->
-
-        // <-- start of aggregate signature implementation.
-
-        $(
-            use fastcrypto::traits::AggregateAuthenticator;
-
-            impl std::borrow::Borrow<$sig_fc> for $sig_name {
-                fn borrow(&self) -> &$sig_fc {
-                    // SAFETY: This assumes that $sig_fc is $sig_name.
-                    unsafe { &*(self as *const $sig_name as *const $sig_fc) }
-                }
-            }
-
-            impl $aggr_sig_name {
-                pub fn aggregate<'a, K, I>(signatures: I) -> anyhow::Result<Self>
-                where
-                    K: std::borrow::Borrow<$sig_name> + 'a,
-                    I: IntoIterator<Item = &'a K>,
-                {
-                    let sig = $aggr_sig_fc::aggregate(
-                        signatures.into_iter().map(|s| s.borrow().into()),
-                    )?;
-                    Ok(sig.into())
-                }
-            }
-        )?
-
-        // end of aggregate signature implementation. -->
     };
 }
 
@@ -282,10 +180,7 @@ impl_pk_sig!(
     BLS12381PublicKey,
     ConsensusSignature,
     48,
-    BLS12381Signature,
-    ConsensusAggregateSignature,
-    48,
-    BLS12381AggregateSignature
+    BLS12381Signature
 );
 
 impl_pk_sig!(

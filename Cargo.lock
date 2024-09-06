@@ -4544,7 +4544,6 @@ dependencies = [
 name = "fleek-crypto"
 version = "0.0.0"
 dependencies = [
- "anyhow",
  "arrayref",
  "bincode",
  "derive_more",
