@@ -130,6 +130,19 @@ impl UsercallExtension for ExternalService {
 }
 
 pub fn main() {
+    std::thread::spawn(|| {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .thread_name("sdk")
+            .enable_all()
+            .build()
+            .expect("failed to build sdk runtime");
+
+        rt.spawn(async move {
+            fn_sdk::ipc::init_from_env();
+            futures::future::pending::<()>().await
+        })
+    });
+
     // Running the enclave
     let aesm_client = AesmClient::new();
     let mut device = IsgxDevice::new()

@@ -33,6 +33,13 @@ pub struct VerifiedStream {
 
 impl VerifiedStream {
     pub async fn new(hash: &[u8; 32]) -> Result<Self, std::io::Error> {
+        if !fn_sdk::api::fetch_blake3(*hash).await {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "failed to fetch blake3 hash",
+            ));
+        }
+
         let handle = Arc::new(ContentHandle::load(hash).await?);
 
         // TODO: Estimate and validate content length limits, based on the
