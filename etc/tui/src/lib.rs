@@ -6,4 +6,3 @@ pub mod mode;
 mod state;
 pub mod tui;
 pub mod utils;
-pub mod widgets;

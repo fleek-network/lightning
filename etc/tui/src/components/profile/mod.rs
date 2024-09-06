@@ -13,7 +13,7 @@ use crate::action::Action;
 use crate::config::Config;
 use crate::mode::Mode;
 use crate::state::State;
-use crate::widgets::list::List;
+use crate::components::utils::list::List;
 
 /// Component that displaying and managing security profiles.
 pub struct Profile {
@@ -61,7 +61,7 @@ impl Component for Profile {
                     .records_to_remove_mut()
                     .map(|p| p.name.clone())
                     .collect();
-                ctx.commit_to_remove_profiles(remove);
+                ctx.commit_remove_profiles(remove);
 
                 self.list.commit_changes();
                 let profiles = self.list.records();

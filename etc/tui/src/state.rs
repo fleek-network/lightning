@@ -23,20 +23,20 @@ impl State {
         }
     }
 
-    pub async fn load_packet_filter_rules(&mut self) -> Result<()> {
+    pub async fn load_filters(&mut self) -> Result<()> {
         self.filters = self.src.read_packet_filters().await?;
         Ok(())
     }
 
-    pub fn update_packet_filters(&mut self, filters: Vec<PacketFilterRule>) {
+    pub fn add_filters(&mut self, filters: Vec<PacketFilterRule>) {
         self.filters = filters;
     }
 
-    pub fn update_filters(&mut self, filter: PacketFilterRule) {
+    pub fn add_filter(&mut self, filter: PacketFilterRule) {
         self.filters.push(filter);
     }
 
-    pub fn commit_packet_filters(&mut self) {
+    pub fn commit_filters(&mut self) {
         let filters = self.filters.clone();
         let src = self.src.clone();
         tokio::spawn(async move {
@@ -75,7 +75,7 @@ impl State {
         });
     }
 
-    pub fn commit_to_remove_profiles(&mut self, remove: Vec<Option<PathBuf>>) {
+    pub fn commit_remove_profiles(&mut self, remove: Vec<Option<PathBuf>>) {
         let src = self.src.clone();
         tokio::spawn(async move {
             if let Err(e) = src.delete_profiles(remove.into_iter().collect()).await {
@@ -88,17 +88,6 @@ impl State {
         self.profiles.values().cloned().collect()
     }
 
-    /// Note: Panics if profile with `name` does not exist in state.
-    pub fn update_profile_rules(&mut self, name: &Option<PathBuf>, rule: FileRule) {
-        let profile = self
-            .profiles
-            .get_mut(name)
-            .expect("there to be a profile with this name");
-
-        profile.file_rules.push(rule);
-    }
-
-    /// Note: Panics if profile with `name` does not exist in state.
     pub fn update_selected_profile_rules_list(&mut self, rules: Vec<FileRule>) {
         let name = &self.selected_profile;
         let profile = self.profiles.get_mut(name).expect("Profile to exist");
@@ -119,12 +108,6 @@ impl State {
 
     pub fn get_selected_profile_mut(&mut self) -> Option<&mut Profile> {
         self.profiles.get_mut(&self.selected_profile)
-    }
-
-    pub fn selected_profile(&self) -> Option<String> {
-        self.selected_profile
-            .as_ref()
-            .map(|path| path.display().to_string())
     }
 
     pub fn select_profile(&mut self, profile: &Profile) {

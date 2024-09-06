@@ -12,8 +12,8 @@ use crate::config::Config;
 use crate::mode::Mode;
 use crate::state::State;
 use crate::tui::Frame;
-use crate::widgets::utils;
-use crate::widgets::utils::InputField;
+use crate::components::utils;
+use crate::components::utils::InputField;
 
 const PROFILE_NAME: &str = "Profile Name";
 const INPUT_FORM_X: u16 = 20;

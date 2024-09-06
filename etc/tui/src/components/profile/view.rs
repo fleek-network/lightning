@@ -10,7 +10,7 @@ use crate::action::Action;
 use crate::config::Config;
 use crate::mode::Mode;
 use crate::state::State;
-use crate::widgets::table::Table;
+use crate::components::utils::table::Table;
 
 const COLUMN_COUNT: usize = 2;
 

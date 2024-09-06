@@ -12,8 +12,8 @@ use crate::config::Config;
 use crate::mode::Mode;
 use crate::state::State;
 use crate::tui::Frame;
-use crate::widgets::utils;
-use crate::widgets::utils::InputField;
+use crate::components::utils;
+use crate::components::utils::InputField;
 
 const TARGET_NAME: &str = "Target";
 const PERMISSIONS: &str = "Permissions";

@@ -14,8 +14,7 @@ use crate::action::Action;
 use crate::config::Config;
 use crate::mode::Mode;
 use crate::state::State;
-use crate::widgets::utils;
-use crate::widgets::utils::InputField;
+use crate::components::{self, utils::InputField};
 
 const IP_FIELD_NAME: &str = "IP";
 const PORT_FIELD_NAME: &str = "Port";
@@ -47,10 +46,10 @@ impl FirewallForm {
         .collect();
 
         debug_assert!(input_fields.len() == INPUT_FIELD_COUNT);
-        utils::activate(&mut input_fields[0]);
-        utils::inactivate(&mut input_fields[1]);
-        utils::inactivate(&mut input_fields[2]);
-        utils::inactivate(&mut input_fields[3]);
+        components::utils::activate(&mut input_fields[0]);
+        components::utils::inactivate(&mut input_fields[1]);
+        components::utils::inactivate(&mut input_fields[2]);
+        components::utils::inactivate(&mut input_fields[3]);
 
         Self {
             command_tx: None,
@@ -171,7 +170,7 @@ impl Component for FirewallForm {
                     let filter = self
                         .yank_input()
                         .expect("We already verified that the input is valid");
-                    ctx.update_filters(filter);
+                    ctx.add_filter(filter);
                     Ok(Some(Action::UpdateMode(Mode::FirewallEdit)))
                 }
             },
@@ -221,9 +220,9 @@ impl Component for FirewallForm {
             .enumerate()
         {
             if i == self.selected_input_field {
-                utils::activate(textarea);
+                components::utils::activate(textarea);
             } else {
-                utils::inactivate(textarea)
+                components::utils::inactivate(textarea)
             }
             f.render_widget(&textarea.area, *chunk);
         }

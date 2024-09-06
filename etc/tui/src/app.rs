@@ -89,7 +89,7 @@ impl App {
 
     async fn load_state(&mut self) -> Result<()> {
         self.state.load_profiles().await?;
-        self.state.load_packet_filter_rules().await?;
+        self.state.load_filters().await?;
         Ok(())
     }
 
@@ -262,7 +262,7 @@ impl App {
         self.firewall.init(tui.size()?)?;
 
         // If it's an error, there is no file and thus there is nothing to do.
-        self.state.load_packet_filter_rules().await?;
+        self.state.load_filters().await?;
         let filters = self.state.get_filters();
         self.firewall.load_list(filters.to_vec());
 

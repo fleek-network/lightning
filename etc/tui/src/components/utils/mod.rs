@@ -3,6 +3,9 @@ use ratatui::prelude::{Color, Modifier, Style};
 use ratatui::widgets::{Block, Borders};
 use tui_textarea::TextArea;
 
+pub mod list;
+pub mod table;
+
 pub struct InputField {
     pub title: &'static str,
     pub area: TextArea<'static>,

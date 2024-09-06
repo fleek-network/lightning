@@ -13,7 +13,7 @@ use crate::action::Action;
 use crate::config::Config;
 use crate::mode::Mode;
 use crate::state::State;
-use crate::widgets::table::Table;
+use crate::components::utils::table::Table;
 
 const COLUMN_COUNT: usize = 6;
 
@@ -107,9 +107,9 @@ impl Component for FireWall {
                 // It is possible that the user deleted some entries thus we handle that here.
                 let filters = self.table.records().cloned().collect();
                 // Update state.
-                ctx.update_packet_filters(filters);
+                ctx.add_filters(filters);
                 // Commit to changes in state.
-                ctx.commit_packet_filters();
+                ctx.commit_filters();
                 Ok(Some(Action::UpdateMode(Mode::Firewall)))
             },
             Action::Cancel => {
