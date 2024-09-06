@@ -3,7 +3,7 @@ use std::time::Duration;
 use cid::Cid;
 use fleek_crypto::{AccountOwnerSecretKey, SecretKey};
 use lightning_application::app::Application;
-use lightning_application::config::Config as AppConfig;
+use lightning_application::config::ApplicationConfig;
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_blockstore_server::BlockstoreServer;
@@ -122,7 +122,9 @@ async fn get_fetchers(
                     .with(keystore)
                     .with(
                         JsonConfigProvider::default()
-                            .with::<Application<TestBinding>>(AppConfig::test(genesis_path.clone()))
+                            .with::<Application<TestBinding>>(ApplicationConfig::test(
+                                genesis_path.clone(),
+                            ))
                             .with::<PoolProvider<TestBinding>>(PoolConfig {
                                 max_idle_timeout: Duration::from_secs(5),
                                 address: format!("0.0.0.0:{}", pool_port_offset + i as u16)

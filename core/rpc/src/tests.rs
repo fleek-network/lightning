@@ -12,7 +12,7 @@ use fleek_crypto::{
 use hp_fixed::unsigned::HpUfixed;
 use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
 use lightning_application::app::Application;
-use lightning_application::config::Config as AppConfig;
+use lightning_application::config::ApplicationConfig;
 use lightning_application::env::ApplicationStateTree;
 use lightning_application::state::QueryRunner;
 use lightning_blockstore::blockstore::Blockstore;
@@ -94,7 +94,7 @@ impl TestNode {
 }
 
 async fn init_rpc(temp_dir: &TempDir, genesis_path: ResolvedPathBuf, rpc_port: u16) -> TestNode {
-    let app_config = AppConfig::test(genesis_path);
+    let app_config = ApplicationConfig::test(genesis_path);
 
     let rpc_config = RpcConfig {
         hmac_secret_dir: Some(temp_dir.path().to_path_buf()),

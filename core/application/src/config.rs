@@ -13,7 +13,7 @@ use crate::network::Network;
 use crate::storage::AtomoStorageBuilder;
 
 #[derive(Clone, Serialize, Deserialize)]
-pub struct Config {
+pub struct ApplicationConfig {
     pub network: Option<Network>,
     pub genesis_path: Option<ResolvedPathBuf>,
     pub storage: StorageConfig,
@@ -39,7 +39,7 @@ impl Default for DevConfig {
     }
 }
 
-impl Config {
+impl ApplicationConfig {
     pub fn test(genesis_path: ResolvedPathBuf) -> Self {
         Self {
             network: None,
@@ -120,7 +120,7 @@ impl Config {
     }
 }
 
-impl Default for Config {
+impl Default for ApplicationConfig {
     fn default() -> Self {
         Self {
             network: None,
@@ -152,10 +152,10 @@ mod config_tests {
 
     #[test]
     fn genesis_with_network_without_genesis() {
-        let config = Config {
+        let config = ApplicationConfig {
             network: Some(Network::LocalnetExample),
             genesis_path: None,
-            ..Config::default()
+            ..Default::default()
         };
         assert!(config.genesis().is_ok());
     }
@@ -166,20 +166,20 @@ mod config_tests {
         let genesis_path = Genesis::default()
             .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
             .unwrap();
-        let config = Config {
+        let config = ApplicationConfig {
             network: None,
             genesis_path: Some(genesis_path),
-            ..Config::default()
+            ..Default::default()
         };
         assert!(config.genesis().is_ok());
     }
 
     #[test]
     fn genesis_missing_network_and_genesis() {
-        let config = Config {
+        let config = ApplicationConfig {
             network: None,
             genesis_path: None,
-            ..Config::default()
+            ..Default::default()
         };
         assert!(config.genesis().is_ok());
     }
@@ -190,10 +190,10 @@ mod config_tests {
         let genesis_path = Genesis::default()
             .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
             .unwrap();
-        let config = Config {
+        let config = ApplicationConfig {
             network: Some(Network::LocalnetExample),
             genesis_path: Some(genesis_path),
-            ..Config::default()
+            ..Default::default()
         };
         assert!(config.genesis().is_err());
     }

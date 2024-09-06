@@ -8,7 +8,7 @@ use fleek_crypto::{
     SecretKey,
 };
 use lightning_application::app::Application;
-use lightning_application::config::Config as AppConfig;
+use lightning_application::config::ApplicationConfig;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Genesis, GenesisLatency, GenesisNode, NodePorts, Participation};
 use lightning_notifier::Notifier;
@@ -159,7 +159,7 @@ async fn test_build_latency_matrix() {
     let mut node = Node::<TestBinding>::init_with_provider(
         fdi::Provider::default().with(
             JsonConfigProvider::default()
-                .with::<Application<TestBinding>>(AppConfig::test(genesis_path)),
+                .with::<Application<TestBinding>>(ApplicationConfig::test(genesis_path)),
         ),
     )
     .expect("failed to init node");
@@ -210,7 +210,7 @@ async fn test_receive_connections() {
     let mut node = Node::<TestBinding>::init_with_provider(
         fdi::Provider::default().with(
             JsonConfigProvider::default()
-                .with::<Application<TestBinding>>(AppConfig::test(genesis_path)),
+                .with::<Application<TestBinding>>(ApplicationConfig::test(genesis_path)),
         ),
     )
     .unwrap();

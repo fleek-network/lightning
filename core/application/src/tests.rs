@@ -64,7 +64,7 @@ use rand::seq::SliceRandom;
 use tempfile::{tempdir, TempDir};
 
 use crate::app::Application;
-use crate::config::{Config, StorageConfig};
+use crate::config::{ApplicationConfig, StorageConfig};
 use crate::state::QueryRunner;
 
 partial!(TestBinding {
@@ -558,18 +558,21 @@ fn test_genesis() -> Genesis {
 }
 
 /// Initialize application state with provided or default configuration.
-fn init_app(temp_dir: &TempDir, config: Option<Config>) -> (ExecutionEngineSocket, QueryRunner) {
+fn init_app(
+    temp_dir: &TempDir,
+    config: Option<ApplicationConfig>,
+) -> (ExecutionEngineSocket, QueryRunner) {
     let config = config.or_else(|| {
         let genesis_path = test_genesis()
             .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
             .unwrap();
-        Some(Config::test(genesis_path))
+        Some(ApplicationConfig::test(genesis_path))
     });
     do_init_app(config.unwrap())
 }
 
 /// Initialize application with provided configuration.
-fn do_init_app(config: Config) -> (ExecutionEngineSocket, QueryRunner) {
+fn do_init_app(config: ApplicationConfig) -> (ExecutionEngineSocket, QueryRunner) {
     let node = Node::<TestBinding>::init_with_provider(
         fdi::Provider::default()
             .with(JsonConfigProvider::default().with::<Application<TestBinding>>(config)),
@@ -590,7 +593,7 @@ fn test_init_app(
     let genesis_path = genesis
         .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
         .unwrap();
-    init_app(temp_dir, Some(Config::test(genesis_path)))
+    init_app(temp_dir, Some(ApplicationConfig::test(genesis_path)))
 }
 
 /// Initialize application with provided genesis.
@@ -601,7 +604,7 @@ fn init_app_with_genesis(
     let genesis_path = genesis
         .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
         .unwrap();
-    init_app(temp_dir, Some(Config::test(genesis_path)))
+    init_app(temp_dir, Some(ApplicationConfig::test(genesis_path)))
 }
 
 /// Initialize application with provided parameters.
@@ -652,7 +655,7 @@ fn init_app_with_params(
         .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
         .unwrap();
 
-    init_app(temp_dir, Some(Config::test(genesis_path)))
+    init_app(temp_dir, Some(ApplicationConfig::test(genesis_path)))
 }
 
 /// Prepare test Reputation Measurements based on provided `uptime`.
@@ -1253,7 +1256,7 @@ async fn test_genesis_configuration() {
 
 #[tokio::test]
 async fn test_node_startup_without_genesis() {
-    let config = Config {
+    let config = ApplicationConfig {
         network: None,
         genesis_path: None,
         storage: StorageConfig::InMemory,

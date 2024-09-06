@@ -142,7 +142,9 @@ fn build_cluster(
                         .with(
                             JsonConfigProvider::default()
                                 .with::<Application<TestBinding>>(
-                                    lightning_application::config::Config::test(path.clone()),
+                                    lightning_application::config::ApplicationConfig::test(
+                                        path.clone(),
+                                    ),
                                 )
                                 .with::<PoolProvider<TestBinding>>(lightning_pool::Config {
                                     max_idle_timeout: Duration::from_millis(100),

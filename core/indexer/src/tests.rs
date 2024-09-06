@@ -3,7 +3,7 @@ use std::time::{Duration, SystemTime};
 
 use fleek_crypto::{AccountOwnerSecretKey, ConsensusSecretKey, NodeSecretKey, SecretKey};
 use lightning_application::app::Application;
-use lightning_application::config::Config as AppConfig;
+use lightning_application::config::ApplicationConfig;
 use lightning_application::state::QueryRunner;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Genesis, GenesisNode, NodePorts};
@@ -103,7 +103,7 @@ async fn test_submission() {
         fdi::Provider::default()
             .with(
                 JsonConfigProvider::default()
-                    .with::<Application<TestBinding>>(AppConfig::test(genesis_path))
+                    .with::<Application<TestBinding>>(ApplicationConfig::test(genesis_path))
                     .with::<MockConsensus<TestBinding>>(ConsensusConfig {
                         min_ordering_time: 0,
                         max_ordering_time: 1,

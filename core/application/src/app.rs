@@ -10,7 +10,7 @@ use lightning_interfaces::types::{ChainId, NodeInfo};
 use tracing::{error, info};
 use types::Genesis;
 
-use crate::config::{Config, StorageConfig};
+use crate::config::{ApplicationConfig, StorageConfig};
 use crate::env::{ApplicationEnv, Env, UpdateWorker};
 use crate::state::QueryRunner;
 pub struct Application<C: Collection> {
@@ -59,7 +59,7 @@ impl<C: Collection> Application<C> {
 impl<C: Collection> ConfigConsumer for Application<C> {
     const KEY: &'static str = "application";
 
-    type Config = Config;
+    type Config = ApplicationConfig;
 }
 
 impl<C: Collection> fdi::BuildGraph for Application<C> {
@@ -96,7 +96,7 @@ impl<C: Collection> ApplicationInterface<C> for Application<C> {
     }
 
     async fn load_from_checkpoint(
-        config: &Config,
+        config: &ApplicationConfig,
         checkpoint: Vec<u8>,
         checkpoint_hash: [u8; 32],
     ) -> Result<()> {
@@ -129,14 +129,14 @@ impl<C: Collection> ApplicationInterface<C> for Application<C> {
         }
     }
 
-    fn get_chain_id(config: &Config) -> Result<ChainId> {
+    fn get_chain_id(config: &ApplicationConfig) -> Result<ChainId> {
         Ok(config
             .genesis()?
             .ok_or(anyhow!("missing genesis"))?
             .chain_id)
     }
 
-    fn get_genesis_committee(config: &Config) -> Result<Vec<NodeInfo>> {
+    fn get_genesis_committee(config: &ApplicationConfig) -> Result<Vec<NodeInfo>> {
         Ok(config
             .genesis()?
             .ok_or(anyhow!("missing genesis"))?
@@ -150,7 +150,7 @@ impl<C: Collection> ApplicationInterface<C> for Application<C> {
     /// Resets the state tree by clearing it and rebuilding it from the full state.
     ///
     /// This method is unsafe because it acts directly on the underlying storage backend.
-    fn reset_state_tree_unsafe(config: &Config) -> Result<()> {
+    fn reset_state_tree_unsafe(config: &ApplicationConfig) -> Result<()> {
         let mut env = ApplicationEnv::new(config, None)?;
         env.inner.reset_state_tree_unsafe()
     }

@@ -10,7 +10,7 @@ use fleek_crypto::{
     SecretKey,
 };
 use lightning_application::app::Application;
-use lightning_application::config::Config as AppConfig;
+use lightning_application::config::ApplicationConfig;
 use lightning_application::network::Network;
 use lightning_final_bindings::UseMockConsensus;
 use lightning_handshake::config::HandshakeConfig;
@@ -68,7 +68,7 @@ where
     }
 
     // Set network field in the configuration.
-    let mut app_config = AppConfig::default();
+    let mut app_config = ApplicationConfig::default();
     if dev {
         if network.is_some() {
             bail!("Cannot specify both --dev and --network");

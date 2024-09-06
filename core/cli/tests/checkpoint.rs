@@ -6,7 +6,7 @@ use atomo::storage::StorageBackend;
 use fleek_blake3 as blake3;
 use fleek_crypto::{AccountOwnerSecretKey, ConsensusSecretKey, NodeSecretKey, SecretKey};
 use lightning_application::app::Application;
-use lightning_application::config::{Config as AppConfig, StorageConfig};
+use lightning_application::config::{ApplicationConfig, StorageConfig};
 use lightning_application::env::Env;
 use lightning_archive::archive::Archive;
 use lightning_archive::config::Config as ArchiveConfig;
@@ -55,7 +55,7 @@ fn build_config(
 
     let config = TomlConfigProvider::<FinalTypes>::default();
 
-    config.inject::<Application<FinalTypes>>(AppConfig {
+    config.inject::<Application<FinalTypes>>(ApplicationConfig {
         network: None,
         genesis_path: Some(genesis_path),
         storage: StorageConfig::RocksDb,
@@ -218,7 +218,7 @@ async fn node_checkpointing() -> Result<()> {
         .unwrap();
 
     // We first have to build the app db in order to obtain a valid checkpoint.
-    let app_config_temp = AppConfig {
+    let app_config_temp = ApplicationConfig {
         network: None,
         genesis_path: Some(genesis_path.clone()),
         storage: StorageConfig::RocksDb,

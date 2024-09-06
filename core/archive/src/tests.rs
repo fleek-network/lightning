@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use ethers::types::BlockNumber;
 use lightning_application::app::Application;
-use lightning_application::config::Config as AppConfig;
+use lightning_application::config::ApplicationConfig;
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_interfaces::prelude::*;
@@ -39,7 +39,7 @@ async fn get_node() -> Node<TestBinding> {
 
     let node = Node::<TestBinding>::init(
         JsonConfigProvider::default()
-            .with::<Application<TestBinding>>(AppConfig::test(genesis_path))
+            .with::<Application<TestBinding>>(ApplicationConfig::test(genesis_path))
             .with::<Archive<TestBinding>>(ArchiveConfig {
                 is_archive: true,
                 store_path: temp_dir.path().join("archive").try_into().unwrap(),

@@ -37,7 +37,7 @@ use merklize::StateTree;
 use tokio::sync::Mutex;
 use tracing::warn;
 
-use crate::config::Config;
+use crate::config::ApplicationConfig;
 use crate::state::{ApplicationState, QueryRunner};
 use crate::storage::AtomoStorage;
 
@@ -52,7 +52,7 @@ pub type ApplicationStateTree = MptStateTree<AtomoStorage, DefaultSerdeBackend, 
 pub type ApplicationEnv = Env<AtomoStorage, DefaultSerdeBackend, ApplicationStateTree>;
 
 impl ApplicationEnv {
-    pub fn new(config: &Config, checkpoint: Option<([u8; 32], &[u8])>) -> Result<Self> {
+    pub fn new(config: &ApplicationConfig, checkpoint: Option<([u8; 32], &[u8])>) -> Result<Self> {
         let builder = config.atomo_builder(checkpoint)?;
 
         Ok(Self {
@@ -401,7 +401,7 @@ impl ApplicationEnv {
 
 impl Default for ApplicationEnv {
     fn default() -> Self {
-        Self::new(&Config::default(), None).unwrap()
+        Self::new(&ApplicationConfig::default(), None).unwrap()
     }
 }
 

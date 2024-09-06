@@ -3,7 +3,7 @@ use std::time::{Duration, SystemTime};
 
 use fleek_crypto::{AccountOwnerSecretKey, SecretKey};
 use lightning_application::app::Application;
-use lightning_application::config::Config as AppConfig;
+use lightning_application::config::ApplicationConfig;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
     DeliveryAcknowledgment,
@@ -93,7 +93,7 @@ async fn init_aggregator(temp_dir: &TempDir) -> Node<TestBinding> {
         fdi::Provider::default()
             .with(
                 JsonConfigProvider::default()
-                    .with::<Application<TestBinding>>(AppConfig::test(genesis_path))
+                    .with::<Application<TestBinding>>(ApplicationConfig::test(genesis_path))
                     .with::<MockConsensus<TestBinding>>(ConsensusConfig {
                         min_ordering_time: 0,
                         max_ordering_time: 1,

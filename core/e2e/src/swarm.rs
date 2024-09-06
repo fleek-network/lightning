@@ -13,7 +13,7 @@ use fleek_crypto::{
 use futures::future::try_join_all;
 use hp_fixed::unsigned::HpUfixed;
 use lightning_application::app::Application;
-use lightning_application::config::{Config as AppConfig, StorageConfig};
+use lightning_application::config::{ApplicationConfig, StorageConfig};
 use lightning_archive::archive::Archive;
 use lightning_archive::config::Config as ArchiveConfig;
 use lightning_blockstore::blockstore::Blockstore;
@@ -394,7 +394,7 @@ impl SwarmBuilder {
             } else {
                 StorageConfig::InMemory
             };
-            config.inject::<Application<FinalTypes>>(AppConfig {
+            config.inject::<Application<FinalTypes>>(ApplicationConfig {
                 network: None,
                 genesis_path: Some(genesis_path.clone()),
                 storage,

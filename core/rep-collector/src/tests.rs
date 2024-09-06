@@ -3,7 +3,7 @@ use std::time::{Duration, SystemTime};
 
 use fleek_crypto::{AccountOwnerSecretKey, ConsensusSecretKey, NodeSecretKey, SecretKey};
 use lightning_application::app::Application;
-use lightning_application::config::Config as AppConfig;
+use lightning_application::config::ApplicationConfig;
 use lightning_application::state::QueryRunner;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
@@ -123,7 +123,7 @@ async fn test_query() {
         fdi::Provider::default()
             .with(
                 JsonConfigProvider::default()
-                    .with::<Application<TestBinding>>(AppConfig::test(genesis_path))
+                    .with::<Application<TestBinding>>(ApplicationConfig::test(genesis_path))
                     .with::<MockConsensus<TestBinding>>(ConsensusConfig {
                         min_ordering_time: 0,
                         max_ordering_time: 1,
@@ -253,7 +253,7 @@ async fn test_submit_measurements() {
         fdi::Provider::default()
             .with(
                 JsonConfigProvider::default()
-                    .with::<Application<TestBinding>>(AppConfig::test(genesis_path))
+                    .with::<Application<TestBinding>>(ApplicationConfig::test(genesis_path))
                     .with::<MockConsensus<TestBinding>>(ConsensusConfig {
                         min_ordering_time: 0,
                         max_ordering_time: 1,
@@ -412,7 +412,7 @@ async fn test_reputation_calculation_and_query() {
         fdi::Provider::default()
             .with(
                 JsonConfigProvider::default()
-                    .with::<Application<TestBinding>>(AppConfig::test(genesis_path.clone()))
+                    .with::<Application<TestBinding>>(ApplicationConfig::test(genesis_path.clone()))
                     .with::<ReputationAggregator<TestBinding>>(Config {
                         reporter_buffer_size: 1,
                     }),
@@ -433,7 +433,7 @@ async fn test_reputation_calculation_and_query() {
         fdi::Provider::default()
             .with(
                 JsonConfigProvider::default()
-                    .with::<Application<TestBinding>>(AppConfig::test(genesis_path))
+                    .with::<Application<TestBinding>>(ApplicationConfig::test(genesis_path))
                     .with::<ReputationAggregator<TestBinding>>(Config {
                         reporter_buffer_size: 1,
                     }),

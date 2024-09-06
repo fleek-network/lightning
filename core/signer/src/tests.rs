@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use fleek_crypto::{AccountOwnerSecretKey, SecretKey};
 use lightning_application::app::Application;
-use lightning_application::config::Config as AppConfig;
+use lightning_application::config::ApplicationConfig;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Genesis, GenesisNode, NodePorts, UpdateMethod};
 use lightning_notifier::Notifier;
@@ -62,7 +62,7 @@ fn build_node(temp_dir: &TempDir, transactions_to_lose: &[u32]) -> Node<TestBind
     Node::<TestBinding>::init_with_provider(
         fdi::Provider::default().with(keystore).with(
             JsonConfigProvider::default()
-                .with::<Application<TestBinding>>(AppConfig::test(genesis_path))
+                .with::<Application<TestBinding>>(ApplicationConfig::test(genesis_path))
                 .with::<MockConsensus<TestBinding>>(ConsensusConfig {
                     min_ordering_time: 0,
                     max_ordering_time: 1,

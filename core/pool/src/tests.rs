@@ -9,7 +9,7 @@ use fleek_crypto::{AccountOwnerSecretKey, NodePublicKey, SecretKey};
 use futures::future::join_all;
 use futures::StreamExt;
 use lightning_application::app::Application;
-use lightning_application::config::Config as AppConfig;
+use lightning_application::config::ApplicationConfig;
 use lightning_application::state::QueryRunner;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Genesis, GenesisNode, NodeIndex, NodePorts};
@@ -66,7 +66,7 @@ async fn get_pools(
     port_offset: u16,
     num_peers: usize,
     state_server_address_port: Option<u16>,
-) -> (Vec<Peer>, AppConfig) {
+) -> (Vec<Peer>, ApplicationConfig) {
     let mut keystores = Vec::new();
     let mut genesis = Genesis::default();
 
@@ -107,7 +107,7 @@ async fn get_pools(
     let genesis_path = genesis
         .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
         .unwrap();
-    let app_config = AppConfig::test(genesis_path);
+    let app_config = ApplicationConfig::test(genesis_path);
 
     // Create peers.
     let mut peers = Vec::new();
@@ -133,13 +133,13 @@ async fn get_pools(
 }
 
 // Create a peer that is not in state.
-fn create_unknown_peer(app_config: AppConfig, address: SocketAddr) -> Peer {
+fn create_unknown_peer(app_config: ApplicationConfig, address: SocketAddr) -> Peer {
     let keystore = EphemeralKeystore::default();
     create_peer(app_config, keystore, address, false, None)
 }
 
 fn create_peer(
-    app_config: AppConfig,
+    app_config: ApplicationConfig,
     keystore: EphemeralKeystore<TestBinding>,
     address: SocketAddr,
     in_state: bool,

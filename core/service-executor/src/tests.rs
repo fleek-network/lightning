@@ -8,7 +8,7 @@ use fleek_crypto::{
     SecretKey,
 };
 use lightning_application::app::Application;
-use lightning_application::config::Config as AppConfig;
+use lightning_application::config::ApplicationConfig;
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_interfaces::prelude::*;
@@ -54,7 +54,7 @@ async fn init_service_executor(
                 .with::<Blockstore<TestBinding>>(BlockstoreConfig {
                     root: temp_dir.path().join("dummy_blockstore").try_into().unwrap(),
                 })
-                .with::<Application<TestBinding>>(AppConfig::test(genesis_path))
+                .with::<Application<TestBinding>>(ApplicationConfig::test(genesis_path))
                 .with::<ServiceExecutor<TestBinding>>(ServiceExecutorConfig {
                     services: [service_id].into_iter().collect(),
                     ipc_path: temp_dir.path().join("ipc").try_into().unwrap(),

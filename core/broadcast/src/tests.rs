@@ -3,7 +3,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use fleek_crypto::{AccountOwnerSecretKey, NodeSecretKey, NodeSignature, SecretKey};
 use lightning_application::app::Application;
-use lightning_application::config::Config as AppConfig;
+use lightning_application::config::ApplicationConfig;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::schema::broadcast::{Frame, Message};
 use lightning_interfaces::types::{Genesis, GenesisNode, NodePorts, Topic};
@@ -92,7 +92,12 @@ async fn get_broadcasts(temp_dir: &TempDir, port_offset: u16, num_peers: usize) 
         let address: SocketAddr = format!("0.0.0.0:{}", port_offset + i as u16)
             .parse()
             .unwrap();
-        let peer = create_peer(AppConfig::test(genesis_path.clone()), keystore, address).await;
+        let peer = create_peer(
+            ApplicationConfig::test(genesis_path.clone()),
+            keystore,
+            address,
+        )
+        .await;
         peers.push(peer);
     }
 
@@ -100,7 +105,7 @@ async fn get_broadcasts(temp_dir: &TempDir, port_offset: u16, num_peers: usize) 
 }
 
 async fn create_peer(
-    app_config: AppConfig,
+    app_config: ApplicationConfig,
     keystore: EphemeralKeystore<TestBinding>,
     address: SocketAddr,
 ) -> Peer {

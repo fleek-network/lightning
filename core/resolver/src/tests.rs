@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use fleek_crypto::{AccountOwnerSecretKey, SecretKey};
 use lightning_application::app::Application;
-use lightning_application::config::Config as AppConfig;
+use lightning_application::config::ApplicationConfig;
 use lightning_broadcast::Broadcast;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Genesis, GenesisNode, NodePorts};
@@ -70,7 +70,7 @@ async fn test_start_shutdown() {
         fdi::Provider::default()
             .with(
                 JsonConfigProvider::default()
-                    .with::<Application<TestBinding>>(AppConfig::test(genesis_path))
+                    .with::<Application<TestBinding>>(ApplicationConfig::test(genesis_path))
                     .with::<Resolver<TestBinding>>(Config {
                         store_path: temp_dir.path().join("store").clone().try_into().unwrap(),
                     }),

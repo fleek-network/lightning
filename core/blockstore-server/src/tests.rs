@@ -5,7 +5,7 @@ use std::time::Duration;
 use blake3_tree::ProofBuf;
 use fleek_crypto::{AccountOwnerSecretKey, NodePublicKey, SecretKey};
 use lightning_application::app::Application;
-use lightning_application::config::Config as AppConfig;
+use lightning_application::config::ApplicationConfig;
 use lightning_blockstore::blockstore::{Blockstore, BLOCK_SIZE};
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_indexer::Indexer;
@@ -120,7 +120,9 @@ async fn get_peers(
             lightning_interfaces::fdi::Provider::default()
                 .with(
                     JsonConfigProvider::default()
-                        .with::<Application<TestBinding>>(AppConfig::test(genesis_path.clone()))
+                        .with::<Application<TestBinding>>(ApplicationConfig::test(
+                            genesis_path.clone(),
+                        ))
                         .with::<PoolProvider<TestBinding>>(PoolConfig {
                             max_idle_timeout: Duration::from_secs(5),
                             address: format!("0.0.0.0:{}", port_offset + i as u16)
