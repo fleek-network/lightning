@@ -137,10 +137,10 @@ pub fn main() {
             .build()
             .expect("failed to build sdk runtime");
 
-        rt.spawn(async move {
+        rt.block_on(async move {
             fn_sdk::ipc::init_from_env();
             futures::future::pending::<()>().await
-        })
+        });
     });
 
     // Running the enclave
