@@ -1,18 +1,13 @@
 use std::path::PathBuf;
-use std::pin::Pin;
-use std::task::{Context, Poll};
 
-use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
-use futures::future::BoxFuture;
-use futures::TryFuture;
 use ipld_core::cid::multihash::Multihash;
 use ipld_core::cid::Cid;
 use ipld_dagpb::PbNode;
 use tokio_stream::{Stream, StreamExt as _};
 
 use crate::errors::IpldError;
-use crate::unixfs::Data;
+use crate::unixfs::{Data, DataType};
 
 /// A link to another IPLD node.
 #[derive(Clone, Debug)]
@@ -50,36 +45,38 @@ impl Link {
 /// this document. If `PathBuf` is empty, then this is the root document.
 #[derive(Clone, Debug)]
 pub struct DocId {
-    link: Link,
+    cid: Cid,
     path: PathBuf,
 }
 
 impl DocId {
-    pub fn new(link: Link, path: PathBuf) -> Self {
-        Self { link, path }
+    pub fn new(cid: Cid, path: PathBuf) -> Self {
+        Self { cid, path }
     }
 
     pub fn cid(&self) -> &Cid {
-        self.link.cid()
-    }
-
-    pub fn link(&self) -> &Link {
-        &self.link
+        &self.cid
     }
 
     pub fn path(&self) -> &PathBuf {
         &self.path
     }
 
-    pub fn from_link(link: &Link, parent: &Option<DirItem>) -> Self {
-        let mut path = parent
-            .as_ref()
-            .map(|dir| dir.id.path.clone())
-            .unwrap_or_default();
-        if let Some(n) = link.name.as_ref() {
-            path.push(n.clone())
-        }
-        Self::new(link.clone(), path)
+    //pub fn from_link(link: &Link, parent: &Option<DirItem>) -> Self {
+    //    let mut path = parent
+    //        .as_ref()
+    //        .map(|dir| dir.id.path.clone())
+    //        .unwrap_or_default();
+    //    if let Some(n) = link.name.as_ref() {
+    //        path.push(n.clone())
+    //    }
+    //    Self::new(link.clone(), path)
+    //}
+
+    fn merge(&mut self, previous_item: Option<&PathBuf>) {
+        let mut path = previous_item.cloned().unwrap_or_default();
+        path.push(self.path());
+        self.path = path;
     }
 }
 
@@ -185,26 +182,55 @@ impl IpldItem {
         matches!(self, Self::Dir(_))
     }
 
-    fn from_node(node: PbNode, data: Data) -> Self {
-        todo!()
+    fn from_result(
+        id: &mut DocId,
+        previous_path: Option<&PathBuf>,
+        node: &PbNode,
+        data: &Data,
+    ) -> Result<Self, IpldError> {
+        match data.Type {
+            DataType::Directory => {
+                id.merge(previous_path);
+                let links = node
+                    .links
+                    .iter()
+                    .map(|link| Link::new(link.cid, link.name.clone(), link.size.clone()))
+                    .collect();
+                Ok(Self::from_dir(id.clone(), links))
+            },
+            DataType::File => {
+                id.merge(previous_path);
+                let data = Bytes::copy_from_slice(&data.Data);
+                Ok(Self::to_chunk(id.clone(), data))
+            },
+            _ => Err(IpldError::UnsupportedUnixFsDataType(format!(
+                "{:?} - {:?}",
+                id, data.Type
+            ))),
+        }
+    }
+
+    fn to_chunk(id: DocId, data: Bytes) -> IpldItem {
+        Self::Chunk(ChunkItem { id, index: 0, data })
     }
 }
 
 impl From<IpldItem> for Cid {
     fn from(item: IpldItem) -> Self {
         match item {
-            IpldItem::Dir(dir) => dir.id.link.cid,
-            IpldItem::File(file) => file.id.link.cid,
-            IpldItem::Chunk(chunk) => chunk.id.link.cid,
+            IpldItem::Dir(dir) => dir.id.cid,
+            IpldItem::File(file) => file.id.cid,
+            IpldItem::Chunk(chunk) => chunk.id.cid,
             IpldItem::Done(cid) => cid,
         }
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct IpldStream {
     hasher: Multihash<32>,
     buffer: BytesMut,
-    last_item: Option<IpldItem>,
+    last_id: Option<DocId>,
 }
 
 impl Default for IpldStream {
@@ -218,41 +244,64 @@ impl IpldStream {
         Self {
             hasher,
             buffer,
-            last_item: None,
+            last_id: None,
         }
     }
 
-    pub async fn from_stream(
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self::new(Multihash::default(), BytesMut::with_capacity(capacity))
+    }
+
+    pub async fn next_from_stream<D: Into<DocId>>(
         &mut self,
+        id: D,
         stream: impl Stream<Item = Result<Bytes, reqwest::Error>> + Unpin,
-    ) -> Result<(), IpldError> {
+    ) -> Result<IpldItem, IpldError> {
         let mut stream = stream;
         while let Some(chunk) = stream.next().await {
             let chunk = chunk?;
             self.buffer.extend_from_slice(&chunk);
         }
-        Ok(())
+        let doc_id = id.into();
+        let item = self.next(&doc_id).await?;
+        self.buffer.clear();
+        self.last_id = Some(doc_id);
+        Ok(item)
     }
 
-    pub async fn next(&mut self) -> Result<Option<IpldItem>, IpldError> {
+    async fn next(&mut self, id: &DocId) -> Result<IpldItem, IpldError> {
         if self.buffer.is_empty() {
-            return Ok(None);
+            return Err(IpldError::StreamBufferEmpty);
         }
+        let mut id = id.clone();
         let bytes = self.buffer.clone().freeze();
         let node = PbNode::from_bytes(bytes)?;
         let data = Data::try_from(&node.data)?;
-        let item = IpldItem::from_node(node.clone(), data);
-        self.buffer.clear();
-        self.last_item = Some(item);
-        Ok(self.last_item.clone())
+        IpldItem::from_result(&mut id, None, &node, &data)
     }
 }
 
 pub async fn download() {
-    let req = reqwest::get("https://example.com").await.unwrap();
+    let cid: Cid = "QmSnuWmxptJZdLJpKRarxBMS2Ju2oANVrgbr2xWbie9b2D"
+        .try_into()
+        .unwrap(); // all
+    let req = reqwest::get(format!("https://ipfs.io/ipfs/{}?format=raw", cid))
+        .await
+        .unwrap();
     let stream = req.bytes_stream();
-    let mut ilpd_stream = IpldStream::default();
-    ilpd_stream.from_stream(stream).await.unwrap();
+    let mut ilpd_stream = IpldStream::with_capacity(1024 * 16);
+    let item = ilpd_stream.next_from_stream(cid, stream).await.unwrap();
+    println!("{:?}", item);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_download() {
+        download().await;
+    }
 }
 
 ///// A trait for processing IPLD data.

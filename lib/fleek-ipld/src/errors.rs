@@ -27,9 +27,15 @@ pub enum IpldError {
     #[error("IPLD error: Error IPFS URL {0}")]
     IpfsUrlError(#[from] url::ParseError),
 
+    #[error("IPLD error: Error processing UnixFS {0}")]
+    UnsupportedUnixFsDataType(String),
+
     #[error("IPLD error: Error traversing stream {0}")]
     TraverseError(String),
 
     #[error("IPLD error: Missing link")]
     MissingLink,
+
+    #[error("IPLD error: Stream buffer empty")]
+    StreamBufferEmpty,
 }
