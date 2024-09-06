@@ -1,3 +1,4 @@
+use ipld_core::cid::multihash;
 use thiserror::Error;
 
 /// Error type for IPLD operations
@@ -38,4 +39,10 @@ pub enum IpldError {
 
     #[error("IPLD error: Stream buffer empty")]
     StreamBufferEmpty,
+
+    #[error("IPLD error: Error validating cid {0}")]
+    IpldMultihashError(#[from] multihash::Error),
+
+    #[error("IPLD error: Error validating hash")]
+    IpldHashError,
 }

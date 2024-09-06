@@ -1,13 +1,14 @@
 use std::path::PathBuf;
 
 use bytes::{Bytes, BytesMut};
-use ipld_core::cid::multihash::Multihash;
 use ipld_core::cid::Cid;
 use ipld_dagpb::PbNode;
 use tokio_stream::{Stream, StreamExt as _};
 
 use crate::errors::IpldError;
 use crate::unixfs::{Data, DataType};
+
+const DEFAULT_BUFFER_SIZE: usize = 1024 * 16;
 
 /// A link to another IPLD node.
 #[derive(Clone, Debug)]
@@ -82,7 +83,7 @@ impl DocId {
 
 impl From<Cid> for DocId {
     fn from(cid: Cid) -> Self {
-        Self::new(cid.into(), PathBuf::new())
+        Self::new(cid, PathBuf::new())
     }
 }
 
@@ -228,28 +229,26 @@ impl From<IpldItem> for Cid {
 
 #[derive(Debug, Clone)]
 pub struct IpldStream {
-    hasher: Multihash<32>,
     buffer: BytesMut,
     last_id: Option<DocId>,
 }
 
 impl Default for IpldStream {
     fn default() -> Self {
-        Self::new(Multihash::default(), BytesMut::new())
+        Self::with_capacity(DEFAULT_BUFFER_SIZE)
     }
 }
 
 impl IpldStream {
-    pub fn new(hasher: Multihash<32>, buffer: BytesMut) -> Self {
+    pub fn new(buffer: BytesMut) -> Self {
         Self {
-            hasher,
             buffer,
             last_id: None,
         }
     }
 
     pub fn with_capacity(capacity: usize) -> Self {
-        Self::new(Multihash::default(), BytesMut::with_capacity(capacity))
+        Self::new(BytesMut::with_capacity(capacity))
     }
 
     pub async fn next_from_stream<D: Into<DocId>>(
