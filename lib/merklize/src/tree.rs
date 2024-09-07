@@ -35,6 +35,12 @@ pub trait StateTree {
         builder: AtomoBuilder<C, Self::Serde>,
     ) -> AtomoBuilder<C, Self::Serde>;
 
+    /// Returns the tables that are part of the state tree.
+    ///
+    /// This is used to exclude the state tree tables from the state serialization used for existing
+    /// state checkpoints.
+    fn state_tree_tables() -> Vec<String>;
+
     /// Returns the root hash of the state tree.
     fn get_state_root(
         ctx: &TableSelector<Self::Storage, Self::Serde>,

@@ -82,6 +82,12 @@ where
             .with_table::<NodeKey, Node>(NODES_TABLE_NAME)
             .with_table::<KeyHash, StateKey>(KEYS_TABLE_NAME)
     }
+
+    /// Returns the tables that are part of the state tree.
+    fn state_tree_tables() -> Vec<String> {
+        vec![NODES_TABLE_NAME.to_string(), KEYS_TABLE_NAME.to_string()]
+    }
+
     /// Get the state root hash of the state tree.
     /// Since we need to read the state, a table selector execution context is needed for
     /// consistency.
