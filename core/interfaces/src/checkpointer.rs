@@ -1,7 +1,7 @@
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 use fdi::BuildGraph;
-use lightning_types::{AggregateCheckpointHeader, CheckpointHeader, Epoch};
+use lightning_types::{AggregateCheckpointHeader, CheckpointHeader, Epoch, NodeIndex};
 use ready::empty::EmptyReadyState;
 use ready::ReadyWaiterState;
 
@@ -38,7 +38,7 @@ pub trait CheckpointerInterface<C: Collection>: BuildGraph + ConfigConsumer + Se
 #[interfaces_proc::blank]
 pub trait CheckpointerQueryInterface: Clone + Send + Sync + 'static {
     /// Get the set of checkpoint headers for the given epoch.
-    fn get_checkpoint_headers(&self, epoch: Epoch) -> HashSet<CheckpointHeader>;
+    fn get_checkpoint_headers(&self, epoch: Epoch) -> HashMap<NodeIndex, CheckpointHeader>;
 
     /// Get the aggregate checkpoint header for the given epoch.
     fn get_aggregate_checkpoint_header(&self, epoch: Epoch) -> Option<AggregateCheckpointHeader>;

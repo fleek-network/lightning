@@ -1,5 +1,6 @@
 use bit_set::BitSet;
 use fleek_crypto::{ConsensusAggregateSignature, ConsensusSignature};
+use merklize::StateRootHash;
 use serde::{Deserialize, Serialize};
 
 use crate::{Epoch, NodeIndex};
@@ -10,8 +11,8 @@ use crate::{Epoch, NodeIndex};
 pub struct CheckpointHeader {
     pub epoch: Epoch,
     pub node_id: NodeIndex,
-    pub previous_state_root: [u8; 32],
-    pub next_state_root: [u8; 32],
+    pub previous_state_root: StateRootHash,
+    pub next_state_root: StateRootHash,
     pub serialized_state_digest: [u8; 32],
     pub signature: ConsensusSignature,
 }
@@ -22,8 +23,7 @@ pub struct CheckpointHeader {
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AggregateCheckpointHeader {
     pub epoch: Epoch,
-    pub previous_state_root: [u8; 32],
-    pub next_state_root: [u8; 32],
+    pub state_root: StateRootHash,
     pub signature: ConsensusAggregateSignature,
     pub nodes: BitSet,
 }

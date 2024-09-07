@@ -1,6 +1,6 @@
-use std::collections::HashSet;
+use std::collections::HashMap;
 
-use lightning_interfaces::types::{AggregateCheckpointHeader, CheckpointHeader, Epoch};
+use lightning_interfaces::types::{AggregateCheckpointHeader, CheckpointHeader, Epoch, NodeIndex};
 use lightning_interfaces::CheckpointerQueryInterface;
 
 use crate::database::CheckpointerDatabaseQuery;
@@ -18,7 +18,7 @@ impl CheckpointerQuery {
 }
 
 impl CheckpointerQueryInterface for CheckpointerQuery {
-    fn get_checkpoint_headers(&self, epoch: Epoch) -> HashSet<CheckpointHeader> {
+    fn get_checkpoint_headers(&self, epoch: Epoch) -> HashMap<NodeIndex, CheckpointHeader> {
         self.db.get_checkpoint_headers(epoch)
     }
 

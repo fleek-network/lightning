@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use lightning_application::{Application, ApplicationConfig};
+use lightning_broadcast::Broadcast;
 use lightning_interfaces::prelude::*;
 use lightning_notifier::Notifier;
 use lightning_pool::{Config as PoolConfig, PoolProvider};
@@ -47,11 +48,16 @@ impl TestNodeBuilder {
 
         node.start().await;
 
+        let shutdown = node
+            .shutdown_waiter()
+            .expect("node missing shutdown waiter");
+
         // Wait for pool to be ready before building genesis.
         let before_genesis_ready = TokioReadyWaiter::new();
         {
             let pool = node.provider.get::<PoolProvider<TestNodeComponents>>();
             let before_genesis_ready = before_genesis_ready.clone();
+            let shutdown = shutdown.clone();
             spawn!(
                 async move {
                     // Wait for pool to be ready.
@@ -63,7 +69,8 @@ impl TestNodeBuilder {
                     // Notify that we are ready.
                     before_genesis_ready.notify(state);
                 },
-                "TEST-NODE before genesis ready watcher"
+                "TEST-NODE before genesis ready watcher",
+                crucial(shutdown)
             );
         }
 
@@ -72,6 +79,7 @@ impl TestNodeBuilder {
         {
             let checkpointer = node.provider.get::<Checkpointer<TestNodeComponents>>();
             let after_genesis_ready = after_genesis_ready.clone();
+            let shutdown = shutdown.clone();
             spawn!(
                 async move {
                     // Wait for checkpointer to be ready.
@@ -80,7 +88,8 @@ impl TestNodeBuilder {
                     // Notify that we are ready.
                     after_genesis_ready.notify(());
                 },
-                "TEST-NODE after genesis ready watcher"
+                "TEST-NODE after genesis ready watcher",
+                crucial(shutdown)
             );
         }
 
@@ -89,6 +98,9 @@ impl TestNodeBuilder {
             checkpointer: node.provider.get::<Checkpointer<TestNodeComponents>>(),
             keystore: node.provider.get::<EphemeralKeystore<TestNodeComponents>>(),
             notifier: node.provider.get::<Notifier<TestNodeComponents>>(),
+            pool: node.provider.get::<PoolProvider<TestNodeComponents>>(),
+            broadcast: node.provider.get::<Broadcast<TestNodeComponents>>(),
+
             inner: node,
             before_genesis_ready,
             after_genesis_ready,

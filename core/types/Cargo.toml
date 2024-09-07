@@ -14,6 +14,7 @@ serde.workspace = true
 ink-quill.workspace = true
 fleek-crypto.workspace = true
 hp-fixed.workspace = true
+merklize.workspace = true
 multiaddr = "0.17.1"
 num-bigint = { workspace = true, features = ["serde"] }
 num-traits.workspace = true

@@ -14,6 +14,7 @@
 //! checkpoint for the epoch. The aggregate checkpoint contains a state root that can be used by
 //! clients to verify the blockchain state using merkle proofs.
 
+mod aggregate_builder;
 mod attestation_listener;
 mod checkpointer;
 mod config;

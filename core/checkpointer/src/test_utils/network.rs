@@ -1,15 +1,31 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::time::Duration;
 
 use anyhow::Result;
 use atomo::{DefaultSerdeBackend, SerdeBackend};
 use fleek_crypto::{ConsensusSignature, PublicKey};
 use futures::future::join_all;
-use lightning_interfaces::types::{AggregateCheckpointHeader, CheckpointHeader, Epoch, NodeIndex};
-use lightning_interfaces::{CheckpointerInterface, CheckpointerQueryInterface, KeystoreInterface};
+use lightning_interfaces::types::{
+    AggregateCheckpointHeader,
+    CheckpointHeader,
+    Epoch,
+    NodeIndex,
+    Topic,
+};
+use lightning_interfaces::{
+    BroadcastInterface,
+    CheckpointerInterface,
+    CheckpointerQueryInterface,
+    Emitter,
+    KeystoreInterface,
+    NotifierInterface,
+    PubSub,
+};
+use merklize::StateRootHash;
 use tempfile::TempDir;
 
-use super::{wait_until, TestNode};
+use super::{wait_until, TestNode, WaitUntilError};
+use crate::message::CheckpointBroadcastMessage;
 
 /// A network of test nodes.
 ///
@@ -44,18 +60,88 @@ impl TestNetwork {
         join_all(self.node_by_id.values_mut().map(|node| node.shutdown())).await;
     }
 
+    /// Emit an epoch changed notification to all nodes.
+    pub async fn notify_epoch_changed(
+        &self,
+        epoch: Epoch,
+        previous_state_root: StateRootHash,
+        new_state_root: StateRootHash,
+        last_epoch_hash: [u8; 32],
+    ) {
+        for node in self.nodes() {
+            self.notify_node_epoch_changed(
+                node.get_id().unwrap(),
+                epoch,
+                last_epoch_hash,
+                previous_state_root,
+                new_state_root,
+            )
+            .await;
+        }
+    }
+
+    /// Emit an epoch change notification to a specific node.
+    pub async fn notify_node_epoch_changed(
+        &self,
+        node_id: NodeIndex,
+        epoch: Epoch,
+        last_epoch_hash: [u8; 32],
+        previous_state_root: StateRootHash,
+        new_state_root: StateRootHash,
+    ) {
+        self.node(node_id)
+            .expect("node not found")
+            .notifier
+            .get_emitter()
+            .epoch_changed(epoch, last_epoch_hash, previous_state_root, new_state_root);
+    }
+
+    /// Send a checkpoint attestation to a specific node via their broadcaster pubsub.
+    pub async fn broadcast_checkpoint_header_via_node(
+        &self,
+        node_id: NodeIndex,
+        header: CheckpointHeader,
+    ) -> Result<()> {
+        self.node(node_id)
+            .expect("node not found")
+            .broadcast
+            .get_pubsub::<CheckpointBroadcastMessage>(Topic::Checkpoint)
+            .send(&CheckpointBroadcastMessage::CheckpointHeader(header), None)
+            .await
+            .map_err(|e| anyhow::anyhow!(e))?;
+
+        Ok(())
+    }
+
     /// Wait for the checkpoint headers to be received and stored by the checkpointer, and matching
     /// the given condition function.
-    pub fn wait_for_checkpoint_headers<F>(
+    pub async fn wait_for_checkpoint_headers<F>(
         &self,
         epoch: Epoch,
         condition: F,
-    ) -> HashMap<NodeIndex, HashSet<CheckpointHeader>>
+    ) -> Result<HashMap<NodeIndex, HashMap<NodeIndex, CheckpointHeader>>, WaitUntilError>
     where
-        F: Fn(&HashMap<NodeIndex, HashSet<CheckpointHeader>>) -> bool,
+        F: Fn(&HashMap<NodeIndex, HashMap<NodeIndex, CheckpointHeader>>) -> bool,
     {
+        const TIMEOUT: Duration = Duration::from_secs(10);
+
+        self.wait_for_checkpoint_headers_with_timeout(epoch, condition, TIMEOUT)
+            .await
+    }
+
+    pub async fn wait_for_checkpoint_headers_with_timeout<F>(
+        &self,
+        epoch: Epoch,
+        condition: F,
+        timeout: Duration,
+    ) -> Result<HashMap<NodeIndex, HashMap<NodeIndex, CheckpointHeader>>, WaitUntilError>
+    where
+        F: Fn(&HashMap<NodeIndex, HashMap<NodeIndex, CheckpointHeader>>) -> bool,
+    {
+        const DELAY: Duration = Duration::from_millis(100);
+
         wait_until(
-            || {
+            || async {
                 let headers_by_node = self
                     .node_by_id
                     .iter()
@@ -67,16 +153,16 @@ impl TestNetwork {
                     })
                     .collect::<HashMap<_, _>>();
 
-                if !condition(&headers_by_node) {
-                    return None;
+                if condition(&headers_by_node) {
+                    Some(headers_by_node)
+                } else {
+                    None
                 }
-
-                Some(headers_by_node)
             },
-            Duration::from_secs(2),
-            Duration::from_millis(100),
+            timeout,
+            DELAY,
         )
-        .unwrap()
+        .await
     }
 
     /// Verify the signature of a checkpoint header.
@@ -89,21 +175,38 @@ impl TestNetwork {
                 ..header.clone()
             })
             .as_slice(),
-        ))
+        )?)
     }
 
     /// Wait for the aggregate checkpoint header to be received and stored by the checkpointer, and
     /// matching the given condition function.
-    pub fn wait_for_aggregate_checkpoint_header<F>(
+    pub async fn wait_for_aggregate_checkpoint_header<F>(
         &self,
         epoch: Epoch,
         condition: F,
-    ) -> HashMap<NodeIndex, AggregateCheckpointHeader>
+    ) -> Result<HashMap<NodeIndex, AggregateCheckpointHeader>, WaitUntilError>
     where
         F: Fn(&HashMap<NodeIndex, Option<AggregateCheckpointHeader>>) -> bool,
     {
+        const TIMEOUT: Duration = Duration::from_secs(10);
+
+        self.wait_for_aggregate_checkpoint_header_with_timeout(epoch, condition, TIMEOUT)
+            .await
+    }
+
+    pub async fn wait_for_aggregate_checkpoint_header_with_timeout<F>(
+        &self,
+        epoch: Epoch,
+        condition: F,
+        timeout: Duration,
+    ) -> Result<HashMap<NodeIndex, AggregateCheckpointHeader>, WaitUntilError>
+    where
+        F: Fn(&HashMap<NodeIndex, Option<AggregateCheckpointHeader>>) -> bool,
+    {
+        const DELAY: Duration = Duration::from_millis(100);
+
         wait_until(
-            || {
+            || async {
                 let header_by_node = self
                     .node_by_id
                     .iter()
@@ -115,21 +218,21 @@ impl TestNetwork {
                     })
                     .collect::<HashMap<_, _>>();
 
-                if !condition(&header_by_node) {
-                    return None;
+                if condition(&header_by_node) {
+                    Some(
+                        header_by_node
+                            .into_iter()
+                            .map(|(node_id, header)| (node_id, header.unwrap()))
+                            .collect::<HashMap<_, _>>(),
+                    )
+                } else {
+                    None
                 }
-
-                Some(
-                    header_by_node
-                        .into_iter()
-                        .map(|(node_id, header)| (node_id, header.unwrap()))
-                        .collect::<HashMap<_, _>>(),
-                )
             },
-            Duration::from_secs(2),
-            Duration::from_millis(100),
+            timeout,
+            DELAY,
         )
-        .unwrap()
+        .await
     }
 
     /// Verify the signature of an aggregate checkpoint header.
@@ -137,7 +240,7 @@ impl TestNetwork {
         &self,
         agg_header: AggregateCheckpointHeader,
         node_id: NodeIndex,
-        headers_by_node: HashMap<NodeIndex, HashSet<CheckpointHeader>>,
+        headers_by_node: HashMap<NodeIndex, HashMap<NodeIndex, CheckpointHeader>>,
     ) -> Result<bool> {
         // Get public keys of all nodes in the aggregate header.
         let mut pks = agg_header
@@ -155,7 +258,7 @@ impl TestNetwork {
 
         // Get checkpoint header attestations for each node from the database.
         let mut attestations = headers_by_node[&node_id]
-            .iter()
+            .values()
             .filter(|h| agg_header.nodes.contains(h.node_id as usize))
             .collect::<Vec<_>>();
         attestations.sort_by_key(|header| header.node_id);

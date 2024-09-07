@@ -119,7 +119,7 @@ impl<B: BroadcastBackend> Context<B> {
             return;
         };
 
-        debug!("recivied frame '{frame:?}' from {sender}");
+        debug!("received frame '{frame:?}' from {sender}");
 
         match frame {
             Frame::Advr(advr) => {

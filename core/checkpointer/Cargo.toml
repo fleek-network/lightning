@@ -13,6 +13,7 @@ fleek-crypto.workspace = true
 lightning-interfaces.workspace = true
 lightning-utils.workspace = true
 lightning-workspace-hack.workspace = true
+merklize.workspace = true
 ready.workspace = true
 resolved-pathbuf.workspace = true
 serde.workspace = true
@@ -22,6 +23,7 @@ tracing.workspace = true
 
 
 [dev-dependencies]
+console-subscriber.workspace = true
 futures.workspace = true
 hp-fixed.workspace = true
 lightning-application.workspace = true

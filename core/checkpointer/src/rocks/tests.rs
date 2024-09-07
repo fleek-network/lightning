@@ -1,8 +1,8 @@
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 use bit_set::BitSet;
 use fleek_crypto::{ConsensusAggregateSignature, ConsensusSignature};
-use lightning_interfaces::types::{AggregateCheckpointHeader, CheckpointHeader, Epoch, NodeIndex};
+use lightning_interfaces::types::{AggregateCheckpointHeader, CheckpointHeader, Epoch};
 use rand::Rng;
 use tempfile::tempdir;
 
@@ -20,30 +20,36 @@ fn test_add_and_get_checkpoint_headers() {
 
     // Check that the database is empty.
     let headers = query.get_checkpoint_headers(0);
-    assert_eq!(headers, HashSet::new());
+    assert_eq!(headers, HashMap::new());
 
     // Add some headers and check that they're retrievable.
     let epoch0_headers = (0..10)
-        .map(|_| random_checkpoint_header(0))
-        .collect::<HashSet<_>>();
-    for header in epoch0_headers.clone() {
-        db.add_checkpoint_header(0, header.clone());
+        .map(|_| {
+            let header = random_checkpoint_header(0);
+            (header.node_id, header)
+        })
+        .collect::<HashMap<_, _>>();
+    for header in epoch0_headers.values() {
+        db.set_node_checkpoint_header(0, header.clone());
     }
     assert_eq!(query.get_checkpoint_headers(0), epoch0_headers);
 
     // Add the same headers and check that it doesn't duplicate.
-    for header in epoch0_headers.clone() {
-        db.add_checkpoint_header(0, header.clone());
+    for header in epoch0_headers.values() {
+        db.set_node_checkpoint_header(0, header.clone());
     }
     assert_eq!(query.get_checkpoint_headers(0), epoch0_headers);
 
     // Add headers for a different epoch and check that it doesn't affect the previous epoch.
-    assert_eq!(query.get_checkpoint_headers(1), HashSet::new());
+    assert_eq!(query.get_checkpoint_headers(1), HashMap::new());
     let epoch1_headers = (0..10)
-        .map(|_| random_checkpoint_header(0))
-        .collect::<HashSet<_>>();
-    for header in epoch1_headers.clone() {
-        db.add_checkpoint_header(1, header.clone());
+        .map(|_| {
+            let header = random_checkpoint_header(1);
+            (header.node_id, header)
+        })
+        .collect::<HashMap<_, _>>();
+    for header in epoch1_headers.values() {
+        db.set_node_checkpoint_header(1, header.clone());
     }
     assert_eq!(query.get_checkpoint_headers(0), epoch0_headers);
     assert_eq!(query.get_checkpoint_headers(1), epoch1_headers);
@@ -101,9 +107,9 @@ fn random_checkpoint_header(epoch: Epoch) -> CheckpointHeader {
 
     CheckpointHeader {
         epoch,
-        node_id: NodeIndex::from(rng.gen::<u32>()),
-        previous_state_root: rng.gen::<[u8; 32]>(),
-        next_state_root: rng.gen::<[u8; 32]>(),
+        node_id: rng.gen(),
+        previous_state_root: rng.gen::<[u8; 32]>().into(),
+        next_state_root: rng.gen::<[u8; 32]>().into(),
         serialized_state_digest: rng.gen::<[u8; 32]>(),
         signature: ConsensusSignature({
             let mut sig = [0u8; 48];
@@ -120,8 +126,7 @@ fn random_aggregate_checkpoint_header(epoch: Epoch) -> AggregateCheckpointHeader
 
     AggregateCheckpointHeader {
         epoch,
-        previous_state_root: rng.gen::<[u8; 32]>(),
-        next_state_root: rng.gen::<[u8; 32]>(),
+        state_root: rng.gen::<[u8; 32]>().into(),
         signature: ConsensusAggregateSignature({
             let mut sig = [0u8; 48];
             for item in &mut sig {
