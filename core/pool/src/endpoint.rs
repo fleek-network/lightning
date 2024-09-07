@@ -142,6 +142,8 @@ where
                         connection = connect() => connection,
                     };
 
+                    tracing::info!("connection with {index} is established");
+
                     match connection {
                         Ok(conn) => AsyncTaskResult::ConnectionSuccess {
                             incoming: false,

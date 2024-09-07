@@ -4,7 +4,7 @@ use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::Poll;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use bytes::Bytes;
 use futures::{SinkExt, Stream};
 use lightning_interfaces::prelude::*;
@@ -209,6 +209,19 @@ impl<C: Collection> PoolInterface<C> for PoolProvider<C, QuinnMuxer> {
             return None;
         }
         self.ready.state().and_then(|state| state.listen_address)
+    }
+
+    /// Returns the list of connected peers.
+    async fn connected_peers(&self) -> Result<Vec<NodeIndex>> {
+        let (tx, rx) = oneshot::channel();
+
+        self.endpoint_task_queue
+            .send(EndpointTask::Stats { respond: tx })
+            .await
+            .context("failed to send stats request to endpoint")?;
+        let stats = rx.await.context("failed to get stats from endpoint")?;
+
+        Ok(stats.connections.keys().cloned().collect())
     }
 }
 

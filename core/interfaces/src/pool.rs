@@ -1,7 +1,7 @@
 use std::io;
 use std::net::SocketAddr;
 
-use anyhow::{bail, Error};
+use anyhow::{bail, Error, Result};
 use bytes::Bytes;
 use fdi::BuildGraph;
 use lightning_types::NodeIndex;
@@ -62,6 +62,9 @@ pub trait PoolInterface<C: Collection>: BuildGraph + Send + Sync + Sized + 'stat
     /// the pool is not bound to a specific address (i.e. `0.0.0.0:0` or `[::]:0`),
     /// in which case the OS will assign a random available port.
     fn listen_address(&self) -> Option<SocketAddr>;
+
+    /// Returns the list of connected peers.
+    async fn connected_peers(&self) -> Result<Vec<NodeIndex>>;
 }
 
 #[interfaces_proc::blank]
