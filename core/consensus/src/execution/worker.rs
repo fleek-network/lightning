@@ -337,8 +337,8 @@ async fn submit_batch<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
     );
 
     let change_epoch = response.change_epoch;
-    let previous_state_root = response.previous_state_root;
-    let new_state_root = response.new_state_root;
+    let previous_state_root = response.previous_state_root.into();
+    let new_state_root = response.new_state_root.into();
     ctx.notifier.new_block(archive_block, response);
 
     if change_epoch {

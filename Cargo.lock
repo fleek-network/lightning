@@ -2403,22 +2403,22 @@ dependencies = [
 
 [[package]]
 name = "console-api"
-version = "0.6.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd326812b3fd01da5bb1af7d340d0d555fd3d4b641e7f1dfcf5962a902952787"
+checksum = "86ed14aa9c9f927213c6e4f3ef75faaad3406134efe84ba2cb7983431d5f0931"
 dependencies = [
  "futures-core",
- "prost 0.12.6",
- "prost-types 0.12.6",
- "tonic 0.10.2",
+ "prost 0.13.1",
+ "prost-types 0.13.1",
+ "tonic 0.12.1",
  "tracing-core",
 ]
 
 [[package]]
 name = "console-subscriber"
-version = "0.2.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7481d4c57092cd1c19dd541b92bdce883de840df30aa5d03fd48a3935c01842e"
+checksum = "e2e3a111a37f3333946ebf9da370ba5c5577b18eb342ec683eb488dd21980302"
 dependencies = [
  "console-api",
  "crossbeam-channel",
@@ -2426,13 +2426,15 @@ dependencies = [
  "futures-task",
  "hdrhistogram",
  "humantime",
- "prost-types 0.12.6",
+ "hyper-util",
+ "prost 0.13.1",
+ "prost-types 0.13.1",
  "serde",
  "serde_json",
  "thread_local",
  "tokio",
  "tokio-stream",
- "tonic 0.10.2",
+ "tonic 0.12.1",
  "tracing",
  "tracing-core",
  "tracing-subscriber",
@@ -6917,6 +6919,7 @@ dependencies = [
  "atomo",
  "atomo-rocks",
  "bit-set 0.8.0",
+ "console-subscriber",
  "fleek-crypto",
  "futures",
  "hp-fixed",
@@ -6936,6 +6939,7 @@ dependencies = [
  "lightning-topology",
  "lightning-utils",
  "lightning-workspace-hack",
+ "merklize",
  "pretty_assertions",
  "rand 0.8.5",
  "ready",
@@ -7424,6 +7428,7 @@ dependencies = [
  "lightning-interfaces",
  "lightning-utils",
  "lightning-workspace-hack",
+ "merklize",
  "tokio",
 ]
 
@@ -7999,6 +8004,7 @@ dependencies = [
  "hp-fixed",
  "ink-quill",
  "lightning-workspace-hack",
+ "merklize",
  "multiaddr",
  "num-bigint",
  "num-derive 0.4.2",
@@ -8149,7 +8155,7 @@ dependencies = [
  "proc-macro2 1.0.86",
  "prost 0.11.9",
  "prost 0.12.6",
- "prost-types 0.12.6",
+ "prost 0.13.1",
  "protobuf",
  "quinn",
  "quinn-proto",
@@ -8200,6 +8206,7 @@ dependencies = [
  "tokio-util 0.7.11",
  "toml_datetime",
  "toml_edit 0.20.2",
+ "tonic 0.12.1",
  "tower",
  "tower-http 0.3.5",
  "tower-http 0.5.2",
@@ -11245,6 +11252,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9091c90b0a32608e984ff2fa4091273cbdd755d54935c51d520887f4a1dbd5b0"
 dependencies = [
  "prost 0.12.6",
+]
+
+[[package]]
+name = "prost-types"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cee5168b05f49d4b0ca581206eb14a7b22fafd963efe729ac48eb03266e25cc2"
+dependencies = [
+ "prost 0.13.1",
 ]
 
 [[package]]
@@ -14452,33 +14468,6 @@ dependencies = [
  "percent-encoding",
  "pin-project",
  "prost 0.11.9",
- "tokio",
- "tokio-stream",
- "tower",
- "tower-layer",
- "tower-service",
- "tracing",
-]
-
-[[package]]
-name = "tonic"
-version = "0.10.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d560933a0de61cf715926b9cac824d4c883c2c43142f787595e48280c40a1d0e"
-dependencies = [
- "async-stream",
- "async-trait",
- "axum 0.6.20",
- "base64 0.21.7",
- "bytes",
- "h2 0.3.26",
- "http 0.2.12",
- "http-body 0.4.6",
- "hyper 0.14.30",
- "hyper-timeout 0.4.1",
- "percent-encoding",
- "pin-project",
- "prost 0.12.6",
  "tokio",
  "tokio-stream",
  "tower",

@@ -1,10 +1,12 @@
+use std::time::Duration;
+
 use anyhow::Result;
 use futures::future::join_all;
-use lightning_interfaces::ApplicationInterface;
+use lightning_interfaces::{ApplicationInterface, PoolInterface};
 use ready::ReadyWaiter;
 use tempfile::tempdir;
 
-use super::{TestGenesisBuilder, TestNetwork, TestNodeBuilder};
+use super::{wait_until, TestGenesisBuilder, TestNetwork, TestNode, TestNodeBuilder};
 
 pub struct TestNetworkBuilder {
     pub num_nodes: u32,
@@ -58,10 +60,42 @@ impl TestNetworkBuilder {
         )
         .await;
 
+        // Wait for the pool to establish all of the node connections.
+        self.wait_for_connected_peers(&nodes).await?;
+
         // Wait for ready after genesis.
         join_all(nodes.iter_mut().map(|node| node.after_genesis_ready.wait())).await;
 
         let network = TestNetwork::new(temp_dir, nodes).await?;
         Ok(network)
+    }
+
+    pub async fn wait_for_connected_peers(&self, nodes: &[TestNode]) -> Result<()> {
+        wait_until(
+            || async {
+                let peers_by_node = join_all(nodes.iter().map(|node| node.pool.connected_peers()))
+                    .await
+                    .into_iter()
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|e| {
+                        tracing::error!("error getting node connected peers: {}", e);
+                        e
+                    })
+                    .ok()?;
+
+                if !(peers_by_node
+                    .iter()
+                    .all(|peers| peers.len() == nodes.len() - 1))
+                {
+                    None
+                } else {
+                    Some(())
+                }
+            },
+            Duration::from_secs(3),
+            Duration::from_millis(200),
+        )
+        .await
+        .map_err(From::from)
     }
 }

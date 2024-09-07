@@ -81,7 +81,7 @@ impl<C: Collection> Node<C> {
     }
 
     pub fn shutdown_waiter(&self) -> Option<ShutdownWaiter> {
-        self.shutdown.as_ref().map(|shutdown| shutdown.waiter())
+        self.shutdown.as_ref().map(|s| s.waiter())
     }
 
     /// Shutdown the node

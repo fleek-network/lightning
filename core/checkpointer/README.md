@@ -74,28 +74,3 @@ sequenceDiagram
         end
     end
 ```
-
-```mermaid
-flowchart LR
-    K[Keystore]
-    N[Notifier]
-    B[Broadcaster]
-    AQ[Application Query]
-    subgraph Checkpointer
-        EL[Epoch Listener]
-        AL[Attestation Listener]
-        DB[Database]
-    end
-
-    N -- notify epoch changed --> EL
-    K -- bls signer key --> EL
-    EL -- save attestation --> DB
-    EL -- broadcast attestation --> B
-
-    B -- consume attestation --> AL
-    AQ -- node keys --> AL
-    AL -- validate attestation --> AL
-    DB -- epoch attestations --> AL
-    AL -- aggregate signatures --> DB
-    AL -- save aggregate checkpoint --> DB
-```

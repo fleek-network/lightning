@@ -12,6 +12,7 @@ tokio.workspace = true
 anyhow.workspace = true
 futures.workspace = true
 lightning-workspace-hack.workspace = true
+merklize.workspace = true
 
 [dev-dependencies]
 lightning-application = { path = "../application", features = ["test"] }

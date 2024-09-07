@@ -1,6 +1,6 @@
-use std::collections::HashSet;
+use std::collections::HashMap;
 
-use lightning_interfaces::types::{AggregateCheckpointHeader, CheckpointHeader, Epoch};
+use lightning_interfaces::types::{AggregateCheckpointHeader, CheckpointHeader, Epoch, NodeIndex};
 
 use crate::config::CheckpointerDatabaseConfig;
 
@@ -22,8 +22,8 @@ pub trait CheckpointerDatabase: Clone + Send + Sync {
     /// Get the query instance for this database.
     fn query(&self) -> Self::Query;
 
-    /// Add a checkpoint header to the set of headers for the given epoch.
-    fn add_checkpoint_header(&self, epoch: Epoch, header: CheckpointHeader);
+    /// Set the checkpoint header for the given epoch and node.
+    fn set_node_checkpoint_header(&self, epoch: Epoch, header: CheckpointHeader);
 
     /// Set the aggregate checkpoint header for the given epoch.
     ///
@@ -38,8 +38,15 @@ pub trait CheckpointerDatabase: Clone + Send + Sync {
 /// There can be many query instances for a given database, and they can be shared between
 /// multiple threads.
 pub trait CheckpointerDatabaseQuery {
-    /// Get the set of checkpoint headers for the given epoch.
-    fn get_checkpoint_headers(&self, epoch: Epoch) -> HashSet<CheckpointHeader>;
+    /// Get the map of checkpoint headers by node for the given epoch.
+    fn get_checkpoint_headers(&self, epoch: Epoch) -> HashMap<NodeIndex, CheckpointHeader>;
+
+    /// Get the checkpoint header for the given epoch and node.
+    fn get_node_checkpoint_header(
+        &self,
+        epoch: Epoch,
+        node_id: NodeIndex,
+    ) -> Option<CheckpointHeader>;
 
     /// Get the aggregate checkpoint header for the given epoch.
     fn get_aggregate_checkpoint_header(&self, epoch: Epoch) -> Option<AggregateCheckpointHeader>;
