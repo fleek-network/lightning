@@ -64,10 +64,7 @@ impl<C: Collection> Resolver<C> {
     /// Start the system, should not do anything if the system is already
     /// started.
     async fn start(this: fdi::Cloned<Self>, waiter: fdi::Cloned<ShutdownWaiter>) {
-        // Wait for genesis to be applied before starting the resolver.
-        if !this.inner.query_runner.wait_for_genesis().await {
-            return;
-        }
+        this.inner.query_runner.wait_for_genesis().await;
 
         waiter.run_until_shutdown(this.inner.start()).await;
     }

@@ -95,10 +95,7 @@ impl<C: Collection> ServiceExecutor<C> {
     ) {
         spawn!(
             async move {
-                // Wait for genesis to be applied before starting the service executor.
-                if !query_runner.wait_for_genesis().await {
-                    return;
-                }
+                query_runner.wait_for_genesis().await;
 
                 for &id in this.config.services.iter() {
                     let handle = spawn_service(id, this.ctx.clone(), waiter.clone()).await;

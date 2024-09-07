@@ -95,6 +95,8 @@ impl<C: Collection> Signer<C> {
         notifier: fdi::Ref<C::NotifierInterface>,
         fdi::Cloned(query_runner): fdi::Cloned<c![C::ApplicationInterface::SyncExecutor]>,
     ) {
+        query_runner.wait_for_genesis().await;
+
         let subscriber = notifier.subscribe_block_executed();
         let worker = this.worker.clone();
 

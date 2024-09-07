@@ -104,7 +104,6 @@ impl<C: Collection> Topology<C> {
     ) -> anyhow::Result<Self> {
         let config = config.get::<Self>();
         let (topology_tx, topology_rx) = watch::channel(Arc::new(Vec::new()));
-
         let inner = TopologyInner {
             target_k: config.testing_target_k,
             notifier,
@@ -121,6 +120,8 @@ impl<C: Collection> Topology<C> {
     }
 
     async fn start(this: fdi::Ref<Self>, waiter: fdi::Cloned<ShutdownWaiter>) {
+        this.inner.query.wait_for_genesis().await;
+
         let inner = this.inner.clone();
         drop(this);
 

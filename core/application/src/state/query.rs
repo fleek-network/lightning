@@ -295,8 +295,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
 
     /// Wait for genesis block to be applied.
     ///
-    /// Returns true if the genesis block was applied is already applied.
-    /// Returns immediately if the genesis block was already applied.
+    /// Returns true, and immediately, if the genesis block was already applied.
     async fn wait_for_genesis(&self) -> bool {
         if !self.has_genesis() {
             tracing::warn!(

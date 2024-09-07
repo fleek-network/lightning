@@ -347,10 +347,7 @@ impl<C: Collection> Consensus<C> {
         let app_query = app_query.clone();
         spawn!(
             async move {
-                // Wait for genesis to be applied before starting the consensus.
-                if !app_query.wait_for_genesis().await {
-                    return;
-                }
+                app_query.wait_for_genesis().await;
 
                 let execution_worker =
                     epoch_state.spawn_execution_worker(reconfigure_notify.clone());
