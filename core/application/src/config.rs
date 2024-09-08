@@ -79,7 +79,7 @@ impl ApplicationConfig {
 
     pub fn atomo_builder<'a>(
         &'a self,
-        checkpoint: Option<([u8; 32], &'a [u8])>,
+        checkpoint: Option<([u8; 32], &'a [u8], &'a [String])>,
     ) -> Result<AtomoBuilder<AtomoStorageBuilder, DefaultSerdeBackend>> {
         let storage = match self.storage {
             StorageConfig::RocksDb => {
@@ -103,9 +103,11 @@ impl ApplicationConfig {
                 db_options.create_if_missing(true);
                 db_options.create_missing_column_families(true);
                 match checkpoint {
-                    Some((hash, checkpoint)) => AtomoStorageBuilder::new(Some(db_path.as_path()))
-                        .with_options(db_options)
-                        .from_checkpoint(hash, checkpoint),
+                    Some((hash, checkpoint, extra_tables)) => {
+                        AtomoStorageBuilder::new(Some(db_path.as_path()))
+                            .with_options(db_options)
+                            .from_checkpoint(hash, checkpoint, extra_tables)
+                    },
                     None => {
                         AtomoStorageBuilder::new(Some(db_path.as_path())).with_options(db_options)
                     },

@@ -39,6 +39,7 @@ once_cell = "1.19"
 os_info = "3.7.0"
 tui-logger = { version = "0.11", optional = true }
 lightning-workspace-hack.workspace = true
+merklize.workspace = true
 
 [dev-dependencies]
 serial_test = "3.0.0"

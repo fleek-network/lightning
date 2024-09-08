@@ -55,11 +55,16 @@ impl<'a> AtomoStorageBuilder<'a> {
     #[inline(always)]
     #[allow(unused)]
     #[allow(clippy::wrong_self_convention)]
-    pub fn from_checkpoint(self, hash: [u8; 32], checkpoint: &'a [u8]) -> Self {
+    pub fn from_checkpoint(
+        self,
+        hash: [u8; 32],
+        checkpoint: &'a [u8],
+        extra_tables: &'a [String],
+    ) -> Self {
         match self {
             AtomoStorageBuilder::InMemory(builder) => AtomoStorageBuilder::InMemory(builder),
             AtomoStorageBuilder::RocksDb(builder) => {
-                let builder = builder.from_checkpoint(hash, checkpoint);
+                let builder = builder.from_checkpoint(hash, checkpoint, extra_tables);
                 AtomoStorageBuilder::RocksDb(builder)
             },
         }
@@ -145,10 +150,10 @@ impl StorageBackend for AtomoStorage {
         }
     }
 
-    fn serialize(&self) -> Option<Vec<u8>> {
+    fn serialize(&self, exclude_tables: &[String]) -> Option<Vec<u8>> {
         match &self {
             AtomoStorage::InMemory(_storage) => None,
-            AtomoStorage::RocksDb(storage) => Some(storage.serialize()),
+            AtomoStorage::RocksDb(storage) => Some(storage.serialize(exclude_tables)),
         }
     }
 }

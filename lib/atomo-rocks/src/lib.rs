@@ -1,6 +1,7 @@
 //! A [`rocksdb`] storage backend implementation for [`atomo`].
 
 mod serialization;
+use std::collections::HashSet;
 use std::fs::{self};
 use std::path::PathBuf;
 
@@ -47,7 +48,7 @@ pub struct RocksBackendBuilder<'a> {
     options: Options,
     columns: Vec<String>,
     column_options: FxHashMap<String, Options>,
-    checkpoint: Option<([u8; 32], &'a [u8])>,
+    checkpoint: Option<([u8; 32], &'a [u8], &'a [String])>,
     read_only: bool,
 }
 
@@ -84,8 +85,13 @@ impl<'a> RocksBackendBuilder<'a> {
     /// Warning: providing a checkpoint will overwrite the existing database at the specified path,
     /// if there is one.
     #[inline(always)]
-    pub fn from_checkpoint(mut self, hash: [u8; 32], checkpoint: &'a [u8]) -> Self {
-        self.checkpoint = Some((hash, checkpoint));
+    pub fn from_checkpoint(
+        mut self,
+        hash: [u8; 32],
+        checkpoint: &'a [u8],
+        extra_tables: &'a [String],
+    ) -> Self {
+        self.checkpoint = Some((hash, checkpoint, extra_tables));
         self
     }
 
@@ -118,7 +124,7 @@ impl<'a> StorageBackendConstructor for RocksBackendBuilder<'a> {
             })
             .collect();
         let db = match self.checkpoint {
-            Some((hash, checkpoint)) => {
+            Some((hash, checkpoint, extra_tables)) => {
                 // We try to build the db from a checkpoint in a temporary dir.
                 let mut tmp_path = self.path.clone();
                 tmp_path.pop();
@@ -127,8 +133,13 @@ impl<'a> StorageBackendConstructor for RocksBackendBuilder<'a> {
                     fs::remove_dir_all(&tmp_path)?;
                 }
                 fs::create_dir_all(&tmp_path)?;
-                let (_db, column_names) =
-                    build_db_from_checkpoint(&tmp_path, hash, checkpoint, self.options.clone())?;
+                let (_db, column_names) = build_db_from_checkpoint(
+                    &tmp_path,
+                    hash,
+                    checkpoint,
+                    extra_tables,
+                    self.options.clone(),
+                )?;
                 // If the build was successful, we move the db over to the actual directory.
                 if self.path.exists() {
                     fs::remove_dir_all(&self.path)?;
@@ -178,11 +189,20 @@ pub struct RocksBackend {
 }
 
 impl RocksBackend {
-    pub fn serialize(&self) -> Vec<u8> {
+    pub fn serialize(&self, exclude_tables: &[String]) -> Vec<u8> {
+        let exclude_tables: HashSet<String> = exclude_tables.iter().cloned().collect();
+        let tables = self
+            .columns
+            .clone()
+            .iter()
+            .map(|table| table.to_string())
+            .filter(|table| !exclude_tables.contains(table))
+            .collect::<Vec<_>>();
+
         // We can safely unwrap here.
         // This will only panic if the table names in `columns` are not consistent with the
         // database.
-        serialize_db(&self.db, &self.columns).unwrap()
+        serialize_db(&self.db, &tables).unwrap()
     }
 }
 
@@ -254,27 +274,116 @@ impl StorageBackend for RocksBackend {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
     use std::sync::Arc;
 
+    use atomo::{DefaultSerdeBackend, SerdeBackend};
     use rocksdb::Options;
+    use tempfile::tempdir;
 
+    use crate::serialization::deserialize_db;
     use crate::{AtomoBuilderWithRocks, RocksBackend, RocksBackendBuilder};
 
-    const TEST_PATH: &str = "test-rocksdb";
+    #[test]
+    fn test_serialize() {
+        let temp_dir = tempdir().unwrap();
+
+        // Setup builder.
+        let mut options = Options::default();
+        options.create_if_missing(true);
+        options.create_missing_column_families(true);
+        let rocksdb = RocksBackendBuilder::new(temp_dir.path()).with_options(options);
+
+        // Build db.
+        let mut db = AtomoBuilderWithRocks::new(rocksdb)
+            .with_table::<u32, String>("data")
+            .with_table::<u32, String>("tree")
+            .enable_iter("data")
+            .enable_iter("tree")
+            .build()
+            .unwrap();
+
+        // Insert some data.
+        db.run(
+            |ctx: &mut atomo::TableSelector<RocksBackend, atomo::BincodeSerde>| {
+                let mut data_table = ctx.get_table::<u32, String>("data");
+                data_table.insert(1, "one".to_string());
+                data_table.insert(2, "two".to_string());
+                data_table.insert(3, "three".to_string());
+            },
+        );
+
+        // Serialize the db.
+        let (bytes1, hash1) = {
+            let storage = db.get_storage_backend_unsafe();
+
+            let bytes = storage.serialize(&["tree".to_string()]);
+            let hash = fleek_blake3::hash(&bytes);
+
+            (bytes, hash)
+        };
+
+        // Insert some excluded table data.
+        db.run(
+            |ctx: &mut atomo::TableSelector<RocksBackend, atomo::BincodeSerde>| {
+                let mut tree_table = ctx.get_table::<u32, String>("tree");
+                tree_table.insert(101, "foo".to_string());
+                tree_table.insert(102, "bar".to_string());
+                tree_table.insert(103, "baz".to_string());
+            },
+        );
+
+        // Serialize the db, excluding the tree table.
+        let (bytes2, hash2) = {
+            let storage = db.get_storage_backend_unsafe();
+
+            let bytes = storage.serialize(&["tree".to_string()]);
+            let hash = fleek_blake3::hash(&bytes);
+
+            (bytes, hash)
+        };
+
+        // Check that the serialized bytes and hash are the same for both serializations.
+        assert_eq!(bytes1, bytes2);
+        assert_eq!(hash1, hash2);
+
+        // Deserialize the db.
+        let tables = deserialize_db(&bytes1).unwrap();
+
+        // Check that the deserialized db has the same data as the original db.
+        assert_eq!(tables.len(), 1);
+        assert_eq!(tables.get("data").unwrap().len(), 3);
+        assert!(!tables.contains_key("tree"));
+
+        let data = tables
+            .get("data")
+            .unwrap()
+            .iter()
+            .map(|(k, v)| {
+                (
+                    DefaultSerdeBackend::deserialize::<u32>(k),
+                    DefaultSerdeBackend::deserialize::<String>(v),
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            data,
+            vec![
+                (1, "one".to_string()),
+                (2, "two".to_string()),
+                (3, "three".to_string())
+            ]
+        );
+    }
 
     #[test]
     fn create_insert_and_query() {
-        let path: PathBuf = TEST_PATH.parse().unwrap();
-        if path.exists() {
-            std::fs::remove_dir_all(path.clone()).expect("failed to remove old rocksdb");
-        }
+        let temp_dir = tempdir().unwrap();
 
         // setup rocksdb
         let mut options = Options::default();
         options.create_if_missing(true);
         options.create_missing_column_families(true);
-        let rocksdb = RocksBackendBuilder::new(path.clone()).with_options(options);
+        let rocksdb = RocksBackendBuilder::new(temp_dir.path()).with_options(options);
 
         // setup atomo db
         let mut db = AtomoBuilderWithRocks::new(rocksdb)
@@ -329,8 +438,5 @@ mod tests {
         barrier_2.wait();
         // Wait for the query thread to finish executing.
         let _ = handle.join();
-
-        // cleanup
-        std::fs::remove_dir_all(path).expect("failed to remove old rocksdb");
     }
 }

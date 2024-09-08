@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
 
 use anyhow::{anyhow, Context, Result};
@@ -11,9 +11,25 @@ pub fn build_db_from_checkpoint(
     path: &Path,
     hash: [u8; 32],
     checkpoint: &[u8],
+    extra_tables: &[String],
     options: Options,
 ) -> Result<(DB, Vec<String>)> {
-    let table_map = deserialize_db(checkpoint)?;
+    let mut table_map = deserialize_db(checkpoint)?;
+    let mut extra_tables: HashSet<String> = HashSet::from_iter(extra_tables.iter().cloned());
+
+    // If any of the extra tables are already in the checkpoint, remove them from the extra tables.
+    for table in table_map.keys() {
+        if extra_tables.contains(table) {
+            extra_tables.remove(table);
+        }
+    }
+
+    // Add the remaining extra tables to the table map.
+    for table in &extra_tables {
+        table_map.insert(table.clone(), vec![]);
+    }
+
+    // Build the tables and insert the data.
     let columns: Vec<String> = table_map.keys().cloned().collect();
     let cf_iter: Vec<_> = columns
         .iter()
@@ -28,16 +44,27 @@ pub fn build_db_from_checkpoint(
             db.put_cf(&cf, key, value)?;
         }
     }
+
     // Check that the serialized db matches the checkpoint.
-    let bytes = serialize_db(&db, &table_names)?;
+    // We only serialize the tables that are not in the extra tables set.
+    let tables_to_serialize = table_names
+        .iter()
+        .filter(|table| !extra_tables.contains(&table.to_string()))
+        .cloned()
+        .collect::<Vec<_>>();
+    let bytes = serialize_db(&db, &tables_to_serialize)?;
     if checkpoint != bytes {
         return Err(anyhow!("Serialized db does not match checkpoint"));
     }
+
     // Verify that the calculated hash matches the hash of the checkpoint.
     let calc_hash = blake3::hash(&bytes);
     if &hash != calc_hash.as_bytes() {
         return Err(anyhow!("Failed to verify hash"));
     }
+
+    // The returned table set needs to include all tables, including the extra ones that were not
+    // serialized and present in the checkpoint.
     Ok((db, table_names))
 }
 
@@ -270,9 +297,14 @@ mod tests {
         }
 
         // Build a new database from the checkpoint
-        let (new_db, _) =
-            build_db_from_checkpoint(&new_path, *hash.as_bytes(), &checkpoint, options)
-                .expect("Failed to build db from checkpoint");
+        let (new_db, _) = build_db_from_checkpoint(
+            &new_path,
+            *hash.as_bytes(),
+            &checkpoint,
+            &["tree".to_string()],
+            options,
+        )
+        .expect("Failed to build db from checkpoint");
 
         // Make sure that the checkpoints match
         let new_checkpoint = serialize_db(&new_db, &table_names).expect("Failed to serialize db");

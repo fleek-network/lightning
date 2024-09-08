@@ -39,7 +39,7 @@ pub trait StorageBackend {
     fn contains(&self, tid: u8, key: &[u8]) -> bool;
 
     /// Serialize the backend to a series of bytes.
-    fn serialize(&self) -> Option<Vec<u8>> {
+    fn serialize(&self, _exclude_tables: &[String]) -> Option<Vec<u8>> {
         None
     }
 }

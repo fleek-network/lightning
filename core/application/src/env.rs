@@ -53,7 +53,10 @@ pub type ApplicationEnv = Env<AtomoStorage, DefaultSerdeBackend, ApplicationStat
 
 impl ApplicationEnv {
     pub fn new(config: &ApplicationConfig, checkpoint: Option<([u8; 32], &[u8])>) -> Result<Self> {
-        let builder = config.atomo_builder(checkpoint)?;
+        let state_tree_tables = ApplicationStateTree::state_tree_tables();
+        let builder = config.atomo_builder(
+            checkpoint.map(|(hash, checkpoint)| (hash, checkpoint, state_tree_tables.as_slice())),
+        )?;
 
         Ok(Self {
             inner: ApplicationState::build(builder)?,
@@ -160,7 +163,8 @@ impl ApplicationEnv {
 
             let storage = self.inner.get_storage_backend_unsafe();
             // This will return `None` only if the InMemory backend is used.
-            if let Some(checkpoint) = storage.serialize() {
+            let exclude_tables = ApplicationStateTree::state_tree_tables();
+            if let Some(checkpoint) = storage.serialize(&exclude_tables) {
                 let mut blockstore_put = get_putter();
                 if blockstore_put
                     .write(checkpoint.as_slice(), CompressionAlgorithm::Uncompressed)

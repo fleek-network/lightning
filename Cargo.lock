@@ -1008,6 +1008,7 @@ dependencies = [
  "fxhash",
  "rand 0.8.5",
  "rocksdb",
+ "tempfile",
 ]
 
 [[package]]
@@ -6922,6 +6923,7 @@ dependencies = [
  "lightning-tui",
  "lightning-utils",
  "lightning-workspace-hack",
+ "merklize",
  "once_cell",
  "os_info",
  "panic-report",

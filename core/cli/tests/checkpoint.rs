@@ -7,7 +7,7 @@ use fleek_blake3 as blake3;
 use fleek_crypto::{AccountOwnerSecretKey, ConsensusSecretKey, NodeSecretKey, SecretKey};
 use lightning_application::app::Application;
 use lightning_application::config::{ApplicationConfig, StorageConfig};
-use lightning_application::env::Env;
+use lightning_application::env::{ApplicationStateTree, Env};
 use lightning_archive::archive::Archive;
 use lightning_archive::config::Config as ArchiveConfig;
 use lightning_blockstore::blockstore::Blockstore;
@@ -38,6 +38,7 @@ use lightning_syncronizer::config::Config as SyncronizerConfig;
 use lightning_syncronizer::syncronizer::Syncronizer;
 use lightning_utils::config::TomlConfigProvider;
 use lightning_utils::shutdown::ShutdownController;
+use merklize::StateTree;
 use resolved_pathbuf::ResolvedPathBuf;
 use serial_test::serial;
 use tempfile::{tempdir, TempDir};
@@ -230,7 +231,8 @@ async fn node_checkpointing() -> Result<()> {
     env.apply_genesis_block(genesis)?;
 
     let storage = env.inner.get_storage_backend_unsafe();
-    let checkpoint = storage.serialize().unwrap();
+    let exclude_tables = ApplicationStateTree::state_tree_tables();
+    let checkpoint = storage.serialize(&exclude_tables).unwrap();
     let checkpoint_hash = blake3::hash(&checkpoint);
     std::mem::drop(env);
 

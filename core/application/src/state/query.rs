@@ -113,8 +113,9 @@ impl SyncQueryRunnerInterface for QueryRunner {
         hash: [u8; 32],
         checkpoint: &[u8],
     ) -> anyhow::Result<Atomo<QueryPerm, Self::Backend>> {
+        let state_tree_tables = ApplicationStateTree::state_tree_tables();
         let backend = AtomoStorageBuilder::new(Some(path.as_ref()))
-            .from_checkpoint(hash, checkpoint)
+            .from_checkpoint(hash, checkpoint, &state_tree_tables)
             .read_only();
 
         let atomo = ApplicationState::register_tables(AtomoBuilder::<
