@@ -101,7 +101,7 @@ impl<C: Collection> BroadcastBackend for LightningBackend<C> {
 
     #[inline(always)]
     fn verify(pk: &Self::Pk, signature: &NodeSignature, digest: &[u8; 32]) -> bool {
-        pk.verify(signature, digest)
+        pk.verify(signature, digest).expect("invalid signature")
     }
 
     #[inline(always)]

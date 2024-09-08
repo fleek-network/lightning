@@ -1,11 +1,13 @@
 use zeroize::ZeroizeOnDrop;
 
+use crate::FleekCryptoError;
+
 pub trait PublicKey: Sized {
     /// The signature associated with this public key.
     type Signature;
 
     /// Verify a signature against this public key.
-    fn verify(&self, signature: &Self::Signature, digest: &[u8]) -> bool;
+    fn verify(&self, signature: &Self::Signature, digest: &[u8]) -> Result<bool, FleekCryptoError>;
 
     /// Encode and return this public key as a string.
     fn to_base58(&self) -> String;

@@ -60,13 +60,13 @@ impl TransactionSender {
     pub fn verify(&self, signature: TransactionSignature, digest: &[u8; 32]) -> bool {
         match (self, signature) {
             (TransactionSender::NodeConsensus(pk), TransactionSignature::NodeConsensus(sig)) => {
-                pk.verify(&sig, digest)
+                pk.verify(&sig, digest).expect("invalid signature")
             },
             (TransactionSender::AccountOwner(pk), TransactionSignature::AccountOwner(sig)) => {
                 pk.verify(&sig, digest)
             },
             (TransactionSender::NodeMain(pk), TransactionSignature::NodeMain(sig)) => {
-                pk.verify(&sig, digest)
+                pk.verify(&sig, digest).expect("invalid signature")
             },
             _ => false,
         }

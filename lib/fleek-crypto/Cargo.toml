@@ -12,6 +12,7 @@ rand = "0.8"
 sec1 = "0.7.2"                                                                                                      # re-exports pkcs8
 serde = { version = "1.0", features = ["derive"] }
 serde-big-array = "0.5.1"
+thiserror = "1.0"
 zeroize = { version = "1.6.0", features = ["zeroize_derive"] }
 derive_more = "0.99"
 schemars = "0.8.21"

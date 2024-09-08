@@ -11,7 +11,7 @@ use fastcrypto::secp256k1::Secp256k1PublicKey;
 use fastcrypto::traits::{ToFromBytes, VerifyRecoverable, VerifyingKey};
 use serde::{Deserialize, Serialize};
 
-use crate::{base58_array, PublicKey};
+use crate::{base58_array, FleekCryptoError, PublicKey};
 
 macro_rules! impl_pk_sig {
     // If the name of the verify function is not provided. Default it to `verify`.
@@ -42,10 +42,17 @@ macro_rules! impl_pk_sig {
         impl PublicKey for $pk_name {
             type Signature = $sig_name;
 
-            fn verify(&self, signature: &Self::Signature, digest: &[u8]) -> bool {
-                let pubkey: $pk_fc = self.into();
-                let signature: $sig_fc = signature.into();
-                pubkey.$verify(digest, &signature.into()).is_ok()
+            fn verify(
+                &self,
+                signature: &Self::Signature,
+                digest: &[u8],
+            ) -> Result<bool, FleekCryptoError> {
+                let pubkey: $pk_fc = self.try_into()?;
+                let signature: $sig_fc = signature.try_into()?;
+                pubkey
+                    .$verify(digest, &signature.into())
+                    .map_err(|e| FleekCryptoError::InvalidSignature(e.to_string()))?;
+                Ok(true)
             }
 
             fn to_base58(&self) -> String {
@@ -151,9 +158,11 @@ macro_rules! impl_pk_sig {
             }
         }
 
-        impl From<&$pk_name> for $pk_fc {
-            fn from(value: &$pk_name) -> Self {
-                $pk_fc::from_bytes(&value.0).unwrap()
+        impl TryFrom<&$pk_name> for $pk_fc {
+            type Error = FleekCryptoError;
+            fn try_from(value: &$pk_name) -> Result<Self, Self::Error> {
+                $pk_fc::from_bytes(&value.0)
+                    .map_err(|e| FleekCryptoError::InvalidPublicKey(e.to_string()))
             }
         }
 
@@ -164,9 +173,11 @@ macro_rules! impl_pk_sig {
             }
         }
 
-        impl From<&$sig_name> for $sig_fc {
-            fn from(value: &$sig_name) -> Self {
-                $sig_fc::from_bytes(&value.0).unwrap()
+        impl TryFrom<&$sig_name> for $sig_fc {
+            type Error = FleekCryptoError;
+            fn try_from(value: &$sig_name) -> Result<Self, Self::Error> {
+                $sig_fc::from_bytes(&value.0)
+                    .map_err(|e| FleekCryptoError::InvalidSignature(e.to_string()))
             }
         }
 

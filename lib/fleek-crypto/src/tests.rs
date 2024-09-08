@@ -1,8 +1,14 @@
 use crate::{
     AccountOwnerSecretKey,
     ConsensusAggregateSignature,
+    ConsensusPublicKey,
     ConsensusSecretKey,
+    ConsensusSignature,
     EthAddress,
+    FleekCryptoError,
+    NodePublicKey,
+    NodeSignature,
+    PublicKey,
     SecretKey,
 };
 
@@ -62,6 +68,40 @@ fn test_consensus_aggregate_signature_verify() {
                 &[&[1; 32], &[2; 32], &[3; 32]],
             )
             .unwrap()
+    );
+
+    // Should return error if signature has invalid bytes.
+    assert_eq!(
+        ConsensusAggregateSignature::default()
+            .verify(
+                &[sk1.to_pk(), sk2.to_pk(), sk3.to_pk()],
+                &[&[1; 32], &[2; 32], &[3; 32]],
+            )
+            .unwrap_err(),
+        FleekCryptoError::InvalidAggregateSignature(
+            "Invalid value was given to the function".to_string()
+        )
+    );
+}
+
+#[test]
+fn test_signature_verify_should_return_error() {
+    let sk = NodePublicKey([1; 32]);
+    let sig = NodeSignature([1; 64]);
+    assert_eq!(
+        sk.verify(&sig, &[0; 32]),
+        Err(FleekCryptoError::InvalidSignature(
+            "Invalid signature was given to the function".to_string()
+        ))
+    );
+
+    let sk = ConsensusPublicKey([1; 96]);
+    let sig = ConsensusSignature([1; 48]);
+    assert_eq!(
+        sk.verify(&sig, &[0; 32]),
+        Err(FleekCryptoError::InvalidPublicKey(
+            "Invalid value was given to the function".to_string()
+        ))
     );
 }
 

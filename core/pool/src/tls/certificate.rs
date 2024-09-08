@@ -326,7 +326,8 @@ impl P2pCertificate<'_> {
         let user_owns_sk = self
             .extension
             .public_key
-            .verify(&self.extension.signature, msg.as_bytes());
+            .verify(&self.extension.signature, msg.as_bytes())
+            .map_err(|_| Error::InvalidSignatureForPublicKey)?;
         if !user_owns_sk {
             return Err(Error::UnknownIssuer);
         }

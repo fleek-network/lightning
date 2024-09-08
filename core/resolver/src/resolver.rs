@@ -122,8 +122,10 @@ impl<C: Collection> ResolverInner<C> {
             match self.query_runner.index_to_pubkey(&record.originator) {
                 Some(peer_public_key) => {
                     let digest = record.to_digest();
-                    peer_public_key.verify(&record.signature, &digest);
-                    if peer_public_key.verify(&record.signature, &digest) {
+                    if peer_public_key
+                        .verify(&record.signature, &digest)
+                        .expect("invalid signature")
+                    {
                         ResolverInner::<C>::store_mapping(record, &db);
                     } else {
                         warn!("Received record with invalid signature")

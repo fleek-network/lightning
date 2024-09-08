@@ -1,3 +1,4 @@
+use std::array::TryFromSliceError;
 use std::borrow::Borrow;
 use std::fmt::Display;
 use std::str::FromStr;
@@ -13,7 +14,7 @@ use fastcrypto::error::FastCryptoError;
 use fastcrypto::traits::{AggregateAuthenticator, ToFromBytes};
 use serde::{Deserialize, Serialize};
 
-use crate::{base58_array, ConsensusPublicKey, ConsensusSignature};
+use crate::{base58_array, ConsensusPublicKey, ConsensusSignature, FleekCryptoError};
 
 const CONSENSUS_AGGREGATE_SIGNATURE_SIZE: usize = 48;
 
@@ -30,11 +31,13 @@ impl ConsensusAggregateSignature {
     /// Combine signatures into a single aggregated signature.
     pub fn aggregate<'a, K: Borrow<ConsensusSignature> + 'a, I: IntoIterator<Item = &'a K>>(
         signatures: I,
-    ) -> Result<Self, std::io::Error> {
-        let signatures: Vec<BLS12381Signature> =
-            signatures.into_iter().map(|s| s.borrow().into()).collect();
+    ) -> Result<Self, FleekCryptoError> {
+        let signatures: Vec<BLS12381Signature> = signatures
+            .into_iter()
+            .map(|s| s.borrow().try_into())
+            .collect::<Result<Vec<_>, _>>()?;
         let agg_sig = BLS12381AggregateSignature::aggregate(&signatures)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))?;
+            .map_err(|e| FleekCryptoError::AggregateSignaturesFailure(e.to_string()))?;
 
         agg_sig.try_into()
     }
@@ -44,8 +47,11 @@ impl ConsensusAggregateSignature {
         &self,
         pks: &[ConsensusPublicKey],
         messages: &[&[u8]],
-    ) -> Result<bool, std::io::Error> {
-        let pks: Vec<BLS12381PublicKey> = pks.iter().map(|s| s.into()).collect();
+    ) -> Result<bool, FleekCryptoError> {
+        let pks: Vec<BLS12381PublicKey> = pks
+            .iter()
+            .map(|s| s.try_into())
+            .collect::<Result<Vec<_>, _>>()?;
         let sig: BLS12381AggregateSignature = (*self).try_into()?;
         let result = sig.verify_different_msg(&pks, messages);
         if result.is_err() {
@@ -53,10 +59,7 @@ impl ConsensusAggregateSignature {
             if err == FastCryptoError::InvalidSignature {
                 return Ok(false);
             } else {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    err.to_string(),
-                ));
+                return Err(FleekCryptoError::InvalidSignature(err.to_string()));
             }
         }
         Ok(true)
@@ -115,20 +118,20 @@ impl Default for ConsensusAggregateSignature {
 }
 
 impl TryFrom<BLS12381AggregateSignature> for ConsensusAggregateSignature {
-    type Error = std::io::Error;
+    type Error = FleekCryptoError;
 
-    fn try_from(signature: BLS12381AggregateSignature) -> Result<Self, Self::Error> {
-        Ok(Self(signature.as_bytes().try_into().map_err(|_| {
-            std::io::Error::new(std::io::ErrorKind::InvalidData, "invalid signature length")
-        })?))
+    fn try_from(signature: BLS12381AggregateSignature) -> Result<Self, FleekCryptoError> {
+        Ok(Self(signature.as_bytes().try_into().map_err(
+            |e: TryFromSliceError| FleekCryptoError::InvalidSignature(e.to_string()),
+        )?))
     }
 }
 
 impl TryFrom<ConsensusAggregateSignature> for BLS12381AggregateSignature {
-    type Error = std::io::Error;
+    type Error = FleekCryptoError;
 
     fn try_from(signature: ConsensusAggregateSignature) -> Result<Self, Self::Error> {
         BLS12381AggregateSignature::from_bytes(&signature.0)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))
+            .map_err(|e| FleekCryptoError::InvalidAggregateSignature(e.to_string()))
     }
 }

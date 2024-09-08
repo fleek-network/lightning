@@ -42,7 +42,8 @@ impl Serialize for EthAddress {
 
 impl EthAddress {
     pub fn verify(&self, signature: &AccountOwnerSignature, digest: &[u8]) -> bool {
-        let signature: Secp256k1RecoverableSignature = signature.into();
+        let signature: Secp256k1RecoverableSignature =
+            signature.try_into().expect("invalid signature");
         match signature.recover_with_hash::<Keccak256>(digest) {
             Ok(public_key) => {
                 if public_key
@@ -65,7 +66,7 @@ where
     T: Borrow<AccountOwnerPublicKey>,
 {
     fn from(value: T) -> Self {
-        let pubkey: Secp256k1PublicKey = value.borrow().into();
+        let pubkey: Secp256k1PublicKey = value.borrow().try_into().expect("invalid public key");
         // get the uncompressed serialization (1 byte prefix + 32 byte X + 32 byte Y)
         let uncompressed = &pubkey.pubkey.serialize_uncompressed();
         // Compute a 32 byte keccak256 hash, ignoring the prefix
