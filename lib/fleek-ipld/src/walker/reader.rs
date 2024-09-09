@@ -117,7 +117,7 @@ mod tests {
 
     async fn from_cid(doc_id: Cid) -> Result<IpldItem, IpldError> {
         let data: Result<Bytes, IpldError> =
-            Ok(Bytes::copy_from_slice(&**FIXTURES.get(&doc_id).unwrap()));
+            Ok(Bytes::copy_from_slice(FIXTURES.get(&doc_id).unwrap()));
         let stream = tokio_stream::once(data);
         let mut ipld_reader = IpldReader::default();
         ipld_reader.read(doc_id, stream).await
