@@ -12,3 +12,4 @@ target
 **.jpg
 **.png
 raw_data
+services/sgx/enclave.sgxs

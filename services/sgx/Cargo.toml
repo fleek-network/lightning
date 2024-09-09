@@ -38,6 +38,9 @@ sgx-isa = { version = "0.4.1", features = ["serde"]}
 whoami = "1.5.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
+[build-dependencies]
+ureq = "2.10"
+
 [[bin]]
 name = "fn-service-3"
 path = "src/bin.rs"
