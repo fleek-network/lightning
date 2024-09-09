@@ -28,10 +28,10 @@ struct Args {
         short,
         long,
         argument::<String>("PUBKEY"),
-        fallback("03e1d7803dfa7e5d3ca4b4afa99073caf57b9afcede3b416ad29bb9ce9e4fe0f86".into()),
+        fallback("03a3fe41244add26af1f820d2acb4ad22b158ff7b69ce41401bf932d7734eb5d49".into()),
         display_fallback,
         parse(|s| {
-            let bytes = hex::decode(&s).context("invalid base58")?;
+            let bytes = hex::decode(&s).context("invalid hex")?;
             let slice = bytes.try_into().map_err(|_| anyhow!("invalid key length"))?;
             PublicKey::parse_compressed(&slice).map_err(|e| anyhow!("invalid public key: {e}"))
         })
