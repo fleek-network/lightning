@@ -4840,6 +4840,7 @@ dependencies = [
  "sgxs-loaders",
  "tokio",
  "tracing-subscriber",
+ "ureq",
  "url",
  "whoami",
 ]
