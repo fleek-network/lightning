@@ -2,7 +2,10 @@ use std::path::PathBuf;
 
 use bytes::{Bytes, BytesMut};
 use ipld_core::cid::Cid;
-use ipld_dagpb::PbNode;
+use ipld_core::codec::Codec;
+use ipld_dagpb::{DagPbCodec, PbLink, PbNode};
+use serde::de::DeserializeOwned;
+use serde::Deserialize;
 use tokio_stream::{Stream, StreamExt as _};
 
 use crate::errors::IpldError;
@@ -21,6 +24,12 @@ pub struct Link {
 impl From<Cid> for Link {
     fn from(cid: Cid) -> Self {
         Self::new(cid, None, None)
+    }
+}
+
+impl From<&PbLink> for Link {
+    fn from(link: &PbLink) -> Self {
+        Link::new(link.cid, link.name.clone(), link.size)
     }
 }
 
@@ -62,17 +71,6 @@ impl DocId {
     pub fn path(&self) -> &PathBuf {
         &self.path
     }
-
-    //pub fn from_link(link: &Link, parent: &Option<DirItem>) -> Self {
-    //    let mut path = parent
-    //        .as_ref()
-    //        .map(|dir| dir.id.path.clone())
-    //        .unwrap_or_default();
-    //    if let Some(n) = link.name.as_ref() {
-    //        path.push(n.clone())
-    //    }
-    //    Self::new(link.clone(), path)
-    //}
 
     fn merge(&mut self, previous_item: Option<&PathBuf>) {
         let mut path = previous_item.cloned().unwrap_or_default();
@@ -142,29 +140,33 @@ impl FileItem {
     }
 }
 
-#[derive(Clone)]
-pub struct ChunkItem {
+#[derive(Clone, Debug)]
+pub struct ChunkFileItem {
     id: DocId,
-    index: usize,
-    data: Bytes,
+    chunks: Vec<Link>,
 }
 
-impl std::fmt::Debug for ChunkItem {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ChunkItem")
-            .field("id", &self.id)
-            .field("index", &self.index)
-            .field("data-length", &self.data.len())
-            .finish()
+impl From<ChunkFileItem> for IpldItem {
+    fn from(chunk: ChunkFileItem) -> Self {
+        Self::ChunkedFile(chunk)
+    }
+}
+
+impl ChunkFileItem {
+    pub fn id(&self) -> &DocId {
+        &self.id
+    }
+
+    pub fn chunks(&self) -> &Vec<Link> {
+        &self.chunks
     }
 }
 
 #[derive(Clone, Debug)]
 pub enum IpldItem {
     Dir(DirItem),
-    Chunk(ChunkItem),
+    ChunkedFile(ChunkFileItem),
     File(FileItem),
-    Done(Cid),
 }
 
 impl IpldItem {
@@ -183,6 +185,10 @@ impl IpldItem {
         matches!(self, Self::Dir(_))
     }
 
+    fn get_links(links: &[PbLink]) -> Vec<Link> {
+        links.iter().map(Into::into).collect()
+    }
+
     fn from_result(
         id: &mut DocId,
         previous_path: Option<&PathBuf>,
@@ -192,17 +198,19 @@ impl IpldItem {
         match data.Type {
             DataType::Directory => {
                 id.merge(previous_path);
-                let links = node
-                    .links
-                    .iter()
-                    .map(|link| Link::new(link.cid, link.name.clone(), link.size.clone()))
-                    .collect();
+                let links = Self::get_links(&node.links);
                 Ok(Self::from_dir(id.clone(), links))
             },
             DataType::File => {
-                id.merge(previous_path);
-                let data = Bytes::copy_from_slice(&data.Data);
-                Ok(Self::to_chunk(id.clone(), data))
+                if node.links.is_empty() {
+                    let data = Bytes::copy_from_slice(&data.Data);
+                    Ok(Self::to_file(id.clone(), data))
+                } else {
+                    Ok(Self::to_chunked_file(
+                        id.clone(),
+                        Self::get_links(&node.links),
+                    ))
+                }
             },
             _ => Err(IpldError::UnsupportedUnixFsDataType(format!(
                 "{:?} - {:?}",
@@ -211,49 +219,105 @@ impl IpldItem {
         }
     }
 
-    fn to_chunk(id: DocId, data: Bytes) -> IpldItem {
-        Self::Chunk(ChunkItem { id, index: 0, data })
+    fn to_chunked_file(id: DocId, chunks: Vec<Link>) -> IpldItem {
+        Self::ChunkedFile(ChunkFileItem { id, chunks })
+    }
+
+    fn to_file(id: DocId, data: Bytes) -> IpldItem {
+        Self::File(FileItem { id, data })
+    }
+}
+
+impl From<IpldItem> for DocId {
+    fn from(item: IpldItem) -> Self {
+        match item {
+            IpldItem::Dir(dir) => dir.id,
+            IpldItem::File(file) => file.id,
+            IpldItem::ChunkedFile(chunk) => chunk.id,
+        }
     }
 }
 
 impl From<IpldItem> for Cid {
     fn from(item: IpldItem) -> Self {
-        match item {
-            IpldItem::Dir(dir) => dir.id.cid,
-            IpldItem::File(file) => file.id.cid,
-            IpldItem::Chunk(chunk) => chunk.id.cid,
-            IpldItem::Done(cid) => cid,
-        }
+        <IpldItem as Into<DocId>>::into(item).cid().into()
+    }
+}
+
+pub trait DataCodec<F> {
+    fn decode_from(doc_id: &DocId, data: F) -> Result<IpldItem, IpldError>;
+}
+
+pub trait Decoder {
+    type Ipld;
+
+    type IpldCodec: Codec<Self::Ipld>;
+
+    type DataCodec: DataCodec<Self::Ipld>;
+
+    fn get_data(data: &Self::Ipld) -> Result<Option<Bytes>, IpldError>;
+
+    fn decode_from_slice(&self, doc_id: &DocId, data: &[u8]) -> Result<IpldItem, IpldError> {
+        let node =
+            Self::IpldCodec::decode_from_slice(data).map_err(|_| IpldError::IpldCodecError)?;
+        Self::DataCodec::decode_from(doc_id, node)
+    }
+}
+
+pub struct UnixFsProtobufCodec;
+
+impl DataCodec<PbNode> for UnixFsProtobufCodec {
+    fn decode_from(doc_id: &DocId, node: PbNode) -> Result<IpldItem, IpldError> {
+        let data = Data::try_from(&node.data)?;
+        let mut doc_id = doc_id.clone();
+        IpldItem::from_result(&mut doc_id, None, &node, &data)
+    }
+}
+
+pub struct DefaultDecoder;
+
+impl Decoder for DefaultDecoder {
+    type Ipld = PbNode;
+    type IpldCodec = DagPbCodec;
+    type DataCodec = UnixFsProtobufCodec;
+
+    fn get_data(node: &PbNode) -> Result<Option<Bytes>, IpldError> {
+        Ok(node.data.clone())
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct IpldStream {
+pub struct IpldStream<D> {
     buffer: BytesMut,
     last_id: Option<DocId>,
+    decoder: D,
 }
 
-impl Default for IpldStream {
+impl Default for IpldStream<DefaultDecoder> {
     fn default() -> Self {
-        Self::with_capacity(DEFAULT_BUFFER_SIZE)
+        IpldStream::with_capacity(DEFAULT_BUFFER_SIZE, DefaultDecoder)
     }
 }
 
-impl IpldStream {
-    pub fn new(buffer: BytesMut) -> Self {
-        Self {
+impl<D> IpldStream<D>
+where
+    D: Decoder,
+{
+    pub fn new(buffer: BytesMut, decoder: D) -> Self {
+        IpldStream {
             buffer,
             last_id: None,
+            decoder,
         }
     }
 
-    pub fn with_capacity(capacity: usize) -> Self {
-        Self::new(BytesMut::with_capacity(capacity))
+    pub fn with_capacity(capacity: usize, decoder: D) -> Self {
+        IpldStream::new(BytesMut::with_capacity(capacity), decoder)
     }
 
-    pub async fn next_from_stream<D: Into<DocId>>(
+    pub async fn next_from_stream<I: Into<DocId>>(
         &mut self,
-        id: D,
+        id: I,
         stream: impl Stream<Item = Result<Bytes, reqwest::Error>> + Unpin,
     ) -> Result<IpldItem, IpldError> {
         let mut stream = stream;
@@ -262,21 +326,10 @@ impl IpldStream {
             self.buffer.extend_from_slice(&chunk);
         }
         let doc_id = id.into();
-        let item = self.next(&doc_id).await?;
+        let item = self.decoder.decode_from_slice(&doc_id, &self.buffer)?;
         self.buffer.clear();
         self.last_id = Some(doc_id);
         Ok(item)
-    }
-
-    async fn next(&mut self, id: &DocId) -> Result<IpldItem, IpldError> {
-        if self.buffer.is_empty() {
-            return Err(IpldError::StreamBufferEmpty);
-        }
-        let mut id = id.clone();
-        let bytes = self.buffer.clone().freeze();
-        let node = PbNode::from_bytes(bytes)?;
-        let data = Data::try_from(&node.data)?;
-        IpldItem::from_result(&mut id, None, &node, &data)
     }
 }
 
@@ -284,11 +337,17 @@ pub async fn download() {
     let cid: Cid = "QmSnuWmxptJZdLJpKRarxBMS2Ju2oANVrgbr2xWbie9b2D"
         .try_into()
         .unwrap(); // all
+    let cid: Cid = "QmP8jTG1m9GSDJLCbeWhVSVgEzCPPwXRdCRuJtQ5Tz9Kc9"
+        .try_into()
+        .unwrap(); // file
+    let cid: Cid = "QmbgeZnTVXAhW2CS15cjo981P81kULbuUqJ672YEGZUqiM"
+        .try_into()
+        .unwrap(); // dir
     let req = reqwest::get(format!("https://ipfs.io/ipfs/{}?format=raw", cid))
         .await
         .unwrap();
     let stream = req.bytes_stream();
-    let mut ilpd_stream = IpldStream::with_capacity(1024 * 16);
+    let mut ilpd_stream = IpldStream::with_capacity(1024 * 16, DefaultDecoder);
     let item = ilpd_stream.next_from_stream(cid, stream).await.unwrap();
     println!("{:?}", item);
 }

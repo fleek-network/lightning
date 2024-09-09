@@ -15,6 +15,7 @@ ipld-core = "0.4.1"
 ipld-dagpb = "0.2.1"
 quick-protobuf = "0.8"
 reqwest = { workspace = true, features = ["stream"] }
+serde.workspace = true
 thiserror.workspace = true
 tokio-stream.workspace = true
 tokio.workspace = true

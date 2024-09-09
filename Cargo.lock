@@ -4579,6 +4579,7 @@ dependencies = [
  "ipld-dagpb",
  "quick-protobuf",
  "reqwest",
+ "serde",
  "thiserror",
  "tokio",
  "tokio-stream",

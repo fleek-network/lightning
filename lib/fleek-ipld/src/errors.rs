@@ -7,6 +7,9 @@ pub enum IpldError {
     #[error("IPLD error: Error parsing Cid {0}")]
     CidParsingError(#[from] ipld_core::cid::Error),
 
+    #[error("IPLD error: Error decoding IPLD format")]
+    IpldCodecError,
+
     #[error("IPLD error: Error Decoding DAG-PB data {0}")]
     DagPbError(#[from] ipld_dagpb::Error),
 
