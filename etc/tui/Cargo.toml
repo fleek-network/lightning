@@ -27,7 +27,7 @@ resolved-pathbuf = { path = "../../lib/resolved-pathbuf" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 signal-hook = "0.3"
-socket-logger = { path = "../socket-logger", optional = true }
+socket-logger = { path = "../../lib/socket-logger", optional = true }
 strum = { version = "0.26", features = ["derive"] }
 tokio = { version = "1.32", features = ["full"] }
 tokio-util = "0.7"
