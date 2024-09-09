@@ -214,6 +214,12 @@
             CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS = " -Clink-arg=-fuse-ld=${pkgs.mold-wrapped}/bin/mold";
             CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER = "${pkgs.clang}/bin/clang";
             CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER = "${pkgs.clang}/bin/clang";
+
+            FN_ENCLAVE_SGXS = pkgs.fetchurl {
+              name = "enclave.sgxs";
+              url = "https://bafybeid37ogyu3ogfctq4ecqa3t3ozneegbkj3gswg3h6lxwx5gq5f4rdm.ipfs.flk-ipfs.xyz";
+              hash = "sha256-glOrKYZ4KzIEcr34XjW3jakudmx0DLN5TksRk2kH4S0=";
+            };
           };
 
           # Build *just* the cargo dependencies, so we can reuse all of that
