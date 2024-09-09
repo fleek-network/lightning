@@ -12,3 +12,5 @@ pub mod unixfs;
 ///
 /// - `dag_pb` module contains `IpldDagPbProcessor` implementation for processing DAG-PB nodes.
 pub mod walker;
+
+pub mod decoder;

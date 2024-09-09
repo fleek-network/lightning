@@ -75,9 +75,12 @@ impl DataCodec<PbNode> for UnixFsProtobufCodec {
     }
 }
 
-pub struct DefaultDecoder;
+#[derive(Default)]
+pub struct DagPbWithUnixFsCodec;
 
-impl Decoder for DefaultDecoder {
+pub type DefaultDecoder = DagPbWithUnixFsCodec;
+
+impl Decoder for DagPbWithUnixFsCodec {
     type Ipld = PbNode;
     type IpldCodec = DagPbCodec;
     type DataCodec = UnixFsProtobufCodec;

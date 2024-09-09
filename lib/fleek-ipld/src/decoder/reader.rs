@@ -2,7 +2,7 @@ use bytes::{Bytes, BytesMut};
 use tokio_stream::{Stream, StreamExt as _};
 use typed_builder::TypedBuilder;
 
-use super::decoder::{Decoder, DefaultDecoder};
+use super::data_codec::{Decoder, DefaultDecoder};
 use super::fs::{DocId, IpldItem};
 use crate::errors::IpldError;
 
@@ -21,7 +21,7 @@ impl Default for IpldReader<DefaultDecoder> {
     fn default() -> Self {
         IpldReader::builder()
             .with_buffer(DEFAULT_BUFFER_SIZE)
-            .decoder(DefaultDecoder)
+            .decoder(DefaultDecoder::default())
             .build()
     }
 }
