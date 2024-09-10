@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use atomo::{DefaultSerdeBackend, SerdeBackend};
 use fleek_crypto::SecretKey;
 use lightning_interfaces::prelude::*;
-use lightning_interfaces::types::CheckpointHeader;
+use lightning_interfaces::types::CheckpointAttestation;
 use lightning_interfaces::EpochChangedNotification;
 use ready::tokio::TokioReadyWaiter;
 use ready::ReadyWaiter;
@@ -20,9 +20,9 @@ use crate::rocks::RocksCheckpointerDatabase;
 /// changed and then broadcasting a checkpoint attestation for the new epoch.
 ///
 /// The epoch change listener also needs to build and save an aggregate checkpoint for the new
-/// epoch if a supermajority of eligible nodes have attested to the checkpoint header for the epoch.
-/// We need to do this here as well because other nodes may have already received their epoch change
-/// notification and broadcasted checkpoint headers for the new epoch.
+/// epoch if a supermajority of eligible nodes have attested to the checkpoint attestation for the
+/// epoch. We need to do this here as well because other nodes may have already received their
+/// epoch change notification and broadcasted checkpoint attestations for the new epoch.
 pub struct EpochChangeListener<C: Collection> {
     _collection: PhantomData<C>,
 }
@@ -131,15 +131,15 @@ impl<C: Collection> Task<C> {
             return Ok(());
         }
 
-        // Ignore if a checkpoint header for this epoch from the same node already exists.
+        // Ignore if a checkpoint attestation for this epoch from the same node already exists.
         if self
             .db
             .query()
-            .get_node_checkpoint_header(epoch, self.node_id)
+            .get_node_checkpoint_attestation(epoch, self.node_id)
             .is_some()
         {
             tracing::debug!(
-                "ignoring epoch changed notification for epoch {}, node already has checkpoint header",
+                "ignoring epoch changed notification for epoch {}, node already has checkpoint attestation",
                 epoch
             );
             return Ok(());
@@ -148,7 +148,7 @@ impl<C: Collection> Task<C> {
         // Build our checkpoint attestation for the new epoch.
         // Build our checkpoint attestation for the new epoch.
         let signer = self.keystore.get_bls_sk();
-        let mut attestation = CheckpointHeader {
+        let mut attestation = CheckpointAttestation {
             epoch,
             node_id: self.node_id,
             previous_state_root: epoch_changed.previous_state_root,
@@ -161,18 +161,18 @@ impl<C: Collection> Task<C> {
 
         // Save our own checkpoint attestation to the database.
         self.db
-            .set_node_checkpoint_header(epoch, attestation.clone());
+            .set_node_checkpoint_attestation(epoch, attestation.clone());
 
         // Broadcast our checkpoint attestation to the network.
         self.pubsub
             .send(
-                &CheckpointBroadcastMessage::CheckpointHeader(attestation),
+                &CheckpointBroadcastMessage::CheckpointAttestation(attestation),
                 None,
             )
             .await?;
 
-        // Check for supermajority of checkpoint headers for the epoch, in case we have already
-        // received the checkpoint headers from other nodes or if we're the only node.
+        // Check for supermajority of checkpoint attestations for the epoch, in case we have already
+        // received the checkpoint attestations from other nodes or if we're the only node.
         self.aggregate
             .build_and_save_aggregate_if_supermajority(epoch, nodes.len())?;
 

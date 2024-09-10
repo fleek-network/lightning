@@ -7,7 +7,7 @@ use jsonrpsee::proc_macros::rpc;
 use lightning_application::env::ApplicationStateTree;
 use lightning_interfaces::types::{
     AccountInfo,
-    AggregateCheckpointHeader,
+    AggregateCheckpoint,
     Blake3Hash,
     Epoch,
     EpochInfo,
@@ -206,7 +206,7 @@ pub trait FleekApi {
     async fn get_aggregate_checkpoint(
         &self,
         epoch: Epoch,
-    ) -> RpcResult<Option<AggregateCheckpointHeader>>;
+    ) -> RpcResult<Option<AggregateCheckpoint>>;
 
     #[method(name = "send_txn")]
     async fn send_txn(&self, tx: TransactionRequest) -> RpcResult<()>;
