@@ -39,7 +39,7 @@ impl UnixFsProtobufCodec {
     ) -> Result<IpldItem, IpldError> {
         match data.Type {
             DataType::Directory => {
-                id.merge(previous_path);
+                id.merge(previous_path, None);
                 let links = Link::get_links(&node.links);
                 Ok(IpldItem::to_dir(id.clone(), links))
             },

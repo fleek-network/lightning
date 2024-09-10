@@ -10,6 +10,11 @@ struct PrintProcessor;
 impl IpldItemProcessor for PrintProcessor {
     async fn on_item(&self, item: &Item) -> Result<(), IpldError> {
         println!("Item: {:?}", item);
+        let cid = "QmTPYQ2T8ten7RRN7pzxuty3ujbc8p2o242nQEfPQQ2jWA";
+        if item.is_cid(cid) {
+            println!("Found the file we were looking for!");
+            return Err(IpldError::MissingLink);
+        }
         Ok(())
     }
 }

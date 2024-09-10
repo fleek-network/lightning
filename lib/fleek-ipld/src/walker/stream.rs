@@ -54,6 +54,22 @@ pub enum Item {
     Skip,
 }
 
+impl Item {
+    pub fn cid(&self) -> Option<&Cid> {
+        match self {
+            Item::Directory(dir) => Some(dir.id.cid()),
+            Item::File(file) => Some(file.id.cid()),
+            Item::Skip => None,
+        }
+    }
+
+    pub fn is_cid(&self, cid: &str) -> bool {
+        Cid::try_from(cid)
+            .map(|cid| Some(&cid) == self.cid())
+            .unwrap_or(false)
+    }
+}
+
 #[async_trait]
 pub trait IpldItemProcessor {
     async fn on_item(&self, item: &Item) -> Result<(), IpldError>;
@@ -105,7 +121,7 @@ pub struct IpldStream<C, D, P> {
     processor: Arc<P>,
 }
 
-#[derive(Default, Clone, TypedBuilder)]
+#[derive(Default, Debug, Clone, TypedBuilder)]
 struct Metadata {
     #[builder(default = PathBuf::new())]
     parent_path: PathBuf,
@@ -150,16 +166,13 @@ where
         }
         let futures = links.clone().into_iter().enumerate().map(|(i, link)| {
             let parent_path = parent_item.path().clone();
-            let mut metadata = Metadata::builder().parent_path(parent_path.clone()).build();
-            if !item.is_dir() {
-                metadata = Metadata::builder()
-                    .parent_path(parent_path)
-                    .size(*link.size())
-                    .name(link.name().clone())
-                    .index(i as u64)
-                    .total(links.len() as u64)
-                    .build();
-            }
+            let metadata = Metadata::builder()
+                .parent_path(parent_path)
+                .size(*link.size())
+                .name(link.name().clone())
+                .index(i as u64)
+                .total(links.len() as u64)
+                .build();
             self.process(*link.cid(), metadata)
         });
         tokio_stream::iter(futures)
@@ -174,7 +187,7 @@ where
         let response = self.downloader.download(&cid).await?;
         let mut reader = self.reader.clone();
         let mut item = reader.read(cid, response).await?;
-        item.merge_path(&metadata.parent_path);
+        item.merge_path(&metadata.parent_path, metadata.name.as_deref());
         let to_item = to_item(&item, metadata);
         self.processor.on_item(&to_item).await?;
         Ok(item)

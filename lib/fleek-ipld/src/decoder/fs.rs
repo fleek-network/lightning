@@ -67,9 +67,12 @@ impl DocId {
         &self.path
     }
 
-    pub fn merge(&mut self, previous_item: Option<&PathBuf>) {
+    pub fn merge(&mut self, previous_item: Option<&PathBuf>, name: Option<&str>) {
         let mut path = previous_item.cloned().unwrap_or_default();
         path.push(self.path());
+        if let Some(name) = name {
+            path.push(name);
+        }
         self.path = path;
     }
 }
@@ -190,11 +193,11 @@ impl IpldItem {
         }
     }
 
-    pub fn merge_path(&mut self, path: &PathBuf) {
+    pub fn merge_path(&mut self, path: &PathBuf, name: Option<&str>) {
         match self {
-            Self::Dir(DirItem { id, .. }) => id.merge(Some(path)),
-            Self::ChunkedFile(ChunkFileItem { id, .. }) => id.merge(Some(path)),
-            Self::File(FileItem { id, .. }) => id.merge(Some(path)),
+            Self::Dir(DirItem { id, .. }) => id.merge(Some(path), name),
+            Self::ChunkedFile(ChunkFileItem { id, .. }) => id.merge(Some(path), name),
+            Self::File(FileItem { id, .. }) => id.merge(Some(path), name),
         }
     }
 }
