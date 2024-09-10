@@ -52,6 +52,7 @@ rand.workspace = true
 hex = "0.4.3"
 
 [dev-dependencies]
+bit-set.workspace = true
 reqwest.workspace = true
 lightning-test-utils = { path = "../test-utils" }
 lightning-fetcher = { path = "../fetcher" }

@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use bit_set::BitSet;
 use fleek_crypto::{AccountOwnerSecretKey, EthAddress, SecretKey};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_application::env::ApplicationStateTree;
@@ -7,6 +8,7 @@ use lightning_interfaces::prelude::*;
 use lightning_test_utils::e2e::TestNetworkBuilder;
 use lightning_types::{
     AccountInfo,
+    AggregateCheckpointHeader,
     Event,
     GenesisAccount,
     GenesisNodeServed,
@@ -21,7 +23,7 @@ use lightning_types::{
     Value,
 };
 use lightning_utils::application::QueryRunnerExt;
-use merklize::StateProof;
+use merklize::{StateProof, StateRootHash};
 
 use crate::api::{AdminApiClient, FleekApiClient};
 
@@ -707,6 +709,68 @@ async fn test_rpc_get_state_proof() {
             root_hash,
         )
         .unwrap();
+
+    network.shutdown().await;
+}
+
+#[tokio::test]
+async fn test_rpc_get_aggregate_checkpoint() {
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    let mut network = TestNetworkBuilder::new()
+        .with_num_nodes(1)
+        .with_genesis_mutator(move |genesis| {
+            genesis.account.push(GenesisAccount {
+                public_key: owner_secret_key.to_pk().into(),
+                flk_balance: 1000u64.into(),
+                stables_balance: 0,
+                bandwidth_balance: 0,
+            });
+        })
+        .build()
+        .await
+        .unwrap();
+    let node = network.node(0).unwrap();
+    let client = node.rpc_client().unwrap();
+    let epoch = 1001;
+
+    // Should initially be `None`
+    let response = FleekApiClient::get_aggregate_checkpoint(&client, epoch)
+        .await
+        .unwrap();
+    assert!(response.is_none());
+
+    // Emit epoch change notification to trigger checkpoint.
+    network
+        .notify_epoch_changed(
+            epoch,
+            StateRootHash::default(),
+            StateRootHash::default(),
+            [0u8; 32],
+        )
+        .await;
+
+    // Wait for the aggregate checkpoint to be available.
+    let _aggregate_checkpoint_by_node = network
+        .wait_for_aggregate_checkpoint_header(epoch, |header_by_node| {
+            header_by_node.values().all(|header| header.is_some())
+        })
+        .await;
+
+    // Get the aggregate checkpoint via RPC.
+    let response = FleekApiClient::get_aggregate_checkpoint(&client, epoch)
+        .await
+        .unwrap();
+    assert!(response.is_some());
+    let aggregate_checkpoint = response.unwrap();
+    assert_eq!(
+        aggregate_checkpoint,
+        AggregateCheckpointHeader {
+            epoch,
+            state_root: StateRootHash::default(),
+            nodes: BitSet::from_iter(vec![0]),
+            signature: aggregate_checkpoint.signature,
+        }
+    );
 
     network.shutdown().await;
 }
