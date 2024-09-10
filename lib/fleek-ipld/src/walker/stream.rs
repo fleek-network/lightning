@@ -91,9 +91,7 @@ impl ReqwestDownloader {
 
 impl Downloader for ReqwestDownloader {
     async fn download(&self, cid: &Cid) -> Result<Response, IpldError> {
-        let url = self
-            .url
-            .join(&format!("ipfs/{}?format=raw", cid.to_string()))?;
+        let url = self.url.join(&format!("ipfs/{}?format=raw", cid))?;
         let response = reqwest::get(url).await?;
         let stream = response.bytes_stream().map_err(Into::into);
         Ok(Box::pin(stream))
