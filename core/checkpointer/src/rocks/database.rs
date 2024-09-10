@@ -3,14 +3,14 @@ use std::sync::{Arc, Mutex};
 
 use atomo::{Atomo, AtomoBuilder, DefaultSerdeBackend, UpdatePerm};
 use atomo_rocks::{Options, RocksBackend, RocksBackendBuilder};
-use lightning_interfaces::types::{AggregateCheckpointHeader, CheckpointHeader, Epoch, NodeIndex};
+use lightning_interfaces::types::{AggregateCheckpoint, CheckpointAttestation, Epoch, NodeIndex};
 
 use super::query::RocksCheckpointerDatabaseQuery;
 use crate::database::CheckpointerDatabase;
 use crate::CheckpointerDatabaseConfig;
 
-pub(crate) const NODE_CHECKPOINT_HEADERS_TABLE: &str = "node_checkpoint_headers";
-pub(crate) const AGGREGATE_CHECKPOINT_HEADERS_TABLE: &str = "aggregate_checkpoint_headers";
+pub(crate) const NODE_CHECKPOINT_HEADERS_TABLE: &str = "node_checkpoint_attestations";
+pub(crate) const AGGREGATE_CHECKPOINT_HEADERS_TABLE: &str = "aggregate_checkpoints";
 
 /// A checkpointer database writer that uses RocksDB as the underlying datastore.
 ///
@@ -36,10 +36,10 @@ impl CheckpointerDatabase for RocksCheckpointerDatabase {
 
         let builder = RocksBackendBuilder::new(config.path.to_path_buf()).with_options(options);
         let builder = AtomoBuilder::new(builder)
-            .with_table::<Epoch, HashMap<NodeIndex, CheckpointHeader>>(
+            .with_table::<Epoch, HashMap<NodeIndex, CheckpointAttestation>>(
                 NODE_CHECKPOINT_HEADERS_TABLE,
             )
-            .with_table::<Epoch, AggregateCheckpointHeader>(AGGREGATE_CHECKPOINT_HEADERS_TABLE);
+            .with_table::<Epoch, AggregateCheckpoint>(AGGREGATE_CHECKPOINT_HEADERS_TABLE);
 
         let db = builder.build().unwrap();
         let db = Arc::new(Mutex::new(db));
@@ -51,9 +51,9 @@ impl CheckpointerDatabase for RocksCheckpointerDatabase {
         RocksCheckpointerDatabaseQuery::new(self.atomo.lock().unwrap().query())
     }
 
-    fn set_node_checkpoint_header(&self, epoch: Epoch, header: CheckpointHeader) {
+    fn set_node_checkpoint_attestation(&self, epoch: Epoch, header: CheckpointAttestation) {
         self.atomo.lock().unwrap().run(|ctx| {
-            let mut table = ctx.get_table::<Epoch, HashMap<NodeIndex, CheckpointHeader>>(
+            let mut table = ctx.get_table::<Epoch, HashMap<NodeIndex, CheckpointAttestation>>(
                 NODE_CHECKPOINT_HEADERS_TABLE,
             );
 
@@ -63,10 +63,10 @@ impl CheckpointerDatabase for RocksCheckpointerDatabase {
         });
     }
 
-    fn set_aggregate_checkpoint_header(&self, epoch: Epoch, header: AggregateCheckpointHeader) {
+    fn set_aggregate_checkpoint(&self, epoch: Epoch, header: AggregateCheckpoint) {
         self.atomo.lock().unwrap().run(|ctx| {
-            let mut table = ctx
-                .get_table::<Epoch, AggregateCheckpointHeader>(AGGREGATE_CHECKPOINT_HEADERS_TABLE);
+            let mut table =
+                ctx.get_table::<Epoch, AggregateCheckpoint>(AGGREGATE_CHECKPOINT_HEADERS_TABLE);
 
             table.insert(epoch, header);
         });

@@ -4,7 +4,7 @@ use anyhow::Result;
 use bit_set::BitSet;
 use fleek_crypto::ConsensusAggregateSignature;
 use lightning_interfaces::prelude::*;
-use lightning_interfaces::types::{AggregateCheckpointHeader, CheckpointHeader, Epoch, NodeIndex};
+use lightning_interfaces::types::{AggregateCheckpoint, CheckpointAttestation, Epoch, NodeIndex};
 use lightning_utils::application::QueryRunnerExt;
 use merklize::StateRootHash;
 use types::NodeInfo;
@@ -34,17 +34,17 @@ impl<C: Collection> AggregateCheckpointBuilder<C> {
     }
 
     // Check if we have a supermajority of attestations that are in agreement on the next state root
-    // for the epoch. If so, build an aggregate checkpoint header, and save it to the local
+    // for the epoch. If so, build an aggregate checkpoint, and save it to the local
     // database.
     //
-    // We assume that the checkpoint header signatures have been validated and deduplicated by the
-    // time they reach this point.
+    // We assume that the checkpoint attestation signatures have been validated and deduplicated by
+    // the time they reach this point.
     pub fn build_and_save_aggregate_if_supermajority(
         &self,
         epoch: Epoch,
         nodes_count: usize,
     ) -> Result<()> {
-        let headers = self.db.query().get_checkpoint_headers(epoch);
+        let headers = self.db.query().get_checkpoint_attestations(epoch);
 
         let mut headers_by_state_root = HashMap::new();
         for header in headers.values() {
@@ -59,15 +59,14 @@ impl<C: Collection> AggregateCheckpointBuilder<C> {
                 tracing::info!("checkpoint supermajority reached for epoch {}", epoch);
 
                 // We have a supermajority of attestations in agreement for the epoch.
-                let aggregate_header = self.build_aggregate_checkpoint_header(
+                let aggregate_header = self.build_aggregate_checkpoint(
                     epoch,
                     header.next_state_root,
                     state_root_headers,
                 )?;
 
                 // Save the aggregate signature to the local database.
-                self.db
-                    .set_aggregate_checkpoint_header(epoch, aggregate_header);
+                self.db.set_aggregate_checkpoint(epoch, aggregate_header);
 
                 break;
             } else {
@@ -78,12 +77,12 @@ impl<C: Collection> AggregateCheckpointBuilder<C> {
         Ok(())
     }
 
-    fn build_aggregate_checkpoint_header(
+    fn build_aggregate_checkpoint(
         &self,
         epoch: Epoch,
         state_root: StateRootHash,
-        state_root_headers: &HashSet<&CheckpointHeader>,
-    ) -> Result<AggregateCheckpointHeader> {
+        state_root_headers: &HashSet<&CheckpointAttestation>,
+    ) -> Result<AggregateCheckpoint> {
         // Aggregate the signatures.
         let signatures = state_root_headers
             .iter()
@@ -99,8 +98,8 @@ impl<C: Collection> AggregateCheckpointBuilder<C> {
                 .map(|header| header.node_id as usize),
         );
 
-        // Create the aggregate checkpoint header.
-        let aggregate_header = AggregateCheckpointHeader {
+        // Create the aggregate checkpoint.
+        let aggregate_header = AggregateCheckpoint {
             epoch,
             state_root,
             signature: aggregate_signature,

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use lightning_interfaces::types::{AggregateCheckpointHeader, CheckpointHeader, Epoch, NodeIndex};
+use lightning_interfaces::types::{AggregateCheckpoint, CheckpointAttestation, Epoch, NodeIndex};
 
 use crate::config::CheckpointerDatabaseConfig;
 
@@ -22,14 +22,14 @@ pub trait CheckpointerDatabase: Clone + Send + Sync {
     /// Get the query instance for this database.
     fn query(&self) -> Self::Query;
 
-    /// Set the checkpoint header for the given epoch and node.
-    fn set_node_checkpoint_header(&self, epoch: Epoch, header: CheckpointHeader);
+    /// Set the checkpoint attestation for the given epoch and node.
+    fn set_node_checkpoint_attestation(&self, epoch: Epoch, header: CheckpointAttestation);
 
-    /// Set the aggregate checkpoint header for the given epoch.
+    /// Set the aggregate checkpoint for the given epoch.
     ///
     /// There is just a single one of these per epoch, and any existing entry for the epoch will
     /// be overwritten.
-    fn set_aggregate_checkpoint_header(&self, epoch: Epoch, header: AggregateCheckpointHeader);
+    fn set_aggregate_checkpoint(&self, epoch: Epoch, header: AggregateCheckpoint);
 }
 
 /// A trait for a checkpointer database query, encapsulating the database query operations that
@@ -38,16 +38,19 @@ pub trait CheckpointerDatabase: Clone + Send + Sync {
 /// There can be many query instances for a given database, and they can be shared between
 /// multiple threads.
 pub trait CheckpointerDatabaseQuery {
-    /// Get the map of checkpoint headers by node for the given epoch.
-    fn get_checkpoint_headers(&self, epoch: Epoch) -> HashMap<NodeIndex, CheckpointHeader>;
+    /// Get the map of checkpoint attestations by node for the given epoch.
+    fn get_checkpoint_attestations(
+        &self,
+        epoch: Epoch,
+    ) -> HashMap<NodeIndex, CheckpointAttestation>;
 
-    /// Get the checkpoint header for the given epoch and node.
-    fn get_node_checkpoint_header(
+    /// Get the checkpoint attestation for the given epoch and node.
+    fn get_node_checkpoint_attestation(
         &self,
         epoch: Epoch,
         node_id: NodeIndex,
-    ) -> Option<CheckpointHeader>;
+    ) -> Option<CheckpointAttestation>;
 
-    /// Get the aggregate checkpoint header for the given epoch.
-    fn get_aggregate_checkpoint_header(&self, epoch: Epoch) -> Option<AggregateCheckpointHeader>;
+    /// Get the aggregate checkpoint for the given epoch.
+    fn get_aggregate_checkpoint(&self, epoch: Epoch) -> Option<AggregateCheckpoint>;
 }

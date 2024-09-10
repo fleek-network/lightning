@@ -8,7 +8,7 @@ use lightning_interfaces::prelude::*;
 use lightning_test_utils::e2e::TestNetworkBuilder;
 use lightning_types::{
     AccountInfo,
-    AggregateCheckpointHeader,
+    AggregateCheckpoint,
     Event,
     GenesisAccount,
     GenesisNodeServed,
@@ -729,7 +729,7 @@ async fn test_rpc_get_aggregate_checkpoint() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0).unwrap();
+    let node = network.node(0);
     let client = node.rpc_client().unwrap();
     let epoch = 1001;
 
@@ -751,7 +751,7 @@ async fn test_rpc_get_aggregate_checkpoint() {
 
     // Wait for the aggregate checkpoint to be available.
     let _aggregate_checkpoint_by_node = network
-        .wait_for_aggregate_checkpoint_header(epoch, |header_by_node| {
+        .wait_for_aggregate_checkpoint(epoch, |header_by_node| {
             header_by_node.values().all(|header| header.is_some())
         })
         .await;
@@ -764,7 +764,7 @@ async fn test_rpc_get_aggregate_checkpoint() {
     let aggregate_checkpoint = response.unwrap();
     assert_eq!(
         aggregate_checkpoint,
-        AggregateCheckpointHeader {
+        AggregateCheckpoint {
             epoch,
             state_root: StateRootHash::default(),
             nodes: BitSet::from_iter(vec![0]),

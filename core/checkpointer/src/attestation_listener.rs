@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use atomo::{DefaultSerdeBackend, SerdeBackend};
 use fleek_crypto::{ConsensusPublicKey, ConsensusSignature, PublicKey};
 use lightning_interfaces::prelude::*;
-use lightning_interfaces::types::CheckpointHeader;
+use lightning_interfaces::types::CheckpointAttestation;
 use tokio::task::JoinHandle;
 
 use crate::aggregate_builder::AggregateCheckpointBuilder;
@@ -14,7 +14,7 @@ use crate::rocks::RocksCheckpointerDatabase;
 /// messages and saving them to the local database.
 ///
 /// When a supermajority of attestations for epochs are consistent, it aggregates the BLS
-/// signatures to create a canonical aggregate checkpoint header, which is saves to the local
+/// signatures to create a canonical aggregate checkpoint, which is saves to the local
 /// database for sharing with other nodes and clients in the future.
 pub struct AttestationListener<C: Collection> {
     db: RocksCheckpointerDatabase,
@@ -67,8 +67,8 @@ impl<C: Collection> AttestationListener<C> {
                 Some(msg) = self.pubsub.recv() => {
                     tracing::debug!("received checkpoint attestation message: {:?}", msg);
                     match msg {
-                        CheckpointBroadcastMessage::CheckpointHeader(checkpoint_header) => {
-                            self.handle_incoming_checkpoint_header(checkpoint_header)?;
+                        CheckpointBroadcastMessage::CheckpointAttestation(attestation) => {
+                            self.handle_incoming_checkpoint_attestation(attestation)?;
                         }
                     }
                 }
@@ -83,16 +83,16 @@ impl<C: Collection> AttestationListener<C> {
         Ok(())
     }
 
-    fn handle_incoming_checkpoint_header(
+    fn handle_incoming_checkpoint_attestation(
         &mut self,
-        checkpoint_header: CheckpointHeader,
+        attestation: CheckpointAttestation,
     ) -> Result<()> {
-        let epoch = checkpoint_header.epoch;
+        let epoch = attestation.epoch;
         // Ignore if from node that is not in the eligible node set.
         let nodes = self.aggregate.get_eligible_nodes();
-        if !nodes.contains_key(&checkpoint_header.node_id) {
+        if !nodes.contains_key(&attestation.node_id) {
             tracing::debug!(
-                "ignoring incoming checkpoint header for epoch {}, node not in eligible node set",
+                "ignoring incoming checkpoint attestation for epoch {}, node not in eligible node set",
                 epoch
             );
             return Ok(());
@@ -101,50 +101,47 @@ impl<C: Collection> AttestationListener<C> {
         // Get the node's consensus BLS public key.
         let node_consensus_key = match self
             .app_query
-            .get_node_info(&checkpoint_header.node_id, |node| node.consensus_key)
+            .get_node_info(&attestation.node_id, |node| node.consensus_key)
         {
             Some(key) => key,
             None => {
-                tracing::warn!(
-                    "checkpointer header node {} not found",
-                    checkpoint_header.node_id
-                );
+                tracing::warn!("checkpointer header node {} not found", attestation.node_id);
                 return Ok(());
             },
         };
 
-        // Validate the incoming checkpoint header; ignore if invalid.
-        if let Err(e) = self.validate_checkpoint_header(&checkpoint_header, node_consensus_key) {
+        // Validate the incoming checkpoint attestation, and ignore if invalid.
+        if let Err(e) = self.validate_checkpoint_attestation(&attestation, node_consensus_key) {
             tracing::info!(
-                "ignoring incoming checkpoint header for epoch {}, invalid signature: {:?}",
+                "ignoring incoming checkpoint attestation for epoch {}, invalid signature: {:?}",
                 epoch,
                 e
             );
             return Ok(());
         }
 
-        // Save the incoming checkpoint header attestation to the database.
-        self.db.set_node_checkpoint_header(epoch, checkpoint_header);
+        // Save the incoming checkpoint attestation to the database.
+        self.db.set_node_checkpoint_attestation(epoch, attestation);
 
         // If there is a supermajority of eligible nodes in agreement, build and save an aggregate
-        // checkpoint header.
+        // checkpoint.
         self.aggregate
             .build_and_save_aggregate_if_supermajority(epoch, nodes.len())?;
 
         Ok(())
     }
 
-    fn validate_checkpoint_header(
+    fn validate_checkpoint_attestation(
         &self,
-        header: &CheckpointHeader,
+        header: &CheckpointAttestation,
         node_consensus_key: ConsensusPublicKey,
     ) -> Result<()> {
-        let serialized_signed_header = DefaultSerdeBackend::serialize(&CheckpointHeader {
+        let serialized_signed_header = DefaultSerdeBackend::serialize(&CheckpointAttestation {
             signature: ConsensusSignature::default(),
             ..header.clone()
         });
         if !node_consensus_key.verify(&header.signature, &serialized_signed_header)? {
-            return Err(anyhow::anyhow!("invalid checkpoint header signature"));
+            return Err(anyhow::anyhow!("invalid checkpoint attestation signature"));
         }
 
         Ok(())
