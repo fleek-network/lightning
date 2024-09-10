@@ -2,6 +2,8 @@ mod bindings;
 mod genesis;
 mod network;
 mod network_builder;
+mod network_checkpointer;
+mod network_notifier;
 mod node;
 mod node_app;
 mod node_builder;

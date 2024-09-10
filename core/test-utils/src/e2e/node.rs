@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use fleek_crypto::{ConsensusSecretKey, NodeSecretKey};
 use lightning_application::Application;
 use lightning_broadcast::Broadcast;
+use lightning_checkpointer::Checkpointer;
 use lightning_interfaces::prelude::*;
 use lightning_notifier::Notifier;
 use lightning_pool::PoolProvider;
@@ -23,6 +24,7 @@ pub struct TestNode {
 
     pub app: fdi::Ref<Application<TestNodeComponents>>,
     pub broadcast: fdi::Ref<Broadcast<TestNodeComponents>>,
+    pub checkpointer: fdi::Ref<Checkpointer<TestNodeComponents>>,
     pub forwarder: fdi::Ref<MockForwarder<TestNodeComponents>>,
     pub keystore: fdi::Ref<EphemeralKeystore<TestNodeComponents>>,
     pub notifier: fdi::Ref<Notifier<TestNodeComponents>>,

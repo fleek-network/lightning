@@ -7849,6 +7849,7 @@ dependencies = [
  "lightning-blockstore",
  "lightning-blockstore-server",
  "lightning-broadcast",
+ "lightning-checkpointer",
  "lightning-consensus",
  "lightning-forwarder",
  "lightning-interfaces",

@@ -157,6 +157,7 @@ pub async fn metrics() -> (StatusCode, String) {
 
 impl<C: Collection> Rpc<C> {
     /// Initialize the RPC-server, with the given parameters.
+    #[allow(clippy::too_many_arguments)]
     fn init(
         config_provider: &C::ConfigProviderInterface,
         forwarder: &C::ForwarderInterface,
