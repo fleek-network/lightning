@@ -198,6 +198,7 @@ impl_method!([], [R0 R1 R2 R3], [E0 E1 E2]);
 impl_method!([], [R0 R1 R2 R3 R4], []);
 impl_method!([], [R0 R1 R2 R3 R4], [E0]);
 impl_method!([], [R0 R1 R2 R3 R4], [E0 E1]);
+impl_method!([], [R0 R1 R2 R3 R4], [E0 E1 E2]);
 impl_method!([], [R0 R1 R2 R3 R4 R5], []);
 impl_method!([], [R0 R1 R2 R3 R4 R5], [E0]);
 impl_method!([], [R0 R1 R2 R3 R4 R5 R6], []);

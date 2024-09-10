@@ -30,7 +30,7 @@ use lightning_interfaces::types::{
     Value,
 };
 use lightning_interfaces::PagingParams;
-use lightning_types::{StateProofKey, StateProofValue};
+use lightning_types::{AggregateCheckpointHeader, StateProofKey, StateProofValue};
 use lightning_utils::application::QueryRunnerExt;
 use merklize::{StateRootHash, StateTree};
 
@@ -416,6 +416,17 @@ impl<C: Collection> FleekApiServer for FleekApi<C> {
             .get_state_proof(key)
             .map_err(|e| RPCError::custom(e.to_string()))?;
         Ok((value, proof))
+    }
+
+    /// Returns the aggregate checkpoint for a given epoch that was stored by this node.
+    async fn get_aggregate_checkpoint(
+        &self,
+        epoch: Epoch,
+    ) -> RpcResult<Option<AggregateCheckpointHeader>> {
+        Ok(self
+            .data
+            .checkpointer_query
+            .get_aggregate_checkpoint_header(epoch))
     }
 
     async fn send_txn(&self, tx: TransactionRequest) -> RpcResult<()> {

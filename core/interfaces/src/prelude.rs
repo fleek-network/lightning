@@ -42,6 +42,7 @@ pub use crate::{
     BroadcastEventInterface,
     BroadcastInterface,
     CheckpointerInterface,
+    CheckpointerQueryInterface,
     Collection,
     ConfigConsumer,
     ConfigProviderInterface,
