@@ -191,8 +191,9 @@ async fn test_rpc_get_flk_balance() -> Result<()> {
     let node = init_rpc(&temp_dir, genesis_path, port).await;
 
     wait_for_server_start(port).await?;
+    let ready = node.rpc().wait_for_ready().await;
 
-    let client = RpcClient::new_no_auth(&format!("http://127.0.0.1:{port}/rpc/v0"))?;
+    let client = RpcClient::new_no_auth(&format!("http://{}/rpc/v0", ready.listen_address))?;
     let response = FleekApiClient::get_flk_balance(&client, eth_address, None).await?;
 
     assert_eq!(HpUfixed::<18>::from(1_000_u32), response);
@@ -245,8 +246,9 @@ async fn test_rpc_get_reputation() -> Result<()> {
     let node = init_rpc(&temp_dir, genesis_path, port).await;
 
     wait_for_server_start(port).await?;
+    let ready = node.rpc().wait_for_ready().await;
 
-    let client = RpcClient::new_no_auth(&format!("http://127.0.0.1:{port}/rpc/v0"))?;
+    let client = RpcClient::new_no_auth(&format!("http://{}/rpc/v0", ready.listen_address))?;
     let response = FleekApiClient::get_reputation(&client, node_public_key, None).await?;
 
     assert_eq!(Some(46), response);
@@ -304,9 +306,11 @@ async fn test_rpc_get_staked() -> Result<()> {
 
     let port = 30003;
     let node = init_rpc(&temp_dir, genesis_path, port).await;
-    wait_for_server_start(port).await?;
 
-    let client = RpcClient::new_no_auth(&format!("http://127.0.0.1:{port}/rpc/v0"))?;
+    wait_for_server_start(port).await?;
+    let ready = node.rpc().wait_for_ready().await;
+
+    let client = RpcClient::new_no_auth(&format!("http://{}/rpc/v0", ready.listen_address))?;
     let response = FleekApiClient::get_staked(&client, node_public_key, None).await?;
 
     assert_eq!(HpUfixed::<18>::from(1_000_u32), response);

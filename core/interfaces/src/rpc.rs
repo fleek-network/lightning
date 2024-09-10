@@ -1,6 +1,8 @@
+use std::net::SocketAddr;
 use std::path::PathBuf;
 
 use fdi::BuildGraph;
+use ready::ReadyWaiterState;
 use tokio::sync::broadcast;
 
 use crate::collection::Collection;
@@ -38,10 +40,18 @@ impl Events {
 /// port (possibly an HTTP server) and accepts queries or updates from the user.
 #[interfaces_proc::blank]
 pub trait RpcInterface<C: Collection>: ConfigConsumer + BuildGraph + Sized + Send + Sync {
+    type ReadyState: ReadyWaiterState;
+
     /// Panics if the event handler is not available.
     fn event_tx(&self) -> Events;
 
     fn port(config: &<Self as ConfigConsumer>::Config) -> u16;
 
     fn hmac_secret_dir(config: &<Self as ConfigConsumer>::Config) -> Option<PathBuf>;
+
+    /// Wait for the server to be ready after starting.
+    async fn wait_for_ready(&self) -> Self::ReadyState;
+
+    /// Get the listen address of the RPC server.
+    fn listen_address(&self) -> Option<SocketAddr>;
 }

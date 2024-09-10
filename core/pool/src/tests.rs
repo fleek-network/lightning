@@ -222,7 +222,7 @@ async fn test_pool_with_random_listen_address() {
     // Check that the peer pools are ready with the correct listen address.
     let mut listen_addrs = HashSet::new();
     for peer in &peers {
-        let ready_state = peer.pool().wait_for_ready().await.unwrap();
+        let ready_state = peer.pool().wait_for_ready().await;
         let listen_addr = ready_state.listen_address.unwrap();
         listen_addrs.insert(listen_addr);
         assert_ne!(ready_state.listen_address, None);
@@ -280,7 +280,7 @@ async fn test_send_to_one() {
     // Check that the peer pools are ready with the correct listen address.
     for (i, peer) in peers.iter().enumerate() {
         let expected_listen_addr = format!("0.0.0.0:{}", 48000 + i);
-        let ready_state = peer.pool().wait_for_ready().await.unwrap();
+        let ready_state = peer.pool().wait_for_ready().await;
         assert_eq!(
             ready_state.listen_address.unwrap().to_string(),
             expected_listen_addr

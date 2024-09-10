@@ -41,6 +41,7 @@ lightning-openrpc-macros = { path = "../rpc-openrpc-macros" }
 lightning-utils = { path = "../utils" }
 merklize.workspace = true
 alloy-primitives = "0.5.2"
+ready.workspace = true
 resolved-pathbuf = { path = "../../lib/resolved-pathbuf" }
 
 futures.workspace = true

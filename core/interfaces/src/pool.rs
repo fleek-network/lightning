@@ -54,7 +54,7 @@ pub trait PoolInterface<C: Collection>: BuildGraph + Send + Sync + Sized + 'stat
     fn open_req_res(&self, scope: ServiceScope) -> (Self::Requester, Self::Responder);
 
     /// Wait for the pool to be ready and return the listen address.
-    async fn wait_for_ready(&self) -> io::Result<Self::ReadyState>;
+    async fn wait_for_ready(&self) -> Self::ReadyState;
 
     /// Returns the local address the pool is listening on.
     ///

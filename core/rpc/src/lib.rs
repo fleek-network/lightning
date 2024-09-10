@@ -1,4 +1,5 @@
 use std::fs::read_to_string;
+use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -12,6 +13,8 @@ use lightning_interfaces::{Events, FetcherSocket, MempoolSocket};
 use lightning_utils::config::LIGHTNING_HOME_DIR;
 use once_cell::sync::Lazy;
 use rand::{RngCore, SeedableRng};
+use ready::tokio::TokioReadyWaiter;
+use ready::ReadyWaiter;
 use reqwest::StatusCode;
 use resolved_pathbuf::ResolvedPathBuf;
 
@@ -137,6 +140,7 @@ pub struct Rpc<C: Collection> {
     admin_module: RpcModule<()>,
     data: Arc<Data<C>>,
     secret: [u8; 32],
+    ready: RpcReadyWaiter,
 }
 
 pub async fn health() -> &'static str {
@@ -186,6 +190,7 @@ impl<C: Collection> Rpc<C> {
             admin_module,
             data,
             secret,
+            ready: Default::default(),
         })
     }
 
@@ -211,6 +216,11 @@ impl<C: Collection> Rpc<C> {
 
         let addr = self.config.addr();
         let server = hyper::Server::bind(&addr).serve(rpc_server);
+
+        // Notify that we are ready and listening.
+        self.ready.notify(RpcReadyState {
+            listen_address: server.local_addr(),
+        });
 
         let panic_waiter = shutdown.clone();
         spawn!(
@@ -276,6 +286,8 @@ impl<C: Collection> Rpc<C> {
 }
 
 impl<C: Collection> RpcInterface<C> for Rpc<C> {
+    type ReadyState = RpcReadyState;
+
     fn event_tx(&self) -> Events {
         self.data.events.clone()
     }
@@ -286,6 +298,19 @@ impl<C: Collection> RpcInterface<C> for Rpc<C> {
 
     fn hmac_secret_dir(config: &<Self as ConfigConsumer>::Config) -> Option<PathBuf> {
         config.hmac_secret_dir.clone()
+    }
+
+    /// Wait for the server to be ready after starting.
+    async fn wait_for_ready(&self) -> Self::ReadyState {
+        self.ready.wait().await
+    }
+
+    /// Returns the address the RPC server is listening on.
+    fn listen_address(&self) -> Option<SocketAddr> {
+        if !self.ready.is_ready() {
+            return None;
+        }
+        self.ready.state().map(|state| state.listen_address)
     }
 }
 
@@ -298,6 +323,21 @@ impl<C: Collection> ConfigConsumer for Rpc<C> {
 impl<C: Collection> fdi::BuildGraph for Rpc<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::default().with(Self::init.with_event_handler("start", Self::start))
+    }
+}
+
+pub type RpcReadyWaiter = TokioReadyWaiter<RpcReadyState>;
+
+#[derive(Clone)]
+pub struct RpcReadyState {
+    pub listen_address: SocketAddr,
+}
+
+impl Default for RpcReadyState {
+    fn default() -> Self {
+        Self {
+            listen_address: "0.0.0.0:0".parse().unwrap(),
+        }
     }
 }
 

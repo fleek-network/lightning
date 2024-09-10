@@ -7656,6 +7656,7 @@ dependencies = [
  "merklize",
  "once_cell",
  "rand 0.8.5",
+ "ready",
  "reqwest",
  "resolved-pathbuf",
  "ruint",

@@ -195,8 +195,8 @@ impl<C: Collection> PoolInterface<C> for PoolProvider<C, QuinnMuxer> {
     }
 
     /// Wait for the pool to be ready and return the ready state.
-    async fn wait_for_ready(&self) -> io::Result<Self::ReadyState> {
-        Ok(self.ready.wait().await)
+    async fn wait_for_ready(&self) -> Self::ReadyState {
+        self.ready.wait().await
     }
 
     /// Returns the local address the pool is listening on.
