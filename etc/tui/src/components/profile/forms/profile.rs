@@ -7,13 +7,12 @@ use tokio::sync::mpsc::UnboundedSender;
 use tui_textarea::{Input, TextArea};
 
 use crate::action::Action;
-use crate::components::Component;
+use crate::components::utils::InputField;
+use crate::components::{utils, Component};
 use crate::config::Config;
 use crate::mode::Mode;
 use crate::state::State;
 use crate::tui::Frame;
-use crate::components::utils;
-use crate::components::utils::InputField;
 
 const PROFILE_NAME: &str = "Profile Name";
 const INPUT_FORM_X: u16 = 20;

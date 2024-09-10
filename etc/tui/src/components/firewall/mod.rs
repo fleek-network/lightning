@@ -10,10 +10,10 @@ use unicode_width::UnicodeWidthStr;
 
 use super::{Component, Frame};
 use crate::action::Action;
+use crate::components::utils::table::Table;
 use crate::config::Config;
 use crate::mode::Mode;
 use crate::state::State;
-use crate::components::utils::table::Table;
 
 const COLUMN_COUNT: usize = 6;
 

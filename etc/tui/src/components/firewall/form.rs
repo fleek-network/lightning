@@ -11,10 +11,11 @@ use tui_textarea::{Input, TextArea};
 
 use super::{Component, Frame};
 use crate::action::Action;
+use crate::components::utils::InputField;
+use crate::components::{self};
 use crate::config::Config;
 use crate::mode::Mode;
 use crate::state::State;
-use crate::components::{self, utils::InputField};
 
 const IP_FIELD_NAME: &str = "IP";
 const PORT_FIELD_NAME: &str = "Port";

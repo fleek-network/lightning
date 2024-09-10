@@ -10,10 +10,10 @@ pub use view::ProfileView;
 
 use super::{Component, Frame};
 use crate::action::Action;
+use crate::components::utils::list::List;
 use crate::config::Config;
 use crate::mode::Mode;
 use crate::state::State;
-use crate::components::utils::list::List;
 
 /// Component that displaying and managing security profiles.
 pub struct Profile {

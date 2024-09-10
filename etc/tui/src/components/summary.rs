@@ -6,8 +6,8 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use super::{Component, Frame};
 use crate::action::Action;
-use crate::config::Config;
 use crate::components::utils::table::Table;
+use crate::config::Config;
 
 /// Component for displaying summary statistics and event notification.
 #[derive(Default)]
