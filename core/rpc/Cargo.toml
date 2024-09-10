@@ -12,7 +12,7 @@ name = "generate-openrpc-spec"
 path = "src/spec/generate.rs"
 
 [dependencies]
-jsonrpsee = { version = "0.21", features = ["full"] }
+jsonrpsee.workspace = true
 serde.workspace = true
 async-trait.workspace = true
 serde_json.workspace = true
