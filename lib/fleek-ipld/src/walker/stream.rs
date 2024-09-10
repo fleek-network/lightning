@@ -167,28 +167,7 @@ where
             .collect::<Vec<Result<(), IpldError>>>()
             .await
             .into_iter()
-            .collect::<Result<(), IpldError>>()?;
-
-        //let mut set_links: JoinSet<Result<(), IpldError>> = JoinSet::new();
-        //for (i, link) in links.clone().into_iter().enumerate() {
-        //    let parent_path = parent_item.path().clone();
-        //    let mut metadata = Metadata::builder().parent_path(parent_path.clone()).build();
-        //    if !item.is_dir() {
-        //        metadata = Metadata::builder()
-        //            .parent_path(parent_path)
-        //            .size(*link.size())
-        //            .name(link.name().clone())
-        //            .index(i as u64)
-        //            .total(links.len() as u64)
-        //            .build();
-        //    }
-        //    let stream = self.clone();
-        //    set_links.spawn(async move { stream.process(link.cid(), metadata).await });
-        //}
-        //while let Some(res) = set_links.join_next().await {
-        //    res??;
-        //}
-        Ok(())
+            .collect::<Result<(), IpldError>>()
     }
 
     async fn download_item(&self, cid: Cid, metadata: Metadata) -> Result<IpldItem, IpldError> {
