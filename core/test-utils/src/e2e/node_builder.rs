@@ -5,6 +5,7 @@ use lightning_application::{Application, ApplicationConfig};
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_broadcast::Broadcast;
+use lightning_checkpointer::{Checkpointer, CheckpointerConfig, CheckpointerDatabaseConfig};
 use lightning_interfaces::prelude::*;
 use lightning_notifier::Notifier;
 use lightning_pool::{Config as PoolConfig, PoolProvider};
@@ -58,6 +59,13 @@ impl TestNodeBuilder {
         // Configure blockstore component.
         config.inject::<Blockstore<TestNodeComponents>>(BlockstoreConfig {
             root: self.home_dir.join("blockstore").try_into().unwrap(),
+        });
+
+        // Configure checkpointer component.
+        config.inject::<Checkpointer<TestNodeComponents>>(CheckpointerConfig {
+            database: CheckpointerDatabaseConfig {
+                path: self.home_dir.join("checkpointer").try_into().unwrap(),
+            },
         });
 
         // Configure consensus component.
@@ -137,12 +145,16 @@ impl TestNodeBuilder {
                 .provider
                 .get::<Application<TestNodeComponents>>()
                 .sync_query();
+            let checkpointer = node.provider.get::<Checkpointer<TestNodeComponents>>();
             let after_genesis_ready = after_genesis_ready.clone();
             let shutdown = shutdown.clone();
             spawn!(
                 async move {
                     // Wait for genesis to be applied.
                     app_query.wait_for_genesis().await;
+
+                    // Wait for the checkpointer to be ready.
+                    checkpointer.wait_for_ready().await;
 
                     // Notify that we are ready.
                     after_genesis_ready.notify(());
@@ -155,6 +167,7 @@ impl TestNodeBuilder {
         Ok(TestNode {
             app: node.provider.get::<Application<TestNodeComponents>>(),
             broadcast: node.provider.get::<Broadcast<TestNodeComponents>>(),
+            checkpointer: node.provider.get::<Checkpointer<TestNodeComponents>>(),
             forwarder: node.provider.get::<MockForwarder<TestNodeComponents>>(),
             keystore: node.provider.get::<EphemeralKeystore<TestNodeComponents>>(),
             notifier: node.provider.get::<Notifier<TestNodeComponents>>(),

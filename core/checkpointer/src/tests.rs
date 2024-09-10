@@ -6,11 +6,15 @@ use bit_set::BitSet;
 use fleek_crypto::{ConsensusSignature, SecretKey};
 use lightning_interfaces::types::{AggregateCheckpointHeader, CheckpointHeader};
 use lightning_interfaces::KeystoreInterface;
+use lightning_test_utils::e2e::{
+    TestNetworkBuilder,
+    TestNodeBuilder,
+    TestNodeComponents,
+    WaitUntilError,
+};
 use lightning_test_utils::keys::EphemeralKeystore;
 use pretty_assertions::assert_eq;
 use tempfile::tempdir;
-
-use crate::test_utils::{TestNetworkBuilder, TestNodeBuilder, TestNodeComponents, WaitUntilError};
 
 #[tokio::test]
 async fn test_start_shutdown() {
@@ -914,7 +918,6 @@ async fn test_multiple_different_attestations_from_same_node() {
     };
     header.signature = network
         .node(0)
-        .unwrap()
         .get_consensus_secret_key()
         .sign(DefaultSerdeBackend::serialize(&header).as_slice());
     network
@@ -946,7 +949,6 @@ async fn test_multiple_different_attestations_from_same_node() {
     };
     header.signature = network
         .node(0)
-        .unwrap()
         .get_consensus_secret_key()
         .sign(DefaultSerdeBackend::serialize(&header).as_slice());
     network

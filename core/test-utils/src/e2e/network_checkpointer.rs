@@ -4,7 +4,8 @@ use std::time::Duration;
 use anyhow::Result;
 use atomo::{DefaultSerdeBackend, SerdeBackend};
 use fleek_crypto::{ConsensusSignature, PublicKey};
-use futures::future::join_all;
+use lightning_checkpointer::CheckpointBroadcastMessage;
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
     AggregateCheckpointHeader,
     CheckpointHeader,
@@ -12,90 +13,11 @@ use lightning_interfaces::types::{
     NodeIndex,
     Topic,
 };
-use lightning_interfaces::{
-    BroadcastInterface,
-    CheckpointerInterface,
-    CheckpointerQueryInterface,
-    Emitter,
-    KeystoreInterface,
-    NotifierInterface,
-    PubSub,
-};
-use merklize::StateRootHash;
-use tempfile::TempDir;
 
-use super::{wait_until, TestNode, WaitUntilError};
-use crate::message::CheckpointBroadcastMessage;
-
-/// A network of test nodes.
-///
-/// This encapsulates the management of nodes and provides methods to interact with them.
-pub struct TestNetwork {
-    _temp_dir: TempDir,
-    pub node_by_id: HashMap<NodeIndex, TestNode>,
-}
+use super::{TestNetwork, WaitUntilError};
+use crate::e2e::wait_until;
 
 impl TestNetwork {
-    pub async fn new(temp_dir: TempDir, nodes: Vec<TestNode>) -> Result<Self> {
-        Ok(Self {
-            _temp_dir: temp_dir,
-
-            // We assume that at this point the genesis has been applied, otherwise this will panic.
-            node_by_id: nodes
-                .into_iter()
-                .map(|node| (node.get_id().expect("node id not found"), node))
-                .collect::<HashMap<_, _>>(),
-        })
-    }
-
-    pub fn nodes(&self) -> impl Iterator<Item = &TestNode> {
-        self.node_by_id.values()
-    }
-
-    pub fn node(&self, node_id: NodeIndex) -> Option<&TestNode> {
-        self.node_by_id.get(&node_id)
-    }
-
-    pub async fn shutdown(&mut self) {
-        join_all(self.node_by_id.values_mut().map(|node| node.shutdown())).await;
-    }
-
-    /// Emit an epoch changed notification to all nodes.
-    pub async fn notify_epoch_changed(
-        &self,
-        epoch: Epoch,
-        previous_state_root: StateRootHash,
-        new_state_root: StateRootHash,
-        last_epoch_hash: [u8; 32],
-    ) {
-        for node in self.nodes() {
-            self.notify_node_epoch_changed(
-                node.get_id().unwrap(),
-                epoch,
-                last_epoch_hash,
-                previous_state_root,
-                new_state_root,
-            )
-            .await;
-        }
-    }
-
-    /// Emit an epoch change notification to a specific node.
-    pub async fn notify_node_epoch_changed(
-        &self,
-        node_id: NodeIndex,
-        epoch: Epoch,
-        last_epoch_hash: [u8; 32],
-        previous_state_root: StateRootHash,
-        new_state_root: StateRootHash,
-    ) {
-        self.node(node_id)
-            .expect("node not found")
-            .notifier
-            .get_emitter()
-            .epoch_changed(epoch, last_epoch_hash, previous_state_root, new_state_root);
-    }
-
     /// Send a checkpoint attestation to a specific node via their broadcaster pubsub.
     pub async fn broadcast_checkpoint_header_via_node(
         &self,
@@ -103,7 +25,6 @@ impl TestNetwork {
         header: CheckpointHeader,
     ) -> Result<()> {
         self.node(node_id)
-            .expect("node not found")
             .broadcast
             .get_pubsub::<CheckpointBroadcastMessage>(Topic::Checkpoint)
             .send(&CheckpointBroadcastMessage::CheckpointHeader(header), None)
@@ -167,7 +88,7 @@ impl TestNetwork {
 
     /// Verify the signature of a checkpoint header.
     pub fn verify_checkpointer_header_signature(&self, header: CheckpointHeader) -> Result<bool> {
-        let header_node = self.node(header.node_id).unwrap();
+        let header_node = self.node(header.node_id);
         Ok(header_node.keystore.get_bls_pk().verify(
             &header.signature,
             DefaultSerdeBackend::serialize(&CheckpointHeader {
@@ -246,12 +167,7 @@ impl TestNetwork {
         let mut pks = agg_header
             .nodes
             .iter()
-            .map(|node_id| {
-                (
-                    node_id,
-                    self.node(node_id as u32).unwrap().keystore.get_bls_pk(),
-                )
-            })
+            .map(|node_id| (node_id, self.node(node_id as u32).keystore.get_bls_pk()))
             .collect::<Vec<_>>();
         pks.sort_by_key(|(node_id, _)| *node_id);
         let pks = pks.into_iter().map(|(_, pk)| pk).collect::<Vec<_>>();

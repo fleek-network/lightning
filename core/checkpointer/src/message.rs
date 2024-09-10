@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 /// The message envelope that is broadcasted to all nodes in the network on the checkpointer topic.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) enum CheckpointBroadcastMessage {
+pub enum CheckpointBroadcastMessage {
     CheckpointHeader(CheckpointHeader),
 }
 

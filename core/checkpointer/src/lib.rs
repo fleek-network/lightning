@@ -25,10 +25,9 @@ mod query;
 mod rocks;
 
 #[cfg(test)]
-mod test_utils;
-#[cfg(test)]
 mod tests;
 
 pub use checkpointer::*;
 pub use config::*;
+pub use message::*;
 pub use query::*;
