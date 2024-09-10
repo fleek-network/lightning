@@ -106,6 +106,7 @@ pub fn load_hmac_secret(secret_dir_path: Option<PathBuf>) -> anyhow::Result<[u8;
 /// The data shared with every request the rpc methods.
 pub(crate) struct Data<C: Collection> {
     pub query_runner: c!(C::ApplicationInterface::SyncExecutor),
+    pub checkpointer_query: c!(C::CheckpointerInterface::Query),
     pub mempool_socket: MempoolSocket,
     pub fetcher_socket: FetcherSocket,
     pub _blockstore: C::BlockstoreInterface,
@@ -164,6 +165,7 @@ impl<C: Collection> Rpc<C> {
         keystore: &C::KeystoreInterface,
         fdi::Cloned(archive): fdi::Cloned<c!(C::ArchiveInterface)>,
         fdi::Cloned(query_runner): fdi::Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
+        fdi::Cloned(checkpointer_query): fdi::Cloned<c!(C::CheckpointerInterface::Query)>,
     ) -> anyhow::Result<Self> {
         let mut config = config_provider.get::<Self>();
 
@@ -175,6 +177,7 @@ impl<C: Collection> Rpc<C> {
             node_public_key: keystore.get_ed25519_pk(),
             consensus_public_key: keystore.get_bls_pk(),
             archive,
+            checkpointer_query: checkpointer_query.clone(),
             events: {
                 let (tx, _) = tokio::sync::broadcast::channel(8);
                 tx.into()

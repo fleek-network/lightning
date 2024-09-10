@@ -24,6 +24,9 @@ macro_rules! collection {
                     .with_infallible(|this: &<Self as Collection>::ApplicationInterface|
                         ApplicationInterface::sync_query(this)
                     )
+                    .with_infallible(|this: &<Self as Collection>::CheckpointerInterface|
+                        CheckpointerInterface::query(this)
+                    )
                     .with_infallible(|this: &<Self as Collection>::ReputationAggregatorInterface|
                         ReputationAggregatorInterface::get_reporter(this)
                     )

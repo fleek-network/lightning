@@ -135,3 +135,19 @@ impl TryFrom<ConsensusAggregateSignature> for BLS12381AggregateSignature {
             .map_err(|e| FleekCryptoError::InvalidAggregateSignature(e.to_string()))
     }
 }
+
+impl schemars::JsonSchema for ConsensusAggregateSignature {
+    fn schema_name() -> String {
+        "ConsensusAggregateSignature".to_string()
+    }
+
+    fn schema_id() -> std::borrow::Cow<'static, str> {
+        std::borrow::Cow::Borrowed(concat!(module_path!(), "::ConsensusAggregateSignature"))
+    }
+
+    fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        let sig = ConsensusAggregateSignature::default();
+
+        schemars::schema_for_value!(sig).schema.into()
+    }
+}
