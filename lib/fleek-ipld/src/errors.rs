@@ -48,4 +48,7 @@ pub enum IpldError {
 
     #[error("IPLD error: Error validating hash")]
     IpldHashError,
+
+    #[error("IPLD error: Error processing item {0}")]
+    ParallelIpldItemProcessingError(#[from] tokio::task::JoinError),
 }

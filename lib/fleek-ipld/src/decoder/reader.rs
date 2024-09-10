@@ -28,7 +28,7 @@ impl Default for IpldReader<DefaultDecoder> {
 
 impl<D> IpldReader<D>
 where
-    D: Decoder,
+    D: Decoder + Clone + Send + Sync + 'static,
 {
     pub async fn read<
         E: Into<IpldError>,

@@ -181,6 +181,22 @@ impl IpldItem {
     pub fn to_file(id: DocId, data: Bytes) -> IpldItem {
         Self::File(FileItem { id, data })
     }
+
+    pub fn links(&self) -> Vec<Link> {
+        match self {
+            Self::Dir(DirItem { links, .. }) => links.clone(),
+            Self::ChunkedFile(ChunkFileItem { chunks, .. }) => chunks.clone(),
+            _ => Vec::new(),
+        }
+    }
+
+    pub fn merge_path(&mut self, path: &PathBuf) {
+        match self {
+            Self::Dir(DirItem { id, .. }) => id.merge(Some(path)),
+            Self::ChunkedFile(ChunkFileItem { id, .. }) => id.merge(Some(path)),
+            Self::File(FileItem { id, .. }) => id.merge(Some(path)),
+        }
+    }
 }
 
 impl From<IpldItem> for DocId {
