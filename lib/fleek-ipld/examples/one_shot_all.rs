@@ -13,7 +13,6 @@ impl IpldItemProcessor for PrintProcessor {
         let cid = "QmTPYQ2T8ten7RRN7pzxuty3ujbc8p2o242nQEfPQQ2jWA";
         if item.is_cid(cid) {
             println!("Found the file we were looking for!");
-            return Err(IpldError::MissingLink);
         }
         Ok(())
     }

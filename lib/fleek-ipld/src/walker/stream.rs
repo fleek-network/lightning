@@ -122,7 +122,7 @@ pub struct IpldStream<C, D, P> {
 }
 
 #[derive(Default, Debug, Clone, TypedBuilder)]
-struct Metadata {
+pub struct Metadata {
     #[builder(default = PathBuf::new())]
     parent_path: PathBuf,
     #[builder(default)]
@@ -183,7 +183,7 @@ where
             .collect::<Result<(), IpldError>>()
     }
 
-    async fn download_item(&self, cid: Cid, metadata: Metadata) -> Result<IpldItem, IpldError> {
+    pub async fn download_item(&self, cid: Cid, metadata: Metadata) -> Result<IpldItem, IpldError> {
         let response = self.downloader.download(&cid).await?;
         let mut reader = self.reader.clone();
         let mut item = reader.read(cid, response).await?;
