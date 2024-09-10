@@ -3427,6 +3427,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "diff"
+version = "0.1.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "56254986775e3233ffa9c4d7d3faaf6d36a2c09d30b20687e9f88bc8bafc16c8"
+
+[[package]]
 name = "difflib"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7800,30 +7806,51 @@ version = "0.0.0"
 dependencies = [
  "affair",
  "anyhow",
+ "atomo",
  "axum 0.6.20",
  "chrono",
+ "console-subscriber",
  "ethers",
- "fdi",
  "fleek-blake3",
  "fleek-crypto",
  "futures",
  "hp-fixed",
  "humantime-serde",
+ "jsonrpsee",
  "lazy_static",
+ "lightning-application",
+ "lightning-blockstore",
+ "lightning-blockstore-server",
+ "lightning-broadcast",
+ "lightning-forwarder",
  "lightning-interfaces",
+ "lightning-notifier",
+ "lightning-pool",
+ "lightning-rep-collector",
+ "lightning-resolver",
+ "lightning-rpc",
+ "lightning-signer",
+ "lightning-syncronizer",
+ "lightning-topology",
  "lightning-utils",
  "lightning-workspace-hack",
+ "merklize",
  "plotters",
+ "pretty_assertions",
  "rand 0.8.5",
  "rand_chacha",
  "rand_distr",
+ "ready",
  "resolved-pathbuf",
  "serde",
  "serde_json",
  "simplelog",
  "socket-logger",
+ "tempfile",
+ "thiserror",
  "tokio",
  "tracing",
+ "tracing-subscriber",
  "tui-logger",
 ]
 
@@ -10779,6 +10806,16 @@ checksum = "41b740d195ed3166cd147c8047ec98db0e22ec019eb8eeb76d343b795304fb13"
 dependencies = [
  "predicates-core",
  "termtree",
+]
+
+[[package]]
+name = "pretty_assertions"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "af7cee1a6c8a5b9208b3cb1061f10c0cb689087b3d8ce85fb9d2dd7a29b6ba66"
+dependencies = [
+ "diff",
+ "yansi",
 ]
 
 [[package]]

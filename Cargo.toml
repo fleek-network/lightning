@@ -32,6 +32,7 @@ autometrics = { version = "0.6.0", features = ["prometheus-exporter"] }
 axum = { version = "0.6.18", features = ["tokio"] }
 bincode = "1.3.3"
 cid = "0.10.1"
+console-subscriber = { version = "0.2.0" }
 ethers = "2.0.10"
 num-bigint = "0.4.0"
 base64 = "0.21"
@@ -39,12 +40,14 @@ bytes = "1.4"
 futures = "0.3"
 lru = "0.10.0"
 multihash = "0.19"
+pretty_assertions = "1.4.0"
 rand = { version = "0.8.5", features = ["small_rng"] }
 reqwest = { version = "0.11.20", features = ["rustls-tls", "json"] }
 serde = { version = "1.0", features = ["derive"] }
 serde-big-array = "0.5.1"
 serde_json = "1.0.96"
 humantime-serde = "1.1.1"
+jsonrpsee = { version = "0.21", features = ["full"] }
 thiserror = "1.0"
 parking_lot = "0.12.1"
 tokio = { version = "1.28", features = ["full", "tracing"] }
@@ -75,9 +78,27 @@ hex = { version = "0.4.3", features = ["serde"] }
 
 # Our libraries
 lightning-application = { path = "core/application" }
+lightning-blockstore = { path = "core/blockstore" }
+lightning-blockstore-server = { path = "core/blockstore-server" }
+lightning-broadcast = { path = "core/broadcast" }
+lightning-consensus = { path = "core/consensus" }
+lightning-firewall = { path = "core/firewall" }
+lightning-forwarder = { path = "core/forwarder" }
 lightning-interfaces = { path = "core/interfaces" }
+lightning-keystore = { path = "core/keystore" }
+lightning-node = { path = "core/node" }
+lightning-notifier = { path = "core/notifier" }
+lightning-pool = { path = "core/pool" }
+lightning-rep-collector = { path = "core/rep-collector" }
+lightning-resolver = { path = "core/resolver" }
+lightning-rpc = { path = "core/rpc" }
+lightning-service-executor = { path = "core/service-executor" }
+lightning-signer = { path = "core/signer" }
+lightning-syncronizer = { path = "core/syncronizer" }
+lightning-topology = { path = "core/topology" }
 lightning-test-utils = { path = "core/test-utils" }
 lightning-types = { path = "core/types" }
+lightning-utils = { path = "core/utils" }
 affair = { path = "lib/affair" }
 atomo = { path = "lib/atomo" }
 atomo-rocks = { path = "lib/atomo-rocks" }
@@ -85,6 +106,7 @@ fleek-crypto = { path = "lib/fleek-crypto" }
 fleek-ipld = { path = "lib/fleek-ipld" }
 hp-fixed = { path = "lib/hp-fixed" }
 ink-quill = { path = "lib/ink-quill" }
+socket-logger = { path = "lib/socket-logger" }
 ready = { path = "lib/ready" }
 resolved-pathbuf = { path = "lib/resolved-pathbuf" }
 panic-report = { path = "lib/panic-report" }

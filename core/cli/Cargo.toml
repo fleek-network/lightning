@@ -29,7 +29,7 @@ clap = { version = "4.4.2", features = ["derive", "string"] }
 clap_complete = "4.5.6"
 tracing.workspace = true
 tracing-subscriber = "0.3"
-console-subscriber = { version = "0.2.0" }
+console-subscriber.workspace = true
 fleek-blake3 = "1.5"
 serde_json.workspace = true
 reqwest.workspace = true

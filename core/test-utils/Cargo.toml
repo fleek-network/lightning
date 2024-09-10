@@ -6,30 +6,51 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-fdi = { path = "../../lib/fdi" }
-lightning-interfaces = { path = "../interfaces" }
-lightning-utils = { path = "../utils" }
-fleek-crypto.workspace = true
 affair.workspace = true
-axum.workspace = true
 anyhow.workspace = true
-rand.workspace = true
-serde.workspace = true
-tokio.workspace = true
-hp-fixed.workspace = true
-ethers.workspace = true
-tracing.workspace = true
-futures.workspace = true
-fleek-blake3.workspace = true
-humantime-serde.workspace = true
-serde_json = "1.0"
-socket-logger = { path = "../../lib/socket-logger" }
+atomo.workspace = true
+axum.workspace = true
 chrono = "0.4.26"
-simplelog = "0.12.1"
-plotters = "0.3"
-rand_distr = "0.4"
-rand_chacha = "0.3"
-resolved-pathbuf = { path = "../../lib/resolved-pathbuf" }
-tui-logger = "0.11"
-lightning-workspace-hack.workspace = true
+console-subscriber.workspace = true
+ethers.workspace = true
+fleek-blake3.workspace = true
+fleek-crypto.workspace = true
+futures.workspace = true
+hp-fixed.workspace = true
+humantime-serde.workspace = true
+jsonrpsee.workspace = true
 lazy_static.workspace = true
+lightning-application.workspace = true
+lightning-blockstore-server.workspace = true
+lightning-blockstore.workspace = true
+lightning-broadcast.workspace = true
+lightning-forwarder.workspace = true
+lightning-interfaces.workspace = true
+lightning-notifier.workspace = true
+lightning-pool.workspace = true
+lightning-rep-collector.workspace = true
+lightning-resolver.workspace = true
+lightning-rpc.workspace = true
+lightning-signer.workspace = true
+lightning-syncronizer.workspace = true
+lightning-topology.workspace = true
+lightning-utils.workspace = true
+lightning-workspace-hack.workspace = true
+merklize.workspace = true
+plotters = "0.3"
+pretty_assertions.workspace = true
+rand.workspace = true
+rand_chacha = "0.3"
+rand_distr = "0.4"
+ready.workspace = true
+resolved-pathbuf.workspace = true
+serde.workspace = true
+serde_json = "1.0"
+simplelog = "0.12.1"
+socket-logger.workspace = true
+tempfile.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing-subscriber.workspace = true
+tracing.workspace = true
+tui-logger = "0.11"
