@@ -72,14 +72,14 @@ impl Item {
 
 #[async_trait]
 pub trait IpldItemProcessor {
-    async fn on_item(&self, item: &Item) -> Result<(), IpldError>;
+    async fn on_item(&self, item: Item) -> Result<(), IpldError>;
 }
 
 pub struct NOOPProcessor;
 
 #[async_trait]
 impl IpldItemProcessor for NOOPProcessor {
-    async fn on_item(&self, _item: &Item) -> Result<(), IpldError> {
+    async fn on_item(&self, _item: Item) -> Result<(), IpldError> {
         Ok(())
     }
 }
@@ -115,10 +115,9 @@ impl Downloader for ReqwestDownloader {
 }
 
 #[derive(Clone)]
-pub struct IpldStream<C, D, P> {
+pub struct IpldStream<C, D> {
     reader: IpldReader<C>,
     downloader: Arc<D>,
-    processor: Arc<P>,
 }
 
 #[derive(Default, Debug, Clone, TypedBuilder)]
@@ -135,30 +134,39 @@ pub struct Metadata {
     total: Option<u64>,
 }
 
-impl<C, D, P> IpldStream<C, D, P>
+impl<C, D> IpldStream<C, D>
 where
     C: Decoder + Clone + Send + Sync + 'static,
     D: Downloader + Clone + Send + Sync + 'static,
-    P: IpldItemProcessor + Clone + Send + Sync + 'static,
 {
-    pub fn new(reader: IpldReader<C>, downloader: D, processor: P) -> Self {
+    pub fn new(reader: IpldReader<C>, downloader: D) -> Self {
         IpldStream {
             reader,
             downloader: Arc::new(downloader),
-            processor: Arc::new(processor),
         }
     }
 
-    pub async fn download(self, cid: Cid) -> Result<(), IpldError> {
-        self.process(cid, Metadata::default()).await
+    pub async fn download<F>(self, cid: Cid, processor: F) -> Result<(), IpldError>
+    where
+        F: IpldItemProcessor + Send + Sync + Clone + 'static,
+    {
+        self.process(cid, Metadata::default(), processor).await
     }
 
-    async fn process(&self, cid: Cid, metadata: Metadata) -> Result<(), IpldError> {
-        let item = self.download_item(cid, metadata.clone()).await?;
-        self.process_item(item).await
+    async fn process<F>(&self, cid: Cid, metadata: Metadata, processor: F) -> Result<(), IpldError>
+    where
+        F: IpldItemProcessor + Send + Sync + Clone + 'static,
+    {
+        let item = self
+            .download_item(cid, metadata.clone(), processor.clone())
+            .await?;
+        self.process_item(item, processor).await
     }
 
-    async fn process_item(&self, item: IpldItem) -> Result<(), IpldError> {
+    async fn process_item<F>(&self, item: IpldItem, processor: F) -> Result<(), IpldError>
+    where
+        F: IpldItemProcessor + Send + Sync + Clone + 'static,
+    {
         let parent_item: DocId = item.clone().into();
         let links = item.links();
         if links.is_empty() {
@@ -173,7 +181,7 @@ where
                 .index(i as u64)
                 .total(links.len() as u64)
                 .build();
-            self.process(*link.cid(), metadata)
+            self.process(*link.cid(), metadata, processor.clone())
         });
         tokio_stream::iter(futures)
             .buffer_unordered(20)
@@ -183,13 +191,20 @@ where
             .collect::<Result<(), IpldError>>()
     }
 
-    pub async fn download_item(&self, cid: Cid, metadata: Metadata) -> Result<IpldItem, IpldError> {
+    pub async fn download_item<F>(
+        &self,
+        cid: Cid,
+        metadata: Metadata,
+        processor: F,
+    ) -> Result<IpldItem, IpldError>
+    where
+        F: IpldItemProcessor + Send + Sync + Clone + 'static,
+    {
         let response = self.downloader.download(&cid).await?;
         let mut reader = self.reader.clone();
         let mut item = reader.read(cid, response).await?;
         item.merge_path(&metadata.parent_path, metadata.name.as_deref());
-        let to_item = to_item(&item, metadata);
-        self.processor.on_item(&to_item).await?;
+        processor.on_item(to_item(&item, metadata)).await?;
         Ok(item)
     }
 }

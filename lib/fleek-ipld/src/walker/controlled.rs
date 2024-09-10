@@ -18,30 +18,32 @@ pub enum StreamState {
     Stopped,
 }
 
-pub struct ControlledIpldStream<C, D, P> {
-    inner: IpldStream<C, D, P>,
+pub struct ControlledIpldStream<C, D> {
+    inner: IpldStream<C, D>,
     state: Arc<AtomicBool>,
     control_rx: Arc<Mutex<mpsc::Receiver<StreamState>>>,
     control_tx: mpsc::Sender<StreamState>,
 }
 
-impl<C, D, P> ControlledIpldStream<C, D, P>
+impl<C, D> ControlledIpldStream<C, D>
 where
     C: Decoder + Clone + Send + Sync + 'static,
     D: Downloader + Clone + Send + Sync + 'static,
-    P: IpldItemProcessor + Clone + Send + Sync + 'static,
 {
-    pub fn new(reader: IpldReader<C>, downloader: D, processor: P) -> Self {
+    pub fn new(reader: IpldReader<C>, downloader: D) -> Self {
         let (control_tx, control_rx) = mpsc::channel(100);
         ControlledIpldStream {
-            inner: IpldStream::new(reader, downloader, processor),
+            inner: IpldStream::new(reader, downloader),
             state: Arc::new(AtomicBool::new(true)),
             control_rx: Arc::new(Mutex::new(control_rx)),
             control_tx,
         }
     }
 
-    pub async fn download(&mut self, cid: Cid) -> Result<(), IpldError> {
+    pub async fn download<F>(&mut self, cid: Cid, processor: F) -> Result<(), IpldError>
+    where
+        F: IpldItemProcessor + Clone + Send + Sync + 'static,
+    {
         let state = self.state.clone();
         let control_rx = self.control_rx.clone();
 
@@ -55,19 +57,38 @@ where
             }
         });
 
-        self.controlled_process(cid, Metadata::default()).await
+        self.controlled_process(cid, Metadata::default(), processor)
+            .await
     }
 
-    async fn controlled_process(&self, cid: Cid, metadata: Metadata) -> Result<(), IpldError> {
+    async fn controlled_process<F>(
+        &self,
+        cid: Cid,
+        metadata: Metadata,
+        processor: F,
+    ) -> Result<(), IpldError>
+    where
+        F: IpldItemProcessor + Clone + Send + Sync + 'static,
+    {
         while !self.state.load(Ordering::SeqCst) {
             tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         }
 
-        let item = self.inner.download_item(cid, metadata.clone()).await?;
-        self.controlled_process_item(item).await
+        let item = self
+            .inner
+            .download_item(cid, metadata.clone(), processor.clone())
+            .await?;
+        self.controlled_process_item(item, processor).await
     }
 
-    async fn controlled_process_item(&self, item: IpldItem) -> Result<(), IpldError> {
+    async fn controlled_process_item<F>(
+        &self,
+        item: IpldItem,
+        processor: F,
+    ) -> Result<(), IpldError>
+    where
+        F: IpldItemProcessor + Clone + Send + Sync + 'static,
+    {
         let parent_item: DocId = item.clone().into();
         let links = item.links();
         if links.is_empty() {
@@ -83,7 +104,7 @@ where
                 .index(i as u64)
                 .total(links.len() as u64)
                 .build();
-            self.controlled_process(*link.cid(), metadata)
+            self.controlled_process(*link.cid(), metadata, processor.clone())
         });
 
         futures::stream::iter(futures)

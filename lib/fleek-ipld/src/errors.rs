@@ -51,4 +51,7 @@ pub enum IpldError {
 
     #[error("IPLD error: Error processing item {0}")]
     ParallelIpldItemProcessingError(#[from] tokio::task::JoinError),
+
+    #[error("IPLD error: Error processing item {0}")]
+    StreamError(String),
 }

@@ -8,7 +8,7 @@ struct PrintProcessor;
 
 #[async_trait::async_trait]
 impl IpldItemProcessor for PrintProcessor {
-    async fn on_item(&self, item: &Item) -> Result<(), IpldError> {
+    async fn on_item(&self, item: Item) -> Result<(), IpldError> {
         println!("Item: {:?}", item);
         let cid = "QmTPYQ2T8ten7RRN7pzxuty3ujbc8p2o242nQEfPQQ2jWA";
         if item.is_cid(cid) {
@@ -28,7 +28,7 @@ async fn main() -> Result<(), Box<(dyn std::error::Error + 'static)>> {
     let processor = PrintProcessor;
     let downloader = ReqwestDownloader::new("https://ipfs.io");
     let reader = IpldReader::default();
-    let stream = IpldStream::new(reader, downloader, processor);
+    let stream = IpldStream::new(reader, downloader);
 
-    stream.download(cid).await.map_err(Into::into)
+    stream.download(cid, processor).await.map_err(Into::into)
 }
