@@ -344,6 +344,7 @@ zeroize = { version = "1", features = ["zeroize_derive"] }
 arrayvec = { version = "0.7", default-features = false, features = ["serde"] }
 bitflags = { version = "2", default-features = false, features = ["serde"] }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
+once_cell = { version = "1" }
 openssl = { version = "0.10", features = ["vendored"] }
 openssl-sys = { version = "0.9", default-features = false, features = ["vendored"] }
 rustix = { version = "0.38", features = ["event", "fs", "net", "pipe", "process", "system", "termios", "time"] }
@@ -355,6 +356,7 @@ web-sys = { version = "0.3", default-features = false, features = ["Worker"] }
 arrayvec = { version = "0.7", default-features = false, features = ["serde"] }
 bitflags = { version = "2", default-features = false, features = ["serde"] }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
+once_cell = { version = "1" }
 openssl = { version = "0.10", features = ["vendored"] }
 openssl-sys = { version = "0.9", default-features = false, features = ["vendored"] }
 rustix = { version = "0.38", features = ["event", "fs", "net", "pipe", "process", "system", "termios", "time"] }
@@ -369,6 +371,7 @@ core-foundation = { version = "0.9" }
 core-foundation-sys = { version = "0.8" }
 core-graphics-types = { version = "0.1" }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
+once_cell = { version = "1" }
 rustix = { version = "0.38", features = ["event", "fs", "net", "pipe", "process", "system", "termios", "time"] }
 security-framework-sys = { version = "2" }
 semver = { version = "1", features = ["serde"] }
@@ -382,6 +385,7 @@ core-foundation = { version = "0.9" }
 core-foundation-sys = { version = "0.8" }
 core-graphics-types = { version = "0.1" }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
+once_cell = { version = "1" }
 rustix = { version = "0.38", features = ["event", "fs", "net", "pipe", "process", "system", "termios", "time"] }
 security-framework-sys = { version = "2" }
 semver = { version = "1", features = ["serde"] }

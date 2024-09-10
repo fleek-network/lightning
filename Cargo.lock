@@ -8042,6 +8042,7 @@ dependencies = [
  "num-integer",
  "num-iter",
  "num-traits",
+ "once_cell",
  "openssl",
  "openssl-sys",
  "opentelemetry_api",
@@ -13231,6 +13232,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "bincode",
+ "lightning-workspace-hack",
  "log",
  "serde",
  "tokio",
