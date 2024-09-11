@@ -5,11 +5,12 @@ use futures::{StreamExt, TryStreamExt};
 use ipld_core::cid::Cid;
 use tokio::sync::{mpsc, Mutex};
 
-use super::processor::{IpldItemProcessor, IpldStream, Metadata};
+use super::processor::{IpldItemProcessor, IpldStream};
 use crate::decoder::data_codec::Decoder;
 use crate::decoder::fs::{DocId, IpldItem};
 use crate::decoder::reader::IpldReader;
 use crate::errors::IpldError;
+use crate::walker::data::Metadata;
 use crate::walker::downloader::Downloader;
 
 #[derive(Debug, Clone, PartialEq)]

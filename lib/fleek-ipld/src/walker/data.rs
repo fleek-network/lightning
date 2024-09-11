@@ -1,7 +1,10 @@
+use std::path::PathBuf;
+
 use bytes::Bytes;
 use ipld_core::cid::Cid;
+use typed_builder::TypedBuilder;
 
-use crate::decoder::fs::DocId;
+use crate::decoder::fs::{DocId, IpldItem, Link};
 
 #[derive(Clone, Debug)]
 pub struct Dir {
@@ -22,6 +25,12 @@ pub struct ItemFile {
     pub size: Option<u64>,
     pub data: Bytes,
     pub chunked: Option<Chunked>,
+}
+
+impl ItemFile {
+    pub fn is_chunked(&self) -> bool {
+        self.chunked.is_some()
+    }
 }
 
 impl std::fmt::Debug for ItemFile {
@@ -56,5 +65,81 @@ impl Item {
         Cid::try_from(cid)
             .map(|cid| Some(&cid) == self.cid())
             .unwrap_or(false)
+    }
+
+    pub fn from_ipld(
+        item: &IpldItem,
+        Metadata {
+            size,
+            name,
+            index,
+            total,
+            ..
+        }: Metadata,
+    ) -> Item {
+        match item {
+            IpldItem::Dir(dir) => Item::Directory(Dir {
+                id: dir.id().clone(),
+                name,
+            }),
+            IpldItem::File(file) => Item::File(ItemFile {
+                id: file.id().clone(),
+                name,
+                size,
+                data: file.data().clone(),
+                chunked: index.and_then(|index| total.map(|total| Chunked { index, total })),
+            }),
+            IpldItem::ChunkedFile(_) => Item::Skip,
+        }
+    }
+}
+
+#[derive(Default, Debug, Clone, TypedBuilder)]
+pub struct Metadata {
+    #[builder(default = PathBuf::new())]
+    parent_path: PathBuf,
+    #[builder(default)]
+    size: Option<u64>,
+    #[builder(default)]
+    name: Option<String>,
+    #[builder(default, setter(into, strip_option))]
+    index: Option<u64>,
+    #[builder(default, setter(into, strip_option))]
+    total: Option<u64>,
+}
+
+impl Metadata {
+    pub fn new(index: usize, total: usize, link: &Link, parent_path: PathBuf) -> Self {
+        Metadata::builder()
+            .parent_path(parent_path)
+            .size(*link.size())
+            .name(link.name().clone())
+            .index(index as u64)
+            .total(total as u64)
+            .build()
+    }
+
+    pub fn parent_path(&self) -> &PathBuf {
+        &self.parent_path
+    }
+
+    pub fn size(&self) -> Option<u64> {
+        self.size
+    }
+
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_deref()
+    }
+
+    pub fn index(&self) -> Option<u64> {
+        self.index
+    }
+
+    pub fn total(&self) -> Option<u64> {
+        self.total
+    }
+
+    pub fn is_chunked(&self) -> bool {
+        self.index.is_some() && self.total.is_some()
     }
 }

@@ -1,16 +1,14 @@
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use futures::{StreamExt, TryStreamExt};
 use ipld_core::cid::Cid;
-use typed_builder::TypedBuilder;
 
 use crate::decoder::data_codec::Decoder;
-use crate::decoder::fs::{DocId, IpldItem, Link};
+use crate::decoder::fs::{DocId, IpldItem};
 use crate::decoder::reader::IpldReader;
 use crate::errors::IpldError;
-use crate::walker::data::{Chunked, Dir, Item, ItemFile};
+use crate::walker::data::{Item, Metadata};
 use crate::walker::downloader::Downloader;
 
 #[async_trait]
@@ -31,32 +29,6 @@ impl IpldItemProcessor for NOOPProcessor {
 pub struct IpldStream<C, D> {
     reader: IpldReader<C>,
     downloader: Arc<D>,
-}
-
-#[derive(Default, Debug, Clone, TypedBuilder)]
-pub struct Metadata {
-    #[builder(default = PathBuf::new())]
-    parent_path: PathBuf,
-    #[builder(default)]
-    size: Option<u64>,
-    #[builder(default)]
-    name: Option<String>,
-    #[builder(default, setter(into, strip_option))]
-    index: Option<u64>,
-    #[builder(default, setter(into, strip_option))]
-    total: Option<u64>,
-}
-
-impl Metadata {
-    pub fn new(index: usize, total: usize, link: &Link, parent_path: PathBuf) -> Self {
-        Metadata::builder()
-            .parent_path(parent_path)
-            .size(*link.size())
-            .name(link.name().clone())
-            .index(index as u64)
-            .total(total as u64)
-            .build()
-    }
 }
 
 impl<C, D> IpldStream<C, D>
@@ -123,35 +95,10 @@ where
     {
         let response = self.downloader.download(&cid).await?;
         let mut reader = self.reader.clone();
-        let mut item = reader.read(cid, response).await?;
-        item.merge_path(&metadata.parent_path, metadata.name.as_deref());
-        processor.on_item(to_item(&item, metadata)).await?;
-        Ok(item)
-    }
-}
-
-fn to_item(
-    item: &IpldItem,
-    Metadata {
-        size,
-        name,
-        index,
-        total,
-        ..
-    }: Metadata,
-) -> Item {
-    match item {
-        IpldItem::Dir(dir) => Item::Directory(Dir {
-            id: dir.id().clone(),
-            name,
-        }),
-        IpldItem::File(file) => Item::File(ItemFile {
-            id: file.id().clone(),
-            name,
-            size,
-            data: file.data().clone(),
-            chunked: index.and_then(|index| total.map(|total| Chunked { index, total })),
-        }),
-        IpldItem::ChunkedFile(_) => Item::Skip,
+        let mut result = reader.read(cid, response.fuse()).await?;
+        result.merge_path(metadata.parent_path(), metadata.name());
+        let item = Item::from_ipld(&result, metadata);
+        processor.on_item(item).await?;
+        Ok(result)
     }
 }

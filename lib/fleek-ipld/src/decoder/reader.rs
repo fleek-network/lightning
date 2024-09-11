@@ -1,7 +1,4 @@
-use std::sync::Arc;
-
 use bytes::{Bytes, BytesMut};
-use tokio::sync::Mutex;
 use tokio_stream::{Stream, StreamExt as _};
 use typed_builder::TypedBuilder;
 
@@ -11,13 +8,23 @@ use crate::errors::IpldError;
 
 const DEFAULT_BUFFER_SIZE: usize = 1024 * 16;
 
-#[derive(Debug, Clone, TypedBuilder)]
+#[derive(Debug, TypedBuilder)]
 pub struct IpldReader<D> {
-    #[builder(setter(prefix = "with_", transform = |x: usize| Arc::new(Mutex::new(BytesMut::with_capacity(x)))), default)]
-    buffer: Arc<Mutex<BytesMut>>,
+    #[builder(setter(prefix = "with_", transform = |x: usize| BytesMut::with_capacity(x)), default)]
+    buffer: BytesMut,
     #[builder(default, setter(strip_option))]
     last_id: Option<DocId>,
     decoder: D,
+}
+
+impl<D: Clone> Clone for IpldReader<D> {
+    fn clone(&self) -> Self {
+        Self {
+            buffer: BytesMut::with_capacity(self.buffer.capacity()),
+            last_id: self.last_id.clone(),
+            decoder: self.decoder.clone(),
+        }
+    }
 }
 
 impl Default for IpldReader<DefaultDecoder> {
@@ -43,15 +50,13 @@ where
         stream: S,
     ) -> Result<IpldItem, IpldError> {
         let mut stream = stream;
-        let mut buff = self.buffer.lock().await;
+        let doc_id = id.into();
         while let Some(chunk) = stream.next().await {
             let chunk = chunk.map_err(Into::into)?;
-            buff.extend_from_slice(&chunk);
+            self.buffer.extend_from_slice(&chunk);
         }
-        let doc_id = id.into();
-        let item = self.decoder.decode_from_slice(&doc_id, &buff)?;
-        buff.clear();
-        drop(buff);
+        let item = self.decoder.decode_from_slice(&doc_id, &self.buffer)?;
+        self.buffer.clear();
         self.last_id = Some(doc_id);
         Ok(item)
     }

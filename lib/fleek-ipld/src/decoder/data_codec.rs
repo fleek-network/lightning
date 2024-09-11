@@ -15,7 +15,9 @@ pub trait DataCodec<F> {
 pub trait Decoder {
     type Ipld;
 
-    type IpldCodec: Codec<Self::Ipld>;
+    type Err: std::fmt::Debug;
+
+    type IpldCodec: Codec<Self::Ipld, Error = Self::Err>;
 
     type DataCodec: DataCodec<Self::Ipld>;
 
@@ -23,7 +25,7 @@ pub trait Decoder {
 
     fn decode_from_slice(&self, doc_id: &DocId, data: &[u8]) -> Result<IpldItem, IpldError> {
         let node = Self::IpldCodec::decode_from_slice(data)
-            .map_err(|_| IpldError::IpldCodecError(*doc_id.cid()))?;
+            .map_err(|e| IpldError::IpldCodecError(*doc_id.cid(), format!("{e:?}")))?;
         Self::DataCodec::decode_from(doc_id, node)
     }
 }
@@ -78,6 +80,7 @@ pub struct DagPbWithUnixFsCodec;
 pub type DefaultDecoder = DagPbWithUnixFsCodec;
 
 impl Decoder for DagPbWithUnixFsCodec {
+    type Err = ipld_dagpb::Error;
     type Ipld = PbNode;
     type IpldCodec = DagPbCodec;
     type DataCodec = UnixFsProtobufCodec;
