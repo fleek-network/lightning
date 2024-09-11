@@ -1,7 +1,8 @@
 use fleek_ipld::decoder::reader::IpldReader;
 use fleek_ipld::errors::IpldError;
+use fleek_ipld::walker::concurrent::processor::{IpldItemProcessor, IpldStream};
 use fleek_ipld::walker::data::Item;
-use fleek_ipld::walker::stream::{IpldItemProcessor, IpldStream, ReqwestDownloader};
+use fleek_ipld::walker::downloader::ReqwestDownloader;
 use ipld_core::cid::Cid;
 
 #[derive(Clone)]
