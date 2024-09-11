@@ -148,15 +148,10 @@ impl Processor for IpldDagPbProcessor {
                     return Ok(Some(item));
                 }
             } else {
-                Err(IpldError::CannotDecodeDagPbData(
-                    "Ipld object does not contain a Data field to identify type".to_string(),
-                ))
+                Err(IpldError::CannotDecodeDagPbData(*doc_id.cid()))
             }
         } else {
-            Err(IpldError::CannotDecodeDagPbData(format!(
-                "Ipld object does not contain a map {:?}",
-                ipld,
-            )))
+            Err(IpldError::CannotDecodeDagPbData(*doc_id.cid()))
         }
     }
 }

@@ -22,8 +22,8 @@ pub trait Decoder {
     fn get_data(data: &Self::Ipld) -> Result<Option<Bytes>, IpldError>;
 
     fn decode_from_slice(&self, doc_id: &DocId, data: &[u8]) -> Result<IpldItem, IpldError> {
-        let node =
-            Self::IpldCodec::decode_from_slice(data).map_err(|_| IpldError::IpldCodecError)?;
+        let node = Self::IpldCodec::decode_from_slice(data)
+            .map_err(|_| IpldError::IpldCodecError(*doc_id.cid()))?;
         Self::DataCodec::decode_from(doc_id, node)
     }
 }
@@ -54,10 +54,7 @@ impl UnixFsProtobufCodec {
                     ))
                 }
             },
-            _ => Err(IpldError::UnsupportedUnixFsDataType(format!(
-                "{:?} - {:?}",
-                id, data.Type
-            ))),
+            _ => Err(IpldError::UnsupportedUnixFsDataType(*id.cid())),
         }
     }
 }

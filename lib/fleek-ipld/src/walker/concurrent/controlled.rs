@@ -24,6 +24,7 @@ pub struct ControlledIpldStream<C, D> {
     state: Arc<AtomicBool>,
     control_rx: Arc<Mutex<mpsc::Receiver<StreamState>>>,
     control_tx: mpsc::Sender<StreamState>,
+    stop: Arc<AtomicBool>,
 }
 
 impl<C, D> ControlledIpldStream<C, D>
@@ -38,6 +39,7 @@ where
             state: Arc::new(AtomicBool::new(true)),
             control_rx: Arc::new(Mutex::new(control_rx)),
             control_tx,
+            stop: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -47,13 +49,17 @@ where
     {
         let state = self.state.clone();
         let control_rx = self.control_rx.clone();
+        let stop = self.stop.clone();
 
         tokio::spawn(async move {
             while let Some(command) = control_rx.lock().await.recv().await {
                 match command {
-                    StreamState::Running => state.store(true, Ordering::SeqCst),
-                    StreamState::Paused => state.store(false, Ordering::SeqCst),
-                    StreamState::Stopped => break,
+                    StreamState::Running => state.store(true, Ordering::Release),
+                    StreamState::Paused => state.store(false, Ordering::Release),
+                    StreamState::Stopped => {
+                        stop.store(true, Ordering::Release);
+                        break;
+                    },
                 }
             }
         });
@@ -71,8 +77,12 @@ where
     where
         F: IpldItemProcessor + Clone + Send + Sync + 'static,
     {
-        while !self.state.load(Ordering::SeqCst) {
+        while !self.state.load(Ordering::Acquire) {
             tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+
+        if self.stop.load(Ordering::Acquire) {
+            return Ok(());
         }
 
         let item = self
@@ -98,19 +108,13 @@ where
 
         let futures = links.clone().into_iter().enumerate().map(|(i, link)| {
             let parent_path = parent_item.path().clone();
-            let metadata = Metadata::builder()
-                .parent_path(parent_path)
-                .size(*link.size())
-                .name(link.name().clone())
-                .index(i as u64)
-                .total(links.len() as u64)
-                .build();
+            let metadata = Metadata::new(i, links.len(), &link, parent_path);
             self.controlled_process(*link.cid(), metadata, processor.clone())
         });
 
-        futures::stream::iter(futures)
-            .buffer_unordered(20)
-            .try_for_each(|_| async { Ok(()) })
+        tokio_stream::iter(futures)
+            .buffer_unordered(5)
+            .try_for_each_concurrent(5, |_| async { Ok(()) })
             .await
     }
 

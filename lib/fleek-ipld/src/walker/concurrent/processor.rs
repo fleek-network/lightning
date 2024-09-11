@@ -2,12 +2,12 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use futures::StreamExt;
+use futures::{StreamExt, TryStreamExt};
 use ipld_core::cid::Cid;
 use typed_builder::TypedBuilder;
 
 use crate::decoder::data_codec::Decoder;
-use crate::decoder::fs::{DocId, IpldItem};
+use crate::decoder::fs::{DocId, IpldItem, Link};
 use crate::decoder::reader::IpldReader;
 use crate::errors::IpldError;
 use crate::walker::data::{Chunked, Dir, Item, ItemFile};
@@ -47,6 +47,18 @@ pub struct Metadata {
     total: Option<u64>,
 }
 
+impl Metadata {
+    pub fn new(index: usize, total: usize, link: &Link, parent_path: PathBuf) -> Self {
+        Metadata::builder()
+            .parent_path(parent_path)
+            .size(*link.size())
+            .name(link.name().clone())
+            .index(index as u64)
+            .total(total as u64)
+            .build()
+    }
+}
+
 impl<C, D> IpldStream<C, D>
 where
     C: Decoder + Clone + Send + Sync + 'static,
@@ -76,7 +88,11 @@ where
         self.process_item(item, processor).await
     }
 
-    async fn process_item<F>(&self, item: IpldItem, processor: F) -> Result<(), IpldError>
+    pub(crate) async fn process_item<F>(
+        &self,
+        item: IpldItem,
+        processor: F,
+    ) -> Result<(), IpldError>
     where
         F: IpldItemProcessor + Send + Sync + Clone + 'static,
     {
@@ -87,21 +103,13 @@ where
         }
         let futures = links.clone().into_iter().enumerate().map(|(i, link)| {
             let parent_path = parent_item.path().clone();
-            let metadata = Metadata::builder()
-                .parent_path(parent_path)
-                .size(*link.size())
-                .name(link.name().clone())
-                .index(i as u64)
-                .total(links.len() as u64)
-                .build();
+            let metadata = Metadata::new(i, links.len(), &link, parent_path);
             self.process(*link.cid(), metadata, processor.clone())
         });
         tokio_stream::iter(futures)
-            .buffer_unordered(20)
-            .collect::<Vec<Result<(), IpldError>>>()
+            .buffer_unordered(5)
+            .try_for_each_concurrent(5, |_| async { Ok(()) })
             .await
-            .into_iter()
-            .collect::<Result<(), IpldError>>()
     }
 
     pub async fn download_item<F>(
