@@ -7,6 +7,8 @@ use std::task::Poll;
 use anyhow::Result;
 use bytes::{BufMut, Bytes, BytesMut};
 use enclave_runner::usercalls::AsyncListener;
+use fn_sdk::header::{read_header, ConnectionHeader, TransportDetail};
+use fn_sdk::io_util::read_length_delimited;
 use futures::ready;
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
@@ -16,94 +18,6 @@ use tokio::sync::mpsc;
 use url::Url;
 
 use crate::IPC_PATH;
-
-/// A utility function to read a U32 big-endian length delimited payload from an async reader.
-///
-/// Returns `None` if the stream is exhausted before the promised number of bytes is read.
-pub async fn read_length_delimited<R>(reader: &mut R) -> Option<BytesMut>
-where
-    R: AsyncRead + Unpin,
-{
-    let mut size = [0; 4];
-    // really unnecessary.
-    let mut i = 0;
-    while i < 4 {
-        match reader.read(&mut size[i..]).await {
-            Ok(0) | Err(_) => return None,
-            Ok(n) => {
-                i += n;
-            },
-        }
-    }
-    let size = u32::from_be_bytes(size) as usize;
-    // now let's read `size` bytes.
-    let mut buffer = BytesMut::with_capacity(size);
-    while buffer.len() < size {
-        match reader.read_buf(&mut buffer).await {
-            Ok(0) | Err(_) => return None,
-            Ok(_) => {},
-        }
-    }
-    debug_assert_eq!(buffer.len(), size);
-    Some(buffer)
-}
-
-/// Client public key, mirrors type found in `fleek_crypto`
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ClientPublicKey(#[serde(with = "BigArray")] pub [u8; 96]);
-
-/// The header of this connection.
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ConnectionHeader {
-    pub pk: Option<ClientPublicKey>,
-    pub transport_detail: TransportDetail,
-}
-
-#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, PartialOrd, Eq)]
-#[allow(clippy::upper_case_acronyms)]
-pub enum HttpMethod {
-    GET,
-    POST,
-    HEAD,
-    PUT,
-    DELETE,
-    PATCH,
-    OPTIONS,
-}
-
-///  Response type used by a service to override the handshake http response fields when the
-/// transport is HTTP
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct HttpResponse {
-    pub headers: Option<Vec<(String, Vec<String>)>>,
-    pub status: Option<u16>,
-    pub body: String,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
-pub struct HttpOverrides {
-    pub headers: Option<Vec<(String, Vec<String>)>>,
-    pub status: Option<u16>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum TransportDetail {
-    HttpRequest {
-        method: HttpMethod,
-        url: Url,
-        header: HashMap<String, String>,
-    },
-    Task {
-        depth: u8,
-        payload: Bytes,
-    },
-    Other,
-}
-
-pub async fn read_header(stream: &mut UnixStream) -> Option<ConnectionHeader> {
-    let buffer = read_length_delimited(stream).await?;
-    serde_cbor::from_slice(&buffer).ok()
-}
 
 /// Listener for incoming connections
 pub struct ConnectionListener {
