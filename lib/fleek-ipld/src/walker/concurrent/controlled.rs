@@ -5,7 +5,7 @@ use futures::{StreamExt, TryStreamExt};
 use ipld_core::cid::Cid;
 use tokio::sync::{mpsc, Mutex};
 
-use super::processor::{IpldItemProcessor, IpldStream};
+use super::processor::{IpldBulkProcessor, IpldItemProcessor};
 use crate::decoder::data_codec::Decoder;
 use crate::decoder::fs::{DocId, IpldItem};
 use crate::decoder::reader::IpldReader;
@@ -20,23 +20,23 @@ pub enum StreamState {
     Stopped,
 }
 
-pub struct ControlledIpldStream<C, D> {
-    inner: IpldStream<C, D>,
+pub struct ControlledIpldBulkProcessor<C, D> {
+    inner: IpldBulkProcessor<C, D>,
     state: Arc<AtomicBool>,
     control_rx: Arc<Mutex<mpsc::Receiver<StreamState>>>,
     control_tx: mpsc::Sender<StreamState>,
     stop: Arc<AtomicBool>,
 }
 
-impl<C, D> ControlledIpldStream<C, D>
+impl<C, D> ControlledIpldBulkProcessor<C, D>
 where
     C: Decoder + Clone + Send + Sync + 'static,
     D: Downloader + Clone + Send + Sync + 'static,
 {
     pub fn new(reader: IpldReader<C>, downloader: D) -> Self {
         let (control_tx, control_rx) = mpsc::channel(100);
-        ControlledIpldStream {
-            inner: IpldStream::new(reader, downloader),
+        ControlledIpldBulkProcessor {
+            inner: IpldBulkProcessor::new(reader, downloader),
             state: Arc::new(AtomicBool::new(true)),
             control_rx: Arc::new(Mutex::new(control_rx)),
             control_tx,

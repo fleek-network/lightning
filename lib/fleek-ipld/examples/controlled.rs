@@ -1,6 +1,6 @@
 use fleek_ipld::decoder::reader::IpldReader;
 use fleek_ipld::errors::IpldError;
-use fleek_ipld::walker::concurrent::controlled::{ControlledIpldStream, StreamState};
+use fleek_ipld::walker::concurrent::controlled::{ControlledIpldBulkProcessor, StreamState};
 use fleek_ipld::walker::concurrent::processor::IpldItemProcessor;
 use fleek_ipld::walker::data::Item;
 use fleek_ipld::walker::downloader::ReqwestDownloader;
@@ -28,7 +28,7 @@ impl IpldItemProcessor for PrintProcessor {
 #[tokio::main]
 async fn main() -> Result<(), Box<(dyn std::error::Error + 'static)>> {
     let cid: Cid = "QmSnuWmxptJZdLJpKRarxBMS2Ju2oANVrgbr2xWbie9b2D".try_into()?; // all
-    let cid: Cid = "Qmb4KDzrnDHdHcH1UUTF3jTC3RhPJ6UyZ2wB8fNPnwiP5R".try_into()?; // all
+    //let cid: Cid = "Qmb4KDzrnDHdHcH1UUTF3jTC3RhPJ6UyZ2wB8fNPnwiP5R".try_into()?; // all
 
     //let cid: Cid = "Qmc8mmzycvXnzgwBHokZQd97iWAmtdFMqX4FZUAQ5AQdQi".try_into()?; // jpg big file
     //let cid: Cid = "Qmej4L6L4UYxHF4s4QeAzkwUX8VZ45GiuZ2BLtVds5LXad".try_into()?; // css file
@@ -36,7 +36,7 @@ async fn main() -> Result<(), Box<(dyn std::error::Error + 'static)>> {
 
     let downloader = ReqwestDownloader::new("https://ipfs.io");
     let reader = IpldReader::default();
-    let mut stream = ControlledIpldStream::new(reader, downloader);
+    let mut stream = ControlledIpldBulkProcessor::new(reader, downloader);
     let control = stream.control();
 
     let processor = PrintProcessor {

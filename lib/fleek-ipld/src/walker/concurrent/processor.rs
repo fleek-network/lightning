@@ -26,18 +26,18 @@ impl IpldItemProcessor for NOOPProcessor {
 }
 
 #[derive(Clone)]
-pub struct IpldStream<C, D> {
+pub struct IpldBulkProcessor<C, D> {
     reader: IpldReader<C>,
     downloader: Arc<D>,
 }
 
-impl<C, D> IpldStream<C, D>
+impl<C, D> IpldBulkProcessor<C, D>
 where
     C: Decoder + Clone + Send + Sync + 'static,
     D: Downloader + Clone + Send + Sync + 'static,
 {
     pub fn new(reader: IpldReader<C>, downloader: D) -> Self {
-        IpldStream {
+        IpldBulkProcessor {
             reader,
             downloader: Arc::new(downloader),
         }

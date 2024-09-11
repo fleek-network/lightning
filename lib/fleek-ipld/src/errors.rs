@@ -53,4 +53,7 @@ pub enum IpldError {
 
     #[error("IPLD error: Error processing item {0}")]
     StreamError(#[from] tokio::sync::mpsc::error::SendError<StreamState>),
+
+    #[error("IPLD error: Error downloading item {0}")]
+    HttpError(reqwest::StatusCode),
 }
