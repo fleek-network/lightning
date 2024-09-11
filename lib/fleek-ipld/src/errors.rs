@@ -1,8 +1,6 @@
 use ipld_core::cid::{multihash, Cid};
 use thiserror::Error;
 
-use crate::walker::concurrent::controlled::StreamState;
-
 /// Error type for IPLD operations
 #[derive(Debug, Error)]
 pub enum IpldError {
@@ -51,9 +49,9 @@ pub enum IpldError {
     #[error("IPLD error: Error processing item {0}")]
     ParallelIpldItemProcessingError(#[from] tokio::task::JoinError),
 
-    #[error("IPLD error: Error processing item {0}")]
-    StreamError(#[from] tokio::sync::mpsc::error::SendError<StreamState>),
-
     #[error("IPLD error: Error downloading item {0}")]
     HttpError(reqwest::StatusCode),
+
+    #[error("IPLD error: Error sending signal to controlled process {0}")]
+    ControlError(String),
 }

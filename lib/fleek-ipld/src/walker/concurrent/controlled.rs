@@ -14,10 +14,36 @@ use crate::walker::data::Metadata;
 use crate::walker::downloader::Downloader;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum StreamState {
+enum StreamState {
     Running,
     Paused,
     Stopped,
+}
+
+#[derive(Clone)]
+pub struct Control {
+    inner: mpsc::Sender<StreamState>,
+}
+
+impl Control {
+    async fn send(&self, state: StreamState) -> Result<(), IpldError> {
+        self.inner
+            .send(state)
+            .await
+            .map_err(|e| IpldError::ControlError(e.to_string()))
+    }
+
+    pub async fn pause(&self) -> Result<(), IpldError> {
+        self.send(StreamState::Paused).await
+    }
+
+    pub async fn resume(&self) -> Result<(), IpldError> {
+        self.send(StreamState::Running).await
+    }
+
+    pub async fn stop(&self) -> Result<(), IpldError> {
+        self.send(StreamState::Stopped).await
+    }
 }
 
 pub struct ControlledIpldBulkProcessor<C, D> {
@@ -119,7 +145,9 @@ where
             .await
     }
 
-    pub fn control(&self) -> mpsc::Sender<StreamState> {
-        self.control_tx.clone()
+    pub fn control(&self) -> Control {
+        Control {
+            inner: self.control_tx.clone(),
+        }
     }
 }
