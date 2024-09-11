@@ -75,11 +75,23 @@ impl DocId {
         }
         self.path = path;
     }
+
+    pub fn from_link(link: &Link, current_dir: Option<&DirItem>) -> DocId {
+        let mut id = DocId::new(*link.cid(), PathBuf::new());
+        id.merge(current_dir.map(|x| x.id().path()), link.name().as_deref());
+        id
+    }
 }
 
 impl From<Cid> for DocId {
     fn from(cid: Cid) -> Self {
         Self::new(cid, PathBuf::new())
+    }
+}
+
+impl From<DocId> for Link {
+    fn from(id: DocId) -> Self {
+        Self::new(id.cid, None, None)
     }
 }
 

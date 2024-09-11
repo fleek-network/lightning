@@ -7,7 +7,8 @@ use ipld_core::ipld::Ipld;
 use ipld_dagpb::PbNode;
 use reqwest::Url;
 
-use super::processor::{DocId, IpldItem, IpldStream, Link, Processor};
+use super::processor::{IpldStream, Processor};
+use crate::decoder::fs::{DocId, IpldItem, Link};
 use crate::errors::IpldError;
 use crate::unixfs::Data;
 
@@ -27,11 +28,7 @@ impl From<PbNode> for PbNodeWrapper {
 
 impl From<PbNodeWrapper> for Vec<Link> {
     fn from(node: PbNodeWrapper) -> Self {
-        node.0
-            .links
-            .into_iter()
-            .map(|x| Link::new(x.cid, x.name, x.size))
-            .collect()
+        node.links.iter().map(Into::into).collect()
     }
 }
 
@@ -139,16 +136,15 @@ impl Processor for IpldDagPbProcessor {
         if let Ipld::Map(map) = ipld {
             if let Some(Ipld::Bytes(ty)) = map.get("Data") {
                 if *ty == [8, 1] {
-                    let item = IpldItem::from_dir(doc_id, node.into());
+                    let item = IpldItem::to_dir(doc_id, node.into());
                     return Ok(Some(item));
                 } else if node.links.is_empty() {
                     let data = Data::try_from(&node.data)?;
-                    let item =
-                        IpldItem::from_file(doc_id, Some(Bytes::copy_from_slice(&data.Data)));
+                    let item = IpldItem::to_file(doc_id, Bytes::copy_from_slice(&data.Data));
                     return Ok(Some(item));
                 } else {
                     let data: Bytes = self.get_file_link_data(&doc_id, node).await?;
-                    let item = IpldItem::from_file(doc_id, Some(data));
+                    let item = IpldItem::to_file(doc_id, data);
                     return Ok(Some(item));
                 }
             } else {

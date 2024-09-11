@@ -1,175 +1,13 @@
-use std::path::PathBuf;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use async_trait::async_trait;
-use bytes::Bytes;
 use futures::future::BoxFuture;
 use futures::TryFuture;
-use ipld_core::cid::Cid;
 use tokio_stream::Stream;
 
+use crate::decoder::fs::{DirItem, DocId, IpldItem, Link};
 use crate::errors::IpldError;
-
-/// A link to another IPLD node.
-#[derive(Clone, Debug)]
-pub struct Link {
-    cid: Cid,
-    name: Option<String>,
-    size: Option<u64>,
-}
-
-impl From<Cid> for Link {
-    fn from(cid: Cid) -> Self {
-        Self::new(cid, None, None)
-    }
-}
-
-impl Link {
-    pub fn new(cid: Cid, name: Option<String>, size: Option<u64>) -> Self {
-        Self { cid, name, size }
-    }
-
-    pub fn cid(&self) -> &Cid {
-        &self.cid
-    }
-
-    pub fn name(&self) -> &Option<String> {
-        &self.name
-    }
-
-    pub fn size(&self) -> &Option<u64> {
-        &self.size
-    }
-}
-
-/// A unique identifier for an IPLD node, which contains a `Link` and a `PathBuf` with the path to
-/// this document. If `PathBuf` is empty, then this is the root document.
-#[derive(Clone, Debug)]
-pub struct DocId {
-    link: Link,
-    path: PathBuf,
-}
-
-impl DocId {
-    pub fn new(link: Link, path: PathBuf) -> Self {
-        Self { link, path }
-    }
-
-    pub fn cid(&self) -> &Cid {
-        self.link.cid()
-    }
-
-    pub fn link(&self) -> &Link {
-        &self.link
-    }
-
-    pub fn path(&self) -> &PathBuf {
-        &self.path
-    }
-
-    pub fn from_link(link: &Link, parent: &Option<DirItem>) -> Self {
-        let mut path = parent
-            .as_ref()
-            .map(|dir| dir.id.path.clone())
-            .unwrap_or_default();
-        if let Some(n) = link.name.as_ref() {
-            path.push(n.clone())
-        }
-        Self::new(link.clone(), path)
-    }
-}
-
-impl From<Cid> for DocId {
-    fn from(cid: Cid) -> Self {
-        Self::new(cid.into(), PathBuf::new())
-    }
-}
-
-/// `DirItem` represents a directory in the IPLD UnixFS data model.
-#[derive(Clone, Debug)]
-pub struct DirItem {
-    id: DocId,
-    links: Vec<Link>,
-}
-
-impl From<DirItem> for IpldItem {
-    fn from(dir: DirItem) -> Self {
-        Self::Dir(dir)
-    }
-}
-
-impl DirItem {
-    pub fn id(&self) -> &DocId {
-        &self.id
-    }
-
-    pub fn links(&self) -> &Vec<Link> {
-        &self.links
-    }
-}
-
-/// `FileItem` represents a file in the IPLD UnixFS data model.
-#[derive(Clone)]
-pub struct FileItem {
-    id: DocId,
-    data: Bytes,
-}
-
-impl std::fmt::Debug for FileItem {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("FileItem")
-            .field("id", &self.id)
-            .field("data-length", &self.data.len())
-            .finish()
-    }
-}
-
-impl From<FileItem> for IpldItem {
-    fn from(file: FileItem) -> Self {
-        Self::File(file)
-    }
-}
-
-impl FileItem {
-    pub fn id(&self) -> &DocId {
-        &self.id
-    }
-
-    pub fn data(&self) -> &Bytes {
-        &self.data
-    }
-}
-
-#[derive(Clone, Debug)]
-pub enum IpldItem {
-    Dir(DirItem),
-    File(FileItem),
-}
-
-impl IpldItem {
-    pub fn from_dir(id: DocId, links: Vec<Link>) -> Self {
-        let dir = DirItem { id, links };
-        Self::Dir(dir)
-    }
-
-    pub fn from_file(id: DocId, data: Option<Bytes>) -> Self {
-        let data = data.unwrap_or_default();
-        let file = FileItem { id, data };
-        Self::File(file)
-    }
-
-    pub fn is_dir(&self) -> bool {
-        matches!(self, Self::Dir(_))
-    }
-
-    pub fn id(&self) -> &DocId {
-        match self {
-            Self::Dir(dir) => &dir.id,
-            Self::File(file) => &file.id,
-        }
-    }
-}
 
 /// A trait for processing IPLD data.
 ///
@@ -198,7 +36,7 @@ where
     pub fn new(processor: P, id: DocId) -> Self {
         Self {
             processor,
-            stack: vec![(None, vec![id.link().clone()], 0)],
+            stack: vec![(None, vec![id.into()], 0)],
             pending_future: None,
         }
     }
@@ -220,12 +58,15 @@ where
                     this.pending_future = None;
                     match result {
                         Ok(Some(ref i @ IpldItem::Dir(ref item))) => {
-                            let links = item.links.clone();
+                            let links = item.links().clone();
                             this.stack.push((Some(item.clone()), links, 0));
                             return Poll::Ready(Some(Ok(i.clone())));
                         },
                         Ok(Some(item @ IpldItem::File(_))) => {
                             return Poll::Ready(Some(Ok(item)));
+                        },
+                        Ok(Some(chunk @ IpldItem::ChunkedFile(_))) => {
+                            return Poll::Ready(Some(Ok(chunk)));
                         },
                         Ok(None) => {
                             return Poll::Ready(None);
@@ -246,7 +87,7 @@ where
                 let link = &current_links[*current_index];
                 *current_index += 1;
                 let processor = this.processor.clone();
-                let cid = DocId::from_link(link, current_dir);
+                let cid = DocId::from_link(link, current_dir.as_ref());
                 this.pending_future = Some(Box::pin(async move { processor.get(cid).await }));
                 cx.waker().wake_by_ref();
                 return Poll::Pending;
@@ -265,6 +106,7 @@ mod tests {
     use std::fs;
     use std::sync::LazyLock;
 
+    use bytes::Bytes;
     use ipld_core::cid::Cid;
     use ipld_core::codec::Codec;
     use ipld_dagpb::{DagPbCodec, PbNode};
@@ -283,7 +125,7 @@ mod tests {
     impl Processor for MyProcessor {
         async fn get(&self, id: DocId) -> Result<Option<IpldItem>, IpldError> {
             let data: Bytes = b"Hello, world!".to_vec().into();
-            let file = IpldItem::from_file(id, Some(data));
+            let file = IpldItem::to_file(id, data);
             Ok(Some(file))
         }
     }
@@ -350,7 +192,7 @@ mod tests {
                         .into_iter()
                         .map(|link| Link::new(link.cid, link.name, link.size))
                         .collect();
-                    Some(IpldItem::from_dir(id, links))
+                    Some(IpldItem::to_dir(id, links))
                 })?;
                 Ok(data)
             } else {
@@ -388,6 +230,9 @@ mod tests {
                 },
                 Ok(IpldItem::Dir(dir)) => {
                     assert_eq!(dir.id().cid(), &doc_id);
+                },
+                Ok(IpldItem::ChunkedFile(_)) => {
+                    panic!("Expected dir, got chunked file");
                 },
                 Err(e) => {
                     panic!("Error: {:?}", e);
