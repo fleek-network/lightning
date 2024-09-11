@@ -8447,7 +8447,6 @@ dependencies = [
  "blake3",
  "block-buffer 0.9.0",
  "block-padding 0.3.3",
- "bs58 0.5.1",
  "bytemuck",
  "byteorder",
  "bytes 1.7.1",
