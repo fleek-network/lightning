@@ -1,3 +1,5 @@
+use std::sync::mpsc::TrySendError;
+
 use anyhow::{bail, Context};
 use deno_core::v8::{Global, IsolateHandle, Value};
 use deno_core::{serde_v8, v8, JsRuntime, ModuleSpecifier};
@@ -5,7 +7,7 @@ use fn_sdk::connection::Connection;
 use fn_sdk::header::TransportDetail;
 use fn_sdk::http_util::{respond, respond_with_error, respond_with_http_response};
 use tokio::sync::mpsc::UnboundedSender;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 use crate::runtime::Runtime;
 use crate::stream::{Origin, Request};
@@ -48,23 +50,43 @@ pub async fn main() {
         }
     });
 
-    while let Ok(conn) = listener.accept().await {
-        let tx = tx.clone();
+    let mut pool = Vec::new();
+    for _ in 0..num_cpus::get_physical() {
+        let (job_tx, job_rx) = std::sync::mpsc::sync_channel(0);
+        pool.push(job_tx);
 
-        // spawn a new thread and tokio runtime to handle the connection
-        // TODO: This is very hacky and not very scalable
-        // Research using deno's JsRealms to provide the script sandboxing in a single or a
+        // TODO: Research using deno's JsRealms to provide the script sandboxing in a single or a
         // few shared multithreaded runtimes, or use a custom work scheduler.
         std::thread::spawn(move || {
-            if let Err(e) = tokio::runtime::Builder::new_current_thread()
+            let runtime = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .build()
-                .expect("failed to create connection async runtime")
-                .block_on(handle_connection(tx, conn))
-            {
-                error!("session failed: {e:?}");
+                .expect("failed to create connection async runtime");
+            while let Ok((tx, conn)) = job_rx.recv() {
+                if let Err(e) = runtime.block_on(handle_connection(tx, conn)) {
+                    error!("session failed: {e:?}");
+                }
             }
         });
+    }
+
+    while let Ok(conn) = listener.accept().await {
+        let tx = tx.clone();
+        let mut job_params = Some((tx, conn));
+        'outer: loop {
+            println!("looping");
+            for job_tx in &pool {
+                let (tx, conn) = job_params.expect("");
+                match job_tx.try_send((tx, conn)) {
+                    Ok(_) => break 'outer,
+                    Err(TrySendError::Full((tx, conn))) => job_params = Some((tx, conn)),
+                    Err(TrySendError::Disconnected((tx, conn))) => {
+                        warn!("a thread in the pool disconnected");
+                        job_params = Some((tx, conn));
+                    },
+                };
+            }
+        }
     }
 }
 
