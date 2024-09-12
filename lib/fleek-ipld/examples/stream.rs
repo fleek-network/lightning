@@ -12,11 +12,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //let cid: Cid = "Qmej4L6L4UYxHF4s4QeAzkwUX8VZ45GiuZ2BLtVds5LXad".try_into()?; // css file
     //let cid: Cid = "QmbvrHYWXAU1BuxMPNRtfeF4DS2oPmo5hat7ocqAkNPr74".try_into()?; // png small
 
-    let downloader = ReqwestDownloader::new("https://ipfs.io");
-    let reader = IpldReader::default();
     let mut stream = StreamStep::builder()
-        .reader(reader)
-        .downloader(downloader)
+        .reader(IpldReader::default())
+        .downloader(ReqwestDownloader::new("https://ipfs.io"))
         .build();
 
     stream.start(cid).await;
@@ -35,8 +33,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             },
             Some(IpldItem::Dir(dir)) => {
                 println!("Directory: {:?} \n\n", dir);
-                stream.explore_dir(dir).await?;
-                continue;
             },
             Some(IpldItem::Chunk(_)) => {
                 panic!("Chunked file should be handled by ChunkedFile");

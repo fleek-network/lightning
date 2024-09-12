@@ -57,4 +57,7 @@ pub enum IpldError {
 
     #[error("IPLD error: Error trying to convert to Chunk {1} - Cid {0}")]
     InvalidChunk(Cid, usize),
+
+    #[error("IPLD error: Error trying to convert to Dir - Cid {0}")]
+    InvalidDir(Cid),
 }

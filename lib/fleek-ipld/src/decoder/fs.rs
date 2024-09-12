@@ -273,6 +273,15 @@ impl IpldItem {
             )),
         }
     }
+
+    pub(crate) fn try_into_dir(&self) -> Result<DirItem, IpldError> {
+        match self {
+            Self::Dir(dir) => Ok(dir.clone()),
+            _ => Err(IpldError::InvalidDir(
+                *<Self as Into<DocId>>::into(self.clone()).cid(),
+            )),
+        }
+    }
 }
 
 impl From<IpldItem> for DocId {

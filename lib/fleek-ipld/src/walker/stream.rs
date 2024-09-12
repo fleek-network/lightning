@@ -1,5 +1,4 @@
 use std::collections::VecDeque;
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use futures::{StreamExt, TryStreamExt};
@@ -18,8 +17,9 @@ use crate::walker::downloader::Downloader;
 struct StreamState {
     initial_cid: bool,
     current_cid: Option<Cid>,
-    dir_entries: Vec<Link>,
+    dir_entries: (Option<DirItem>, Vec<Link>),
     cache_items: Arc<RwLock<Vec<IpldItem>>>,
+    last_item: Option<IpldItem>,
 }
 
 impl StreamState {
@@ -28,8 +28,16 @@ impl StreamState {
         self.initial_cid = true;
     }
 
-    fn add_dir_entry(&mut self, links: Vec<Link>) {
-        self.dir_entries = links;
+    fn add_dir_entry(&mut self, dir_item: DirItem, links: Vec<Link>) {
+        self.dir_entries = (Some(dir_item), links);
+    }
+
+    fn get_list_entries(&self) -> Vec<Link> {
+        self.dir_entries.1.clone()
+    }
+
+    fn get_dir_item(&self) -> Option<DirItem> {
+        self.dir_entries.0.clone()
     }
 
     async fn get_next_dir_entry(&mut self) -> Option<IpldItem> {
@@ -60,37 +68,66 @@ where
             self.state.initial_cid,
             "Stream not started. You must call start(cid) first."
         );
+        if let Some(item) = &self.state.last_item {
+            if item.is_dir() {
+                let dir = item.try_into_dir()?;
+                self.explore_dir(dir).await?;
+            }
+        }
         if let Some(cid) = self.state.current_cid {
             let item = self.download_item(cid, Metadata::default()).await.map(Some);
             self.state.current_cid = None;
+            if let Ok(item) = &item {
+                self.state.last_item = item.clone();
+            }
             return item;
         }
-        if !self.state.dir_entries.is_empty() {
-            self.next_items(10).await?;
+        if !self.state.get_list_entries().is_empty() {
+            self.cache_next(10).await?;
         }
-        Ok(self.state.get_next_dir_entry().await)
+        let item = self.state.get_next_dir_entry().await;
+        self.state.last_item = item.clone();
+        Ok(item)
     }
 
-    pub async fn explore_dir(&mut self, item: DirItem) -> Result<(), IpldError> {
-        let links = item.links();
+    pub async fn next_n(&mut self, n: usize) -> Result<Vec<IpldItem>, IpldError> {
+        let mut items = Vec::with_capacity(n);
+        for _ in 0..n {
+            if let Some(item) = self.next().await? {
+                items.push(item);
+            } else {
+                break;
+            }
+        }
+        Ok(items)
+    }
+
+    async fn explore_dir(&mut self, item: DirItem) -> Result<(), IpldError> {
+        let item_dir = item.clone();
+        let links = item.links().to_vec();
         if links.is_empty() {
             return Ok(());
         }
-        self.state.add_dir_entry(links.clone());
+        self.state.add_dir_entry(item_dir, links.clone());
         Ok(())
     }
 
-    async fn next_items(&mut self, num_items: usize) -> Result<(), IpldError> {
-        let num_items = num_items.min(self.state.dir_entries.len());
+    async fn cache_next(&mut self, num_items: usize) -> Result<(), IpldError> {
+        let num_items = num_items.min(self.state.get_list_entries().len());
         let iter = self
             .state
-            .dir_entries
+            .get_list_entries()
             .drain(..num_items)
             .collect::<Vec<_>>();
         let futures = iter.into_iter().map(|link| {
             let self_clone = self.clone();
+            let parent_path = self
+                .state
+                .get_dir_item()
+                .map(|x| x.id().path().clone())
+                .unwrap_or_default();
             async move {
-                let metadata = Metadata::new(0, 0, &link, PathBuf::new());
+                let metadata = Metadata::new(0, 0, &link, parent_path);
                 let item = self_clone.download_item(*link.cid(), metadata).await?;
                 self_clone
                     .state
