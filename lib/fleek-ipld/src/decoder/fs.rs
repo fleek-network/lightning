@@ -98,10 +98,19 @@ impl From<DocId> for Link {
 }
 
 /// `DirItem` represents a directory in the IPLD UnixFS data model.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct DirItem {
     id: DocId,
     links: Vec<Link>,
+}
+
+impl std::fmt::Debug for DirItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DirItem")
+            .field("id", &self.id)
+            .field("links", &self.links.len())
+            .finish()
+    }
 }
 
 impl From<DirItem> for IpldItem {
@@ -190,10 +199,19 @@ impl ChunkItem {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct ChunkFileItem {
     id: DocId,
     chunks: Vec<Link>,
+}
+
+impl std::fmt::Debug for ChunkFileItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ChunkFileItem")
+            .field("id", &self.id)
+            .field("chunks", &self.chunks.len())
+            .finish()
+    }
 }
 
 impl From<ChunkFileItem> for IpldItem {

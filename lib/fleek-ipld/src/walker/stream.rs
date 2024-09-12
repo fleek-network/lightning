@@ -1,9 +1,9 @@
 use std::collections::VecDeque;
 use std::sync::Arc;
 
-use futures::{StreamExt, TryStreamExt};
+use futures::StreamExt;
 use ipld_core::cid::Cid;
-use tokio::sync::RwLock;
+use tokio::task::JoinSet;
 use typed_builder::TypedBuilder;
 
 use crate::decoder::data_codec::Decoder;
@@ -17,8 +17,8 @@ use crate::walker::downloader::Downloader;
 struct StreamState {
     initial_cid: bool,
     current_cid: Option<Cid>,
-    dir_entries: (Option<DirItem>, Vec<Link>),
-    cache_items: Arc<RwLock<Vec<IpldItem>>>,
+    dir_entries: Vec<(DirItem, Link)>,
+    cache_items: Vec<IpldItem>,
     last_item: Option<IpldItem>,
 }
 
@@ -29,19 +29,16 @@ impl StreamState {
     }
 
     fn add_dir_entry(&mut self, dir_item: DirItem, links: Vec<Link>) {
-        self.dir_entries = (Some(dir_item), links);
+        self.dir_entries
+            .extend(links.iter().map(|x| (dir_item.clone(), x.clone())));
     }
 
-    fn get_list_entries(&self) -> Vec<Link> {
-        self.dir_entries.1.clone()
+    fn get_list_entries(&self) -> Vec<(DirItem, Link)> {
+        self.dir_entries.clone()
     }
 
-    fn get_dir_item(&self) -> Option<DirItem> {
-        self.dir_entries.0.clone()
-    }
-
-    async fn get_next_dir_entry(&mut self) -> Option<IpldItem> {
-        self.cache_items.write().await.pop()
+    fn get_next_dir_entry(&mut self) -> Option<IpldItem> {
+        self.cache_items.pop()
     }
 }
 
@@ -64,16 +61,23 @@ where
     }
 
     pub async fn next(&mut self) -> Result<Option<IpldItem>, IpldError> {
+        // Not allow calling next if start has not been called
         assert!(
             self.state.initial_cid,
             "Stream not started. You must call start(cid) first."
         );
+
+        // If there was an item in the previous iteration, explore it if it is a directory
+        // in order to store the links for the next iteration
         if let Some(item) = &self.state.last_item {
             if item.is_dir() {
                 let dir = item.try_into_dir()?;
                 self.explore_dir(dir).await?;
             }
+            self.state.last_item = None;
         }
+
+        // If there is a current_cid which means first iteration, download it and return the item
         if let Some(cid) = self.state.current_cid {
             let item = self.download_item(cid, Metadata::default()).await.map(Some);
             self.state.current_cid = None;
@@ -82,10 +86,14 @@ where
             }
             return item;
         }
+
+        // If there are items to be explored, download 10 of them in parallel and cache them
         if !self.state.get_list_entries().is_empty() {
             self.cache_next(10).await?;
         }
-        let item = self.state.get_next_dir_entry().await;
+
+        // Return the next item from the cache
+        let item = self.state.get_next_dir_entry();
         self.state.last_item = item.clone();
         Ok(item)
     }
@@ -116,32 +124,24 @@ where
         let num_items = num_items.min(self.state.get_list_entries().len());
         let iter = self
             .state
-            .get_list_entries()
+            .dir_entries
             .drain(..num_items)
             .collect::<Vec<_>>();
-        let futures = iter.into_iter().map(|link| {
+        let mut set = JoinSet::new();
+        for (dir, link) in iter {
             let self_clone = self.clone();
-            let parent_path = self
-                .state
-                .get_dir_item()
-                .map(|x| x.id().path().clone())
-                .unwrap_or_default();
-            async move {
-                let metadata = Metadata::new(0, 0, &link, parent_path);
-                let item = self_clone.download_item(*link.cid(), metadata).await?;
-                self_clone
-                    .state
-                    .cache_items
-                    .write()
-                    .await
-                    .push(item.clone());
-                Ok::<(), IpldError>(())
-            }
-        });
-        tokio_stream::iter(futures)
-            .buffer_unordered(5)
-            .try_for_each_concurrent(5, |_| async { Ok(()) })
-            .await
+            set.spawn(async move {
+                let metadata = Metadata::new(0, 0, &link, dir.id().path().clone());
+                self_clone.download_item(*link.cid(), metadata).await
+            });
+        }
+        let mut vec = Vec::with_capacity(num_items);
+        while let Some(result) = set.join_next().await {
+            let item = result??;
+            vec.push(item);
+        }
+        self.state.cache_items.extend(vec);
+        Ok(())
     }
 
     pub async fn new_chunk_file_streamer(&self, item: ChunkFileItem) -> StreamChunkedFile<C, D> {
