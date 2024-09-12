@@ -1,23 +1,17 @@
 //! Mostly copied from `lib/fn_sdk/src/connection.rs`
 
-use std::collections::HashMap;
+use std::path::PathBuf;
 use std::pin::Pin;
 use std::task::Poll;
 
 use anyhow::Result;
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::{BufMut, BytesMut};
 use enclave_runner::usercalls::AsyncListener;
-use fn_sdk::header::{read_header, ConnectionHeader, TransportDetail};
-use fn_sdk::io_util::read_length_delimited;
+use fn_sdk::header::{read_header, TransportDetail};
 use futures::ready;
-use serde::{Deserialize, Serialize};
-use serde_big_array::BigArray;
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::mpsc;
-use url::Url;
-
-use crate::IPC_PATH;
 
 /// Listener for incoming connections
 pub struct ConnectionListener {
@@ -26,8 +20,9 @@ pub struct ConnectionListener {
 
 impl ConnectionListener {
     pub async fn bind() -> Self {
-        let listener = UnixListener::bind(IPC_PATH.join("conn"))
-            .expect("failed to bind to connection socket listener");
+        let listener =
+            UnixListener::bind(PathBuf::from(std::env::var("IPC_PATH").unwrap()).join("conn"))
+                .expect("failed to bind to connection socket listener");
         let ConnectionListener { rx } = ConnectionListener::new(listener);
         Self { rx }
     }
@@ -91,11 +86,13 @@ impl Connection {
         let header = read_header(&mut stream)
             .await
             .ok_or(std::io::ErrorKind::Other)?;
+
         let mut buffer = BytesMut::new();
         if let TransportDetail::Task { ref payload, .. } = header.transport_detail {
             buffer.put_u32(payload.len() as u32);
             buffer.put_slice(payload);
         }
+
         Ok(Self { stream, buffer })
     }
 }
