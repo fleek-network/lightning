@@ -18,7 +18,6 @@ exclude = [
   "etc/ebpf-apps/ebpf",
   "etc/ebpf-apps/common",
   "etc/ebpf-apps/guard",
-  "etc/socket-logger",
   "etc/tui",
 ]
 

@@ -21,6 +21,7 @@ urlencoding = "2.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 lightning-schema = { path = "../../core/schema" }
 lightning-workspace-hack.workspace = true
+num_cpus = "1.16"
 
 # Deno core + webapi extensions
 deno_core = "0.299"

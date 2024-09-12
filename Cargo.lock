@@ -4638,6 +4638,7 @@ dependencies = [
  "hex",
  "lightning-schema",
  "lightning-workspace-hack",
+ "num_cpus",
  "serde",
  "serde_json",
  "tokio",
