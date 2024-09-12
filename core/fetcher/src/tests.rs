@@ -111,7 +111,7 @@ async fn get_fetchers(
         .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
         .unwrap();
 
-    let consensus_group = MockConsensusGroup::new(ConsensusConfig::default());
+    let consensus_group = MockConsensusGroup::new(ConsensusConfig::default(), None);
     let peers = keystores
         .into_iter()
         .enumerate()

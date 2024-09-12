@@ -3,7 +3,9 @@ mod genesis;
 mod network;
 mod network_builder;
 mod node;
+mod node_app;
 mod node_builder;
+mod node_rpc;
 mod tracing;
 mod wait;
 

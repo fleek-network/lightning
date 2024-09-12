@@ -32,8 +32,12 @@ impl TestNetwork {
         self.node_by_id.values()
     }
 
-    pub fn node(&self, node_id: NodeIndex) -> Option<&TestNode> {
+    pub fn maybe_node(&self, node_id: NodeIndex) -> Option<&TestNode> {
         self.node_by_id.get(&node_id)
+    }
+
+    pub fn node(&self, node_id: NodeIndex) -> &TestNode {
+        self.node_by_id.get(&node_id).expect("node not found")
     }
 
     pub async fn shutdown(&mut self) {

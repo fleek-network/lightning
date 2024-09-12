@@ -17,12 +17,32 @@ use lightning_types::{
     StateProofKey,
     StateProofValue,
     TotalServed,
+    UpdateMethod,
     Value,
 };
 use lightning_utils::application::QueryRunnerExt;
 use merklize::StateProof;
 
 use crate::api::{AdminApiClient, FleekApiClient};
+
+#[tokio::test]
+async fn test_rpc_send_txn() {
+    let mut network = TestNetworkBuilder::new()
+        .with_num_nodes(1)
+        .build()
+        .await
+        .unwrap();
+    let node = network.node(0);
+
+    FleekApiClient::send_txn(
+        &node.rpc_client().unwrap(),
+        node.new_update_transaction(UpdateMethod::ChangeEpoch { epoch: 1 }),
+    )
+    .await
+    .unwrap();
+
+    network.shutdown().await;
+}
 
 #[tokio::test]
 async fn test_rpc_get_flk_balance() {
@@ -41,7 +61,7 @@ async fn test_rpc_get_flk_balance() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0).unwrap();
+    let node = network.node(0);
 
     let response = FleekApiClient::get_flk_balance(&node.rpc_client().unwrap(), eth_address, None)
         .await
@@ -61,7 +81,7 @@ async fn test_rpc_get_reputation() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0).unwrap();
+    let node = network.node(0);
     let node_public_key = node.keystore.get_ed25519_pk();
 
     let response =
@@ -88,7 +108,7 @@ async fn test_rpc_get_staked() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0).unwrap();
+    let node = network.node(0);
     let node_public_key = node.keystore.get_ed25519_pk();
 
     let response = FleekApiClient::get_staked(&node.rpc_client().unwrap(), node_public_key, None)
@@ -116,7 +136,7 @@ async fn test_rpc_get_stables_balance() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0).unwrap();
+    let node = network.node(0);
 
     let response =
         FleekApiClient::get_stables_balance(&node.rpc_client().unwrap(), eth_address, None)
@@ -142,7 +162,7 @@ async fn test_rpc_get_stake_locked_until() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0).unwrap();
+    let node = network.node(0);
     let node_public_key = node.keystore.get_ed25519_pk();
 
     let response =
@@ -169,7 +189,7 @@ async fn test_rpc_get_locked_time() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0).unwrap();
+    let node = network.node(0);
     let node_public_key = node.keystore.get_ed25519_pk();
 
     let response =
@@ -196,7 +216,7 @@ async fn test_rpc_get_locked() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0).unwrap();
+    let node = network.node(0);
     let node_public_key = node.keystore.get_ed25519_pk();
 
     let response = FleekApiClient::get_locked(&node.rpc_client().unwrap(), node_public_key, None)
@@ -224,7 +244,7 @@ async fn test_rpc_get_bandwidth_balance() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0).unwrap();
+    let node = network.node(0);
 
     let response =
         FleekApiClient::get_bandwidth_balance(&node.rpc_client().unwrap(), eth_address, None)
@@ -242,7 +262,7 @@ async fn test_rpc_get_node_info() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0).unwrap();
+    let node = network.node(0);
     let node_public_key = node.keystore.get_ed25519_pk();
 
     let response =
@@ -266,7 +286,7 @@ async fn test_rpc_get_staking_amount() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0).unwrap();
+    let node = network.node(0);
 
     let response = FleekApiClient::get_staking_amount(&node.rpc_client().unwrap())
         .await
@@ -283,7 +303,7 @@ async fn test_rpc_get_committee_members() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0).unwrap();
+    let node = network.node(0);
 
     let response = FleekApiClient::get_committee_members(&node.rpc_client().unwrap(), None)
         .await
@@ -300,7 +320,7 @@ async fn test_rpc_get_epoch() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0).unwrap();
+    let node = network.node(0);
 
     let response = FleekApiClient::get_epoch(&node.rpc_client().unwrap())
         .await
@@ -317,7 +337,7 @@ async fn test_rpc_get_epoch_info() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0).unwrap();
+    let node = network.node(0);
 
     let response = FleekApiClient::get_epoch_info(&node.rpc_client().unwrap())
         .await
@@ -334,7 +354,7 @@ async fn test_rpc_get_total_supply() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0).unwrap();
+    let node = network.node(0);
 
     let response = FleekApiClient::get_total_supply(&node.rpc_client().unwrap(), None)
         .await
@@ -355,7 +375,7 @@ async fn test_rpc_get_year_start_supply() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0).unwrap();
+    let node = network.node(0);
 
     let response = FleekApiClient::get_year_start_supply(&node.rpc_client().unwrap(), None)
         .await
@@ -380,7 +400,7 @@ async fn test_rpc_get_protocol_fund_address() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0).unwrap();
+    let node = network.node(0);
 
     let response = FleekApiClient::get_protocol_fund_address(&node.rpc_client().unwrap())
         .await
@@ -405,7 +425,7 @@ async fn test_rpc_get_protocol_param_lock_time() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0).unwrap();
+    let node = network.node(0);
 
     let response =
         FleekApiClient::get_protocol_params(&node.rpc_client().unwrap(), ProtocolParams::LockTime)
@@ -439,7 +459,7 @@ async fn test_rpc_get_total_served() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0).unwrap();
+    let node = network.node(0);
 
     let response = FleekApiClient::get_total_served(&node.rpc_client().unwrap(), 0)
         .await
@@ -468,7 +488,7 @@ async fn test_rpc_get_node_served() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0).unwrap();
+    let node = network.node(0);
     let node_public_key = node.keystore.get_ed25519_pk();
 
     let response =
@@ -499,7 +519,7 @@ async fn test_rpc_is_valid_node() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0).unwrap();
+    let node = network.node(0);
     let node_public_key = node.keystore.get_ed25519_pk();
 
     let response = FleekApiClient::is_valid_node(&node.rpc_client().unwrap(), node_public_key)
@@ -520,7 +540,7 @@ async fn test_rpc_get_node_registry() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0).unwrap();
+    let node = network.node(0);
 
     let response = FleekApiClient::get_node_registry(&node.rpc_client().unwrap(), None)
         .await
@@ -541,7 +561,7 @@ async fn test_rpc_get_node_registry() {
 }
 
 #[tokio::test]
-async fn test_admin_seq() {
+async fn test_admin_ping() {
     let mut network = TestNetworkBuilder::new()
         .with_num_nodes(1)
         .with_genesis_mutator(move |genesis| {
@@ -550,7 +570,7 @@ async fn test_admin_seq() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0).unwrap();
+    let node = network.node(0);
 
     // Should fail because we are not authenticated.
     assert!(
@@ -584,7 +604,7 @@ async fn test_rpc_events() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0).unwrap();
+    let node = network.node(0);
     let sender = node.rpc.event_tx();
 
     let client = node.rpc_ws_client().await.unwrap();
@@ -622,7 +642,7 @@ async fn test_rpc_get_state_root() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0).unwrap();
+    let node = network.node(0);
 
     let response = FleekApiClient::get_state_root(&node.rpc_client().unwrap(), None)
         .await
@@ -651,7 +671,7 @@ async fn test_rpc_get_state_proof() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0).unwrap();
+    let node = network.node(0);
     let client = node.rpc_client().unwrap();
 
     let state_key = StateProofKey::Accounts(owner_eth_address);

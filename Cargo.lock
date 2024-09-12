@@ -7822,6 +7822,7 @@ dependencies = [
  "lightning-blockstore",
  "lightning-blockstore-server",
  "lightning-broadcast",
+ "lightning-consensus",
  "lightning-forwarder",
  "lightning-interfaces",
  "lightning-notifier",

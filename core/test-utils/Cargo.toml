@@ -23,6 +23,7 @@ lazy_static.workspace = true
 lightning-application.workspace = true
 lightning-blockstore-server.workspace = true
 lightning-blockstore.workspace = true
+lightning-consensus.workspace = true
 lightning-broadcast.workspace = true
 lightning-forwarder.workspace = true
 lightning-interfaces.workspace = true

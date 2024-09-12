@@ -6,6 +6,7 @@
 
 use std::collections::HashSet;
 use std::marker::PhantomData;
+use std::sync::Arc;
 use std::time::Duration;
 
 use affair::AsyncWorkerUnordered;
@@ -28,23 +29,38 @@ use tokio::time::{interval, sleep};
 /// group into a brodcast sender and the receiver will be all of the [ExecutionEngineSocket]s of
 /// all of the nodes.
 pub struct MockConsensusGroup {
+    pub config: Config,
     req_tx: Option<mpsc::Sender<TransactionRequest>>,
     block_producer_rx: Option<broadcast::Receiver<Block>>,
+    start: Option<Arc<tokio::sync::Notify>>,
 }
 
 impl MockConsensusGroup {
-    pub fn new(config: Config) -> Self {
+    pub fn new(config: Config, start: Option<Arc<tokio::sync::Notify>>) -> Self {
         let (req_tx, req_rx) = mpsc::channel(128);
         let (block_producer_tx, block_producer_rx) = broadcast::channel(16);
 
         tokio::task::Builder::new()
             .name("MockConsensusGroup")
-            .spawn(group_worker(config, req_rx, block_producer_tx))
+            .spawn(group_worker(
+                config.clone(),
+                start.clone(),
+                req_rx,
+                block_producer_tx,
+            ))
             .unwrap();
 
         Self {
+            config,
             req_tx: Some(req_tx),
             block_producer_rx: Some(block_producer_rx),
+            start,
+        }
+    }
+
+    pub fn start(&self) {
+        if let Some(start) = self.start.clone() {
+            start.notify_waiters();
         }
     }
 }
@@ -52,22 +68,18 @@ impl MockConsensusGroup {
 impl Clone for MockConsensusGroup {
     fn clone(&self) -> Self {
         Self {
+            config: self.config.clone(),
             req_tx: self.req_tx.clone(),
             block_producer_rx: self
                 .block_producer_rx
                 .as_ref()
                 .map(broadcast::Receiver::resubscribe),
+            start: self.start.clone(),
         }
     }
 }
 
-impl Default for MockConsensusGroup {
-    fn default() -> Self {
-        Self::new(Config::default())
-    }
-}
-
-pub struct MockForwarder<C> {
+pub struct MockForwarder<C: Collection> {
     socket: MempoolSocket,
     c: PhantomData<C>,
 }
@@ -156,7 +168,7 @@ impl<C: Collection> BuildGraph for MockConsensus<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::new()
             .with_infallible(|config: fdi::Ref<C::ConfigProviderInterface>| {
-                MockConsensusGroup::new(config.get::<Self>())
+                MockConsensusGroup::new(config.get::<Self>(), None)
             })
             .with_infallible(
                 Self::new.with_event_handler(
@@ -204,9 +216,15 @@ impl Default for Config {
 
 async fn group_worker(
     config: Config,
+    start: Option<Arc<tokio::sync::Notify>>,
     mut req_rx: mpsc::Receiver<TransactionRequest>,
     block_producer_tx: broadcast::Sender<Block>,
 ) {
+    // Wait for the start signal.
+    if let Some(start) = start {
+        start.notified().await;
+    }
+
     let period = if config.new_block_interval.is_zero() {
         Duration::from_secs(120)
     } else {

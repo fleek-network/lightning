@@ -341,13 +341,16 @@ async fn test_reputation_calculation_and_query() {
     let owner_secret_key1 = AccountOwnerSecretKey::generate();
     let owner_public_key1 = owner_secret_key1.to_pk();
 
-    let consensus_group = MockConsensusGroup::new(ConsensusConfig {
-        min_ordering_time: 0,
-        max_ordering_time: 1,
-        probability_txn_lost: 0.0,
-        transactions_to_lose: HashSet::new(),
-        new_block_interval: Duration::from_secs(5),
-    });
+    let consensus_group = MockConsensusGroup::new(
+        ConsensusConfig {
+            min_ordering_time: 0,
+            max_ordering_time: 1,
+            probability_txn_lost: 0.0,
+            transactions_to_lose: HashSet::new(),
+            new_block_interval: Duration::from_secs(5),
+        },
+        None,
+    );
 
     genesis.node_info.push(GenesisNode::new(
         owner_public_key1.into(),
