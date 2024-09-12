@@ -1,7 +1,6 @@
 use fleek_ipld::decoder::reader::IpldReader;
 use fleek_ipld::errors::IpldError;
-use fleek_ipld::walker::concurrent::controlled::{Control, ControlledIpldBulkProcessor};
-use fleek_ipld::walker::concurrent::processor::IpldItemProcessor;
+use fleek_ipld::walker::concurrent::{Control, IpldBulkProcessor, IpldItemProcessor};
 use fleek_ipld::walker::data::Item;
 use fleek_ipld::walker::downloader::ReqwestDownloader;
 use ipld_core::cid::Cid;
@@ -35,7 +34,7 @@ async fn main() -> Result<(), Box<(dyn std::error::Error + 'static)>> {
 
     let downloader = ReqwestDownloader::new("https://ipfs.io");
     let reader = IpldReader::default();
-    let mut stream = ControlledIpldBulkProcessor::new(reader, downloader);
+    let stream = IpldBulkProcessor::new(reader, downloader);
     let control = stream.control();
 
     let processor = PrintProcessor { control };
