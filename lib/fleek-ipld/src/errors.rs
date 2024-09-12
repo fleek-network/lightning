@@ -54,4 +54,7 @@ pub enum IpldError {
 
     #[error("IPLD error: Error sending signal to controlled process {0}")]
     ControlError(String),
+
+    #[error("IPLD error: Error trying to convert to Chunk {1} - Cid {0}")]
+    InvalidChunk(Cid, usize),
 }

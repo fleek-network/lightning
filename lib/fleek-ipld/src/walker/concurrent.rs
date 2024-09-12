@@ -18,6 +18,7 @@ pub trait IpldItemProcessor {
     async fn on_item(&self, item: Item) -> Result<(), IpldError>;
 }
 
+#[derive(Clone)]
 pub struct NOOPProcessor;
 
 #[async_trait]

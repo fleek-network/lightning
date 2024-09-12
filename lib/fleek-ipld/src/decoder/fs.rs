@@ -4,6 +4,8 @@ use bytes::Bytes;
 use ipld_core::cid::Cid;
 use ipld_dagpb::PbLink;
 
+use crate::errors::IpldError;
+
 /// A link to another IPLD node.
 #[derive(Clone, Debug)]
 pub struct Link {
@@ -150,6 +152,44 @@ impl FileItem {
     }
 }
 
+/// `FileItem` represents a file in the IPLD UnixFS data model.
+#[derive(Clone)]
+pub struct ChunkItem {
+    id: DocId,
+    index: usize,
+    data: Bytes,
+}
+
+impl std::fmt::Debug for ChunkItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FileItem")
+            .field("id", &self.id)
+            .field("index", &self.index)
+            .field("data-length", &self.data.len())
+            .finish()
+    }
+}
+
+impl From<ChunkItem> for IpldItem {
+    fn from(file: ChunkItem) -> Self {
+        Self::Chunk(file)
+    }
+}
+
+impl ChunkItem {
+    pub fn id(&self) -> &DocId {
+        &self.id
+    }
+
+    pub fn index(&self) -> usize {
+        self.index
+    }
+
+    pub fn data(&self) -> &Bytes {
+        &self.data
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct ChunkFileItem {
     id: DocId,
@@ -177,6 +217,7 @@ pub enum IpldItem {
     Dir(DirItem),
     ChunkedFile(ChunkFileItem),
     File(FileItem),
+    Chunk(ChunkItem),
 }
 
 impl IpldItem {
@@ -191,6 +232,10 @@ impl IpldItem {
 
     pub fn to_chunked_file(id: DocId, chunks: Vec<Link>) -> IpldItem {
         Self::ChunkedFile(ChunkFileItem { id, chunks })
+    }
+
+    pub fn to_chunk(id: DocId, index: usize, data: Bytes) -> IpldItem {
+        Self::Chunk(ChunkItem { id, index, data })
     }
 
     pub fn to_file(id: DocId, data: Bytes) -> IpldItem {
@@ -210,6 +255,22 @@ impl IpldItem {
             Self::Dir(DirItem { id, .. }) => id.merge(Some(path), name),
             Self::ChunkedFile(ChunkFileItem { id, .. }) => id.merge(Some(path), name),
             Self::File(FileItem { id, .. }) => id.merge(Some(path), name),
+            Self::Chunk(ChunkItem { id, .. }) => id.merge(Some(path), name),
+        }
+    }
+
+    pub(crate) fn try_into_chunk(&self, i: usize) -> Result<ChunkItem, IpldError> {
+        match self {
+            Self::File(chunk) => Ok(ChunkItem {
+                id: chunk.id.clone(),
+                index: i,
+                data: chunk.data.clone(),
+            }),
+            Self::Chunk(chunk) => Ok(chunk.clone()),
+            _ => Err(IpldError::InvalidChunk(
+                *<Self as Into<DocId>>::into(self.clone()).cid(),
+                i,
+            )),
         }
     }
 }
@@ -220,6 +281,7 @@ impl From<IpldItem> for DocId {
             IpldItem::Dir(dir) => dir.id,
             IpldItem::File(file) => file.id,
             IpldItem::ChunkedFile(chunk) => chunk.id,
+            IpldItem::Chunk(chunk) => chunk.id,
         }
     }
 }

@@ -60,6 +60,9 @@ where
                         Ok(Some(chunk @ IpldItem::ChunkedFile(_))) => {
                             return Poll::Ready(Some(Ok(chunk)));
                         },
+                        Ok(Some(chunk @ IpldItem::Chunk(_))) => {
+                            return Poll::Ready(Some(Ok(chunk)));
+                        },
                         Ok(None) => {
                             return Poll::Ready(None);
                         },

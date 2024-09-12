@@ -90,6 +90,7 @@ impl Item {
                 chunked: index.and_then(|index| total.map(|total| Chunked { index, total })),
             }),
             IpldItem::ChunkedFile(_) => Item::Skip,
+            IpldItem::Chunk(_) => Item::Skip,
         }
     }
 }
