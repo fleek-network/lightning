@@ -7,7 +7,7 @@ use tokio::task::JoinSet;
 use typed_builder::TypedBuilder;
 
 use crate::decoder::data_codec::Decoder;
-use crate::decoder::fs::{ChunkFileItem, ChunkItem, DirItem, IpldItem, Link};
+use crate::decoder::fs::{ChunkFileItem, ChunkItem, DirItem, DocId, IpldItem, Link};
 use crate::decoder::reader::IpldReader;
 use crate::errors::IpldError;
 use crate::walker::data::Metadata;
@@ -17,7 +17,7 @@ use crate::walker::downloader::Downloader;
 struct StreamState {
     initial_cid: bool,
     current_cid: Option<Cid>,
-    dir_entries: Vec<(DirItem, Link)>,
+    dir_entries: Vec<(DocId, Link)>,
     cache_items: Vec<IpldItem>,
     last_item: Option<IpldItem>,
 }
@@ -28,13 +28,13 @@ impl StreamState {
         self.initial_cid = true;
     }
 
-    fn add_dir_entry(&mut self, dir_item: DirItem, links: Vec<Link>) {
+    fn add_dir_entry(&mut self, dir_item: DocId, links: Vec<Link>) {
         self.dir_entries
             .extend(links.iter().map(|x| (dir_item.clone(), x.clone())));
     }
 
-    fn get_list_entries(&self) -> Vec<(DirItem, Link)> {
-        self.dir_entries.clone()
+    fn get_list_entries(&self) -> &Vec<(DocId, Link)> {
+        &self.dir_entries
     }
 
     fn get_next_dir_entry(&mut self) -> Option<IpldItem> {
@@ -111,12 +111,11 @@ where
     }
 
     async fn explore_dir(&mut self, item: DirItem) -> Result<(), IpldError> {
-        let item_dir = item.clone();
-        let links = item.links().to_vec();
+        let links = item.links();
         if links.is_empty() {
             return Ok(());
         }
-        self.state.add_dir_entry(item_dir, links.clone());
+        self.state.add_dir_entry(item.id().clone(), links.clone());
         Ok(())
     }
 
@@ -128,10 +127,10 @@ where
             .drain(..num_items)
             .collect::<Vec<_>>();
         let mut set = JoinSet::new();
-        for (dir, link) in iter {
+        for (id, link) in iter {
             let self_clone = self.clone();
             set.spawn(async move {
-                let metadata = Metadata::new(0, 0, &link, dir.id().path().clone());
+                let metadata = Metadata::new(0, 0, &link, id.path().clone());
                 self_clone.download_item(*link.cid(), metadata).await
             });
         }
