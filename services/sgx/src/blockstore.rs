@@ -1,19 +1,15 @@
 use std::borrow::BorrowMut;
 use std::future::Future;
-use std::io::{ErrorKind, Result as IoResult};
-use std::path::PathBuf;
+use std::io::Result as IoResult;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
-use arrayvec::ArrayString;
 use blake3_tree::ProofBuf;
 use bytes::{BufMut, BytesMut};
 use fn_sdk::blockstore::ContentHandle;
 use futures::{ready, FutureExt};
 use tokio::io::{AsyncRead, AsyncWrite};
-
-use crate::BLOCKSTORE_PATH;
 
 trait ReadFut: Future<Output = Result<Vec<u8>, std::io::Error>> + Send + Sync {}
 impl<T: Future<Output = Result<Vec<u8>, std::io::Error>> + Send + Sync> ReadFut for T {}

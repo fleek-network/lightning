@@ -348,6 +348,7 @@
                   fortanix-sgx-tools
                   sgxs-tools
                 ];
+              FN_ENCLAVE_SGXS = "";
             }
           );
 

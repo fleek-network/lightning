@@ -19,18 +19,6 @@ mod blockstore;
 mod connection;
 mod req_res;
 
-static BLOCKSTORE_PATH: LazyLock<PathBuf> = LazyLock::new(|| {
-    std::env::var("BLOCKSTORE_PATH")
-        //.expect("BLOCKSTORE_PATH env variable not found")
-        .unwrap_or("blockstore_path".to_string())
-        .into()
-});
-static IPC_PATH: LazyLock<PathBuf> = LazyLock::new(|| {
-    std::env::var("IPC_PATH")
-        //.expect("IPC_PATH env variable not found")
-        .unwrap_or(String::from("./ipc_path"))
-        .into()
-});
 static SGX_SEALED_DATA_PATH: LazyLock<PathBuf> = LazyLock::new(|| {
     std::env::var("SGX_SEALED_DATA_PATH")
         //.expect("SGX_SEALED_DATA_PATH env variable not found")
