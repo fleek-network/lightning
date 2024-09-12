@@ -33,8 +33,5 @@ name = "one_shot_all"
 [[example]]
 name = "controlled"
 
-[[example]]
-name = "wannabe"
-
 [lib]
 doctest = false
