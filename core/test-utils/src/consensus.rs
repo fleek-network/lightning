@@ -18,6 +18,7 @@ use rand::{thread_rng, Rng, SeedableRng};
 use rand_chacha::ChaCha12Rng;
 use rand_distr::{Bernoulli, Distribution};
 use serde::{Deserialize, Serialize};
+use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::{broadcast, mpsc};
 use tokio::task::JoinSet;
 use tokio::time::{interval, sleep};
@@ -146,14 +147,19 @@ impl<C: Collection> MockConsensus<C> {
         waiter
             .run_until_shutdown(async move {
                 loop {
-                    let block = this.group.recv().await.unwrap();
-                    let response = this
-                        .execution_socket
-                        .run(block.clone())
-                        .await
-                        .map_err(|r| anyhow::anyhow!(format!("{r:?}")))
-                        .unwrap();
-                    this.notifier.new_block(block, response);
+                    match this.group.recv().await {
+                        Ok(block) => {
+                            let response = this
+                                .execution_socket
+                                .run(block.clone())
+                                .await
+                                .map_err(|r| anyhow::anyhow!(format!("{r:?}")))
+                                .unwrap();
+                            this.notifier.new_block(block, response);
+                        },
+                        Err(RecvError::Closed) => break,
+                        Err(RecvError::Lagged(_)) => continue,
+                    }
                 }
             })
             .await;
