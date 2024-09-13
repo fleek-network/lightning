@@ -1,3 +1,4 @@
+//! This module provides data structures to represent the UnixFS data model.
 use std::path::PathBuf;
 
 use bytes::Bytes;
@@ -69,6 +70,9 @@ impl DocId {
         &self.path
     }
 
+    /// Merge the current path with the previous path and the name of the current item.
+    ///
+    /// This function tries to build the path of the current item by based on the previous item
     pub fn merge(&mut self, previous_item: Option<&PathBuf>, name: Option<&str>) {
         let mut path = previous_item.cloned().unwrap_or_default();
         path.push(self.path());

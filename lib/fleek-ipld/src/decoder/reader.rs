@@ -1,3 +1,6 @@
+//! This module provides a reader abstraction to read stream data downloaded from IPFS and stored
+//! in a buffer. After that it is applied to a `data_codec.rs` to decode the data into a specific
+//! `fs.rs` format
 use bytes::{Bytes, BytesMut};
 use tokio_stream::{Stream, StreamExt as _};
 use typed_builder::TypedBuilder;
@@ -6,8 +9,14 @@ use super::data_codec::{Decoder, DefaultDecoder};
 use super::fs::{DocId, IpldItem};
 use crate::errors::IpldError;
 
+/// The default buffer size for the reader is 16KB.
 const DEFAULT_BUFFER_SIZE: usize = 1024 * 16;
 
+/// A reader abstraction to read stream data downloaded from IPFS and stored in a buffer.
+///
+/// After that it is applied to a `data_codec.rs` to decode the data into a specific `fs.rs` format.
+///
+/// The `IpldReader` struct is a builder pattern that allows to inject any decoder we want to use.
 #[derive(Debug, TypedBuilder)]
 pub struct IpldReader<D> {
     #[builder(setter(prefix = "with_", transform = |x: usize| BytesMut::with_capacity(x)), default)]
@@ -17,6 +26,7 @@ pub struct IpldReader<D> {
     decoder: D,
 }
 
+/// Implement the `Clone` trait for the `IpldReader` struct not not reference to the same buffer.
 impl<D: Clone> Clone for IpldReader<D> {
     fn clone(&self) -> Self {
         Self {
@@ -36,10 +46,18 @@ impl Default for IpldReader<DefaultDecoder> {
     }
 }
 
+/// Implement the `IpldReader` struct methods.
+///
+/// -[`D`] is the decoder type which is constraint to the `Decoder` trait.
 impl<D> IpldReader<D>
 where
     D: Decoder + Clone + Send + Sync + 'static,
 {
+    /// Read the stream data and decode it into a specific IPLD format.
+    ///
+    /// - [`S`] is the stream data. It is a `Stream` of `Result<Bytes, E>`.
+    /// - [`I`] is the document identifier. It is something that can be converted into a `DocId`.
+    /// - [`E`] is the error type for the stream data.
     pub async fn read<
         E: Into<IpldError>,
         S: Stream<Item = Result<Bytes, E>> + Unpin,
