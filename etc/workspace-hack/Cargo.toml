@@ -19,7 +19,6 @@ publish = false
 ahash = { version = "0.8" }
 arc-swap = { version = "1", default-features = false, features = ["serde"] }
 arrayvec = { version = "0.7" }
-autometrics = { version = "0.6", default-features = false, features = ["prometheus", "prometheus-exporter"] }
 axum-3b31131e45eafb45 = { package = "axum", version = "0.6", features = ["headers", "http2", "ws"] }
 axum-ca01ad9e24f5d932 = { package = "axum", version = "0.7", features = ["macros"] }
 axum-core = { version = "0.4", default-features = false, features = ["tracing"] }
@@ -72,7 +71,6 @@ generic-array = { version = "0.14", default-features = false, features = ["more_
 getrandom = { version = "0.2", default-features = false, features = ["std"] }
 half = { version = "2" }
 hashbrown-582f2526e08bb6a0 = { package = "hashbrown", version = "0.14", features = ["raw"] }
-hashbrown-594e8ee84c453af0 = { package = "hashbrown", version = "0.13" }
 hashbrown-5ef9efb8ec2df382 = { package = "hashbrown", version = "0.12", features = ["raw"] }
 hdrhistogram = { version = "7" }
 hex = { version = "0.4", features = ["serde"] }
@@ -105,8 +103,6 @@ num-complex = { version = "0.4", default-features = false, features = ["std"] }
 num-integer = { version = "0.1", features = ["i128"] }
 num-iter = { version = "0.1", features = ["i128"] }
 num-traits = { version = "0.2", features = ["i128", "libm"] }
-opentelemetry_api = { version = "0.20", features = ["logs", "metrics"] }
-opentelemetry_sdk = { version = "0.20", features = ["logs", "metrics", "rt-tokio"] }
 p256 = { version = "0.13", features = ["ecdh"] }
 parity-scale-codec = { version = "3", features = ["derive", "max-encoded-len"] }
 plotters = { version = "0.3" }
@@ -179,7 +175,6 @@ zeroize = { version = "1", features = ["zeroize_derive"] }
 ahash = { version = "0.8" }
 arc-swap = { version = "1", default-features = false, features = ["serde"] }
 arrayvec = { version = "0.7" }
-autometrics = { version = "0.6", default-features = false, features = ["prometheus", "prometheus-exporter"] }
 axum-3b31131e45eafb45 = { package = "axum", version = "0.6", features = ["headers", "http2", "ws"] }
 axum-ca01ad9e24f5d932 = { package = "axum", version = "0.7", features = ["macros"] }
 axum-core = { version = "0.4", default-features = false, features = ["tracing"] }
@@ -233,7 +228,6 @@ generic-array = { version = "0.14", default-features = false, features = ["more_
 getrandom = { version = "0.2", default-features = false, features = ["std"] }
 half = { version = "2" }
 hashbrown-582f2526e08bb6a0 = { package = "hashbrown", version = "0.14", features = ["raw"] }
-hashbrown-594e8ee84c453af0 = { package = "hashbrown", version = "0.13" }
 hashbrown-5ef9efb8ec2df382 = { package = "hashbrown", version = "0.12", features = ["raw"] }
 hdrhistogram = { version = "7" }
 hex = { version = "0.4", features = ["serde"] }
@@ -267,8 +261,6 @@ num-complex = { version = "0.4", default-features = false, features = ["std"] }
 num-integer = { version = "0.1", features = ["i128"] }
 num-iter = { version = "0.1", features = ["i128"] }
 num-traits = { version = "0.2", features = ["i128", "libm"] }
-opentelemetry_api = { version = "0.20", features = ["logs", "metrics"] }
-opentelemetry_sdk = { version = "0.20", features = ["logs", "metrics", "rt-tokio"] }
 p256 = { version = "0.13", features = ["ecdh"] }
 parity-scale-codec = { version = "3", features = ["derive", "max-encoded-len"] }
 parity-scale-codec-derive = { version = "3", default-features = false, features = ["max-encoded-len"] }
