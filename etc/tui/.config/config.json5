@@ -85,6 +85,12 @@
       "<Ctrl-c>": "Quit", // Quit the application.
       "<Ctrl-z>": "Suspend" // Suspend the application.
     },
+    "Summary":{
+      "<right>": "NavRight", // Move right to the next page.
+      "<left>": "NavLeft", // Move left to the next page.
+      "<Ctrl-c>": "Quit", // Quit the application.
+      "<Ctrl-z>": "Suspend" // Suspend the application.
+    },
     "Logger": {
       "<up>": "Up",
       "<Down>": "Down",

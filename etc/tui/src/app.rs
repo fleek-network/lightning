@@ -106,6 +106,7 @@ impl App {
             Mode::ProfileViewEdit => self.profile_view.update(action.clone(), ctx)?,
             Mode::ProfileForm => self.profile_form.update(action.clone(), ctx)?,
             Mode::ProfileRuleForm => self.profile_rule_form.update(action.clone(), ctx)?,
+            Mode::Summary => self.summary.update(action.clone(), ctx)?,
             #[cfg(feature = "logger")]
             Mode::Logger => self.logger.update(action.clone(), ctx)?,
             #[cfg(not(feature = "logger"))]
@@ -132,6 +133,7 @@ impl App {
             Mode::ProfileViewEdit => self.profile_view.handle_events(Some(event), ctx),
             Mode::ProfileForm => self.profile_form.handle_events(Some(event), ctx),
             Mode::ProfileRuleForm => self.profile_rule_form.handle_events(Some(event), ctx),
+            Mode::Summary => self.summary.handle_events(Some(event), ctx),
             #[cfg(feature = "logger")]
             Mode::Logger => self.logger.handle_events(Some(event), ctx),
             #[cfg(not(feature = "logger"))]
@@ -150,8 +152,8 @@ impl App {
         let content_area = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
-                Constraint::Percentage(25),
-                Constraint::Percentage((100_u16).saturating_sub(25)),
+                Constraint::Percentage(0),
+                Constraint::Percentage(100),
             ])
             .split(body_footer_area[0]);
 
@@ -193,6 +195,9 @@ impl App {
             Mode::ProfileRuleForm => {
                 self.profile_rule_form.draw(f, content[0])?;
             },
+            Mode::Summary => {
+                self.summary.draw(f, content[0])?;
+            }
             #[cfg(feature = "logger")]
             Mode::Logger => {
                 self.logger.draw(f, content[0])?;

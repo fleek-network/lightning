@@ -1,7 +1,7 @@
 use anyhow::Result;
 use ratatui::layout::Rect;
 use ratatui::prelude::{Alignment, Color, Constraint, Layout, Style, Stylize, Text};
-use ratatui::widgets::{Block, BorderType, Borders, Cell, Paragraph, Row};
+use ratatui::widgets::{Block, Borders, Cell, Paragraph, Row};
 use tokio::sync::mpsc::UnboundedSender;
 
 use super::{Component, Frame};
@@ -193,17 +193,7 @@ impl Component for Summary {
         Ok(())
     }
 
-    fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
-        let overview = Paragraph::new("Overview\n")
-            .block(
-                Block::bordered()
-                    .title_alignment(Alignment::Center)
-                    .border_type(BorderType::Rounded),
-            )
-            .style(Style::default().fg(Color::White))
-            .centered();
-        f.render_widget(overview, area);
-
+    fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {        
         let content = Layout::default()
             .vertical_margin(3)
             .horizontal_margin(3)

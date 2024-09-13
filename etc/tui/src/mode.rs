@@ -17,7 +17,8 @@ pub enum Mode {
     ProfileView,
     ProfileViewEdit,
     ProfileRuleForm,
-}
+    Summary,
+    }
 
 impl FromStr for Mode {
     type Err = io::Error;
@@ -29,6 +30,7 @@ impl FromStr for Mode {
             #[cfg(feature = "logger")]
             "Logger" => Mode::Logger,
             "Profiles" => Mode::Profiles,
+            "Summary" => Mode::Summary,
             _ => return Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid mode")),
         };
 
