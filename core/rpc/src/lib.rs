@@ -148,7 +148,7 @@ pub async fn health() -> &'static str {
 }
 
 pub async fn metrics() -> (StatusCode, String) {
-    match autometrics::prometheus_exporter::encode_to_string() {
+    match prometheus::TextEncoder::new().encode_to_string(&prometheus::gather()) {
         Ok(metrics) => (StatusCode::OK, metrics),
         Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
     }

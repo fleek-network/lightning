@@ -458,7 +458,7 @@ impl<C: Collection> FleekApiServer for FleekApi<C> {
     }
 
     async fn metrics(&self) -> RpcResult<String> {
-        match autometrics::prometheus_exporter::encode_to_string() {
+        match prometheus::TextEncoder::new().encode_to_string(&prometheus::gather()) {
             Ok(metrics) => Ok(metrics),
             Err(err) => Err(RPCError::custom(err.to_string()).into()),
         }

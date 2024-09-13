@@ -6745,7 +6745,6 @@ dependencies = [
  "anyhow",
  "atomo",
  "atomo-rocks",
- "autometrics",
  "bincode",
  "ethers",
  "fleek-blake3",
@@ -7331,7 +7330,6 @@ name = "lightning-metrics"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "autometrics",
  "axum 0.6.20",
  "dashmap",
  "lightning-workspace-hack",
@@ -7631,7 +7629,6 @@ dependencies = [
  "alloy-primitives",
  "anyhow",
  "async-trait",
- "autometrics",
  "clap",
  "ethers",
  "fleek-crypto",
@@ -7662,6 +7659,7 @@ dependencies = [
  "lightning-workspace-hack",
  "merklize",
  "once_cell",
+ "prometheus",
  "rand 0.8.5",
  "ready",
  "reqwest",
@@ -7958,7 +7956,6 @@ name = "lightning-utils"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "autometrics",
  "ethers",
  "fleek-crypto",
  "lazy_static",

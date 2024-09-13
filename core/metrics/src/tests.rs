@@ -1,17 +1,7 @@
-use autometrics::settings::AutometricsSettingsBuilder;
-
-use crate::{histogram, increment_counter, DEFAULT_HISTOGRAM_BUCKETS, METRICS_SERVICE_NAME};
-
-fn init() {
-    let _ = AutometricsSettingsBuilder::default()
-        .service_name(METRICS_SERVICE_NAME)
-        .histogram_buckets(DEFAULT_HISTOGRAM_BUCKETS)
-        .try_init();
-}
+use crate::{histogram, increment_counter};
 
 #[test]
 fn test_counter_macro() {
-    init();
     for _i in 0..5 {
         increment_counter!("Test_Custom_Counter", Some("A custom counter"), "extra_label1" => "1", "extra_label2" => "2");
     }
@@ -34,7 +24,6 @@ fn test_counter_macro() {
 
 #[test]
 fn test_histogram_macro() {
-    init();
     histogram!(
         "Test_Custom_Histogram",
         Some("A custom histogram"),

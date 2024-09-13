@@ -67,7 +67,6 @@ impl ApplicationEnv {
         self.inner.query()
     }
 
-    #[autometrics::autometrics]
     async fn run<F, P>(&mut self, mut block: Block, get_putter: F) -> Result<BlockExecutionResponse>
     where
         F: FnOnce() -> P,

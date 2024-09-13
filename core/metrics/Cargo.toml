@@ -6,7 +6,6 @@ edition = "2021"
 
 [dependencies]
 anyhow.workspace = true
-autometrics = { workspace = true, features = ["prometheus"] }
 axum.workspace = true
 dashmap = "5.5.0"
 tracing.workspace = true

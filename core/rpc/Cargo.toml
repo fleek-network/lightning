@@ -27,10 +27,10 @@ ruint = { version = "1.10", features = ["num-bigint", "serde"] }
 tokio.workspace = true
 tracing.workspace = true
 affair.workspace = true
-autometrics.workspace = true
 reqwest.workspace = true
 once_cell = "1.19"
 clap = { version = "4.4.10", features = ["derive"] }
+prometheus = "0.13"
 
 lightning-application = { path = "../application" }
 lightning-firewall = { path = "../firewall" }

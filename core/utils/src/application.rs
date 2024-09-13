@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
-use autometrics::autometrics;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
@@ -26,7 +25,6 @@ pub trait QueryRunnerExt: SyncQueryRunnerInterface {
     }
 
     /// Returns the committee members of the current epoch
-    #[autometrics]
     fn get_committee_members(&self) -> Vec<NodePublicKey> {
         self.get_committee_members_by_index()
             .into_iter()
