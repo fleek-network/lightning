@@ -6,7 +6,7 @@
 //!   (Concise Binary Object Representation), etc. In those cases it is encourage to use any of the
 //!   existing codec implementation in `ipld` Rust libraries.
 //! - Read the decoded IPLD format `data` field and decode it into a specific user format, for
-//!   example `UnixFS` data.
+//!   example `Data` (UnixFS).
 //!
 //! On any doubts or question please refer to the [IPLD Spec](https://ipld.io/specs/about/).
 use std::path::PathBuf;
@@ -59,7 +59,7 @@ pub trait Decoder {
 
 /// Default implementation for `UnixFs`.
 ///
-/// `DagPbCodec` ---> `UnixFS` ---> `IpldItem`
+/// `DagPbCodec` ---> `Data` (UnixFs) ---> `IpldItem`
 pub struct UnixFsProtobufCodec;
 
 impl UnixFsProtobufCodec {
@@ -107,7 +107,7 @@ impl DataCodec<PbNode> for UnixFsProtobufCodec {
 /// Default implementation for the combination of `DagPbCodec` and `UnixFs`.
 /// This is the most common use case for IPFS data.
 ///
-/// `Bytes` ---> `DagPbCodec` ---> `UnixFS` ---> `IpldItem`:write
+/// `Bytes` ---> `DagPbCodec` ---> `Data` (UnixFs) ---> `IpldItem`
 #[derive(Default, Clone)]
 pub struct DagPbWithUnixFsCodec;
 

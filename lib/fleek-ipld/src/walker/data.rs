@@ -67,7 +67,7 @@ impl Item {
             .unwrap_or(false)
     }
 
-    pub fn from_ipld(
+    pub(crate) fn from_ipld(
         item: &IpldItem,
         Metadata {
             size,
@@ -95,8 +95,9 @@ impl Item {
     }
 }
 
+/// This is an internal struct used to pass metadata to the `Item` constructor.
 #[derive(Default, Debug, Clone, TypedBuilder)]
-pub struct Metadata {
+pub(crate) struct Metadata {
     #[builder(default = PathBuf::new())]
     parent_path: PathBuf,
     #[builder(default)]
@@ -110,7 +111,7 @@ pub struct Metadata {
 }
 
 impl Metadata {
-    pub fn new(index: usize, total: usize, link: &Link, parent_path: PathBuf) -> Self {
+    pub(crate) fn new(index: usize, total: usize, link: &Link, parent_path: PathBuf) -> Self {
         Metadata::builder()
             .parent_path(parent_path)
             .size(*link.size())
@@ -120,27 +121,11 @@ impl Metadata {
             .build()
     }
 
-    pub fn parent_path(&self) -> &PathBuf {
+    pub(crate) fn parent_path(&self) -> &PathBuf {
         &self.parent_path
     }
 
-    pub fn size(&self) -> Option<u64> {
-        self.size
-    }
-
-    pub fn name(&self) -> Option<&str> {
+    pub(crate) fn name(&self) -> Option<&str> {
         self.name.as_deref()
-    }
-
-    pub fn index(&self) -> Option<u64> {
-        self.index
-    }
-
-    pub fn total(&self) -> Option<u64> {
-        self.total
-    }
-
-    pub fn is_chunked(&self) -> bool {
-        self.index.is_some() && self.total.is_some()
     }
 }

@@ -1,3 +1,4 @@
+//! This module contains the implementation of the Walker with a Stream fashion approach.
 use std::collections::VecDeque;
 use std::sync::Arc;
 
@@ -42,8 +43,9 @@ impl StreamState {
     }
 }
 
+/// The `IpldStream` struct is used to stream IPLD data from IPFS.
 #[derive(Clone, TypedBuilder)]
-pub struct StreamStep<C, D> {
+pub struct IpldStream<C, D> {
     reader: IpldReader<C>,
     #[builder(setter(transform = |x: D| Arc::new(x)))]
     downloader: Arc<D>,
@@ -51,15 +53,24 @@ pub struct StreamStep<C, D> {
     state: StreamState,
 }
 
-impl<C, D> StreamStep<C, D>
+impl<C, D> IpldStream<C, D>
 where
     C: Decoder + Clone + Send + Sync + 'static,
     D: Downloader + Clone + Send + Sync + 'static,
 {
+    /// Start the stream with the given CID.
+    ///
+    /// This function must be called before calling `next`.
     pub async fn start<I: Into<Cid>>(&mut self, cid: I) {
         self.state.current_cid(cid.into());
     }
 
+    /// Get the next item from the stream.
+    ///
+    /// This function will return the next item from the stream. If there are no more items, it will
+    /// return `Ok(None)`.
+    ///
+    /// **Note**: You must call `start` before calling this function.
     pub async fn next(&mut self) -> Result<Option<IpldItem>, IpldError> {
         // Not allow calling next if start has not been called
         assert!(
@@ -98,6 +109,7 @@ where
         Ok(item)
     }
 
+    /// Get the next `n` items from the stream, instead of just one.
     pub async fn next_n(&mut self, n: usize) -> Result<Vec<IpldItem>, IpldError> {
         let mut items = Vec::with_capacity(n);
         for _ in 0..n {
@@ -143,6 +155,10 @@ where
         Ok(())
     }
 
+    /// When you receive a `ChunkedFile` item, from the caller, this is a signal that the file is
+    /// split into multiple chunks. `ChunkedFile` DOES NOT contain the actual data, because it will
+    /// be more efficient to download the chunks lazyly as they are needed. This function will
+    /// return a stream that you can use to download the chunks.
     pub async fn new_chunk_file_streamer(&self, item: ChunkFileItem) -> StreamChunkedFile<C, D> {
         StreamChunkedFile::new(self.downloader.clone(), self.reader.clone(), item)
     }
@@ -156,6 +172,7 @@ where
     }
 }
 
+/// The `StreamChunkedFile` struct is used to stream chunks of a `ChunkedFile` item.
 pub struct StreamChunkedFile<C, D> {
     reader: IpldReader<C>,
     downloader: Arc<D>,
@@ -168,7 +185,7 @@ where
     C: Decoder + Clone + Send + Sync + 'static,
     D: Downloader + Clone + Send + Sync + 'static,
 {
-    pub fn new(downloader: Arc<D>, reader: IpldReader<C>, item: ChunkFileItem) -> Self {
+    pub(crate) fn new(downloader: Arc<D>, reader: IpldReader<C>, item: ChunkFileItem) -> Self {
         let vec: Vec<(usize, Cid)> = item
             .chunks()
             .iter()
@@ -184,6 +201,7 @@ where
         }
     }
 
+    /// Get the next chunk from the stream.
     pub async fn next_chunk(&mut self) -> Result<Option<ChunkItem>, IpldError> {
         if let Some((i, element)) = self.pending_chunks.pop_front() {
             let response = self.downloader.download(&element).await?;

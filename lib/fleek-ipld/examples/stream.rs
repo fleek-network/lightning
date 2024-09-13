@@ -1,7 +1,7 @@
 use fleek_ipld::decoder::fs::IpldItem;
 use fleek_ipld::decoder::reader::IpldReader;
 use fleek_ipld::walker::downloader::ReqwestDownloader;
-use fleek_ipld::walker::stream::StreamStep;
+use fleek_ipld::walker::stream::IpldStream;
 use ipld_core::cid::Cid;
 
 #[tokio::main]
@@ -13,7 +13,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //let cid: Cid = "Qmej4L6L4UYxHF4s4QeAzkwUX8VZ45GiuZ2BLtVds5LXad".try_into()?; // css file
     //let cid: Cid = "QmbvrHYWXAU1BuxMPNRtfeF4DS2oPmo5hat7ocqAkNPr74".try_into()?; // png small
 
-    let mut stream = StreamStep::builder()
+    let mut stream = IpldStream::builder()
         .reader(IpldReader::default())
         .downloader(ReqwestDownloader::new("https://flk-ipfs.xyz"))
         .build();

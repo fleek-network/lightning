@@ -1,3 +1,5 @@
+//! Highly concurrent implementation, to iterate over the elements in a `Cid`
+//! that sends a signal to a callback function on each element explored.
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -13,11 +15,24 @@ use crate::errors::IpldError;
 use crate::walker::data::{Item, Metadata};
 use crate::walker::downloader::Downloader;
 
+/// The `IpldItemProcessor` trait defines the interface for receiving a callback on each item that
+/// is downloaded from IPFS.
+///
+/// The `on_item` method is called with the `Item` that was downloaded.
+///
+/// The `Item` is a wrapper around the `IpldItem` that was downloaded, and contains additional
+/// metadata about the item.
+///
+/// **Note**: The `IpldItemProcessor` is responsible for processing the item and it is not
+/// guaranteed that the items are processed in order. In cases where the items needs a specific
+/// order, like Chunks of a File, the `IpldItemProcessor` should be called with the `Item` that
+/// contains the index of the chunk
 #[async_trait]
 pub trait IpldItemProcessor {
     async fn on_item(&self, item: Item) -> Result<(), IpldError>;
 }
 
+/// The `NOOPProcessor` is a simple implementation of the `IpldItemProcessor` that does nothing.
 #[derive(Clone)]
 pub struct NOOPProcessor;
 
@@ -35,6 +50,7 @@ enum StreamState {
     Stopped,
 }
 
+/// The `Control` struct is used to control the `IpldBulkProcessor` stream.
 #[derive(Clone)]
 pub struct Control {
     inner: mpsc::Sender<StreamState>,
@@ -48,19 +64,29 @@ impl Control {
             .map_err(|e| IpldError::ControlError(e.to_string()))
     }
 
+    /// Pause the stream.
+    ///
+    /// **Note**: The stream will not be paused immediately, it will wait until the current item is
     pub async fn pause(&self) -> Result<(), IpldError> {
         self.send(StreamState::Paused).await
     }
 
+    /// Resume the stream. If the stream is already running, it will not have any effect.
     pub async fn resume(&self) -> Result<(), IpldError> {
         self.send(StreamState::Running).await
     }
 
+    /// Stop the stream. If the stream is already stopped, it will not have any effect.
+    ///
+    /// **Note**: The stream will not be stopped immediately, it will wait until the current item is
+    /// processed.
     pub async fn stop(&self) -> Result<(), IpldError> {
         self.send(StreamState::Stopped).await
     }
 }
 
+/// The `IpldBulkProcessor` is a highly concurrent implementation to iterate over the elements
+/// given a `Cid` that sends a signal to a callback function on each element explored.
 #[derive(Clone)]
 pub struct IpldBulkProcessor<C, D> {
     reader: IpldReader<C>,
@@ -76,6 +102,7 @@ where
     C: Decoder + Clone + Send + Sync + 'static,
     D: Downloader + Clone + Send + Sync + 'static,
 {
+    /// Create a new `IpldBulkProcessor` with the given `IpldReader` and `Downloader`.
     pub fn new(reader: IpldReader<C>, downloader: D) -> Self {
         let (control_tx, control_rx) = mpsc::channel(100);
         let state = Arc::new(AtomicBool::new(true));
@@ -90,12 +117,18 @@ where
         }
     }
 
+    /// Get the `Control` struct to control the stream.
     pub fn control(&self) -> Control {
         Control {
             inner: self.control_tx.clone(),
         }
     }
 
+    /// Start the stream with the given `Cid` and `IpldItemProcessor`.
+    ///
+    /// **Note**: The stream will start immediately, and the `IpldItemProcessor` will be called with
+    /// each item downloaded. The function will return when the stream either is stopped, paused or
+    /// the stream finishes to explore all the elements in the `Cid`.
     pub async fn download<F>(self, cid: Cid, processor: F) -> Result<(), IpldError>
     where
         F: IpldItemProcessor + Send + Sync + Clone + 'static,
@@ -165,7 +198,7 @@ where
             .await
     }
 
-    pub async fn download_item<F>(
+    pub(crate) async fn download_item<F>(
         &self,
         cid: Cid,
         metadata: Metadata,
