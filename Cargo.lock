@@ -7954,6 +7954,7 @@ dependencies = [
  "anyhow",
  "atomo",
  "atomo-rocks",
+ "b3fs",
  "better-shutdown",
  "blake3-tree",
  "bytes",
