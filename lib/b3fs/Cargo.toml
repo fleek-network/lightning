@@ -18,12 +18,12 @@ triomphe = "0.1.9"
 bytes = "1.5"
 
 # IO / multi-threading
-tokio = { version = "1.28", features = ["fs"] }
+tokio = { version = "1.28", features = ["full"] }
 rayon = "1.10"
 rayon-core = "1.12"
 
 # Randomnness and hashing
-rand = { version="0.8", features=["small_rng"] }
+rand = { version = "0.8", features = ["small_rng"] }
 blake3 = "1.5"
 fleek-blake3 = "1.5"
 
@@ -36,4 +36,3 @@ criterion = { version = "0.5", features = ["html_reports"] }
 [[bench]]
 name = "phf"
 harness = false
-
