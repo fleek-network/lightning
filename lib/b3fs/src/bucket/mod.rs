@@ -55,6 +55,7 @@ use triomphe::Arc;
 use crate::utils::{to_hex, Digest};
 
 pub mod dir;
+pub mod errors;
 pub mod file;
 
 /// An open b3fs bucket which can be used for both reads and writes.
@@ -106,6 +107,12 @@ impl Bucket {
             headers: headers_path,
             wal: wal_path,
         })
+    }
+
+    /// Returns `Ok(true)` if the given content exists in this bucket.
+    pub async fn exists(&self, hash: &[u8; 32]) -> Result<bool> {
+        let path = self.get_header_path(hash);
+        fs::try_exists(&path).await
     }
 
     /// Open a content with the given provided hash. Returns a [`ContentHeader`] on success.
