@@ -159,7 +159,6 @@ mod config_tests {
             genesis_path: None,
             ..Default::default()
         };
-        println!("{:?}", config.genesis());
         assert!(config.genesis().is_ok());
     }
 
