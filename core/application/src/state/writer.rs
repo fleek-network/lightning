@@ -25,7 +25,8 @@ use lightning_interfaces::types::{
     NodeIndex,
     NodeInfo,
     NodeServed,
-    ProtocolParams,
+    ProtocolParamKey,
+    ProtocolParamValue,
     ReportedReputationMeasurements,
     Service,
     ServiceId,
@@ -167,7 +168,7 @@ impl ApplicationState<AtomoStorage, DefaultSerdeBackend, ApplicationStateTree> {
             .with_table::<(NodeIndex, NodeIndex), Duration>("latencies")
             .with_table::<Epoch, Committee>("committee")
             .with_table::<ServiceId, Service>("service")
-            .with_table::<ProtocolParams, u128>("parameter")
+            .with_table::<ProtocolParamKey, ProtocolParamValue>("parameter")
             .with_table::<NodeIndex, Vec<ReportedReputationMeasurements>>("rep_measurements")
             .with_table::<NodeIndex, u8>("rep_scores")
             .with_table::<NodeIndex, u8>("submitted_rep_measurements")

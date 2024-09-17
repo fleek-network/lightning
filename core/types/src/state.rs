@@ -1,4 +1,5 @@
 //! The data types used in the application state
+use std::borrow::Cow;
 use std::fmt::Display;
 use std::net::IpAddr;
 
@@ -158,7 +159,7 @@ pub enum Participation {
     schemars::JsonSchema
 )]
 #[repr(u8)]
-pub enum ProtocolParams {
+pub enum ProtocolParamKey {
     /// The time in milliseconds that an epoch lasts for. Genesis 24 hours(86400)
     EpochTime = 0,
     /// The size of the committee
@@ -186,6 +187,48 @@ pub enum ProtocolParams {
     /// Minimum number of reported measurements that have to be available for a node. If less
     /// measurements have been reported, no reputation score will be computed in that epoch.
     MinNumMeasurements = 12,
+    /// The public key corresponding to the secret key that is shared among the SGX enclaves
+    SGXSharedPubKey = 13
+}
+
+/// The Value enum is a data type used to represent values in a key-value pair for a metadata table
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, schemars::JsonSchema)]
+pub enum ProtocolParamValue {
+    EpochTime(u64),
+    CommitteeSize(u64),
+    NodeCount(u64),
+    MinimumNodeStake(u64),
+    EligibilityTime(u64),
+    LockTime(u64),
+    ProtocolShare(u16),
+    NodeShare(u16),
+    ServiceBuilderShare(u16),
+    MaxInflation(u16),
+    MaxBoost(u16),
+    MaxStakeLockTime(u64),
+    MinNumMeasurements(u64),
+    SGXSharedPubKey(String),
+}
+
+impl ProtocolParamValue {
+    pub fn get_bytes(&self) -> Cow<'_, [u8]> {
+        match self {
+            ProtocolParamValue::EpochTime(i) => Cow::Owned(i.to_le_bytes().to_vec()),
+            ProtocolParamValue::CommitteeSize(i) => Cow::Owned(i.to_le_bytes().to_vec()),
+            ProtocolParamValue::NodeCount(i) => Cow::Owned(i.to_le_bytes().to_vec()),
+            ProtocolParamValue::MinimumNodeStake(i) => Cow::Owned(i.to_le_bytes().to_vec()),
+            ProtocolParamValue::EligibilityTime(i) => Cow::Owned(i.to_le_bytes().to_vec()),
+            ProtocolParamValue::LockTime(i) => Cow::Owned(i.to_le_bytes().to_vec()),
+            ProtocolParamValue::ProtocolShare(i) => Cow::Owned(i.to_le_bytes().to_vec()),
+            ProtocolParamValue::NodeShare(i) => Cow::Owned(i.to_le_bytes().to_vec()),
+            ProtocolParamValue::ServiceBuilderShare(i) => Cow::Owned(i.to_le_bytes().to_vec()),
+            ProtocolParamValue::MaxInflation(i) => Cow::Owned(i.to_le_bytes().to_vec()),
+            ProtocolParamValue::MaxBoost(i) => Cow::Owned(i.to_le_bytes().to_vec()),
+            ProtocolParamValue::MaxStakeLockTime(i) => Cow::Owned(i.to_le_bytes().to_vec()),
+            ProtocolParamValue::MinNumMeasurements(i) => Cow::Owned(i.to_le_bytes().to_vec()),
+            ProtocolParamValue::SGXSharedPubKey(s) => Cow::Borrowed(s.as_bytes()),
+        }
+    }
 }
 
 #[rustfmt::skip]

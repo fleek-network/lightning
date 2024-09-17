@@ -7326,6 +7326,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde-big-array",
+ "serde_json",
  "thiserror",
  "tokio",
  "tokio-stream",

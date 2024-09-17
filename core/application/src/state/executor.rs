@@ -34,7 +34,8 @@ use lightning_interfaces::types::{
     Participation,
     ProofOfConsensus,
     ProofOfMisbehavior,
-    ProtocolParams,
+    ProtocolParamKey,
+    ProtocolParamValue,
     ReportedReputationMeasurements,
     ReputationMeasurements,
     Service,
@@ -110,7 +111,7 @@ pub struct StateExecutor<B: Backend> {
     pub latencies: B::Ref<(NodeIndex, NodeIndex), Duration>,
     pub committee_info: B::Ref<Epoch, Committee>,
     pub services: B::Ref<ServiceId, Service>,
-    pub parameters: B::Ref<ProtocolParams, u128>,
+    pub parameters: B::Ref<ProtocolParamKey, ProtocolParamValue>,
     pub rep_measurements: B::Ref<NodeIndex, Vec<ReportedReputationMeasurements>>,
     pub rep_scores: B::Ref<NodeIndex, u8>,
     pub submitted_rep_measurements: B::Ref<NodeIndex, u8>,
@@ -663,13 +664,13 @@ impl<B: Backend> StateExecutor<B> {
         };
         let current_lock = node.stake.stake_locked_until.saturating_sub(epoch);
 
-        let max_lock_time = self
-            .parameters
-            .get(&ProtocolParams::MaxStakeLockTime)
-            .unwrap_or(1);
+        let max_lock_time = match self.parameters.get(&ProtocolParamKey::MaxStakeLockTime) {
+            Some(ProtocolParamValue::MaxStakeLockTime(v)) => v,
+            _ => 1,
+        };
 
         // check if total locking is greater than max locking
-        if current_lock + locked_for > max_lock_time as u64 {
+        if current_lock + locked_for > max_lock_time {
             return TransactionResponse::Revert(ExecutionError::LockExceededMaxStakeLockTime);
         }
 
@@ -718,14 +719,17 @@ impl<B: Backend> StateExecutor<B> {
             return TransactionResponse::Revert(ExecutionError::InsufficientBalance);
         }
 
-        let lock_time = self.parameters.get(&ProtocolParams::LockTime).unwrap_or(0);
+        let lock_time = match self.parameters.get(&ProtocolParamKey::LockTime) {
+            Some(ProtocolParamValue::LockTime(v)) => v,
+            _ => 0,
+        };
 
         // decrease the stake, add to the locked amount, and set the locked time for the withdrawal
         // current epoch + lock time todo(dalton): we should be storing unstaked tokens in a
         // list so we can have multiple locked stakes with dif lock times
         node.stake.staked -= amount.clone();
         node.stake.locked += amount;
-        node.stake.locked_until = current_epoch + lock_time as u64;
+        node.stake.locked_until = current_epoch + lock_time;
 
         // Save the changed node state and return success
         self.node_info.set(index, node);
@@ -869,10 +873,11 @@ impl<B: Backend> StateExecutor<B> {
         )
         .unwrap_or(15);
 
-        let min_num_measurements = self
-            .parameters
-            .get(&ProtocolParams::MinNumMeasurements)
-            .unwrap() as usize;
+        let min_num_measurements = match self.parameters.get(&ProtocolParamKey::MinNumMeasurements)
+        {
+            Some(ProtocolParamValue::MinNumMeasurements(v)) => v as usize,
+            _ => unreachable!(), // set in genesis
+        };
 
         let mut map = HashMap::new();
         for node in self.rep_measurements.keys() {
@@ -1002,8 +1007,8 @@ impl<B: Backend> StateExecutor<B> {
     fn change_protocol_param(
         &self,
         sender: TransactionSender,
-        param: ProtocolParams,
-        value: u128,
+        param: ProtocolParamKey,
+        value: ProtocolParamValue,
     ) -> TransactionResponse {
         let sender = match self.only_account_owner(sender) {
             Ok(account) => account,
@@ -1248,11 +1253,11 @@ impl<B: Backend> StateExecutor<B> {
             return;
         }
 
-        let node_percentage: HpUfixed<18> = self
-            .parameters
-            .get(&ProtocolParams::NodeShare)
-            .unwrap_or_default()
-            .into();
+        let node_percentage = match self.parameters.get(&ProtocolParamKey::NodeShare) {
+            Some(ProtocolParamValue::NodeShare(v)) => HpUfixed::<18>::from(v),
+            _ => unreachable!(), // set in genesis
+        };
+
         let node_share = &node_percentage / &(*BIG_HUNDRED);
         let emissions = self.calculate_emissions();
         let emissions_for_node = &emissions * &node_share;
@@ -1299,12 +1304,13 @@ impl<B: Backend> StateExecutor<B> {
         }
 
         // todo: add service builders revenue
-        let service_share: HpUfixed<18> = &(self
-            .parameters
-            .get(&ProtocolParams::ServiceBuilderShare)
-            .unwrap_or_default()
-            .into())
-            / &(*BIG_HUNDRED);
+        let service_share = match self.parameters.get(&ProtocolParamKey::ServiceBuilderShare) {
+            Some(ProtocolParamValue::ServiceBuilderShare(v)) => {
+                HpUfixed::<18>::from(v) / &(*BIG_HUNDRED)
+            },
+            _ => unreachable!(), // set in genesis
+        };
+
         let services_stable_reward_pool = &reward_pool * &service_share.convert_precision();
         let services_flk_reward_pool = &emissions * &service_share;
         for service_id in self.service_revenue.keys() {
@@ -1324,12 +1330,10 @@ impl<B: Backend> StateExecutor<B> {
         }
 
         // protocols share for rewards
-        let protocol_share: HpUfixed<18> = &(self
-            .parameters
-            .get(&ProtocolParams::ProtocolShare)
-            .unwrap_or_default()
-            .into())
-            / &(*BIG_HUNDRED);
+        let protocol_share = match self.parameters.get(&ProtocolParamKey::ProtocolShare) {
+            Some(ProtocolParamValue::ProtocolShare(v)) => HpUfixed::<18>::from(v) / &(*BIG_HUNDRED),
+            _ => unreachable!(), // set in genesis
+        };
 
         let protocol_owner = match self.metadata.get(&Metadata::ProtocolFundAddress) {
             Some(Value::AccountPublicKey(owner)) => owner,
@@ -1345,8 +1349,11 @@ impl<B: Backend> StateExecutor<B> {
     /// Settles the auction for the current epoch and returns a list of the active set of nodes
     /// Uses quick sort algorithm for effecient sorting
     fn settle_auction(&self, nodes: Vec<(NodeIndex, NodeInfo)>) -> Vec<(NodeIndex, NodeInfo)> {
-        // Safe unwrap set at genesis
-        let node_count = self.parameters.get(&ProtocolParams::NodeCount).unwrap() as usize;
+        let node_count = match self.parameters.get(&ProtocolParamKey::NodeCount) {
+            Some(ProtocolParamValue::NodeCount(v)) => v as usize,
+            _ => unreachable!(), // set in genesis
+        };
+
         let total_nodes = nodes.len();
 
         if total_nodes <= node_count {
@@ -1421,11 +1428,12 @@ impl<B: Backend> StateExecutor<B> {
 
     fn calculate_emissions(&self) -> HpUfixed<18> {
         let percentage_divisor = HpUfixed::<18>::from(100_u64);
-        let inflation_percent: HpUfixed<18> = self
-            .parameters
-            .get(&ProtocolParams::MaxInflation)
-            .unwrap_or(0)
-            .into();
+
+        let inflation_percent = match self.parameters.get(&ProtocolParamKey::MaxInflation) {
+            Some(ProtocolParamValue::MaxInflation(v)) => HpUfixed::<18>::from(v),
+            _ => HpUfixed::<18>::from(0_u16), // set in genesis
+        };
+
         let inflation: HpUfixed<18> =
             (&inflation_percent / &percentage_divisor).convert_precision();
 
@@ -1495,16 +1503,16 @@ impl<B: Backend> StateExecutor<B> {
     /// Returns:
     /// - The calculated boost factor for the current rewards.
     fn get_boost(&self, locked_until: u64, current_epoch: &Epoch) -> HpUfixed<3> {
-        let max_boost: HpUfixed<3> = self
-            .parameters
-            .get(&ProtocolParams::MaxBoost)
-            .unwrap_or(1)
-            .into();
-        let max_lock_time: HpUfixed<3> = self
-            .parameters
-            .get(&ProtocolParams::MaxStakeLockTime)
-            .unwrap_or(1)
-            .into();
+        let max_boost = match self.parameters.get(&ProtocolParamKey::MaxBoost) {
+            Some(ProtocolParamValue::MaxBoost(v)) => HpUfixed::<3>::from(v),
+            _ => HpUfixed::<3>::from(1_u16), // set in genesis
+        };
+
+        let max_lock_time = match self.parameters.get(&ProtocolParamKey::MaxStakeLockTime) {
+            Some(ProtocolParamValue::MaxStakeLockTime(v)) => HpUfixed::<3>::from(v),
+            _ => HpUfixed::<3>::from(1_u16), // set in genesis
+        };
+
         let min_boost = HpUfixed::from(1_u64);
         let locking_period: HpUfixed<3> = (locked_until.saturating_sub(*current_epoch)).into();
         let boost = &min_boost + (&max_boost - &min_boost) * (&locking_period / &max_lock_time);
@@ -1523,7 +1531,10 @@ impl<B: Backend> StateExecutor<B> {
             .filter(|index| index.1.participation == Participation::True)
             .collect();
 
-        let committee_size = self.parameters.get(&ProtocolParams::CommitteeSize).unwrap();
+        let committee_size = match self.parameters.get(&ProtocolParamKey::CommitteeSize) {
+            Some(ProtocolParamValue::CommitteeSize(v)) => v,
+            _ => unreachable!(), // set in genesis
+        };
 
         let mut active_nodes: Vec<NodeIndex> = self
             .settle_auction(node_registry)
@@ -1531,7 +1542,7 @@ impl<B: Backend> StateExecutor<B> {
             .map(|node| node.0)
             .collect();
 
-        let num_of_nodes: u128 = active_nodes.len() as u128;
+        let num_of_nodes = active_nodes.len() as u64;
         // if total number of nodes are less than committee size, all nodes are part of committee
         let committee = if committee_size >= num_of_nodes {
             active_nodes.clone()
@@ -1565,7 +1576,11 @@ impl<B: Backend> StateExecutor<B> {
                 .copied()
                 .collect()
         };
-        let epoch_length = self.parameters.get(&ProtocolParams::EpochTime).unwrap();
+
+        let epoch_length = match self.parameters.get(&ProtocolParamKey::EpochTime) {
+            Some(ProtocolParamValue::EpochTime(v)) => v,
+            _ => unreachable!(), // set in genesis
+        };
 
         let epoch_end_timestamp =
             self.committee_info.get(&epoch).unwrap().epoch_end_timestamp + epoch_length as u64;
@@ -1826,10 +1841,11 @@ impl<B: Backend> StateExecutor<B> {
     // This function can panic if ProtocolParams::MinimumNodeStake is missing from the parameters.
     // This should not happen because this parameter is seeded in the genesis.
     fn is_valid_node(&self, node_index: &NodeIndex) -> Option<bool> {
-        let min_amount = self
-            .parameters
-            .get(&ProtocolParams::MinimumNodeStake)
-            .unwrap();
+        let min_amount = match self.parameters.get(&ProtocolParamKey::MinimumNodeStake) {
+            Some(ProtocolParamValue::MinimumNodeStake(v)) => v,
+            _ => unreachable!(), // set in genesis
+        };
+
         self.node_info
             .get(node_index)
             .map(|node_info| node_info.stake.staked >= min_amount.into())

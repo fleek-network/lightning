@@ -10,6 +10,7 @@ interfaces-proc = { path = "./proc" }
 ethers.workspace = true
 anyhow.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 serde-big-array.workspace = true
 trait-variant = "0.1"
 tokio.workspace = true

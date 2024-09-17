@@ -10,7 +10,8 @@ use lightning_interfaces::types::{
     NodeIndex,
     NodeInfo,
     NodeInfoWithIndex,
-    ProtocolParams,
+    ProtocolParamKey,
+    ProtocolParamValue,
     Value,
 };
 use lightning_interfaces::PagingParams;
@@ -188,9 +189,11 @@ pub trait QueryRunnerExt: SyncQueryRunnerInterface {
     }
 
     /// Returns the amount that is required to be a valid node in the network.
-    fn get_staking_amount(&self) -> u128 {
-        self.get_protocol_param(&ProtocolParams::MinimumNodeStake)
-            .unwrap_or(0)
+    fn get_staking_amount(&self) -> u64 {
+        match self.get_protocol_param(&ProtocolParamKey::MinimumNodeStake) {
+            Some(ProtocolParamValue::MinimumNodeStake(min_stake)) => min_stake,
+            _ => 0,
+        }
     }
 
     /// Returns true if the node is a valid node in the network, with enough stake.
