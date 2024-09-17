@@ -521,6 +521,8 @@ fn test_genesis() -> Genesis {
         // Set to 1 million for testing, to be determined when initial allocations are set
         supply_at_genesis: 1000000,
         min_num_measurements: 2,
+        sgx_shared_pub_key: "03a3fe41244add26af1f820d2acb4ad22b158ff7b69ce41401bf932d7734eb5d49"
+            .to_string(),
         protocol_fund_address: protocol_address,
         governance_address: protocol_address,
         node_info: genesis_nodes,
