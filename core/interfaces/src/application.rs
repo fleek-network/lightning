@@ -14,6 +14,8 @@ use lightning_types::{
     Committee,
     Genesis,
     NodeIndex,
+    ProtocolParamKey,
+    ProtocolParamValue,
     StateProofKey,
     StateProofValue,
     TransactionRequest,
@@ -31,7 +33,6 @@ use crate::types::{
     Epoch,
     NodeInfo,
     NodeServed,
-    ProtocolParams,
     ReportedReputationMeasurements,
     Service,
     ServiceId,
@@ -149,7 +150,7 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
 
     /// Query Params Table
     /// Returns the passed in protocol parameter
-    fn get_protocol_param(&self, param: &ProtocolParams) -> Option<u128>;
+    fn get_protocol_param(&self, param: &ProtocolParamKey) -> Option<ProtocolParamValue>;
 
     /// Query Current Epoch Served Table
     fn get_current_epoch_served(&self, node: &NodeIndex) -> Option<NodeServed>;

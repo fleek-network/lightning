@@ -17,7 +17,6 @@ use lightning_interfaces::types::{
     NodeInfo,
     NodeInfoWithIndex,
     NodeServed,
-    ProtocolParams,
     PublicKeys,
     ReportedReputationMeasurements,
     TotalServed,
@@ -25,7 +24,7 @@ use lightning_interfaces::types::{
 };
 use lightning_interfaces::PagingParams;
 use lightning_openrpc_macros::open_rpc;
-use lightning_types::{StateProofKey, StateProofValue};
+use lightning_types::{ProtocolParamKey, StateProofKey, StateProofValue};
 use merklize::{StateRootHash, StateTree};
 
 #[open_rpc(namespace = "flk", tag = "1.0.0")]
@@ -112,7 +111,7 @@ pub trait FleekApi {
     ) -> RpcResult<Option<AccountInfo>>;
 
     #[method(name = "get_staking_amount")]
-    async fn get_staking_amount(&self) -> RpcResult<u128>;
+    async fn get_staking_amount(&self) -> RpcResult<u64>;
 
     #[method(name = "get_committee_members")]
     async fn get_committee_members(&self, epoch: Option<u64>) -> RpcResult<Vec<NodePublicKey>>;
@@ -136,7 +135,10 @@ pub trait FleekApi {
     async fn get_protocol_fund_address(&self) -> RpcResult<EthAddress>;
 
     #[method(name = "get_protocol_params")]
-    async fn get_protocol_params(&self, protocol_params: ProtocolParams) -> RpcResult<u128>;
+    async fn get_protocol_params(
+        &self,
+        protocol_params: ProtocolParamKey,
+    ) -> RpcResult<serde_json::Value>;
 
     #[method(name = "get_total_served")]
     async fn get_total_served(&self, epoch: Epoch) -> RpcResult<TotalServed>;

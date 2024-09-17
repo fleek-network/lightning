@@ -24,7 +24,8 @@ use lightning_interfaces::types::{
     NodeIndex,
     NodeInfo,
     NodeServed,
-    ProtocolParams,
+    ProtocolParamKey,
+    ProtocolParamValue,
     ReportedReputationMeasurements,
     Service,
     ServiceId,
@@ -54,7 +55,7 @@ pub struct QueryRunner {
     pub_key_to_index: ResolvedTableReference<NodePublicKey, NodeIndex>,
     committee_table: ResolvedTableReference<Epoch, Committee>,
     services_table: ResolvedTableReference<ServiceId, Service>,
-    param_table: ResolvedTableReference<ProtocolParams, u128>,
+    param_table: ResolvedTableReference<ProtocolParamKey, ProtocolParamValue>,
     current_epoch_served: ResolvedTableReference<NodeIndex, NodeServed>,
     rep_measurements: ResolvedTableReference<NodeIndex, Vec<ReportedReputationMeasurements>>,
     latencies: ResolvedTableReference<(NodeIndex, NodeIndex), Duration>,
@@ -90,7 +91,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
             pub_key_to_index: atomo.resolve::<NodePublicKey, NodeIndex>("pub_key_to_index"),
             committee_table: atomo.resolve::<Epoch, Committee>("committee"),
             services_table: atomo.resolve::<ServiceId, Service>("service"),
-            param_table: atomo.resolve::<ProtocolParams, u128>("parameter"),
+            param_table: atomo.resolve::<ProtocolParamKey, ProtocolParamValue>("parameter"),
             current_epoch_served: atomo.resolve::<NodeIndex, NodeServed>("current_epoch_served"),
             rep_measurements: atomo
                 .resolve::<NodeIndex, Vec<ReportedReputationMeasurements>>("rep_measurements"),
@@ -198,7 +199,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
         self.inner.run(|ctx| self.services_table.get(ctx).get(id))
     }
 
-    fn get_protocol_param(&self, param: &ProtocolParams) -> Option<u128> {
+    fn get_protocol_param(&self, param: &ProtocolParamKey) -> Option<ProtocolParamValue> {
         self.inner.run(|ctx| self.param_table.get(ctx).get(param))
     }
 

@@ -22,7 +22,8 @@ use lightning_interfaces::types::{
     NodeIndex,
     NodeInfo,
     NodeServed,
-    ProtocolParams,
+    ProtocolParamKey,
+    ProtocolParamValue,
     Service,
     ServiceId,
     TotalServed,
@@ -201,7 +202,7 @@ impl ApplicationEnv {
             let mut account_table = ctx.get_table::<EthAddress, AccountInfo>("account");
             let mut client_table = ctx.get_table::<ClientPublicKey, EthAddress>("client_keys");
             let mut service_table = ctx.get_table::<ServiceId, Service>("service");
-            let mut param_table = ctx.get_table::<ProtocolParams, u128>("parameter");
+            let mut param_table = ctx.get_table::<ProtocolParamKey, ProtocolParamValue>("parameter");
             let mut committee_table = ctx.get_table::<Epoch, Committee>("committee");
             let mut commodity_prices_table =
                 ctx.get_table::<CommodityTypes, HpUfixed<6>>("commodity_prices");
@@ -245,36 +246,57 @@ impl ApplicationEnv {
                 Metadata::SupplyYearStart,
                 Value::HpUfixed(supply_at_genesis),
             );
-            param_table.insert(ProtocolParams::MaxBoost, genesis.max_boost as u128);
-            param_table.insert(ProtocolParams::MaxStakeLockTime, genesis.max_lock_time as u128);
-            param_table.insert(ProtocolParams::EpochTime, genesis.epoch_time as u128);
-            param_table.insert(ProtocolParams::MinimumNodeStake, genesis.min_stake as u128);
-            param_table.insert(ProtocolParams::LockTime, genesis.lock_time as u128);
-            param_table.insert(ProtocolParams::MaxInflation, genesis.max_inflation as u128);
-            param_table.insert(ProtocolParams::NodeShare, genesis.node_share as u128);
             param_table.insert(
-                ProtocolParams::ProtocolShare,
-                genesis.protocol_share as u128,
+                ProtocolParamKey::MaxBoost,
+                ProtocolParamValue::MaxBoost(genesis.max_boost)
             );
             param_table.insert(
-                ProtocolParams::ServiceBuilderShare,
-                genesis.service_builder_share as u128,
+                ProtocolParamKey::MaxStakeLockTime,
+                ProtocolParamValue::MaxStakeLockTime(genesis.max_lock_time)
             );
             param_table.insert(
-                ProtocolParams::EligibilityTime,
-                genesis.eligibility_time as u128,
+                ProtocolParamKey::EpochTime,
+                ProtocolParamValue::EpochTime(genesis.epoch_time)
             );
             param_table.insert(
-                ProtocolParams::CommitteeSize,
-                genesis.committee_size as u128,
+                ProtocolParamKey::MinimumNodeStake,
+                ProtocolParamValue::MinimumNodeStake(genesis.min_stake)
             );
             param_table.insert(
-                ProtocolParams::NodeCount,
-                genesis.node_count as u128
+                ProtocolParamKey::LockTime,
+                ProtocolParamValue::LockTime(genesis.lock_time)
             );
             param_table.insert(
-                ProtocolParams::MinNumMeasurements,
-                genesis.min_num_measurements as u128
+                ProtocolParamKey::MaxInflation,
+                ProtocolParamValue::MaxInflation(genesis.max_inflation)
+            );
+            param_table.insert(
+                ProtocolParamKey::NodeShare,
+                ProtocolParamValue::NodeShare(genesis.node_share)
+            );
+            param_table.insert(
+                ProtocolParamKey::ProtocolShare,
+                ProtocolParamValue::ProtocolShare(genesis.protocol_share),
+            );
+            param_table.insert(
+                ProtocolParamKey::ServiceBuilderShare,
+                ProtocolParamValue::ServiceBuilderShare(genesis.service_builder_share),
+            );
+            param_table.insert(
+                ProtocolParamKey::EligibilityTime,
+                ProtocolParamValue::EligibilityTime(genesis.eligibility_time),
+            );
+            param_table.insert(
+                ProtocolParamKey::CommitteeSize,
+                ProtocolParamValue::CommitteeSize(genesis.committee_size),
+            );
+            param_table.insert(
+                ProtocolParamKey::NodeCount,
+                ProtocolParamValue::NodeCount(genesis.node_count)
+            );
+            param_table.insert(
+                ProtocolParamKey::MinNumMeasurements,
+                ProtocolParamValue::MinNumMeasurements(genesis.min_num_measurements)
             );
 
             let epoch_end: u64 = genesis.epoch_time + genesis.epoch_start;

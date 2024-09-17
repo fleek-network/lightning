@@ -14,7 +14,6 @@ use lightning_types::{
     GenesisNodeServed,
     Metadata,
     NodeServed,
-    ProtocolParams,
     Staking,
     StateProofKey,
     StateProofValue,
@@ -24,6 +23,7 @@ use lightning_types::{
 };
 use lightning_utils::application::QueryRunnerExt;
 use merklize::{StateProof, StateRootHash};
+use types::ProtocolParamKey;
 
 use crate::api::{AdminApiClient, FleekApiClient};
 
@@ -429,15 +429,20 @@ async fn test_rpc_get_protocol_param_lock_time() {
         .unwrap();
     let node = network.node(0);
 
-    let response =
-        FleekApiClient::get_protocol_params(&node.rpc_client().unwrap(), ProtocolParams::LockTime)
-            .await
-            .unwrap();
+    let response = FleekApiClient::get_protocol_params(
+        &node.rpc_client().unwrap(),
+        ProtocolParamKey::LockTime,
+    )
+    .await
+    .unwrap();
     assert_eq!(
-        node.app
-            .sync_query()
-            .get_protocol_param(&ProtocolParams::LockTime)
-            .unwrap(),
+        serde_json::to_value(
+            node.app
+                .sync_query()
+                .get_protocol_param(&ProtocolParamKey::LockTime)
+                .unwrap()
+        )
+        .unwrap(),
         response
     );
 

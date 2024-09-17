@@ -22,7 +22,6 @@ use lightning_interfaces::types::{
     NodeInfoWithIndex,
     NodeServed,
     OriginProvider,
-    ProtocolParams,
     PublicKeys,
     ReportedReputationMeasurements,
     TotalServed,
@@ -33,6 +32,8 @@ use lightning_interfaces::PagingParams;
 use lightning_types::{AggregateCheckpoint, StateProofKey, StateProofValue};
 use lightning_utils::application::QueryRunnerExt;
 use merklize::{StateRootHash, StateTree};
+use serde_json::Value as JsonValue;
+use types::ProtocolParamKey;
 
 use crate::api::FleekApiServer;
 use crate::error::RPCError;
@@ -204,7 +205,7 @@ impl<C: Collection> FleekApiServer for FleekApi<C> {
             .get_account_info::<AccountInfo>(&pk, |a| a))
     }
 
-    async fn get_staking_amount(&self) -> RpcResult<u128> {
+    async fn get_staking_amount(&self) -> RpcResult<u64> {
         Ok(self.data.query_runner.get_staking_amount())
     }
 
@@ -268,12 +269,11 @@ impl<C: Collection> FleekApiServer for FleekApi<C> {
         Ok(protocol_fund_address)
     }
 
-    async fn get_protocol_params(&self, protocol_params: ProtocolParams) -> RpcResult<u128> {
-        Ok(self
-            .data
-            .query_runner
-            .get_protocol_param(&protocol_params)
-            .unwrap_or(0))
+    async fn get_protocol_params(&self, protocol_params: ProtocolParamKey) -> RpcResult<JsonValue> {
+        match self.data.query_runner.get_protocol_param(&protocol_params) {
+            Some(value) => Ok(serde_json::to_value(&value).unwrap()),
+            _ => Err(RPCError::custom("Invalid protocol param key".to_string()).into()),
+        }
     }
 
     async fn get_total_served(&self, epoch: Epoch) -> RpcResult<TotalServed> {

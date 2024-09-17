@@ -20,14 +20,20 @@ use super::{
     Event,
     ProofOfConsensus,
     ProofOfMisbehavior,
-    ProtocolParams,
     ReputationMeasurements,
     Service,
     ServiceId,
     Tokens,
 };
 use crate::content_registry::ContentUpdate;
-use crate::{DeliveryAcknowledgmentProof, NodeIndex, NodePorts, TransactionDestination};
+use crate::{
+    DeliveryAcknowledgmentProof,
+    NodeIndex,
+    NodePorts,
+    ProtocolParamKey,
+    ProtocolParamValue,
+    TransactionDestination,
+};
 
 pub type ChainId = u32;
 
@@ -419,7 +425,10 @@ pub enum UpdateMethod {
         measurements: BTreeMap<NodeIndex, ReputationMeasurements>,
     },
     /// Change protocol parameters
-    ChangeProtocolParam { param: ProtocolParams, value: u128 },
+    ChangeProtocolParam {
+        param: ProtocolParamKey,
+        value: ProtocolParamValue,
+    },
     /// Opt out of participating in the network.
     OptOut {},
     /// Opt into participating in the network.
@@ -631,7 +640,7 @@ impl ToDigest for UpdatePayload {
                     .with("transaction_name", &"change_protocol_param")
                     .with_prefix("input".to_owned())
                     .with("param", &(param.clone() as u8))
-                    .with("value", value);
+                    .with("value", &value.get_bytes().as_ref());
             },
             UpdateMethod::OptIn {} => {
                 transcript_builder = transcript_builder.with("transaction_name", &"opt_in");
@@ -714,8 +723,8 @@ mod tests {
     #[test]
     fn test_transaction_request_fleek() {
         let update_method = UpdateMethod::ChangeProtocolParam {
-            param: ProtocolParams::CommitteeSize,
-            value: 4,
+            param: ProtocolParamKey::CommitteeSize,
+            value: ProtocolParamValue::CommitteeSize(4),
         };
         let payload = UpdatePayload {
             sender: TransactionSender::AccountOwner(EthAddress([0; 20])),
@@ -739,8 +748,8 @@ mod tests {
         let chain_id_2 = chain_id_1 + 1;
 
         let update_method = UpdateMethod::ChangeProtocolParam {
-            param: ProtocolParams::CommitteeSize,
-            value: 4,
+            param: ProtocolParamKey::CommitteeSize,
+            value: ProtocolParamValue::CommitteeSize(4),
         };
         let payload_1 = UpdatePayload {
             sender: TransactionSender::AccountOwner(EthAddress([0; 20])),
