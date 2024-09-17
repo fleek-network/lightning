@@ -1,5 +1,6 @@
 #![allow(unused)]
 
+use std::future::Future;
 use std::io;
 use std::marker::PhantomData;
 use std::path::PathBuf;
@@ -24,7 +25,6 @@ use tokio::task::JoinSet;
 use tracing::{error, trace};
 
 use crate::config::Config;
-use crate::put::Putter;
 use crate::store::{Block, Store};
 
 pub const BLOCK_SIZE: usize = 256 << 10;
@@ -39,6 +39,7 @@ pub struct Blockstore<C: Collection> {
 impl<C: Collection> Clone for Blockstore<C> {
     fn clone(&self) -> Self {
         Self {
+            bucket: self.bucket.clone(),
             root: self.root.clone(),
             indexer: self.indexer.clone(),
             collection: PhantomData,
@@ -53,7 +54,7 @@ impl<C: Collection> ConfigConsumer for Blockstore<C> {
 
 impl<C: Collection> BuildGraph for Blockstore<C> {
     fn build_graph() -> fdi::DependencyGraph {
-        fdi::DependencyGraph::new().with(Self::new.with_event_handler(
+        fdi::DependencyGraph::new().with(Self::new.wrap_with_block_on().with_event_handler(
             "_post",
             |mut this: fdi::RefMut<Self>,
              fdi::Cloned(indexer): fdi::Cloned<C::IndexerInterface>| {
@@ -64,22 +65,15 @@ impl<C: Collection> BuildGraph for Blockstore<C> {
 }
 
 impl<C: Collection> Blockstore<C> {
-    async fn new(config_provider: &C::ConfigProviderInterface) -> anyhow::Result<Self> {
-        Self::init(config_provider.get::<Self>()).await
+    fn new(
+        config_provider: &C::ConfigProviderInterface,
+    ) -> impl Future<Output = anyhow::Result<Self>> {
+        let config = config_provider.get::<Self>();
+        Self::init(config)
     }
 
     pub async fn init(config: Config) -> anyhow::Result<Self> {
         let root = config.root.to_path_buf();
-
-        // TODO: Check this with @parsa
-        //let internal_dir = root.join(INTERNAL_DIR);
-        //let block_dir = root.join(BLOCK_DIR);
-        //let tmp_dir = root.join(TMP_DIR);
-
-        //std::fs::create_dir_all(&root)?;
-        //std::fs::create_dir_all(internal_dir)?;
-        //std::fs::create_dir_all(block_dir)?;
-        //std::fs::create_dir_all(tmp_dir)?;
 
         let bucket = Bucket::open(&root).await?;
 

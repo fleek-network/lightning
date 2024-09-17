@@ -1,7 +1,5 @@
 pub mod blockstore;
 pub mod config;
-// TODO: Check this with @parsa
-//pub mod put;
 mod store;
 
 #[cfg(test)]

@@ -60,4 +60,7 @@ pub enum IpldError {
 
     #[error("IPLD error: Error trying to convert to Dir - Cid {0}")]
     InvalidDir(Cid),
+
+    #[error("IPLD error: Error downloading - {0}")]
+    DownloaderError(String),
 }

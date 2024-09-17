@@ -5,10 +5,14 @@ use std::time::Duration;
 use anyhow::{anyhow, Context, Result};
 use cid::multihash::{Code, MultihashDigest};
 use cid::Cid;
+use fleek_ipld::decoder::reader::IpldReader;
+use fleek_ipld::errors::IpldError;
 use fleek_ipld::unixfs::Data;
+use fleek_ipld::walker::downloader::{Downloader, Response};
+use fleek_ipld::walker::stream::IpldStream;
 use futures::TryStreamExt;
 use hyper::client::{self, HttpConnector};
-use hyper::{Body, Client, Request, Response, Uri};
+use hyper::{Body, Client, Request, Uri};
 use hyper_rustls::{ConfigBuilderExt, HttpsConnector};
 use libipld::pb::PbNode;
 use lightning_interfaces::prelude::*;
@@ -40,6 +44,64 @@ impl<C: Collection> Clone for IPFSOrigin<C> {
     }
 }
 
+impl<C: Collection> Downloader for IPFSOrigin<C> {
+    async fn download(&self, cid: &Cid) -> Result<Response, IpldError> {
+        for gateway in self.gateways.iter() {
+            let url: Uri = gateway.build_request(*cid).parse().map_err(|e| {
+                IpldError::DownloaderError(format!("Failed to parse uri into cid: {e}"))
+            })?;
+
+            let req = Request::builder()
+                .uri(url)
+                .header("Connection", "keep-alive")
+                .body(Body::default())
+                .map_err(|e| IpldError::DownloaderError(format!("Failed to build request: {e}")))?;
+
+            match timeout(self.gateway_timeout, self.client.request(req)).await {
+                Ok(Ok(res)) => {
+                    match res.status().as_u16() {
+                        200..=299 => {
+                            let body = res.into_body().map_err(|e| {
+                                IpldError::DownloaderError(format!("Failed to get body: {e}"))
+                            });
+                            return Ok(Box::pin(body));
+                        },
+                        300..=399 => {
+                            info!("Gateway {} returned redirect error code", gateway.authority);
+                            // This is the redirect code we should try to redirect one time to the
+                            // proper location
+                            return Err(IpldError::DownloaderError(
+                                "Response was a redirect".into(),
+                            ));
+                        },
+                        _ => {
+                            // This is either informational(100-199), error(300-399, server
+                            // error(400-499) so lets try another gateway
+                            // todo(dalton): We should look into what could cause informational
+                            // 100-199 and see if there is anything we can do here
+                            info!(
+                                "Gateway {} response was not successful, moving on to the next gateway",
+                                gateway.authority
+                            );
+
+                            return Err(IpldError::DownloaderError(
+                                "Response was not successfull".into(),
+                            ));
+                        },
+                    }
+                },
+                Ok(Err(e)) => {
+                    return Err(IpldError::DownloaderError(format!("Request failed: {e}")));
+                },
+                Err(_) => return Err(IpldError::DownloaderError("Request timed out".into())),
+            }
+        }
+        Err(IpldError::DownloaderError(
+            "Failed to fetch data from gateways.".into(),
+        ))
+    }
+}
+
 impl<C: Collection> IPFSOrigin<C> {
     pub fn new(config: Config, blockstore: C::BlockstoreInterface) -> Result<Self> {
         // Prepare the TLS client config
@@ -66,10 +128,7 @@ impl<C: Collection> IPFSOrigin<C> {
         })
     }
 
-    pub async fn stream_car_into_blockstore(
-        &self,
-        response_body: Body,
-    ) -> Result<Blake3Hash, Error> {
+    pub async fn into_blockstore(&self, response_body: Body) -> Result<Blake3Hash, Error> {
         // Disclaimer(matthias): this method is unpolished and will be improved in due time
         let reader = StreamReader::new(response_body.map_err(hyper_error));
         let mut car_reader = CarReader::new(reader).await?;
@@ -155,12 +214,16 @@ impl<C: Collection> IPFSOrigin<C> {
 
     pub async fn fetch(&self, uri: &[u8]) -> Result<Blake3Hash> {
         let requested_cid = Cid::try_from(uri).with_context(|| "Failed to parse uri into cid")?;
+        let mut stream = IpldStream::builder()
+            .reader(IpldReader::default())
+            .downloader(self)
+            .build();
+
         for gateway in self.gateways.iter() {
             let url: Uri = gateway.build_request(requested_cid).parse()?;
 
             let req = Request::builder()
                 .uri(url)
-                .header("Accept", "application/vnd.ipld.car;version=1")
                 .header("Connection", "keep-alive")
                 .body(Body::default())?;
 
@@ -196,7 +259,7 @@ impl<C: Collection> IPFSOrigin<C> {
                 match res.status().as_u16() {
                     200..=299 => {
                         // The gateway responded succesfully
-                        self.stream_car_into_blockstore(res.into_body()).await
+                        self.into_blockstore(res.into_body()).await
                     },
                     300..=399 => {
                         info!(

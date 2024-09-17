@@ -37,12 +37,12 @@ byteorder = { version = "1", features = ["i128"] }
 bytes = { version = "1", features = ["serde"] }
 cbc = { version = "0.1", features = ["std"] }
 chrono = { version = "0.4" }
-cid = { version = "0.11" }
 cipher = { version = "0.4", default-features = false, features = ["block-padding", "std"] }
 clap = { version = "4", features = ["derive", "string", "wrap_help"] }
 clap_builder = { version = "4", default-features = false, features = ["color", "std", "string", "suggestions", "usage", "wrap_help"] }
 concurrent-queue = { version = "2" }
 console = { version = "0.15", default-features = false, features = ["ansi-parsing", "unicode-width"] }
+core2 = { version = "0.4", default-features = false, features = ["alloc"] }
 criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
 crossbeam-channel = { version = "0.5" }
 crossbeam-deque = { version = "0.8" }
@@ -194,12 +194,12 @@ bytes = { version = "1", features = ["serde"] }
 cbc = { version = "0.1", features = ["std"] }
 cc = { version = "1", default-features = false, features = ["parallel"] }
 chrono = { version = "0.4" }
-cid = { version = "0.11" }
 cipher = { version = "0.4", default-features = false, features = ["block-padding", "std"] }
 clap = { version = "4", features = ["derive", "string", "wrap_help"] }
 clap_builder = { version = "4", default-features = false, features = ["color", "std", "string", "suggestions", "usage", "wrap_help"] }
 concurrent-queue = { version = "2" }
 console = { version = "0.15", default-features = false, features = ["ansi-parsing", "unicode-width"] }
+core2 = { version = "0.4", default-features = false, features = ["alloc"] }
 criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
 crossbeam-channel = { version = "0.5" }
 crossbeam-deque = { version = "0.8" }
