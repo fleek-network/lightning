@@ -110,9 +110,9 @@ portable-atomic = { version = "1", features = ["require-cas"] }
 prettyplease = { version = "0.2", default-features = false, features = ["verbatim"] }
 primitive-types = { version = "0.12", features = ["byteorder", "rlp", "rustc-hex", "scale-info", "serde_no_std"] }
 proc-macro2 = { version = "1", features = ["span-locations"] }
+prost-594e8ee84c453af0 = { package = "prost", version = "0.13", features = ["prost-derive"] }
 prost-5ef9efb8ec2df382 = { package = "prost", version = "0.12", features = ["prost-derive"] }
 prost-a6292c17cd707f01 = { package = "prost", version = "0.11" }
-prost-types = { version = "0.12" }
 protobuf = { version = "2", default-features = false, features = ["with-bytes"] }
 quinn = { version = "0.10", features = ["futures-io"] }
 quinn-proto = { version = "0.10", features = ["native-certs"] }
@@ -158,6 +158,7 @@ tokio-stream = { version = "0.1", features = ["net", "sync"] }
 tokio-util = { version = "0.7", features = ["codec", "compat", "io", "time"] }
 toml_datetime = { version = "0.6", default-features = false, features = ["serde"] }
 toml_edit = { version = "0.20", features = ["serde"] }
+tonic = { version = "0.12" }
 tower = { version = "0.4", features = ["full"] }
 tower-http-468e82937335b1c9 = { package = "tower-http", version = "0.3", features = ["full"] }
 tower-http-d8f496e17d97b5cb = { package = "tower-http", version = "0.5", features = ["cors", "decompression-br", "decompression-gzip", "set-header"] }
@@ -270,9 +271,9 @@ prettyplease = { version = "0.2", default-features = false, features = ["verbati
 primitive-types = { version = "0.12", features = ["byteorder", "rlp", "rustc-hex", "scale-info", "serde_no_std"] }
 proc-macro-error = { version = "1" }
 proc-macro2 = { version = "1", features = ["span-locations"] }
+prost-594e8ee84c453af0 = { package = "prost", version = "0.13", features = ["prost-derive"] }
 prost-5ef9efb8ec2df382 = { package = "prost", version = "0.12", features = ["prost-derive"] }
 prost-a6292c17cd707f01 = { package = "prost", version = "0.11" }
-prost-types = { version = "0.12" }
 protobuf = { version = "2", default-features = false, features = ["with-bytes"] }
 quinn = { version = "0.10", features = ["futures-io"] }
 quinn-proto = { version = "0.10", features = ["native-certs"] }
@@ -319,6 +320,7 @@ tokio-stream = { version = "0.1", features = ["net", "sync"] }
 tokio-util = { version = "0.7", features = ["codec", "compat", "io", "time"] }
 toml_datetime = { version = "0.6", default-features = false, features = ["serde"] }
 toml_edit = { version = "0.20", features = ["serde"] }
+tonic = { version = "0.12" }
 tower = { version = "0.4", features = ["full"] }
 tower-http-468e82937335b1c9 = { package = "tower-http", version = "0.3", features = ["full"] }
 tower-http-d8f496e17d97b5cb = { package = "tower-http", version = "0.5", features = ["cors", "decompression-br", "decompression-gzip", "set-header"] }
