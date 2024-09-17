@@ -54,13 +54,13 @@ impl<C: Collection> HttpOrigin<C> {
             data = verified_data;
         }
 
-        // TODO: Check this with Parsa
         let bucket = self.blockstore.get_bucket();
         let mut writer = FileWriter::new(&bucket);
-        writer.write(data.as_ref()).await.map_err(Into::into)
-
-        //putter.write(data.as_ref(), CompressionAlgorithm::Uncompressed)?;
-        //putter.finalize().await.map_err(Into::into)
+        writer
+            .write(data.as_ref())
+            .await
+            .map_err(|e| anyhow::anyhow!(e))?;
+        writer.commit().await.map_err(|e| anyhow::anyhow!(e))
     }
 }
 
