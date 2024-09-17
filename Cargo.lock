@@ -6764,6 +6764,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "arrayref",
+ "b3fs",
  "bincode",
  "blake3-tree",
  "bytes",

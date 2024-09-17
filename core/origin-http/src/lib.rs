@@ -7,7 +7,7 @@ use std::time::Duration;
 use b3fs::bucket::file::writer::FileWriter;
 use fast_sri::IntegrityMetadata;
 use lightning_interfaces::prelude::*;
-use lightning_interfaces::types::{Blake3Hash, CompressionAlgorithm};
+use lightning_interfaces::types::Blake3Hash;
 use reqwest::{Client, ClientBuilder, Url};
 
 pub use crate::config::Config;

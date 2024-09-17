@@ -59,6 +59,7 @@ pub mod errors;
 pub mod file;
 
 /// An open b3fs bucket which can be used for both reads and writes.
+#[derive(Clone)]
 pub struct Bucket {
     root: PathBuf,
     // The cache of `$root/{blocks,headers,wal}`
