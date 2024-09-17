@@ -7403,6 +7403,7 @@ version = "0.0.0"
 dependencies = [
  "affair",
  "anyhow",
+ "b3fs",
  "fast-sri",
  "fleek-crypto",
  "lightning-application",

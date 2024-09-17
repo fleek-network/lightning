@@ -52,8 +52,6 @@ pub use crate::{
     FetcherInterface,
     ForwarderInterface,
     HandshakeInterface,
-    IncrementalDirInterface,
-    IncrementalPutInterface,
     IndexerInterface,
     KeystoreInterface,
     LaneManager,

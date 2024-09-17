@@ -4,6 +4,7 @@ mod tests;
 
 use std::time::Duration;
 
+use b3fs::bucket::file::writer::FileWriter;
 use fast_sri::IntegrityMetadata;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Blake3Hash, CompressionAlgorithm};
@@ -53,9 +54,13 @@ impl<C: Collection> HttpOrigin<C> {
             data = verified_data;
         }
 
-        let mut putter = self.blockstore.put(None);
-        putter.write(data.as_ref(), CompressionAlgorithm::Uncompressed)?;
-        putter.finalize().await.map_err(Into::into)
+        // TODO: Check this with Parsa
+        let bucket = self.blockstore.get_bucket();
+        let mut writer = FileWriter::new(&bucket);
+        writer.write(data.as_ref()).await.map_err(Into::into)
+
+        //putter.write(data.as_ref(), CompressionAlgorithm::Uncompressed)?;
+        //putter.finalize().await.map_err(Into::into)
     }
 }
 
