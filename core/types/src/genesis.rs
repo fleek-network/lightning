@@ -40,6 +40,7 @@ pub struct Genesis {
     pub max_boost: u16,
     pub max_lock_time: u64,
     pub min_num_measurements: u64,
+    pub sgx_shared_pub_key: String,
     pub node_info: Vec<GenesisNode>,
     pub service: Vec<GenesisService>,
     pub account: Vec<GenesisAccount>,
