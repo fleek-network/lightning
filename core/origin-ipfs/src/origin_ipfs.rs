@@ -5,6 +5,7 @@ use std::time::Duration;
 use anyhow::{anyhow, Context, Result};
 use cid::multihash::{Code, MultihashDigest};
 use cid::Cid;
+use fleek_ipld::decoder::fs::IpldItem;
 use fleek_ipld::decoder::reader::IpldReader;
 use fleek_ipld::errors::IpldError;
 use fleek_ipld::unixfs::Data;
@@ -219,33 +220,31 @@ impl<C: Collection> IPFSOrigin<C> {
             .downloader(self)
             .build();
 
-        for gateway in self.gateways.iter() {
-            let url: Uri = gateway.build_request(requested_cid).parse()?;
-
-            let req = Request::builder()
-                .uri(url)
-                .header("Connection", "keep-alive")
-                .body(Body::default())?;
-
-            match self.fetch_from_gateway(req, gateway).await {
-                Ok(hash) => return Ok(hash),
-                Err(e) => match e {
-                    Error::Blockstore(info) => {
-                        error!("{info:?}. Stopping request.");
-                        return Err(anyhow!("Request for CID {requested_cid} failed: {info:?}"));
-                    },
-                    Error::Request(info) => {
-                        error!("{info:?}. Moving to next gateway.");
-                    },
-                    Error::Redirect(info) => {
-                        error!("{info:?}. Moving to next gateway.");
-                    },
-                    Error::CarReader(info) => {
-                        error!("{info:?}. Moving to next gateway.");
-                    },
+        loop {
+            let item = stream.next().await?;
+            match item {
+                Some(IpldItem::ChunkedFile(chunk)) => {
+                    let mut stream_file = stream.new_chunk_file_streamer(chunk).await;
+                    FileWriter::new(&self.blockstore)
+                        .write_stream(&mut stream_file)
+                        .await?;
+                    while let Some(chunk) = stream_file.next_chunk().await? {
+                        println!("Chunk: {:?} \n\n", chunk);
+                    }
                 },
+                Some(IpldItem::File(file)) => {
+                    println!("File: {:?} \n\n", file);
+                },
+                Some(IpldItem::Dir(dir)) => {
+                    println!("Directory: {:?} \n\n", dir);
+                },
+                Some(IpldItem::Chunk(_)) => {
+                    panic!("Chunked file should be handled by ChunkedFile");
+                },
+                None => break,
             }
         }
+
         Err(anyhow!("Failed to fetch data from gateways."))
     }
 
