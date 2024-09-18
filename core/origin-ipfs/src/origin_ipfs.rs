@@ -4,8 +4,9 @@ use std::time::Duration;
 use anyhow::{anyhow, Context, Result};
 use b3fs::bucket::dir::writer::DirWriter;
 use b3fs::bucket::file::writer::FileWriter;
+use b3fs::entry::{BorrowedEntry, BorrowedLink};
 use cid::Cid;
-use fleek_ipld::decoder::fs::IpldItem;
+use fleek_ipld::decoder::fs::{DocId, IpldItem};
 use fleek_ipld::decoder::reader::IpldReader;
 use fleek_ipld::errors::IpldError;
 use fleek_ipld::walker::downloader::{Downloader, Response};
@@ -17,6 +18,7 @@ use hyper_rustls::{ConfigBuilderExt, HttpsConnector};
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::Blake3Hash;
 use multihash_codetable::{Code, MultihashDigest};
+use tokio::sync::RwLock;
 use tokio::time::timeout;
 use tracing::info;
 
@@ -129,24 +131,38 @@ impl<C: Collection> IPFSOrigin<C> {
             .build();
 
         stream.start(requested_cid).await;
+        let hash: RwLock<[u8; 32]> = RwLock::new([0; 32]);
 
         loop {
             let item = stream.next().await?;
+            let last_dir: RwLock<Option<DirWriter>> = RwLock::new(None);
             match item {
                 Some(IpldItem::ChunkedFile(chunk)) => {
+                    let doc_id = chunk.id().clone();
                     let mut stream_file = stream.new_chunk_file_streamer(chunk).await;
                     let mut file_writer = FileWriter::new(&self.blockstore.get_bucket());
                     while let Some(chunk) = stream_file.next_chunk().await? {
                         file_writer.write(chunk.data()).await?;
                     }
+                    self.insert_file_into_dir(last_dir, &hash, file_writer, &doc_id)
+                        .await?;
                 },
                 Some(IpldItem::File(file)) => {
-                    FileWriter::new(&self.blockstore.get_bucket())
-                        .write(file.data())
+                    let doc_id = file.id().clone();
+                    let mut file_writer = FileWriter::new(&self.blockstore.get_bucket());
+                    file_writer.write(file.data()).await?;
+                    self.insert_file_into_dir(last_dir, &hash, file_writer, &doc_id)
                         .await?;
                 },
                 Some(IpldItem::Dir(dir)) => {
-                    DirWriter::new(&self.blockstore.get_bucket(), dir.links().len());
+                    let mut dir_last = last_dir.write().await;
+                    if dir_last.is_some() {
+                        *hash.write().await = dir_last.take().unwrap().commit().await?;
+                    }
+                    let dir_writer =
+                        DirWriter::new(&self.blockstore.get_bucket(), dir.links().len());
+                    dir_last.replace(dir_writer);
+                    drop(dir_last);
                 },
                 Some(IpldItem::Chunk(_)) => {
                     return Err(anyhow!("Chunked data is not supported"));
@@ -155,9 +171,29 @@ impl<C: Collection> IPFSOrigin<C> {
             }
         }
 
-        // TODO: Return the hash
+        let hash = hash.into_inner();
+        Ok(hash)
+    }
 
-        Err(anyhow!("Failed to fetch data from gateways."))
+    async fn insert_file_into_dir(
+        &self,
+        last_dir: RwLock<Option<DirWriter>>,
+        hash: &RwLock<[u8; 32]>,
+        file_writer: FileWriter,
+        doc_id: &DocId,
+    ) -> Result<()> {
+        let file_name = doc_id.file_name().unwrap_or_default();
+        let temp_hash = file_writer.commit().await?;
+        let mut lock = last_dir.write().await;
+        if let Some(dir) = lock.as_mut() {
+            let entry = BorrowedEntry {
+                name: file_name.as_bytes(),
+                link: BorrowedLink::Content(&temp_hash),
+            };
+            dir.insert(entry).await?;
+        }
+        *hash.write().await = temp_hash;
+        Ok(())
     }
 }
 
