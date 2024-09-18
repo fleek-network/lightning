@@ -8,6 +8,7 @@ use fleek_crypto::{ClientPublicKey, NodePublicKey};
 use fn_sdk::ipc_types::{self, IpcMessage, IpcRequest, Response, DELIMITER_SIZE};
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::schema::task_broker::TaskScope;
+use lightning_interfaces::types::{ProtocolParamKey, ProtocolParamValue};
 use lightning_utils::application::QueryRunnerExt;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
@@ -139,6 +140,17 @@ impl<C: Collection> Context<C> {
             ipc_types::Request::FetchNodeIndex {} => {
                 let node_index = self.query_runner.pubkey_to_index(&self.our_public_key);
                 ipc_types::Response::FetchNodeIndex { node_index }
+            },
+            ipc_types::Request::FetchSgxSharedPubKey {} => {
+                match self
+                    .query_runner
+                    .get_protocol_param(&ProtocolParamKey::SGXSharedPubKey)
+                {
+                    Some(ProtocolParamValue::SGXSharedPubKey(public_key)) => {
+                        ipc_types::Response::FetchSgxSharedPubKey { public_key }
+                    },
+                    _ => unreachable!(), // added in the genesis
+                }
             },
             _ => unreachable!(),
         }
