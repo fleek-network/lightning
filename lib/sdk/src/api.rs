@@ -68,6 +68,15 @@ pub async fn fetch_node_index() -> Option<u32> {
     }
 }
 
+pub async fn fetch_sgx_shared_pub_key() -> String {
+    let req = Request::FetchSgxSharedPubKey {};
+    let res = send_and_await_response(req).await;
+    match res {
+        crate::ipc_types::Response::FetchSgxSharedPubKey { public_key } => public_key,
+        _ => unreachable!(),
+    }
+}
+
 pub async fn run_task(
     depth: u8,
     scope: TaskScope,

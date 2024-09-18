@@ -212,6 +212,11 @@ ReqRes! {
         /// The node index of this node
         node_index: Option<u32>,
     },
+    FetchSgxSharedPubKey {
+        =>
+        /// The node index of this node
+        public_key: String,
+    },
     /// Submit a task
     Task {
         depth: u8,
