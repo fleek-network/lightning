@@ -25,7 +25,7 @@ use tokio::task::JoinSet;
 use tracing::{error, trace};
 
 use crate::config::Config;
-use crate::store::Store;
+use crate::store::{Block, Store};
 
 pub const BLOCK_SIZE: usize = 256 << 10;
 
