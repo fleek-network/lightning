@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 affair.workspace = true
 anyhow.workspace = true
-b3fs = { path = "../../lib/b3fs" }
+b3fs.workspace = true
 fast-sri = { path = "../../lib/fast-sri" }
 lightning-interfaces = { path = "../interfaces" }
 lightning-workspace-hack.workspace = true

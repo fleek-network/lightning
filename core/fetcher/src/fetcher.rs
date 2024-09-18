@@ -111,16 +111,13 @@ impl<C: Collection> FetcherWorker<C> {
     /// then falling back to the record's immutable pointer.
     #[inline(always)]
     async fn fetch(&self, hash: Blake3Hash) -> Result<()> {
-        self.blockstore.get_bucket().clone();
-
-        // TODO: Check this with @parsa
-        //if self.blockstore.get_tree(&hash).await.is_some() {
-        //    increment_counter!(
-        //        "fetcher_from_cache",
-        //        Some("Counter for content that was already cached locally")
-        //    );
-        //    return Ok(());
-        //}
+        if self.blockstore.get_bucket().exists(&hash).await? {
+            increment_counter!(
+                "fetcher_from_blockstore",
+                Some("Counter for content that was fetched from the blockstore")
+            );
+            return Ok(());
+        }
         let mut origin_pointers = self
             .resolver
             .get_origins(hash)
@@ -148,15 +145,13 @@ impl<C: Collection> FetcherWorker<C> {
             }
             if let Some(pointer) = pointer {
                 debug_assert_eq!(pointer.hash, hash);
-                // TODO: Check this with @parsa
-                //if self.blockstore.get_tree(&hash).await.is_some() {
-                //    // in case we have the file
-                //    increment_counter!(
-                //        "fetcher_from_cache",
-                //        Some("Counter for content that was already cached locally")
-                //    );
-                //    return Ok(());
-                //}
+                if self.blockstore.get_bucket().exists(&hash).await? {
+                    increment_counter!(
+                        "fetcher_from_blockstore",
+                        Some("Counter for content that was already cached locally")
+                    );
+                    return Ok(());
+                }
                 // If not, attempt to pull from the origin. This strikes a balance between trying
                 // to fetch from a bunch of peers vs going to the origin right away.
                 if self.fetch_from_origin(pointer.pointer).await.is_ok() {

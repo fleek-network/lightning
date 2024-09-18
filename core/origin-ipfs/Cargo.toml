@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 affair.workspace = true
 anyhow.workspace = true
+b3fs.workspace = true
 bytes.workspace = true
 cid.workspace = true
 fleek-ipld.workspace = true
@@ -13,10 +14,10 @@ futures.workspace = true
 humantime-serde.workspace = true
 hyper = { version = "0.14.27", features = ["stream"] }
 hyper-rustls = "0.24.1"
-libipld = { version = "0.16", features = ["dag-cbor", "derive"] }
 lightning-interfaces = { path = "../interfaces" }
 lightning-workspace-hack.workspace = true
 multihash.workspace = true
+multihash-codetable.workspace = true
 rustls = "0.21.5"
 serde.workspace = true
 thiserror = "1"
