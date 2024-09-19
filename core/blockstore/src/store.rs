@@ -1,19 +1,19 @@
 use std::future::Future;
 use std::io;
 
+use b3fs::bucket::ContentHeader;
 use lightning_interfaces::types::Blake3Hash;
 
 /// Simple block store interface.
 pub trait Store: Send + Clone {
     fn fetch(
         &self,
-        location: &str,
         key: &Blake3Hash,
         tag: Option<usize>,
-    ) -> impl Future<Output = Option<Block>> + Send;
+    ) -> impl Future<Output = Option<ContentHeader>> + Send;
     fn insert(
         &mut self,
-        location: &str,
+        location: &Blake3Hash,
         key: Blake3Hash,
         block: &[u8],
         tag: Option<usize>,

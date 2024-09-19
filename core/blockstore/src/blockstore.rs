@@ -6,8 +6,9 @@ use std::marker::PhantomData;
 use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 
+use b3fs::bucket::dir::writer::DirWriter;
 use b3fs::bucket::file::writer::FileWriter;
-use b3fs::bucket::Bucket;
+use b3fs::bucket::{Bucket, ContentHeader};
 use blake3_tree::blake3::tree::{BlockHasher, HashTreeBuilder};
 use blake3_tree::blake3::Hash;
 use blake3_tree::utils::{HashTree, HashVec};
@@ -39,8 +40,8 @@ pub struct Blockstore<C: Collection> {
 impl<C: Collection> Clone for Blockstore<C> {
     fn clone(&self) -> Self {
         Self {
-            bucket: self.bucket.clone(),
             root: self.root.clone(),
+            bucket: self.bucket.clone(),
             indexer: self.indexer.clone(),
             collection: PhantomData,
         }
@@ -97,10 +98,6 @@ impl<C: Collection> BlockstoreInterface<C> for Blockstore<C> {
         self.bucket.clone()
     }
 
-    //fn put_dir(&self, root: Option<Blake3Hash>) -> Self::DirPut {
-    //    todo!()
-    //}
-
     fn get_root_dir(&self) -> PathBuf {
         self.root.to_path_buf()
     }
@@ -110,19 +107,13 @@ impl<C> Store for Blockstore<C>
 where
     C: Collection,
 {
-    async fn fetch(&self, location: &str, key: &Blake3Hash, tag: Option<usize>) -> Option<Block> {
-        let filename = match tag {
-            Some(tag) => format!("{tag}-{}", Hash::from(*key).to_hex()),
-            None => format!("{}", Hash::from(*key).to_hex()),
-        };
-        let path = self.root.to_path_buf().join(location).join(filename);
-        trace!("Fetch {path:?}");
-        fs::read(path).await.ok()
+    async fn fetch(&self, key: &Blake3Hash, tag: Option<usize>) -> Option<ContentHeader> {
+        self.get_bucket().get(&key).await.ok()
     }
 
     async fn insert(
         &mut self,
-        location: &str,
+        location: &Blake3Hash,
         key: Blake3Hash,
         block: &[u8],
         tag: Option<usize>,
@@ -132,24 +123,44 @@ where
             None => format!("{}", Hash::from(key).to_hex()),
         };
         let tmp_file_name = format!("{}-{}", rand::random::<u64>(), filename);
-        // TODO: Check this with @parsa
-        FileWriter::new(&self.bucket)
-            .write(block)
-            .await
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
-        //let tmp_file_path = self.root.to_path_buf().join(TMP_DIR).join(&tmp_file_name);
-        //if let Ok(mut tmp_file) = File::create(&tmp_file_path).await {
-        //    tmp_file.write_all(block).await?;
-
-        //    // TODO: Is this needed before calling rename?
-        //    tmp_file.sync_all().await?;
-
-        //    let store_path = self.root.to_path_buf().join(location).join(filename);
-
-        //    trace!("Inserting {store_path:?}");
-
-        //    fs::rename(tmp_file_path, store_path).await?;
-        //}
-        //Ok(())
+        let bucket = self.get_bucket();
+        let maybe_dir = bucket.get(location).await?;
+        if maybe_dir.is_dir() {
+            if let Some(dir) = maybe_dir.into_dir() {
+                let mut file_writer = FileWriter::new(&bucket);
+                file_writer
+                    .write(block)
+                    .await
+                    .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+                let hash = file_writer
+                    .commit()
+                    .await
+                    .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+                // TODO: Check this with @parsa
+                // dir.insert(&filename, hash)
+                //     .await
+                //     .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+                // dir.commit()
+                //     .await
+                //     .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+                Ok(())
+            } else {
+                Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    "Failed to insert block into directory",
+                ))
+            }
+        } else {
+            let mut file_writer = FileWriter::new(&bucket);
+            file_writer
+                .write(block)
+                .await
+                .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+            let _hash = file_writer
+                .commit()
+                .await
+                .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+            Ok(())
+        }
     }
 }
