@@ -1,6 +1,5 @@
 pub mod blockstore;
 pub mod config;
-mod store;
 
 #[cfg(test)]
 mod tests {

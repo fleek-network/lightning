@@ -26,7 +26,6 @@ use tokio::task::JoinSet;
 use tracing::{error, trace};
 
 use crate::config::Config;
-use crate::store::{Block, Store};
 
 pub const BLOCK_SIZE: usize = 256 << 10;
 
@@ -100,67 +99,5 @@ impl<C: Collection> BlockstoreInterface<C> for Blockstore<C> {
 
     fn get_root_dir(&self) -> PathBuf {
         self.root.to_path_buf()
-    }
-}
-
-impl<C> Store for Blockstore<C>
-where
-    C: Collection,
-{
-    async fn fetch(&self, key: &Blake3Hash, tag: Option<usize>) -> Option<ContentHeader> {
-        self.get_bucket().get(&key).await.ok()
-    }
-
-    async fn insert(
-        &mut self,
-        location: &Blake3Hash,
-        key: Blake3Hash,
-        block: &[u8],
-        tag: Option<usize>,
-    ) -> io::Result<()> {
-        let filename = match tag {
-            Some(tag) => format!("{tag}-{}", Hash::from(key).to_hex()),
-            None => format!("{}", Hash::from(key).to_hex()),
-        };
-        let tmp_file_name = format!("{}-{}", rand::random::<u64>(), filename);
-        let bucket = self.get_bucket();
-        let maybe_dir = bucket.get(location).await?;
-        if maybe_dir.is_dir() {
-            if let Some(dir) = maybe_dir.into_dir() {
-                let mut file_writer = FileWriter::new(&bucket);
-                file_writer
-                    .write(block)
-                    .await
-                    .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
-                let hash = file_writer
-                    .commit()
-                    .await
-                    .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
-                // TODO: Check this with @parsa
-                // dir.insert(&filename, hash)
-                //     .await
-                //     .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
-                // dir.commit()
-                //     .await
-                //     .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
-                Ok(())
-            } else {
-                Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    "Failed to insert block into directory",
-                ))
-            }
-        } else {
-            let mut file_writer = FileWriter::new(&bucket);
-            file_writer
-                .write(block)
-                .await
-                .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
-            let _hash = file_writer
-                .commit()
-                .await
-                .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
-            Ok(())
-        }
     }
 }
