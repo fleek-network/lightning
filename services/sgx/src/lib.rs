@@ -172,6 +172,7 @@ pub fn main() {
         if state_pub_key != enclave_pub_key {
             std::fs::remove_file(SGX_SEALED_DATA_PATH.join("sealedkey.bin"))
                 .expect("Failed to remove sealed secret key");
+            panic!("State public key doesn't match enclave public key");
         }
     });
 
