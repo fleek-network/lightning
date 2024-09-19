@@ -4,6 +4,7 @@ use std::time::Duration;
 use affair::AsyncWorker as WorkerTrait;
 use anyhow::{Context, Result};
 use atomo::{DefaultSerdeBackend, SerdeBackend, StorageBackend};
+use b3fs::bucket::file::writer::FileWriter;
 use fleek_crypto::{ClientPublicKey, ConsensusPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::prelude::*;
@@ -13,7 +14,6 @@ use lightning_interfaces::types::{
     BlockExecutionResponse,
     Committee,
     CommodityTypes,
-    CompressionAlgorithm,
     Epoch,
     ExecutionData,
     Genesis,
@@ -35,7 +35,6 @@ use merklize::hashers::keccak::KeccakHasher;
 use merklize::trees::mpt::MptStateTree;
 use merklize::StateTree;
 use tokio::sync::Mutex;
-use tracing::warn;
 
 use crate::config::ApplicationConfig;
 use crate::state::{ApplicationState, QueryRunner};
@@ -67,10 +66,15 @@ impl ApplicationEnv {
         self.inner.query()
     }
 
-    async fn run<F, P>(&mut self, mut block: Block, get_putter: F) -> Result<BlockExecutionResponse>
+    async fn run<C, F, P>(
+        &mut self,
+        mut block: Block,
+        get_blockstore: F,
+    ) -> Result<BlockExecutionResponse>
     where
+        C: Collection,
         F: FnOnce() -> P,
-        P: IncrementalPutInterface,
+        P: BlockstoreInterface<C>,
     {
         let response = self
             .inner
@@ -164,20 +168,12 @@ impl ApplicationEnv {
             // This will return `None` only if the InMemory backend is used.
             let exclude_tables = ApplicationStateTree::state_tree_tables();
             if let Some(checkpoint) = storage.serialize(&exclude_tables) {
-                let mut blockstore_put = get_putter();
-                if blockstore_put
-                    .write(checkpoint.as_slice(), CompressionAlgorithm::Uncompressed)
-                    .is_ok()
-                {
-                    if let Ok(state_hash) = blockstore_put.finalize().await {
-                        // Only temporary: write the checkpoint to disk directly.
-                        self.update_last_epoch_hash(state_hash)?;
-                    } else {
-                        warn!("Failed to finalize writing checkpoint to blockstore");
-                    }
-                } else {
-                    warn!("Failed to write checkpoint to blockstore");
-                }
+                let bucket = get_blockstore().get_bucket();
+                let mut file_writer = FileWriter::new(&bucket);
+                file_writer.write(checkpoint.as_slice()).await?;
+                let state_hash = file_writer.commit().await?;
+                // Only temporary: write the checkpoint to disk directly.
+                self.update_last_epoch_hash(state_hash)?;
             }
         }
 
@@ -428,7 +424,7 @@ impl<C: Collection> WorkerTrait for UpdateWorker<C> {
         self.env
             .lock()
             .await
-            .run(req, || self.blockstore.put(None))
+            .run(req, || self.blockstore.clone())
             .await
             .expect("Failed to execute block")
     }
