@@ -17,7 +17,6 @@ use hyper::{Body, Client, Request, Uri};
 use hyper_rustls::{ConfigBuilderExt, HttpsConnector};
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::Blake3Hash;
-use multihash_codetable::{Code, MultihashDigest};
 use tokio::time::timeout;
 use tracing::info;
 
@@ -193,17 +192,5 @@ impl<C: Collection> IPFSOrigin<C> {
         }
         *hash = temp_hash;
         Ok(())
-    }
-}
-
-fn verify_data(cid: &Cid, data: &[u8]) -> Result<()> {
-    let valid = match Code::try_from(cid.hash().code()) {
-        Ok(hasher) => &hasher.digest(data) == cid.hash(),
-        _ => false,
-    };
-    if valid {
-        Ok(())
-    } else {
-        Err(anyhow!("Data verification failed for CID: {cid}"))
     }
 }

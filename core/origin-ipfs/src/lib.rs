@@ -1,4 +1,3 @@
-/// mod car_reader;
 pub mod config;
 mod origin_ipfs;
 #[cfg(test)]
