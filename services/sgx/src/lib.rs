@@ -4,6 +4,7 @@ use std::io::Result as IoResult;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, LazyLock};
+use std::time::Duration;
 
 use aesm_client::AesmClient;
 use enclave_runner::usercalls::{AsyncStream, UsercallExtension};
@@ -153,6 +154,26 @@ pub fn main() {
     enclave_builder.dummy_signature();
     enclave_builder.usercall_extension(ExternalService { attest_state });
     let enclave = enclave_builder.build(&mut device).unwrap();
+
+    std::thread::spawn(|| {
+        let state_pub_key = block_on(async move { fn_sdk::api::fetch_sgx_shared_pub_key().await });
+
+        // TODO(matthias): until we update the enclave to send the public key along with the
+        // encrypted shared secret key, we have to hit the http endpoint in the enclave to get the
+        // public key.
+        // Wait for enclave to start up.
+        std::thread::sleep(Duration::from_secs(10));
+
+        let enclave_pub_key = reqwest::blocking::get("http://127.0.0.1:8011/key")
+            .expect("Failed to query public key from enclave")
+            .text()
+            .expect("Failed to query public key from enclave");
+
+        if state_pub_key != enclave_pub_key {
+            std::fs::remove_file(SGX_SEALED_DATA_PATH.join("sealedkey.bin"))
+                .expect("Failed to remove sealed secret key");
+        }
+    });
 
     enclave
         .run()

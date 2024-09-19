@@ -3,7 +3,6 @@ use std::io::Write;
 use std::ops::Deref;
 use std::sync::Arc;
 use std::task::Waker;
-use std::time::Duration;
 
 use aesm_client::AesmClient;
 use anyhow::{ensure, Context};
@@ -113,34 +112,10 @@ impl EndpointState {
     }
 
     pub fn handle_save_key(&self, data: Vec<u8>) -> std::io::Result<Bytes> {
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .thread_name("sdk")
-            .enable_all()
-            .build()
-            .expect("failed to build sdk runtime");
-
-        let state_pub_key =
-            rt.block_on(async move { fn_sdk::api::fetch_sgx_shared_pub_key().await });
-
-        // TODO(matthias): until we update the enclave to send the public key along with the
-        // encrypted shared secret key, we have to hit the http endpoint in the enclave to get the
-        // public key.
-        // Wait for enclave to start up.
-        std::thread::sleep(Duration::from_secs(10));
-
-        let enclave_pub_key = reqwest::blocking::get("http://127.0.0.1:8011/key")
-            .map_err(std::io::Error::other)?
-            .text()
-            .map_err(std::io::Error::other)?;
-
-        if state_pub_key == enclave_pub_key {
-            std::fs::create_dir_all(SGX_SEALED_DATA_PATH.deref())?;
-            let mut file = File::create(SGX_SEALED_DATA_PATH.join("sealedkey.bin"))
-                .expect("Failed to create file");
-            file.write_all(&data)?;
-        } else {
-            panic!("Enclave public key doesn't match public key on state");
-        }
+        std::fs::create_dir_all(SGX_SEALED_DATA_PATH.deref())?;
+        let mut file = File::create(SGX_SEALED_DATA_PATH.join("sealedkey.bin"))
+            .expect("Failed to create file");
+        file.write_all(&data)?;
         // no need to respond with anything
         Ok(Bytes::new())
     }
