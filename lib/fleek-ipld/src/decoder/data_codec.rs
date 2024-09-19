@@ -22,6 +22,8 @@ use crate::unixfs::{Data, DataType};
 /// Trait to decode the `data` field from a IPLD abstract format `F`.
 pub trait DataCodec<F> {
     fn decode_from(doc_id: &DocId, data: F) -> Result<IpldItem, IpldError>;
+
+    fn validate_data(doc_id: &DocId, data: &F) -> Result<(), IpldError>;
 }
 
 /// Trait to decode a IPLD abstract format `Ipld` into a specific user format p `DataCodec`.
@@ -53,6 +55,7 @@ pub trait Decoder {
     fn decode_from_slice(&self, doc_id: &DocId, data: &[u8]) -> Result<IpldItem, IpldError> {
         let node = Self::IpldCodec::decode_from_slice(data)
             .map_err(|e| IpldError::IpldCodecError(*doc_id.cid(), format!("{e:?}")))?;
+        Self::DataCodec::validate_data(doc_id, &node)?;
         Self::DataCodec::decode_from(doc_id, node)
     }
 }
@@ -101,6 +104,23 @@ impl DataCodec<PbNode> for UnixFsProtobufCodec {
         let data = Data::try_from(&node.data)?;
         let mut doc_id = doc_id.clone();
         Self::from_result(&mut doc_id, None, &node, &data)
+    }
+
+    fn validate_data(_doc_id: &DocId, _data: &PbNode) -> Result<(), IpldError> {
+        Ok(())
+        //if let Some(data) = data.data.as_ref() {
+        //    let valid = match Code::try_from(doc_id.cid().hash().code()) {
+        //        Ok(hasher) => &hasher.digest(data) == doc_id.cid().hash(),
+        //        _ => false,
+        //    };
+        //    if valid {
+        //        Ok(())
+        //    } else {
+        //        Err(IpldError::IpldMultihashError(*doc_id.cid()))
+        //    }
+        //} else {
+        //    Ok(())
+        //}
     }
 }
 

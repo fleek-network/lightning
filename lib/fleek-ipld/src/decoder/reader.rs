@@ -69,6 +69,9 @@ where
     ) -> Result<IpldItem, IpldError> {
         let mut stream = stream;
         let doc_id = id.into();
+        if doc_id.cid().codec() != 0x70 {
+            return Err(IpldError::UnsupportedCodec(*doc_id.cid()));
+        }
         while let Some(chunk) = stream.next().await {
             let chunk = chunk.map_err(Into::into)?;
             self.buffer.extend_from_slice(&chunk);

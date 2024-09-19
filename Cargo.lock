@@ -4527,6 +4527,8 @@ dependencies = [
  "httpmock",
  "ipld-core",
  "ipld-dagpb",
+ "multihash 0.19.1",
+ "multihash-codetable",
  "quick-protobuf",
  "reqwest",
  "thiserror",

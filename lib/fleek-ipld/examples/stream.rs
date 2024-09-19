@@ -15,7 +15,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut stream = IpldStream::builder()
         .reader(IpldReader::default())
-        .downloader(ReqwestDownloader::new("https://flk-ipfs.xyz"))
+        .downloader(ReqwestDownloader::new("https://ipfs.io"))
         .build();
 
     stream.start(cid).await;
