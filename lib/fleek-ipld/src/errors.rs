@@ -44,7 +44,10 @@ pub enum IpldError {
     StreamBufferEmpty,
 
     #[error("IPLD error: Error validating hash - Cid {0}")]
-    IpldMultihashError(Cid),
+    MultihashError(Cid),
+
+    #[error("IPLD error: UnssuportedCode Multihash code: {0}")]
+    MultihashCodeError(u64),
 
     #[error("IPLD error: Error processing item {0}")]
     ParallelIpldItemProcessingError(#[from] tokio::task::JoinError),

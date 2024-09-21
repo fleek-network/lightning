@@ -17,7 +17,6 @@ hyper-rustls = "0.24.1"
 lightning-interfaces = { path = "../interfaces" }
 lightning-workspace-hack.workspace = true
 multihash.workspace = true
-multihash-codetable.workspace = true
 rustls = "0.21.5"
 serde.workspace = true
 thiserror = "1"
