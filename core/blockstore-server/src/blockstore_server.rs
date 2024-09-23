@@ -355,11 +355,13 @@ async fn handle_request<C: NodeComponents>(
     num_responses: Arc<AtomicUsize>,
     rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
 ) {
-    if let Some(tree) = blockstore.get_tree(&peer_request.hash).await {
+    if let Ok(tree) = blockstore.get_bucket().get(&peer_request.hash).await {
         let mut num_bytes = 0;
         let instant = Instant::now();
         for block in 0..tree.len() {
             let compr = CompressionAlgoSet::default(); // rustfmt
+
+            // TODO: Check this with @parsa. How to map this get?
             let Some(chunk) = blockstore.get(block as u32, &tree[block], compr).await else {
                 break;
             };

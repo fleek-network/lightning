@@ -111,10 +111,10 @@ impl<C: NodeComponents> FetcherWorker<C> {
     /// then falling back to the record's immutable pointer.
     #[inline(always)]
     async fn fetch(&self, hash: Blake3Hash) -> Result<()> {
-        if self.blockstore.get_tree(&hash).await.is_some() {
+        if self.blockstore.get_bucket().exists(&hash).await? {
             increment_counter!(
-                "fetcher_from_cache",
-                Some("Counter for content that was already cached locally")
+                "fetcher_from_blockstore",
+                Some("Counter for content that was fetched from the blockstore")
             );
             return Ok(());
         }
@@ -145,10 +145,9 @@ impl<C: NodeComponents> FetcherWorker<C> {
             }
             if let Some(pointer) = pointer {
                 debug_assert_eq!(pointer.hash, hash);
-                if self.blockstore.get_tree(&hash).await.is_some() {
-                    // in case we have the file
+                if self.blockstore.get_bucket().exists(&hash).await? {
                     increment_counter!(
-                        "fetcher_from_cache",
+                        "fetcher_from_blockstore",
                         Some("Counter for content that was already cached locally")
                     );
                     return Ok(());
