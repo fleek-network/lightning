@@ -42,7 +42,6 @@ clap = { version = "4", features = ["derive", "string", "wrap_help"] }
 clap_builder = { version = "4", default-features = false, features = ["color", "std", "string", "suggestions", "usage", "wrap_help"] }
 concurrent-queue = { version = "2" }
 console = { version = "0.15", default-features = false, features = ["ansi-parsing", "unicode-width"] }
-core2 = { version = "0.4", default-features = false, features = ["std"] }
 criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
 crossbeam-channel = { version = "0.5" }
 crossbeam-deque = { version = "0.8" }
@@ -95,7 +94,6 @@ matrixmultiply = { version = "0.3", features = ["cgemm"] }
 memchr = { version = "2" }
 miniz_oxide = { version = "0.7", features = ["simd"] }
 multibase = { version = "0.9" }
-multihash = { version = "0.19" }
 nom = { version = "7" }
 num-bigint = { version = "0.4", features = ["rand", "serde"] }
 num-bigint-dig = { version = "0.8", default-features = false, features = ["i128", "prime", "u64_digit", "zeroize"] }
@@ -165,7 +163,6 @@ tracing = { version = "0.1", features = ["log"] }
 tracing-core = { version = "0.1" }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "time"] }
 uint = { version = "0.9" }
-unicode-xid = { version = "0.2" }
 url = { version = "2", features = ["expose_internals", "serde"] }
 uuid = { version = "1", features = ["fast-rng", "serde", "v4"] }
 web-sys = { version = "0.3", default-features = false, features = ["AbortController", "AbortSignal", "AddEventListenerOptions", "BinaryType", "Cache", "CacheQueryOptions", "CacheStorage", "CloseEvent", "CloseEventInit", "Document", "ErrorEvent", "File", "FileReader", "FormData", "Headers", "History", "HtmlHeadElement", "Location", "MessageEvent", "ProgressEvent", "QueuingStrategy", "ReadableByteStreamController", "ReadableStream", "ReadableStreamByobReader", "ReadableStreamByobRequest", "ReadableStreamDefaultController", "ReadableStreamDefaultReader", "ReadableStreamGetReaderOptions", "ReadableStreamReadResult", "ReadableStreamReaderMode", "ReadableStreamType", "ReadableWritablePair", "Request", "RequestInit", "RequestRedirect", "Response", "ResponseInit", "StreamPipeOptions", "TransformStream", "TransformStreamDefaultController", "Transformer", "UnderlyingSink", "UnderlyingSource", "WebSocket", "Window", "WorkerGlobalScope", "WritableStream", "WritableStreamDefaultController", "WritableStreamDefaultWriter", "console"] }
@@ -199,7 +196,6 @@ clap = { version = "4", features = ["derive", "string", "wrap_help"] }
 clap_builder = { version = "4", default-features = false, features = ["color", "std", "string", "suggestions", "usage", "wrap_help"] }
 concurrent-queue = { version = "2" }
 console = { version = "0.15", default-features = false, features = ["ansi-parsing", "unicode-width"] }
-core2 = { version = "0.4", default-features = false, features = ["std"] }
 criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
 crossbeam-channel = { version = "0.5" }
 crossbeam-deque = { version = "0.8" }
@@ -253,7 +249,6 @@ matrixmultiply = { version = "0.3", features = ["cgemm"] }
 memchr = { version = "2" }
 miniz_oxide = { version = "0.7", features = ["simd"] }
 multibase = { version = "0.9" }
-multihash = { version = "0.19" }
 nom = { version = "7" }
 num-bigint = { version = "0.4", features = ["rand", "serde"] }
 num-bigint-dig = { version = "0.8", default-features = false, features = ["i128", "prime", "u64_digit", "zeroize"] }
@@ -326,7 +321,6 @@ tracing = { version = "0.1", features = ["log"] }
 tracing-core = { version = "0.1" }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "time"] }
 uint = { version = "0.9" }
-unicode-xid = { version = "0.2" }
 url = { version = "2", features = ["expose_internals", "serde"] }
 uuid = { version = "1", features = ["fast-rng", "serde", "v4"] }
 web-sys = { version = "0.3", default-features = false, features = ["AbortController", "AbortSignal", "AddEventListenerOptions", "BinaryType", "Cache", "CacheQueryOptions", "CacheStorage", "CloseEvent", "CloseEventInit", "Document", "ErrorEvent", "File", "FileReader", "FormData", "Headers", "History", "HtmlHeadElement", "Location", "MessageEvent", "ProgressEvent", "QueuingStrategy", "ReadableByteStreamController", "ReadableStream", "ReadableStreamByobReader", "ReadableStreamByobRequest", "ReadableStreamDefaultController", "ReadableStreamDefaultReader", "ReadableStreamGetReaderOptions", "ReadableStreamReadResult", "ReadableStreamReaderMode", "ReadableStreamType", "ReadableWritablePair", "Request", "RequestInit", "RequestRedirect", "Response", "ResponseInit", "StreamPipeOptions", "TransformStream", "TransformStreamDefaultController", "Transformer", "UnderlyingSink", "UnderlyingSource", "WebSocket", "Window", "WorkerGlobalScope", "WritableStream", "WritableStreamDefaultController", "WritableStreamDefaultWriter", "console"] }
