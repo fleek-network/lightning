@@ -1,20 +1,30 @@
 [package]
-name = "lightning-origin-demuxer"
+name = "lightning-origin-b3fs"
 version = "0.0.0"
 edition = "2021"
 
 [dependencies]
 affair.workspace = true
 anyhow.workspace = true
-derive_more = "0.99"
+b3fs.workspace = true
+bytes.workspace = true
+cid.workspace = true
+fleek-ipld.workspace = true
+futures.workspace = true
+humantime-serde.workspace = true
+hyper = { version = "0.14.27", features = ["stream"] }
+hyper-rustls = "0.24.1"
 lightning-interfaces = { path = "../interfaces" }
-lightning-origin-ipfs = { path = "../origin-ipfs" }
-lightning-origin-http = { path = "../origin-http" }
-lightning-origin-b3fs = { path = "../origin-b3fs" }
+lightning-workspace-hack.workspace = true
+multihash.workspace = true
+rustls = "0.21.5"
 serde.workspace = true
+thiserror = "1"
+tokio-stream.workspace = true
+tokio-util = { version = "0.7.8", features = ["io"] }
 tokio.workspace = true
 tracing.workspace = true
-lightning-workspace-hack.workspace = true
+unsigned-varint = { version = "0.8", features = ["std"] }
 
 [dev-dependencies]
 fleek-crypto.workspace = true
@@ -23,6 +33,4 @@ lightning-blockstore = { path = "../blockstore" }
 lightning-indexer = { path = "../indexer" }
 lightning-signer = { path = "../signer" }
 lightning-test-utils = { path = "../test-utils" }
-lightning-node.workspace = true
-cid.workspace = true
 tempfile.workspace = true
