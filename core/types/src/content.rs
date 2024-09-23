@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 
 const HTTP_ORIGIN: &str = "http";
 const IPFS_ORIGIN: &str = "ipfs";
+const B3FS_ORIGIN: &str = "b3fs";
 
 /// An immutable pointer is used as a general address to a content living off Fleek Network.
 ///
@@ -37,6 +38,7 @@ impl FromStr for ImmutablePointer {
                     .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
                 (OriginProvider::IPFS, cid.to_bytes())
             },
+            B3FS_ORIGIN => (OriginProvider::B3FS, uri.to_string().into_bytes()),
             ty => {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidData,
@@ -57,6 +59,7 @@ impl FromStr for ImmutablePointer {
 pub enum OriginProvider {
     IPFS,
     HTTP,
+    B3FS,
 }
 
 impl Display for OriginProvider {
@@ -64,6 +67,7 @@ impl Display for OriginProvider {
         match self {
             OriginProvider::IPFS => write!(f, "ipfs"),
             OriginProvider::HTTP => write!(f, "http"),
+            OriginProvider::B3FS => write!(f, "b3fs"),
         }
     }
 }
@@ -94,6 +98,16 @@ mod tests {
                 .parse()
                 .unwrap();
         assert_eq!(expected_pointer_ipfs, parsed_pointer_ipfs);
+
+        let expected_pointer_b3fs = ImmutablePointer {
+            origin: OriginProvider::B3FS,
+            uri: b"bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi".to_vec(),
+        };
+        let parsed_pointer_b3fs: ImmutablePointer =
+            "b3fs=bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
+                .parse()
+                .unwrap();
+        assert_eq!(expected_pointer_b3fs, parsed_pointer_b3fs);
 
         assert_eq!(
             "https://lightning.com"
