@@ -1,4 +1,4 @@
-use ipld_core::cid::{multihash, Cid};
+use ipld_core::cid::Cid;
 use thiserror::Error;
 
 /// Error type for IPLD operations
@@ -43,8 +43,11 @@ pub enum IpldError {
     #[error("IPLD error: Stream buffer empty")]
     StreamBufferEmpty,
 
-    #[error("IPLD error: Error validating cid {0}")]
-    IpldMultihashError(#[from] multihash::Error),
+    #[error("IPLD error: Error validating hash - Cid {0}")]
+    MultihashError(Cid),
+
+    #[error("IPLD error: UnssuportedCode Multihash code: {0}")]
+    MultihashCodeError(u64),
 
     #[error("IPLD error: Error processing item {0}")]
     ParallelIpldItemProcessingError(#[from] tokio::task::JoinError),
@@ -60,4 +63,10 @@ pub enum IpldError {
 
     #[error("IPLD error: Error trying to convert to Dir - Cid {0}")]
     InvalidDir(Cid),
+
+    #[error("IPLD error: Error downloading - {0}")]
+    DownloaderError(String),
+
+    #[error("IPLD error: Unsupported codec - Cid {0}")]
+    UnsupportedCodec(Cid),
 }
