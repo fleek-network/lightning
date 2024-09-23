@@ -9,6 +9,7 @@ use crate::Config;
 pub struct Demuxer<C: NodeComponents> {
     http: HttpOrigin<C>,
     ipfs: IPFSOrigin<C>,
+    b3fs: B3FSOrigin<C>,
 }
 
 impl<C: NodeComponents> AsyncWorkerUnordered for Demuxer<C> {
@@ -19,6 +20,7 @@ impl<C: NodeComponents> AsyncWorkerUnordered for Demuxer<C> {
         match &req.origin {
             OriginProvider::HTTP => self.http.fetch(&req.uri).await,
             OriginProvider::IPFS => self.ipfs.fetch(&req.uri).await,
+            OriginProvider::B3FS => self.b3fs.fetch(&req.uri).await,
             _ => Err(anyhow::anyhow!("unknown origin type")),
         }
     }
@@ -29,6 +31,7 @@ impl<C: NodeComponents> Demuxer<C> {
         Ok(Self {
             http: HttpOrigin::<C>::new(config.http, blockstore.clone())?,
             ipfs: IPFSOrigin::<C>::new(config.ipfs, blockstore)?,
+            b3fs: B3FSOrigin::<C>::new(config.b3fs, blockstore)?,
         })
     }
 }
