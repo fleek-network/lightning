@@ -6,7 +6,7 @@ use ipld_core::cid::Cid;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let cid: Cid = "QmSnuWmxptJZdLJpKRarxBMS2Ju2oANVrgbr2xWbie9b2D".try_into()?; // all
+    let cid: Cid = "QmSnuWmxptJZdLJpKRarxBMS2Ju2oANVrgbr2xWbie9b2D".parse()?;
     //let cid: Cid = "QmeqQyim8DtFfse3XNaVE2AbH4gY5uauSndiAJcArVHnzA".try_into()?; // all
     //let cid: Cid = "Qmb4KDzrnDHdHcH1UUTF3jTC3RhPJ6UyZ2wB8fNPnwiP5R".try_into()?; // all
     //let cid: Cid = "Qmc8mmzycvXnzgwBHokZQd97iWAmtdFMqX4FZUAQ5AQdQi".try_into()?; // jpg big file
@@ -15,7 +15,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut stream = IpldStream::builder()
         .reader(IpldReader::default())
-        .downloader(ReqwestDownloader::new("https://flk-ipfs.xyz"))
+        .downloader(ReqwestDownloader::new("https://ipfs.io"))
         .build();
 
     stream.start(cid).await;

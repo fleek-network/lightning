@@ -14,6 +14,7 @@ use std::path::PathBuf;
 use bytes::Bytes;
 use ipld_core::codec::Codec;
 use ipld_dagpb::{DagPbCodec, PbNode};
+use multihash::{Code, MultihashDigest};
 
 use super::fs::{DocId, IpldItem, Link};
 use crate::errors::IpldError;
@@ -53,7 +54,20 @@ pub trait Decoder {
     fn decode_from_slice(&self, doc_id: &DocId, data: &[u8]) -> Result<IpldItem, IpldError> {
         let node = Self::IpldCodec::decode_from_slice(data)
             .map_err(|e| IpldError::IpldCodecError(*doc_id.cid(), format!("{e:?}")))?;
+        Self::validate_data(doc_id, data)?;
         Self::DataCodec::decode_from(doc_id, node)
+    }
+
+    fn validate_data(doc_id: &DocId, data: &[u8]) -> Result<(), IpldError> {
+        if let Ok(hasher) = Code::try_from(doc_id.cid().hash().code()) {
+            if hasher.digest(data).digest() == doc_id.cid().hash().digest() {
+                Ok(())
+            } else {
+                Err(IpldError::MultihashError(*doc_id.cid()))
+            }
+        } else {
+            Err(IpldError::MultihashCodeError(doc_id.cid().hash().code()))
+        }
     }
 }
 
