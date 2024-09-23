@@ -10,10 +10,12 @@ description = "The Fleek IPLD crate"
 anyhow.workspace = true
 async-trait.workspace = true
 bytes.workspace = true
+cid.workspace = true
 futures.workspace = true
 ipld-core = "0.4.1"
 ipld-dagpb = "0.2.1"
 quick-protobuf = "0.8"
+multihash.workspace = true
 reqwest = { workspace = true, features = ["stream"] }
 thiserror.workspace = true
 tokio-stream.workspace = true

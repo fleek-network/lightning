@@ -43,7 +43,6 @@ byteorder = { version = "1", features = ["i128"] }
 bytes = { version = "1", features = ["serde"] }
 cbc = { version = "0.1", features = ["std"] }
 chrono = { version = "0.4" }
-cid = { version = "0.11" }
 cipher = { version = "0.4", default-features = false, features = ["block-padding", "std"] }
 clap = { version = "4", features = ["derive", "string", "wrap_help"] }
 clap_builder = { version = "4", default-features = false, features = ["color", "std", "string", "suggestions", "usage", "wrap_help"] }
@@ -106,7 +105,6 @@ matrixmultiply = { version = "0.3", features = ["cgemm"] }
 memchr = { version = "2" }
 miniz_oxide = { version = "0.7", features = ["simd"] }
 multibase = { version = "0.9" }
-multihash = { version = "0.19" }
 nom = { version = "7" }
 num-bigint = { version = "0.4", features = ["rand", "serde"] }
 num-bigint-dig = { version = "0.8", features = ["i128", "prime", "zeroize"] }
@@ -155,7 +153,7 @@ scrypt = { version = "0.11" }
 sec1 = { version = "0.7", features = ["pem", "serde", "std", "subtle"] }
 semver = { version = "1", features = ["serde"] }
 serde = { version = "1", features = ["alloc", "derive", "rc"] }
-serde_json = { version = "1", features = ["alloc", "arbitrary_precision", "float_roundtrip", "preserve_order", "raw_value", "unbounded_depth"] }
+serde_json = { version = "1", features = ["alloc", "arbitrary_precision", "preserve_order", "raw_value", "unbounded_depth"] }
 serde_with = { version = "2", features = ["hex"] }
 sha1 = { version = "0.10", features = ["oid"] }
 sha2-274715c4dabd11b0 = { package = "sha2", version = "0.9", default-features = false, features = ["std"] }
@@ -187,7 +185,6 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "time"
 uint = { version = "0.9" }
 unicode-bidi = { version = "0.3" }
 unicode-normalization = { version = "0.1" }
-unicode-xid = { version = "0.2" }
 url = { version = "2", features = ["expose_internals", "serde"] }
 uuid = { version = "1", features = ["fast-rng", "serde", "v4"] }
 web-sys = { version = "0.3", default-features = false, features = ["AbortController", "AbortSignal", "AddEventListenerOptions", "BinaryType", "Cache", "CacheQueryOptions", "CacheStorage", "CloseEvent", "CloseEventInit", "Document", "ErrorEvent", "File", "FileReader", "FormData", "Headers", "History", "HtmlHeadElement", "Location", "MessageEvent", "ProgressEvent", "QueuingStrategy", "ReadableByteStreamController", "ReadableStream", "ReadableStreamByobReader", "ReadableStreamByobRequest", "ReadableStreamDefaultController", "ReadableStreamDefaultReader", "ReadableStreamGetReaderOptions", "ReadableStreamReadResult", "ReadableStreamReaderMode", "ReadableStreamType", "ReadableWritablePair", "Request", "RequestInit", "RequestRedirect", "Response", "ResponseInit", "StreamPipeOptions", "TransformStream", "TransformStreamDefaultController", "Transformer", "UnderlyingSink", "UnderlyingSource", "WebSocket", "Window", "WorkerGlobalScope", "WritableStream", "WritableStreamDefaultController", "WritableStreamDefaultWriter", "console"] }
@@ -222,7 +219,6 @@ bytes = { version = "1", features = ["serde"] }
 cbc = { version = "0.1", features = ["std"] }
 cc = { version = "1", default-features = false, features = ["parallel"] }
 chrono = { version = "0.4" }
-cid = { version = "0.11" }
 cipher = { version = "0.4", default-features = false, features = ["block-padding", "std"] }
 clap = { version = "4", features = ["derive", "string", "wrap_help"] }
 clap_builder = { version = "4", default-features = false, features = ["color", "std", "string", "suggestions", "usage", "wrap_help"] }
@@ -286,7 +282,6 @@ matrixmultiply = { version = "0.3", features = ["cgemm"] }
 memchr = { version = "2" }
 miniz_oxide = { version = "0.7", features = ["simd"] }
 multibase = { version = "0.9" }
-multihash = { version = "0.19" }
 nom = { version = "7" }
 num-bigint = { version = "0.4", features = ["rand", "serde"] }
 num-bigint-dig = { version = "0.8", features = ["i128", "prime", "zeroize"] }
@@ -337,7 +332,7 @@ scrypt = { version = "0.11" }
 sec1 = { version = "0.7", features = ["pem", "serde", "std", "subtle"] }
 semver = { version = "1", features = ["serde"] }
 serde = { version = "1", features = ["alloc", "derive", "rc"] }
-serde_json = { version = "1", features = ["alloc", "arbitrary_precision", "float_roundtrip", "preserve_order", "raw_value", "unbounded_depth"] }
+serde_json = { version = "1", features = ["alloc", "arbitrary_precision", "preserve_order", "raw_value", "unbounded_depth"] }
 serde_with = { version = "2", features = ["hex"] }
 sha1 = { version = "0.10", features = ["oid"] }
 sha2-274715c4dabd11b0 = { package = "sha2", version = "0.9", default-features = false, features = ["std"] }
@@ -370,7 +365,6 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "time"
 uint = { version = "0.9" }
 unicode-bidi = { version = "0.3" }
 unicode-normalization = { version = "0.1" }
-unicode-xid = { version = "0.2" }
 url = { version = "2", features = ["expose_internals", "serde"] }
 uuid = { version = "1", features = ["fast-rng", "serde", "v4"] }
 web-sys = { version = "0.3", default-features = false, features = ["AbortController", "AbortSignal", "AddEventListenerOptions", "BinaryType", "Cache", "CacheQueryOptions", "CacheStorage", "CloseEvent", "CloseEventInit", "Document", "ErrorEvent", "File", "FileReader", "FormData", "Headers", "History", "HtmlHeadElement", "Location", "MessageEvent", "ProgressEvent", "QueuingStrategy", "ReadableByteStreamController", "ReadableStream", "ReadableStreamByobReader", "ReadableStreamByobRequest", "ReadableStreamDefaultController", "ReadableStreamDefaultReader", "ReadableStreamGetReaderOptions", "ReadableStreamReadResult", "ReadableStreamReaderMode", "ReadableStreamType", "ReadableWritablePair", "Request", "RequestInit", "RequestRedirect", "Response", "ResponseInit", "StreamPipeOptions", "TransformStream", "TransformStreamDefaultController", "Transformer", "UnderlyingSink", "UnderlyingSource", "WebSocket", "Window", "WorkerGlobalScope", "WritableStream", "WritableStreamDefaultController", "WritableStreamDefaultWriter", "console"] }

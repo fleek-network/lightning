@@ -1,7 +1,5 @@
 pub mod blockstore;
 pub mod config;
-pub mod put;
-mod store;
 
 pub use blockstore::Blockstore;
 

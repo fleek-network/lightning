@@ -4,9 +4,10 @@ mod tests;
 
 use std::time::Duration;
 
+use b3fs::bucket::file::writer::FileWriter;
 use fast_sri::IntegrityMetadata;
 use lightning_interfaces::prelude::*;
-use lightning_interfaces::types::{Blake3Hash, CompressionAlgorithm};
+use lightning_interfaces::types::Blake3Hash;
 use reqwest::{Client, ClientBuilder, Url};
 
 pub use crate::config::Config;
@@ -53,9 +54,13 @@ impl<C: NodeComponents> HttpOrigin<C> {
             data = verified_data;
         }
 
-        let mut putter = self.blockstore.put(None);
-        putter.write(data.as_ref(), CompressionAlgorithm::Uncompressed)?;
-        putter.finalize().await.map_err(Into::into)
+        let bucket = self.blockstore.get_bucket();
+        let mut writer = FileWriter::new(&bucket);
+        writer
+            .write(data.as_ref())
+            .await
+            .map_err(|e| anyhow::anyhow!(e))?;
+        writer.commit().await.map_err(|e| anyhow::anyhow!(e))
     }
 }
 

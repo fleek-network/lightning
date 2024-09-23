@@ -14,3 +14,6 @@ pub mod unixfs;
 pub mod walker;
 
 pub mod decoder;
+
+pub use ipld_core::*;
+pub use ipld_dagpb::*;
