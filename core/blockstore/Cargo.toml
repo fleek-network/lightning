@@ -6,19 +6,20 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow.workspace = true
+arrayref = "0.3"
+b3fs.workspace = true
+bincode.workspace = true
+blake3-tree = { path = "../../lib/blake3-tree" }
+bytes.workspace = true
+derive_more = "0.99"
 lightning-interfaces = { path = "../interfaces" }
 lightning-utils = { path = "../utils" }
-bincode.workspace = true
-resolved-pathbuf.workspace = true
-blake3-tree = { path = "../../lib/blake3-tree" }
-anyhow.workspace = true
-bytes.workspace = true
-tracing.workspace = true
+lightning-workspace-hack.workspace = true
 parking_lot.workspace = true
 rand.workspace = true
+resolved-pathbuf.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
-derive_more = "0.99"
-arrayref = "0.3"
-lightning-workspace-hack.workspace = true
+tracing.workspace = true

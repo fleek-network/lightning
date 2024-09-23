@@ -87,6 +87,12 @@ impl DocId {
         id.merge(current_dir.map(|x| x.id().path()), link.name().as_deref());
         id
     }
+
+    pub fn file_name(&self) -> Option<String> {
+        self.path
+            .file_name()
+            .map(|x| x.to_string_lossy().to_string())
+    }
 }
 
 impl From<Cid> for DocId {

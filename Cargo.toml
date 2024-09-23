@@ -34,7 +34,7 @@ async-trait = "0.1"
 axum = { version = "0.6.18", features = ["tokio"] }
 bincode = "1.3.3"
 bit-set = { version = "0.8.0", features = ["serde"] }
-cid = "0.10.1"
+cid = "0.11.1"
 console-subscriber = { version = "0.4.0" }
 ethers = "2.0.10"
 num-bigint = "0.4.0"
@@ -42,7 +42,7 @@ base64 = "0.21"
 bytes = { version = "1.7", features = ["serde"] }
 futures = "0.3"
 lru = "0.10.0"
-multihash = "0.19"
+multihash = "0.18"
 pretty_assertions = "1.4.0"
 rand = { version = "0.8.5", features = ["small_rng"] }
 reqwest = { version = "0.11.20", features = ["rustls-tls", "json"] }
@@ -111,17 +111,18 @@ lightning-utils = { path = "core/utils" }
 affair = { path = "lib/affair" }
 atomo = { path = "lib/atomo" }
 atomo-rocks = { path = "lib/atomo-rocks" }
+b3fs = { path = "lib/b3fs" }
+better-shutdown = { path = "lib/better-shutdown" }
+fleek-blake3 = "1.5"
 fleek-crypto = { path = "lib/fleek-crypto" }
 fleek-ipld = { path = "lib/fleek-ipld" }
 hp-fixed = { path = "lib/hp-fixed" }
 ink-quill = { path = "lib/ink-quill" }
-socket-logger = { path = "lib/socket-logger" }
+merklize = { path = "lib/merklize" }
+panic-report = { path = "lib/panic-report" }
 ready = { path = "lib/ready" }
 resolved-pathbuf = { path = "lib/resolved-pathbuf" }
-panic-report = { path = "lib/panic-report" }
-better-shutdown = { path = "lib/better-shutdown" }
-fleek-blake3 = "1.5"
-merklize = { path = "lib/merklize" }
+socket-logger = { path = "lib/socket-logger" }
 
 # This ensures that while building within the workspace, the real workspace-hack is used. When
 # building outside of the workspace, such as via a Git or path dependency, the [patch] directive
