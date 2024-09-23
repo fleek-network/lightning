@@ -1,6 +1,7 @@
 use affair::AsyncWorkerUnordered;
 use lightning_interfaces::types::{Blake3Hash, ImmutablePointer, OriginProvider};
 use lightning_interfaces::NodeComponents;
+use lightning_origin_b3fs::B3FSOrigin;
 use lightning_origin_http::HttpOrigin;
 use lightning_origin_ipfs::IPFSOrigin;
 
@@ -31,7 +32,7 @@ impl<C: NodeComponents> Demuxer<C> {
         Ok(Self {
             http: HttpOrigin::<C>::new(config.http, blockstore.clone())?,
             ipfs: IPFSOrigin::<C>::new(config.ipfs, blockstore)?,
-            b3fs: B3FSOrigin::<C>::new(config.b3fs, blockstore)?,
+            b3fs: B3FSOrigin::<C>::new(config.b3fs)?,
         })
     }
 }
