@@ -18,8 +18,8 @@ exclude = [
   "etc/ebpf-apps/guard",
   "etc/socket-logger",
   "etc/tui",
+  "services/sgx",
 ]
-
 
 [workspace.package]
 version = "0.1.0"
