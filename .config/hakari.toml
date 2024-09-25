@@ -52,7 +52,6 @@ workspace-members = [
   "blake3-tree",
   "blake3-wasm",
   "cdk-rust",
-  "dcap-quoteprov",
   "fast-sri",
   "fdi",
   "fleek-crypto",
