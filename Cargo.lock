@@ -6993,7 +6993,8 @@ dependencies = [
  "lightning-interfaces",
  "lightning-metrics",
  "lightning-notifier",
- "lightning-origin-demuxer",
+ "lightning-origin-b3fs",
+ "lightning-origin-http",
  "lightning-origin-ipfs",
  "lightning-pool",
  "lightning-rep-collector",
@@ -7028,7 +7029,6 @@ dependencies = [
  "lightning-interfaces",
  "lightning-keystore",
  "lightning-notifier",
- "lightning-origin-demuxer",
  "lightning-pinger",
  "lightning-pool",
  "lightning-rep-collector",
@@ -7343,31 +7343,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lightning-origin-demuxer"
-version = "0.0.0"
-dependencies = [
- "affair",
- "anyhow",
- "cid",
- "derive_more",
- "fleek-crypto",
- "lightning-application",
- "lightning-blockstore",
- "lightning-indexer",
- "lightning-interfaces",
- "lightning-origin-b3fs",
- "lightning-origin-http",
- "lightning-origin-ipfs",
- "lightning-signer",
- "lightning-test-utils",
- "lightning-workspace-hack",
- "serde",
- "tempfile",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "lightning-origin-filecoin"
 version = "0.0.0"
 dependencies = [
@@ -7592,7 +7567,6 @@ dependencies = [
  "lightning-notifier",
  "lightning-openrpc",
  "lightning-openrpc-macros",
- "lightning-origin-demuxer",
  "lightning-pool",
  "lightning-rep-collector",
  "lightning-signer",

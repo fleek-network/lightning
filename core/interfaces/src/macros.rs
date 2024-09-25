@@ -82,7 +82,6 @@ macro_rules! partial {
             ConsensusInterface,
             HandshakeInterface,
             NotifierInterface,
-            OriginProviderInterface,
             DeliveryAcknowledgmentAggregatorInterface,
             ReputationAggregatorInterface,
             ResolverInterface,
