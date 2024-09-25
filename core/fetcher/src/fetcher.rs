@@ -18,6 +18,7 @@ use types::{NodeIndex, PeerRequestError};
 
 use crate::config::Config;
 use crate::origin::{OriginError, OriginFetcher, OriginRequest};
+use crate::router::Router;
 
 pub(crate) type Uri = Vec<u8>;
 
@@ -31,7 +32,6 @@ impl<C: NodeComponents> Fetcher<C> {
     pub fn new(
         config: &C::ConfigProviderInterface,
         blockstore_server: &C::BlockstoreServerInterface,
-        origin: &C::OriginProviderInterface,
         app: &C::ApplicationInterface,
         fdi::Cloned(blockstore): fdi::Cloned<C::BlockstoreInterface>,
         fdi::Cloned(resolver): fdi::Cloned<C::ResolverInterface>,
@@ -39,13 +39,11 @@ impl<C: NodeComponents> Fetcher<C> {
     ) -> anyhow::Result<Self> {
         let config = config.get::<Self>();
 
+        let router = Router::new(config.clone(), blockstore.clone())?;
+
         let (origin_tx, rx) = mpsc::channel(128);
-        let origin_fetcher = OriginFetcher::<C>::new(
-            config.max_conc_origin_req,
-            origin.get_socket(),
-            rx,
-            resolver.clone(),
-        );
+        let origin_fetcher =
+            OriginFetcher::<C>::new(config.max_conc_origin_req, router, rx, resolver.clone());
 
         let waiter = shutdown.clone();
         let app_query = app.sync_query();
