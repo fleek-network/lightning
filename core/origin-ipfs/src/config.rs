@@ -3,7 +3,7 @@ use std::time::Duration;
 use cid::Cid;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Config {
     pub gateways: Vec<Gateway>,
     #[serde(with = "humantime_serde")]

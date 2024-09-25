@@ -18,7 +18,6 @@ lightning-handshake = { path = "../handshake" }
 lightning-indexer = { path = "../indexer" }
 lightning-interfaces = { path = "../interfaces" }
 lightning-notifier = { path = "../notifier" }
-lightning-origin-demuxer = { path = "../origin-demuxer" }
 lightning-pool = { path = "../pool" }
 lightning-rep-collector = { path = "../rep-collector" }
 lightning-resolver = { path = "../resolver" }
