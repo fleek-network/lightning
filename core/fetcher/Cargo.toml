@@ -9,6 +9,9 @@ edition = "2021"
 lightning-interfaces = { path = "../interfaces" }
 blake3-tree = { path = "../../lib/blake3-tree" }
 lightning-metrics = { path = "../metrics" }
+lightning-origin-ipfs = { path = "../origin-ipfs" }
+lightning-origin-http = { path = "../origin-http" }
+lightning-origin-b3fs = { path = "../origin-b3fs" }
 futures.workspace = true
 serde.workspace = true
 anyhow.workspace = true
@@ -23,7 +26,6 @@ lightning-workspace-hack.workspace = true
 [dev-dependencies]
 lightning-blockstore = { path = "../blockstore" }
 lightning-indexer = { path = "../indexer" }
-lightning-origin-demuxer = { path = "../origin-demuxer" }
 lightning-origin-ipfs = { path = "../origin-ipfs" }
 lightning-resolver = { path = "../resolver" }
 lightning-blockstore-server = { path = "../blockstore-server" }

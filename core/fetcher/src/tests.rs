@@ -20,7 +20,6 @@ use lightning_interfaces::types::{
     OriginProvider,
 };
 use lightning_notifier::Notifier;
-use lightning_origin_demuxer::{Config as DemuxerOriginConfig, OriginDemuxer};
 use lightning_origin_ipfs::config::{Gateway, Protocol, RequestFormat};
 use lightning_origin_ipfs::Config as IPFSOriginConfig;
 use lightning_pool::{Config as PoolConfig, PoolProvider};
@@ -49,7 +48,6 @@ partial!(TestBinding {
     ConfigProviderInterface = JsonConfigProvider;
     FetcherInterface = Fetcher<Self>;
     ForwarderInterface = MockForwarder<Self>;
-    OriginProviderInterface = OriginDemuxer<Self>;
     BroadcastInterface = Broadcast<Self>;
     BlockstoreInterface = Blockstore<Self>;
     BlockstoreServerInterface = BlockstoreServer<Self>;

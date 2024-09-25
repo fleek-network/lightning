@@ -21,7 +21,6 @@ pub use crate::{c, fdi, partial, schema, spawn, types, Node, ShutdownWaiter};
 #[rustfmt::skip]
 pub use crate::{
     ExecutionEngineSocket,
-    OriginProviderSocket,
     SubmitTxSocket,
     FetcherSocket,
     DeliveryAcknowledgmentSocket,
@@ -57,7 +56,6 @@ pub use crate::{
     LaneManager,
     NotifierInterface,
     OriginFinderAsyncIter,
-    OriginProviderInterface,
     PingerInterface,
     PoolInterface,
     PubSub,
@@ -77,5 +75,4 @@ pub use crate::{
     SyncQueryRunnerInterface,
     SyncronizerInterface,
     TopologyInterface,
-    UntrustedStream,
 };
