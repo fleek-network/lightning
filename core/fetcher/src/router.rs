@@ -1,5 +1,5 @@
 use lightning_interfaces::types::{Blake3Hash, ImmutablePointer, OriginProvider};
-use lightning_interfaces::NodeComponents;
+use lightning_interfaces::Collection;
 use lightning_origin_b3fs::B3FSOrigin;
 use lightning_origin_http::HttpOrigin;
 use lightning_origin_ipfs::IPFSOrigin;
