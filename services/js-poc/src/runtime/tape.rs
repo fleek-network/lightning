@@ -46,7 +46,7 @@ impl Tape {
     }
 
     /// Consumes the inner refcell and returns the feed
-    pub fn end(self) -> Vec<Punch> {
+    pub fn end(&self) -> Vec<Punch> {
         let mut feed = self.feed.take();
         feed.push(Punch::End);
         feed

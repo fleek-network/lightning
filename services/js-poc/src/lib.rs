@@ -6,6 +6,7 @@ use fn_sdk::header::TransportDetail;
 use fn_sdk::http_util::{respond, respond_with_error, respond_with_http_response};
 use tokio::sync::mpsc::error::TrySendError;
 use tokio::sync::mpsc::UnboundedSender;
+use tokio_util::task::LocalPoolHandle;
 use tracing::{debug, error, info, warn};
 
 use crate::runtime::Runtime;
@@ -40,60 +41,26 @@ pub async fn main() {
 
     // To cancel events mid execution.
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<IsolateHandle>();
-    tokio::spawn(async move {
-        while let Some(handle) = rx.recv().await {
-            tokio::spawn(async move {
-                tokio::time::sleep(params::REQ_TIMEOUT).await;
-                handle.terminate_execution();
-            });
-        }
-    });
+    // tokio::spawn(async move {
+    //     while let Some(handle) = rx.recv().await {
+    //         tokio::spawn(async move {
+    //             tokio::time::sleep(params::REQ_TIMEOUT).await;
+    //             handle.terminate_execution();
+    //         });
+    //     }
+    // });
 
-    let mut pool = Vec::new();
-    for _ in 0..num_cpus::get_physical() {
-        let (job_tx, mut job_rx) = tokio::sync::mpsc::channel(1);
-        pool.push(job_tx);
-
-        // TODO: Research using deno's JsRealms to provide the script sandboxing in a single or a
-        // few shared multithreaded runtimes, or use a custom work scheduler.
-        std::thread::spawn(move || {
-            tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .expect("failed to create connection async runtime")
-                .block_on(async move {
-                    let local = tokio::task::LocalSet::new();
-                    local
-                        .run_until(async move {
-                            while let Some((tx, conn)) = job_rx.recv().await {
-                                tokio::task::spawn_local(async move {
-                                    if let Err(e) = handle_connection(tx, conn).await {
-                                        error!("session failed: {e:?}");
-                                    }
-                                });
-                            }
-                        })
-                        .await;
-                });
-        });
-    }
+    let pool = LocalPoolHandle::new(num_cpus::get());
 
     while let Ok(conn) = listener.accept().await {
-        let tx = tx.clone();
-        let mut job_params = Some((tx, conn));
-        'outer: loop {
-            for job_tx in &pool {
-                let (tx, conn) = job_params.expect("");
-                match job_tx.try_send((tx, conn)) {
-                    Ok(_) => break 'outer,
-                    Err(TrySendError::Full((tx, conn))) => job_params = Some((tx, conn)),
-                    Err(TrySendError::Closed((tx, conn))) => {
-                        warn!("a thread in the pool disconnected");
-                        job_params = Some((tx, conn));
-                    },
-                };
-            }
-        }
+        let tx_clone = tx.clone();
+        pool.spawn_pinned(|| {
+            tokio::task::spawn_local(async move {
+                if let Err(e) = handle_connection(tx_clone, conn).await {
+                    error!("session failed: {e:?}");
+                }
+            })
+        });
     }
 }
 
@@ -176,10 +143,15 @@ async fn handle_request(
     }
 
     // Create runtime and execute the source
-    let mut runtime =
+    let runtime =
         Runtime::new(location.clone(), depth).context("Failed to initialize runtime")?;
-    tx.send(runtime.deno.v8_isolate().thread_safe_handle())
-        .context("Failed to send the IsolateHandle to main thread.")?;
+
+    let mut runtime = scopeguard::guard(runtime, |mut rt| {
+        unsafe { rt.deno.v8_isolate().enter(); }
+
+    });
+
+    unsafe { runtime.deno.v8_isolate().exit(); }
 
     let res = match runtime.exec(&module_url, param).await? {
         Some(res) => res,
@@ -188,12 +160,21 @@ async fn handle_request(
         },
     };
 
-    // Resolve async if applicable
-    // TODO: figure out why `deno.resolve` doesn't drive async functions
-    #[allow(deprecated)]
-    let res = tokio::time::timeout(params::REQ_TIMEOUT, runtime.deno.resolve_value(res))
-        .await
-        .context("Execution timeout")??;
+    let res = {
+        unsafe { runtime.deno.v8_isolate().enter(); };
+        let deno = &mut runtime.deno;
+        let mut deno = scopeguard::guard(deno, |d| {
+            unsafe { d.v8_isolate().exit(); }
+        });
+
+        // Resolve async if applicable
+        // TODO: figure out why `deno.resolve` doesn't drive async functions
+        #[allow(deprecated)]
+        tokio::time::timeout(params::REQ_TIMEOUT, deno.resolve_value(res))
+            .await
+            .context("Execution timeout")??
+    };
+
 
     parse_and_respond(connection, &mut runtime, res).await?;
 
@@ -208,6 +189,11 @@ async fn parse_and_respond(
     runtime: &mut Runtime,
     res: Global<Value>,
 ) -> anyhow::Result<()> {
+    let mut runtime = scopeguard::guard(runtime, |rt| {
+        unsafe { rt.deno.v8_isolate().exit(); }
+    });
+
+    unsafe { runtime.deno.v8_isolate().enter(); }
     // Handle the return data
     let scope = &mut runtime.deno.handle_scope();
     let local = v8::Local::new(scope, res);
