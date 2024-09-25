@@ -181,10 +181,6 @@
                 rust-bindgen
                 bpf-linker
               ]
-              ++ lib.optionals (!pkgs.stdenv.isDarwin) [
-                # For sgx service, not available on darwin
-                sgx-azure-dcap-client
-              ]
               ++ lib.optionals pkgs.stdenv.isDarwin [
                 # MacOS specific packages
                 pkgs.libiconv
@@ -214,12 +210,6 @@
             CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS = " -Clink-arg=-fuse-ld=${pkgs.mold-wrapped}/bin/mold";
             CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER = "${pkgs.clang}/bin/clang";
             CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER = "${pkgs.clang}/bin/clang";
-
-            FN_ENCLAVE_SGXS = pkgs.fetchurl {
-              name = "enclave.sgxs";
-              url = "https://bafybeid37ogyu3ogfctq4ecqa3t3ozneegbkj3gswg3h6lxwx5gq5f4rdm.ipfs.flk-ipfs.xyz";
-              hash = "sha256-glOrKYZ4KzIEcr34XjW3jakudmx0DLN5TksRk2kH4S0=";
-            };
           };
 
           # Build *just* the cargo dependencies, so we can reuse all of that
@@ -324,7 +314,38 @@
               fn-service-0 = mkLightningBin "fn-service-0";
               fn-service-1 = mkLightningBin "fn-service-1";
               fn-service-2 = mkLightningBin "fn-service-2";
-              fn-service-3 = mkLightningBin "fn-service-3";
+
+              fn-service-3 = craneLib.buildPackage (
+                commonArgs
+                // {
+                  pname = "fn-service-3";
+                  doCheck = false;
+                  nativeBuildInputs = (
+                    with pkgs;
+                    [
+                      fortanix-sgx-tools
+                      sgxs-tools
+                    ]
+                    ++ commonArgs.nativeBuildInputs
+                  );
+                  buildInputs = ([ pkgs.sgx-azure-dcap-client ] ++ commonArgs.buildInputs);
+
+                  # hack to use full source, but set cargo lock and deps to excluded workspace
+                  cargoToml = "${src}/services/sgx/Cargo.toml";
+                  cargoLock = "${src}/services/sgx/Cargo.lock";
+                  postUnpack = ''
+                    cd $sourceRoot/services/sgx
+                    sourceRoot="."
+                  '';
+
+                  # Vendor enclave bin
+                  FN_ENCLAVE_SGXS = pkgs.fetchurl {
+                    name = "enclave.sgxs";
+                    url = "https://bafybeid37ogyu3ogfctq4ecqa3t3ozneegbkj3gswg3h6lxwx5gq5f4rdm.ipfs.flk-ipfs.xyz";
+                    hash = "sha256-glOrKYZ4KzIEcr34XjW3jakudmx0DLN5TksRk2kH4S0=";
+                  };
+                }
+              );
             };
 
           # Allow using `nix run` on the project
