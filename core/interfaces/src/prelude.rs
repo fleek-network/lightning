@@ -60,7 +60,6 @@ pub use crate::{
     NodeComponents,
     NotifierInterface,
     OriginFinderAsyncIter,
-    OriginProviderInterface,
     PingerInterface,
     PoolInterface,
     PubSub,
@@ -80,5 +79,4 @@ pub use crate::{
     SyncQueryRunnerInterface,
     SyncronizerInterface,
     TopologyInterface,
-    UntrustedStream,
 };
