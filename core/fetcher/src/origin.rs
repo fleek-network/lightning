@@ -2,26 +2,26 @@ use std::collections::{HashMap, VecDeque};
 
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Blake3Hash, ImmutablePointer};
-use lightning_interfaces::OriginProviderSocket;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::task::JoinSet;
 use tracing::error;
 
 use crate::fetcher::Uri;
+use crate::router::Router;
 
 pub struct OriginFetcher<C: NodeComponents> {
     tasks: JoinSet<Result<SuccessResponse, ErrorResponse>>,
     queue: VecDeque<ImmutablePointer>,
     rx: mpsc::Receiver<OriginRequest>,
-    origin_socket: OriginProviderSocket,
     resolver: C::ResolverInterface,
     capacity: usize,
+    router: Router<C>,
 }
 
 impl<C: NodeComponents> OriginFetcher<C> {
     pub fn new(
         capacity: usize,
-        origin_socket: OriginProviderSocket,
+        router: Router<C>,
         rx: mpsc::Receiver<OriginRequest>,
         resolver: C::ResolverInterface,
     ) -> Self {
@@ -29,9 +29,9 @@ impl<C: NodeComponents> OriginFetcher<C> {
             tasks: JoinSet::new(),
             queue: VecDeque::new(),
             rx,
-            origin_socket,
             resolver,
             capacity,
+            router,
         }
     }
 
@@ -74,7 +74,6 @@ impl<C: NodeComponents> OriginFetcher<C> {
                         }
                         Ok(Err(e)) => {
                             match e {
-                                ErrorResponse::OriginSocketError => error!("Failed to get response from socket"),
                                 ErrorResponse::OriginFetchError(uri) => {
                                     if let Some(tx) = pending_requests.remove(&uri) {
                                         tx.send(Err(OriginError)).expect("Failed to send response");
@@ -99,12 +98,11 @@ impl<C: NodeComponents> OriginFetcher<C> {
     }
 
     async fn spawn(&mut self, pointer: ImmutablePointer) {
-        let origin_socket = self.origin_socket.clone();
+        let router = self.router.clone();
         self.tasks.spawn(async move {
-            match origin_socket.run(pointer.clone()).await {
-                Ok(Ok(hash)) => Ok(SuccessResponse { pointer, hash }),
-                Ok(Err(_)) => Err(ErrorResponse::OriginFetchError(pointer.uri)),
-                Err(_) => Err(ErrorResponse::OriginSocketError),
+            match router.route(&pointer).await {
+                Ok(hash) => Ok(SuccessResponse { pointer, hash }),
+                Err(_) => Err(ErrorResponse::OriginFetchError(pointer.uri)),
             }
         });
     }
@@ -122,8 +120,6 @@ struct SuccessResponse {
 
 #[derive(Debug, thiserror::Error)]
 enum ErrorResponse {
-    #[error("Failed to get message from origin socket")]
-    OriginSocketError,
     #[error("Failed to fetch data from origin: {0:?}")]
     OriginFetchError(Uri),
 }
