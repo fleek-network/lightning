@@ -24,7 +24,6 @@ collection!([
     ConsensusInterface,
     HandshakeInterface,
     NotifierInterface,
-    OriginProviderInterface,
     DeliveryAcknowledgmentAggregatorInterface,
     ReputationAggregatorInterface,
     ResolverInterface,

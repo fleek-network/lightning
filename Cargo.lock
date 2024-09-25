@@ -6949,7 +6949,8 @@ dependencies = [
  "lightning-interfaces",
  "lightning-metrics",
  "lightning-notifier",
- "lightning-origin-demuxer",
+ "lightning-origin-b3fs",
+ "lightning-origin-http",
  "lightning-origin-ipfs",
  "lightning-pool",
  "lightning-rep-collector",
@@ -6984,7 +6985,6 @@ dependencies = [
  "lightning-interfaces",
  "lightning-keystore",
  "lightning-notifier",
- "lightning-origin-demuxer",
  "lightning-pinger",
  "lightning-pool",
  "lightning-rep-collector",
@@ -7265,27 +7265,37 @@ dependencies = [
 ]
 
 [[package]]
-name = "lightning-origin-demuxer"
+name = "lightning-origin-b3fs"
 version = "0.0.0"
 dependencies = [
  "affair",
  "anyhow",
+ "b3fs",
+ "bytes",
  "cid",
- "derive_more",
  "fleek-crypto",
+ "fleek-ipld",
+ "futures",
+ "humantime-serde",
+ "hyper 0.14.30",
+ "hyper-rustls 0.24.2",
  "lightning-application",
  "lightning-blockstore",
  "lightning-indexer",
  "lightning-interfaces",
- "lightning-origin-http",
- "lightning-origin-ipfs",
  "lightning-signer",
  "lightning-test-utils",
  "lightning-workspace-hack",
+ "multihash 0.18.1",
+ "rustls 0.21.12",
  "serde",
  "tempfile",
+ "thiserror",
  "tokio",
+ "tokio-stream",
+ "tokio-util 0.7.11",
  "tracing",
+ "unsigned-varint 0.8.0",
 ]
 
 [[package]]
@@ -7513,7 +7523,6 @@ dependencies = [
  "lightning-notifier",
  "lightning-openrpc",
  "lightning-openrpc-macros",
- "lightning-origin-demuxer",
  "lightning-pool",
  "lightning-rep-collector",
  "lightning-signer",

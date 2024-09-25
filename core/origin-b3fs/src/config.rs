@@ -1,4 +1,4 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Default, Deserialize, Serialize, Clone)]
+#[derive(Serialize, Deserialize, Default, Clone)]
 pub struct Config {}
