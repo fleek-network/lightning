@@ -11,7 +11,6 @@ use lightning_indexer::Indexer;
 use lightning_interfaces::partial;
 use lightning_keystore::Keystore;
 use lightning_notifier::Notifier;
-use lightning_origin_demuxer::OriginDemuxer;
 use lightning_pinger::Pinger;
 use lightning_pool::PoolProvider;
 use lightning_rep_collector::ReputationAggregator;
@@ -38,7 +37,6 @@ partial!(FinalTypes require full {
     ArchiveInterface = Archive<Self>;
     HandshakeInterface = Handshake<Self>;
     NotifierInterface = Notifier<Self>;
-    OriginProviderInterface = OriginDemuxer<Self>;
     ReputationAggregatorInterface = ReputationAggregator<Self>;
     ResolverInterface = Resolver<Self>;
     RpcInterface = Rpc<Self>;
@@ -66,7 +64,6 @@ partial!(UseMockConsensus require full {
     ArchiveInterface = Archive<Self>;
     HandshakeInterface = Handshake<Self>;
     NotifierInterface = Notifier<Self>;
-    OriginProviderInterface = OriginDemuxer<Self>;
     ReputationAggregatorInterface = ReputationAggregator<Self>;
     ResolverInterface = Resolver<Self>;
     RpcInterface = Rpc<Self>;
