@@ -2,7 +2,8 @@ use std::io::ErrorKind;
 use std::sync::atomic::AtomicBool;
 
 use sgxkit_sys::fn0;
-use sgxkit_sys::types::IOError;
+
+use crate::error::HostError;
 
 /// Get the input data string (request).
 pub fn get_input_data_string() -> Result<String, std::io::Error> {
@@ -12,7 +13,7 @@ pub fn get_input_data_string() -> Result<String, std::io::Error> {
     if len > 0 {
         // SAFETY: we initialized the string with the length that will be written
         let res = unsafe { fn0::input_data_copy(buf.as_mut_ptr() as usize, 0, len) };
-        IOError::result(res)?;
+        HostError::result(res)?;
     }
 
     String::from_utf8(buf).map_err(|e| std::io::Error::new(ErrorKind::InvalidData, e.to_string()))
@@ -52,8 +53,8 @@ impl Drop for OutputWriter {
 
 impl std::io::Write for OutputWriter {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        let res = unsafe { fn0::output_data_append(buf.as_ptr() as usize, buf.len() as u32) };
-        IOError::result(res)?;
+        let res = unsafe { fn0::output_data_append(buf.as_ptr() as usize, buf.len()) };
+        HostError::result(res)?;
         Ok(buf.len())
     }
 
