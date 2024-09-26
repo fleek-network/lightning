@@ -32,6 +32,35 @@ use lightning_interfaces::types::{
 use lightning_interfaces::PagingParams;
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_utils::application::QueryRunnerExt;
+use tempfile::TempDir;
+use types::{
+    AccountInfo,
+    Blake3Hash,
+    Block,
+    BlockExecutionResponse,
+    ContentUpdate,
+    DeliveryAcknowledgmentProof,
+    Epoch,
+    ExecutionData,
+    ExecutionError,
+    GenesisAccount,
+    NodeIndex,
+    NodeInfo,
+    Participation,
+    ProofOfConsensus,
+    ProtocolParamKey,
+    ProtocolParamValue,
+    Tokens,
+    TransactionRequest,
+    TransactionResponse,
+    UpdateMethod,
+    UpdatePayload,
+    UpdateRequest,
+};
+
+use super::TestBinding;
+use crate::state::QueryRunner;
+use crate::{Application, ApplicationConfig};
 
 pub const CHAIN_ID: ChainId = 1337;
 
@@ -72,303 +101,196 @@ pub(crate) fn test_genesis_ports(index: u16) -> NodePorts {
     }
 }
 
-/// Helper macro executing single Update within a single Block.
+/// Helper executing single Update within a single Block.
 /// Asserts that submission occurred.
-/// Transaction Result may be Success or Revert - `TransactionResponse`.
-///
-///  # Arguments
-///
-/// * `update: UpdateRequest` - The update request to be executed.
-/// * `socket: &ExecutionEngineSocket` - Socket for submitting transaction.
-///
-/// # Returns
-///
-/// * `BlockExecutionResponse`
-macro_rules! run_update {
-    ($update:expr,$socket:expr) => {{
-        let updates = vec![$update.into()];
-        run_transactions!(updates, $socket)
-    }};
+pub(crate) async fn run_update(
+    update: UpdateRequest,
+    socket: &ExecutionEngineSocket,
+) -> BlockExecutionResponse {
+    let updates = vec![update.into()];
+    run_transactions(updates, socket).await
 }
 
-pub(crate) use run_update;
-
-/// Helper macro executing many Updates within a single Block.
+/// Helper executing many Updates within a single Block.
 /// Asserts that submission occurred.
 /// Transaction Result may be Success or Revert - `TransactionResponse`.
-///
-///  # Arguments
-///
-/// * `updates: Vec<UpdateRequest>` - Vector of update requests to be executed.
-/// * `socket: &ExecutionEngineSocket` - Socket for submitting transaction.
-///
-/// # Returns
-///
-/// * `BlockExecutionResponse`
-macro_rules! run_updates {
-    ($updates:expr,$socket:expr) => {{
-        let txs = $updates.into_iter().map(|update| update.into()).collect();
-        run_transactions!(txs, $socket)
-    }};
+pub(crate) async fn run_updates(
+    updates: Vec<UpdateRequest>,
+    socket: &ExecutionEngineSocket,
+) -> BlockExecutionResponse {
+    let txs = updates.into_iter().map(|update| update.into()).collect();
+    run_transactions(txs, socket).await
 }
 
-pub(crate) use run_updates;
-
-/// Helper macro executing many Transactions within a single Block.
+/// Helper executing many Transactions within a single Block.
 /// Asserts that submission occurred.
 /// Transaction Result may be Success or Revert.
-///
-///  # Arguments
-///
-/// * `txs: Vec<TransactionRequest>` - Vector of transaction to be executed.
-/// * `socket: &ExecutionEngineSocket` - Socket for submitting transaction.
-///
-/// # Returns
-///
-/// * `BlockExecutionResponse`
-macro_rules! run_transactions {
-    ($txs:expr,$socket:expr) => {{
-        let result = run_transaction($txs, $socket).await;
-        assert!(result.is_ok());
-        result.unwrap()
-    }};
+pub(crate) async fn run_transactions(
+    txs: Vec<TransactionRequest>,
+    socket: &ExecutionEngineSocket,
+) -> BlockExecutionResponse {
+    let result = run_transaction(txs, socket).await;
+    assert!(result.is_ok());
+    result.unwrap()
 }
 
-pub(crate) use run_transactions;
-
-/// Helper macro executing a single Update within a single Block.
+/// Helper executing a single Update within a single Block.
 /// Asserts that submission occurred.
 /// Asserts that the Update was successful - `TransactionResponse::Success`.
-///
-///  # Arguments
-///
-/// * `update: UpdateRequest` - Vector of update requests to be executed.
-/// * `socket: &ExecutionEngineSocket` - Socket for submitting transaction.
-/// * `response: ExecutionData` - Expected execution data, optional param
-///
-/// # Returns
-///
-/// * `BlockExecutionResponse`
-macro_rules! expect_tx_success {
-    ($update:expr,$socket:expr) => {{
-        expect_tx_success!($update, $socket, ExecutionData::None);
-    }};
-    ($update:expr,$socket:expr,$response:expr) => {{
-        let result = run_update!($update, $socket);
-        assert_eq!(
-            result.txn_receipts[0].response,
-            TransactionResponse::Success($response)
-        );
-        result
-    }};
+pub(crate) async fn expect_tx_success(
+    update: UpdateRequest,
+    socket: &ExecutionEngineSocket,
+    response: ExecutionData,
+) -> BlockExecutionResponse {
+    let result = run_update(update, socket).await;
+    assert_eq!(
+        result.txn_receipts[0].response,
+        TransactionResponse::Success(response)
+    );
+    result
 }
 
-pub(crate) use expect_tx_success;
-
-/// Helper macro executing a single Update within a single Block.
+/// Helper executing a single Update within a single Block.
 /// Asserts that submission occurred.
 /// Asserts that the Update was reverted - `TransactionResponse::Revert`.
-///
-///  # Arguments
-///
-/// * `update: UpdateRequest` - Vector of update requests to be executed.
-/// * `socket: &ExecutionEngineSocket` - Socket for submitting transaction.
-/// * `revert: ExecutionError` - Expected execution error
-macro_rules! expect_tx_revert {
-    ($update:expr,$socket:expr,$revert:expr) => {{
-        let result = run_update!($update, $socket);
-        assert_eq!(
-            result.txn_receipts[0].response,
-            TransactionResponse::Revert($revert)
-        );
-    }};
+pub(crate) async fn expect_tx_revert(
+    update: UpdateRequest,
+    socket: &ExecutionEngineSocket,
+    revert: ExecutionError,
+) -> BlockExecutionResponse {
+    let result = run_update(update, socket).await;
+    assert_eq!(
+        result.txn_receipts[0].response,
+        TransactionResponse::Revert(revert)
+    );
+    result
 }
 
-pub(crate) use expect_tx_revert;
-
-/// Helper macro executing `ChangeEpoch` Update within a single Block.
+/// Helper executing `ChangeEpoch` Update within a single Block.
 /// Asserts that submission occurred.
-///
-///  # Arguments
-///
-/// * `socket: &ExecutionEngineSocket` - Socket for submitting transaction.
-/// * `secret_key: &NodeSecretKey` - Node's secret key for signing transaction.
-/// * `nonce: u64` - Nonce for Node's account.
-/// * `epoch: u64` - Epoch to be changed.
-///
-/// # Returns
-///
-/// * `BlockExecutionResponse`
-macro_rules! change_epoch {
-    ($socket:expr,$secret_key:expr,$nonce:expr,$epoch:expr) => {{
-        let req = prepare_update_request_node(
-            UpdateMethod::ChangeEpoch { epoch: $epoch },
-            $secret_key,
-            $nonce,
-        );
-        run_update!(req, $socket)
-    }};
+pub(crate) async fn change_epoch(
+    socket: &ExecutionEngineSocket,
+    secret_key: &NodeSecretKey,
+    nonce: u64,
+    epoch: u64,
+) -> BlockExecutionResponse {
+    let req = prepare_update_request_node(UpdateMethod::ChangeEpoch { epoch }, secret_key, nonce);
+    run_update(req, socket).await
 }
 
-pub(crate) use change_epoch;
-
-/// Helper macro that performs an epoch change.
+/// Helper that performs an epoch change.
 /// Asserts that submission occurred.
-///
-///  # Arguments
-///
-/// * `socket: &ExecutionEngineSocket` - Socket for submitting transaction.
-/// * `committee_keystore: &Vec<GenesisCommitteeKeystore> ` - Keystore with committee's private
-///   keys.
-/// * `query_runner: &QueryRunner` - Query Runner.
-/// * `epoch: u64` - Epoch to be changed.
-macro_rules! simple_epoch_change {
-    ($socket:expr,$committee_keystore:expr,$query_runner:expr,$epoch:expr) => {{
-        let required_signals = calculate_required_signals($committee_keystore.len());
-        // make call epoch change for 2/3rd committee members
-        for (index, node) in $committee_keystore
-            .iter()
-            .enumerate()
-            .take(required_signals)
-        {
-            let nonce = get_node_nonce($query_runner, &node.node_secret_key.to_pk()) + 1;
-            let req = prepare_change_epoch_request($epoch, &node.node_secret_key, nonce);
+pub(crate) async fn simple_epoch_change(
+    socket: &ExecutionEngineSocket,
+    committee_keystore: &[GenesisCommitteeKeystore],
+    query_runner: &QueryRunner,
+    epoch: u64,
+) {
+    let required_signals = calculate_required_signals(committee_keystore.len());
+    // make call epoch change for 2/3rd committee members
+    for (index, node) in committee_keystore.iter().enumerate().take(required_signals) {
+        let nonce = get_node_nonce(query_runner, &node.node_secret_key.to_pk()) + 1;
+        let req = prepare_change_epoch_request(epoch, &node.node_secret_key, nonce);
 
-            let res = run_update!(req, $socket);
-            // check epoch change
-            if index == required_signals - 1 {
-                assert!(res.change_epoch);
-            }
+        let res = run_update(req, socket).await;
+        // check epoch change
+        if index == required_signals - 1 {
+            assert!(res.change_epoch);
         }
-    }};
+    }
 }
 
-pub(crate) use simple_epoch_change;
-
-/// Helper macro executing `SubmitReputationMeasurements` Update within a single Block.
+/// Helper executing `SubmitReputationMeasurements` Update within a single Block.
 /// Asserts that submission occurred.
 /// Asserts that the Update was successful - `TransactionResponse::Success`.
-///
-///  # Arguments
-///
-/// * `socket: &ExecutionEngineSocket` - Socket for submitting transaction.
-/// * `secret_key: &NodeSecretKey` - Node's secret key for signing transaction.
-/// * `nonce: u64` - Nonce for Node's account.
-/// * `measurements: BTreeMap<u32, ReputationMeasurements>` - Reputation measurements to be
-///   submitted.
-macro_rules! submit_reputation_measurements {
-    ($socket:expr,$secret_key:expr,$nonce:expr,$measurements:expr) => {{
-        let req = prepare_update_request_node(
-            UpdateMethod::SubmitReputationMeasurements {
-                measurements: $measurements,
-            },
-            $secret_key,
-            $nonce,
-        );
-        expect_tx_success!(req, $socket)
-    }};
+pub(crate) async fn submit_reputation_measurements(
+    socket: &ExecutionEngineSocket,
+    secret_key: &NodeSecretKey,
+    nonce: u64,
+    measurements: BTreeMap<u32, ReputationMeasurements>,
+) -> BlockExecutionResponse {
+    let req = prepare_update_request_node(
+        UpdateMethod::SubmitReputationMeasurements { measurements },
+        secret_key,
+        nonce,
+    );
+    expect_tx_success(req, socket, ExecutionData::None).await
 }
 
-pub(crate) use submit_reputation_measurements;
-
-/// Helper macro executing `SubmitReputationMeasurements` Update within a single Block.
+/// Helper executing `Deposit` Update within a single Block.
 /// Asserts that submission occurred.
 /// Asserts that the Update was successful - `TransactionResponse::Success`.
-///
-///  # Arguments
-///
-/// * `socket: &ExecutionEngineSocket` - Socket for submitting transaction.
-/// * `secret_key: &AccountOwnerSecretKey` - Account's secret key for signing transaction.
-/// * `nonce: u64` - Nonce for the account.
-/// * `amount: &HpUfixed<18>` - Amount to be deposited.
-macro_rules! deposit {
-    ($socket:expr,$secret_key:expr,$nonce:expr,$amount:expr) => {{
-        let req = prepare_deposit_update($amount, $secret_key, $nonce);
-        expect_tx_success!(req, $socket)
-    }};
+pub(crate) async fn deposit(
+    socket: &ExecutionEngineSocket,
+    secret_key: &AccountOwnerSecretKey,
+    nonce: u64,
+    amount: &HpUfixed<18>,
+) -> BlockExecutionResponse {
+    let req = prepare_deposit_update(amount, secret_key, nonce);
+    expect_tx_success(req, socket, ExecutionData::None).await
 }
 
-pub(crate) use deposit;
-
-/// Helper macro executing `Stake` Update within a single Block.
+/// Helper executing `Stake` Update within a single Block.
 /// Asserts that submission occurred.
 /// Asserts that the Update was successful - `TransactionResponse::Success`.
-///
-///  # Arguments
-///
-/// * `socket: &ExecutionEngineSocket` - Socket for submitting transaction.
-/// * `secret_key: &AccountOwnerSecretKey` - Account's secret key for signing transaction.
-/// * `nonce: u64` - Nonce for the account.
-/// * `amount: &HpUfixed<18>` - Amount to be staked.
-/// * `node_pk: &NodePublicKey` - Public key of a Node to be staked on.
-/// * `consensus_key: ConsensusPublicKey` - Consensus public key.
-macro_rules! stake {
-    ($socket:expr,$secret_key:expr,$nonce:expr,$amount:expr,$node_pk:expr,$consensus_key:expr) => {{
-        let req = prepare_initial_stake_update(
-            $amount,
-            $node_pk,
-            $consensus_key,
-            "127.0.0.1".parse().unwrap(),
-            [0; 32].into(),
-            "127.0.0.1".parse().unwrap(),
-            NodePorts::default(),
-            $secret_key,
-            $nonce,
-        );
-
-        expect_tx_success!(req, $socket)
-    }};
+pub(crate) async fn stake(
+    socket: &ExecutionEngineSocket,
+    secret_key: &AccountOwnerSecretKey,
+    nonce: u64,
+    amount: &HpUfixed<18>,
+    node_pk: &NodePublicKey,
+    consensus_key: ConsensusPublicKey,
+) -> BlockExecutionResponse {
+    let req = prepare_initial_stake_update(
+        amount,
+        node_pk,
+        consensus_key,
+        "127.0.0.1".parse().unwrap(),
+        [0; 32].into(),
+        "127.0.0.1".parse().unwrap(),
+        NodePorts::default(),
+        secret_key,
+        nonce,
+    );
+    expect_tx_success(req, socket, ExecutionData::None).await
 }
 
-pub(crate) use stake;
-
-/// Helper macro executing `Deposit` and `Stake` Updates within a single Block.
+/// Helper executing `Deposit` and `Stake` Updates within a single Block.
 /// Asserts that submission occurred.
 /// Asserts that Updates were successful - `TransactionResponse::Success`.
-///
-///  # Arguments
-///
-/// * `socket: &ExecutionEngineSocket` - Socket for submitting transaction.
-/// * `secret_key: &AccountOwnerSecretKey` - Account's secret key for signing transaction.
-/// * `nonce: u64` - Nonce for the account.
-/// * `amount: &HpUfixed<18>` - Amount to be deposited and staked.
-/// * `node_pk: &NodePublicKey` - Public key of a Node to be staked on.
-/// * `consensus_key: ConsensusPublicKey` - Consensus public key.
-macro_rules! deposit_and_stake {
-    ($socket:expr,$secret_key:expr,$nonce:expr,$amount:expr,$node_pk:expr,$consensus_key:expr) => {{
-        deposit!($socket, $secret_key, $nonce, $amount);
-        stake!(
-            $socket,
-            $secret_key,
-            $nonce + 1,
-            $amount,
-            $node_pk,
-            $consensus_key
-        );
-    }};
+pub(crate) async fn deposit_and_stake(
+    socket: &ExecutionEngineSocket,
+    secret_key: &AccountOwnerSecretKey,
+    nonce: u64,
+    amount: &HpUfixed<18>,
+    node_pk: &NodePublicKey,
+    consensus_key: ConsensusPublicKey,
+) -> BlockExecutionResponse {
+    deposit(socket, secret_key, nonce, amount).await;
+    stake(
+        socket,
+        secret_key,
+        nonce + 1,
+        amount,
+        node_pk,
+        consensus_key,
+    )
+    .await
 }
 
-pub(crate) use deposit_and_stake;
-
-/// Helper macro executing `StakeLock` Update within a single Block.
+/// Helper executing `StakeLock` Update within a single Block.
 /// Asserts that submission occurred.
 /// Asserts that the Updates was successful - `TransactionResponse::Success`.
-///
-///  # Arguments
-///
-/// * `socket: &ExecutionEngineSocket` - Socket for submitting transaction.
-/// * `secret_key: &AccountOwnerSecretKey` - Account's secret key for signing transaction.
-/// * `nonce: u64` - Nonce for the account.
-/// * `node_pk: &NodePublicKey` - Public key of a Node.
-/// * `locked_for: u64` - Lock time.
-macro_rules! stake_lock {
-    ($socket:expr,$secret_key:expr,$nonce:expr,$node_pk:expr,$locked_for:expr) => {{
-        let req = prepare_stake_lock_request($locked_for, $node_pk, $secret_key, $nonce);
-        expect_tx_success!(req, $socket)
-    }};
+pub(crate) async fn stake_lock(
+    socket: &ExecutionEngineSocket,
+    secret_key: &AccountOwnerSecretKey,
+    nonce: u64,
+    node_pk: &NodePublicKey,
+    locked_for: u64,
+) -> BlockExecutionResponse {
+    let req = prepare_stake_lock_request(locked_for, node_pk, secret_key, nonce);
+    expect_tx_success(req, socket, ExecutionData::None).await
 }
-
-pub(crate) use stake_lock;
 
 /// Assert that Reputation Measurements are submitted (updated).
 ///
@@ -440,32 +362,6 @@ macro_rules! assert_paging_node_registry {
 }
 
 pub(crate) use assert_paging_node_registry;
-use tempfile::TempDir;
-use types::{
-    AccountInfo,
-    Blake3Hash,
-    Block,
-    BlockExecutionResponse,
-    ContentUpdate,
-    DeliveryAcknowledgmentProof,
-    Epoch,
-    GenesisAccount,
-    NodeIndex,
-    NodeInfo,
-    Participation,
-    ProofOfConsensus,
-    ProtocolParamKey,
-    ProtocolParamValue,
-    Tokens,
-    TransactionRequest,
-    UpdateMethod,
-    UpdatePayload,
-    UpdateRequest,
-};
-
-use super::TestBinding;
-use crate::state::QueryRunner;
-use crate::{Application, ApplicationConfig};
 
 /// Prepare Test Genesis
 pub(crate) fn test_genesis() -> Genesis {
