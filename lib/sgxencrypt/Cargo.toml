@@ -7,10 +7,11 @@ authors = ["ozwaldorf <self@ossian.dev>"]
 license = "MIT"
 
 [dependencies]
-anyhow.workspace = true
-bpaf = { version = "0.9.12", features = ["derive", "dull-color"] } # cli parsing
-hex = "0.4.3" # encoding/decoding public keys
-ecies = { version = "0.2.7", default-features = false, features = ["pure", "std"] } # encrypting content for the sgx enclave
+anyhow.workspace = true # errors
+bpaf = { version = "0.9.14", features = ["derive", "dull-color"] } # cli
+hex = "0.4.3" # blake3 hashes
+bip32 = "0.5.2" # public keys
+ecies = { version = "0.2.7", default-features = false, features = ["pure", "std"] } # encryption
 
 [[bin]]
 name = "sgxencrypt"

@@ -1493,6 +1493,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "bip32"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aa13fae8b6255872fd86f7faf4b41168661d7d78609f7bfe6771b85c6739a15b"
+dependencies = [
+ "bs58 0.5.1",
+ "hmac",
+ "k256",
+ "once_cell",
+ "pbkdf2 0.12.2",
+ "rand_core 0.6.4",
+ "ripemd",
+ "sha2 0.10.8",
+ "subtle",
+ "zeroize",
+]
+
+[[package]]
 name = "bit-set"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1752,9 +1770,9 @@ dependencies = [
 
 [[package]]
 name = "bpaf"
-version = "0.9.12"
+version = "0.9.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3280efcf6d66bc77c2cf9b67dc8acee47a217d9be67dd590b3230dffe663724d"
+checksum = "8d4e5ca9929037866947af4b8b7418124f2ec7c411a8b9ee24e46ad2b8470497"
 dependencies = [
  "bpaf_derive",
  "owo-colors",
@@ -1763,9 +1781,9 @@ dependencies = [
 
 [[package]]
 name = "bpaf_derive"
-version = "0.5.10"
+version = "0.5.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a8d5b11f7fa1068e5bbac8ab6c8c2c6940047f69185987446b60c995d4bf89c"
+checksum = "cf95d9c7e6aba67f8fc07761091e93254677f4db9e27197adecebc7039a58722"
 dependencies = [
  "proc-macro2 1.0.86",
  "quote 1.0.36",
@@ -13588,6 +13606,7 @@ name = "sgxencrypt"
 version = "0.0.3"
 dependencies = [
  "anyhow",
+ "bip32",
  "bpaf",
  "ecies",
  "hex",
