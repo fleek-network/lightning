@@ -13616,7 +13616,16 @@ dependencies = [
 name = "sgxkit"
 version = "0.1.0"
 dependencies = [
+ "arrayref",
+ "base64 0.22.1",
+ "hex",
+ "hex-literal",
+ "k256",
+ "serde",
+ "serde_json",
  "sgxkit-sys",
+ "strum 0.26.3",
+ "thiserror",
 ]
 
 [[package]]
