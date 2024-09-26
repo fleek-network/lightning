@@ -3664,9 +3664,9 @@ dependencies = [
 
 [[package]]
 name = "deno_unsync"
-version = "0.4.1"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f36b4ef61a04ce201b925a5dffa90f88437d37fee4836c758470dd15ba7f05e"
+checksum = "03ee1607db298c8f12124b345a52d5f2f504a7504c9d535f1d8f07127b237010"
 dependencies = [
  "parking_lot",
  "tokio",
@@ -9062,8 +9062,17 @@ dependencies = [
  "arc-swap",
  "arrayvec",
  "axum 0.6.20",
+<<<<<<< HEAD
  "axum 0.7.7",
  "axum-core 0.4.5",
+||||||| parent of 486db6a6 (fix: hakari generate)
+ "axum 0.7.4",
+ "axum-core 0.4.3",
+=======
+ "axum 0.7.4",
+ "axum-core 0.4.3",
+ "base16ct",
+>>>>>>> 486db6a6 (fix: hakari generate)
  "base64 0.13.1",
  "base64 0.21.7",
  "base64 0.22.1",
@@ -9075,6 +9084,7 @@ dependencies = [
  "blake3",
  "block-buffer 0.9.0",
  "block-padding 0.3.3",
+ "bs58 0.5.1",
  "bumpalo",
  "bytemuck",
  "byteorder",
@@ -9108,7 +9118,14 @@ dependencies = [
  "event-listener 5.3.1",
  "fastcrypto 0.1.5",
  "fastcrypto 0.1.8",
+<<<<<<< HEAD
  "futures 0.3.31",
+||||||| parent of 486db6a6 (fix: hakari generate)
+ "futures",
+=======
+ "ff",
+ "futures",
+>>>>>>> 486db6a6 (fix: hakari generate)
  "futures-channel",
  "futures-core",
  "futures-executor",
@@ -9118,6 +9135,7 @@ dependencies = [
  "futures-util",
  "generic-array",
  "getrandom",
+ "group",
  "half 2.4.1",
  "hashbrown 0.12.3",
  "hashbrown 0.14.5",
@@ -9163,6 +9181,7 @@ dependencies = [
  "p256",
  "parity-scale-codec 3.6.11",
  "parity-scale-codec-derive 3.6.9",
+ "pbkdf2 0.12.2",
  "phf_shared 0.11.2",
  "pkcs8 0.10.2",
  "plotters",
@@ -9209,6 +9228,7 @@ dependencies = [
  "sha2 0.10.8",
  "sha2 0.9.9",
  "sha3 0.10.8",
+ "signature 2.2.0",
  "simdutf8",
  "similar",
  "smallvec",
