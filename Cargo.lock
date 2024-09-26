@@ -1432,9 +1432,9 @@ dependencies = [
 
 [[package]]
 name = "better_scoped_tls"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "794edcc9b3fb07bb4aecaa11f093fd45663b4feadb782d68303a2268bc2701de"
+checksum = "297b153aa5e573b5863108a6ddc9d5c968bd0b20e75cc614ee9821d2f45679c7"
 dependencies = [
  "scoped-tls",
 ]
@@ -3032,9 +3032,9 @@ dependencies = [
 
 [[package]]
 name = "deno_ast"
-version = "0.42.1"
+version = "0.42.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "89ea2fd038c9c7e3e87e624fd708303cd33f39c33707f6c48fa9a65d65fefc47"
+checksum = "b2b9d03b1bbeeecdac54367f075d572131736d06c5be3bc49037855bc5ab1bbb"
 dependencies = [
  "base64 0.21.7",
  "deno_media_type",
@@ -3471,9 +3471,9 @@ dependencies = [
 
 [[package]]
 name = "deno_semver"
-version = "0.5.14"
+version = "0.5.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "670fec7ef309384e23c2a90ac5d2d9d91a776d225306c75f5cdd28cf6cc8a59f"
+checksum = "c957c6a57c38b7dde2315df0da0ec228911e56a74f185b108a488d0401841a67"
 dependencies = [
  "monch",
  "once_cell",
@@ -3522,9 +3522,9 @@ dependencies = [
 
 [[package]]
 name = "deno_unsync"
-version = "0.4.1"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f36b4ef61a04ce201b925a5dffa90f88437d37fee4836c758470dd15ba7f05e"
+checksum = "03ee1607db298c8f12124b345a52d5f2f504a7504c9d535f1d8f07127b237010"
 dependencies = [
  "parking_lot",
  "tokio",
@@ -5144,6 +5144,15 @@ name = "float-cmp"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "98de4bbd547a563b716d8dfa9aad1cb19bfab00f4fa09a6a4ed21dbcf44ce9c4"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
+name = "float-cmp"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b09cf3155332e944990140d967ff5eceb70df778b34f77d8075db46e4704e6d8"
 dependencies = [
  "num-traits",
 ]
@@ -7136,9 +7145,9 @@ checksum = "db13adb97ab515a3691f56e4dbab09283d0b86cb45abd991d8634a9d6f501760"
 
 [[package]]
 name = "libc"
-version = "0.2.159"
+version = "0.2.161"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "561d97a539a36e26a9a5fad1ea11a3039a67714694aaa379433e580854bc3dc5"
+checksum = "8e9489c2807c139ffd9c1794f4af0ebe86a828db53ecdc7fea2111d0fed085d1"
 
 [[package]]
 name = "libipld"
@@ -8678,6 +8687,7 @@ dependencies = [
  "axum 0.6.20",
  "axum 0.7.4",
  "axum-core 0.4.3",
+ "base16ct",
  "base64 0.13.1",
  "base64 0.21.7",
  "base64 0.22.1",
@@ -8689,6 +8699,7 @@ dependencies = [
  "blake3",
  "block-buffer 0.9.0",
  "block-padding 0.3.3",
+ "bs58 0.5.1",
  "bumpalo",
  "bytemuck",
  "byteorder",
@@ -8724,6 +8735,7 @@ dependencies = [
  "event-listener 5.3.1",
  "fastcrypto 0.1.5",
  "fastcrypto 0.1.8",
+ "ff",
  "futures",
  "futures-channel",
  "futures-core",
@@ -8734,6 +8746,7 @@ dependencies = [
  "futures-util",
  "generic-array",
  "getrandom",
+ "group",
  "half 2.4.1",
  "hashbrown 0.12.3",
  "hashbrown 0.14.5",
@@ -8778,6 +8791,7 @@ dependencies = [
  "p256",
  "parity-scale-codec 3.6.11",
  "parity-scale-codec-derive 3.6.9",
+ "pbkdf2 0.12.2",
  "phf_shared 0.11.2",
  "pkcs8 0.10.2",
  "plotters",
@@ -8824,6 +8838,7 @@ dependencies = [
  "sha2 0.10.8",
  "sha2 0.9.9",
  "sha3 0.10.8",
+ "signature 2.2.0",
  "simdutf8",
  "similar",
  "smallvec",
@@ -11490,7 +11505,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "59230a63c37f3e18569bdb90e4a89cbf5bf8b06fea0b84e65ea10cc4df47addd"
 dependencies = [
  "difflib",
- "float-cmp",
+ "float-cmp 0.9.0",
  "itertools 0.10.5",
  "normalize-line-endings",
  "predicates-core",
@@ -13856,9 +13871,9 @@ checksum = "d66dc143e6b11c1eddc06d5c423cfc97062865baf299914ab64caa38182078fe"
 
 [[package]]
 name = "simd-json"
-version = "0.14.1"
+version = "0.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bfa5500f67df6466a45c6f83d1aada89fe0f7e9b17afec424ea06feee0906549"
+checksum = "b1df0290e9bfe79ddd5ff8798ca887cd107b75353d2957efe9777296e17f26b5"
 dependencies = [
  "getrandom",
  "halfbrown",
@@ -14583,9 +14598,9 @@ dependencies = [
 
 [[package]]
 name = "swc_allocator"
-version = "0.1.9"
+version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7016ee7a5186d6a80e381aa1926e0f3c7b06eaf444745ff7af3632e978eb8dc5"
+checksum = "76aa0eb65c0f39f9b6d82a7e5192c30f7ac9a78f084a21f270de1d8c600ca388"
 dependencies = [
  "bumpalo",
  "hashbrown 0.14.5",
@@ -16560,11 +16575,11 @@ checksum = "5a84c137d37ab0142f0f2ddfe332651fdbf252e7b7dbb4e67b6c1f1b2e925101"
 
 [[package]]
 name = "value-trait"
-version = "0.10.0"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bcaa56177466248ba59d693a048c0959ddb67f1151b963f904306312548cf392"
+checksum = "9170e001f458781e92711d2ad666110f153e4e50bfd5cbd02db6547625714187"
 dependencies = [
- "float-cmp",
+ "float-cmp 0.10.0",
  "halfbrown",
  "itoa",
  "ryu",
