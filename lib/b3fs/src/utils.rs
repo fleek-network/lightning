@@ -14,6 +14,19 @@ pub fn to_hex(slice: &[u8; 32]) -> ArrayString<64> {
     s
 }
 
+pub fn from_hex(hex: &ArrayString<64>) -> [u8; 32] {
+    let mut out = [0; 32];
+    let mut i = 0;
+    let mut j = 0;
+    while i < 64 {
+        let byte = u8::from_str_radix(&hex[i..i + 2], 16).unwrap();
+        out[j] = byte;
+        j += 1;
+        i += 2;
+    }
+    out
+}
+
 /// Returns the previous power of two of a given number, the returned
 /// value is always less than the provided `n`.
 #[inline(always)]

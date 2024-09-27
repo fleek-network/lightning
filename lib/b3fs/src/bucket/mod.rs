@@ -165,7 +165,7 @@ impl Bucket {
     }
 
     pub(crate) fn get_new_wal_path(&self) -> PathBuf {
-        let mut path = self.headers.clone();
+        let mut path = self.wal.clone();
         let name: [u8; 32] = random();
         path.push(to_hex(&name).as_str());
         path
