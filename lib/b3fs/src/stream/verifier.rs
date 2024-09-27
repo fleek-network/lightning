@@ -321,6 +321,10 @@ impl<T: HashTreeCollector> IncrementalVerifier<WithHashTreeCollector<T>> {
     pub fn get_tree_mut(&mut self) -> &mut T {
         &mut self.storage.tree
     }
+
+    pub fn counter(&self) -> usize {
+        self.storage.counter()
+    }
 }
 
 impl<S: VerifierCollector> Default for IncrementalVerifier<S>

@@ -1283,6 +1283,7 @@ version = "0.1.0"
 dependencies = [
  "arrayref",
  "arrayvec",
+ "bincode",
  "blake3",
  "bytes",
  "criterion",
@@ -1290,6 +1291,7 @@ dependencies = [
  "rand 0.8.5",
  "rayon",
  "rayon-core",
+ "serde",
  "siphasher 1.0.1",
  "smallvec",
  "smol_str",

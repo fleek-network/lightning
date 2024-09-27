@@ -28,44 +28,32 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace.dependencies]
-lightning-workspace-hack = "0.1.0"
 anyhow = "1.0"
 async-trait = "0.1"
 axum = { version = "0.6.18", features = ["tokio"] }
+base64 = "0.21"
 bincode = "1.3.3"
 bit-set = { version = "0.8.0", features = ["serde"] }
 cid = "0.11.1"
 console-subscriber = { version = "0.4.0" }
 ethers = "2.0.10"
 num-bigint = "0.4.0"
-base64 = "0.21"
 bytes = { version = "1.7", features = ["serde"] }
 futures = "0.3"
+hex = { version = "0.4.3", features = ["serde"] }
+humantime-serde = "1.1.1"
+hyper = { version = "0.14.27", features = ["server", "full"] }
+jsonrpsee = { version = "0.21", features = ["full"] }
+lazy_static = "1.4.0"
+lightning-workspace-hack = "0.1.0"
 lru = "0.10.0"
 multihash = "0.18"
+num-derive = "0.4.2"
+num-traits = "0.2.15"
+parking_lot = "0.12.1"
 pretty_assertions = "1.4.0"
 rand = { version = "0.8.5", features = ["small_rng"] }
 reqwest = { version = "0.11.20", features = ["rustls-tls", "json"] }
-serde = { version = "1.0", features = ["derive"] }
-serde-big-array = "0.5.1"
-serde_json = "1.0.96"
-humantime-serde = "1.1.1"
-jsonrpsee = { version = "0.21", features = ["full"] }
-thiserror = "1.0"
-parking_lot = "0.12.1"
-tokio = { version = "1.28", features = ["full", "tracing"] }
-tokio-stream = "0.1"
-tokio-util = { version = "0.7", features = ["time"] }
-toml = "0.7.4"
-tracing = "0.1.37"
-tracing-subscriber = { version = "0.3", features = ["fmt", "json"] }
-zeroize = "1.6"
-serde_with = "3.8.1"
-scc = "1.8.1"
-num-traits = "0.2.15"
-num-derive = "0.4.2"
-lazy_static = "1.4.0"
-schemars = "0.8.21"
 rkyv = { version = "0.7.44", features = [
   "validation",
   "alloc",
@@ -73,11 +61,24 @@ rkyv = { version = "0.7.44", features = [
   "hashbrown",
   "bytecheck",
 ] }
-triomphe = "0.1"
+scc = "1.8.1"
+schemars = "0.8.21"
+serde = { version = "1.0", features = ["derive"] }
+serde-big-array = "0.5.1"
+serde_json = "1.0.96"
+serde_with = "3.8.1"
 tempfile = "3.10.1"
-hyper = { version = "0.14.27", features = ["server", "full"] }
+thiserror = "1.0"
+tokio = { version = "1.28", features = ["full", "tracing"] }
+tokio-stream = "0.1"
+tokio-util = { version = "0.7", features = ["time"] }
+toml = "0.7.4"
 tower = { version = "0.4.13", features = ["tokio", "steer"] }
-hex = { version = "0.4.3", features = ["serde"] }
+tracing = "0.1.37"
+tracing-subscriber = { version = "0.3", features = ["fmt", "json"] }
+triomphe = "0.1"
+uuid = { version = "1.6", features = ["v4"], default-features = false }
+zeroize = "1.6"
 url = { version = "2.4.1", features = ["serde"] }
 sha3 = "0.10.8"
 fxhash = "0.2"
