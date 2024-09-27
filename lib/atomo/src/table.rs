@@ -1,6 +1,7 @@
 use std::any::{Any, TypeId};
 use std::borrow::Borrow;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::hash::Hash;
 use std::marker::PhantomData;
 use std::sync::Arc;
@@ -320,5 +321,134 @@ where
             .expect("Iterator functionality is not enabled for the table.");
 
         KeyIterator::new(keys)
+    }
+
+    /// Clear the table.
+    pub fn clear(&mut self) {
+        for key in self.keys() {
+            self.remove(&key);
+        }
+    }
+
+    /// Returns a map containing all values in this table.
+    pub fn as_map(&self) -> HashMap<K, V>
+    where
+        K: Serialize + DeserializeOwned + Any,
+        V: Serialize + DeserializeOwned + Any,
+    {
+        self.keys()
+            .map(|key| {
+                let value = self.get(&key).unwrap();
+                (key, value)
+            })
+            .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{Atomo, AtomoBuilder, DefaultSerdeBackend, InMemoryStorage, UpdatePerm};
+
+    #[test]
+    fn test_get_set() {
+        let mut db = new_test_db();
+        db.run(|ctx| {
+            let mut table = ctx.get_table::<String, String>("data");
+            table.insert("key1".to_string(), "value1".to_string());
+            assert_eq!(table.get("key1".to_string()), Some("value1".to_string()));
+        });
+    }
+
+    #[test]
+    fn test_remove() {
+        let mut db = new_test_db();
+        db.run(|ctx| {
+            let mut table = ctx.get_table::<String, String>("data");
+            table.insert("key1".to_string(), "value1".to_string());
+            table.remove("key1".to_string());
+            assert_eq!(table.get("key1".to_string()), None);
+        });
+    }
+
+    #[test]
+    fn test_keys() {
+        let mut db = new_test_db_with_enable_iter();
+        db.run(|ctx| {
+            let mut table = ctx.get_table::<String, String>("data");
+            table.insert("key1".to_string(), "value1".to_string());
+            table.insert("key2".to_string(), "value2".to_string());
+            assert_eq!(table.keys().count(), 2);
+            assert_eq!(table.keys().collect::<Vec<_>>(), vec!["key1", "key2"]);
+        });
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_keys_should_panic_without_enable_iter() {
+        let mut db = new_test_db();
+        db.run(|ctx| {
+            let table = ctx.get_table::<String, String>("data");
+            table.keys();
+        });
+    }
+
+    #[test]
+    fn test_clear() {
+        let mut db = new_test_db_with_enable_iter();
+        db.run(|ctx| {
+            let mut table = ctx.get_table::<String, String>("data");
+            table.insert("key1".to_string(), "value1".to_string());
+            table.insert("key2".to_string(), "value2".to_string());
+            table.clear();
+            assert_eq!(table.keys().count(), 0);
+        });
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_clear_should_panic_without_enable_iter() {
+        let mut db = new_test_db();
+        db.run(|ctx| {
+            let mut table = ctx.get_table::<String, String>("data");
+            table.clear();
+        });
+    }
+
+    #[test]
+    fn test_as_map() {
+        let mut db = new_test_db_with_enable_iter();
+        db.run(|ctx| {
+            let mut table = ctx.get_table::<String, String>("data");
+            table.insert("key1".to_string(), "value1".to_string());
+            table.insert("key2".to_string(), "value2".to_string());
+            assert_eq!(table.as_map().len(), 2);
+            assert_eq!(table.as_map().get("key1"), Some(&"value1".to_string()));
+            assert_eq!(table.as_map().get("key2"), Some(&"value2".to_string()));
+        });
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_as_map_should_panic_without_enable_iter() {
+        let mut db = new_test_db();
+        db.run(|ctx| {
+            let table = ctx.get_table::<String, String>("data");
+            table.as_map();
+        });
+    }
+
+    fn new_test_db() -> Atomo<UpdatePerm, InMemoryStorage, DefaultSerdeBackend> {
+        AtomoBuilder::<_, DefaultSerdeBackend>::new(InMemoryStorage::default())
+            .with_table::<String, String>("data")
+            .build()
+            .unwrap()
+    }
+
+    fn new_test_db_with_enable_iter() -> Atomo<UpdatePerm, InMemoryStorage, DefaultSerdeBackend> {
+        AtomoBuilder::<_, DefaultSerdeBackend>::new(InMemoryStorage::default())
+            .with_table::<String, String>("data")
+            .enable_iter("data")
+            .build()
+            .unwrap()
     }
 }
