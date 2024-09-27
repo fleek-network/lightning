@@ -81,9 +81,7 @@ impl<B: Backend> StateExecutor<B> {
             self.clean_up_content_registry();
 
             // Clear executed digests.
-            for digest in self.executed_digests.keys() {
-                self.executed_digests.remove(&digest);
-            }
+            self.executed_digests.clear();
 
             self.committee_info.set(current_epoch, current_committee);
             // Get new committee
