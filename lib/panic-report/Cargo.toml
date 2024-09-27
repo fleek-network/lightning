@@ -10,4 +10,5 @@ anstyle = "1.0.4"
 anstream = "0.6.5"
 serde.workspace = true
 toml = "0.8"
-uuid = { version = "1.6", features = ["v4"], default-features = false }
+uuid.workspace = true
+
