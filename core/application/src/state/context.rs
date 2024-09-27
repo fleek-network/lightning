@@ -24,6 +24,7 @@ pub trait TableRef<K, V> {
     fn get(&self, key: &K) -> Option<V>;
     fn keys(&self) -> KeyIterator<K>;
     fn remove(&self, key: &K);
+    fn clear(&self);
 }
 
 pub struct StateContext<'selector, B: StorageBackend, S: SerdeBackend> {
@@ -77,5 +78,114 @@ impl<
 
     fn remove(&self, key: &K) {
         self.0.borrow_mut().remove(key)
+    }
+
+    fn clear(&self) {
+        self.0.borrow_mut().clear();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use atomo::{Atomo, AtomoBuilder, DefaultSerdeBackend, InMemoryStorage, UpdatePerm};
+
+    use super::*;
+
+    #[test]
+    fn test_get_set() {
+        let mut db = new_test_db();
+        db.run(|ctx| {
+            let ctx = StateContext {
+                table_selector: ctx,
+            };
+            let table = ctx.get_table_reference::<String, String>("data");
+            table.set("key1".to_string(), "value1".to_string());
+            assert_eq!(table.get(&"key1".to_string()), Some("value1".to_string()));
+        });
+    }
+
+    #[test]
+    fn test_remove() {
+        let mut db = new_test_db();
+        db.run(|ctx| {
+            let ctx = StateContext {
+                table_selector: ctx,
+            };
+            let table = ctx.get_table_reference::<String, String>("data");
+            table.set("key1".to_string(), "value1".to_string());
+            table.remove(&"key1".to_string());
+            assert_eq!(table.get(&"key1".to_string()), None);
+        });
+    }
+
+    #[test]
+    fn test_keys() {
+        let mut db = new_test_db_with_enable_iter();
+        db.run(|ctx| {
+            let ctx = StateContext {
+                table_selector: ctx,
+            };
+            let table = ctx.get_table_reference::<String, String>("data");
+            table.set("key1".to_string(), "value1".to_string());
+            table.set("key2".to_string(), "value2".to_string());
+            assert_eq!(table.keys().count(), 2);
+            assert_eq!(table.keys().collect::<Vec<_>>(), vec!["key1", "key2"]);
+        });
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_keys_should_panic_without_enable_iter() {
+        let mut db = new_test_db();
+        db.run(|ctx| {
+            let ctx = StateContext {
+                table_selector: ctx,
+            };
+            let table = ctx.get_table_reference::<String, String>("data");
+            table.keys();
+        });
+    }
+
+    #[test]
+    fn test_clear() {
+        let mut db = new_test_db_with_enable_iter();
+        db.run(|ctx| {
+            let ctx = StateContext {
+                table_selector: ctx,
+            };
+            let table = ctx.get_table_reference::<String, String>("data");
+            table.set("key1".to_string(), "value1".to_string());
+            table.set("key2".to_string(), "value2".to_string());
+            table.clear();
+            assert_eq!(table.keys().count(), 0);
+        });
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_clear_should_panic_without_enable_iter() {
+        let mut db = new_test_db();
+        db.run(|ctx| {
+            let ctx = StateContext {
+                table_selector: ctx,
+            };
+            let table = ctx.get_table_reference::<String, String>("data");
+            table.clear();
+        });
+    }
+
+    fn new_test_db() -> Atomo<UpdatePerm, InMemoryStorage, DefaultSerdeBackend> {
+        AtomoBuilder::<_, DefaultSerdeBackend>::new(InMemoryStorage::default())
+            .with_table::<String, String>("data")
+            .build()
+            .unwrap()
+    }
+
+    fn new_test_db_with_enable_iter() -> Atomo<UpdatePerm, InMemoryStorage, DefaultSerdeBackend> {
+        AtomoBuilder::<_, DefaultSerdeBackend>::new(InMemoryStorage::default())
+            .with_table::<String, String>("data")
+            .enable_iter("data")
+            .build()
+            .unwrap()
     }
 }
