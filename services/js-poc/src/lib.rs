@@ -1,14 +1,19 @@
+use std::future::Future;
+use std::pin::Pin;
+use std::task::Poll;
+
 use anyhow::{bail, Context};
-use deno_core::v8::{Global, IsolateHandle, Value};
+use deno_core::v8::{Global, IsolateHandle, OwnedIsolate, Value};
 use deno_core::{serde_v8, v8, JsRuntime, ModuleSpecifier};
 use fn_sdk::connection::Connection;
 use fn_sdk::header::TransportDetail;
 use fn_sdk::http_util::{respond, respond_with_error, respond_with_http_response};
-use tokio::sync::mpsc::error::TrySendError;
+use scopeguard::ScopeGuard;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio_util::task::LocalPoolHandle;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 
+use crate::runtime::guard::IsolateGuard;
 use crate::runtime::Runtime;
 use crate::stream::{Origin, Request};
 
@@ -41,17 +46,8 @@ pub async fn main() {
 
     // To cancel events mid execution.
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<IsolateHandle>();
-    // tokio::spawn(async move {
-    //     while let Some(handle) = rx.recv().await {
-    //         tokio::spawn(async move {
-    //             tokio::time::sleep(params::REQ_TIMEOUT).await;
-    //             handle.terminate_execution();
-    //         });
-    //     }
-    // });
 
     let pool = LocalPoolHandle::new(num_cpus::get());
-
     while let Ok(conn) = listener.accept().await {
         let tx_clone = tx.clone();
         pool.spawn_pinned(|| {
@@ -142,17 +138,32 @@ async fn handle_request(
         location = location.join(&path).context("Invalid path string")?;
     }
 
-    // Create runtime and execute the source
-    let runtime =
+    // Create runtime and execute the source.
+    let mut runtime =
         Runtime::new(location.clone(), depth).context("Failed to initialize runtime")?;
 
-    let mut runtime = scopeguard::guard(runtime, |mut rt| {
-        unsafe { rt.deno.v8_isolate().enter(); }
+    unsafe {
+        runtime.deno.v8_isolate().exit();
+    }
 
-    });
+    IsolateGuard::new(&mut runtime, |rt| {
+        Box::pin(run(rt, connection, module_url, param))
+    })
+    .await?;
 
-    unsafe { runtime.deno.v8_isolate().exit(); }
+    unsafe {
+        runtime.deno.v8_isolate().enter();
+    }
 
+    Ok(())
+}
+
+async fn run(
+    mut runtime: &mut Runtime,
+    connection: &mut Connection,
+    module_url: ModuleSpecifier,
+    param: Option<serde_json::Value>,
+) -> anyhow::Result<()> {
     let res = match runtime.exec(&module_url, param).await? {
         Some(res) => res,
         None => {
@@ -160,21 +171,12 @@ async fn handle_request(
         },
     };
 
-    let res = {
-        unsafe { runtime.deno.v8_isolate().enter(); };
-        let deno = &mut runtime.deno;
-        let mut deno = scopeguard::guard(deno, |d| {
-            unsafe { d.v8_isolate().exit(); }
-        });
-
-        // Resolve async if applicable
-        // TODO: figure out why `deno.resolve` doesn't drive async functions
-        #[allow(deprecated)]
-        tokio::time::timeout(params::REQ_TIMEOUT, deno.resolve_value(res))
-            .await
-            .context("Execution timeout")??
-    };
-
+    // Resolve async if applicable
+    // TODO: figure out why `deno.resolve` doesn't drive async functions
+    #[allow(deprecated)]
+    let res = tokio::time::timeout(params::REQ_TIMEOUT, runtime.deno.resolve_value(res))
+        .await
+        .context("Execution timeout")??;
 
     parse_and_respond(connection, &mut runtime, res).await?;
 
@@ -189,11 +191,6 @@ async fn parse_and_respond(
     runtime: &mut Runtime,
     res: Global<Value>,
 ) -> anyhow::Result<()> {
-    let mut runtime = scopeguard::guard(runtime, |rt| {
-        unsafe { rt.deno.v8_isolate().exit(); }
-    });
-
-    unsafe { runtime.deno.v8_isolate().enter(); }
     // Handle the return data
     let scope = &mut runtime.deno.handle_scope();
     let local = v8::Local::new(scope, res);
