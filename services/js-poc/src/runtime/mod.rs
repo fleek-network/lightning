@@ -24,9 +24,9 @@ use self::tape::{Punch, Tape};
 use crate::params::{FETCH_BLACKLIST, HEAP_INIT, HEAP_LIMIT};
 
 pub mod extensions;
+pub mod guard;
 pub mod module_loader;
 pub mod tape;
-mod worker;
 
 /// Snapshot of the runtime after javascript modules have been initialized
 static SNAPSHOT: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/snapshot.bin"));
@@ -176,21 +176,15 @@ impl Runtime {
         specifier: &ModuleSpecifier,
         param: Option<serde_json::Value>,
     ) -> anyhow::Result<Option<Global<Value>>> {
-        unsafe { self.deno.v8_isolate().enter(); }
-
-        let mut this = scopeguard::guard(&mut *self, |rt| {
-           unsafe { rt.deno.v8_isolate().exit(); }
-        });
-
-        let id = this.deno.load_main_es_module(specifier).await?;
-        this.deno
+        let id = self.deno.load_main_es_module(specifier).await?;
+        self.deno
             .run_event_loop(PollEventLoopOptions::default())
             .await?;
-        this.deno.mod_evaluate(id).await?;
+        self.deno.mod_evaluate(id).await?;
 
         {
-            let main = this.deno.get_module_namespace(id)?;
-            let scope = &mut this.deno.handle_scope();
+            let main = self.deno.get_module_namespace(id)?;
+            let scope = &mut self.deno.handle_scope();
             let scope = &mut v8::TryCatch::new(scope);
             let main_local = v8::Local::new(scope, main);
 
