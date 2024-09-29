@@ -42,11 +42,9 @@ impl<'a> Future for IsolateGuard<'a> {
     type Output = anyhow::Result<()>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
-        let mut this = scopeguard::guard(self, |mut w| {
-            w.as_mut().exit();
-        });
-        this.as_mut().enter();
-
-        this.as_mut().f.as_mut().poll(cx)
+        self.as_mut().enter();
+        let res = self.as_mut().f.as_mut().poll(cx);
+        self.as_mut().exit();
+        res
     }
 }

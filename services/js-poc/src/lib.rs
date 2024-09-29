@@ -8,7 +8,6 @@ use deno_core::{serde_v8, v8, JsRuntime, ModuleSpecifier};
 use fn_sdk::connection::Connection;
 use fn_sdk::header::TransportDetail;
 use fn_sdk::http_util::{respond, respond_with_error, respond_with_http_response};
-use scopeguard::ScopeGuard;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio_util::task::LocalPoolHandle;
 use tracing::{debug, error, info};
@@ -30,7 +29,7 @@ pub(crate) mod params {
     pub const FETCH_BLACKLIST: &[&str] = &["localhost", "127.0.0.1", "::1"];
 }
 
-#[tokio::main(flavor = "current_thread")]
+#[tokio::main]
 pub async fn main() {
     fn_sdk::ipc::init_from_env();
 

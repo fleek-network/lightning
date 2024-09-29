@@ -4639,7 +4639,6 @@ dependencies = [
  "lightning-schema",
  "lightning-workspace-hack",
  "num_cpus",
- "scopeguard",
  "serde",
  "serde_json",
  "tokio",

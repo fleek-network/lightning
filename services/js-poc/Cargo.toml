@@ -14,7 +14,6 @@ tracing.workspace = true
 fleek-crypto.workspace = true
 arrayref = "0.3"
 triomphe = "0.1"
-scopeguard = "1.2"
 serde.workspace = true
 serde_json.workspace = true
 hex = "0.4"
