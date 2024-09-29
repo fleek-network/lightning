@@ -120,6 +120,7 @@ impl TestGenesisBuilder {
             chain_id: self.chain_id,
             epoch_start: 1684276288383,
             epoch_time: 120000,
+            epochs_per_year: 365,
             committee_size: 10,
             node_count: 10,
             min_stake: 1000,

@@ -27,6 +27,7 @@ pub struct Genesis {
     pub chain_id: u32,
     pub epoch_start: u64,
     pub epoch_time: u64,
+    pub epochs_per_year: u64,
     pub committee_size: u64,
     pub node_count: u64,
     pub min_stake: u64,

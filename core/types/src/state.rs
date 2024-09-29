@@ -188,13 +188,16 @@ pub enum ProtocolParamKey {
     /// measurements have been reported, no reputation score will be computed in that epoch.
     MinNumMeasurements = 12,
     /// The public key corresponding to the secret key that is shared among the SGX enclaves
-    SGXSharedPubKey = 13
+    SGXSharedPubKey = 13,
+    /// The number of epochs per year
+    EpochsPerYear = 14,
 }
 
 /// The Value enum is a data type used to represent values in a key-value pair for a metadata table
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, schemars::JsonSchema)]
 pub enum ProtocolParamValue {
     EpochTime(u64),
+    EpochsPerYear(u64),
     CommitteeSize(u64),
     NodeCount(u64),
     MinimumNodeStake(u64),
@@ -214,6 +217,7 @@ impl ProtocolParamValue {
     pub fn get_bytes(&self) -> Cow<'_, [u8]> {
         match self {
             ProtocolParamValue::EpochTime(i) => Cow::Owned(i.to_le_bytes().to_vec()),
+            ProtocolParamValue::EpochsPerYear(i) => Cow::Owned(i.to_le_bytes().to_vec()),
             ProtocolParamValue::CommitteeSize(i) => Cow::Owned(i.to_le_bytes().to_vec()),
             ProtocolParamValue::NodeCount(i) => Cow::Owned(i.to_le_bytes().to_vec()),
             ProtocolParamValue::MinimumNodeStake(i) => Cow::Owned(i.to_le_bytes().to_vec()),
