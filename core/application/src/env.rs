@@ -259,6 +259,10 @@ impl ApplicationEnv {
                 ProtocolParamValue::EpochTime(genesis.epoch_time)
             );
             param_table.insert(
+                ProtocolParamKey::EpochsPerYear,
+                ProtocolParamValue::EpochsPerYear(genesis.epochs_per_year)
+            );
+            param_table.insert(
                 ProtocolParamKey::MinimumNodeStake,
                 ProtocolParamValue::MinimumNodeStake(genesis.min_stake)
             );

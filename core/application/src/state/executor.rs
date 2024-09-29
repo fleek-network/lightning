@@ -1097,6 +1097,8 @@ impl<B: Backend> StateExecutor<B> {
             _ => HpUfixed::<18>::from(0_u16), // set in genesis
         };
 
+        let epoch_per_year = self.get_epochs_per_year();
+
         let inflation: HpUfixed<18> =
             (&inflation_percent / &percentage_divisor).convert_precision();
 
@@ -1105,7 +1107,7 @@ impl<B: Backend> StateExecutor<B> {
             _ => panic!("SupplyYearStart is set genesis and should never be empty"),
         };
 
-        (&inflation * &supply_at_year_start.convert_precision()) / &365.0.into()
+        (&inflation * &supply_at_year_start.convert_precision()) / &epoch_per_year.into()
     }
 
     fn mint_and_transfer_stables(&self, amount: HpUfixed<6>, owner: EthAddress) {
@@ -1126,6 +1128,8 @@ impl<B: Backend> StateExecutor<B> {
             _ => panic!("TotalSupply is set genesis and should never be empty"),
         };
 
+        let epoch_per_year = self.get_epochs_per_year();
+
         current_supply += amount;
         self.metadata.set(
             Metadata::TotalSupply,
@@ -1137,9 +1141,20 @@ impl<B: Backend> StateExecutor<B> {
             _ => 0,
         };
 
-        if (current_epoch + 1) % 365_u64 == 0_u64 {
+        if (current_epoch + 1) % epoch_per_year == 0_u64 {
             self.metadata
                 .set(Metadata::SupplyYearStart, Value::HpUfixed(current_supply));
+        }
+    }
+
+    fn get_epochs_per_year(&self) -> u64 {
+        match self
+            .parameters
+            .get(&ProtocolParamKey::EpochsPerYear)
+            .unwrap()
+        {
+            ProtocolParamValue::EpochsPerYear(v) => v,
+            _ => unreachable!("invalid epoch per year in parameters"),
         }
     }
 

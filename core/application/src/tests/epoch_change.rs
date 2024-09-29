@@ -2,7 +2,15 @@ use std::collections::BTreeMap;
 
 use fleek_crypto::{AccountOwnerSecretKey, ConsensusSecretKey, NodeSecretKey, SecretKey};
 use hp_fixed::unsigned::HpUfixed;
-use lightning_interfaces::types::{ExecutionData, ExecutionError, Metadata, UpdateMethod, Value};
+use lightning_interfaces::types::{
+    ExecutionData,
+    ExecutionError,
+    Metadata,
+    ProtocolParamKey,
+    ProtocolParamValue,
+    UpdateMethod,
+    Value,
+};
 use lightning_interfaces::SyncQueryRunnerInterface;
 use lightning_utils::application::QueryRunnerExt;
 use tempfile::tempdir;
@@ -303,7 +311,11 @@ async fn test_distribute_rewards() {
         &node_1_proportion * HpUfixed::from(1_u64) + &node_2_proportion * HpUfixed::from(4_u64);
 
     // calculate emissions per unit
-    let emissions: HpUfixed<18> = (inflation * supply_at_year_start) / &365.0.into();
+    let epochs_per_year = match query_runner.get_protocol_param(&ProtocolParamKey::EpochsPerYear) {
+        Some(ProtocolParamValue::EpochsPerYear(v)) => v,
+        _ => unreachable!(),
+    };
+    let emissions: HpUfixed<18> = (inflation * supply_at_year_start) / &epochs_per_year.into();
     let emissions_for_node = &emissions * &node_share;
 
     // assert flk balances node 1
@@ -421,12 +433,17 @@ async fn test_supply_across_epoch() {
     let _node_1_usd = 0.1 * 10000_f64;
 
     // calculate emissions per unit
+    let epochs_per_year = match query_runner.get_protocol_param(&ProtocolParamKey::EpochsPerYear) {
+        Some(ProtocolParamValue::EpochsPerYear(v)) => v,
+        _ => unreachable!(),
+    };
     let emissions_per_epoch: HpUfixed<18> = (&inflation * &supply_at_year_start) / &365.0.into();
 
     let mut supply = supply_at_year_start;
 
-    // 365 epoch changes to see if the current supply and year start suppply are ok
-    for epoch in 0..365 {
+    // Iterate over `epochs_per_year` epoch changes to see if the current supply and year start
+    // suppply are ok
+    for epoch in 0..epochs_per_year {
         // add at least one transaction per epoch, so reward pool is not zero
         let nonce = get_node_nonce(&query_runner, &node_secret_key.to_pk());
         let pod_10 = prepare_pod_request(10000, 0, &node_secret_key, nonce + 1);
@@ -471,7 +488,7 @@ async fn test_supply_across_epoch() {
         supply += supply_increase;
         assert_eq!(total_supply, supply);
 
-        if epoch == 364 {
+        if epoch == epochs_per_year - 1 {
             // the supply_year_start should update
             let supply_year_start = match query_runner.get_metadata(&Metadata::SupplyYearStart) {
                 Some(Value::HpUfixed(s)) => s,
