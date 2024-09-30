@@ -6,23 +6,44 @@ use deno_core::v8::OwnedIsolate;
 
 use crate::runtime::Runtime;
 
-pub struct IsolateGuard<'a> {
+/// Guards the Isolate of a Deno runtime instance.
+///
+/// This is simply a wrapper for any future that needs
+/// to handle a `JsRuntime` instance. It maintains a
+/// thread state invariant required by the library
+/// so that multiple futures can handle multiple
+/// instances in the same thread.
+pub struct IsolateGuard {
+    rt: Runtime,
+}
+
+impl IsolateGuard {
+    pub fn new(rt: Runtime) -> Self {
+        Self { rt }
+    }
+
+    pub fn guard<'a, F>(&'a mut self, f: F) -> GuardedIsolateFuture
+    where
+        F: FnOnce(&'a mut Runtime) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + 'a>>,
+    {
+        let ptr = self.rt.deno.v8_isolate() as *mut _;
+        GuardedIsolateFuture {
+            ptr,
+            f: f(&mut self.rt),
+        }
+    }
+
+    pub fn destroy(self) -> Runtime {
+        self.rt
+    }
+}
+
+pub struct GuardedIsolateFuture<'a> {
     ptr: *mut OwnedIsolate,
     f: Pin<Box<dyn Future<Output = anyhow::Result<()>> + 'a>>,
 }
 
-impl<'a> IsolateGuard<'a> {
-    pub fn new<F>(mut runtime: &'a mut Runtime, f: F) -> Self
-    where
-        F: FnOnce(&'a mut Runtime) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + 'a>>,
-    {
-        let isolate = runtime.deno.v8_isolate() as *mut _;
-        Self {
-            ptr: isolate,
-            f: f(runtime),
-        }
-    }
-
+impl<'a> GuardedIsolateFuture<'a> {
     fn enter(&mut self) {
         let runtime = unsafe { self.ptr.as_mut().expect("Pointer to be non-null") };
         unsafe {
@@ -38,7 +59,7 @@ impl<'a> IsolateGuard<'a> {
     }
 }
 
-impl<'a> Future for IsolateGuard<'a> {
+impl<'a> Future for GuardedIsolateFuture<'a> {
     type Output = anyhow::Result<()>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
