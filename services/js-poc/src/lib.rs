@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use anyhow::{bail, Context};
 use deno_core::v8::{Global, IsolateHandle, Value};
 use deno_core::{serde_v8, v8, JsRuntime, ModuleSpecifier};
@@ -142,13 +144,15 @@ async fn handle_request(
     }
 
     let mut guard = IsolateGuard::new(runtime);
-    guard
-        .guard(|rt| {
+    tokio::time::timeout(
+        Duration::from_secs(15),
+        guard.guard(|rt| {
             Box::pin(handle_request_and_respond(
                 rt, connection, module_url, param,
             ))
-        })
-        .await?;
+        }),
+    )
+    .await??;
 
     let mut runtime = guard.destroy();
 
