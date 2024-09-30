@@ -29,7 +29,7 @@ impl IsolateGuard {
         let ptr = self.rt.deno.v8_isolate() as *mut _;
         GuardedIsolateFuture {
             ptr,
-            f: f(&mut self.rt),
+            fut: f(&mut self.rt),
         }
     }
 
@@ -40,7 +40,7 @@ impl IsolateGuard {
 
 pub struct GuardedIsolateFuture<'a> {
     ptr: *mut OwnedIsolate,
-    f: Pin<Box<dyn Future<Output = anyhow::Result<()>> + 'a>>,
+    fut: Pin<Box<dyn Future<Output = anyhow::Result<()>> + 'a>>,
 }
 
 impl<'a> GuardedIsolateFuture<'a> {
@@ -64,7 +64,7 @@ impl<'a> Future for GuardedIsolateFuture<'a> {
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         self.as_mut().enter();
-        let res = self.as_mut().f.as_mut().poll(cx);
+        let res = self.as_mut().fut.as_mut().poll(cx);
         self.as_mut().exit();
         res
     }

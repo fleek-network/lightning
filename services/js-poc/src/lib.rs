@@ -135,7 +135,7 @@ async fn handle_request(
     }
 
     let mut guard = IsolateGuard::new(runtime);
-    tokio::time::timeout(
+    let res = tokio::time::timeout(
         Duration::from_secs(15),
         guard.guard(|rt| {
             Box::pin(handle_request_and_respond(
@@ -143,13 +143,15 @@ async fn handle_request(
             ))
         }),
     )
-    .await??;
+    .await;
 
     let mut runtime = guard.destroy();
 
     unsafe {
         runtime.deno.v8_isolate().enter();
     }
+
+    res??;
 
     let feed = runtime.end();
     debug!("{feed:?}");
