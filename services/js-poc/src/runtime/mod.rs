@@ -219,7 +219,7 @@ impl Runtime {
     }
 
     /// End and collect the punch tape
-    pub fn end(&mut self) -> Vec<Punch> {
+    pub fn end(self) -> Vec<Punch> {
         self.tape.end()
     }
 }
