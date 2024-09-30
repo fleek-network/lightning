@@ -151,6 +151,9 @@ async fn handle_request(
         runtime.deno.v8_isolate().enter();
     }
 
+    let feed = runtime.end();
+    debug!("{feed:?}");
+
     Ok(())
 }
 
@@ -175,9 +178,6 @@ async fn handle_request_and_respond(
         .context("Execution timeout")??;
 
     parse_and_respond(connection, runtime, res).await?;
-
-    let feed = runtime.end();
-    debug!("{feed:?}");
 
     Ok(())
 }
