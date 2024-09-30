@@ -1,12 +1,11 @@
 use std::time::Duration;
 
 use anyhow::{bail, Context};
-use deno_core::v8::{Global, IsolateHandle, Value};
+use deno_core::v8::{Global, Value};
 use deno_core::{serde_v8, v8, JsRuntime, ModuleSpecifier};
 use fn_sdk::connection::Connection;
 use fn_sdk::header::TransportDetail;
 use fn_sdk::http_util::{respond, respond_with_error, respond_with_http_response};
-use tokio::sync::mpsc::UnboundedSender;
 use tokio_util::task::LocalPoolHandle;
 use tracing::{debug, error, info};
 
@@ -41,15 +40,11 @@ pub async fn main() {
     // Initialize node polyfill imports
     runtime::module_loader::get_or_init_imports();
 
-    // To cancel events mid execution.
-    let (tx, _rx) = tokio::sync::mpsc::unbounded_channel::<IsolateHandle>();
-
     let pool = LocalPoolHandle::new(num_cpus::get());
     while let Ok(conn) = listener.accept().await {
-        let tx_clone = tx.clone();
         pool.spawn_pinned(|| {
             tokio::task::spawn_local(async move {
-                if let Err(e) = handle_connection(tx_clone, conn).await {
+                if let Err(e) = handle_connection(conn).await {
                     error!("session failed: {e:?}");
                 }
             })
@@ -57,10 +52,7 @@ pub async fn main() {
     }
 }
 
-async fn handle_connection(
-    tx: UnboundedSender<IsolateHandle>,
-    mut connection: Connection,
-) -> anyhow::Result<()> {
+async fn handle_connection(mut connection: Connection) -> anyhow::Result<()> {
     match &connection.header.transport_detail {
         TransportDetail::HttpRequest { .. } => {
             let body = connection
@@ -79,14 +71,14 @@ async fn handle_connection(
             let request = http::request::extract(url, header, method, body.to_vec())
                 .context("failed to parse request")?;
 
-            if let Err(e) = handle_request(0, &mut connection, &tx, request).await {
+            if let Err(e) = handle_request(0, &mut connection, request).await {
                 respond_with_error(&mut connection, format!("{e:?}").as_bytes(), 400).await?;
                 return Err(e);
             }
         },
         TransportDetail::Task { depth, payload } => {
             let request: Request = serde_json::from_slice(payload)?;
-            if let Err(e) = handle_request(*depth, &mut connection, &tx, request).await {
+            if let Err(e) = handle_request(*depth, &mut connection, request).await {
                 respond_with_error(&mut connection, e.to_string().as_bytes(), 400).await?;
                 return Err(e);
             }
@@ -94,7 +86,7 @@ async fn handle_connection(
         TransportDetail::Other => {
             while let Some(payload) = connection.read_payload().await {
                 let request: Request = serde_json::from_slice(&payload)?;
-                if let Err(e) = handle_request(0, &mut connection, &tx, request).await {
+                if let Err(e) = handle_request(0, &mut connection, request).await {
                     respond_with_error(&mut connection, e.to_string().as_bytes(), 400).await?;
                     return Err(e);
                 };
@@ -108,7 +100,6 @@ async fn handle_connection(
 async fn handle_request(
     depth: u8,
     connection: &mut Connection,
-    _tx: &UnboundedSender<IsolateHandle>,
     request: Request,
 ) -> anyhow::Result<()> {
     let Request {
