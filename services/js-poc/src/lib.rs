@@ -1,11 +1,12 @@
-use std::time::Duration;
-
 use anyhow::{bail, Context};
-use deno_core::v8::{Global, Value};
+use deno_core::futures::stream::FuturesUnordered;
+use deno_core::futures::StreamExt;
+use deno_core::v8::{Global, IsolateHandle, Value};
 use deno_core::{serde_v8, v8, JsRuntime, ModuleSpecifier};
 use fn_sdk::connection::Connection;
 use fn_sdk::header::TransportDetail;
 use fn_sdk::http_util::{respond, respond_with_error, respond_with_http_response};
+use tokio::sync::mpsc::UnboundedSender;
 use tokio_util::task::LocalPoolHandle;
 use tracing::{debug, error, info};
 
@@ -40,11 +41,33 @@ pub async fn main() {
     // Initialize node polyfill imports
     runtime::module_loader::get_or_init_imports();
 
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<IsolateHandle>();
+    tokio::task::spawn(async move {
+        let mut isolates = FuturesUnordered::new();
+        loop {
+            tokio::select! {
+                next = rx.recv() => {
+                    match next {
+                        Some(isolate) => {
+                            isolates.push(async move {
+                                tokio::time::sleep(params::REQ_TIMEOUT).await;
+                                isolate.terminate_execution();
+                            })
+                        }
+                        None => break,
+                    }
+                }
+                Some(_) = isolates.next() => {}
+            }
+        }
+    });
+
     let pool = LocalPoolHandle::new(num_cpus::get());
     while let Ok(conn) = listener.accept().await {
+        let tx_clone = tx.clone();
         pool.spawn_pinned(|| {
             tokio::task::spawn_local(async move {
-                if let Err(e) = handle_connection(conn).await {
+                if let Err(e) = handle_connection(conn, tx_clone).await {
                     error!("session failed: {e:?}");
                 }
             })
@@ -52,7 +75,10 @@ pub async fn main() {
     }
 }
 
-async fn handle_connection(mut connection: Connection) -> anyhow::Result<()> {
+async fn handle_connection(
+    mut connection: Connection,
+    tx: UnboundedSender<IsolateHandle>,
+) -> anyhow::Result<()> {
     match &connection.header.transport_detail {
         TransportDetail::HttpRequest { .. } => {
             let body = connection
@@ -71,14 +97,14 @@ async fn handle_connection(mut connection: Connection) -> anyhow::Result<()> {
             let request = http::request::extract(url, header, method, body.to_vec())
                 .context("failed to parse request")?;
 
-            if let Err(e) = handle_request(0, &mut connection, request).await {
+            if let Err(e) = handle_request(0, &mut connection, tx, request).await {
                 respond_with_error(&mut connection, format!("{e:?}").as_bytes(), 400).await?;
                 return Err(e);
             }
         },
         TransportDetail::Task { depth, payload } => {
             let request: Request = serde_json::from_slice(payload)?;
-            if let Err(e) = handle_request(*depth, &mut connection, request).await {
+            if let Err(e) = handle_request(*depth, &mut connection, tx, request).await {
                 respond_with_error(&mut connection, e.to_string().as_bytes(), 400).await?;
                 return Err(e);
             }
@@ -86,7 +112,7 @@ async fn handle_connection(mut connection: Connection) -> anyhow::Result<()> {
         TransportDetail::Other => {
             while let Some(payload) = connection.read_payload().await {
                 let request: Request = serde_json::from_slice(&payload)?;
-                if let Err(e) = handle_request(0, &mut connection, request).await {
+                if let Err(e) = handle_request(0, &mut connection, tx.clone(), request).await {
                     respond_with_error(&mut connection, e.to_string().as_bytes(), 400).await?;
                     return Err(e);
                 };
@@ -100,6 +126,7 @@ async fn handle_connection(mut connection: Connection) -> anyhow::Result<()> {
 async fn handle_request(
     depth: u8,
     connection: &mut Connection,
+    tx: UnboundedSender<IsolateHandle>,
     request: Request,
 ) -> anyhow::Result<()> {
     let Request {
@@ -129,21 +156,20 @@ async fn handle_request(
     // Create runtime and execute the source.
     let mut runtime =
         Runtime::new(location.clone(), depth).context("Failed to initialize runtime")?;
+    tx.send(runtime.deno.v8_isolate().thread_safe_handle())?;
 
     unsafe {
         runtime.deno.v8_isolate().exit();
     }
 
     let mut guard = IsolateGuard::new(runtime);
-    let res = tokio::time::timeout(
-        Duration::from_secs(15),
-        guard.guard(|rt| {
+    let res = guard
+        .guard(|rt| {
             Box::pin(handle_request_and_respond(
                 rt, connection, module_url, param,
             ))
-        }),
-    )
-    .await;
+        })
+        .await;
 
     let mut runtime = guard.destroy();
 
@@ -151,7 +177,7 @@ async fn handle_request(
         runtime.deno.v8_isolate().enter();
     }
 
-    res??;
+    res?;
 
     let feed = runtime.end();
     debug!("{feed:?}");
