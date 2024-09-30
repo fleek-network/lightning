@@ -161,7 +161,7 @@ tiny-keccak = { version = "2", features = ["keccak", "sha3"] }
 tokio = { version = "1", features = ["full", "test-util", "tracing"] }
 tokio-rustls = { version = "0.24" }
 tokio-stream = { version = "0.1", features = ["net", "sync"] }
-tokio-util = { version = "0.7", features = ["codec", "compat", "io", "time"] }
+tokio-util = { version = "0.7", features = ["codec", "compat", "io", "rt", "time"] }
 toml_datetime = { version = "0.6", default-features = false, features = ["serde"] }
 tonic = { version = "0.12" }
 tower = { version = "0.4", features = ["full"] }
@@ -328,7 +328,7 @@ tiny-keccak = { version = "2", features = ["keccak", "sha3"] }
 tokio = { version = "1", features = ["full", "test-util", "tracing"] }
 tokio-rustls = { version = "0.24" }
 tokio-stream = { version = "0.1", features = ["net", "sync"] }
-tokio-util = { version = "0.7", features = ["codec", "compat", "io", "time"] }
+tokio-util = { version = "0.7", features = ["codec", "compat", "io", "rt", "time"] }
 toml_datetime = { version = "0.6", default-features = false, features = ["serde"] }
 tonic = { version = "0.12" }
 tower = { version = "0.4", features = ["full"] }
