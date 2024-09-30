@@ -155,7 +155,7 @@ async fn handle_request(
 }
 
 async fn handle_request_and_respond(
-    mut runtime: &mut Runtime,
+    runtime: &mut Runtime,
     connection: &mut Connection,
     module_url: ModuleSpecifier,
     param: Option<serde_json::Value>,
@@ -174,7 +174,7 @@ async fn handle_request_and_respond(
         .await
         .context("Execution timeout")??;
 
-    parse_and_respond(connection, &mut runtime, res).await?;
+    parse_and_respond(connection, runtime, res).await?;
 
     let feed = runtime.end();
     debug!("{feed:?}");
