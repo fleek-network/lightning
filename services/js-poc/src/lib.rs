@@ -1,9 +1,5 @@
-use std::future::Future;
-use std::pin::Pin;
-use std::task::Poll;
-
 use anyhow::{bail, Context};
-use deno_core::v8::{Global, IsolateHandle, OwnedIsolate, Value};
+use deno_core::v8::{Global, IsolateHandle, Value};
 use deno_core::{serde_v8, v8, JsRuntime, ModuleSpecifier};
 use fn_sdk::connection::Connection;
 use fn_sdk::header::TransportDetail;
@@ -44,7 +40,7 @@ pub async fn main() {
     runtime::module_loader::get_or_init_imports();
 
     // To cancel events mid execution.
-    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<IsolateHandle>();
+    let (tx, _rx) = tokio::sync::mpsc::unbounded_channel::<IsolateHandle>();
 
     let pool = LocalPoolHandle::new(num_cpus::get());
     while let Ok(conn) = listener.accept().await {
@@ -110,7 +106,7 @@ async fn handle_connection(
 async fn handle_request(
     depth: u8,
     connection: &mut Connection,
-    tx: &UnboundedSender<IsolateHandle>,
+    _tx: &UnboundedSender<IsolateHandle>,
     request: Request,
 ) -> anyhow::Result<()> {
     let Request {
@@ -145,10 +141,16 @@ async fn handle_request(
         runtime.deno.v8_isolate().exit();
     }
 
-    IsolateGuard::new(&mut runtime, |rt| {
-        Box::pin(run(rt, connection, module_url, param))
-    })
-    .await?;
+    let mut guard = IsolateGuard::new(runtime);
+    guard
+        .guard(|rt| {
+            Box::pin(handle_request_and_respond(
+                rt, connection, module_url, param,
+            ))
+        })
+        .await?;
+
+    let mut runtime = guard.destroy();
 
     unsafe {
         runtime.deno.v8_isolate().enter();
@@ -157,7 +159,7 @@ async fn handle_request(
     Ok(())
 }
 
-async fn run(
+async fn handle_request_and_respond(
     mut runtime: &mut Runtime,
     connection: &mut Connection,
     module_url: ModuleSpecifier,
