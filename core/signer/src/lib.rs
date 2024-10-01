@@ -98,17 +98,9 @@ impl<C: NodeComponents> Signer<C> {
         let subscriber = notifier.subscribe_block_executed();
         let worker = this.worker.clone();
 
-        // Initialize the worker's state.
-        let mut guard = worker.state.lock().await;
-        let mut node_index = LazyNodeIndex::new(guard.node_public_key);
-        let chain_id = query_runner.get_chain_id();
-        let nonce = node_index.query_nonce(&query_runner);
-        guard.init_state(chain_id, nonce);
-        drop(guard);
-
         spawn!(
             async move {
-                new_block_task(node_index, worker, subscriber, query_runner).await;
+                new_block_task(worker, subscriber, query_runner).await;
             },
             "SIGNER: new block task"
         );
@@ -310,11 +302,23 @@ struct PendingTransaction {
 }
 
 async fn new_block_task<Q: SyncQueryRunnerInterface>(
-    mut node_index: LazyNodeIndex,
     worker: SignerWorker,
     mut subscriber: impl Subscriber<BlockExecutedNotification>,
     query_runner: Q,
 ) {
+    query_runner.wait_for_genesis().await;
+
+    // Initialize the worker state.
+    let mut node_index = {
+        let mut guard = worker.state.lock().await;
+        let mut node_index = LazyNodeIndex::new(guard.node_public_key);
+        let chain_id = query_runner.get_chain_id();
+        let base_nonce = node_index.query_nonce(&query_runner);
+        guard.init_state(chain_id, base_nonce);
+
+        node_index
+    };
+
     while let Some(_notification) = subscriber.last().await {
         let nonce = node_index.query_nonce(&query_runner);
         // TODO(qti3e): Get the lock only if we have to. Timeout should get sep from block.
