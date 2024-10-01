@@ -19,7 +19,7 @@ use deno_core::{
 use fn_sdk::api::fetch_from_origin;
 use fn_sdk::blockstore::ContentHandle;
 use tokio::sync::Semaphore;
-use tracing::{debug, trace, warn};
+use tracing::{debug, trace, warn, info};
 
 static IMPORTS: OnceLock<HashMap<ModuleSpecifier, ModuleSpecifier>> = OnceLock::new();
 
@@ -91,7 +91,7 @@ impl ModuleLoader for FleekModuleLoader {
         _is_dyn_import: bool,
         requested_module_type: RequestedModuleType,
     ) -> ModuleLoadResponse {
-        trace!(
+        info!(
             "LOAD specifier: {module_specifier} maybe_referrer {}",
             maybe_referrer.map(|m| m.as_str()).unwrap_or("none")
         );
@@ -102,6 +102,20 @@ impl ModuleLoader for FleekModuleLoader {
                 ModuleType::JavaScript,
                 ModuleSourceCode::String(
                     include_str!("../../polyfill/overrides/util.js")
+                        .to_string()
+                        .into(),
+                ),
+                module_specifier,
+                None,
+            )));
+        }
+
+        // Manually override module
+        if module_specifier.as_str() == "node:async_hooks" {
+            return ModuleLoadResponse::Sync(Ok(ModuleSource::new(
+                ModuleType::JavaScript,
+                ModuleSourceCode::String(
+                    include_str!("../../polyfill/overrides/async_hooks.js")
                         .to_string()
                         .into(),
                 ),

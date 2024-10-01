@@ -1,16 +1,5 @@
 {
   "version": "3",
-  "packages": {
-    "specifiers": {
-      "npm:@types/node": "npm:@types/node@18.16.19"
-    },
-    "npm": {
-      "@types/node@18.16.19": {
-        "integrity": "sha512-IXl7o+R9iti9eBW4Wg2hx1xQDig183jj7YLn8F7udNceyfkbn1ZxmzZXuak20gR40D7pIkIY1kYGx5VIGbaHKA==",
-        "dependencies": {}
-      }
-    }
-  },
   "remote": {
     "https://esm.sh/v135/asn1.js@5.4.1/es2022/asn1.mjs": "8aafe66452968b1016f091a04223af96cffab10ae4bfdb5dfa32e1c35d535025",
     "https://esm.sh/v135/assert@2.1.0/es2022/assert.mjs": "c768a407feafb70c1d5fccd8500514cba88f414a02aee4cc1e40df73d63c46a9",
