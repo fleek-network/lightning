@@ -367,4 +367,25 @@ impl<B: Backend> StateExecutor<B> {
             }
         }
     }
+
+    fn calculate_emissions(&self) -> HpUfixed<18> {
+        let percentage_divisor = HpUfixed::<18>::from(100_u64);
+
+        let inflation_percent = match self.parameters.get(&ProtocolParamKey::MaxInflation) {
+            Some(ProtocolParamValue::MaxInflation(v)) => HpUfixed::<18>::from(v),
+            _ => HpUfixed::<18>::from(0_u16), // set in genesis
+        };
+
+        let epoch_per_year = self.get_epochs_per_year();
+
+        let inflation: HpUfixed<18> =
+            (&inflation_percent / &percentage_divisor).convert_precision();
+
+        let supply_at_year_start = match self.metadata.get(&Metadata::SupplyYearStart) {
+            Some(Value::HpUfixed(supply)) => supply,
+            _ => panic!("SupplyYearStart is set genesis and should never be empty"),
+        };
+
+        (&inflation * &supply_at_year_start.convert_precision()) / &epoch_per_year.into()
+    }
 }
