@@ -575,9 +575,9 @@ dependencies = [
 
 [[package]]
 name = "arrayref"
-version = "0.3.8"
+version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d151e35f61089500b617991b791fc8bfd237ae50cd5950803758a179b41e67a"
+checksum = "76a2e8124351fda1ef8aaaa3bbd7ebbcb486bbcd4225aca0aa0d84bb2db8fecb"
 
 [[package]]
 name = "arrayvec"
@@ -974,37 +974,6 @@ name = "atomic_float"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "62af46d040ba9df09edc6528dae9d8e49f5f3e82f55b7d2ec31a733c38dbc49d"
-
-[[package]]
-name = "atomo"
-version = "0.0.5"
-dependencies = [
- "arc-swap",
- "bincode",
- "dashmap",
- "fxhash",
- "im",
- "once-ptr 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "rand 0.8.5",
- "seize",
- "serde",
-]
-
-[[package]]
-name = "atomo"
-version = "0.0.5"
-source = "git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.4#3b21025a5946fda345813453b58ca5c0f6dcb4e4"
-dependencies = [
- "arc-swap",
- "bincode",
- "dashmap",
- "fxhash",
- "im",
- "once-ptr 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "rand 0.8.5",
- "seize",
- "serde",
-]
 
 [[package]]
 name = "atomo-rocks"
@@ -4833,7 +4802,7 @@ dependencies = [
  "fn-sdk 0.0.0 (git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.4)",
  "futures 0.3.30",
  "hex",
- "reqwest 0.12.7",
+ "reqwest 0.12.8",
  "serde",
  "serde-big-array",
  "serde_cbor",
@@ -6700,9 +6669,9 @@ dependencies = [
 
 [[package]]
 name = "k256"
-version = "0.13.3"
+version = "0.13.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "956ff9b67e26e1a6a866cb758f12c6f8746208489e3e4a4b5580802f2f0a587b"
+checksum = "f6e3919bbaa2945715f0bb6d3934a173d1e9a59ac23767fbaaef277265a7411b"
 dependencies = [
  "cfg-if 1.0.0",
  "ecdsa",
@@ -7282,12 +7251,12 @@ dependencies = [
  "lightning-checkpointer",
  "lightning-consensus",
  "lightning-dack-aggregator",
- "lightning-final-bindings",
  "lightning-guard",
  "lightning-handshake",
  "lightning-interfaces",
  "lightning-keystore",
  "lightning-node",
+ "lightning-node-bindings",
  "lightning-pinger",
  "lightning-pool",
  "lightning-rep-collector",
@@ -7402,12 +7371,12 @@ dependencies = [
  "lightning-broadcast",
  "lightning-checkpointer",
  "lightning-consensus",
- "lightning-final-bindings",
  "lightning-firewall",
  "lightning-handshake",
  "lightning-interfaces",
  "lightning-keystore",
  "lightning-node",
+ "lightning-node-bindings",
  "lightning-notifier",
  "lightning-pinger",
  "lightning-pool",
@@ -7471,44 +7440,6 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-stream",
- "tracing",
-]
-
-[[package]]
-name = "lightning-final-bindings"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "lightning-application",
- "lightning-archive",
- "lightning-blockstore",
- "lightning-blockstore-server",
- "lightning-broadcast",
- "lightning-checkpointer",
- "lightning-consensus",
- "lightning-fetcher",
- "lightning-forwarder",
- "lightning-handshake",
- "lightning-indexer",
- "lightning-interfaces",
- "lightning-keystore",
- "lightning-notifier",
- "lightning-origin-demuxer",
- "lightning-pinger",
- "lightning-pool",
- "lightning-rep-collector",
- "lightning-resolver",
- "lightning-rpc",
- "lightning-service-executor",
- "lightning-signer",
- "lightning-syncronizer",
- "lightning-task-broker",
- "lightning-test-utils",
- "lightning-topology",
- "lightning-utils",
- "lightning-workspace-hack",
- "resolved-pathbuf 0.2.0",
- "toml 0.7.8",
  "tracing",
 ]
 
@@ -7722,6 +7653,44 @@ dependencies = [
  "lightning-workspace-hack",
  "thread-local-panic-hook",
  "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "lightning-node-bindings"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "lightning-application",
+ "lightning-archive",
+ "lightning-blockstore",
+ "lightning-blockstore-server",
+ "lightning-broadcast",
+ "lightning-checkpointer",
+ "lightning-consensus",
+ "lightning-fetcher",
+ "lightning-forwarder",
+ "lightning-handshake",
+ "lightning-indexer",
+ "lightning-interfaces",
+ "lightning-keystore",
+ "lightning-notifier",
+ "lightning-origin-demuxer",
+ "lightning-pinger",
+ "lightning-pool",
+ "lightning-rep-collector",
+ "lightning-resolver",
+ "lightning-rpc",
+ "lightning-service-executor",
+ "lightning-signer",
+ "lightning-syncronizer",
+ "lightning-task-broker",
+ "lightning-test-utils",
+ "lightning-topology",
+ "lightning-utils",
+ "lightning-workspace-hack",
+ "resolved-pathbuf 0.2.0",
+ "toml 0.7.8",
  "tracing",
 ]
 
@@ -8511,7 +8480,6 @@ dependencies = [
  "prettyplease 0.2.20",
  "primitive-types 0.12.2",
  "proc-macro-error",
- "proc-macro2 0.4.30",
  "proc-macro2 1.0.86",
  "prost 0.11.9",
  "prost 0.12.6",
@@ -8520,7 +8488,6 @@ dependencies = [
  "quinn",
  "quinn-proto",
  "quinn-udp",
- "quote 0.6.13",
  "quote 1.0.36",
  "rand 0.8.5",
  "rand_chacha",
@@ -8546,8 +8513,6 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with 2.3.3",
- "sgx-isa",
- "sgxs",
  "sha1",
  "sha2 0.10.8",
  "sha2 0.9.9",
@@ -8559,7 +8524,6 @@ dependencies = [
  "spin 0.9.8",
  "spki 0.7.3",
  "subtle",
- "syn 0.15.44",
  "syn 1.0.109",
  "syn 2.0.72",
  "time",
@@ -12252,9 +12216,9 @@ dependencies = [
 
 [[package]]
 name = "reqwest"
-version = "0.12.7"
+version = "0.12.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8f4955649ef5c38cc7f9e8aa41761d48fb9677197daea9984dc54f56aad5e63"
+checksum = "f713147fbe92361e52392c73b8c9e48c04c6625bce969ef54dc901e58e042a7b"
 dependencies = [
  "base64 0.22.1",
  "bytes 1.7.1",
@@ -13178,9 +13142,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.127"
+version = "1.0.128"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8043c06d9f82bd7271361ed64f415fe5e12a77fdb52e573e7f06a516dea329ad"
+checksum = "6ff5456707a1de34e7e37f2a6fd3d3f808c318259cbd01ab6377795054b483d8"
 dependencies = [
  "indexmap 2.3.0",
  "itoa",
@@ -14511,18 +14475,18 @@ checksum = "3369f5ac52d5eb6ab48c6b4ffdc8efbcad6b89c765749064ba298f2c68a16a76"
 
 [[package]]
 name = "thiserror"
-version = "1.0.63"
+version = "1.0.64"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0342370b38b6a11b6cc11d6a805569958d54cfa061a29969c3b5ce2ea405724"
+checksum = "d50af8abc119fb8bb6dbabcfa89656f46f84aa0ac7688088608076ad2b459a84"
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "1.0.63"
+version = "1.0.64"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4558b58466b9ad7ca0f102865eccc95938dca1a74a856f2b57b6629050da261"
+checksum = "08904e7672f5eb876eaaf87e0ce17857500934f4981c4a0ab2b4aa98baac7fc3"
 dependencies = [
  "proc-macro2 1.0.86",
  "quote 1.0.36",
