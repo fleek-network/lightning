@@ -1,0 +1,142 @@
+chain_id = 59330
+epoch_start = 1727759170068
+epoch_time = 1800000
+committee_size = 4
+node_count = 100
+min_stake = 1000
+eligibility_time = 1
+lock_time = 5
+protocol_share = 0
+node_share = 80
+service_builder_share = 20
+max_inflation = 10
+consumer_rebate = 0
+max_boost = 4
+max_lock_time = 1460                                                 # 1460 days(epoch) meaning 4 years
+supply_at_genesis = 1000000                                          # set to 1 million for testing, to be determined when initial allocations are set
+min_num_measurements = 4
+sgx_shared_pub_key = "03a3fe41244add26af1f820d2acb4ad22b158ff7b69ce41401bf932d7734eb5d49"
+protocol_fund_address = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
+governance_address = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
+
+[[node_info]]
+owner = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
+primary_public_key = "6juSKWradhYu7rgoyg5g7Fyo2dSAWdTgUYR95Et1Hokj"
+consensus_public_key = "23NmbYcuc4qvXCyXcx19o41aku7Kz5VhtzUrtybiAnidyU1TX82McfU3qBd6WphaFm15tQXCod4zH3z4nJ8mWAshY7ypG14QK45Ed17ZT6xtHYCntJZCJRzk2qSf7jvvQPqv"
+worker_public_key = "6juSKWradhYu7rgoyg5g7Fyo2dSAWdTgUYR95Et1Hokj"
+primary_domain = "162.19.99.179"
+worker_domain = "162.19.99.179"
+ports.primary = 4310
+ports.worker = 4311
+ports.mempool = 4210
+ports.rpc = 4240
+ports.pool = 4300
+ports.pinger = 4350
+ports.handshake.http = 80
+ports.handshake.webrtc = 4320
+ports.handshake.webtransport = 4321
+stake.staked = "1000"
+stake.stake_locked_until = 0
+stake.locked = "0"
+stake.locked_until = 0
+genesis_committee = true
+
+[[node_info]]
+owner = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
+primary_public_key = "HkAXaMqczrC9NPxyhJ59KnSqBQU96o8qnW6urDaCPw3P"
+consensus_public_key = "nuRhivVwS8YsvNcNhBwVybdPh4AJRvrWix1gkhicBUmNfzkko1q5rNpEuCrVghU3jKNGKpcsHeWwYrBFavoynCNRCf2WjEM36TqxQ5WjwwYySVnBApF7vdcFDhQcBPa1WiZ"
+worker_public_key = "HkAXaMqczrC9NPxyhJ59KnSqBQU96o8qnW6urDaCPw3P"
+primary_domain = "141.95.64.216"
+worker_domain = "141.95.64.216"
+ports.primary = 4310
+ports.worker = 4311
+ports.mempool = 4210
+ports.rpc = 4240
+ports.pool = 4300
+ports.pinger = 4350
+ports.handshake.http = 80
+ports.handshake.webrtc = 4320
+ports.handshake.webtransport = 4321
+stake.staked = "1000"
+stake.stake_locked_until = 0
+stake.locked = "0"
+stake.locked_until = 0
+genesis_committee = true
+
+[[node_info]]
+owner = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
+primary_public_key = "AwASeZBa58DPWDHqDcTTRe1ouMqGJBq1yC1Z8iV5KBUS"
+consensus_public_key = "qwVbY2RasR6Qvs9TkdqJ56pj3U8c57AkB4F5AR6onT2EEVNMYYkKuCw2qqZY7TUkytUxnPRz8mcTA9aXtAidLt84voqDEYuef18qh1zztimL1XaZjJxQCLNapkEr5Kr2vMN"
+worker_public_key = "AwASeZBa58DPWDHqDcTTRe1ouMqGJBq1yC1Z8iV5KBUS"
+primary_domain = "15.235.216.225"
+worker_domain = "15.235.216.225"
+ports.primary = 4310
+ports.worker = 4311
+ports.mempool = 4210
+ports.rpc = 4240
+ports.pool = 4300
+ports.pinger = 4350
+ports.handshake.http = 80
+ports.handshake.webrtc = 4320
+ports.handshake.webtransport = 4321
+stake.staked = "1000"
+stake.stake_locked_until = 0
+stake.locked = "0"
+stake.locked_until = 0
+genesis_committee = true
+
+[[node_info]]
+owner = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
+primary_public_key = "FFcZTqxpFaoWw5d5zQMmQtjdUSUUYqBe3vHzWJ6khrR1"
+consensus_public_key = "tTiLV8R7m4ZFCxXesYhZ9YppxgVRsMqwvDgsMaNXeC9iXESKLRmqUpH9rSETX1ktjdLMMwvX5kra1WHJSZQijy1TK8RkiobXB8gtjWtCLA62pJoYhazRHkJMaAmSmJ93y1L"
+worker_public_key = "FFcZTqxpFaoWw5d5zQMmQtjdUSUUYqBe3vHzWJ6khrR1"
+primary_domain = "198.244.228.198"
+worker_domain = "198.244.228.198"
+ports.primary = 4310
+ports.worker = 4311
+ports.mempool = 4210
+ports.rpc = 4240
+ports.pool = 4300
+ports.pinger = 4350
+ports.handshake.http = 80
+ports.handshake.webrtc = 4320
+ports.handshake.webtransport = 4321
+stake.staked = "1000"
+stake.stake_locked_until = 0
+stake.locked = "0"
+stake.locked_until = 0
+genesis_committee = true
+
+
+
+[[service]]
+id = 0
+owner = "0xDC0A31F9eeb151f82BF1eE6831095284fC215Ee7"
+commodity_type = "Bandwidth"
+
+[[service]]
+id = 1
+owner = "0x684166BDbf530a256d7c92Fa0a4128669aFd9B9F"
+commodity_type = "Compute"
+
+[[account]]
+public_key = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
+flk_balance = "100690000000000000000"
+stables_balance = 100
+bandwidth_balance = 100
+
+[[commodity_prices]]
+commodity = "Bandwidth"
+price = 0.1
+
+[[commodity_prices]]
+commodity = "Compute"
+price = 1
+
+[rep_scores]
+
+[total_served]
+
+[current_epoch_served]
+
+[client]
