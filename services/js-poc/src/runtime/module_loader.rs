@@ -91,7 +91,7 @@ impl ModuleLoader for FleekModuleLoader {
         _is_dyn_import: bool,
         requested_module_type: RequestedModuleType,
     ) -> ModuleLoadResponse {
-        trace!(
+        tracing::info!(
             "LOAD specifier: {module_specifier} maybe_referrer {}",
             maybe_referrer.map(|m| m.as_str()).unwrap_or("none")
         );
@@ -102,6 +102,32 @@ impl ModuleLoader for FleekModuleLoader {
                 ModuleType::JavaScript,
                 ModuleSourceCode::String(
                     include_str!("../../polyfill/overrides/util.js")
+                        .to_string()
+                        .into(),
+                ),
+                module_specifier,
+                None,
+            )));
+        }
+
+        if module_specifier.as_str() == "node:child_process" {
+            return ModuleLoadResponse::Sync(Ok(ModuleSource::new(
+                ModuleType::JavaScript,
+                ModuleSourceCode::String(
+                    include_str!("../../polyfill/overrides/child_process.js")
+                        .to_string()
+                        .into(),
+                ),
+                module_specifier,
+                None,
+            )));
+        }
+
+        if module_specifier.as_str() == "node:fs" {
+            return ModuleLoadResponse::Sync(Ok(ModuleSource::new(
+                ModuleType::JavaScript,
+                ModuleSourceCode::String(
+                    include_str!("../../polyfill/overrides/fs.js")
                         .to_string()
                         .into(),
                 ),

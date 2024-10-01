@@ -17,6 +17,8 @@ use deno_crypto::deno_crypto;
 use deno_url::deno_url;
 use deno_webgpu::deno_webgpu;
 use deno_webidl::deno_webidl;
+use deno_node::deno_node;
+use deno_io::deno_io;
 use extensions::fleek;
 
 use self::module_loader::FleekModuleLoader;
@@ -110,11 +112,41 @@ impl NetPermissions for Permissions {
         Err(anyhow!("paths are disabled :("))
     }
 }
+impl NodePermissions for Permissions {
+    fn check_net_url(
+        &mut self,
+        url: &deno_core::url::Url,
+        api_name: &str,
+      ) -> Result<(), deno_core::error::AnyError> {
+        self.check_net_url(url, api_name)
+    }
+
+    fn check_read_with_api_name(
+        &mut self,
+        _path: &std::path::Path,
+        _api_name: Option<&str>,
+      ) -> Result<(), deno_core::error::AnyError> {
+        Err(anyhow!("paths are disabled :("))
+    }
+
+    fn check_sys(&mut self, _kind: &str, _api_name: &str) -> Result<(), deno_core::error::AnyError> {
+        Err(anyhow!("paths are disabled :("))
+    }
+
+    fn check_write_with_api_name(
+        &mut self,
+        _path: &std::path::Path,
+        _api_name: Option<&str>,
+      ) -> Result<(), deno_core::error::AnyError> {
+        Err(anyhow!("paths are disabled :("))
+    }
+}
 
 impl Runtime {
     /// Create a new runtime
     pub fn new(location: Url, depth: u8) -> Result<Self> {
         let tape = Tape::new(location.clone());
+        let fs = MaybeArc::new(InMemoryFs::default());
         let mut deno = JsRuntime::new(RuntimeOptions {
             extensions: vec![
                 // WebApi subset
@@ -128,6 +160,9 @@ impl Runtime {
                 deno_crypto::init_ops(None),
                 deno_webgpu::init_ops(),
                 deno_canvas::init_ops(),
+                deno_io::init_ops_and_esm(None),
+                deno_fs::init_ops_and_esm::<Permissions>(fs.clone()),
+                deno_node::init_ops::<Permissions>(None, MaybeArc::new(deno_fs::InMemoryFs::default())),
                 // Fleek runtime
                 fleek::init_ops(depth),
             ],

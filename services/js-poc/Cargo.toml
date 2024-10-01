@@ -34,6 +34,10 @@ deno_crypto = "0.178"
 deno_canvas = "0.33.0"
 deno_webgpu = "0.131"
 deno_websocket = "0.169"
+deno_runtime = { git = "https://github.com/gabrielmpinto/deno.git", rev = "031f35420738337d4fa41784fa246a553b4f4b58" }
+deno_fs = { git = "https://github.com/gabrielmpinto/deno.git", rev = "031f35420738337d4fa41784fa246a553b4f4b58" }
+deno_io = { git = "https://github.com/gabrielmpinto/deno.git", rev = "031f35420738337d4fa41784fa246a553b4f4b58" }
+deno_node = { git = "https://github.com/gabrielmpinto/deno.git", rev = "031f35420738337d4fa41784fa246a553b4f4b58" }
 
 [build-dependencies]
 serde.workspace = true
@@ -51,6 +55,10 @@ deno_crypto = "0.178"
 deno_canvas = "0.33.0"
 deno_webgpu = "0.131"
 deno_websocket = "0.169"
+deno_runtime = { git = "https://github.com/gabrielmpinto/deno.git", rev = "031f35420738337d4fa41784fa246a553b4f4b58" }
+deno_fs = { git = "https://github.com/gabrielmpinto/deno.git", rev = "031f35420738337d4fa41784fa246a553b4f4b58" }
+deno_io = { git = "https://github.com/gabrielmpinto/deno.git", rev = "031f35420738337d4fa41784fa246a553b4f4b58" }
+deno_node = { git = "https://github.com/gabrielmpinto/deno.git", rev = "031f35420738337d4fa41784fa246a553b4f4b58" }
 
 [[bin]]
 name = "fn-service-1"

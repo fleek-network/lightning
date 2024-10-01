@@ -8,6 +8,7 @@
 // - https://github.com/browserify/browserify/blob/master/lib/builtins.js
 // - https://github.com/jspm/jspm-core/blob/main/package.json
 
+export * as assert from 'node:assert'
 export * as buffer from 'node:buffer'
 export * as crypto from 'node:crypto'
 export * as domain from 'node:domain'

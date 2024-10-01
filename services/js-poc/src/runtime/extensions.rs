@@ -29,7 +29,10 @@ extension!(
         deno_websocket,
         deno_crypto,
         deno_webgpu,
-        deno_canvas
+        deno_canvas,
+        deno_io,
+        deno_fs,
+        deno_node
     ],
     ops = [
         run_task,
