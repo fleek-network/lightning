@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 pub enum Network {
     LocalnetExample,
     TestnetStable,
+    TestnetStaging,
 }
 
 impl Network {
@@ -14,6 +15,7 @@ impl Network {
         let raw = match self {
             Network::LocalnetExample => include_str!("../networks/localnet-example/genesis.toml"),
             Network::TestnetStable => include_str!("../networks/testnet-stable/genesis.toml"),
+            Network::TestnetStaging => include_str!("../networks/testnet-staging/genesis.toml"),
         };
         let genesis = toml::from_str(raw).context("Failed to parse genesis file")?;
 
@@ -33,5 +35,10 @@ mod tests {
     #[test]
     fn test_testnet_stable_genesis() {
         assert!(Network::TestnetStable.genesis().is_ok());
+    }
+
+    #[test]
+    fn test_testnet_staging_genesis() {
+        assert!(Network::TestnetStaging.genesis().is_ok());
     }
 }
