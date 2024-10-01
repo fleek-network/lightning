@@ -128,7 +128,7 @@ pub async fn connection_loop<C: ConnectionInterface>(mut ctx: Context<C>) -> Res
                         }, "POOL: send request");
                     }
                     Some(Request::Stats { respond }) => {
-                        tracing::debug!("handling new stats request");
+                        tracing::trace!("handling new stats request");
                         let _ = respond.send(ctx.connection.stats());
                     }
                     Some(Request::Close) | None => {
