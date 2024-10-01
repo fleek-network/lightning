@@ -190,6 +190,8 @@ async fn before_epoch_change<Q>(
 ) where
     Q: SyncQueryRunnerInterface,
 {
+    query_runner.wait_for_genesis().await;
+
     loop {
         // We might start at the very end of an epoch or the sleep duration given to us might be
         // larger than the epoch duration (which should not happen), in these cases we want to skip
