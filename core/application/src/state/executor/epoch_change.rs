@@ -1,9 +1,11 @@
 use std::cmp::Ordering;
 use std::collections::HashMap;
 
-use fleek_crypto::TransactionSender;
+use fleek_blake3::Hasher;
+use fleek_crypto::{NodePublicKey, TransactionSender};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::types::{
+    Committee,
     Epoch,
     ExecutionData,
     ExecutionError,
@@ -18,6 +20,9 @@ use lightning_interfaces::types::{
 };
 use lightning_reputation::statistics;
 use lightning_reputation::types::WeightedReputationMeasurements;
+use rand::prelude::SliceRandom;
+use rand::rngs::StdRng;
+use rand::SeedableRng;
 
 use super::{StateExecutor, BIG_HUNDRED, DEFAULT_REP_QUANTILE, MINIMUM_UPTIME, REP_EWMA_WEIGHT};
 use crate::state::context::{Backend, TableRef};
@@ -98,6 +103,80 @@ impl<B: Backend> StateExecutor<B> {
         } else {
             self.committee_info.set(current_epoch, current_committee);
             TransactionResponse::Success(ExecutionData::None)
+        }
+    }
+
+    fn choose_new_committee(&self) -> Committee {
+        let epoch = match self.metadata.get(&Metadata::Epoch) {
+            Some(Value::Epoch(epoch)) => epoch,
+            _ => 0,
+        };
+
+        let node_registry: Vec<(NodeIndex, NodeInfo)> = self
+            .get_node_registry()
+            .into_iter()
+            .filter(|index| index.1.participation == Participation::True)
+            .collect();
+
+        let committee_size = match self.parameters.get(&ProtocolParamKey::CommitteeSize) {
+            Some(ProtocolParamValue::CommitteeSize(v)) => v,
+            _ => unreachable!(), // set in genesis
+        };
+
+        let mut active_nodes: Vec<NodeIndex> = self
+            .settle_auction(node_registry)
+            .iter()
+            .map(|node| node.0)
+            .collect();
+
+        let num_of_nodes = active_nodes.len() as u64;
+        // if total number of nodes are less than committee size, all nodes are part of committee
+        let committee = if committee_size >= num_of_nodes {
+            active_nodes.clone()
+            //   return node_registry;
+        } else {
+            let committee_table = self.committee_info.get(&epoch).unwrap();
+            let epoch_end = committee_table.epoch_end_timestamp;
+            let public_key = {
+                if !committee_table.members.is_empty() {
+                    let mid_index = committee_table.members.len() / 2;
+                    self.node_info
+                        .get(&committee_table.members[mid_index])
+                        .unwrap()
+                        .public_key
+                } else {
+                    NodePublicKey([1u8; 32])
+                }
+            };
+
+            let mut hasher = Hasher::new();
+            hasher.update(&public_key.0);
+            hasher.update(&epoch_end.to_be_bytes());
+            let result = hasher.finalize();
+            let mut seed = [0u8; 32];
+            seed.copy_from_slice(&result.as_bytes()[0..32]);
+            let mut rng: StdRng = SeedableRng::from_seed(seed);
+            active_nodes.shuffle(&mut rng);
+            active_nodes
+                .iter()
+                .take(committee_size.try_into().unwrap())
+                .copied()
+                .collect()
+        };
+
+        let epoch_length = match self.parameters.get(&ProtocolParamKey::EpochTime) {
+            Some(ProtocolParamValue::EpochTime(v)) => v,
+            _ => unreachable!(), // set in genesis
+        };
+
+        let epoch_end_timestamp =
+            self.committee_info.get(&epoch).unwrap().epoch_end_timestamp + epoch_length as u64;
+
+        Committee {
+            ready_to_change: Vec::with_capacity(committee.len()),
+            members: committee,
+            epoch_end_timestamp,
+            active_node_set: active_nodes,
         }
     }
 
