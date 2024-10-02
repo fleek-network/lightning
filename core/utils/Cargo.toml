@@ -6,16 +6,20 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-lightning-interfaces = { path = "../interfaces" }
 anyhow.workspace = true
-tokio.workspace = true
-tracing.workspace = true
 ethers.workspace = true
 fleek-crypto.workspace = true
-serde.workspace = true
-serde_json.workspace = true
+lazy_static.workspace = true
+lightning-interfaces = { path = "../interfaces" }
+lightning-workspace-hack.workspace = true
 reqwest.workspace = true
 resolved-pathbuf.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
 toml = "0.7"
-lightning-workspace-hack.workspace = true
-lazy_static.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+lightning-test-utils.workspace = true
