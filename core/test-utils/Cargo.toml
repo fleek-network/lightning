@@ -26,6 +26,7 @@ lightning-blockstore.workspace = true
 lightning-consensus.workspace = true
 lightning-broadcast.workspace = true
 lightning-checkpointer.workspace = true
+lightning-committee-beacon.workspace = true
 lightning-forwarder.workspace = true
 lightning-interfaces.workspace = true
 lightning-node.workspace = true

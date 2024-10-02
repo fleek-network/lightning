@@ -12,6 +12,7 @@ use lightning_application::state::QueryRunner as ApplicationQuery;
 use lightning_application::Application;
 use lightning_broadcast::Broadcast;
 use lightning_checkpointer::Checkpointer;
+use lightning_committee_beacon::CommitteeBeaconComponent;
 use lightning_interfaces::prelude::*;
 use lightning_node::Node;
 use lightning_notifier::Notifier;
@@ -37,6 +38,7 @@ pub struct TestNode {
     pub app_query: ApplicationQuery,
     pub broadcast: fdi::Ref<Broadcast<TestNodeComponents>>,
     pub checkpointer: fdi::Ref<Checkpointer<TestNodeComponents>>,
+    pub committee_beacon: fdi::Ref<CommitteeBeaconComponent<TestNodeComponents>>,
     pub forwarder: fdi::Ref<MockForwarder<TestNodeComponents>>,
     pub keystore: fdi::Ref<EphemeralKeystore<TestNodeComponents>>,
     pub notifier: fdi::Ref<Notifier<TestNodeComponents>>,

@@ -6,6 +6,9 @@ use fleek_crypto::{NodePublicKey, TransactionSender};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::types::{
     Committee,
+    CommitteeSelectionBeaconCommit,
+    CommitteeSelectionBeaconPhase,
+    CommitteeSelectionBeaconReveal,
     Epoch,
     ExecutionData,
     ExecutionError,
@@ -23,17 +26,16 @@ use lightning_reputation::types::WeightedReputationMeasurements;
 use rand::prelude::SliceRandom;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
+use sha3::{Digest, Sha3_256};
 
 use super::{StateExecutor, BIG_HUNDRED, DEFAULT_REP_QUANTILE, MINIMUM_UPTIME, REP_EWMA_WEIGHT};
 use crate::state::context::{Backend, TableRef};
 
-/********Internal Application Functions******** */
-// These functions should only ever be called in the context of an external transaction function
-// They should never panic and any check that could result in that should be done in the
-// external function that calls it The functions that should call this and the required
-// checks should be documented for each function
-
 impl<B: Backend> StateExecutor<B> {
+    /// Handle a change epoch transaction.
+    ///
+    /// This does not execute the epoch change, it just signals that the epoch change process is
+    /// starting, with a committee selection process happening next.
     pub(crate) fn change_epoch(
         &self,
         sender: TransactionSender,
@@ -44,11 +46,12 @@ impl<B: Backend> StateExecutor<B> {
             Ok(account) => account,
             Err(e) => return e,
         };
-        let mut current_epoch = match self.metadata.get(&Metadata::Epoch) {
+
+        // Check that the epoch is current.
+        let current_epoch = match self.metadata.get(&Metadata::Epoch) {
             Some(Value::Epoch(epoch)) => epoch,
             _ => 0,
         };
-
         match epoch.cmp(&current_epoch) {
             Ordering::Less => {
                 return TransactionResponse::Revert(ExecutionError::EpochAlreadyChanged);
@@ -59,6 +62,7 @@ impl<B: Backend> StateExecutor<B> {
             _ => (),
         }
 
+        // Get the current committee info.
         let mut current_committee = self.committee_info.get(&current_epoch).unwrap_or_default();
 
         // If sender is not on the current committee revert early, or if they have already signaled;
@@ -69,41 +73,478 @@ impl<B: Backend> StateExecutor<B> {
         }
         current_committee.ready_to_change.push(index);
 
-        // If more than 2/3rds of the committee have signaled, start the epoch change process
+        // If more than 2/3rds of the committee have signaled, start the committee selection
+        // process.
         if current_committee.ready_to_change.len() > (2 * current_committee.members.len() / 3) {
-            // Todo: Reward nodes, choose new committee, increment epoch.
-            self.calculate_reputation_scores();
-            self.distribute_rewards();
-            // Todo: We can't really fail after here
-            // because changes have already been submitted above
-            // in the call to calculate_reputation_scores.
-            // Should we refactor change_epoch so it operates in two steps?
-            //  1. Validate all mutations that will be made and stage them.
-            //  2. Submit staged changes.
-            // Then, `clear_content_registry` could become
-            // `stage_clear_content_registry' and return the new state for the
-            // tables instead of applying the changes itself.
-            self.clean_up_content_registry();
+            let start_block = self.get_last_block_number() + 1;
+            let end_block = start_block + self.get_commit_phase_duration();
 
-            // Clear executed digests.
-            self.executed_digests.clear();
+            // Store the start and end block number for the committee selection commit phase.
+            tracing::debug!(
+                "transitioning to committee selection beacon commit phase because epoch change is starting (start: {}, end: {})",
+                start_block,
+                end_block
+            );
+            self.metadata.set(
+                Metadata::CommitteeSelectionBeaconPhase,
+                Value::CommitteeSelectionBeaconPhase(CommitteeSelectionBeaconPhase::Commit((
+                    start_block,
+                    end_block,
+                ))),
+            );
 
-            self.committee_info.set(current_epoch, current_committee);
-            // Get new committee
-            let new_committee = self.choose_new_committee();
-            // increment epoch
-            current_epoch += 1;
-
-            // Set the new committee, epoch, and reset sub dag index
-            self.committee_info.set(current_epoch, new_committee);
-
-            self.metadata
-                .set(Metadata::Epoch, Value::Epoch(current_epoch));
-            TransactionResponse::Success(ExecutionData::EpochChange)
+            // Return success.
+            TransactionResponse::Success(ExecutionData::None)
         } else {
             self.committee_info.set(current_epoch, current_committee);
             TransactionResponse::Success(ExecutionData::None)
         }
+    }
+
+    /// Handle a committee selection beacon commit transaction.
+    ///
+    /// This transaction is submitted by a node when it wants to commit to a committee selection
+    /// random beacon.
+    pub fn committee_selection_beacon_commit(
+        &self,
+        sender: TransactionSender,
+        commit: CommitteeSelectionBeaconCommit,
+    ) -> TransactionResponse {
+        // Check that a node is sending the transaction, and get the node's index.
+        let node_index = match self.only_node(sender) {
+            Ok(account) => account,
+            Err(e) => return e,
+        };
+
+        // Log the received commit.
+        tracing::debug!(
+            "received committee selection beacon commit transaction from node {}: {:?}",
+            node_index,
+            commit
+        );
+
+        // Check that the node has sufficient stake.
+        let node = match self.node_info.get(&node_index) {
+            Some(node) => node,
+            None => return TransactionResponse::Revert(ExecutionError::NodeDoesNotExist),
+        };
+        // TODO(snormore): What should the minimum stake be? Should it be a protocol parameter?
+        if node.stake.staked == HpUfixed::zero() {
+            // TODO(snormore): Remove most of these logging statements when the beacon/listener is
+            // able to detect and log it's own failed/reverted transactions.
+            tracing::debug!("node {} has insufficient stake", node_index);
+            return TransactionResponse::Revert(ExecutionError::InsufficientStake);
+        }
+
+        // TODO(snormore): Revert if the node was a non-revealing node in the previous round.
+
+        // Get the current block number.
+        let current_block = self.get_last_block_number() + 1;
+
+        // Check that the commit phase has started.
+        let commit_phase = match self.metadata.get(&Metadata::CommitteeSelectionBeaconPhase) {
+            Some(Value::CommitteeSelectionBeaconPhase(CommitteeSelectionBeaconPhase::Commit(
+                (start, end),
+            ))) => Some((start, end)),
+            _ => None,
+        };
+        if commit_phase.is_none() {
+            tracing::debug!(
+                "commit phase not started (current block: {})",
+                current_block
+            );
+            return TransactionResponse::Revert(
+                ExecutionError::CommitteeSelectionBeaconCommitPhaseNotStarted,
+            );
+        }
+
+        // Check that the current block number is within the commit phase range.
+        if current_block < commit_phase.unwrap().0 || current_block > commit_phase.unwrap().1 {
+            tracing::debug!("not in commit phase (current block: {})", current_block);
+            return TransactionResponse::Revert(
+                ExecutionError::CommitteeSelectionBeaconNotInCommitPhase,
+            );
+        }
+
+        // Check that the node has not already committed.
+        if self.committee_selection_beacon.get(&node_index).is_some() {
+            tracing::debug!("node {} already committed", node_index);
+            return TransactionResponse::Revert(ExecutionError::CommitteeSelectionAlreadyCommitted);
+        }
+
+        // Save the commit beacon.
+        tracing::debug!(
+            "saving committee selection beacon commit for node {}: {:?}",
+            node_index,
+            commit
+        );
+        self.committee_selection_beacon
+            .set(node_index, (commit, None));
+
+        // If we are on the last block of the commit phase, restart a new commit phase.
+        if current_block == commit_phase.unwrap().1 {
+            // Clean up beacon state.
+            self.committee_selection_beacon.clear();
+
+            // Reset and start a new commit phase.
+            let commit_start = current_block + 1;
+            let commit_end = commit_start + self.get_commit_phase_duration();
+            tracing::debug!(
+                "transitioning to new committee selection beacon commit phase because it is the last block of the current commit phase (start: {}, end: {})",
+                commit_start,
+                commit_end
+            );
+            self.metadata.set(
+                Metadata::CommitteeSelectionBeaconPhase,
+                Value::CommitteeSelectionBeaconPhase(CommitteeSelectionBeaconPhase::Commit((
+                    commit_start,
+                    commit_end,
+                ))),
+            );
+        }
+
+        // Return success.
+        TransactionResponse::Success(ExecutionData::None)
+    }
+
+    /// Handle a committee selection beacon reveal transaction.
+    ///
+    /// This transaction is submitted by a node when it wants to reveal a committee selection
+    /// random beacon.
+    ///
+    /// If all nodes that committed have revealed, the epoch change is executed.
+    pub fn committee_selection_beacon_reveal(
+        &self,
+        sender: TransactionSender,
+        reveal: CommitteeSelectionBeaconReveal,
+    ) -> TransactionResponse {
+        // Check that a node is sending the transaction, and get the node's index.
+        let node_index = match self.only_node(sender) {
+            Ok(account) => account,
+            Err(e) => return e,
+        };
+
+        // Check that the node has sufficient stake.
+        // TODO(snormore): What should the minimum stake be?
+        let node = match self.node_info.get(&node_index) {
+            Some(node) => node,
+            None => return TransactionResponse::Revert(ExecutionError::NodeDoesNotExist),
+        };
+        if node.stake.staked == HpUfixed::zero() {
+            return TransactionResponse::Revert(ExecutionError::InsufficientStake);
+        }
+
+        // Get the current block number.
+        let current_block = self.get_last_block_number() + 1;
+
+        // Check that the reveal phase has started.
+        let reveal_phase = match self.metadata.get(&Metadata::CommitteeSelectionBeaconPhase) {
+            Some(Value::CommitteeSelectionBeaconPhase(CommitteeSelectionBeaconPhase::Reveal(
+                (start, end),
+            ))) => Some((start, end)),
+            _ => None,
+        };
+        if reveal_phase.is_none() {
+            return TransactionResponse::Revert(
+                ExecutionError::CommitteeSelectionBeaconRevealPhaseNotStarted,
+            );
+        }
+
+        // Check that the current block number is within the reveal phase range.
+        if current_block < reveal_phase.unwrap().0 || current_block > reveal_phase.unwrap().1 {
+            return TransactionResponse::Revert(
+                ExecutionError::CommitteeSelectionBeaconNotInRevealPhase,
+            );
+        }
+
+        // Check that the node has already committed.
+        let existing_beacon = self.committee_selection_beacon.get(&node_index);
+        if existing_beacon.is_none() {
+            return TransactionResponse::Revert(
+                ExecutionError::CommitteeSelectionBeaconNotCommitted,
+            );
+        }
+        let (existing_commit, existing_reveal) = existing_beacon.unwrap();
+
+        // Check that the node has not already revealed.
+        if existing_reveal.is_some() {
+            return TransactionResponse::Revert(ExecutionError::CommitteeSelectionAlreadyRevealed);
+        }
+
+        // Check that the reveal is valid.
+        let reveal_digest: [u8; 32] = Sha3_256::digest(reveal).into();
+        if existing_commit != reveal_digest {
+            return TransactionResponse::Revert(
+                ExecutionError::CommitteeSelectionBeaconInvalidReveal,
+            );
+        }
+
+        // Save the reveal beacon.
+        self.committee_selection_beacon
+            .set(node_index, (existing_commit, Some(reveal)));
+
+        // Get the current epoch.
+        let epoch = self.get_epoch();
+
+        // If all nodes that committed have revealed, execute the epoch change.
+        let revealed_beacons = self
+            .committee_selection_beacon
+            .as_map()
+            .into_iter()
+            .filter(|(_, (_, reveal))| reveal.is_some())
+            .collect::<HashMap<_, _>>();
+        let committee = match self.committee_info.get(&epoch) {
+            Some(committee) => committee,
+            // TODO(snormore): This should never happen here; are we doing the right thing by
+            // reverting and returning this specific error?
+            None => return TransactionResponse::Revert(ExecutionError::MissingCommittee),
+        };
+        if committee
+            .members
+            .iter()
+            .all(|member| revealed_beacons.contains_key(member))
+        {
+            // Reset the committee selection beacon phase metadata to indicate we are no longer in
+            // commit or reveal phases, we are transitioning to epoch change execution and pre-epoch
+            // change waiting phase.
+            tracing::debug!(
+                "transitioning to committee selection beacon to epoch change execution phase because all committed nodes have revealed (start: {current_block})"
+            );
+            self.metadata
+                .remove(&Metadata::CommitteeSelectionBeaconPhase);
+
+            // Reset the committee selection beacon.
+            // TODO(snormore): Do we need to keep any history in the state?
+            self.committee_selection_beacon.clear();
+
+            // Execute the epoch change.
+            self.execute_epoch_change(epoch, committee);
+
+            // Return success.
+            return TransactionResponse::Success(ExecutionData::EpochChange);
+        }
+
+        // Return success.
+        TransactionResponse::Success(ExecutionData::None)
+    }
+
+    /// Handle a committee selection beacon commit phase timeout transaction.
+    ///
+    /// This transaction is submitted by a node when it sees that the commit phase has timed out.
+    pub fn committee_selection_beacon_commit_phase_timeout(
+        &self,
+        sender: TransactionSender,
+    ) -> TransactionResponse {
+        // Check that a node is sending the transaction, and get the node's index.
+        let _node_index = match self.only_node(sender) {
+            Ok(account) => account,
+            Err(e) => return e,
+        };
+
+        // Get the current block number.
+        let current_block = self.get_last_block_number() + 1;
+        tracing::debug!(
+            "received committee selection beacon commit phase timeout transaction at block {}",
+            current_block
+        );
+
+        // Get the commit phase metadata.
+        let commit_phase = match self.metadata.get(&Metadata::CommitteeSelectionBeaconPhase) {
+            Some(Value::CommitteeSelectionBeaconPhase(CommitteeSelectionBeaconPhase::Commit(
+                (start, end),
+            ))) => (start, end),
+            _ => {
+                // Revert if not in commit phase.
+                return TransactionResponse::Revert(
+                    ExecutionError::CommitteeSelectionBeaconCommitPhaseNotStarted,
+                );
+            },
+        };
+
+        // Revert if commit phase has not timed out.
+        if current_block <= commit_phase.1 {
+            return TransactionResponse::Revert(
+                ExecutionError::CommitteeSelectionBeaconCommitPhaseNotTimedOut,
+            );
+        }
+
+        // The commit phase has timed out.
+        // Check if we have sufficient participation or not.
+        let epoch = self.get_epoch();
+        let current_committee = self.committee_info.get(&epoch).unwrap_or_default();
+        let beacons = self.committee_selection_beacon.as_map();
+        let committee_beacons = beacons
+            .into_iter()
+            .filter(|(node_index, _)| current_committee.members.contains(node_index))
+            .collect::<HashMap<_, _>>();
+
+        // Check for sufficient participation; that 2/3 of the existing committee has committed. Any
+        // other non-committee nodes can also optionally participate, but it's not required.
+        if committee_beacons.len() >= (2 * current_committee.members.len() / 3) {
+            // If we have sufficient participation, start the reveal phase.
+            let reveal_start = current_block + 1;
+            let reveal_end = reveal_start + self.get_reveal_phase_duration();
+            tracing::debug!(
+                "transitioning to committee selection beacon reveal phase because commit phase timed out with sufficient participation (start: {}, end: {})",
+                reveal_start,
+                reveal_end
+            );
+            self.metadata.set(
+                Metadata::CommitteeSelectionBeaconPhase,
+                Value::CommitteeSelectionBeaconPhase(CommitteeSelectionBeaconPhase::Reveal((
+                    reveal_start,
+                    reveal_end,
+                ))),
+            );
+        } else {
+            // If we don't have sufficient participation, start the commit phase again.
+            let commit_start = current_block + 1;
+            let commit_end = commit_start + self.get_commit_phase_duration();
+            tracing::debug!(
+                "transitioning to new committee selection beacon commit phase because commit phase timed out without sufficient participation (start: {}, end: {})",
+                commit_start,
+                commit_end
+            );
+            self.metadata.set(
+                Metadata::CommitteeSelectionBeaconPhase,
+                Value::CommitteeSelectionBeaconPhase(CommitteeSelectionBeaconPhase::Commit((
+                    commit_start,
+                    commit_end,
+                ))),
+            );
+
+            // Clear the beacon state.
+            self.committee_selection_beacon.clear();
+        }
+
+        // Return success.
+        TransactionResponse::Success(ExecutionData::None)
+    }
+
+    /// Handle a committee selection beacon reveal phase timeout transaction.
+    ///
+    /// This transaction is submitted by a node when it sees that the reveal phase has timed out.
+    pub fn committee_selection_beacon_reveal_phase_timeout(
+        &self,
+        sender: TransactionSender,
+    ) -> TransactionResponse {
+        // Check that a node is sending the transaction, and get the node's index.
+        let _node_index = match self.only_node(sender) {
+            Ok(account) => account,
+            Err(e) => return e,
+        };
+
+        // Get the current block number.
+        let current_block = self.get_last_block_number() + 1;
+        tracing::debug!(
+            "received committee selection beacon reveal phase timeout transaction at block {}",
+            current_block
+        );
+
+        // Get the reveal phase metadata.
+        let reveal_phase = match self.metadata.get(&Metadata::CommitteeSelectionBeaconPhase) {
+            Some(Value::CommitteeSelectionBeaconPhase(CommitteeSelectionBeaconPhase::Reveal(
+                (start, end),
+            ))) => (start, end),
+            _ => {
+                // Revert if not in reveal phase.
+                return TransactionResponse::Revert(
+                    ExecutionError::CommitteeSelectionBeaconRevealPhaseNotStarted,
+                );
+            },
+        };
+
+        // Revert if reveal phase has not timed out.
+        if current_block <= reveal_phase.1 {
+            return TransactionResponse::Revert(
+                ExecutionError::CommitteeSelectionBeaconRevealPhaseNotTimedOut,
+            );
+        }
+
+        // The reveal phase has timed out.
+        // Start the commit phase again.
+        let commit_start = current_block + 1;
+        let commit_end = commit_start + self.get_commit_phase_duration();
+        tracing::debug!(
+            "transitioning to new committee selection beacon commit phase because reveal phase timed out (start: {}, end: {})",
+            commit_start,
+            commit_end
+        );
+        self.metadata.set(
+            Metadata::CommitteeSelectionBeaconPhase,
+            Value::CommitteeSelectionBeaconPhase(CommitteeSelectionBeaconPhase::Commit((
+                commit_start,
+                commit_end,
+            ))),
+        );
+
+        // Clear the beacon state.
+        for digest in self.committee_selection_beacon.keys() {
+            self.committee_selection_beacon.remove(&digest);
+        }
+
+        // Return success.
+        TransactionResponse::Success(ExecutionData::None)
+    }
+
+    /********Internal Application Functions******** */
+    // These functions should only ever be called in the context of an external transaction function
+    // They should never panic and any check that could result in that should be done in the
+    // external function that calls it The functions that should call this and the required
+    // checks should be documented for each function
+
+    fn get_commit_phase_duration(&self) -> u64 {
+        match self
+            .parameters
+            .get(&ProtocolParamKey::CommitteeSelectionBeaconCommitPhaseDuration)
+        {
+            Some(ProtocolParamValue::CommitteeSelectionBeaconCommitPhaseDuration(v)) => v,
+            None => unreachable!("missing commit phase duration"),
+            _ => unreachable!("invalid commit phase duration"),
+        }
+    }
+
+    fn get_reveal_phase_duration(&self) -> u64 {
+        match self
+            .parameters
+            .get(&ProtocolParamKey::CommitteeSelectionBeaconRevealPhaseDuration)
+        {
+            Some(ProtocolParamValue::CommitteeSelectionBeaconRevealPhaseDuration(v)) => v,
+            None => unreachable!("missing reveal phase duration"),
+            _ => unreachable!("invalid reveal phase duration"),
+        }
+    }
+
+    fn execute_epoch_change(&self, epoch: Epoch, current_committee: Committee) {
+        // Todo: Reward nodes, choose new committee, increment epoch.
+        self.calculate_reputation_scores();
+        self.distribute_rewards();
+        // Todo: We can't really fail after here
+        // because changes have already been submitted above
+        // in the call to calculate_reputation_scores.
+        // Should we refactor change_epoch so it operates in two steps?
+        //  1. Validate all mutations that will be made and stage them.
+        //  2. Submit staged changes.
+        // Then, `clear_content_registry` could become
+        // `stage_clear_content_registry' and return the new state for the
+        // tables instead of applying the changes itself.
+        self.clean_up_content_registry();
+
+        // Clear executed digests.
+        self.executed_digests.clear();
+
+        self.committee_info.set(epoch, current_committee);
+        // Get new committee
+        let new_committee = self.choose_new_committee();
+
+        // increment epoch
+        let epoch = epoch + 1;
+
+        // Set the new committee, epoch, and reset sub dag index
+        self.committee_info.set(epoch, new_committee);
+
+        // Save new epoch to metadata.
+        self.metadata.set(Metadata::Epoch, Value::Epoch(epoch));
     }
 
     fn choose_new_committee(&self) -> Committee {
@@ -136,6 +577,9 @@ impl<B: Backend> StateExecutor<B> {
             //   return node_registry;
         } else {
             let committee_table = self.committee_info.get(&epoch).unwrap();
+            // TODO(snormore): Use the aggregated random beacon instead of the
+            // `epoch_end_timestamp`. Make sure this is tested, that there are non-committee nodes
+            // in the network or else this code path will never get hit.
             let epoch_end = committee_table.epoch_end_timestamp;
             let public_key = {
                 if !committee_table.members.is_empty() {

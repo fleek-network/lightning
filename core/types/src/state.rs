@@ -23,6 +23,12 @@ pub type Epoch = u64;
 /// A nodes index
 pub type NodeIndex = u32;
 
+/// Committee selection beacon commit.
+pub type CommitteeSelectionBeaconCommit = [u8; 32];
+
+/// Committee selection beacon reveal.
+pub type CommitteeSelectionBeaconReveal = [u8; 32];
+
 #[derive(Serialize, Deserialize, Hash, Debug, Clone, Eq, PartialEq, schemars::JsonSchema)]
 pub enum Tokens {
     USDC,
@@ -99,6 +105,7 @@ pub enum Metadata {
     GenesisCommittee,
     SubDagIndex,
     SubDagRound,
+    CommitteeSelectionBeaconPhase,
 }
 
 /// The Value enum is a data type used to represent values in a key-value pair for a metadata table
@@ -115,6 +122,8 @@ pub enum Value {
     GenesisCommittee(Vec<NodeIndex>),
     SubDagIndex(u64),
     SubDagRound(u64),
+    BlockRange(u64, u64),
+    CommitteeSelectionBeaconPhase(CommitteeSelectionBeaconPhase),
 }
 
 impl Value {
@@ -124,6 +133,19 @@ impl Value {
             _ => None,
         }
     }
+}
+
+/// Block number.
+pub type BlockNumber = u64;
+
+/// Range of block numbers.
+pub type BlockRange = (BlockNumber, BlockNumber);
+
+/// Phase of the committee selection beacon.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, schemars::JsonSchema)]
+pub enum CommitteeSelectionBeaconPhase {
+    Commit(BlockRange),
+    Reveal(BlockRange),
 }
 
 /// Indicates the participation status of a node.
@@ -198,6 +220,10 @@ pub enum ProtocolParamKey {
     TopologyTargetK = 16,
     /// The minimum number of nodes to run the topology algorithm.
     TopologyMinNodes = 17,
+    /// The committee selection beacon commit phase duration in blocks
+    CommitteeSelectionBeaconCommitPhaseDuration = 16,
+    /// The committee selection beacon reveal phase duration in blocks
+    CommitteeSelectionBeaconRevealPhaseDuration = 17,
 }
 
 /// The Value enum is a data type used to represent values in a key-value pair for a metadata table
@@ -221,6 +247,8 @@ pub enum ProtocolParamValue {
     ReputationPingTimeout(Duration),
     TopologyTargetK(usize),
     TopologyMinNodes(usize),
+    CommitteeSelectionBeaconCommitPhaseDuration(u64),
+    CommitteeSelectionBeaconRevealPhaseDuration(u64),
 }
 
 impl ProtocolParamValue {
@@ -246,6 +274,12 @@ impl ProtocolParamValue {
             },
             ProtocolParamValue::TopologyTargetK(i) => Cow::Owned(i.to_le_bytes().to_vec()),
             ProtocolParamValue::TopologyMinNodes(i) => Cow::Owned(i.to_le_bytes().to_vec()),
+            ProtocolParamValue::CommitteeSelectionBeaconCommitPhaseDuration(i) => {
+                Cow::Owned(i.to_le_bytes().to_vec())
+            },
+            ProtocolParamValue::CommitteeSelectionBeaconRevealPhaseDuration(i) => {
+                Cow::Owned(i.to_le_bytes().to_vec())
+            },
         }
     }
 }

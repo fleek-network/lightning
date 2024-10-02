@@ -24,7 +24,7 @@ use crate::rocks::RocksCheckpointerDatabase;
 /// epoch. We need to do this here as well because other nodes may have already received their
 /// epoch change notification and broadcasted checkpoint attestations for the new epoch.
 pub struct EpochChangeListener<C: NodeComponents> {
-    _collection: PhantomData<C>,
+    _components: PhantomData<C>,
 }
 
 impl<C: NodeComponents> EpochChangeListener<C> {

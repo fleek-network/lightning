@@ -106,6 +106,15 @@ pub trait QueryRunnerExt: SyncQueryRunnerInterface {
         }
     }
 
+    /// Returns the latest block number.
+    fn get_block_number(&self) -> Option<u64> {
+        match self.get_metadata(&Metadata::BlockNumber) {
+            Some(Value::BlockNumber(block)) => Some(block),
+            None => None,
+            _ => unreachable!("invalid block number in metadata"),
+        }
+    }
+
     /// Returns last executed block hash. [0;32] is genesis
     fn get_last_block(&self) -> [u8; 32] {
         match self.get_metadata(&Metadata::LastBlockHash) {

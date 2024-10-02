@@ -4,7 +4,7 @@ use anyhow::Result;
 use futures::future::join_all;
 use lightning_interfaces::prelude::*;
 use lightning_utils::poll::{poll_until, PollUntilError};
-use types::{Epoch, UpdateMethod};
+use types::{Epoch, Metadata, UpdateMethod};
 
 use super::{TestNetwork, TestNode};
 
@@ -71,5 +71,25 @@ impl TestNetwork {
 
     pub fn get_epoch(&self) -> Epoch {
         self.node(0).get_epoch()
+    }
+
+    /// Wait for committee selection beacon phase to be unset.
+    pub async fn wait_for_committee_selection_beacon_phase_unset(
+        &self,
+    ) -> Result<(), PollUntilError> {
+        poll_until(
+            || async {
+                self.node(0)
+                    .app
+                    .sync_query()
+                    .get_metadata(&Metadata::CommitteeSelectionBeaconPhase)
+                    .is_none()
+                    .then_some(())
+                    .ok_or(PollUntilError::ConditionNotSatisfied)
+            },
+            Duration::from_secs(30),
+            Duration::from_millis(100),
+        )
+        .await
     }
 }

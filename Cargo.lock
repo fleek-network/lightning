@@ -6781,6 +6781,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with 3.9.0",
+ "sha3 0.10.8",
  "tempfile",
  "tokio",
  "toml 0.7.8",
@@ -7009,6 +7010,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "lightning-committee-beacon"
+version = "0.0.0"
+dependencies = [
+ "affair",
+ "anyhow",
+ "atomo",
+ "atomo-rocks",
+ "fleek-crypto",
+ "futures",
+ "lightning-interfaces",
+ "lightning-test-utils",
+ "lightning-utils",
+ "lightning-workspace-hack",
+ "rand 0.8.5",
+ "resolved-pathbuf",
+ "serde",
+ "sha3 0.10.8",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "lightning-consensus"
 version = "0.0.0"
 dependencies = [
@@ -7094,6 +7119,7 @@ dependencies = [
  "lightning-blockstore-server",
  "lightning-broadcast",
  "lightning-checkpointer",
+ "lightning-committee-beacon",
  "lightning-consensus",
  "lightning-firewall",
  "lightning-handshake",
@@ -7401,6 +7427,7 @@ dependencies = [
  "lightning-blockstore-server",
  "lightning-broadcast",
  "lightning-checkpointer",
+ "lightning-committee-beacon",
  "lightning-consensus",
  "lightning-fetcher",
  "lightning-forwarder",
@@ -7910,6 +7937,7 @@ dependencies = [
  "lightning-blockstore-server",
  "lightning-broadcast",
  "lightning-checkpointer",
+ "lightning-committee-beacon",
  "lightning-consensus",
  "lightning-forwarder",
  "lightning-interfaces",
