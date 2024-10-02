@@ -101,7 +101,7 @@ impl ModuleLoader for FleekModuleLoader {
             return ModuleLoadResponse::Sync(Ok(ModuleSource::new(
                 ModuleType::JavaScript,
                 ModuleSourceCode::String(
-                    include_str!("../../polyfill/overrides/util.js")
+                    include_str!("../../ext/node/polyfill/overrides/util.js")
                         .to_string()
                         .into(),
                 ),

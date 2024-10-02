@@ -151,17 +151,17 @@ fn main() {
 
     // Read polyfill config and lock
     let config: DenoJson = serde_json::from_reader(
-        std::fs::File::open("./polyfill/deno.json").expect("failed to read deno.json"),
+        std::fs::File::open("./ext/node/polyfill/deno.json").expect("failed to read deno.json"),
     )
     .expect("failed to parse deno.json");
     let mut lock: DenoLock = serde_json::from_reader(
-        std::fs::File::open("./polyfill/deno.lock").expect("failed to read deno.lock"),
+        std::fs::File::open("./ext/node/polyfill/deno.lock").expect("failed to read deno.lock"),
     )
     .expect("failed to parse deno.lock");
 
     // Rebuild if polyfills change
-    println!("cargo::rerun-if-changed=./polyfill/deno.json");
-    println!("cargo::rerun-if-changed=./polyfill/deno.lock");
+    println!("cargo::rerun-if-changed=./ext/node/polyfill/deno.json");
+    println!("cargo::rerun-if-changed=./ext/node/polyfill/deno.lock");
 
     let mut map = HashMap::new();
 
