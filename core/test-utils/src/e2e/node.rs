@@ -18,6 +18,7 @@ use fleek_crypto::{
 use lightning_application::state::QueryRunner;
 use lightning_application::Application;
 use lightning_checkpointer::Checkpointer;
+use lightning_committee_beacon::CommitteeBeaconComponent;
 use lightning_interfaces::prelude::*;
 use lightning_node::ContainedNode;
 use lightning_notifier::Notifier;

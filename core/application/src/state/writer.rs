@@ -19,6 +19,8 @@ use lightning_interfaces::types::{
     AccountInfo,
     Blake3Hash,
     Committee,
+    CommitteeSelectionBeaconCommit,
+    CommitteeSelectionBeaconReveal,
     CommodityTypes,
     Epoch,
     Metadata,
@@ -181,6 +183,10 @@ impl ApplicationState<AtomoStorage, DefaultSerdeBackend, ApplicationStateTree> {
             .with_table::<NodeIndex, u8>("uptime")
             .with_table::<Blake3Hash, BTreeSet<NodeIndex>>("uri_to_node")
             .with_table::<NodeIndex, BTreeSet<Blake3Hash>>("node_to_uri")
+            .with_table::<NodeIndex, (
+                CommitteeSelectionBeaconCommit,
+                Option<CommitteeSelectionBeaconReveal>,
+            )>("committee_selection_beacon")
             .enable_iter("current_epoch_served")
             .enable_iter("rep_measurements")
             .enable_iter("submitted_rep_measurements")
@@ -191,7 +197,8 @@ impl ApplicationState<AtomoStorage, DefaultSerdeBackend, ApplicationStateTree> {
             .enable_iter("uptime")
             .enable_iter("service_revenue")
             .enable_iter("uri_to_node")
-            .enable_iter("node_to_uri");
+            .enable_iter("node_to_uri")
+            .enable_iter("committee_selection_beacon");
 
         #[cfg(debug_assertions)]
         {

@@ -7,6 +7,11 @@ use lightning_application::{Application, ApplicationConfig};
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_checkpointer::{Checkpointer, CheckpointerConfig, CheckpointerDatabaseConfig};
+use lightning_committee_beacon::{
+    CommitteeBeaconComponent,
+    CommitteeBeaconConfig,
+    CommitteeBeaconDatabaseConfig,
+};
 use lightning_interfaces::prelude::*;
 use lightning_node::ContainedNode;
 use lightning_pool::{Config as PoolConfig, PoolProvider};
@@ -85,6 +90,13 @@ impl TestNodeBuilder {
         config.inject::<Checkpointer<C>>(CheckpointerConfig {
             database: CheckpointerDatabaseConfig {
                 path: self.home_dir.join("checkpointer").try_into().unwrap(),
+            },
+        });
+
+        // Configure committee beacon component.
+        config.inject::<CommitteeBeaconComponent<TestNodeComponents>>(CommitteeBeaconConfig {
+            database: CommitteeBeaconDatabaseConfig {
+                path: self.home_dir.join("committee-beacon").try_into().unwrap(),
             },
         });
 

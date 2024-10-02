@@ -60,6 +60,8 @@ pub struct Genesis {
     pub reputation_ping_timeout: Duration,
     pub topology_target_k: usize,
     pub topology_min_nodes: usize,
+    pub committee_selection_beacon_commit_phase_duration: u64,
+    pub committee_selection_beacon_reveal_phase_duration: u64,
 }
 
 impl Genesis {

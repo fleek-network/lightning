@@ -3,6 +3,7 @@ use fleek_crypto::{AccountOwnerSecretKey, EthAddress, SecretKey};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_application::state::QueryRunner;
 use lightning_interfaces::types::{
+    CommitteeSelectionBeaconPhase,
     Epoch,
     ExecuteTransactionError,
     Metadata,
@@ -91,6 +92,18 @@ where
         {
             Some(balance) => balance,
             None => HpUfixed::<18>::zero(),
+        }
+    }
+
+    pub fn get_committee_selection_beacon_phase(&self) -> Option<CommitteeSelectionBeaconPhase> {
+        match self
+            .app
+            .sync_query()
+            .get_metadata(&Metadata::CommitteeSelectionBeaconPhase)
+        {
+            Some(Value::CommitteeSelectionBeaconPhase(phase)) => Some(phase),
+            None => None,
+            _ => unreachable!("invalid committee selection beacon phase in metadata"),
         }
     }
 

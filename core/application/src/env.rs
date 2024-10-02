@@ -82,7 +82,7 @@ impl ApplicationEnv {
                 let app = ApplicationState::executor(ctx);
                 let last_block_hash = app.get_block_hash();
 
-                let block_number = app.get_block_number() + 1;
+                let block_number = app.get_last_block_number() + 1;
 
                 // Create block response
                 let mut response = BlockExecutionResponse {
@@ -313,6 +313,18 @@ impl ApplicationEnv {
             param_table.insert(
                 ProtocolParamKey::TopologyMinNodes,
                 ProtocolParamValue::TopologyMinNodes(genesis.topology_min_nodes),
+            );
+            param_table.insert(
+                ProtocolParamKey::CommitteeSelectionBeaconCommitPhaseDuration,
+                ProtocolParamValue::CommitteeSelectionBeaconCommitPhaseDuration(
+                    genesis.committee_selection_beacon_commit_phase_duration,
+                ),
+            );
+            param_table.insert(
+                ProtocolParamKey::CommitteeSelectionBeaconRevealPhaseDuration,
+                ProtocolParamValue::CommitteeSelectionBeaconRevealPhaseDuration(
+                    genesis.committee_selection_beacon_reveal_phase_duration,
+                ),
             );
 
             let epoch_end: u64 = genesis.epoch_time + genesis.epoch_start;
