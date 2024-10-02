@@ -10,6 +10,7 @@ use lightning_interfaces::types::{
     MAX_MEASUREMENTS_SUBMIT,
 };
 use lightning_interfaces::SyncQueryRunnerInterface;
+use lightning_test_utils::e2e::TestNetwork;
 use lightning_test_utils::random;
 use lightning_test_utils::reputation::generate_reputation_measurements;
 use lightning_utils::application::QueryRunnerExt;
@@ -95,59 +96,68 @@ async fn test_submit_rep_measurements_too_many_times() {
 
 #[tokio::test]
 async fn test_rep_scores() {
-    let temp_dir = tempdir().unwrap();
-
-    let committee_size = 4;
-    let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
-    let required_signals = calculate_required_signals(committee_size);
+    let mut network = TestNetwork::builder()
+        .with_num_nodes(4)
+        .with_genesis_mutator(|genesis| {
+            genesis.node_info[0].reputation = Some(40);
+            genesis.node_info[1].reputation = Some(80);
+        })
+        .build()
+        .await
+        .unwrap();
+    let node = network.node(0);
+    let peer1 = network.node(2);
+    let peer2 = network.node(3);
 
     let mut rng = random::get_seedable_rng();
 
-    let peer1 = keystore[2].node_secret_key.to_pk();
-    let peer2 = keystore[3].node_secret_key.to_pk();
-    let nonce = 1;
+    // Submit reputation measurements from node 0, for peer 1 and 2.
+    let measurements = BTreeMap::from_iter(vec![
+        (
+            peer1.index(),
+            generate_reputation_measurements(&mut rng, 0.1),
+        ),
+        (
+            peer2.index(),
+            generate_reputation_measurements(&mut rng, 0.1),
+        ),
+    ]);
+    node.execute_transaction_from_node(UpdateMethod::SubmitReputationMeasurements { measurements })
+        .await
+        .unwrap();
 
-    let mut map = BTreeMap::new();
-    let _ = update_reputation_measurements(
-        &query_runner,
-        &mut map,
-        &peer1,
-        generate_reputation_measurements(&mut rng, 0.1),
-    );
-    let _ = update_reputation_measurements(
-        &query_runner,
-        &mut map,
-        &peer2,
-        generate_reputation_measurements(&mut rng, 0.1),
-    );
-    submit_reputation_measurements(&update_socket, &keystore[0].node_secret_key, nonce, map).await;
+    // Submit reputation measurements from node 1, for peer 1 and 2.
+    let measurements = BTreeMap::from_iter(vec![
+        (
+            peer1.index(),
+            generate_reputation_measurements(&mut rng, 0.1),
+        ),
+        (
+            peer2.index(),
+            generate_reputation_measurements(&mut rng, 0.1),
+        ),
+    ]);
+    node.execute_transaction_from_node(UpdateMethod::SubmitReputationMeasurements { measurements })
+        .await
+        .unwrap();
 
-    let mut map = BTreeMap::new();
-    let (peer_idx_1, _) = update_reputation_measurements(
-        &query_runner,
-        &mut map,
-        &peer1,
-        generate_reputation_measurements(&mut rng, 0.1),
-    );
-    let (peer_idx_2, _) = update_reputation_measurements(
-        &query_runner,
-        &mut map,
-        &peer2,
-        generate_reputation_measurements(&mut rng, 0.1),
-    );
-    submit_reputation_measurements(&update_socket, &keystore[1].node_secret_key, nonce, map).await;
+    // Change epoch and wait for it to be complete.
+    network.change_epoch_and_wait_for_complete().await.unwrap();
 
-    let epoch = 0;
-    // Change epoch so that rep scores will be calculated from the measurements.
-    for (i, node) in keystore.iter().enumerate().take(required_signals) {
-        // Not the prettiest solution but we have to keep track of the nonces somehow.
-        let nonce = if i < 2 { 2 } else { 1 };
-        change_epoch(&update_socket, &node.node_secret_key, nonce, epoch).await;
-    }
+    // Check the reputation scores.
+    assert!(
+        node.app_query
+            .get_reputation_score(&peer1.index())
+            .is_some()
+    );
+    assert!(
+        node.app_query
+            .get_reputation_score(&peer2.index())
+            .is_some()
+    );
 
-    assert!(query_runner.get_reputation_score(&peer_idx_1).is_some());
-    assert!(query_runner.get_reputation_score(&peer_idx_2).is_some());
+    // Shutdown the network.
+    network.shutdown().await;
 }
 
 #[tokio::test]

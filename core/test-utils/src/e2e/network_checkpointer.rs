@@ -13,9 +13,9 @@ use lightning_interfaces::types::{
     NodeIndex,
     Topic,
 };
+use lightning_utils::poll::{poll_until, PollUntilError};
 
-use super::{TestNetwork, WaitUntilError};
-use crate::e2e::wait_until;
+use super::TestNetwork;
 
 impl TestNetwork {
     /// Send a checkpoint attestation to a specific node via their broadcaster pubsub.
@@ -43,7 +43,7 @@ impl TestNetwork {
         &self,
         epoch: Epoch,
         condition: F,
-    ) -> Result<HashMap<NodeIndex, HashMap<NodeIndex, CheckpointAttestation>>, WaitUntilError>
+    ) -> Result<HashMap<NodeIndex, HashMap<NodeIndex, CheckpointAttestation>>, PollUntilError>
     where
         F: Fn(&HashMap<NodeIndex, HashMap<NodeIndex, CheckpointAttestation>>) -> bool,
     {
@@ -58,13 +58,13 @@ impl TestNetwork {
         epoch: Epoch,
         condition: F,
         timeout: Duration,
-    ) -> Result<HashMap<NodeIndex, HashMap<NodeIndex, CheckpointAttestation>>, WaitUntilError>
+    ) -> Result<HashMap<NodeIndex, HashMap<NodeIndex, CheckpointAttestation>>, PollUntilError>
     where
         F: Fn(&HashMap<NodeIndex, HashMap<NodeIndex, CheckpointAttestation>>) -> bool,
     {
         const DELAY: Duration = Duration::from_millis(100);
 
-        wait_until(
+        poll_until(
             || async {
                 let headers_by_node = self
                     .node_by_id
@@ -77,11 +77,9 @@ impl TestNetwork {
                     })
                     .collect::<HashMap<_, _>>();
 
-                if condition(&headers_by_node) {
-                    Some(headers_by_node)
-                } else {
-                    None
-                }
+                condition(&headers_by_node)
+                    .then_some(headers_by_node)
+                    .ok_or(PollUntilError::ConditionNotSatisfied)
             },
             timeout,
             DELAY,
@@ -111,7 +109,7 @@ impl TestNetwork {
         &self,
         epoch: Epoch,
         condition: F,
-    ) -> Result<HashMap<NodeIndex, AggregateCheckpoint>, WaitUntilError>
+    ) -> Result<HashMap<NodeIndex, AggregateCheckpoint>, PollUntilError>
     where
         F: Fn(&HashMap<NodeIndex, Option<AggregateCheckpoint>>) -> bool,
     {
@@ -126,13 +124,13 @@ impl TestNetwork {
         epoch: Epoch,
         condition: F,
         timeout: Duration,
-    ) -> Result<HashMap<NodeIndex, AggregateCheckpoint>, WaitUntilError>
+    ) -> Result<HashMap<NodeIndex, AggregateCheckpoint>, PollUntilError>
     where
         F: Fn(&HashMap<NodeIndex, Option<AggregateCheckpoint>>) -> bool,
     {
         const DELAY: Duration = Duration::from_millis(100);
 
-        wait_until(
+        poll_until(
             || async {
                 let header_by_node = self
                     .node_by_id
@@ -145,16 +143,14 @@ impl TestNetwork {
                     })
                     .collect::<HashMap<_, _>>();
 
-                if condition(&header_by_node) {
-                    Some(
+                condition(&header_by_node)
+                    .then(|| {
                         header_by_node
                             .into_iter()
                             .map(|(node_id, header)| (node_id, header.unwrap()))
-                            .collect::<HashMap<_, _>>(),
-                    )
-                } else {
-                    None
-                }
+                            .collect::<HashMap<_, _>>()
+                    })
+                    .ok_or(PollUntilError::ConditionNotSatisfied)
             },
             timeout,
             DELAY,

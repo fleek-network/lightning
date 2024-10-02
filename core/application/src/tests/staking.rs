@@ -16,7 +16,8 @@ use lightning_interfaces::types::{
     NodePorts,
     UpdateMethod,
 };
-use lightning_interfaces::SyncQueryRunnerInterface;
+use lightning_interfaces::{KeystoreInterface, SyncQueryRunnerInterface};
+use lightning_test_utils::e2e::TestNetwork;
 use tempfile::tempdir;
 
 use super::utils::*;
@@ -700,59 +701,65 @@ async fn test_withdraw_unstaked_reverts_no_locked_tokens() {
 
 #[tokio::test]
 async fn test_withdraw_unstaked_works_properly() {
-    let temp_dir = tempdir().unwrap();
+    let mut network = TestNetwork::builder()
+        .with_num_nodes(4)
+        .build()
+        .await
+        .unwrap();
+    let node = network.node(0);
+    let node_initial_stake = node.get_stake();
 
-    let committee_size = 4;
-    let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
-
-    let owner_secret_key = AccountOwnerSecretKey::generate();
-    let owner: EthAddress = owner_secret_key.to_pk().into();
-    let node_pub_key = NodeSecretKey::generate().to_pk();
+    // Execute deposit and stake transasctions from the node owner account.
     let amount: HpUfixed<18> = 1_000u64.into();
+    node.deposit_and_stake(amount.clone(), &node.owner_secret_key)
+        .await
+        .unwrap();
 
-    // Stake
-    deposit_and_stake(
-        &update_socket,
-        &owner_secret_key,
-        1,
-        &amount,
-        &node_pub_key,
-        [0; 96].into(),
-    )
-    .await;
-    assert_eq!(get_staked(&query_runner, &node_pub_key), amount);
+    // Check that node has the stake.
+    assert_eq!(node.get_stake(), node_initial_stake + amount.clone());
 
-    // Unstake
-    let update = prepare_unstake_update(&amount, &node_pub_key, &owner_secret_key, 3);
-    expect_tx_success(update, &update_socket, ExecutionData::None).await;
+    // Execute unstake transaction from node owner account.
+    node.unstake(amount.clone(), &node.owner_secret_key)
+        .await
+        .unwrap();
 
-    // Wait 5 epochs to unlock lock_time (5)
-    for epoch in 0..5 {
-        simple_epoch_change(&update_socket, &keystore, &query_runner, epoch).await;
+    // Iterate through 5 epochs to to unlock `lock_time`.
+    for _ in 0..5 {
+        // Trigger epoch change and wait for it to be complete.
+        network.change_epoch_and_wait_for_complete().await.unwrap();
     }
 
-    let prev_balance = get_flk_balance(&query_runner, &owner);
+    // Get node owner flk balance.
+    let prev_balance = node.get_flk_balance(node.get_owner_address());
 
-    //Withdraw Unstaked
-    let withdraw_unstaked =
-        prepare_withdraw_unstaked_update(&node_pub_key, Some(owner), &owner_secret_key, 4);
-    expect_tx_success(withdraw_unstaked, &update_socket, ExecutionData::None).await;
+    // Execute withdraw unstaked transaction.
+    node.execute_transaction_from_owner(UpdateMethod::WithdrawUnstaked {
+        node: node.keystore.get_ed25519_pk(),
+        recipient: Some(node.get_owner_address()),
+    })
+    .await
+    .unwrap();
 
-    // Assert updated Flk balance
+    // Check that the flk balance was updated.
     assert_eq!(
-        get_flk_balance(&query_runner, &owner),
+        node.get_flk_balance(node.get_owner_address()),
         prev_balance + amount
     );
 
-    // Assert reset the nodes locked stake state
+    // Check that the node's locked stake is reset.
     assert_eq!(
-        query_runner
+        node.app_query
             .get_node_info::<HpUfixed<18>>(
-                &query_runner.pubkey_to_index(&node_pub_key).unwrap(),
+                &node
+                    .app_query
+                    .pubkey_to_index(&node.keystore.get_ed25519_pk())
+                    .unwrap(),
                 |n| n.stake.locked
             )
             .unwrap(),
         HpUfixed::zero()
     );
+
+    // Shutdown the network.
+    network.shutdown().await;
 }

@@ -15,7 +15,7 @@ impl TestNetwork {
     ) {
         for node in self.nodes() {
             self.notify_node_epoch_changed(
-                node.get_id().unwrap(),
+                node.index(),
                 epoch,
                 last_epoch_hash,
                 previous_state_root,

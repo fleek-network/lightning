@@ -22,7 +22,6 @@ use super::{GenesisMutator, TestNode};
 #[derive(Clone)]
 pub struct TestGenesisBuilder {
     chain_id: ChainId,
-    owner_secret_key: AccountOwnerSecretKey,
     protocol_address: EthAddress,
     nodes: Vec<GenesisNode>,
     accounts: Vec<GenesisAccount>,
@@ -37,32 +36,17 @@ impl Default for TestGenesisBuilder {
 
 impl TestGenesisBuilder {
     pub fn new() -> Self {
-        let owner_secret_key = AccountOwnerSecretKey::generate();
-        let owner_public_key = owner_secret_key.to_pk();
         Self {
             chain_id: 1337,
-            owner_secret_key,
             nodes: Vec::new(),
             protocol_address: AccountOwnerSecretKey::generate().to_pk().into(),
-            accounts: vec![GenesisAccount {
-                public_key: owner_public_key.into(),
-                flk_balance: HpUfixed::<18>::from(100690000000000000000u128),
-                stables_balance: 100,
-                bandwidth_balance: 100,
-            }],
+            accounts: Vec::new(),
             mutator: None,
         }
     }
 
     pub fn with_chain_id(self, chain_id: ChainId) -> Self {
         Self { chain_id, ..self }
-    }
-
-    pub fn with_owner(self, secret_key: AccountOwnerSecretKey) -> Self {
-        Self {
-            owner_secret_key: secret_key,
-            ..self
-        }
     }
 
     pub fn with_accounts(self, accounts: Vec<GenesisAccount>) -> Self {
@@ -86,6 +70,7 @@ impl TestGenesisBuilder {
     pub fn with_node(mut self, node: &TestNode) -> Self {
         let node_secret_key = node.keystore.get_ed25519_sk();
         let node_public_key = node_secret_key.to_pk();
+        let node_owner_address = node.owner_secret_key.to_pk().into();
         let consensus_secret_key = node.keystore.get_bls_sk();
         let consensus_public_key = consensus_secret_key.to_pk();
         let node_domain = "127.0.0.1".parse().unwrap();
@@ -95,8 +80,21 @@ impl TestGenesisBuilder {
             ..Default::default()
         };
 
+        if !self
+            .accounts
+            .iter()
+            .any(|a| a.public_key == node_owner_address)
+        {
+            self.accounts.push(GenesisAccount {
+                public_key: node_owner_address,
+                flk_balance: HpUfixed::<18>::zero(),
+                stables_balance: 0,
+                bandwidth_balance: 0,
+            });
+        }
+
         self.nodes.push(GenesisNode::new(
-            self.owner_secret_key.to_pk().into(),
+            node.owner_secret_key.to_pk().into(),
             node_public_key,
             node_domain,
             consensus_public_key,

@@ -6,26 +6,15 @@ use lightning_application::app::Application;
 use lightning_application::config::ApplicationConfig;
 use lightning_application::state::QueryRunner;
 use lightning_interfaces::prelude::*;
-use lightning_interfaces::types::{
-    Genesis,
-    GenesisNode,
-    NodePorts,
-    UpdateMethod,
-    UpdatePayload,
-    UpdateRequest,
-};
+use lightning_interfaces::types::{Genesis, GenesisNode, NodePorts};
 use lightning_interfaces::Weight;
 use lightning_notifier::Notifier;
 use lightning_signer::Signer;
-use lightning_test_utils::consensus::{
-    Config as ConsensusConfig,
-    MockConsensus,
-    MockConsensusGroup,
-    MockForwarder,
-};
+use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus, MockForwarder};
+use lightning_test_utils::e2e::TestNetwork;
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
-use lightning_utils::application::QueryRunnerExt;
+use lightning_utils::poll::{poll_until, PollUntilError};
 use tempfile::tempdir;
 
 use crate::aggregator::ReputationAggregator;
@@ -43,44 +32,6 @@ partial_node_components!(TestBinding {
     KeystoreInterface = EphemeralKeystore<Self>;
     SignerInterface = Signer<Self>;
 });
-
-fn get_genesis_committee(
-    num_members: usize,
-) -> (Vec<GenesisNode>, Vec<EphemeralKeystore<TestBinding>>) {
-    let mut keystores = Vec::new();
-    let mut committee = Vec::new();
-    (0..num_members).for_each(|i| {
-        let keystore = EphemeralKeystore::default();
-        let (consensus_secret_key, node_secret_key) =
-            (keystore.get_bls_sk(), keystore.get_ed25519_sk());
-        let (consensus_public_key, node_public_key) =
-            (consensus_secret_key.to_pk(), node_secret_key.to_pk());
-        let owner_secret_key = AccountOwnerSecretKey::generate();
-        let owner_public_key = owner_secret_key.to_pk();
-
-        committee.push(GenesisNode::new(
-            owner_public_key.into(),
-            node_public_key,
-            "127.0.0.1".parse().unwrap(),
-            consensus_public_key,
-            "127.0.0.1".parse().unwrap(),
-            node_public_key,
-            NodePorts {
-                primary: 8000 + i as u16,
-                worker: 8100 + i as u16,
-                mempool: 8200 + i as u16,
-                rpc: 8300 + i as u16,
-                pool: 8400 + i as u16,
-                pinger: 8600 + i as u16,
-                handshake: Default::default(),
-            },
-            None,
-            true,
-        ));
-        keystores.push(keystore);
-    });
-    (committee, keystores)
-}
 
 #[tokio::test]
 async fn test_query() {
@@ -319,223 +270,76 @@ async fn test_submit_measurements() {
 
 #[tokio::test]
 async fn test_reputation_calculation_and_query() {
-    // The application will only calculate reputation scores for nodes if multiple nodes
-    // have reported measurements. Therefore, we need to create two reputation aggregators, two
-    // signers, and two consensus services that will receive a socket for the same application
-    // service.
-    let keystore1 = EphemeralKeystore::<TestBinding>::default();
-    let keystore2 = EphemeralKeystore::<TestBinding>::default();
-    let (consensus_secret_key1, node_secret_key1) =
-        (keystore1.get_bls_sk(), keystore1.get_ed25519_sk());
-    let (consensus_secret_key2, node_secret_key2) =
-        (keystore2.get_bls_sk(), keystore2.get_ed25519_sk());
-
-    let (committee, mut keystores) = get_genesis_committee(4);
-    let mut genesis = Genesis::default();
-    let chain_id = genesis.chain_id;
-
-    genesis.node_info = committee;
-
-    let node_public_key1 = node_secret_key1.to_pk();
-    let consensus_public_key1 = consensus_secret_key1.to_pk();
-    let owner_secret_key1 = AccountOwnerSecretKey::generate();
-    let owner_public_key1 = owner_secret_key1.to_pk();
-
-    let consensus_group = MockConsensusGroup::new(
-        ConsensusConfig {
-            min_ordering_time: 0,
-            max_ordering_time: 1,
-            probability_txn_lost: 0.0,
-            transactions_to_lose: HashSet::new(),
-            new_block_interval: Duration::from_secs(5),
-        },
-        None,
-    );
-
-    genesis.node_info.push(GenesisNode::new(
-        owner_public_key1.into(),
-        node_public_key1,
-        "127.0.0.1".parse().unwrap(),
-        consensus_public_key1,
-        "127.0.0.1".parse().unwrap(),
-        node_public_key1,
-        NodePorts {
-            primary: 48000,
-            worker: 48101,
-            mempool: 48102,
-            rpc: 48103,
-            pool: 48104,
-            pinger: 48106,
-            handshake: Default::default(),
-        },
-        None,
-        true,
-    ));
-    keystores.push(keystore1.clone());
-
-    let node_public_key2 = node_secret_key2.to_pk();
-    let consensus_public_key2 = consensus_secret_key2.to_pk();
-    let owner_secret_key2 = AccountOwnerSecretKey::generate();
-    let owner_public_key2 = owner_secret_key2.to_pk();
-
-    genesis.node_info.push(GenesisNode::new(
-        owner_public_key2.into(),
-        node_public_key2,
-        "127.0.0.1".parse().unwrap(),
-        consensus_public_key2,
-        "127.0.0.1".parse().unwrap(),
-        node_public_key2,
-        NodePorts {
-            primary: 48000,
-            worker: 48101,
-            mempool: 48102,
-            rpc: 48103,
-            pool: 48104,
-            pinger: 48106,
-            handshake: Default::default(),
-        },
-        None,
-        true,
-    ));
-    keystores.push(keystore2.clone());
-
-    let epoch_start = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap()
-        .as_millis() as u64;
-    genesis.epoch_start = epoch_start;
-    genesis.epoch_time = 4000; // millis
-
-    let temp_dir = tempdir().unwrap();
-    let genesis_path = genesis
-        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+    let mut network = TestNetwork::builder()
+        .with_num_nodes(4)
+        .with_genesis_mutator(|genesis| {
+            genesis.epoch_start = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64;
+            genesis.epoch_time = 4000;
+        })
+        .build()
+        .await
         .unwrap();
+    let app_query = network.node(0).app_query.clone();
 
-    let mut node1 = Node::<TestBinding>::init_with_provider(
-        fdi::Provider::default()
-            .with(
-                JsonConfigProvider::default()
-                    .with::<Application<TestBinding>>(ApplicationConfig::test(genesis_path.clone()))
-                    .with::<ReputationAggregator<TestBinding>>(Config {
-                        reporter_buffer_size: 1,
-                    }),
-            )
-            .with(consensus_group.clone())
-            .with(keystore1),
+    let reporter1 = network.node(0).reputation_reporter.clone();
+    let reporter2 = network.node(1).reputation_reporter.clone();
+
+    let alice = network.node(2).index();
+    let bob = network.node(3).index();
+
+    // Report some measurements for alice (node 2) and bob (node 3), from node 0 and node 1.
+    reporter1.report_sat(alice, Weight::Strong);
+    reporter1.report_ping(alice, Some(Duration::from_millis(100)));
+    reporter1.report_bytes_sent(alice, 10_000, Some(Duration::from_millis(100)));
+    reporter1.report_bytes_received(alice, 20_000, Some(Duration::from_millis(100)));
+
+    reporter1.report_sat(bob, Weight::Weak);
+    reporter1.report_ping(bob, Some(Duration::from_millis(300)));
+    reporter1.report_bytes_sent(bob, 12_000, Some(Duration::from_millis(300)));
+    reporter1.report_bytes_received(bob, 23_000, Some(Duration::from_millis(400)));
+
+    reporter2.report_sat(alice, Weight::Strong);
+    reporter2.report_ping(alice, Some(Duration::from_millis(120)));
+    reporter2.report_bytes_sent(alice, 11_000, Some(Duration::from_millis(90)));
+    reporter2.report_bytes_received(alice, 22_000, Some(Duration::from_millis(110)));
+
+    reporter2.report_sat(bob, Weight::Weak);
+    reporter2.report_ping(bob, Some(Duration::from_millis(250)));
+    reporter2.report_bytes_sent(bob, 9_000, Some(Duration::from_millis(280)));
+    reporter2.report_bytes_received(bob, 19_000, Some(Duration::from_millis(350)));
+
+    // Wait until all measurements have been submitted to the application.
+    poll_until(
+        || async {
+            let alice_rep = app_query
+                .get_reputation_measurements(&alice)
+                .unwrap_or(Vec::new());
+            let bob_rep = app_query
+                .get_reputation_measurements(&bob)
+                .unwrap_or(Vec::new());
+
+            (alice_rep.len() == 2 && bob_rep.len() == 2)
+                .then_some(())
+                .ok_or(PollUntilError::ConditionNotSatisfied)
+        },
+        Duration::from_secs(20),
+        Duration::from_millis(100),
     )
-    .expect("failed to initialize node");
-    node1.start().await;
+    .await
+    .unwrap();
 
-    let rep_reporter1 = node1.provider.get::<MyReputationReporter>();
-    let forwarder_socket = node1
-        .provider
-        .get::<MockForwarder<TestBinding>>()
-        .mempool_socket();
+    // Change epoch and wait for it to be complete.
+    network.change_epoch_and_wait_for_complete().await.unwrap();
 
-    let mut node2 = Node::<TestBinding>::init_with_provider(
-        fdi::Provider::default()
-            .with(
-                JsonConfigProvider::default()
-                    .with::<Application<TestBinding>>(ApplicationConfig::test(genesis_path))
-                    .with::<ReputationAggregator<TestBinding>>(Config {
-                        reporter_buffer_size: 1,
-                    }),
-            )
-            .with(consensus_group)
-            .with(keystore2),
-    )
-    .expect("failed to initialize node");
-    node2.start().await;
-    let query_runner: fdi::Ref<QueryRunner> = node2.provider.get();
-    let rep_reporter2 = node2.provider.get::<MyReputationReporter>();
+    // Check that the reputation scores have been calculated correctly, and that node1 has a higher
+    // reputation score than node2, because reported measurements were better.
+    let node1_rep = app_query.get_reputation_score(&alice).unwrap();
+    let node2_rep = app_query.get_reputation_score(&bob).unwrap();
+    assert!(node1_rep > node2_rep);
 
-    // Both nodes report measurements for two peers (alice and bob).
-    // note(dalton): Refactored to not include measurements for non white listed nodes so have to
-    // switch Alice and bob to the keys we added to the committee
-    let alice = query_runner
-        .pubkey_to_index(&keystores[0].get_ed25519_pk())
-        .unwrap();
-    let bob = query_runner
-        .pubkey_to_index(&keystores[1].get_ed25519_pk())
-        .unwrap();
-
-    rep_reporter1.report_sat(alice, Weight::Strong);
-    rep_reporter1.report_ping(alice, Some(Duration::from_millis(100)));
-    rep_reporter1.report_bytes_sent(alice, 10_000, Some(Duration::from_millis(100)));
-    rep_reporter1.report_bytes_received(alice, 20_000, Some(Duration::from_millis(100)));
-
-    rep_reporter1.report_sat(bob, Weight::Weak);
-    rep_reporter1.report_ping(bob, Some(Duration::from_millis(300)));
-    rep_reporter1.report_bytes_sent(bob, 12_000, Some(Duration::from_millis(300)));
-    rep_reporter1.report_bytes_received(bob, 23_000, Some(Duration::from_millis(400)));
-
-    rep_reporter2.report_sat(alice, Weight::Strong);
-    rep_reporter2.report_ping(alice, Some(Duration::from_millis(120)));
-    rep_reporter2.report_bytes_sent(alice, 11_000, Some(Duration::from_millis(90)));
-    rep_reporter2.report_bytes_received(alice, 22_000, Some(Duration::from_millis(110)));
-
-    rep_reporter2.report_sat(bob, Weight::Weak);
-    rep_reporter2.report_ping(bob, Some(Duration::from_millis(250)));
-    rep_reporter2.report_bytes_sent(bob, 9_000, Some(Duration::from_millis(280)));
-    rep_reporter2.report_bytes_received(bob, 19_000, Some(Duration::from_millis(350)));
-
-    let mut interval = tokio::time::interval(Duration::from_millis(100));
-    loop {
-        interval.tick().await;
-        let measure_alice = query_runner
-            .get_reputation_measurements(&alice)
-            .unwrap_or(Vec::new());
-        let measure_bob = query_runner
-            .get_reputation_measurements(&bob)
-            .unwrap_or(Vec::new());
-        if measure_alice.len() == 2 && measure_bob.len() == 2 {
-            // Wait until all measurements were submitted to the application.
-            break;
-        }
-    }
-
-    // Change epoch to trigger reputation score calculation.
-    let required_signals = 2 * keystores.len() / 3 + 1;
-    for node in keystores.iter().take(required_signals) {
-        let sk = node.get_ed25519_sk();
-        let method = UpdateMethod::ChangeEpoch { epoch: 0 };
-        // If the committee member is either one of the nodes from this test, we have to increment
-        // the nonce, since the nodes already send a transaction containing the measurements.
-        let nonce = if sk == node_secret_key1 || sk == node_secret_key2 {
-            2
-        } else {
-            1
-        };
-        let payload = UpdatePayload {
-            sender: node.get_ed25519_pk().into(),
-            nonce,
-            method,
-            chain_id,
-        };
-        let digest = payload.to_digest();
-        let signature = sk.sign(&digest);
-        let req = UpdateRequest {
-            signature: signature.into(),
-            payload,
-        };
-
-        forwarder_socket.run(req.into()).await.unwrap();
-    }
-    // Make sure that the epoch change happened.
-    assert_eq!(query_runner.get_epoch_info().epoch, 1);
-
-    // After a long journey, here comes the actual testing.
-    // Test that reputation scores were calculated for both alice and bob.
-    // Also test that alice received a higher reputation, because the reported measurements were
-    // better.
-    let alice_rep = query_runner
-        .get_reputation_score(&alice)
-        .expect("Reputation score for alice is missing");
-    let bob_rep = query_runner
-        .get_reputation_score(&bob)
-        .expect("Reputation score for bob is missing");
-    assert!(alice_rep > bob_rep);
-
-    node1.shutdown().await;
-    node2.shutdown().await;
+    // Shutdown the network.
+    network.shutdown().await;
 }
