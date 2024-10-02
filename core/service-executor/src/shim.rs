@@ -141,6 +141,10 @@ impl<C: NodeComponents> ServiceExecutorInterface<C> for ServiceExecutor<C> {
             2 => {
                 fleek_service_ai::main();
             },
+            #[cfg(feature = "services")]
+            3 => {
+                fleek_service_sgx::main();
+            },
             1001 => {
                 crate::test_services::io_stress::main();
             },
