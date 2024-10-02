@@ -185,7 +185,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
     }
 
     #[inline]
-    fn get_committe_info<V>(
+    fn get_committee_info<V>(
         &self,
         epoch: &Epoch,
         selector: impl FnOnce(Committee) -> V,

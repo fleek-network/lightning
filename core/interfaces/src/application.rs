@@ -138,7 +138,7 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     fn pubkey_to_index(&self, pub_key: &NodePublicKey) -> Option<NodeIndex>;
 
     /// Query Committee Table
-    fn get_committe_info<V>(
+    fn get_committee_info<V>(
         &self,
         epoch: &Epoch,
         selector: impl FnOnce(Committee) -> V,
