@@ -2,14 +2,9 @@ use std::collections::BTreeMap;
 
 use fleek_crypto::{AccountOwnerSecretKey, NodeSecretKey, SecretKey};
 use hp_fixed::unsigned::HpUfixed;
-use lightning_interfaces::types::{
-    ContentUpdate,
-    ExecutionData,
-    ExecutionError,
-    Participation,
-    UpdateMethod,
-};
+use lightning_interfaces::types::{ExecutionData, ExecutionError, Participation, UpdateMethod};
 use lightning_interfaces::SyncQueryRunnerInterface;
+use lightning_test_utils::e2e::TestNetwork;
 use lightning_utils::application::QueryRunnerExt;
 use tempfile::tempdir;
 
@@ -17,97 +12,109 @@ use super::utils::*;
 
 #[tokio::test]
 async fn test_uptime_participation() {
-    let temp_dir = tempdir().unwrap();
+    let mut network = TestNetwork::builder()
+        .with_num_nodes(4)
+        .with_genesis_mutator(|genesis| {
+            genesis.node_info[0].reputation = Some(40);
+            genesis.node_info[1].reputation = Some(80);
+        })
+        .build()
+        .await
+        .unwrap();
+    let node = network.node(0);
+    let peer1 = network.node(2);
+    let peer2 = network.node(3);
 
-    let committee_size = 4;
-    let (mut committee, keystore) = create_genesis_committee(committee_size);
-    committee[0].reputation = Some(40);
-    committee[1].reputation = Some(80);
-    let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
+    // Add records in the content registry for the peers.
+    peer1
+        .execute_transaction_from_node(UpdateMethod::UpdateContentRegistry {
+            updates: vec![Default::default()],
+        })
+        .await
+        .unwrap();
+    peer2
+        .execute_transaction_from_node(UpdateMethod::UpdateContentRegistry {
+            updates: vec![Default::default()],
+        })
+        .await
+        .unwrap();
 
-    let required_signals = calculate_required_signals(committee_size);
+    // Check that the content registries have been updated.
+    let peer1_content_registry = node
+        .app_query
+        .get_content_registry(&peer1.index())
+        .unwrap_or_default();
+    assert!(!peer1_content_registry.is_empty());
 
-    let peer_1 = keystore[2].node_secret_key.to_pk();
-    let peer_2 = keystore[3].node_secret_key.to_pk();
-    let nonce = 1;
+    let peer2_content_registry = node
+        .app_query
+        .get_content_registry(&peer2.index())
+        .unwrap_or_default();
+    assert!(!peer2_content_registry.is_empty());
 
-    // Add records in the content registry for all nodes.
-    let updates = vec![ContentUpdate {
-        uri: [0u8; 32],
-        remove: false,
-    }];
-    let content_registry_update =
-        prepare_content_registry_update(updates.clone(), &keystore[2].node_secret_key, 1);
-    expect_tx_success(content_registry_update, &update_socket, ExecutionData::None).await;
-    let content_registry_update =
-        prepare_content_registry_update(updates, &keystore[3].node_secret_key, 1);
-    expect_tx_success(content_registry_update, &update_socket, ExecutionData::None).await;
-
-    // Assert that registries have been updated.
-    let index_peer1 = query_runner.pubkey_to_index(&peer_1).unwrap();
-    let content_registry1 = content_registry(&query_runner, &index_peer1);
-    assert!(!content_registry1.is_empty());
-
-    let index_peer2 = query_runner.pubkey_to_index(&peer_2).unwrap();
-    let content_registry2 = content_registry(&query_runner, &index_peer2);
-    assert!(!content_registry2.is_empty());
-
-    let providers = uri_to_providers(&query_runner, &[0u8; 32]);
+    let providers = node
+        .app_query
+        .get_uri_providers(&[0u8; 32])
+        .unwrap_or_default();
     assert_eq!(providers.len(), 2);
 
-    let mut map = BTreeMap::new();
-    let _ = update_reputation_measurements(
-        &query_runner,
-        &mut map,
-        &peer_1,
-        test_reputation_measurements(20),
+    // Submit reputation measurements from node 0, for peer 1 and 2.
+    let measurements: BTreeMap<u32, lightning_interfaces::types::ReputationMeasurements> =
+        BTreeMap::from_iter(vec![
+            (peer1.index(), test_reputation_measurements(20)),
+            (peer2.index(), test_reputation_measurements(40)),
+        ]);
+    network
+        .node(0)
+        .execute_transaction_from_node(UpdateMethod::SubmitReputationMeasurements { measurements })
+        .await
+        .unwrap();
+
+    // Submit reputation measurements from node 1, for peer 1 and 2.
+    let measurements = BTreeMap::from_iter(vec![
+        (peer1.index(), test_reputation_measurements(30)),
+        (peer2.index(), test_reputation_measurements(45)),
+    ]);
+    network
+        .node(1)
+        .execute_transaction_from_node(UpdateMethod::SubmitReputationMeasurements { measurements })
+        .await
+        .unwrap();
+
+    // Change epoch and wait for it to be complete.
+    network.change_epoch_and_wait_for_complete().await.unwrap();
+
+    // Check participation.
+    assert_eq!(
+        peer1.get_node_info().unwrap().participation,
+        Participation::False
     );
-    let _ = update_reputation_measurements(
-        &query_runner,
-        &mut map,
-        &peer_2,
-        test_reputation_measurements(40),
+    assert_eq!(
+        peer2.get_node_info().unwrap().participation,
+        Participation::True
     );
 
-    submit_reputation_measurements(&update_socket, &keystore[0].node_secret_key, nonce, map).await;
+    // Check that the content registries have been updated.
+    let peer1_content_registry = node
+        .app_query
+        .get_content_registry(&peer1.index())
+        .unwrap_or_default();
+    assert!(peer1_content_registry.is_empty());
 
-    let mut map = BTreeMap::new();
-    let _ = update_reputation_measurements(
-        &query_runner,
-        &mut map,
-        &peer_1,
-        test_reputation_measurements(30),
-    );
+    let peer2_content_registry = node
+        .app_query
+        .get_content_registry(&peer2.index())
+        .unwrap_or_default();
+    assert!(!peer2_content_registry.is_empty());
 
-    let _ = update_reputation_measurements(
-        &query_runner,
-        &mut map,
-        &peer_2,
-        test_reputation_measurements(45),
-    );
-    submit_reputation_measurements(&update_socket, &keystore[1].node_secret_key, nonce, map).await;
-
-    let epoch = 0;
-    // Change epoch so that rep scores will be calculated from the measurements.
-    for node in keystore.iter().take(required_signals) {
-        change_epoch(&update_socket, &node.node_secret_key, 2, epoch).await;
-    }
-
-    let node_info1 = get_node_info(&query_runner, &peer_1);
-    let node_info2 = get_node_info(&query_runner, &peer_2);
-
-    assert_eq!(node_info1.participation, Participation::False);
-    assert_eq!(node_info2.participation, Participation::True);
-
-    // Assert that registries have been updated.
-    let content_registry1 = content_registry(&query_runner, &index_peer1);
-    assert!(content_registry1.is_empty());
-
-    let content_registry2 = content_registry(&query_runner, &index_peer2);
-    assert!(!content_registry2.is_empty());
-
-    let providers = uri_to_providers(&query_runner, &[0u8; 32]);
+    let providers = node
+        .app_query
+        .get_uri_providers(&[0u8; 32])
+        .unwrap_or_default();
     assert_eq!(providers.len(), 1);
+
+    // Shutdown the network.
+    network.shutdown().await;
 }
 
 #[tokio::test]

@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
+use fleek_crypto::{AccountOwnerSecretKey, SecretKey};
 use lightning_application::{Application, ApplicationConfig};
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
@@ -9,6 +10,7 @@ use lightning_checkpointer::{Checkpointer, CheckpointerConfig, CheckpointerDatab
 use lightning_interfaces::prelude::*;
 use lightning_notifier::Notifier;
 use lightning_pool::{Config as PoolConfig, PoolProvider};
+use lightning_rep_collector::MyReputationReporter;
 use lightning_rpc::config::Config as RpcConfig;
 use lightning_rpc::Rpc;
 use lightning_utils::config::TomlConfigProvider;
@@ -164,8 +166,10 @@ impl TestNodeBuilder {
             );
         }
 
+        let app = node.provider.get::<Application<TestNodeComponents>>();
         Ok(TestNode {
-            app: node.provider.get::<Application<TestNodeComponents>>(),
+            app_query: app.sync_query(),
+            app,
             broadcast: node.provider.get::<Broadcast<TestNodeComponents>>(),
             checkpointer: node.provider.get::<Checkpointer<TestNodeComponents>>(),
             forwarder: node.provider.get::<MockForwarder<TestNodeComponents>>(),
@@ -173,11 +177,13 @@ impl TestNodeBuilder {
             notifier: node.provider.get::<Notifier<TestNodeComponents>>(),
             pool: node.provider.get::<PoolProvider<TestNodeComponents>>(),
             rpc: node.provider.get::<Rpc<TestNodeComponents>>(),
+            reputation_reporter: node.provider.get::<MyReputationReporter>(),
 
             inner: node,
             before_genesis_ready,
             after_genesis_ready,
             home_dir: self.home_dir.clone(),
+            owner_secret_key: AccountOwnerSecretKey::generate(),
         })
     }
 }

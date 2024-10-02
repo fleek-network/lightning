@@ -1,57 +1,87 @@
 use std::collections::BTreeMap;
+use std::time::Duration;
 
-use fleek_crypto::{AccountOwnerSecretKey, ConsensusSecretKey, NodeSecretKey, SecretKey};
+use fleek_crypto::{AccountOwnerSecretKey, NodeSecretKey, SecretKey};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::types::{
+    DeliveryAcknowledgmentProof,
     ExecutionData,
     ExecutionError,
-    Metadata,
-    ProtocolParamKey,
-    ProtocolParamValue,
+    TransactionReceipt,
+    TransactionResponse,
     UpdateMethod,
-    Value,
 };
 use lightning_interfaces::SyncQueryRunnerInterface;
+use lightning_test_utils::e2e::TestNetwork;
 use lightning_utils::application::QueryRunnerExt;
+use lightning_utils::poll::{poll_until, PollUntilError};
+use lightning_utils::transaction::TransactionClientError;
 use tempfile::tempdir;
 
 use super::utils::*;
 
 #[tokio::test]
 async fn test_epoch_changed() {
-    let temp_dir = tempdir().unwrap();
+    let mut network = TestNetwork::builder()
+        .with_num_nodes(4)
+        .build()
+        .await
+        .unwrap();
+    let node1 = network.node(0);
+    let node2 = network.node(1);
+    let node3 = network.node(2);
 
-    // Create a genesis committee and seed the application state with it.
-    let committee_size = 4;
-    let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
-    let required_signals = calculate_required_signals(committee_size);
+    // Get the current epoch.
+    let epoch = node1.get_epoch();
 
-    let epoch = 0;
-    let nonce = 1;
+    // Execute an epoch change transaction from less than 2/3 of the nodes.
+    node1
+        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
+        .await
+        .unwrap();
+    node2
+        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
+        .await
+        .unwrap();
 
-    // Have (required_signals - 1) say they are ready to change epoch
-    // make sure the epoch doesn't change each time someone signals
-    for node in keystore.iter().take(required_signals - 1) {
-        // Make sure epoch didn't change
-        let res = change_epoch(&update_socket, &node.node_secret_key, nonce, epoch).await;
-        assert!(!res.change_epoch);
-    }
-    // check that the current epoch is still 0
-    assert_eq!(query_runner.get_epoch_info().epoch, 0);
-
-    // Have the last needed committee member signal the epoch change and make sure it changes
-    let res = change_epoch(
-        &update_socket,
-        &keystore[required_signals].node_secret_key,
-        nonce,
-        epoch,
+    // Check that the epoch has not been changed within some time period.
+    let result = poll_until(
+        || async {
+            network
+                .nodes()
+                .all(|node| node.get_epoch() != epoch)
+                .then_some(())
+                .ok_or(PollUntilError::ConditionNotSatisfied)
+        },
+        Duration::from_secs(1),
+        Duration::from_millis(100),
     )
     .await;
-    assert!(res.change_epoch);
+    assert_eq!(result.unwrap_err(), PollUntilError::Timeout);
 
-    // Query epoch info and make sure it incremented to new epoch
-    assert_eq!(query_runner.get_epoch_info().epoch, 1);
+    // Execute an epoch change transaction from enough nodes to trigger an epoch change.
+    node3
+        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
+        .await
+        .unwrap();
+
+    // Wait for epoch to be incremented across all nodes, even the one that did not send an epoch
+    // change transaction.
+    poll_until(
+        || async {
+            Ok((
+                (),
+                network.nodes().all(|node| node.get_epoch() == epoch + 1),
+            ))
+        },
+        Duration::from_secs(5),
+        Duration::from_millis(100),
+    )
+    .await
+    .unwrap();
+
+    // Shutdown the network.
+    network.shutdown().await;
 }
 
 #[tokio::test]
@@ -122,20 +152,34 @@ async fn test_change_epoch_reverts_insufficient_stake() {
 
 #[tokio::test]
 async fn test_epoch_change_reverts_epoch_already_changed() {
-    let temp_dir = tempdir().unwrap();
+    let mut network = TestNetwork::builder()
+        .with_num_nodes(4)
+        .build()
+        .await
+        .unwrap();
+    let node = network.node(0);
+    let epoch = node.get_epoch();
 
-    // Create a genesis committee and seed the application state with it.
-    let committee_size = 4;
-    let (committee, keystore) = create_genesis_committee(committee_size);
-    let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
+    // Trigger epoch change and wait for it to complete.
+    network.change_epoch_and_wait_for_complete().await.unwrap();
 
-    // call epoch change
-    simple_epoch_change(&update_socket, &keystore, &query_runner, 0).await;
-    assert_eq!(query_runner.get_epoch_info().epoch, 1);
+    // Send epoch change transaction from a node for same epoch, and expect it to be reverted.
+    let result = node
+        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
+        .await;
+    match result {
+        Err(TransactionClientError::Reverted((_, TransactionReceipt { response, .. }))) => {
+            assert_eq!(
+                response,
+                TransactionResponse::Revert(ExecutionError::EpochAlreadyChanged)
+            )
+        },
+        Err(e) => panic!("Transaction execution failed: {}", e),
+        Ok(_) => panic!("Expected an error, but got Ok"),
+    }
 
-    let change_epoch = UpdateMethod::ChangeEpoch { epoch: 0 };
-    let update = prepare_update_request_node(change_epoch, &keystore[0].node_secret_key, 2);
-    expect_tx_revert(update, &update_socket, ExecutionError::EpochAlreadyChanged).await;
+    // Shutdown the network.
+    network.shutdown().await;
 }
 
 #[tokio::test]
@@ -203,81 +247,67 @@ async fn test_epoch_change_reverts_already_signaled() {
 
 #[tokio::test]
 async fn test_distribute_rewards() {
-    let temp_dir = tempdir().unwrap();
+    let mut network = TestNetwork::builder()
+        .with_num_nodes(4)
+        .with_genesis_mutator(|genesis| {
+            genesis.max_inflation = 10;
+            genesis.node_share = 80;
+            genesis.protocol_share = 10;
+            genesis.service_builder_share = 10;
+            genesis.max_boost = 4;
+            genesis.supply_at_genesis = 1_000_000;
+        })
+        .build()
+        .await
+        .unwrap();
+    let genesis = &network.genesis;
+    let node1 = network.node(0);
+    let node2 = network.node(1);
 
-    let committee_size = 4;
-    let (committee, keystore) = create_genesis_committee(committee_size);
-
-    let max_inflation = 10;
-    let protocol_part = 10;
-    let node_part = 80;
-    let service_part = 10;
-    let boost = 4;
-    let supply_at_genesis = 1_000_000;
-    let (update_socket, query_runner) = init_app_with_params(
-        &temp_dir,
-        Params {
-            epoch_time: None,
-            max_inflation: Some(max_inflation),
-            protocol_share: Some(protocol_part),
-            node_share: Some(node_part),
-            service_builder_share: Some(service_part),
-            max_boost: Some(boost),
-            supply_at_genesis: Some(supply_at_genesis),
-        },
-        Some(committee),
-    );
-
-    // get params for emission calculations
+    // Initialize params for emission calculations.
     let percentage_divisor: HpUfixed<18> = 100_u16.into();
-    let supply_at_year_start: HpUfixed<18> = supply_at_genesis.into();
-    let inflation: HpUfixed<18> = HpUfixed::from(max_inflation) / &percentage_divisor;
-    let node_share = HpUfixed::from(node_part) / &percentage_divisor;
-    let protocol_share = HpUfixed::from(protocol_part) / &percentage_divisor;
-    let service_share = HpUfixed::from(service_part) / &percentage_divisor;
+    let supply_at_year_start: HpUfixed<18> = genesis.supply_at_genesis.into();
+    let inflation: HpUfixed<18> = HpUfixed::from(genesis.max_inflation) / &percentage_divisor;
+    let node_share = HpUfixed::from(genesis.node_share) / &percentage_divisor;
+    let protocol_share = HpUfixed::from(genesis.protocol_share) / &percentage_divisor;
+    let service_share = HpUfixed::from(genesis.service_builder_share) / &percentage_divisor;
 
-    let owner_secret_key1 = AccountOwnerSecretKey::generate();
-    let node_secret_key1 = NodeSecretKey::generate();
-    let owner_secret_key2 = AccountOwnerSecretKey::generate();
-    let node_secret_key2 = NodeSecretKey::generate();
+    // Deposit and stake FLK tokens, and stake lock in node 2.
+    node1
+        .deposit_and_stake(10_000_u64.into(), &node1.owner_secret_key)
+        .await
+        .unwrap();
+    node2
+        .deposit_and_stake(10_000_u64.into(), &node2.owner_secret_key)
+        .await
+        .unwrap();
+    node2
+        .stake_lock(1460, &node2.owner_secret_key)
+        .await
+        .unwrap();
 
-    let deposit_amount = 10_000_u64.into();
-    let locked_for = 1460;
-    // deposit FLK tokens and stake it
-    deposit_and_stake(
-        &update_socket,
-        &owner_secret_key1,
-        1,
-        &deposit_amount,
-        &node_secret_key1.to_pk(),
-        [0; 96].into(),
-    )
-    .await;
-    deposit_and_stake(
-        &update_socket,
-        &owner_secret_key2,
-        1,
-        &deposit_amount,
-        &node_secret_key2.to_pk(),
-        [1; 96].into(),
-    )
-    .await;
-    stake_lock(
-        &update_socket,
-        &owner_secret_key2,
-        3,
-        &node_secret_key2.to_pk(),
-        locked_for,
-    )
-    .await;
-
-    // submit pods for usage
+    // Build delivery acknowledgment transactions.
     let commodity_10 = 12_800;
     let commodity_11 = 3_600;
     let commodity_21 = 5000;
-    let pod_10 = prepare_pod_request(commodity_10, 0, &node_secret_key1, 1);
-    let pod_11 = prepare_pod_request(commodity_11, 1, &node_secret_key1, 2);
-    let pod_21 = prepare_pod_request(commodity_21, 1, &node_secret_key2, 1);
+    let pod_10 = UpdateMethod::SubmitDeliveryAcknowledgmentAggregation {
+        commodity: commodity_10,
+        service_id: 0,
+        proofs: vec![DeliveryAcknowledgmentProof],
+        metadata: None,
+    };
+    let pod_11 = UpdateMethod::SubmitDeliveryAcknowledgmentAggregation {
+        commodity: commodity_11,
+        service_id: 1,
+        proofs: vec![DeliveryAcknowledgmentProof],
+        metadata: None,
+    };
+    let pod_21 = UpdateMethod::SubmitDeliveryAcknowledgmentAggregation {
+        commodity: commodity_21,
+        service_id: 1,
+        proofs: vec![DeliveryAcknowledgmentProof],
+        metadata: None,
+    };
 
     let node_1_usd = 0.1 * (commodity_10 as f64) + 0.2 * (commodity_11 as f64); // 2_000 in revenue
     let node_2_usd = 0.2 * (commodity_21 as f64); // 1_000 in revenue
@@ -291,73 +321,62 @@ async fn test_distribute_rewards() {
         HpUfixed::from(1720_u64) / HpUfixed::from(3000_u64),
     ];
 
-    // run the delivery ack transaction
-    run_updates(vec![pod_10, pod_11, pod_21], &update_socket).await;
+    // Execute delivery acknowledgment transactions.
+    node1.execute_transaction_from_node(pod_10).await.unwrap();
+    node1.execute_transaction_from_node(pod_11).await.unwrap();
+    node2.execute_transaction_from_node(pod_21).await.unwrap();
 
-    // call epoch change that will trigger distribute rewards
-    simple_epoch_change(&update_socket, &keystore, &query_runner, 0).await;
+    // Trigger epoch change and distribute rewards.
+    network.change_epoch_and_wait_for_complete().await.unwrap();
 
-    // assert stable balances
+    // Check node stables balances.
     assert_eq!(
-        get_stables_balance(&query_runner, &owner_secret_key1.to_pk().into()),
+        node1.get_stables_balance(node1.get_owner_address()),
         HpUfixed::<6>::from(node_1_usd) * node_share.convert_precision()
     );
     assert_eq!(
-        get_stables_balance(&query_runner, &owner_secret_key2.to_pk().into()),
+        node1.get_stables_balance(node2.get_owner_address()),
         HpUfixed::<6>::from(node_2_usd) * node_share.convert_precision()
     );
 
-    let total_share =
-        &node_1_proportion * HpUfixed::from(1_u64) + &node_2_proportion * HpUfixed::from(4_u64);
-
-    // calculate emissions per unit
-    let epochs_per_year = match query_runner.get_protocol_param(&ProtocolParamKey::EpochsPerYear) {
-        Some(ProtocolParamValue::EpochsPerYear(v)) => v,
-        _ => unreachable!(),
-    };
-    let emissions: HpUfixed<18> = (inflation * supply_at_year_start) / &epochs_per_year.into();
+    // Calculate emissions per unit.
+    let emissions: HpUfixed<18> =
+        (inflation * supply_at_year_start) / &genesis.epochs_per_year.into();
     let emissions_for_node = &emissions * &node_share;
 
-    // assert flk balances node 1
+    // Check node FLK balances.
+    let total_share =
+        &node_1_proportion * HpUfixed::from(1_u64) + &node_2_proportion * HpUfixed::from(4_u64);
     assert_eq!(
-        // node_flk_balance1
-        get_flk_balance(&query_runner, &owner_secret_key1.to_pk().into()),
-        // node_flk_rewards1
+        node1.get_flk_balance(node1.get_owner_address()),
         (&emissions_for_node * &node_1_proportion) / &total_share
     );
-
-    // assert flk balances node 2
     assert_eq!(
-        // node_flk_balance2
-        get_flk_balance(&query_runner, &owner_secret_key2.to_pk().into()),
-        // node_flk_rewards2
+        node2.get_flk_balance(node2.get_owner_address()),
         (&emissions_for_node * (&node_2_proportion * HpUfixed::from(4_u64))) / &total_share
     );
 
-    // assert protocols share
-    let protocol_account = match query_runner.get_metadata(&Metadata::ProtocolFundAddress) {
-        Some(Value::AccountPublicKey(s)) => s,
-        _ => panic!("AccountPublicKey is set genesis and should never be empty"),
-    };
-    let protocol_balance = get_flk_balance(&query_runner, &protocol_account);
+    // Check the protocol fund balances.
+    let protocol_account = node1.get_protocol_fund_address();
+    let protocol_balance = node1.get_flk_balance(protocol_account);
     let protocol_rewards = &emissions * &protocol_share;
     assert_eq!(protocol_balance, protocol_rewards);
 
-    let protocol_stables_balance = get_stables_balance(&query_runner, &protocol_account);
+    let protocol_stables_balance = node1.get_stables_balance(protocol_account);
     assert_eq!(
         &reward_pool * &protocol_share.convert_precision(),
         protocol_stables_balance
     );
 
-    // assert service balances with service id 0 and 1
+    // Check the service owner balances.
     for s in 0..2 {
-        let service_owner = query_runner.get_service_info(&s).unwrap().owner;
-        let service_balance = get_flk_balance(&query_runner, &service_owner);
+        let service_owner = node1.app_query.get_service_info(&s).unwrap().owner;
+        let service_balance = node1.get_flk_balance(service_owner);
         assert_eq!(
             service_balance,
             &emissions * &service_share * &service_proportions[s as usize]
         );
-        let service_stables_balance = get_stables_balance(&query_runner, &service_owner);
+        let service_stables_balance = node1.get_stables_balance(service_owner);
         assert_eq!(
             service_stables_balance,
             &reward_pool
@@ -365,136 +384,102 @@ async fn test_distribute_rewards() {
                 * &service_proportions[s as usize].convert_precision()
         );
     }
+
+    // Shutdown the network.
+    network.shutdown().await;
 }
 
 #[tokio::test]
 async fn test_supply_across_epoch() {
-    let temp_dir = tempdir().unwrap();
+    let mut network = TestNetwork::builder()
+        .with_num_nodes(4)
+        .with_genesis_mutator(|genesis| {
+            genesis.epoch_time = 100;
+            genesis.epochs_per_year = 3;
+            genesis.max_inflation = 10;
+            genesis.node_share = 80;
+            genesis.protocol_share = 10;
+            genesis.service_builder_share = 10;
+            genesis.max_boost = 4;
+            genesis.supply_at_genesis = 1000000;
+        })
+        .build()
+        .await
+        .unwrap();
+    let genesis = &network.genesis;
+    let node = network.node(0);
 
-    let committee_size = 4;
-    let (mut committee, mut keystore) = create_genesis_committee(committee_size);
-
-    let epoch_time = 100;
-    let max_inflation = 10;
-    let protocol_part = 10;
-    let node_part = 80;
-    let service_part = 10;
-    let boost = 4;
-    let supply_at_genesis = 1000000;
-    let (update_socket, query_runner) = init_app_with_params(
-        &temp_dir,
-        Params {
-            epoch_time: Some(epoch_time),
-            max_inflation: Some(max_inflation),
-            protocol_share: Some(protocol_part),
-            node_share: Some(node_part),
-            service_builder_share: Some(service_part),
-            max_boost: Some(boost),
-            supply_at_genesis: Some(supply_at_genesis),
-        },
-        Some(committee.clone()),
-    );
-
-    // get params for emission calculations
+    // Initialize params for emission calculations.
     let percentage_divisor: HpUfixed<18> = 100_u16.into();
-    let supply_at_year_start: HpUfixed<18> = supply_at_genesis.into();
-    let inflation: HpUfixed<18> = HpUfixed::from(max_inflation) / &percentage_divisor;
-    let node_share = HpUfixed::from(node_part) / &percentage_divisor;
-    let protocol_share = HpUfixed::from(protocol_part) / &percentage_divisor;
-    let service_share = HpUfixed::from(service_part) / &percentage_divisor;
+    let supply_at_year_start: HpUfixed<18> = genesis.supply_at_genesis.into();
+    let inflation: HpUfixed<18> = HpUfixed::from(genesis.max_inflation) / &percentage_divisor;
+    let node_share = HpUfixed::from(genesis.node_share) / &percentage_divisor;
+    let protocol_share = HpUfixed::from(genesis.protocol_share) / &percentage_divisor;
+    let service_share = HpUfixed::from(genesis.service_builder_share) / &percentage_divisor;
 
-    let owner_secret_key = AccountOwnerSecretKey::generate();
-    let node_secret_key = NodeSecretKey::generate();
-    let consensus_secret_key = ConsensusSecretKey::generate();
+    // Deposit and stake FLK tokens.
+    node.deposit_and_stake(10_000_u64.into(), &node.owner_secret_key)
+        .await
+        .unwrap();
 
-    let deposit_amount = 10_000_u64.into();
-    // deposit FLK tokens and stake it
-    deposit_and_stake(
-        &update_socket,
-        &owner_secret_key,
-        1,
-        &deposit_amount,
-        &node_secret_key.to_pk(),
-        consensus_secret_key.to_pk(),
-    )
-    .await;
+    // Calculate emissions per unit.
+    let emissions_per_epoch: HpUfixed<18> =
+        (&inflation * &supply_at_year_start) / &genesis.epochs_per_year.into();
 
-    // the index should be increment of whatever the size of genesis committee is, 5 in this case
-    add_to_committee(
-        &mut committee,
-        &mut keystore,
-        node_secret_key.clone(),
-        consensus_secret_key.clone(),
-        owner_secret_key.clone(),
-        5,
-    );
-
-    // every epoch supply increase similar for simplicity of the test
-    let _node_1_usd = 0.1 * 10000_f64;
-
-    // calculate emissions per unit
-    let epochs_per_year = match query_runner.get_protocol_param(&ProtocolParamKey::EpochsPerYear) {
-        Some(ProtocolParamValue::EpochsPerYear(v)) => v,
-        _ => unreachable!(),
-    };
-    let emissions_per_epoch: HpUfixed<18> = (&inflation * &supply_at_year_start) / &365.0.into();
-
+    // Get supply at this point.
     let mut supply = supply_at_year_start;
 
-    // Iterate over `epochs_per_year` epoch changes to see if the current supply and year start
-    // suppply are ok
-    for epoch in 0..epochs_per_year {
-        // add at least one transaction per epoch, so reward pool is not zero
-        let nonce = get_node_nonce(&query_runner, &node_secret_key.to_pk());
-        let pod_10 = prepare_pod_request(10000, 0, &node_secret_key, nonce + 1);
-        expect_tx_success(pod_10, &update_socket, ExecutionData::None).await;
+    // Iterate through `epoch_per_year` epoch changes to see if the current supply and year start
+    // supply are as expected.
+    for epoch in 0..genesis.epochs_per_year {
+        // Add at least one transaction per epoch, so reward pool is not zero.
+        node.execute_transaction_from_node(UpdateMethod::SubmitDeliveryAcknowledgmentAggregation {
+            commodity: 10000,
+            service_id: 0,
+            proofs: vec![DeliveryAcknowledgmentProof],
+            metadata: None,
+        })
+        .await
+        .unwrap();
 
         // We have to submit uptime measurements to make sure nodes aren't set to
         // participating=false in the next epoch.
-        // This is obviously tedious. The alternative is to deactivate the removal of offline nodes
-        // for testing.
-        for node in &keystore {
+        for node in network.nodes() {
             let mut map = BTreeMap::new();
             let measurements = test_reputation_measurements(100);
 
-            for peer in &keystore {
-                if node.node_secret_key == peer.node_secret_key {
+            for peer in network.nodes() {
+                if node.get_node_secret_key() == peer.get_node_secret_key() {
                     continue;
                 }
-                let _ = update_reputation_measurements(
-                    &query_runner,
-                    &mut map,
-                    &peer.node_secret_key.to_pk(),
-                    measurements.clone(),
-                );
-            }
-            let nonce = get_node_nonce(&query_runner, &node.node_secret_key.to_pk()) + 1;
 
-            submit_reputation_measurements(&update_socket, &node.node_secret_key, nonce, map).await;
+                map.insert(peer.index(), measurements.clone());
+            }
+            node.execute_transaction_from_node(UpdateMethod::SubmitReputationMeasurements {
+                measurements: map,
+            })
+            .await
+            .unwrap();
         }
 
-        let (_, new_keystore) = prepare_new_committee(&query_runner, &committee, &keystore);
-        simple_epoch_change(&update_socket, &new_keystore, &query_runner, epoch).await;
+        // Trigger epoch change and wait for it to complete.
+        network.change_epoch_and_wait_for_complete().await.unwrap();
 
+        // Check that the total supply was updated correctly.
         let supply_increase = &emissions_per_epoch * &node_share
             + &emissions_per_epoch * &protocol_share
             + &emissions_per_epoch * &service_share;
-
-        let total_supply = match query_runner.get_metadata(&Metadata::TotalSupply) {
-            Some(Value::HpUfixed(s)) => s,
-            _ => panic!("TotalSupply is set genesis and should never be empty"),
-        };
-
+        let total_supply = node.get_total_supply();
         supply += supply_increase;
         assert_eq!(total_supply, supply);
 
-        if epoch == epochs_per_year - 1 {
-            // the supply_year_start should update
-            let supply_year_start = match query_runner.get_metadata(&Metadata::SupplyYearStart) {
-                Some(Value::HpUfixed(s)) => s,
-                _ => panic!("SupplyYearStart is set genesis and should never be empty"),
-            };
+        // If this is the last epoch, check if the supply_year_start is updated correctly.
+        if epoch == genesis.epochs_per_year - 1 {
+            let supply_year_start = node.get_supply_year_start();
             assert_eq!(total_supply, supply_year_start);
         }
     }
+
+    // Shutdown the network.
+    network.shutdown().await;
 }

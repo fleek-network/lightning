@@ -22,6 +22,7 @@ use lightning_types::{
     Value,
 };
 use lightning_utils::application::QueryRunnerExt;
+use lightning_utils::transaction::TransactionBuilder;
 use merklize::{StateProof, StateRootHash};
 use types::ProtocolParamKey;
 
@@ -36,9 +37,17 @@ async fn test_rpc_send_txn() {
         .unwrap();
     let node = network.node(0);
 
+    let chain_id = node.app_query.get_chain_id();
+    let nonce = node.get_nonce();
     FleekApiClient::send_txn(
         &node.rpc_client().unwrap(),
-        node.new_update_transaction(UpdateMethod::ChangeEpoch { epoch: 1 }),
+        TransactionBuilder::from_update(
+            UpdateMethod::ChangeEpoch { epoch: 1 },
+            chain_id,
+            nonce + 1,
+            &node.get_owner_signer(),
+        )
+        .into(),
     )
     .await
     .unwrap();
@@ -293,7 +302,7 @@ async fn test_rpc_get_staking_amount() {
     let response = FleekApiClient::get_staking_amount(&node.rpc_client().unwrap())
         .await
         .unwrap();
-    assert_eq!(node.app.sync_query().get_staking_amount(), response);
+    assert_eq!(node.app_query.get_staking_amount(), response);
 
     network.shutdown().await;
 }
@@ -310,7 +319,7 @@ async fn test_rpc_get_committee_members() {
     let response = FleekApiClient::get_committee_members(&node.rpc_client().unwrap(), None)
         .await
         .unwrap();
-    assert_eq!(node.app.sync_query().get_committee_members(), response);
+    assert_eq!(node.app_query.get_committee_members(), response);
 
     network.shutdown().await;
 }
@@ -327,7 +336,7 @@ async fn test_rpc_get_epoch() {
     let response = FleekApiClient::get_epoch(&node.rpc_client().unwrap())
         .await
         .unwrap();
-    assert_eq!(node.app.sync_query().get_current_epoch(), response);
+    assert_eq!(node.app_query.get_current_epoch(), response);
 
     network.shutdown().await;
 }
@@ -344,7 +353,7 @@ async fn test_rpc_get_epoch_info() {
     let response = FleekApiClient::get_epoch_info(&node.rpc_client().unwrap())
         .await
         .unwrap();
-    assert_eq!(node.app.sync_query().get_epoch_info(), response);
+    assert_eq!(node.app_query.get_epoch_info(), response);
 
     network.shutdown().await;
 }
@@ -361,7 +370,7 @@ async fn test_rpc_get_total_supply() {
     let response = FleekApiClient::get_total_supply(&node.rpc_client().unwrap(), None)
         .await
         .unwrap();
-    let total_supply = match node.app.sync_query().get_metadata(&Metadata::TotalSupply) {
+    let total_supply = match node.app_query.get_metadata(&Metadata::TotalSupply) {
         Some(Value::HpUfixed(s)) => s,
         _ => panic!("TotalSupply is set genesis and should never be empty"),
     };

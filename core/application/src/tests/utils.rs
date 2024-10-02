@@ -1,7 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 use std::net::IpAddr;
 use std::str::FromStr;
-use std::time::SystemTime;
 
 use affair::Socket;
 use anyhow::{anyhow, Result};
@@ -31,7 +30,6 @@ use lightning_interfaces::types::{
 };
 use lightning_interfaces::PagingParams;
 use lightning_test_utils::json_config::JsonConfigProvider;
-use lightning_utils::application::QueryRunnerExt;
 use tempfile::TempDir;
 use types::{
     AccountInfo,
@@ -63,16 +61,6 @@ use crate::state::QueryRunner;
 use crate::{Application, ApplicationConfig};
 
 pub const CHAIN_ID: ChainId = 1337;
-
-pub struct Params {
-    pub epoch_time: Option<u64>,
-    pub max_inflation: Option<u16>,
-    pub protocol_share: Option<u16>,
-    pub node_share: Option<u16>,
-    pub service_builder_share: Option<u16>,
-    pub max_boost: Option<u16>,
-    pub supply_at_genesis: Option<u64>,
-}
 
 /// Helper struct for keeping track of a node's private keys.
 #[derive(Clone)]
@@ -166,40 +154,6 @@ pub(crate) async fn expect_tx_revert(
     result
 }
 
-/// Helper executing `ChangeEpoch` Update within a single Block.
-/// Asserts that submission occurred.
-pub(crate) async fn change_epoch(
-    socket: &ExecutionEngineSocket,
-    secret_key: &NodeSecretKey,
-    nonce: u64,
-    epoch: u64,
-) -> BlockExecutionResponse {
-    let req = prepare_update_request_node(UpdateMethod::ChangeEpoch { epoch }, secret_key, nonce);
-    run_update(req, socket).await
-}
-
-/// Helper that performs an epoch change.
-/// Asserts that submission occurred.
-pub(crate) async fn simple_epoch_change(
-    socket: &ExecutionEngineSocket,
-    committee_keystore: &[GenesisCommitteeKeystore],
-    query_runner: &QueryRunner,
-    epoch: u64,
-) {
-    let required_signals = calculate_required_signals(committee_keystore.len());
-    // make call epoch change for 2/3rd committee members
-    for (index, node) in committee_keystore.iter().enumerate().take(required_signals) {
-        let nonce = get_node_nonce(query_runner, &node.node_secret_key.to_pk()) + 1;
-        let req = prepare_change_epoch_request(epoch, &node.node_secret_key, nonce);
-
-        let res = run_update(req, socket).await;
-        // check epoch change
-        if index == required_signals - 1 {
-            assert!(res.change_epoch);
-        }
-    }
-}
-
 /// Helper executing `SubmitReputationMeasurements` Update within a single Block.
 /// Asserts that submission occurred.
 /// Asserts that the Update was successful - `TransactionResponse::Success`.
@@ -276,20 +230,6 @@ pub(crate) async fn deposit_and_stake(
         consensus_key,
     )
     .await
-}
-
-/// Helper executing `StakeLock` Update within a single Block.
-/// Asserts that submission occurred.
-/// Asserts that the Updates was successful - `TransactionResponse::Success`.
-pub(crate) async fn stake_lock(
-    socket: &ExecutionEngineSocket,
-    secret_key: &AccountOwnerSecretKey,
-    nonce: u64,
-    node_pk: &NodePublicKey,
-    locked_for: u64,
-) -> BlockExecutionResponse {
-    let req = prepare_stake_lock_request(locked_for, node_pk, secret_key, nonce);
-    expect_tx_success(req, socket, ExecutionData::None).await
 }
 
 /// Assert that Reputation Measurements are submitted (updated).
@@ -523,57 +463,6 @@ pub(crate) fn init_app_with_genesis(
     init_app(temp_dir, Some(ApplicationConfig::test(genesis_path)))
 }
 
-/// Initialize application with provided parameters.
-pub(crate) fn init_app_with_params(
-    temp_dir: &TempDir,
-    params: Params,
-    committee: Option<Vec<GenesisNode>>,
-) -> (ExecutionEngineSocket, QueryRunner) {
-    let mut genesis = test_genesis();
-
-    if let Some(committee) = committee {
-        genesis.node_info = committee;
-    }
-
-    genesis.epoch_start = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap()
-        .as_millis() as u64;
-    if let Some(epoch_time) = params.epoch_time {
-        genesis.epoch_time = epoch_time;
-    }
-
-    if let Some(max_inflation) = params.max_inflation {
-        genesis.max_inflation = max_inflation;
-    }
-
-    if let Some(protocol_share) = params.protocol_share {
-        genesis.protocol_share = protocol_share;
-    }
-
-    if let Some(node_share) = params.node_share {
-        genesis.node_share = node_share;
-    }
-
-    if let Some(service_builder_share) = params.service_builder_share {
-        genesis.service_builder_share = service_builder_share;
-    }
-
-    if let Some(max_boost) = params.max_boost {
-        genesis.max_boost = max_boost;
-    }
-
-    if let Some(supply_at_genesis) = params.supply_at_genesis {
-        genesis.supply_at_genesis = supply_at_genesis;
-    }
-
-    let genesis_path = genesis
-        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
-        .unwrap();
-
-    init_app(temp_dir, Some(ApplicationConfig::test(genesis_path)))
-}
-
 /// Prepare test Reputation Measurements based on provided `uptime`.
 pub(crate) fn test_reputation_measurements(uptime: u8) -> ReputationMeasurements {
     ReputationMeasurements {
@@ -586,11 +475,6 @@ pub(crate) fn test_reputation_measurements(uptime: u8) -> ReputationMeasurements
         uptime: Some(HpFixed::from(uptime as i32)),
         hops: None,
     }
-}
-
-/// Calculate requited signals for epoch change
-pub(crate) fn calculate_required_signals(committee_size: usize) -> usize {
-    2 * committee_size / 3 + 1
 }
 
 /// Create a test genesis committee.
@@ -864,26 +748,6 @@ pub(crate) fn prepare_pod_request(
     )
 }
 
-/// Prepare an `UpdateRequest` for `UpdateMethod::SubmitDeliveryAcknowledgmentAggregation` signed
-/// with `AccountOwnerSecretKey`. Passing the private key around like this should only be done for
-/// testing.
-pub(crate) fn prepare_stake_lock_request(
-    locked_for: u64,
-    node: &NodePublicKey,
-    secret_key: &AccountOwnerSecretKey,
-    nonce: u64,
-) -> UpdateRequest {
-    // Deposit some FLK into account 1
-    prepare_update_request_account(
-        UpdateMethod::StakeLock {
-            node: *node,
-            locked_for,
-        },
-        secret_key,
-        nonce,
-    )
-}
-
 /// Prepare an `UpdateRequest` for `UpdateMethod::ChangeEpoch` signed with `NodeSecretKey`.
 /// Passing the private key around like this should only be done for testing.
 pub(crate) fn prepare_change_epoch_request(
@@ -986,76 +850,6 @@ pub(crate) fn paging_params(ignore_stake: bool, start: u32, limit: usize) -> Pag
     }
 }
 
-/// Helper function that add a node to the `committee`.
-pub(crate) fn add_to_committee(
-    committee: &mut Vec<GenesisNode>,
-    keystore: &mut Vec<GenesisCommitteeKeystore>,
-    node_secret_key: NodeSecretKey,
-    consensus_secret_key: ConsensusSecretKey,
-    owner_secret_key: AccountOwnerSecretKey,
-    index: u16,
-) {
-    let node_public_key = node_secret_key.to_pk();
-    let consensus_public_key = consensus_secret_key.to_pk();
-    let owner_public_key = owner_secret_key.to_pk();
-    committee.push(GenesisNode::new(
-        owner_public_key.into(),
-        node_public_key,
-        "127.0.0.1".parse().unwrap(),
-        consensus_public_key,
-        "127.0.0.1".parse().unwrap(),
-        node_public_key,
-        NodePorts {
-            primary: 8000 + index,
-            worker: 9000 + index,
-            mempool: 7000 + index,
-            rpc: 6000 + index,
-            pool: 5000 + index,
-            pinger: 2000 + index,
-            handshake: HandshakePorts {
-                http: 5000 + index,
-                webrtc: 6000 + index,
-                webtransport: 7000 + index,
-            },
-        },
-        None,
-        true,
-    ));
-    keystore.push(GenesisCommitteeKeystore {
-        _owner_secret_key: owner_secret_key,
-        _worker_secret_key: node_secret_key.clone(),
-        node_secret_key,
-        consensus_secret_key,
-    });
-}
-
-/// Helper function that prepare new `committee`.
-pub(crate) fn prepare_new_committee(
-    query_runner: &QueryRunner,
-    committee: &[GenesisNode],
-    keystore: &[GenesisCommitteeKeystore],
-) -> (Vec<GenesisNode>, Vec<GenesisCommitteeKeystore>) {
-    let mut new_committee = Vec::new();
-    let mut new_keystore = Vec::new();
-    let committee_members = query_runner.get_committee_members();
-    for node in committee_members {
-        let index = committee
-            .iter()
-            .enumerate()
-            .find_map(|(index, c)| {
-                if c.primary_public_key == node {
-                    Some(index)
-                } else {
-                    None
-                }
-            })
-            .expect("Committee member was not found in genesis Committee");
-        new_committee.push(committee[index].clone());
-        new_keystore.push(keystore[index].clone());
-    }
-    (new_committee, new_keystore)
-}
-
 /// Convert NodePublicKey to NodeIndex
 pub(crate) fn get_node_index(query_runner: &QueryRunner, pub_key: &NodePublicKey) -> NodeIndex {
     query_runner.pubkey_to_index(pub_key).unwrap()
@@ -1076,11 +870,6 @@ pub(crate) fn do_get_node_info<T: Clone>(
 /// Query NodeInfo from NodeTable
 pub(crate) fn get_node_info(query_runner: &QueryRunner, pub_key: &NodePublicKey) -> NodeInfo {
     do_get_node_info(query_runner, pub_key, |n| n)
-}
-
-/// Query Node's Nonce from NodeTable
-pub(crate) fn get_node_nonce(query_runner: &QueryRunner, pub_key: &NodePublicKey) -> u64 {
-    do_get_node_info::<u64>(query_runner, pub_key, |n| n.nonce)
 }
 
 /// Query Node's Participation from NodeTable
@@ -1129,12 +918,6 @@ pub(crate) fn get_flk_balance(query_runner: &QueryRunner, address: &EthAddress) 
 /// Query Account's bandwidth balance
 pub(crate) fn get_account_balance(query_runner: &QueryRunner, address: &EthAddress) -> u128 {
     do_get_account_info::<u128>(query_runner, address, |a| a.bandwidth_balance).unwrap_or(0)
-}
-
-/// Query Account's stables balance
-pub(crate) fn get_stables_balance(query_runner: &QueryRunner, address: &EthAddress) -> HpUfixed<6> {
-    do_get_account_info::<HpUfixed<6>>(query_runner, address, |a| a.stables_balance)
-        .unwrap_or(HpUfixed::<6>::zero())
 }
 
 pub(crate) fn uri_to_providers(query_runner: &QueryRunner, uri: &Blake3Hash) -> Vec<NodeIndex> {
