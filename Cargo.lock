@@ -976,6 +976,37 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "62af46d040ba9df09edc6528dae9d8e49f5f3e82f55b7d2ec31a733c38dbc49d"
 
 [[package]]
+name = "atomo"
+version = "0.0.5"
+dependencies = [
+ "arc-swap",
+ "bincode",
+ "dashmap",
+ "fxhash",
+ "im",
+ "once-ptr 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand 0.8.5",
+ "seize",
+ "serde",
+]
+
+[[package]]
+name = "atomo"
+version = "0.0.5"
+source = "git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.4#3b21025a5946fda345813453b58ca5c0f6dcb4e4"
+dependencies = [
+ "arc-swap",
+ "bincode",
+ "dashmap",
+ "fxhash",
+ "im",
+ "once-ptr 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand 0.8.5",
+ "seize",
+ "serde",
+]
+
+[[package]]
 name = "atomo-rocks"
 version = "0.2.0"
 dependencies = [
