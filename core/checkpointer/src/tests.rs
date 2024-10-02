@@ -6,12 +6,7 @@ use bit_set::BitSet;
 use fleek_crypto::{ConsensusSignature, SecretKey};
 use lightning_interfaces::types::{AggregateCheckpoint, CheckpointAttestation};
 use lightning_interfaces::KeystoreInterface;
-use lightning_test_utils::e2e::{
-    TestNetworkBuilder,
-    TestNodeBuilder,
-    TestNodeComponents,
-    WaitUntilError,
-};
+use lightning_test_utils::e2e::{TestNetwork, TestNodeBuilder, TestNodeComponents};
 use lightning_test_utils::keys::EphemeralKeystore;
 use pretty_assertions::assert_eq;
 use tempfile::tempdir;
@@ -27,7 +22,7 @@ async fn test_start_shutdown() {
 
 #[tokio::test]
 async fn test_supermajority_over_epoch_changes() {
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(3)
         .build()
         .await
@@ -112,7 +107,7 @@ async fn test_supermajority_over_epoch_changes() {
 
 #[tokio::test]
 async fn test_no_supermajority_of_attestations() {
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(3)
         .build()
         .await
@@ -173,7 +168,7 @@ async fn test_no_supermajority_of_attestations() {
 
 #[tokio::test]
 async fn test_missing_epoch_change_notification_no_supermajority() {
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(3)
         .build()
         .await
@@ -232,7 +227,7 @@ async fn test_missing_epoch_change_notification_no_supermajority() {
 
 #[tokio::test]
 async fn test_missing_epoch_change_notification_still_supermajority() {
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(4)
         .build()
         .await
@@ -315,7 +310,7 @@ async fn test_missing_epoch_change_notification_still_supermajority() {
 
 #[tokio::test]
 async fn test_aggregate_checkpoint_already_exists() {
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(1)
         .build()
         .await
@@ -371,7 +366,7 @@ async fn test_aggregate_checkpoint_already_exists() {
 
 #[tokio::test]
 async fn test_delayed_epoch_change_notification() {
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(3)
         .build()
         .await
@@ -446,7 +441,7 @@ async fn test_delayed_epoch_change_notification() {
 
 #[tokio::test]
 async fn test_multiple_different_epoch_change_notifications_simultaneously() {
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(3)
         .build()
         .await
@@ -601,7 +596,7 @@ async fn test_multiple_different_epoch_change_notifications_simultaneously() {
 
 #[tokio::test]
 async fn test_attestation_from_ineligible_node() {
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(2)
         .build()
         .await
@@ -650,7 +645,7 @@ async fn test_attestation_from_ineligible_node() {
 
 #[tokio::test]
 async fn test_attestation_with_invalid_signature() {
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(2)
         .build()
         .await
@@ -694,7 +689,7 @@ async fn test_attestation_with_invalid_signature() {
 
 #[tokio::test]
 async fn test_attestations_with_inconsistent_state_roots_no_supermajority() {
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(3)
         .build()
         .await
@@ -742,7 +737,7 @@ async fn test_attestations_with_inconsistent_state_roots_no_supermajority() {
 
 #[tokio::test]
 async fn test_attestations_with_inconsistent_state_roots_still_supermajority() {
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(4)
         .build()
         .await
@@ -817,7 +812,7 @@ async fn test_attestations_with_inconsistent_state_roots_still_supermajority() {
 
 #[tokio::test]
 async fn test_multiple_different_epoch_change_notifications_for_same_epoch() {
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(2)
         .build()
         .await
@@ -900,7 +895,7 @@ async fn test_multiple_different_epoch_change_notifications_for_same_epoch() {
 
 #[tokio::test]
 async fn test_multiple_different_attestations_from_same_node() {
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(2)
         .build()
         .await

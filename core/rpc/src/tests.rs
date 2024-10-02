@@ -5,7 +5,7 @@ use fleek_crypto::{AccountOwnerSecretKey, EthAddress, SecretKey};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_application::env::ApplicationStateTree;
 use lightning_interfaces::prelude::*;
-use lightning_test_utils::e2e::TestNetworkBuilder;
+use lightning_test_utils::e2e::TestNetwork;
 use lightning_types::{
     AccountInfo,
     AggregateCheckpoint,
@@ -29,7 +29,7 @@ use crate::api::{AdminApiClient, FleekApiClient};
 
 #[tokio::test]
 async fn test_rpc_send_txn() {
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(1)
         .build()
         .await
@@ -50,7 +50,7 @@ async fn test_rpc_send_txn() {
 async fn test_rpc_get_flk_balance() {
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let eth_address: EthAddress = owner_secret_key.to_pk().into();
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(1)
         .with_genesis_mutator(move |genesis| {
             genesis.account.push(GenesisAccount {
@@ -75,7 +75,7 @@ async fn test_rpc_get_flk_balance() {
 
 #[tokio::test]
 async fn test_rpc_get_reputation() {
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(1)
         .with_genesis_mutator(move |genesis| {
             genesis.node_info[0].reputation = Some(46);
@@ -97,7 +97,7 @@ async fn test_rpc_get_reputation() {
 
 #[tokio::test]
 async fn test_rpc_get_staked() {
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(1)
         .with_genesis_mutator(move |genesis| {
             genesis.node_info[0].stake = Staking {
@@ -125,7 +125,7 @@ async fn test_rpc_get_staked() {
 async fn test_rpc_get_stables_balance() {
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let eth_address: EthAddress = owner_secret_key.to_pk().into();
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(1)
         .with_genesis_mutator(move |genesis| {
             genesis.account.push(GenesisAccount {
@@ -151,7 +151,7 @@ async fn test_rpc_get_stables_balance() {
 
 #[tokio::test]
 async fn test_rpc_get_stake_locked_until() {
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(1)
         .with_genesis_mutator(move |genesis| {
             genesis.node_info[0].stake = Staking {
@@ -178,7 +178,7 @@ async fn test_rpc_get_stake_locked_until() {
 
 #[tokio::test]
 async fn test_rpc_get_locked_time() {
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(1)
         .with_genesis_mutator(move |genesis| {
             genesis.node_info[0].stake = Staking {
@@ -205,7 +205,7 @@ async fn test_rpc_get_locked_time() {
 
 #[tokio::test]
 async fn test_rpc_get_locked() {
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(1)
         .with_genesis_mutator(move |genesis| {
             genesis.node_info[0].stake = Staking {
@@ -233,7 +233,7 @@ async fn test_rpc_get_locked() {
 async fn test_rpc_get_bandwidth_balance() {
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let eth_address: EthAddress = owner_secret_key.to_pk().into();
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(1)
         .with_genesis_mutator(move |genesis| {
             genesis.account.push(GenesisAccount {
@@ -259,7 +259,7 @@ async fn test_rpc_get_bandwidth_balance() {
 
 #[tokio::test]
 async fn test_rpc_get_node_info() {
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(1)
         .build()
         .await
@@ -283,7 +283,7 @@ async fn test_rpc_get_node_info() {
 
 #[tokio::test]
 async fn test_rpc_get_staking_amount() {
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(1)
         .build()
         .await
@@ -300,7 +300,7 @@ async fn test_rpc_get_staking_amount() {
 
 #[tokio::test]
 async fn test_rpc_get_committee_members() {
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(1)
         .build()
         .await
@@ -317,7 +317,7 @@ async fn test_rpc_get_committee_members() {
 
 #[tokio::test]
 async fn test_rpc_get_epoch() {
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(1)
         .build()
         .await
@@ -334,7 +334,7 @@ async fn test_rpc_get_epoch() {
 
 #[tokio::test]
 async fn test_rpc_get_epoch_info() {
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(1)
         .build()
         .await
@@ -351,7 +351,7 @@ async fn test_rpc_get_epoch_info() {
 
 #[tokio::test]
 async fn test_rpc_get_total_supply() {
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(1)
         .build()
         .await
@@ -372,7 +372,7 @@ async fn test_rpc_get_total_supply() {
 
 #[tokio::test]
 async fn test_rpc_get_year_start_supply() {
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(1)
         .build()
         .await
@@ -397,7 +397,7 @@ async fn test_rpc_get_year_start_supply() {
 
 #[tokio::test]
 async fn test_rpc_get_protocol_fund_address() {
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(1)
         .build()
         .await
@@ -422,7 +422,7 @@ async fn test_rpc_get_protocol_fund_address() {
 
 #[tokio::test]
 async fn test_rpc_get_protocol_param_lock_time() {
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(1)
         .build()
         .await
@@ -451,7 +451,7 @@ async fn test_rpc_get_protocol_param_lock_time() {
 
 #[tokio::test]
 async fn test_rpc_get_total_served() {
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(1)
         .with_genesis_mutator(move |genesis| {
             genesis.total_served.insert(
@@ -484,7 +484,7 @@ async fn test_rpc_get_total_served() {
 
 #[tokio::test]
 async fn test_rpc_get_node_served() {
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(1)
         .with_genesis_mutator(move |genesis| {
             genesis.node_info[0].current_epoch_served = Some(GenesisNodeServed {
@@ -515,7 +515,7 @@ async fn test_rpc_get_node_served() {
 
 #[tokio::test]
 async fn test_rpc_is_valid_node() {
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(1)
         .with_genesis_mutator(move |genesis| {
             genesis.node_info[0].current_epoch_served = Some(GenesisNodeServed {
@@ -539,7 +539,7 @@ async fn test_rpc_is_valid_node() {
 
 #[tokio::test]
 async fn test_rpc_get_node_registry() {
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(3)
         .with_genesis_mutator(move |genesis| {
             genesis.node_info[0].genesis_committee = false;
@@ -569,7 +569,7 @@ async fn test_rpc_get_node_registry() {
 
 #[tokio::test]
 async fn test_admin_ping() {
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(1)
         .with_genesis_mutator(move |genesis| {
             genesis.node_info[0].genesis_committee = false;
@@ -598,7 +598,7 @@ async fn test_admin_ping() {
 #[tokio::test]
 async fn test_rpc_events() {
     let owner_secret_key = AccountOwnerSecretKey::generate();
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(1)
         .with_genesis_mutator(move |genesis| {
             genesis.account.push(GenesisAccount {
@@ -636,7 +636,7 @@ async fn test_rpc_events() {
 #[tokio::test]
 async fn test_rpc_get_state_root() {
     let owner_secret_key = AccountOwnerSecretKey::generate();
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(1)
         .with_genesis_mutator(move |genesis| {
             genesis.account.push(GenesisAccount {
@@ -665,7 +665,7 @@ async fn test_rpc_get_state_root() {
 async fn test_rpc_get_state_proof() {
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_eth_address: EthAddress = owner_secret_key.to_pk().into();
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(1)
         .with_genesis_mutator(move |genesis| {
             genesis.account.push(GenesisAccount {
@@ -721,7 +721,7 @@ async fn test_rpc_get_state_proof() {
 #[tokio::test]
 async fn test_rpc_get_aggregate_checkpoint() {
     let owner_secret_key = AccountOwnerSecretKey::generate();
-    let mut network = TestNetworkBuilder::new()
+    let mut network = TestNetwork::builder()
         .with_num_nodes(1)
         .with_genesis_mutator(move |genesis| {
             genesis.account.push(GenesisAccount {
