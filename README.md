@@ -8,13 +8,13 @@ Lightning is the open-source Rust implementation of Fleek Network.
 
 This repository contains the source code for the implementation of _Fleek Network_.
 
-Here is the directory schema:
-
 ## Running locally
 
 The `main` branch is considered a WIP and may at times be buggy or broken. To try out the code checkout the [stable](https://github.com/fleek-network/lightning/tree/stable) branch,
 
 # Project Layout
+
+Here is the directory schema:
 
 ```txt
 lightning
