@@ -20,7 +20,7 @@ serde_json.workspace = true
 tracing.workspace = true
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tokio.workspace = true
-url = "2.5.0"
+url.workspace = true
 lightning-workspace-hack.workspace = true
 lightning-utils = { path = "../../core/utils" }
 lazy_static.workspace = true

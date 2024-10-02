@@ -10,7 +10,7 @@ fast-sri = { path = "../../lib/fast-sri" }
 lightning-interfaces = { path = "../interfaces" }
 reqwest.workspace = true
 serde.workspace = true
-url = "2.5.0"
+url.workspace = true
 lightning-workspace-hack.workspace = true
 
 [dev-dependencies]

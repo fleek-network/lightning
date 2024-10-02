@@ -76,6 +76,7 @@ tempfile = "3.10.1"
 hyper = { version = "0.14.27", features = ["server", "full"] }
 tower = { version = "0.4.13", features = ["tokio", "steer"] }
 hex = { version = "0.4.3", features = ["serde"] }
+url = { version = "2.4.1", features = ["serde"] }
 
 # Our libraries
 lightning-application = { path = "core/application" }

@@ -19,7 +19,7 @@ thiserror.workspace = true
 tokio-stream.workspace = true
 tokio.workspace = true
 typed-builder = "0.20.0"
-url = "2.5.0"
+url.workspace = true
 
 [dev-dependencies]
 httpmock = "0.7.0-rc.1"
