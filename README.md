@@ -10,6 +10,12 @@ This repository contains the source code for the implementation of _Fleek Networ
 
 Here is the directory schema:
 
+## Running locally
+
+The `main` branch is considered a WIP and may at times be buggy or broken. To try out the code checkout the [stable](https://github.com/fleek-network/lightning/tree/stable) branch,
+
+# Project Layout
+
 ```txt
 lightning
 ├── lib
@@ -22,29 +28,15 @@ lightning
 │   ├── ink-quill
 │   ├── sdk
 │   ├── sdk-macros
-│   └── simulon
+│   ├── simuon
+│   └── ...
 ├── core
 │   ├── application
 │   ├── blockstore
-│   ├── consensus
-│   ├── handshake
-│   ├── interfaces
-│   ├── mock
-│   ├── node
-│   ├── notifier
-│   ├── origin-arweave
-│   ├── origin-filecoin
-│   ├── origin-ipfs
-│   ├── pod
-│   ├── rep-collector
-│   ├── reputation
-│   ├── rpc
-│   ├── signer
-│   ├── table
-│   ├── test-utils
-│   └── topology
+│   ├── ....
 └── services
-    └── cdn
+    ├── js-poc
+    └── ...
 ```
 
 There are 3 top level directories `lib` & `core` and `services`:
@@ -60,6 +52,7 @@ There are 3 top level directories `lib` & `core` and `services`:
 
 3. `services`: Our services which we build using the `SDK`.
 
+
 # Interfaces
 
 The design pattern adopted for this software is highly inspired by the Object-Oriented model
@@ -70,20 +63,7 @@ and process as objects that communicate with each other by message passing.
 
 # Rust Version
 
-To get the best of the ecosystem by default the nightly version of Rust is set in the `rust-toolchain`
-file, the version in use is `nightly-2024-06-25`, which is the version used by the `rustfmt` project
-itself which is a good sign of reliability.
-
-This is set so that the default that the IDEs will pick and default invocation of `cargo fmt` is consistent
-between everyone and also we get to use some of the nightly options when it comes to clippy and fmt.
-
-But this does not mean we're going to use this for building and releasing the binary, building the binary
-for any actual use cases should use the `cargo +stable build` command and the coming scripts and CI config
-will ease this process. Our MSRV (Minimum Supported Rust Version) is 1.80.
-
-So in summary: We use the default that is set in the `rust-toolchain` to have consistent formatting of
-the code. And does not necessarily indicate that it is the version of the compiler we are going to use
-for builds, which should be rust stable and at a minimum version 1.80.
+Check the tool chain file.
 
 # Development
 
