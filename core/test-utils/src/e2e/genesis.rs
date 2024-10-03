@@ -67,7 +67,7 @@ impl TestGenesisBuilder {
         }
     }
 
-    pub fn with_node(mut self, node: &TestNode) -> Self {
+    pub fn with_node(mut self, node: &TestNode, is_committee: bool) -> Self {
         let node_secret_key = node.keystore.get_ed25519_sk();
         let node_public_key = node_secret_key.to_pk();
         let node_owner_address = node.owner_secret_key.to_pk().into();
@@ -107,7 +107,7 @@ impl TestGenesisBuilder {
                 locked: HpUfixed::<18>::zero(),
                 locked_until: 0,
             }),
-            true,
+            is_committee,
         ));
 
         self

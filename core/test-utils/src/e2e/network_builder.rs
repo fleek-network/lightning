@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -17,6 +18,7 @@ pub type GenesisMutator = Arc<dyn Fn(&mut Genesis)>;
 #[derive(Clone)]
 pub struct TestNetworkBuilder {
     pub num_nodes: u32,
+    pub committee_size: u32,
     pub genesis_mutator: Option<GenesisMutator>,
     pub mock_consensus_config: Option<MockConsensusConfig>,
 }
@@ -25,6 +27,7 @@ impl TestNetworkBuilder {
     pub fn new() -> Self {
         Self {
             num_nodes: 3,
+            committee_size: 3,
             genesis_mutator: None,
             mock_consensus_config: Some(MockConsensusConfig {
                 max_ordering_time: 1,
@@ -38,6 +41,11 @@ impl TestNetworkBuilder {
 
     pub fn with_num_nodes(mut self, num_nodes: u32) -> Self {
         self.num_nodes = num_nodes;
+        self
+    }
+
+    pub fn with_committee_size(mut self, committee_size: u32) -> Self {
+        self.committee_size = committee_size;
         self
     }
 
@@ -98,14 +106,21 @@ impl TestNetworkBuilder {
         )
         .await;
 
+        // Decide which nodes will be on the genesis committee.
+        let node_by_index = nodes.iter().enumerate().collect::<HashMap<_, _>>();
+        let committee_nodes = node_by_index
+            .iter()
+            .take(self.committee_size as usize)
+            .collect::<HashMap<_, _>>();
+
         // Build genesis.
         let genesis = {
             let mut builder = TestGenesisBuilder::default();
             if let Some(mutator) = self.genesis_mutator.clone() {
                 builder = builder.with_mutator(mutator);
             }
-            for node in nodes.iter() {
-                builder = builder.with_node(node);
+            for (node_index, node) in node_by_index.iter() {
+                builder = builder.with_node(node, committee_nodes.contains_key(&node_index));
             }
             builder.build()
         };
