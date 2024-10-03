@@ -187,6 +187,7 @@ impl ApplicationState<AtomoStorage, DefaultSerdeBackend, ApplicationStateTree> {
                 CommitteeSelectionBeaconCommit,
                 Option<CommitteeSelectionBeaconReveal>,
             )>("committee_selection_beacon")
+            .with_table::<NodeIndex, ()>("committee_selection_beacon_non_revealing_node")
             .enable_iter("current_epoch_served")
             .enable_iter("rep_measurements")
             .enable_iter("submitted_rep_measurements")
@@ -198,7 +199,8 @@ impl ApplicationState<AtomoStorage, DefaultSerdeBackend, ApplicationStateTree> {
             .enable_iter("service_revenue")
             .enable_iter("uri_to_node")
             .enable_iter("node_to_uri")
-            .enable_iter("committee_selection_beacon");
+            .enable_iter("committee_selection_beacon")
+            .enable_iter("committee_selection_beacon_non_revealing_node");
 
         #[cfg(debug_assertions)]
         {

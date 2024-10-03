@@ -80,7 +80,8 @@ impl<B: Backend> StateExecutor<B> {
 
             // Store the start and end block number for the committee selection commit phase.
             tracing::debug!(
-                "transitioning to committee selection beacon commit phase because epoch change is starting (start: {}, end: {})",
+                "transitioning to committee selection beacon commit phase because epoch change is starting (epoch: {}, start: {}, end: {})",
+                epoch,
                 start_block,
                 end_block
             );
@@ -115,13 +116,6 @@ impl<B: Backend> StateExecutor<B> {
             Err(e) => return e,
         };
 
-        // Log the received commit.
-        tracing::debug!(
-            "received committee selection beacon commit transaction from node {}: {:?}",
-            node_index,
-            commit
-        );
-
         // Check that the node has sufficient stake.
         let node = match self.node_info.get(&node_index) {
             Some(node) => node,
@@ -129,13 +123,23 @@ impl<B: Backend> StateExecutor<B> {
         };
         // TODO(snormore): What should the minimum stake be? Should it be a protocol parameter?
         if node.stake.staked == HpUfixed::zero() {
-            // TODO(snormore): Remove most of these logging statements when the beacon/listener is
-            // able to detect and log it's own failed/reverted transactions.
-            tracing::debug!("node {} has insufficient stake", node_index);
             return TransactionResponse::Revert(ExecutionError::InsufficientStake);
         }
 
-        // TODO(snormore): Revert if the node was a non-revealing node in the previous round.
+        // Revert if the node was a non-revealing node in the previous round.
+        // TODO(snormore): Should we exclude non-revealing nodes from the "sufficient participation"
+        // calculation? Otherwise, can we get stuck in the commit phase forever with too many nodes
+        // from previous round that did not reveal that we are rejecting commits from? Write a test
+        // for this scenario.
+        if self
+            .committee_selection_beacon_non_revealing_node
+            .get(&node_index)
+            .is_some()
+        {
+            return TransactionResponse::Revert(
+                ExecutionError::CommitteeSelectionBeaconNonRevealingNode,
+            );
+        }
 
         // Get the current block number.
         let current_block = self.get_last_block_number() + 1;
@@ -148,10 +152,6 @@ impl<B: Backend> StateExecutor<B> {
             _ => None,
         };
         if commit_phase.is_none() {
-            tracing::debug!(
-                "commit phase not started (current block: {})",
-                current_block
-            );
             return TransactionResponse::Revert(
                 ExecutionError::CommitteeSelectionBeaconCommitPhaseNotStarted,
             );
@@ -159,7 +159,6 @@ impl<B: Backend> StateExecutor<B> {
 
         // Check that the current block number is within the commit phase range.
         if current_block < commit_phase.unwrap().0 || current_block > commit_phase.unwrap().1 {
-            tracing::debug!("not in commit phase (current block: {})", current_block);
             return TransactionResponse::Revert(
                 ExecutionError::CommitteeSelectionBeaconNotInCommitPhase,
             );
@@ -167,40 +166,12 @@ impl<B: Backend> StateExecutor<B> {
 
         // Check that the node has not already committed.
         if self.committee_selection_beacon.get(&node_index).is_some() {
-            tracing::debug!("node {} already committed", node_index);
             return TransactionResponse::Revert(ExecutionError::CommitteeSelectionAlreadyCommitted);
         }
 
         // Save the commit beacon.
-        tracing::debug!(
-            "saving committee selection beacon commit for node {}: {:?}",
-            node_index,
-            commit
-        );
         self.committee_selection_beacon
             .set(node_index, (commit, None));
-
-        // If we are on the last block of the commit phase, restart a new commit phase.
-        if current_block == commit_phase.unwrap().1 {
-            // Clean up beacon state.
-            self.committee_selection_beacon.clear();
-
-            // Reset and start a new commit phase.
-            let commit_start = current_block + 1;
-            let commit_end = commit_start + self.get_commit_phase_duration();
-            tracing::debug!(
-                "transitioning to new committee selection beacon commit phase because it is the last block of the current commit phase (start: {}, end: {})",
-                commit_start,
-                commit_end
-            );
-            self.metadata.set(
-                Metadata::CommitteeSelectionBeaconPhase,
-                Value::CommitteeSelectionBeaconPhase(CommitteeSelectionBeaconPhase::Commit((
-                    commit_start,
-                    commit_end,
-                ))),
-            );
-        }
 
         // Return success.
         TransactionResponse::Success(ExecutionData::None)
@@ -292,12 +263,7 @@ impl<B: Backend> StateExecutor<B> {
             .into_iter()
             .filter(|(_, (_, reveal))| reveal.is_some())
             .collect::<HashMap<_, _>>();
-        let committee = match self.committee_info.get(&epoch) {
-            Some(committee) => committee,
-            // TODO(snormore): This should never happen here; are we doing the right thing by
-            // reverting and returning this specific error?
-            None => return TransactionResponse::Revert(ExecutionError::MissingCommittee),
-        };
+        let committee = self.committee_info.get(&epoch).unwrap_or_default();
         if committee
             .members
             .iter()
@@ -307,13 +273,14 @@ impl<B: Backend> StateExecutor<B> {
             // commit or reveal phases, we are transitioning to epoch change execution and pre-epoch
             // change waiting phase.
             tracing::debug!(
-                "transitioning to committee selection beacon to epoch change execution phase because all committed nodes have revealed (start: {current_block})"
+                "transitioning to committee selection beacon to epoch change execution phase because all committed nodes have revealed (epoch: {}, start: {})",
+                epoch,
+                current_block,
             );
             self.metadata
                 .remove(&Metadata::CommitteeSelectionBeaconPhase);
 
             // Reset the committee selection beacon.
-            // TODO(snormore): Do we need to keep any history in the state?
             self.committee_selection_beacon.clear();
 
             // Execute the epoch change.
@@ -341,10 +308,12 @@ impl<B: Backend> StateExecutor<B> {
         };
 
         // Get the current block number.
+        let epoch = self.get_epoch();
         let current_block = self.get_last_block_number() + 1;
         tracing::debug!(
-            "received committee selection beacon commit phase timeout transaction at block {}",
-            current_block
+            "received committee selection beacon commit phase timeout transaction at block {} (epoch: {})",
+            current_block,
+            epoch
         );
 
         // Get the commit phase metadata.
@@ -369,7 +338,6 @@ impl<B: Backend> StateExecutor<B> {
 
         // The commit phase has timed out.
         // Check if we have sufficient participation or not.
-        let epoch = self.get_epoch();
         let current_committee = self.committee_info.get(&epoch).unwrap_or_default();
         let beacons = self.committee_selection_beacon.as_map();
         let committee_beacons = beacons
@@ -384,7 +352,8 @@ impl<B: Backend> StateExecutor<B> {
             let reveal_start = current_block + 1;
             let reveal_end = reveal_start + self.get_reveal_phase_duration();
             tracing::debug!(
-                "transitioning to committee selection beacon reveal phase because commit phase timed out with sufficient participation (start: {}, end: {})",
+                "transitioning to committee selection beacon reveal phase because commit phase timed out with sufficient participation (epoch: {}, start: {}, end: {})",
+                epoch,
                 reveal_start,
                 reveal_end
             );
@@ -400,7 +369,8 @@ impl<B: Backend> StateExecutor<B> {
             let commit_start = current_block + 1;
             let commit_end = commit_start + self.get_commit_phase_duration();
             tracing::debug!(
-                "transitioning to new committee selection beacon commit phase because commit phase timed out without sufficient participation (start: {}, end: {})",
+                "transitioning to new committee selection beacon commit phase because commit phase timed out without sufficient participation (epoch: {}, start: {}, end: {})",
+                epoch,
                 commit_start,
                 commit_end
             );
@@ -436,8 +406,9 @@ impl<B: Backend> StateExecutor<B> {
         // Get the current block number.
         let current_block = self.get_last_block_number() + 1;
         tracing::debug!(
-            "received committee selection beacon reveal phase timeout transaction at block {}",
-            current_block
+            "received committee selection beacon reveal phase timeout transaction at block {} (epoch: {})",
+            current_block,
+            self.get_epoch()
         );
 
         // Get the reveal phase metadata.
@@ -476,6 +447,22 @@ impl<B: Backend> StateExecutor<B> {
                 commit_end,
             ))),
         );
+
+        // Save non-revealing nodes to state so we can reject any commits in the next round.
+        // Clear existing non-revealing nodes table first.
+        self.committee_selection_beacon_non_revealing_node.clear();
+        let beacons = self.committee_selection_beacon.as_map();
+        let non_revealing_nodes = beacons
+            .iter()
+            .filter(|(_, (_, reveal))| reveal.is_none())
+            .map(|(node_index, _)| node_index)
+            .collect::<Vec<_>>();
+        for node_index in non_revealing_nodes {
+            self.committee_selection_beacon_non_revealing_node
+                .set(*node_index, ());
+        }
+
+        // TODO(snormore): Slash non-revealing nodes.
 
         // Clear the beacon state.
         for digest in self.committee_selection_beacon.keys() {

@@ -121,6 +121,7 @@ pub enum ExecutionError {
     CommitteeSelectionBeaconInvalidReveal,
     CommitteeSelectionBeaconCommitPhaseNotTimedOut,
     CommitteeSelectionBeaconRevealPhaseNotTimedOut,
+    CommitteeSelectionBeaconNonRevealingNode,
     MissingCommittee,
     InsufficientBalance,
     InvalidChainId,
