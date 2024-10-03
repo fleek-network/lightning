@@ -1,4 +1,5 @@
 use lightning_interfaces::types::Value;
+use lightning_utils::transaction::TransactionClientError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -11,6 +12,9 @@ pub enum CommitteeBeaconError {
 
     #[error("failed to submit transaction: {0}")]
     SubmitTransaction(#[from] SocketErrorWrapper),
+
+    #[error("failed to execute transaction: {0}")]
+    ExecuteTransaction(#[from] TransactionClientError),
 
     #[error("timeout waiting for transaction receipt: {0:?}")]
     TimeoutWaitingForTransactionReceipt([u8; 32]),

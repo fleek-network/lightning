@@ -74,6 +74,7 @@ impl<C: NodeComponents> CommitteeBeaconComponent<C> {
                     app_query.clone(),
                     listener_mempool_socket,
                 )
+                .await
                 .expect("failed to create committee beacon listener");
                 let listener_waiter = listener_shutdown.clone();
                 spawn!(
@@ -95,6 +96,7 @@ impl<C: NodeComponents> CommitteeBeaconComponent<C> {
                     app_query,
                     timer_mempool_socket,
                 )
+                .await
                 .expect("failed to create committee beacon timer");
                 let timer_waiter = timer_shutdown.clone();
                 spawn!(
