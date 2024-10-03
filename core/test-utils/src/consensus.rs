@@ -37,7 +37,11 @@ pub struct MockConsensusGroup {
 }
 
 impl MockConsensusGroup {
-    pub fn new(config: Config, start: Option<Arc<tokio::sync::Notify>>) -> Self {
+    pub fn new<C: NodeComponents>(
+        config: Config,
+        app_query: Option<c![C::ApplicationInterface::SyncExecutor]>,
+        start: Option<Arc<tokio::sync::Notify>>,
+    ) -> Self {
         let (req_tx, req_rx) = mpsc::channel(128);
         let (block_producer_tx, block_producer_rx) = broadcast::channel(16);
 
@@ -45,6 +49,7 @@ impl MockConsensusGroup {
             .name("MockConsensusGroup")
             .spawn(group_worker(
                 config.clone(),
+                app_query,
                 start.clone(),
                 req_rx,
                 block_producer_tx,
@@ -173,8 +178,11 @@ impl<C: NodeComponents> ConsensusInterface<C> for MockConsensus<C> {
 impl<C: NodeComponents> BuildGraph for MockConsensus<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::new()
-            .with_infallible(|config: fdi::Ref<C::ConfigProviderInterface>| {
-                MockConsensusGroup::new(config.get::<Self>(), None)
+            .with_infallible(|
+                config: fdi::Ref<C::ConfigProviderInterface>,
+                fdi::Cloned(app_query): fdi::Cloned<c![C::ApplicationInterface::SyncExecutor]>
+            | {
+                MockConsensusGroup::new::<C>(config.get::<Self>(), Some(app_query), None)
             })
             .with_infallible(
                 Self::new.with_event_handler(
@@ -220,12 +228,18 @@ impl Default for Config {
     }
 }
 
-async fn group_worker(
+async fn group_worker<Q: SyncQueryRunnerInterface>(
     config: Config,
+    app_query: Option<Q>,
     start: Option<Arc<tokio::sync::Notify>>,
     mut req_rx: mpsc::Receiver<TransactionRequest>,
     block_producer_tx: broadcast::Sender<Block>,
 ) {
+    // Wait for genesis if app query is given.
+    if let Some(app_query) = app_query {
+        app_query.wait_for_genesis().await;
+    }
+
     // Wait for the start signal.
     if let Some(start) = start {
         start.notified().await;

@@ -9,7 +9,7 @@ use lightning_utils::poll::{poll_until, PollUntilError};
 use ready::ReadyWaiter;
 use tempfile::tempdir;
 
-use super::{TestGenesisBuilder, TestNetwork, TestNode, TestNodeBuilder};
+use super::{TestGenesisBuilder, TestNetwork, TestNode, TestNodeBuilder, TestNodeComponents};
 use crate::consensus::{Config as MockConsensusConfig, MockConsensusGroup};
 
 pub type GenesisMutator = Arc<dyn Fn(&mut Genesis)>;
@@ -68,8 +68,11 @@ impl TestNetworkBuilder {
             if let Some(config) = &self.mock_consensus_config {
                 // Build the shared mock consensus group.
                 let consensus_group_start = Arc::new(tokio::sync::Notify::new());
-                let consensus_group =
-                    MockConsensusGroup::new(config.clone(), Some(consensus_group_start.clone()));
+                let consensus_group = MockConsensusGroup::new::<TestNodeComponents>(
+                    config.clone(),
+                    None,
+                    Some(consensus_group_start.clone()),
+                );
                 (Some(consensus_group), Some(consensus_group_start))
             } else {
                 (None, None)
