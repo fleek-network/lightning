@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 # project libs
-fn-sdk = { git = "https://github.com/fleek-network/lightning", rev = "0.1.0-alpha.4" }
+fn-sdk = { git = "https://github.com/fleek-network/lightning", rev = "0.1.0-alpha.5" }
 dcap-quoteprov = { path = "../../lib/dcap-quoteprov" }
 
 # async

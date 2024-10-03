@@ -114,12 +114,14 @@ impl EndpointState {
 
     pub fn handle_save_key(&self, data: Vec<u8>) -> std::io::Result<Bytes> {
         let state_pub_key = block_on(async move { fn_sdk::api::fetch_sgx_shared_pub_key().await });
-        let enc_seal_key = &data[..data.len() - 33];
-        let pub_key_bytes = &data[data.len() - 33..];
-        let pub_key_hex = hex::encode(pub_key_bytes);
-        if state_pub_key != pub_key_hex {
-            panic!("State public key doesn't match enclave public key");
+        if let Some(state_pub_key) = state_pub_key {
+            let pub_key_bytes = &data[data.len() - 33..];
+            let pub_key_hex = hex::encode(pub_key_bytes);
+            if state_pub_key != pub_key_hex {
+                panic!("State public key doesn't match enclave public key");
+            }
         }
+        let enc_seal_key = &data[..data.len() - 33];
         std::fs::create_dir_all(SGX_SEALED_DATA_PATH.deref())?;
         let mut file = File::create(SGX_SEALED_DATA_PATH.join("sealedkey.bin"))
             .expect("Failed to create file");
