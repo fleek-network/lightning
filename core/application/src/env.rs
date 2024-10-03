@@ -302,6 +302,10 @@ impl ApplicationEnv {
                 ProtocolParamKey::MinNumMeasurements,
                 ProtocolParamValue::MinNumMeasurements(genesis.min_num_measurements)
             );
+            param_table.insert(
+                ProtocolParamKey::ReputationPingTimeout,
+                ProtocolParamValue::ReputationPingTimeout(genesis.reputation_ping_timeout),
+            );
 
             let epoch_end: u64 = genesis.epoch_time + genesis.epoch_start;
             let mut committee_members = Vec::with_capacity(4);

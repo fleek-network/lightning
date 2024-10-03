@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, HashMap};
 use std::net::IpAddr;
 use std::str::FromStr;
+use std::time::Duration;
 
 use affair::Socket;
 use anyhow::{anyhow, Result};
@@ -411,6 +412,7 @@ pub(crate) fn test_genesis() -> Genesis {
         ],
         total_served: HashMap::new(),
         latencies: None,
+        reputation_ping_timeout: Duration::from_secs(1),
     }
 }
 

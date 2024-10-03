@@ -2,6 +2,7 @@
 use std::borrow::Cow;
 use std::fmt::Display;
 use std::net::IpAddr;
+use std::time::Duration;
 
 use anyhow::anyhow;
 use fleek_crypto::{ConsensusPublicKey, EthAddress, NodePublicKey};
@@ -191,6 +192,8 @@ pub enum ProtocolParamKey {
     SGXSharedPubKey = 13,
     /// The number of epochs per year
     EpochsPerYear = 14,
+    /// The ping timeout for node reputation.
+    ReputationPingTimeout = 15,
 }
 
 /// The Value enum is a data type used to represent values in a key-value pair for a metadata table
@@ -211,6 +214,7 @@ pub enum ProtocolParamValue {
     MaxStakeLockTime(u64),
     MinNumMeasurements(u64),
     SGXSharedPubKey(String),
+    ReputationPingTimeout(Duration),
 }
 
 impl ProtocolParamValue {
@@ -231,6 +235,9 @@ impl ProtocolParamValue {
             ProtocolParamValue::MaxStakeLockTime(i) => Cow::Owned(i.to_le_bytes().to_vec()),
             ProtocolParamValue::MinNumMeasurements(i) => Cow::Owned(i.to_le_bytes().to_vec()),
             ProtocolParamValue::SGXSharedPubKey(s) => Cow::Borrowed(s.as_bytes()),
+            ProtocolParamValue::ReputationPingTimeout(d) => {
+                Cow::Owned(d.as_millis().to_le_bytes().to_vec())
+            },
         }
     }
 }

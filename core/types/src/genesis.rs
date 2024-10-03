@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::net::IpAddr;
+use std::time::Duration;
 
 use anyhow::{Context, Result};
 use fleek_crypto::{ClientPublicKey, ConsensusPublicKey, EthAddress, NodePublicKey};
@@ -55,6 +56,8 @@ pub struct Genesis {
     #[serde_as(as = "HashMap<DisplayFromStr, _>")]
     pub total_served: HashMap<Epoch, GenesisTotalServed>,
     pub latencies: Option<Vec<GenesisLatency>>,
+    #[serde(with = "humantime_serde")]
+    pub reputation_ping_timeout: Duration,
 }
 
 impl Genesis {
