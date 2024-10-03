@@ -54,8 +54,16 @@ impl<C: NodeComponents> CommitteeBeaconTimer<C> {
     /// commit or reveal phase. If the block number has not advanced, we submit a benign
     /// transaction to move the phase forward.
     pub async fn start(&self) -> Result<(), CommitteeBeaconError> {
-        let tick_delay = Duration::from_millis(500);
+        let base_delay = Duration::from_millis(500);
+        let mut current_delay = base_delay;
+        let max_delay = Duration::from_secs(60);
+
+        // The block number of the previous iteration of the loop.
         let mut prev_block_number = None;
+
+        // The block number of the previous time we submitted a transaction to advance the phase.
+        let mut prev_advance_block_number = None;
+
         loop {
             // Get latest block number in application state.
             let block_number = self
@@ -63,12 +71,8 @@ impl<C: NodeComponents> CommitteeBeaconTimer<C> {
                 .get_block_number()
                 .context("failed to get block number")?;
 
-            // Sleep for the tick duration.
-            // TODO(snormore): This tick delay should expontentially back-off if the block number
-            // still hasn't changed since last submitting our benign transaction.
-            tokio::time::sleep(tick_delay).await;
-
             // Check if we need to advance the phase based on the block number and phase metadata.
+            let mut is_advance_tick = false;
             if let Some(prev) = prev_block_number {
                 // Check if the block number hasn't advanced and we're in the commit or reveal
                 // phase.
@@ -104,11 +108,38 @@ impl<C: NodeComponents> CommitteeBeaconTimer<C> {
                             return Err(e.into());
                         },
                     }
+
+                    // Indicate that this tick attempted to advance the phase.
+                    is_advance_tick = true;
                 }
+            }
+
+            // If the block number hasn't advanced since we last submitted a benign
+            // transaction to get it to advance, something may be wrong. Apply exponential
+            // back-off to the delay to avoid spamming the mempool.
+            if let Some(prev_advance_block_number) = prev_advance_block_number {
+                if block_number == prev_advance_block_number {
+                    tracing::warn!(
+                        "block number {} has not advanced since last advance tick, increasing delay",
+                        block_number
+                    );
+                    current_delay = (current_delay * 2).min(max_delay);
+                } else {
+                    // Otherwise, reset the delay back to the base delay.
+                    current_delay = base_delay;
+                }
+            }
+
+            // Set the last advance block number if we attempted to advance the phase.
+            if is_advance_tick {
+                prev_advance_block_number = Some(block_number);
             }
 
             // Set our previous block number.
             prev_block_number = Some(block_number);
+
+            // Sleep for the current tick delay.
+            tokio::time::sleep(current_delay).await;
         }
     }
 
