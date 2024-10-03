@@ -12,15 +12,11 @@ use lightning_interfaces::types::{
 use lightning_interfaces::Weight;
 use tokio::pin;
 use tracing::{error, info};
+use types::{ProtocolParamKey, ProtocolParamValue};
 
 use crate::buffered_mpsc;
 use crate::config::Config;
 use crate::measurement_manager::MeasurementManager;
-
-#[cfg(all(not(test), not(debug_assertions)))]
-const BEFORE_EPOCH_CHANGE: Duration = Duration::from_secs(300);
-#[cfg(any(test, debug_assertions))]
-const BEFORE_EPOCH_CHANGE: Duration = Duration::from_secs(3);
 
 pub struct ReputationAggregator<C: NodeComponents> {
     reporter: MyReputationReporter,
@@ -56,13 +52,31 @@ impl<C: NodeComponents> ReputationAggregator<C> {
         })
     }
 
-    pub async fn start(mut self, fdi::Cloned(waiter): fdi::Cloned<ShutdownWaiter>) {
+    pub async fn start(
+        mut self,
+        app_query: fdi::Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
+        fdi::Cloned(waiter): fdi::Cloned<ShutdownWaiter>,
+    ) {
+        app_query.wait_for_genesis().await;
+
+        // Calculate the amount of time before the next epoch change that the "before epoch change"
+        // notification should be emitted by the notifier.
+        // Default to 5 minutes, but if that exceeds the total epoch time then 3 seconds is used.
+        let epoch_time = match app_query.get_protocol_param(&ProtocolParamKey::EpochTime) {
+            Some(ProtocolParamValue::EpochTime(epoch_time)) => epoch_time,
+            _ => unreachable!("invalid epoch time in protocol params"),
+        };
+        let mut time_before_epoch_change = Duration::from_secs(300);
+        if time_before_epoch_change.as_millis() >= epoch_time as u128 {
+            time_before_epoch_change = Duration::from_secs(3);
+        }
+
         let shutdown_future = waiter.wait_for_shutdown();
         pin!(shutdown_future);
 
         let mut before_epoch_change_sub = self
             .notifier
-            .subscribe_before_epoch_change(BEFORE_EPOCH_CHANGE);
+            .subscribe_before_epoch_change(time_before_epoch_change);
 
         loop {
             tokio::select! {
