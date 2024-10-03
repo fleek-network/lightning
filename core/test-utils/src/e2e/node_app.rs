@@ -22,7 +22,7 @@ use lightning_utils::transaction::{TransactionClient, TransactionClientError, Tr
 use super::{TestNode, TestNodeComponents};
 
 impl TestNode {
-    pub async fn app_client(
+    pub async fn transaction_client(
         &self,
         signer: TransactionSigner,
     ) -> TransactionClient<TestNodeComponents> {
@@ -118,7 +118,7 @@ impl TestNode {
         account: &AccountOwnerSecretKey,
     ) -> Result<(), TransactionClientError> {
         let client = self
-            .app_client(TransactionSigner::AccountOwner(account.clone()))
+            .transaction_client(TransactionSigner::AccountOwner(account.clone()))
             .await;
         // Deposit FLK tokens.
         client
@@ -151,7 +151,7 @@ impl TestNode {
         account: &AccountOwnerSecretKey,
     ) -> Result<(), TransactionClientError> {
         let client = self
-            .app_client(TransactionSigner::AccountOwner(account.clone()))
+            .transaction_client(TransactionSigner::AccountOwner(account.clone()))
             .await;
 
         client
@@ -170,7 +170,7 @@ impl TestNode {
         account: &AccountOwnerSecretKey,
     ) -> Result<(), TransactionClientError> {
         let client = self
-            .app_client(TransactionSigner::AccountOwner(account.clone()))
+            .transaction_client(TransactionSigner::AccountOwner(account.clone()))
             .await;
 
         client
@@ -187,7 +187,7 @@ impl TestNode {
         &self,
         method: UpdateMethod,
     ) -> Result<(TransactionRequest, TransactionReceipt), TransactionClientError> {
-        let client = self.app_client(self.get_node_signer()).await;
+        let client = self.transaction_client(self.get_node_signer()).await;
         client.execute_transaction(method).await
     }
 
@@ -195,7 +195,7 @@ impl TestNode {
         &self,
         method: UpdateMethod,
     ) -> Result<(TransactionRequest, TransactionReceipt), TransactionClientError> {
-        let client = self.app_client(self.get_owner_signer()).await;
+        let client = self.transaction_client(self.get_owner_signer()).await;
         client.execute_transaction(method).await
     }
 }
