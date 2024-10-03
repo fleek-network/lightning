@@ -21,7 +21,7 @@ use tempfile::tempdir;
 use super::utils::*;
 
 #[tokio::test]
-async fn test_epoch_changed() {
+async fn test_epoch_change_with_all_committee_nodes() {
     let mut network = TestNetwork::builder()
         .with_num_nodes(4)
         .build()
@@ -61,6 +61,105 @@ async fn test_epoch_changed() {
 
     // Execute an epoch change transaction from enough nodes to trigger an epoch change.
     node3
+        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
+        .await
+        .unwrap();
+
+    // Wait for epoch to be incremented across all nodes, even the one that did not send an epoch
+    // change transaction.
+    poll_until(
+        || async {
+            Ok((
+                (),
+                network.nodes().all(|node| node.get_epoch() == epoch + 1),
+            ))
+        },
+        Duration::from_secs(5),
+        Duration::from_millis(100),
+    )
+    .await
+    .unwrap();
+
+    // Shutdown the network.
+    network.shutdown().await;
+}
+
+#[tokio::test]
+async fn test_epoch_change_with_some_non_committee_nodes() {
+    let mut network = TestNetwork::builder()
+        .with_num_nodes(6)
+        .with_committee_size(4)
+        .build()
+        .await
+        .unwrap();
+
+    // Get the current committee nodes.
+    let committee_nodes = network.committee_nodes();
+    let committee_node1 = committee_nodes[0];
+    let committee_node2 = committee_nodes[1];
+    let committee_node3 = committee_nodes[2];
+
+    // Get the current non-committee nodes.
+    let non_committee_nodes = network.non_committee_nodes();
+    let non_committee_node1 = non_committee_nodes[0];
+    let non_committee_node2 = non_committee_nodes[1];
+
+    // Get the current epoch.
+    let epoch = network.get_epoch();
+
+    // Execute an epoch change transaction from less than 2/3 of the committee nodes.
+    committee_node1
+        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
+        .await
+        .unwrap();
+    committee_node2
+        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
+        .await
+        .unwrap();
+
+    // Send epoch change transactions from the non-committee nodes.
+    let result = non_committee_node1
+        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
+        .await;
+    match result.unwrap_err() {
+        TransactionClientError::Reverted((_, TransactionReceipt { response, .. })) => {
+            assert_eq!(
+                response,
+                TransactionResponse::Revert(ExecutionError::NotCommitteeMember)
+            )
+        },
+        _ => panic!("unexpected error type"),
+    }
+    let result = non_committee_node2
+        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
+        .await;
+    match result.unwrap_err() {
+        TransactionClientError::Reverted((_, TransactionReceipt { response, .. })) => {
+            assert_eq!(
+                response,
+                TransactionResponse::Revert(ExecutionError::NotCommitteeMember)
+            )
+        },
+        _ => panic!("unexpected error type"),
+    }
+
+    // Check that the epoch has not been changed within some time period.
+    let result = poll_until(
+        || async {
+            network
+                .nodes()
+                .all(|node| node.get_epoch() != epoch)
+                .then_some(())
+                .ok_or(PollUntilError::ConditionNotSatisfied)
+        },
+        Duration::from_secs(1),
+        Duration::from_millis(100),
+    )
+    .await;
+    assert_eq!(result.unwrap_err(), PollUntilError::Timeout);
+
+    // Execute an epoch change transaction from enough nodes to trigger an epoch change.
+    committee_node3
         .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
         .await
         .unwrap();
@@ -167,15 +266,14 @@ async fn test_epoch_change_reverts_epoch_already_changed() {
     let result = node
         .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
         .await;
-    match result {
-        Err(TransactionClientError::Reverted((_, TransactionReceipt { response, .. }))) => {
+    match result.unwrap_err() {
+        TransactionClientError::Reverted((_, TransactionReceipt { response, .. })) => {
             assert_eq!(
                 response,
                 TransactionResponse::Revert(ExecutionError::EpochAlreadyChanged)
             )
         },
-        Err(e) => panic!("Transaction execution failed: {}", e),
-        Ok(_) => panic!("Expected an error, but got Ok"),
+        _ => panic!("unexpected error type"),
     }
 
     // Shutdown the network.
