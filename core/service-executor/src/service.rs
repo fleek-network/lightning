@@ -147,9 +147,11 @@ impl<C: NodeComponents> Context<C> {
                     .get_protocol_param(&ProtocolParamKey::SGXSharedPubKey)
                 {
                     Some(ProtocolParamValue::SGXSharedPubKey(public_key)) => {
-                        ipc_types::Response::FetchSgxSharedPubKey { public_key }
+                        ipc_types::Response::FetchSgxSharedPubKey {
+                            public_key: Some(public_key),
+                        }
                     },
-                    _ => unreachable!(), // added in the genesis
+                    _ => ipc_types::Response::FetchSgxSharedPubKey { public_key: None },
                 }
             },
             _ => unreachable!(),
