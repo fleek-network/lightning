@@ -394,7 +394,7 @@ dependencies = [
 [[package]]
 name = "atomo"
 version = "0.0.5"
-source = "git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.4#3b21025a5946fda345813453b58ca5c0f6dcb4e4"
+source = "git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.5#4a726d20fbf8a58d5d8d8c13dc596ca03a457ccd"
 dependencies = [
  "arc-swap",
  "bincode",
@@ -649,7 +649,7 @@ dependencies = [
 [[package]]
 name = "blake3-tree"
 version = "0.1.0"
-source = "git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.4#3b21025a5946fda345813453b58ca5c0f6dcb4e4"
+source = "git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.5#4a726d20fbf8a58d5d8d8c13dc596ca03a457ccd"
 dependencies = [
  "arrayref",
  "arrayvec",
@@ -2038,7 +2038,7 @@ dependencies = [
 [[package]]
 name = "fleek-crypto"
 version = "0.0.0"
-source = "git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.4#3b21025a5946fda345813453b58ca5c0f6dcb4e4"
+source = "git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.5#4a726d20fbf8a58d5d8d8c13dc596ca03a457ccd"
 dependencies = [
  "arrayref",
  "derive_more",
@@ -2097,11 +2097,11 @@ dependencies = [
 [[package]]
 name = "fn-sdk"
 version = "0.0.0"
-source = "git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.4#3b21025a5946fda345813453b58ca5c0f6dcb4e4"
+source = "git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.5#4a726d20fbf8a58d5d8d8c13dc596ca03a457ccd"
 dependencies = [
  "anyhow",
  "arrayvec",
- "blake3-tree 0.1.0 (git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.4)",
+ "blake3-tree 0.1.0 (git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.5)",
  "bytes 1.7.2",
  "derive_more",
  "fleek-crypto",
@@ -2488,7 +2488,7 @@ dependencies = [
 [[package]]
 name = "hp-fixed"
 version = "0.1.0"
-source = "git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.4#3b21025a5946fda345813453b58ca5c0f6dcb4e4"
+source = "git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.5#4a726d20fbf8a58d5d8d8c13dc596ca03a457ccd"
 dependencies = [
  "anyhow",
  "num-bigint 0.4.6",
@@ -2722,7 +2722,7 @@ dependencies = [
 [[package]]
 name = "ink-quill"
 version = "0.1.0"
-source = "git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.4#3b21025a5946fda345813453b58ca5c0f6dcb4e4"
+source = "git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.5#4a726d20fbf8a58d5d8d8c13dc596ca03a457ccd"
 dependencies = [
  "fleek-blake3",
 ]
@@ -2962,7 +2962,7 @@ dependencies = [
 [[package]]
 name = "lightning-schema"
 version = "0.0.0"
-source = "git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.4#3b21025a5946fda345813453b58ca5c0f6dcb4e4"
+source = "git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.5#4a726d20fbf8a58d5d8d8c13dc596ca03a457ccd"
 dependencies = [
  "anyhow",
  "arrayref",
@@ -2978,7 +2978,7 @@ dependencies = [
 [[package]]
 name = "lightning-types"
 version = "0.1.0"
-source = "git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.4#3b21025a5946fda345813453b58ca5c0f6dcb4e4"
+source = "git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.5#4a726d20fbf8a58d5d8d8c13dc596ca03a457ccd"
 dependencies = [
  "anyhow",
  "atomo",
@@ -3072,7 +3072,7 @@ checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 [[package]]
 name = "merklize"
 version = "0.0.0"
-source = "git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.4#3b21025a5946fda345813453b58ca5c0f6dcb4e4"
+source = "git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.5#4a726d20fbf8a58d5d8d8c13dc596ca03a457ccd"
 dependencies = [
  "anyhow",
  "atomo",
@@ -4340,7 +4340,7 @@ dependencies = [
 [[package]]
 name = "resolved-pathbuf"
 version = "0.2.0"
-source = "git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.4#3b21025a5946fda345813453b58ca5c0f6dcb4e4"
+source = "git+https://github.com/fleek-network/lightning?rev=0.1.0-alpha.5#4a726d20fbf8a58d5d8d8c13dc596ca03a457ccd"
 dependencies = [
  "derive_more",
  "resolve-path",
