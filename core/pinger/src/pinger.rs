@@ -15,11 +15,9 @@ use rand::{Rng, SeedableRng};
 use tokio::net::UdpSocket;
 use tokio::sync::mpsc;
 use tracing::{error, info};
+use types::{ProtocolParamKey, ProtocolParamValue};
 
 use crate::config::Config;
-
-/// The duration after which a ping will be reported as unanswered
-const TIMEOUT: Duration = Duration::from_secs(15);
 
 pub struct Pinger<C: NodeComponents> {
     inner: Option<PingerInner<C>>,
@@ -199,19 +197,16 @@ impl<C: NodeComponents> PingerInner<C> {
                         let msg = Message::Request { sender: node_index, id };
                         let bytes: Vec<u8> = msg.into();
                         let addr = (node.domain, node.ports.pinger);
+                        let timeout = self.get_ping_timeout();
                         if let Err(e) = socket.send_to(&bytes, addr).await {
                             error!("Failed to respond to ping message: {e:?}");
                         } else {
                             pending_req.insert((peer_index, id), Instant::now());
                             let tx = timeout_tx.clone();
                             spawn!(async move {
-                                tokio::time::sleep(TIMEOUT).await;
+                                tokio::time::sleep(timeout).await;
                                 // We ignore the sending error because it can happen that the
-                                // pinger is shutdown while there are still pending timeout tasks.
-                                let _ = tx.send((peer_index, id)).await;
-                            },
                             "PINGER: request timeout");
-                        }
                     }
                 }
                 timeout = timeout_rx.recv() => {
@@ -244,6 +239,18 @@ impl<C: NodeComponents> PingerInner<C> {
             .collect();
         nodes.shuffle(rng);
         nodes
+    }
+
+    fn get_ping_timeout(&self) -> Duration {
+        match self
+            .query_runner
+            .get_protocol_param(&ProtocolParamKey::ReputationPingTimeout)
+        {
+            Some(ProtocolParamValue::ReputationPingTimeout(timeout)) => timeout,
+            // Return 15s if the param is not set, for backwards compatibility.
+            None => Duration::from_secs(15),
+            _ => unreachable!(),
+        }
     }
 }
 

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::str::FromStr;
+use std::time::Duration;
 
 use fleek_crypto::{AccountOwnerSecretKey, EthAddress, SecretKey};
 use hp_fixed::unsigned::HpUfixed;
@@ -164,6 +165,7 @@ impl TestGenesisBuilder {
             ],
             total_served: HashMap::new(),
             latencies: None,
+            reputation_ping_timeout: Duration::from_secs(1),
         };
 
         if let Some(mutator) = self.mutator {

@@ -31,6 +31,7 @@ lightning-workspace-hack.workspace = true
 resolved-pathbuf.workspace = true
 serde_with.workspace = true
 toml.workspace = true
+humantime-serde.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
