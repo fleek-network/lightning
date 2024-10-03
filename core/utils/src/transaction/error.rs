@@ -4,7 +4,7 @@ use tokio::sync::mpsc;
 
 /// The transaction client error enum encapsulates errors that can occur when executing transactions
 /// with the [`TransactionClient`].
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Eq, PartialEq)]
 pub enum TransactionClientError {
     // The transaction was submitted but reverted during execution for the reason in the receipt.
     #[error("transaction was reverted: {:?}", .0.0.hash())]
