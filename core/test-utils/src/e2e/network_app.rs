@@ -6,7 +6,7 @@ use lightning_interfaces::prelude::*;
 use lightning_utils::poll::{poll_until, PollUntilError};
 use types::{Epoch, UpdateMethod};
 
-use super::TestNetwork;
+use super::{TestNetwork, TestNode};
 
 impl TestNetwork {
     /// Execute epoch change transaction from all nodes and wait for epoch to be incremented.
@@ -44,5 +44,32 @@ impl TestNetwork {
             Duration::from_millis(100),
         )
         .await
+    }
+
+    pub fn committee_nodes(&self) -> Vec<&TestNode> {
+        let node = self.node(0);
+        let epoch = node.get_epoch();
+        node.app_query
+            .get_committee_info(&epoch, |committee| committee.members)
+            .unwrap_or_default()
+            .into_iter()
+            .map(|index| self.node(index))
+            .collect()
+    }
+
+    pub fn non_committee_nodes(&self) -> Vec<&TestNode> {
+        let node = self.node(0);
+        let epoch = node.get_epoch();
+        let committee_nodes = node
+            .app_query
+            .get_committee_info(&epoch, |committee| committee.members)
+            .unwrap_or_default();
+        self.nodes()
+            .filter(|node| !committee_nodes.contains(&node.index()))
+            .collect()
+    }
+
+    pub fn get_epoch(&self) -> Epoch {
+        self.node(0).get_epoch()
     }
 }
