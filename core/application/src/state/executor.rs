@@ -1520,6 +1520,32 @@ impl<B: Backend> StateExecutor<B> {
         }
     }
 
+    fn get_epoch_time(&self) -> u64 {
+        match self.parameters.get(&ProtocolParamKey::EpochTime) {
+            Some(ProtocolParamValue::EpochTime(epoch_time)) => epoch_time,
+            _ => unreachable!("invalid epoch time in protocol parameters"),
+        }
+    }
+
+    fn get_committee_size(&self) -> u64 {
+        match self.parameters.get(&ProtocolParamKey::CommitteeSize) {
+            Some(ProtocolParamValue::CommitteeSize(committee_size)) => committee_size,
+            _ => unreachable!("invalid committee size in protocol parameters"),
+        }
+    }
+
+    fn get_active_nodes(&self) -> Vec<NodeIndex> {
+        let node_registry: Vec<(NodeIndex, NodeInfo)> = self
+            .get_node_registry()
+            .into_iter()
+            .filter(|(_, node)| node.participation == Participation::True)
+            .collect();
+        self.settle_auction(node_registry)
+            .into_iter()
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>()
+    }
+
     fn clear_content_registry(&self, node_index: &NodeIndex) -> Result<(), ExecutionError> {
         let uris = self.node_to_uri.get(node_index).unwrap_or_default();
 

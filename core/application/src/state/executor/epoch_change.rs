@@ -1,8 +1,7 @@
 use std::cmp::Ordering;
 use std::collections::HashMap;
 
-use fleek_blake3::Hasher;
-use fleek_crypto::{NodePublicKey, TransactionSender};
+use fleek_crypto::TransactionSender;
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::types::{
     Committee,
@@ -548,59 +547,42 @@ impl<B: Backend> StateExecutor<B> {
     }
 
     fn choose_new_committee(&self) -> Committee {
-        let epoch = match self.metadata.get(&Metadata::Epoch) {
-            Some(Value::Epoch(epoch)) => epoch,
-            _ => 0,
-        };
+        let epoch = self.get_epoch();
+        let committee_size = self.get_committee_size();
 
-        let node_registry: Vec<(NodeIndex, NodeInfo)> = self
-            .get_node_registry()
-            .into_iter()
-            .filter(|index| index.1.participation == Participation::True)
-            .collect();
+        // Get the active nodes from the node registry.
+        let mut active_nodes = self.get_active_nodes();
 
-        let committee_size = match self.parameters.get(&ProtocolParamKey::CommitteeSize) {
-            Some(ProtocolParamValue::CommitteeSize(v)) => v,
-            _ => unreachable!(), // set in genesis
-        };
-
-        let mut active_nodes: Vec<NodeIndex> = self
-            .settle_auction(node_registry)
-            .iter()
-            .map(|node| node.0)
-            .collect();
-
-        let num_of_nodes = active_nodes.len() as u64;
-        // if total number of nodes are less than committee size, all nodes are part of committee
-        let committee = if committee_size >= num_of_nodes {
+        // If total number of nodes are less than committee size, all nodes are part of
+        // committee. Otherwise, we need to select the committee from the active nodes.
+        let committee = if committee_size >= active_nodes.len() as u64 {
             active_nodes.clone()
-            //   return node_registry;
         } else {
-            let committee_table = self.committee_info.get(&epoch).unwrap();
-            // TODO(snormore): Use the aggregated random beacon instead of the
-            // `epoch_end_timestamp`. Make sure this is tested, that there are non-committee nodes
-            // in the network or else this code path will never get hit.
-            let epoch_end = committee_table.epoch_end_timestamp;
-            let public_key = {
-                if !committee_table.members.is_empty() {
-                    let mid_index = committee_table.members.len() / 2;
-                    self.node_info
-                        .get(&committee_table.members[mid_index])
-                        .unwrap()
-                        .public_key
-                } else {
-                    NodePublicKey([1u8; 32])
-                }
-            };
+            // Collect the committee selection beacons from the active nodes.
+            let mut committee_selection_beacons = self
+                .committee_selection_beacon
+                .as_map()
+                .into_iter()
+                .filter(|(_, (_, reveal))| reveal.is_some())
+                .map(|(node_index, (commit, reveal))| (node_index, (commit, reveal.unwrap())))
+                .collect::<Vec<_>>();
 
-            let mut hasher = Hasher::new();
-            hasher.update(&public_key.0);
-            hasher.update(&epoch_end.to_be_bytes());
-            let result = hasher.finalize();
-            let mut seed = [0u8; 32];
-            seed.copy_from_slice(&result.as_bytes()[0..32]);
-            let mut rng: StdRng = SeedableRng::from_seed(seed);
+            // Sort the committee selection beacons by node index.
+            committee_selection_beacons.sort_by_key(|k| k.0);
+
+            // Concatenate the reveals in ascending order of node index.
+            let combined_reveals = committee_selection_beacons
+                .into_iter()
+                .map(|(_, (_, reveal))| reveal)
+                .collect::<Vec<_>>()
+                .concat();
+            let combined_reveals_hash: [u8; 32] = Sha3_256::digest(&combined_reveals).into();
+
+            // Shuffle the active nodes using the combined reveals hash as the seed.
+            let mut rng: StdRng = SeedableRng::from_seed(combined_reveals_hash);
             active_nodes.shuffle(&mut rng);
+
+            // Take the first `committee_size` nodes from the shuffled list as the new committee.
             active_nodes
                 .iter()
                 .take(committee_size.try_into().unwrap())
@@ -608,13 +590,10 @@ impl<B: Backend> StateExecutor<B> {
                 .collect()
         };
 
-        let epoch_length = match self.parameters.get(&ProtocolParamKey::EpochTime) {
-            Some(ProtocolParamValue::EpochTime(v)) => v,
-            _ => unreachable!(), // set in genesis
-        };
-
+        // Calculate the epoch end timestamp.
+        let epoch_time = self.get_epoch_time();
         let epoch_end_timestamp =
-            self.committee_info.get(&epoch).unwrap().epoch_end_timestamp + epoch_length as u64;
+            self.committee_info.get(&epoch).unwrap().epoch_end_timestamp + epoch_time;
 
         Committee {
             ready_to_change: Vec::with_capacity(committee.len()),
