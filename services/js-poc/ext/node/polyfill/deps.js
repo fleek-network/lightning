@@ -22,3 +22,4 @@ export * as url from 'node:url'
 export * as zlib from 'node:zlib'
 
 export * as util from './overrides/util.js'
+export * as os from './os.ts'
