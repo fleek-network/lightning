@@ -77,6 +77,7 @@ pub struct QueryRunner {
             Option<CommitteeSelectionBeaconReveal>,
         ),
     >,
+    _committee_selection_beacon_non_revealing_node: ResolvedTableReference<NodeIndex, ()>,
 }
 
 impl QueryRunner {
@@ -118,6 +119,8 @@ impl SyncQueryRunnerInterface for QueryRunner {
                 CommitteeSelectionBeaconCommit,
                 Option<CommitteeSelectionBeaconReveal>,
             )>("committee_selection_beacon"),
+            _committee_selection_beacon_non_revealing_node: atomo
+                .resolve::<NodeIndex, ()>("committee_selection_beacon_non_revealing_node"),
 
             inner: atomo,
         }

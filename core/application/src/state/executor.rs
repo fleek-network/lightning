@@ -129,6 +129,7 @@ pub struct StateExecutor<B: Backend> {
             Option<CommitteeSelectionBeaconReveal>,
         ),
     >,
+    pub committee_selection_beacon_non_revealing_node: B::Ref<NodeIndex, ()>,
     pub backend: B,
 }
 
@@ -158,6 +159,8 @@ impl<B: Backend> StateExecutor<B> {
             uri_to_node: backend.get_table_reference("uri_to_node"),
             node_to_uri: backend.get_table_reference("node_to_uri"),
             committee_selection_beacon: backend.get_table_reference("committee_selection_beacon"),
+            committee_selection_beacon_non_revealing_node: backend
+                .get_table_reference("committee_selection_beacon_non_revealing_node"),
             backend,
         }
     }
