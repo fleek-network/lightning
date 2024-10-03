@@ -15,7 +15,6 @@ futures = "0.3"
 # io
 bytes = { version = "1.7", features = ["serde"]}
 arrayref = "0.3"
-reqwest = { version = "0.12", features = ["blocking"] }
 
 # encodings
 hex = "0.4"
