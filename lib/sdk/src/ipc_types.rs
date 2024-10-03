@@ -215,7 +215,7 @@ ReqRes! {
     FetchSgxSharedPubKey {
         =>
         /// The node index of this node
-        public_key: String,
+        public_key: Option<String>,
     },
     /// Submit a task
     Task {

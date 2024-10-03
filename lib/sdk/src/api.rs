@@ -68,7 +68,7 @@ pub async fn fetch_node_index() -> Option<u32> {
     }
 }
 
-pub async fn fetch_sgx_shared_pub_key() -> String {
+pub async fn fetch_sgx_shared_pub_key() -> Option<String> {
     let req = Request::FetchSgxSharedPubKey {};
     let res = send_and_await_response(req).await;
     match res {

@@ -16,7 +16,6 @@ max_boost = 4
 max_lock_time = 1460                                                 # 1460 days(epoch) meaning 4 years
 supply_at_genesis = 1000000                                          # set to 1 million for testing, to be determined when initial allocations are set
 min_num_measurements = 4
-sgx_shared_pub_key = "03a3fe41244add26af1f820d2acb4ad22b158ff7b69ce41401bf932d7734eb5d49"
 protocol_fund_address = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
 governance_address = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
 
