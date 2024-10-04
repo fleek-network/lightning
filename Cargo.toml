@@ -5,6 +5,7 @@ members = [
   "core/interfaces/proc",
   "etc/workspace-hack",
   "lib/*",
+  "lib/sgxkit/macros",
   "lib/sgxkit/sys",
   "services/*",
   "services/js-poc/deno_fleek",

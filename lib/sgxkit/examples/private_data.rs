@@ -37,6 +37,7 @@ where
         .map_err(|e| serde::de::Error::custom(e.to_string()))
 }
 
+#[sgxkit::main]
 fn main() -> anyhow::Result<()> {
     let Request {
         content_type,
