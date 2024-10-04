@@ -13641,9 +13641,18 @@ dependencies = [
  "k256",
  "serde",
  "serde_json",
+ "sgxkit-macros",
  "sgxkit-sys",
  "strum 0.26.3",
  "thiserror",
+]
+
+[[package]]
+name = "sgxkit-macros"
+version = "0.1.0"
+dependencies = [
+ "quote 1.0.36",
+ "syn 2.0.72",
 ]
 
 [[package]]

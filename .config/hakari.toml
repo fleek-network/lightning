@@ -68,5 +68,6 @@ workspace-members = [
   "simulon",
   "sgxkit",
   "sgxkit-sys",
+  "sgxkit-macros",
   "sgxencrypt"
 ]
