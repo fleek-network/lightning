@@ -7374,7 +7374,10 @@ name = "lightning-node"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "lightning-checkpointer",
  "lightning-interfaces",
+ "lightning-pool",
+ "lightning-rpc",
  "lightning-workspace-hack",
  "thread-local-panic-hook",
  "tokio",

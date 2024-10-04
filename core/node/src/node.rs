@@ -3,14 +3,17 @@ use std::time::Duration;
 
 use anyhow::Result;
 use fdi::Provider;
+use lightning_checkpointer::Checkpointer;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::ShutdownController;
+use lightning_pool::PoolProvider;
+use lightning_rpc::Rpc;
 use tokio::time::sleep;
 
 pub struct Node<C: NodeComponents> {
     pub provider: Provider,
     pub shutdown: Option<ShutdownController>,
-    _p: PhantomData<C>,
+    _components: PhantomData<C>,
 }
 
 impl<C: NodeComponents> Node<C> {
@@ -29,9 +32,6 @@ impl<C: NodeComponents> Node<C> {
 
         let graph = C::build_graph();
 
-        // let vis = graph.viz("Lightning Dependency Graph");
-        // println!("{vis}");
-
         graph.init_all(&mut provider)?;
 
         let shutdown = provider.take();
@@ -39,12 +39,24 @@ impl<C: NodeComponents> Node<C> {
         Ok(Self {
             provider,
             shutdown: Some(shutdown),
-            _p: PhantomData,
+            _components: PhantomData,
         })
     }
 
     pub async fn start(&self) {
         self.provider.trigger("start");
+    }
+
+    pub async fn wait_for_ready(&self) {
+        self.provider
+            .get::<PoolProvider<C>>()
+            .wait_for_ready()
+            .await;
+        self.provider.get::<Rpc<C>>().wait_for_ready().await;
+        self.provider
+            .get::<Checkpointer<C>>()
+            .wait_for_ready()
+            .await;
     }
 
     pub fn shutdown_waiter(&self) -> Option<ShutdownWaiter> {
