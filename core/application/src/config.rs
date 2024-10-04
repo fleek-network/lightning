@@ -148,9 +148,93 @@ pub enum StorageConfig {
 
 #[cfg(test)]
 mod config_tests {
+    use std::fs::File;
+    use std::io::Write;
+    use std::panic;
+
+    use lightning_interfaces::prelude::*;
+    use lightning_test_utils::json_config::JsonConfigProvider;
+    use lightning_utils::config::TomlConfigProvider;
+    use serde_json::json;
     use tempfile::tempdir;
 
     use super::*;
+    use crate::Application;
+
+    partial_node_components!(TomlConfigTestNodeComponents {
+        ConfigProviderInterface = TomlConfigProvider<Self>;
+        ApplicationInterface = Application<Self>;
+    });
+
+    partial_node_components!(JsonConfigTestNodeComponents {
+        ConfigProviderInterface = JsonConfigProvider;
+        ApplicationInterface = Application<Self>;
+    });
+
+    #[test]
+    fn config_toml_fails_to_deserialize_unknown_network() {
+        let temp_dir = tempdir().unwrap();
+
+        // Write the configuration.
+        let config_path = temp_dir.path().join("config.toml");
+        let config = r#"
+        [application]
+        network = "invalid"
+        "#;
+        let mut file = File::create(&config_path).unwrap();
+        file.write_all(config.as_bytes()).unwrap();
+
+        // Load config into the provider.
+        let provider =
+            TomlConfigProvider::<TomlConfigTestNodeComponents>::load(&config_path).unwrap();
+
+        // Attempt to get the config.
+        // This should panic because of the invalid enum variant.
+        let result =
+            panic::catch_unwind(|| provider.get::<Application<TomlConfigTestNodeComponents>>());
+        assert!(result.is_err());
+        if let Err(err) = result {
+            let panic_message = err
+                .downcast_ref::<String>()
+                .map(|s| s.as_str())
+                .or_else(|| err.downcast_ref::<&str>().copied())
+                .unwrap();
+            assert_eq!(
+                panic_message,
+                "Failed to deserialize 'application' config: unknown variant `invalid`, expected `localnet-example` or `testnet-stable`\nin `network`\n"
+            )
+        }
+    }
+
+    #[test]
+    fn config_json_fails_to_deserialize_unknown_network() {
+        let config_value = json!({
+            "application": {
+                "network": "invalid"
+            }
+        });
+        let provider: JsonConfigProvider = config_value.into();
+
+        // Attempt to get the config.
+        // This should panic because of the invalid enum variant.
+        let result = panic::catch_unwind(|| {
+            <JsonConfigProvider as ConfigProviderInterface<JsonConfigTestNodeComponents>>::get::<
+                Application<JsonConfigTestNodeComponents>,
+            >(&provider)
+        });
+        assert!(result.is_err());
+        if let Err(err) = result {
+            let panic_message = err
+                .downcast_ref::<String>()
+                .map(|s| s.as_str())
+                .or_else(|| err.downcast_ref::<&str>().copied())
+                .unwrap();
+            assert_eq!(
+                panic_message,
+                "invalid value: Error(\"unknown variant `invalid`, expected `localnet-example` or `testnet-stable`\", line: 0, column: 0)"
+            )
+        }
+    }
 
     #[test]
     fn genesis_with_network_without_genesis() {
