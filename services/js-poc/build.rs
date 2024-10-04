@@ -3,6 +3,7 @@ mod ext;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::path::Path;
+use std::rc::Rc;
 use std::sync::Arc;
 
 use ::deno_fetch::{deno_fetch, FetchPermissions};
@@ -10,15 +11,17 @@ use ::deno_net::{deno_net, NetPermissions};
 use ::deno_web::{deno_web, TimersPermission};
 use ::deno_websocket::{deno_websocket, WebSocketPermissions};
 use base64::Engine;
+use deno_ast::{ParseParams, SourceMapOption};
 use deno_canvas::deno_canvas;
 use deno_console::deno_console;
 use deno_core::error::AnyError;
-use deno_core::{extension, op2, OpState};
+use deno_core::{extension, ModuleCodeString, ModuleName, op2, OpState, SourceMapData};
 use deno_core::url::Url;
 use deno_crypto::deno_crypto;
 use deno_fs::sync::MaybeArc;
 use deno_fs::{FsPermissions, InMemoryFs};
 use deno_io::fs::FsError;
+use deno_media_type::MediaType;
 use deno_node::NodePermissions;
 use deno_url::deno_url;
 use deno_webgpu::deno_webgpu;
@@ -210,7 +213,9 @@ fn main() {
     let snapshot = deno_core::snapshot::create_snapshot(
         deno_core::snapshot::CreateSnapshotOptions {
             cargo_manifest_dir: env!("CARGO_MANIFEST_DIR"),
-            extension_transpiler: None,
+            extension_transpiler: Some(Rc::new(|specifier, source| {
+                maybe_transpile_source(specifier, source)
+            })),
             startup_snapshot: None,
             skip_op_registration: false,
             with_runtime_cb: None,
@@ -276,4 +281,57 @@ fn op_set_raw(
     cbreak: bool,
 ) -> Result<(), AnyError> {
     todo!()
+}
+
+pub fn maybe_transpile_source(
+    name: ModuleName,
+    source: ModuleCodeString,
+) -> Result<(ModuleCodeString, Option<SourceMapData>), AnyError> {
+    // Always transpile `node:` built-in modules, since they might be TypeScript.
+    let media_type = if name.starts_with("node:") {
+        MediaType::TypeScript
+    } else {
+        MediaType::from_path(Path::new(&name))
+    };
+
+    match media_type {
+        MediaType::TypeScript => {}
+        MediaType::JavaScript => return Ok((source, None)),
+        MediaType::Mjs => return Ok((source, None)),
+        _ => panic!(
+            "Unsupported media type for snapshotting {media_type:?} for file {}",
+            name
+        ),
+    }
+
+    let parsed = deno_ast::parse_module(ParseParams {
+        specifier: deno_core::url::Url::parse(&name).unwrap(),
+        text: source.into(),
+        media_type,
+        capture_tokens: false,
+        scope_analysis: false,
+        maybe_syntax: None,
+    })?;
+    let transpiled_source = parsed
+        .transpile(
+            &deno_ast::TranspileOptions {
+                imports_not_used_as_values: deno_ast::ImportsNotUsedAsValues::Remove,
+                ..Default::default()
+            },
+            &deno_ast::EmitOptions {
+                source_map: if cfg!(debug_assertions) {
+                    SourceMapOption::Separate
+                } else {
+                    SourceMapOption::None
+                },
+                ..Default::default()
+            },
+        )?
+        .into_source();
+
+    let maybe_source_map: Option<SourceMapData> =
+        transpiled_source.source_map.map(|sm| sm.into());
+    let source_text = String::from_utf8(transpiled_source.source)?;
+
+    Ok((source_text.into(), maybe_source_map))
 }
