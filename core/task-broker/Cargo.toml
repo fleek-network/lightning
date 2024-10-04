@@ -26,6 +26,7 @@ lightning-workspace-hack.workspace = true
 tokio-util.workspace = true
 lightning-test-utils = { path = "../test-utils" }
 lightning-application = { path = "../application" }
+lightning-node.workspace = true
 lightning-pool = { path = "../pool" }
 lightning-topology = { path = "../topology" }
 tempdir = "0.3.7"

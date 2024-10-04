@@ -6,6 +6,7 @@ use lightning_application::app::Application;
 use lightning_application::config::ApplicationConfig;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Genesis, GenesisNode, NodePorts, UpdateMethod};
+use lightning_node::Node;
 use lightning_notifier::Notifier;
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus, MockForwarder};
 use lightning_test_utils::json_config::JsonConfigProvider;

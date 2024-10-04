@@ -14,6 +14,7 @@ use lightning_application::state::QueryRunner;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Genesis, GenesisNode, NodeIndex, NodePorts};
 use lightning_interfaces::ServiceScope;
+use lightning_node::Node;
 use lightning_notifier::Notifier;
 use lightning_rep_collector::ReputationAggregator;
 use lightning_signer::Signer;

@@ -20,6 +20,7 @@ lightning-workspace-hack.workspace = true
 
 [dev-dependencies]
 lightning-application = { path = "../application" }
+lightning-node.workspace = true
 lightning-notifier = { path = "../notifier" }
 lightning-test-utils = { path = "../test-utils" }
 criterion = { version = "0.5", features = ["html_reports"] }

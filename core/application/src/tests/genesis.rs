@@ -1,6 +1,7 @@
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::types::{Metadata, Value};
-use lightning_interfaces::{fdi, ApplicationInterface, Node};
+use lightning_interfaces::{fdi, ApplicationInterface};
+use lightning_node::Node;
 use lightning_test_utils::json_config::JsonConfigProvider;
 use tempfile::tempdir;
 

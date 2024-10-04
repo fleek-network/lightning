@@ -44,6 +44,7 @@ lightning-workspace-hack.workspace = true
 lightning-test-utils = { path = "../test-utils" }
 lightning-signer = { path = "../signer" }
 lightning-application = { path = "../application", features = ["test"] }
+lightning-node.workspace = true
 lightning-notifier = { path = "../notifier" }
 lightning-topology = { path = "../topology" }
 lightning-rep-collector = { path = "../rep-collector" }

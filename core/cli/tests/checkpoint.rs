@@ -26,6 +26,7 @@ use lightning_handshake::transports::webrtc::WebRtcConfig;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Genesis, GenesisNode, HandshakePorts, NodePorts};
 use lightning_keystore::{Keystore, KeystoreConfig};
+use lightning_node::Node;
 use lightning_node_bindings::FullNodeComponents;
 use lightning_pinger::{Config as PingerConfig, Pinger};
 use lightning_pool::{Config as PoolConfig, PoolProvider};

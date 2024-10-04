@@ -8,6 +8,7 @@ use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::Genesis;
 use lightning_interfaces::{partial_node_components, Ref};
+use lightning_node::Node;
 use lightning_notifier::Notifier;
 use lightning_test_utils::consensus::{
     Config as MockConsensusConfig,

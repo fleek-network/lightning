@@ -9,6 +9,7 @@ use lightning_application::app::Application;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Genesis, GenesisNode};
 use lightning_interfaces::TaskError;
+use lightning_node::Node;
 use lightning_pool::PoolProvider;
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;

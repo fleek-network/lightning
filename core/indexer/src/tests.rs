@@ -7,6 +7,7 @@ use lightning_application::config::ApplicationConfig;
 use lightning_application::state::QueryRunner;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Genesis, GenesisNode, NodePorts};
+use lightning_node::Node;
 use lightning_notifier::Notifier;
 use lightning_signer::Signer;
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus, MockForwarder};

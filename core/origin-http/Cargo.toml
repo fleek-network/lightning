@@ -20,5 +20,6 @@ lightning-blockstore = { path = "../blockstore" }
 lightning-indexer = { path = "../indexer" }
 lightning-signer = { path = "../signer" }
 lightning-test-utils = { path = "../test-utils" }
+lightning-node.workspace = true
 tempfile.workspace = true
 tokio.workspace = true

@@ -8,6 +8,7 @@ edition = "2021"
 
 [dependencies]
 lightning-interfaces = { path = "../interfaces" }
+lightning-node.workspace = true
 lightning-utils = { path = "../utils" }
 affair.workspace = true
 anyhow.workspace = true

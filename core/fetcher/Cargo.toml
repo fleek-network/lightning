@@ -33,6 +33,7 @@ lightning-signer = { path = "../signer" }
 lightning-forwarder = { path = "../forwarder" }
 lightning-test-utils = { path = "../test-utils" }
 lightning-broadcast = { path = "../broadcast" }
+lightning-node.workspace = true
 lightning-notifier = { path = "../notifier" }
 lightning-topology = { path = "../topology" }
 lightning-rep-collector = { path = "../rep-collector" }
