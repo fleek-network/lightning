@@ -16,7 +16,7 @@ pub use ink_quill::{ToDigest, TranscriptBuilder};
 pub use lightning_schema::{AutoImplSerde, LightningMessage};
 
 // Re-export top level modules and highly used stuff.
-pub use crate::{c, fdi, partial_node_components, schema, spawn, types, Node, ShutdownWaiter};
+pub use crate::{c, fdi, partial_node_components, schema, spawn, types, ShutdownWaiter};
 
 #[rustfmt::skip]
 pub use crate::{

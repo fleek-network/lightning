@@ -8,6 +8,7 @@ use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_broadcast::Broadcast;
 use lightning_checkpointer::{Checkpointer, CheckpointerConfig, CheckpointerDatabaseConfig};
 use lightning_interfaces::prelude::*;
+use lightning_node::Node;
 use lightning_notifier::Notifier;
 use lightning_pool::{Config as PoolConfig, PoolProvider};
 use lightning_rep_collector::MyReputationReporter;

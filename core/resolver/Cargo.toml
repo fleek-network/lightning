@@ -26,6 +26,7 @@ lightning-broadcast = { path = "../broadcast" }
 lightning-rep-collector = { path = "../rep-collector" }
 lightning-application = { path = "../application", features = ["test"] }
 lightning-pool = { path = "../pool" }
+lightning-node.workspace = true
 lightning-notifier = { path = "../notifier" }
 lightning-topology = { path = "../topology" }
 fleek-crypto.workspace = true

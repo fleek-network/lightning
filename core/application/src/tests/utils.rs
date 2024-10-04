@@ -29,6 +29,7 @@ use lightning_interfaces::types::{
     Staking,
 };
 use lightning_interfaces::PagingParams;
+use lightning_node::Node;
 use lightning_test_utils::json_config::JsonConfigProvider;
 use tempfile::TempDir;
 use types::{

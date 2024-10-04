@@ -18,6 +18,7 @@ use lightning_interfaces::types::{
     NodePorts,
     ServerRequest,
 };
+use lightning_node::Node;
 use lightning_notifier::Notifier;
 use lightning_pool::{Config as PoolConfig, PoolProvider};
 use lightning_rep_collector::ReputationAggregator;

@@ -13,6 +13,7 @@ use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Genesis, GenesisAccount};
+use lightning_node::Node;
 use lightning_notifier::Notifier;
 use lightning_signer::Signer;
 use lightning_test_utils::json_config::JsonConfigProvider;

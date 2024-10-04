@@ -37,6 +37,7 @@ merklize.workspace = true
 
 
 [dev-dependencies]
+lightning-node.workspace = true
 lightning-test-utils = { path = "../test-utils" }
 tokio.workspace = true
 rand.workspace = true

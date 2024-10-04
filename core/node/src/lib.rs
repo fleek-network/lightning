@@ -10,6 +10,9 @@ use tokio::runtime::{Handle, Runtime};
 use tokio::task::JoinHandle;
 use tokio::time::timeout;
 
+mod node;
+pub use node::*;
+
 /// A single [Node] instance that has ownership over its tokio runtime.
 pub struct ContainedNode<C: NodeComponents> {
     /// The name of this contained node.

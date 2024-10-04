@@ -28,6 +28,7 @@ lightning-broadcast.workspace = true
 lightning-checkpointer.workspace = true
 lightning-forwarder.workspace = true
 lightning-interfaces.workspace = true
+lightning-node.workspace = true
 lightning-notifier.workspace = true
 lightning-pool.workspace = true
 lightning-rep-collector.workspace = true

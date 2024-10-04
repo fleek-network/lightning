@@ -11,6 +11,7 @@ use lightning_application::app::Application;
 use lightning_application::config::ApplicationConfig;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Genesis, GenesisLatency, GenesisNode, NodePorts, Participation};
+use lightning_node::Node;
 use lightning_notifier::Notifier;
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;

@@ -14,6 +14,7 @@ use lightning_interfaces::types::{
     GenesisService,
     NodePorts,
 };
+use lightning_node::Node;
 use lightning_notifier::Notifier;
 use lightning_signer::Signer;
 use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus, MockForwarder};

@@ -50,5 +50,6 @@ lightning-blockstore = { path = "../blockstore" }
 lightning-signer = { path = "../signer" }
 lightning-application = { path = "../application", features = ["test"] }
 lightning-notifier = { path = "../notifier" }
+lightning-node.workspace = true
 serial_test = "3.0"
 tempfile.workspace = true

@@ -25,6 +25,7 @@ lightning-test-utils = { path = "../test-utils" }
 lightning-application = { path = "../application", features = ["test"] }
 lightning-blockstore = { path = "../blockstore" }
 lightning-indexer = { path = "../indexer" }
+lightning-node.workspace = true
 lightning-notifier = { path = "../notifier" }
 lightning-topology = { path = "../topology" }
 lightning-signer = { path = "../signer" }

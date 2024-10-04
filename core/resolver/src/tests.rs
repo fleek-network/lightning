@@ -6,6 +6,7 @@ use lightning_application::config::ApplicationConfig;
 use lightning_broadcast::Broadcast;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Genesis, GenesisNode, NodePorts};
+use lightning_node::Node;
 use lightning_notifier::Notifier;
 use lightning_pool::PoolProvider;
 use lightning_rep_collector::ReputationAggregator;

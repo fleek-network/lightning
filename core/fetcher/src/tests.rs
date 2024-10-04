@@ -19,6 +19,7 @@ use lightning_interfaces::types::{
     NodePorts,
     OriginProvider,
 };
+use lightning_node::Node;
 use lightning_notifier::Notifier;
 use lightning_origin_demuxer::{Config as DemuxerOriginConfig, OriginDemuxer};
 use lightning_origin_ipfs::config::{Gateway, Protocol, RequestFormat};

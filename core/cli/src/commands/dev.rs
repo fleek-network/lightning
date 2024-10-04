@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use lightning_interfaces::prelude::*;
+use lightning_node::Node;
 use lightning_rpc::interface::Admin;
 use lightning_utils::config::TomlConfigProvider;
 use resolved_pathbuf::ResolvedPathBuf;

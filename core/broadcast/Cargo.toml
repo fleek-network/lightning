@@ -34,6 +34,7 @@ lightning-test-utils = { path = "../test-utils" }
 lightning-signer = { path = "../signer" }
 lightning-application = { path = "../application", features = ["test"] }
 lightning-pool = { path = "../pool" }
+lightning-node.workspace = true
 lightning-notifier = { path = "../notifier" }
 lightning-rep-collector = { path = "../rep-collector" }
 lightning-topology = { path = "../topology" }
