@@ -273,6 +273,9 @@ fn0_module! {
     /// * `<0`: Host error
     fn0.output_data_append: (ptr: usize, len: usize) -> i32;
 
+    /// Clear the output buffer, ie to write an error message mid-write.
+    fn0.output_data_clear: () -> ();
+
     /// Unseal a section of memory in-place using the shared extended key.
     ///
     /// # Handling permissions
