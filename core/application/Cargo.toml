@@ -40,6 +40,7 @@ merklize.workspace = true
 lightning-test-utils = { path = "../test-utils" }
 tokio.workspace = true
 rand.workspace = true
+serde_json.workspace = true
 tempfile.workspace = true
 
 [features]

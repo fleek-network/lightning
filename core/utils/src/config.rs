@@ -104,16 +104,22 @@ impl<C: NodeComponents> TomlConfigProvider<C> {
 }
 
 impl<C: NodeComponents> ConfigProviderInterface<C> for TomlConfigProvider<C> {
-    fn get<S: lightning_interfaces::ConfigConsumer>(&self) -> S::Config {
+    fn get<S: ConfigConsumer>(&self) -> S::Config {
         debug!("Getting the config for {}", std::any::type_name::<S>());
 
         let mut table = self.table.lock().expect("failed to acquire lock");
 
-        // Parse the table value into S::Config, or use the default in the event it doesn't exist.
-        let item: S::Config = table
-            .get(S::KEY)
-            .and_then(|v| v.clone().try_into().ok())
-            .unwrap_or_default();
+        // Attempt to retrieve and deserialize the configuration.
+        let item: S::Config = match table.get(S::KEY) {
+            // Panic with an error message if deserialization fails.
+            Some(v) => v
+                .clone()
+                .try_into()
+                .unwrap_or_else(|e| panic!("Failed to deserialize '{}' config: {}", S::KEY, e)),
+
+            // If the key is not found, use the default config.
+            None => S::Config::default(),
+        };
 
         // Amend the internal table with the parsed or default item to be serialized later.
         table.insert(S::KEY.into(), Value::try_from(&item).unwrap());
