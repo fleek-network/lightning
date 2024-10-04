@@ -1,6 +1,5 @@
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 
 use affair::AsyncWorker;
 use anyhow::{anyhow, Result};
@@ -100,32 +99,16 @@ impl<C: NodeComponents> ApplicationInterface<C> for Application<C> {
         checkpoint: Vec<u8>,
         checkpoint_hash: [u8; 32],
     ) -> Result<()> {
-        // Due to a race condition on shutdowns when a node checkpoints, we should sleep and try
-        // again if there is a lock on the DB at this stage of the process
-        let mut counter = 0;
-
-        loop {
-            match ApplicationEnv::new(config, Some((checkpoint_hash, &checkpoint))) {
-                Ok(mut env) => {
-                    info!(
-                        "Successfully built database from checkpoint with hash {checkpoint_hash:?}"
-                    );
-
-                    // Update the last epoch hash on state
-                    env.update_last_epoch_hash(checkpoint_hash)?;
-
-                    return Ok(());
-                },
-                Err(e) => {
-                    if counter > 10 {
-                        error!("Failed to build app db from checkpoint: {e:?}");
-                        return Err(anyhow!("Failed to build app db from checkpoint: {}", e));
-                    } else {
-                        counter += 1;
-                        tokio::time::sleep(Duration::from_secs(3)).await;
-                    }
-                },
-            }
+        match ApplicationEnv::new(config, Some((checkpoint_hash, &checkpoint))) {
+            Ok(mut env) => {
+                info!("Successfully built database from checkpoint with hash {checkpoint_hash:?}");
+                env.update_last_epoch_hash(checkpoint_hash)?;
+                Ok(())
+            },
+            Err(e) => {
+                error!("Failed to build app db from checkpoint: {e:?}");
+                Err(anyhow!("Failed to build app db from checkpoint: {}", e))
+            },
         }
     }
 
