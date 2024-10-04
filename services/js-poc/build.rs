@@ -1,6 +1,8 @@
 mod ext;
 
+use std::borrow::Cow;
 use std::collections::HashMap;
+use std::path::Path;
 use std::sync::Arc;
 
 use ::deno_fetch::{deno_fetch, FetchPermissions};
@@ -10,8 +12,14 @@ use ::deno_websocket::{deno_websocket, WebSocketPermissions};
 use base64::Engine;
 use deno_canvas::deno_canvas;
 use deno_console::deno_console;
-use deno_core::extension;
+use deno_core::error::AnyError;
+use deno_core::{extension, op2, OpState};
+use deno_core::url::Url;
 use deno_crypto::deno_crypto;
+use deno_fs::sync::MaybeArc;
+use deno_fs::{FsPermissions, InMemoryFs};
+use deno_io::fs::FsError;
+use deno_node::NodePermissions;
 use deno_url::deno_url;
 use deno_webgpu::deno_webgpu;
 use deno_webidl::deno_webidl;
@@ -28,7 +36,13 @@ extension!(
         deno_websocket,
         deno_crypto,
         deno_webgpu,
-        deno_canvas
+        deno_canvas,
+        deno_io,
+        deno_fs,
+        deno_node
+    ],
+    ops = [
+        op_set_raw
     ],
     esm_entry_point = "ext:fleek/bootstrap.js",
     esm = [
@@ -96,6 +110,66 @@ impl NetPermissions for Permissions {
     }
 }
 
+impl NodePermissions for Permissions {
+    fn check_net_url(&mut self, url: &Url, api_name: &str) -> Result<(), AnyError> {
+        todo!()
+    }
+
+    fn check_read_with_api_name(
+        &mut self,
+        path: &Path,
+        api_name: Option<&str>,
+    ) -> Result<(), AnyError> {
+        todo!()
+    }
+
+    fn check_sys(&mut self, kind: &str, api_name: &str) -> Result<(), AnyError> {
+        todo!()
+    }
+
+    fn check_write_with_api_name(
+        &mut self,
+        path: &Path,
+        api_name: Option<&str>,
+    ) -> Result<(), AnyError> {
+        todo!()
+    }
+}
+
+impl FsPermissions for Permissions {
+    fn check_open<'a>(&mut self, resolved: bool, read: bool, write: bool, path: &'a Path, api_name: &str) -> Result<Cow<'a, Path>, FsError> {
+        todo!()
+    }
+
+    fn check_read(&mut self, path: &Path, api_name: &str) -> Result<(), AnyError> {
+        todo!()
+    }
+
+    fn check_read_all(&mut self, api_name: &str) -> Result<(), AnyError> {
+        todo!()
+    }
+
+    fn check_read_blind(&mut self, p: &Path, display: &str, api_name: &str) -> Result<(), AnyError> {
+        todo!()
+    }
+
+    fn check_write(&mut self, path: &Path, api_name: &str) -> Result<(), AnyError> {
+        todo!()
+    }
+
+    fn check_write_partial(&mut self, path: &Path, api_name: &str) -> Result<(), AnyError> {
+        todo!()
+    }
+
+    fn check_write_all(&mut self, api_name: &str) -> Result<(), AnyError> {
+        todo!()
+    }
+
+    fn check_write_blind(&mut self, p: &Path, display: &str, api_name: &str) -> Result<(), AnyError> {
+        todo!()
+    }
+}
+
 #[derive(Deserialize)]
 struct DenoJson {
     imports: HashMap<String, String>,
@@ -124,6 +198,12 @@ fn main() {
         deno_crypto::init_ops_and_esm(None),
         deno_webgpu::init_ops_and_esm(),
         deno_canvas::init_ops_and_esm(),
+        deno_io::deno_io::init_ops_and_esm(None),
+        deno_fs::deno_fs::init_ops::<Permissions>(MaybeArc::new(InMemoryFs::default())),
+        deno_node::deno_node::init_ops_and_esm::<Permissions>(
+            None,
+            MaybeArc::new(InMemoryFs::default()),
+        ),
         fleek::init_ops_and_esm(),
     ];
 
@@ -186,4 +266,14 @@ fn main() {
         serde_json::to_string_pretty(&map).unwrap(),
     )
     .expect("failed to write importmap.json");
+}
+
+#[op2(fast)]
+fn op_set_raw(
+    state: &mut OpState,
+    rid: u32,
+    is_raw: bool,
+    cbreak: bool,
+) -> Result<(), AnyError> {
+    todo!()
 }
