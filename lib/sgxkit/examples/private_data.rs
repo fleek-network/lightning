@@ -9,7 +9,7 @@ use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use serde::{Deserialize, Deserializer};
 use sgxkit::crypto::{shared_key_unseal, DerivedKey};
-use sgxkit::io::{get_input_data_string, OutputWriter};
+use sgxkit::io::{get_input_data_string, output_writer};
 
 #[derive(Deserialize, strum::EnumString)]
 #[strum(ascii_case_insensitive)]
@@ -38,23 +38,17 @@ where
 }
 
 fn main() -> anyhow::Result<()> {
-    // encode request
     let Request {
         content_type,
         mut data,
     } = serde_json::from_str::<Request>(&get_input_data_string()?)?;
-
-    // decrypt data
     match content_type {
         ContentType::Shared => shared_key_unseal(&mut data)?,
         ContentType::Wasm => {
             DerivedKey::root().unseal(&mut data)?;
         },
     }
-
-    // hash data and write to output
     let hash = blake3::hash(&data).to_string();
-    OutputWriter::new().write_all(hash.as_bytes())?;
-
+    output_writer().write_all(hash.as_bytes())?;
     Ok(())
 }

@@ -9,7 +9,7 @@ use k256::ecdsa::{RecoveryId, Signature};
 use serde::de::IntoDeserializer;
 use serde::{Deserialize, Deserializer};
 use sgxkit::crypto::DerivedKey;
-use sgxkit::io::OutputWriter;
+use sgxkit::io::output_writer;
 
 /// List of valid secp256k1 signers
 const PUBLIC_SIGNERS: &[[u8; 33]] = &[
@@ -102,7 +102,7 @@ pub fn main() -> Result<(), String> {
         .map_err(|e| e.to_string())?;
 
     // Write base64 signature to certified output
-    OutputWriter::new()
+    output_writer()
         .write_all(BASE64_STANDARD.encode(wasm_sig).as_bytes())
         .unwrap();
 
