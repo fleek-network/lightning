@@ -5,6 +5,8 @@ edition = "2021"
 
 [dependencies]
 sgxkit-sys = { path = "./sys" }
+sgxkit-macros = { path = "./macros", optional = true }
+
 strum = { version = "0.26.3", features = ["derive"]}
 thiserror = "1.0.64"
 
@@ -16,8 +18,12 @@ arrayref = "0.3.9"
 hex = "0.4.3"
 hex-literal = "0.4.1"
 base64 = "0.22.1"
-k256 = "0.13.4"
+k256 = { version = "0.13.4", default-features = false, features = ["signature"]}
 blake3 = "1.5.4"
+
+[features]
+default = ["derive"]
+derive = ["dep:sgxkit-macros"]
 
 [[example]]
 name = "sgx-wasm-hello"

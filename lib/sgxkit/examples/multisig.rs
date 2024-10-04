@@ -68,6 +68,7 @@ where
     Ok(sigs)
 }
 
+#[sgxkit::main]
 pub fn main() -> Result<(), String> {
     // Get json data and parse into input
     let input = sgxkit::io::get_input_data_string().unwrap();
