@@ -14,6 +14,9 @@ use deno_core::url::Url;
 use deno_core::v8::{self, CreateParams, Global, Value};
 use deno_core::{JsRuntime, ModuleSpecifier, PollEventLoopOptions, RuntimeOptions};
 use deno_crypto::deno_crypto;
+use deno_fs::sync::MaybeArc;
+use deno_fs::InMemoryFs;
+use deno_io::deno_io;
 use deno_url::deno_url;
 use deno_webgpu::deno_webgpu;
 use deno_webidl::deno_webidl;
@@ -129,6 +132,12 @@ impl Runtime {
                 deno_crypto::init_ops(None),
                 deno_webgpu::init_ops(),
                 deno_canvas::init_ops(),
+                deno_io::init_ops(None),
+                deno_fs::deno_fs::init_ops(MaybeArc::new(InMemoryFs::default())),
+                deno_node::deno_node::init_ops(
+                    Default::default(),
+                    MaybeArc::new(InMemoryFs::default()),
+                ),
                 // Fleek runtime
                 fleek::init_ops(depth),
             ],

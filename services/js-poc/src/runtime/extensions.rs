@@ -10,6 +10,7 @@ use blake3_tree::utils::{tree_index, HashVec};
 use cid::Cid;
 use deno_core::url::Url;
 use deno_core::{extension, op2, OpState};
+use deno_node::deno_node;
 use fleek_crypto::{ClientPublicKey, NodeSignature};
 use fn_sdk::blockstore::get_internal_path;
 use lightning_schema::task_broker::TaskScope;
@@ -29,7 +30,10 @@ extension!(
         deno_websocket,
         deno_crypto,
         deno_webgpu,
-        deno_canvas
+        deno_canvas,
+        deno_io,
+        deno_fs,
+        deno_node
     ],
     ops = [
         run_task,

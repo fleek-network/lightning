@@ -3,8 +3,8 @@
 mod cpus;
 
 use deno_core::error::AnyError;
-use deno_core::op2;
-use deno_core::OpState;
+use deno_core::{op2, OpState};
+
 use crate::ext::node::NodePermissions;
 
 #[op2(fast)]
