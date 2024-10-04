@@ -1,9 +1,9 @@
 use std::io::Write;
 
-use sgxkit::io::OutputWriter;
+use sgxkit::io::output_writer;
 
 fn main() {
-    let mut writer = OutputWriter::new();
+    let mut writer = output_writer();
     writer
         .write_all(b"Hello, world! From, SGX WASM <3\n")
         .unwrap();
