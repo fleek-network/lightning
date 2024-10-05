@@ -20,6 +20,8 @@ use narwhal_crypto::traits::{KeyPair as _, ToFromBytes};
 use narwhal_crypto::{KeyPair, NetworkKeyPair, NetworkPublicKey, PublicKey};
 use narwhal_node::NodeStorage;
 use prometheus::Registry;
+use ready::tokio::TokioReadyWaiter;
+use ready::ReadyWaiter;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -33,6 +35,8 @@ use crate::execution::parcel::{AuthenticStampedParcel, CommitteeAttestation, Dig
 use crate::execution::state::FilteredConsensusOutput;
 use crate::execution::worker::ExecutionWorker;
 use crate::narwhal::{NarwhalArgs, NarwhalService};
+
+pub type ConsensusReadyWaiter = TokioReadyWaiter<()>;
 
 pub struct Consensus<C: NodeComponents> {
     /// Inner state of the consensus
@@ -51,6 +55,8 @@ pub struct Consensus<C: NodeComponents> {
     reconfigure_notify: Arc<Notify>,
     /// To notify the epoch state when consensus is shutting down
     shutdown_notify_epoch_state: Arc<Notify>,
+    /// To notify the epoch state when consensus is ready
+    ready: ConsensusReadyWaiter,
 }
 
 /// This struct contains mutable state only for the current epoch.
@@ -86,6 +92,8 @@ struct EpochState<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, N
     event_tx_rx: Option<oneshot::Receiver<Events>>,
     /// To notify when consensus is shutting down.
     shutdown_notify: Arc<Notify>,
+    /// To notify when consensus is ready.
+    ready: ConsensusReadyWaiter,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -106,6 +114,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
         consensus_output_rx: Receiver<FilteredConsensusOutput>,
         event_tx_rx: oneshot::Receiver<Events>,
         shutdown_notify: Arc<Notify>,
+        ready: ConsensusReadyWaiter,
     ) -> Self {
         Self {
             executor,
@@ -122,6 +131,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
             consensus_output_rx: Some(consensus_output_rx),
             event_tx_rx: Some(event_tx_rx),
             shutdown_notify,
+            ready,
         }
     }
 
@@ -295,6 +305,9 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
             .start(self.consensus_output_tx.clone(), self.query_runner.clone())
             .await;
 
+        // Notify that the component has started and is ready.
+        self.ready.notify(());
+
         // start the timer to signal when your node thinks its ready to change epochs
         let now = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
@@ -402,6 +415,12 @@ impl<C: NodeComponents> BuildGraph for Consensus<C> {
 
 impl<C: NodeComponents> ConsensusInterface<C> for Consensus<C> {
     type Certificate = PubSubMsg;
+
+    type ReadyState = ();
+
+    async fn wait_for_ready(&self) -> Self::ReadyState {
+        self.ready.wait().await
+    }
 }
 
 impl<C: NodeComponents> Consensus<C> {
@@ -442,6 +461,8 @@ impl<C: NodeComponents> Consensus<C> {
 
         let shutdown_notify_epoch_state = Arc::new(Notify::new());
 
+        let ready = ConsensusReadyWaiter::new();
+
         let epoch_state = EpochState::new(
             executor,
             primary_pk,
@@ -456,6 +477,7 @@ impl<C: NodeComponents> Consensus<C> {
             consensus_output_rx,
             event_tx_rx,
             shutdown_notify_epoch_state.clone(),
+            ready.clone(),
         );
 
         Ok(Self {
@@ -463,6 +485,7 @@ impl<C: NodeComponents> Consensus<C> {
             event_tx_tx: Some(event_tx_tx),
             reconfigure_notify,
             shutdown_notify_epoch_state,
+            ready,
         })
     }
 

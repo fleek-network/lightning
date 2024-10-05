@@ -16,6 +16,7 @@ lightning-utils = { path = "../utils" }
 lightning-metrics = { path = "../metrics" }
 futures.workspace = true
 anyhow.workspace = true
+ready.workspace = true
 tracing.workspace = true
 serde.workspace = true
 tokio.workspace = true

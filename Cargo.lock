@@ -7042,6 +7042,7 @@ dependencies = [
  "prometheus",
  "quick_cache",
  "rand 0.8.5",
+ "ready",
  "resolved-pathbuf",
  "serde",
  "sui-protocol-config 0.1.0 (git+https://github.com/MystenLabs/sui.git?rev=bbfaafc17652d221651e835c908028c440f039d7)",
@@ -7375,6 +7376,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "lightning-checkpointer",
+ "lightning-consensus",
  "lightning-interfaces",
  "lightning-pool",
  "lightning-rpc",
