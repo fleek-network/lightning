@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 lightning-checkpointer.workspace = true
+lightning-consensus.workspace = true
 lightning-interfaces = { path = "../interfaces" }
 lightning-pool.workspace = true
 lightning-rpc.workspace = true

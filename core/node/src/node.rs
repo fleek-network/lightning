@@ -4,6 +4,7 @@ use std::time::Duration;
 use anyhow::Result;
 use fdi::Provider;
 use lightning_checkpointer::Checkpointer;
+use lightning_consensus::consensus::Consensus;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::ShutdownController;
 use lightning_pool::PoolProvider;
@@ -57,6 +58,7 @@ impl<C: NodeComponents> Node<C> {
             .get::<Checkpointer<C>>()
             .wait_for_ready()
             .await;
+        self.provider.get::<Consensus<C>>().wait_for_ready().await;
     }
 
     pub fn shutdown_waiter(&self) -> Option<ShutdownWaiter> {

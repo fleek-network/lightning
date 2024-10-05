@@ -173,6 +173,9 @@ impl<C: NodeComponents> MockConsensus<C> {
 
 impl<C: NodeComponents> ConsensusInterface<C> for MockConsensus<C> {
     type Certificate = ();
+    type ReadyState = ();
+
+    async fn wait_for_ready(&self) -> Self::ReadyState {}
 }
 
 impl<C: NodeComponents> BuildGraph for MockConsensus<C> {
