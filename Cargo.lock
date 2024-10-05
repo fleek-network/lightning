@@ -7923,6 +7923,7 @@ dependencies = [
  "lightning-utils",
  "lightning-workspace-hack",
  "merklize",
+ "minilsof",
  "plotters",
  "pretty_assertions",
  "rand 0.8.5",
@@ -8505,6 +8506,15 @@ dependencies = [
  "smallvec",
  "tagptr",
  "triomphe",
+]
+
+[[package]]
+name = "minilsof"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "03c44fadc807092f5d438e690484378175d1beeb900d2f3048ab965d82d00c38"
+dependencies = [
+ "glob",
 ]
 
 [[package]]
