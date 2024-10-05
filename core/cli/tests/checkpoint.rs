@@ -36,6 +36,7 @@ use lightning_rpc::{Config as RpcConfig, Rpc};
 use lightning_service_executor::shim::{ServiceExecutor, ServiceExecutorConfig};
 use lightning_syncronizer::config::Config as SyncronizerConfig;
 use lightning_syncronizer::syncronizer::Syncronizer;
+use lightning_test_utils::lsof::wait_for_file_to_close;
 use lightning_utils::application::QueryRunnerExt;
 use lightning_utils::config::TomlConfigProvider;
 use merklize::StateRootHash;
@@ -88,36 +89,71 @@ async fn test_node_load_checkpoint_start_shutdown_iterations() {
             .await
             .unwrap();
 
-        // Get application query runner for checking the state.
-        let app = node.provider.get::<Application<FullNodeComponents>>();
-        let app_query = app.sync_query();
+        // Check the application state.
+        {
+            let app = node.provider.get::<Application<FullNodeComponents>>();
+            let app_query = app.sync_query();
 
-        // Check some entries from the state.
-        assert_eq!(app_query.get_chain_id(), genesis.chain_id);
+            // Check some entries from the state.
+            assert_eq!(app_query.get_chain_id(), genesis.chain_id);
 
-        // Check the last epoch hash. It should be the checkpoint hash.
-        let last_epoch_hash = match app_query.get_metadata(&Metadata::LastEpochHash).unwrap() {
-            Value::Hash(hash) => hash,
-            _ => unreachable!("invalid last epoch hash in metadata"),
-        };
-        assert_eq!(last_epoch_hash, checkpoint_hash);
+            // Check the last epoch hash. It should be the checkpoint hash.
+            let last_epoch_hash = match app_query.get_metadata(&Metadata::LastEpochHash).unwrap() {
+                Value::Hash(hash) => hash,
+                _ => unreachable!("invalid last epoch hash in metadata"),
+            };
+            assert_eq!(last_epoch_hash, checkpoint_hash);
 
-        // Check the state tree root.
-        // NOTE: We can't check equality here because the `Metadata::LastEpochHash` is not set in
-        // the checkpoint but is in the live application state after loading from the checkpoint, so
-        // the state roots are different.
-        let state_root = app_query.get_state_root().unwrap();
-        assert_ne!(state_root, checkpoint_state_root);
+            // Check the state tree root.
+            // NOTE: We can't check equality here because the `Metadata::LastEpochHash` is not set
+            // in the checkpoint but is in the live application state after loading from
+            // the checkpoint, so the state roots are different.
+            let state_root = app_query.get_state_root().unwrap();
+            assert_ne!(state_root, checkpoint_state_root);
 
-        // We need to sleep for a short period before shutting down because of an issue with the
-        // process still holding onto the app db `LOCK` file when shutdown too quickly after
-        // startup. This doesn't happen consistently and only in some environments.
-        // TODO(snormore): Figure out why this happens and fix it so that the sleep isn't needed.
-        tokio::time::sleep(Duration::from_millis(100)).await;
+            // NOTE: It's important that `app` and `app_query` are dropped here or else the app db
+            // LOCK file will not be released, even when the node is released.
+        }
 
-        // Shutdown the node.
+        // Shutdown and drop the node.
         node.shutdown().await;
+        drop(node);
+
+        // Wait for the component database locks to be released.
+        // This mitigates a race condition where the OS has not yet propagated the closing of the
+        // database files, and so the next iteration will fail to open them.
+        wait_for_database_locks(&config).await.unwrap();
     }
+}
+
+async fn wait_for_database_locks(config: &TomlConfigProvider<FullNodeComponents>) -> Result<()> {
+    // Get the application db path before dropping the node.
+    let app_config = config.get::<Application<FullNodeComponents>>();
+    let app_db_path = app_config.db_path;
+
+    // Get the consensus db path before dropping the node.
+    let consensus_config = config.get::<Consensus<FullNodeComponents>>();
+    let consensus_db_path = consensus_config.store_path;
+
+    // Wait for the app db lock file to be released.
+    if let Some(path) = app_db_path {
+        wait_for_file_to_close(
+            &path.join("LOCK"),
+            Duration::from_secs(5),
+            Duration::from_millis(100),
+        )
+        .await?;
+    }
+
+    // Wait for the narwhal db lock file to be released.
+    wait_for_file_to_close(
+        &consensus_db_path.join("0/LOCK"),
+        Duration::from_secs(5),
+        Duration::from_millis(100),
+    )
+    .await?;
+
+    Ok(())
 }
 
 fn build_genesis(keystore_config: &KeystoreConfig) -> Result<Genesis> {
