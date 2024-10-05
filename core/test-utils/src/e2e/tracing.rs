@@ -18,7 +18,7 @@ pub fn try_init_tracing_with_tokio_console() -> Result<(), TryInitError> {
         .with(tracing_subscriber::fmt::layer())
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "debug".into()),
+                .unwrap_or_else(|_| "trace".into()),
         )
         .try_init()
 }
