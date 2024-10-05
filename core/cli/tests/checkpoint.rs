@@ -84,7 +84,9 @@ async fn test_node_load_checkpoint_start_shutdown_iterations() {
 
         // Start the node and wait for it to be ready.
         node.start().await;
-        node.wait_for_ready().await;
+        node.wait_for_ready(Some(Duration::from_secs(5)))
+            .await
+            .unwrap();
 
         // Get application query runner for checking the state.
         let app = node.provider.get::<Application<FullNodeComponents>>();

@@ -4,13 +4,14 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+anyhow.workspace = true
 lightning-checkpointer.workspace = true
 lightning-consensus.workspace = true
 lightning-interfaces = { path = "../interfaces" }
 lightning-pool.workspace = true
 lightning-rpc.workspace = true
+lightning-workspace-hack.workspace = true
+thiserror.workspace = true
+thread-local-panic-hook = "0.1.0"
 tokio.workspace = true
 tracing.workspace = true
-anyhow.workspace = true
-thread-local-panic-hook = "0.1.0"
-lightning-workspace-hack.workspace = true

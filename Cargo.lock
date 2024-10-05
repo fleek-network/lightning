@@ -7382,6 +7382,7 @@ dependencies = [
  "lightning-pool",
  "lightning-rpc",
  "lightning-workspace-hack",
+ "thiserror",
  "thread-local-panic-hook",
  "tokio",
  "tracing",
