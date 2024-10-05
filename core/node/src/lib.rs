@@ -10,7 +10,9 @@ use tokio::runtime::{Handle, Runtime};
 use tokio::task::JoinHandle;
 use tokio::time::timeout;
 
+mod error;
 mod node;
+pub use error::*;
 pub use node::*;
 
 /// A single [Node] instance that has ownership over its tokio runtime.

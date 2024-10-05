@@ -11,6 +11,8 @@ use lightning_pool::PoolProvider;
 use lightning_rpc::Rpc;
 use tokio::time::sleep;
 
+use crate::NodeError;
+
 pub struct Node<C: NodeComponents> {
     pub provider: Provider,
     pub shutdown: Option<ShutdownController>,
@@ -48,17 +50,29 @@ impl<C: NodeComponents> Node<C> {
         self.provider.trigger("start");
     }
 
-    pub async fn wait_for_ready(&self) {
-        self.provider
-            .get::<PoolProvider<C>>()
-            .wait_for_ready()
-            .await;
-        self.provider.get::<Rpc<C>>().wait_for_ready().await;
-        self.provider
-            .get::<Checkpointer<C>>()
-            .wait_for_ready()
-            .await;
-        self.provider.get::<Consensus<C>>().wait_for_ready().await;
+    pub async fn wait_for_ready(&self, timeout: Option<Duration>) -> Result<(), NodeError> {
+        let wait_fut = async {
+            self.provider
+                .get::<PoolProvider<C>>()
+                .wait_for_ready()
+                .await;
+            self.provider.get::<Rpc<C>>().wait_for_ready().await;
+            self.provider
+                .get::<Checkpointer<C>>()
+                .wait_for_ready()
+                .await;
+            self.provider.get::<Consensus<C>>().wait_for_ready().await;
+        };
+
+        match timeout {
+            Some(timeout) => tokio::time::timeout(timeout, wait_fut)
+                .await
+                .map_err(From::from),
+            None => {
+                wait_fut.await;
+                Ok(())
+            },
+        }
     }
 
     pub fn shutdown_waiter(&self) -> Option<ShutdownWaiter> {
