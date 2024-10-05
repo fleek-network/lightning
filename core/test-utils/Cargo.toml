@@ -40,6 +40,7 @@ lightning-topology.workspace = true
 lightning-utils.workspace = true
 lightning-workspace-hack.workspace = true
 merklize.workspace = true
+minilsof = "0.1.0"
 plotters = "0.3"
 pretty_assertions.workspace = true
 rand.workspace = true
