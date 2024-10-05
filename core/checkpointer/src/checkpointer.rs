@@ -81,7 +81,15 @@ impl<C: NodeComponents> Checkpointer<C> {
 
         let waiter = shutdown.clone();
         spawn!(
-            async move { this.start(waiter).await.expect("checkpointer failed") },
+            async move {
+                waiter
+                    .run_until_shutdown(async {
+                        this.start(waiter.clone())
+                            .await
+                            .expect("checkpointer failed");
+                    })
+                    .await;
+            },
             "CHECKPOINTER",
             crucial(shutdown)
         );
@@ -133,6 +141,7 @@ impl<C: NodeComponents> Checkpointer<C> {
 
         // Notify that we are ready.
         self.ready.notify(());
+        tracing::debug!("checkpointer ready");
 
         // Wait for shutdown.
         tracing::debug!("waiting for shutdown");
