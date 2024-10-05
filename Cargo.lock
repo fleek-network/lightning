@@ -3230,6 +3230,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "deno_napi"
+version = "0.95.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3d5332ad3491822d85b7080fbcc38af598d0bf4d9c72f02966cb5013047ff56a"
+dependencies = [
+ "deno_core",
+ "deno_permissions",
+ "libloading 0.7.4",
+]
+
+[[package]]
 name = "deno_native_certs"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4968,8 +4979,10 @@ dependencies = [
  "deno_fs",
  "deno_io",
  "deno_media_type",
+ "deno_napi",
  "deno_net",
  "deno_node",
+ "deno_permissions",
  "deno_url",
  "deno_web",
  "deno_webgpu",
