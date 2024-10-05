@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::path::Path;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -11,16 +12,25 @@ use anyhow::{anyhow, bail, Result};
 use deno_ast::{ParseParams, SourceMapOption};
 use deno_canvas::deno_canvas;
 use deno_console::deno_console;
+use deno_core::error::AnyError;
 use deno_core::serde_v8::{self, to_v8};
 use deno_core::url::Url;
 use deno_core::v8::{self, CreateParams, Global, Value};
-use deno_core::{JsRuntime, ModuleCodeString, ModuleName, ModuleSpecifier, PollEventLoopOptions, RuntimeOptions, SourceMapData};
-use deno_core::error::AnyError;
+use deno_core::{
+    JsRuntime,
+    ModuleCodeString,
+    ModuleName,
+    ModuleSpecifier,
+    PollEventLoopOptions,
+    RuntimeOptions,
+    SourceMapData,
+};
 use deno_crypto::deno_crypto;
 use deno_fs::sync::MaybeArc;
-use deno_fs::InMemoryFs;
-use deno_io::deno_io;
+use deno_fs::{FsPermissions, InMemoryFs};
+use deno_io::fs::FsError;
 use deno_media_type::MediaType;
+use deno_node::NodePermissions;
 use deno_url::deno_url;
 use deno_webgpu::deno_webgpu;
 use deno_webidl::deno_webidl;
@@ -119,6 +129,87 @@ impl NetPermissions for Permissions {
     }
 }
 
+impl FsPermissions for Permissions {
+    fn check_open<'a>(
+        &mut self,
+        resolved: bool,
+        read: bool,
+        write: bool,
+        path: &'a Path,
+        api_name: &str,
+    ) -> std::result::Result<Cow<'a, Path>, FsError> {
+        todo!()
+    }
+
+    fn check_read(&mut self, path: &Path, api_name: &str) -> std::result::Result<(), AnyError> {
+        todo!()
+    }
+
+    fn check_read_all(&mut self, api_name: &str) -> std::result::Result<(), AnyError> {
+        todo!()
+    }
+
+    fn check_read_blind(
+        &mut self,
+        p: &Path,
+        display: &str,
+        api_name: &str,
+    ) -> std::result::Result<(), AnyError> {
+        todo!()
+    }
+
+    fn check_write(&mut self, path: &Path, api_name: &str) -> std::result::Result<(), AnyError> {
+        todo!()
+    }
+
+    fn check_write_partial(
+        &mut self,
+        path: &Path,
+        api_name: &str,
+    ) -> std::result::Result<(), AnyError> {
+        todo!()
+    }
+
+    fn check_write_all(&mut self, api_name: &str) -> std::result::Result<(), AnyError> {
+        todo!()
+    }
+
+    fn check_write_blind(
+        &mut self,
+        p: &Path,
+        display: &str,
+        api_name: &str,
+    ) -> std::result::Result<(), AnyError> {
+        todo!()
+    }
+}
+
+impl NodePermissions for Permissions {
+    fn check_net_url(&mut self, url: &Url, api_name: &str) -> std::result::Result<(), AnyError> {
+        todo!()
+    }
+
+    fn check_read_with_api_name(
+        &mut self,
+        path: &Path,
+        api_name: Option<&str>,
+    ) -> std::result::Result<(), AnyError> {
+        todo!()
+    }
+
+    fn check_sys(&mut self, kind: &str, api_name: &str) -> std::result::Result<(), AnyError> {
+        todo!()
+    }
+
+    fn check_write_with_api_name(
+        &mut self,
+        path: &Path,
+        api_name: Option<&str>,
+    ) -> std::result::Result<(), AnyError> {
+        todo!()
+    }
+}
+
 impl Runtime {
     /// Create a new runtime
     pub fn new(location: Url, depth: u8) -> Result<Self> {
@@ -136,9 +227,9 @@ impl Runtime {
                 deno_crypto::init_ops(None),
                 deno_webgpu::init_ops(),
                 deno_canvas::init_ops(),
-                deno_io::init_ops(None),
-                deno_fs::deno_fs::init_ops(MaybeArc::new(InMemoryFs::default())),
-                deno_node::deno_node::init_ops(
+                deno_io::deno_io::init_ops(None),
+                deno_fs::deno_fs::init_ops::<Permissions>(MaybeArc::new(InMemoryFs::default())),
+                deno_node::deno_node::init_ops::<Permissions>(
                     Default::default(),
                     MaybeArc::new(InMemoryFs::default()),
                 ),
@@ -240,7 +331,6 @@ impl Runtime {
     }
 }
 
-
 pub fn maybe_transpile_source(
     name: ModuleName,
     source: ModuleCodeString,
@@ -253,7 +343,7 @@ pub fn maybe_transpile_source(
     };
 
     match media_type {
-        MediaType::TypeScript => {}
+        MediaType::TypeScript => {},
         MediaType::JavaScript => return Ok((source, None)),
         MediaType::Mjs => return Ok((source, None)),
         _ => panic!(
@@ -287,8 +377,7 @@ pub fn maybe_transpile_source(
         )?
         .into_source();
 
-    let maybe_source_map: Option<SourceMapData> =
-        transpiled_source.source_map.map(|sm| sm.into());
+    let maybe_source_map: Option<SourceMapData> = transpiled_source.source_map.map(|sm| sm.into());
     let source_text = String::from_utf8(transpiled_source.source)?;
 
     Ok((source_text.into(), maybe_source_map))
