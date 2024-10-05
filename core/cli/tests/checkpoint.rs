@@ -58,6 +58,59 @@ async fn test_node_load_checkpoint_start_shutdown_iterations() {
         .unwrap();
 
     // Build a checkpoint.
+    let (checkpoint_hash, _, checkpoint) = build_checkpoint(&genesis, &genesis_path).unwrap();
+
+    // Build the node config.
+    let config = build_node_config(
+        &temp_dir,
+        genesis_path,
+        keystore_config,
+        genesis.node_info[0].ports.clone(),
+    );
+    let app_config = config.get::<<FullNodeComponents as NodeComponents>::ApplicationInterface>();
+
+    for _ in 0..10 {
+        // Load the checkpoint into the application state database.
+        <FullNodeComponents as NodeComponents>::ApplicationInterface::load_from_checkpoint(
+            &app_config,
+            checkpoint.clone(),
+            checkpoint_hash,
+        )
+        .await
+        .unwrap();
+
+        // Initialize the node with the same config.
+        let mut node = Node::<FullNodeComponents>::init(config.clone()).unwrap();
+
+        // Start the node.
+        node.start().await;
+
+        // Shutdown and drop the node.
+        node.shutdown().await;
+        drop(node);
+
+        // Wait for the database locks to be fully released.
+        // This prevents a race condition where the operating system may take time to release
+        // file locks or close file handles on the database files, causing the next iteration
+        // to fail.
+        wait_for_database_locks(&config).await.unwrap();
+    }
+}
+
+#[tokio::test]
+async fn test_node_load_checkpoint_start_ready_shutdown_iterations() {
+    let temp_dir = tempdir().unwrap();
+
+    // Build the keystore config.
+    let keystore_config = KeystoreConfig::test();
+
+    // Build the genesis.
+    let genesis = build_genesis(&keystore_config).unwrap();
+    let genesis_path = genesis
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
+
+    // Build a checkpoint.
     let (checkpoint_hash, checkpoint_state_root, checkpoint) =
         build_checkpoint(&genesis, &genesis_path).unwrap();
 
