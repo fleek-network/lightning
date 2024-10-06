@@ -4,15 +4,7 @@ use anyhow::{Context, Result};
 use lightning_interfaces::prelude::*;
 use lightning_utils::application::QueryRunnerExt;
 use lightning_utils::transaction::{TransactionClient, TransactionClientError, TransactionSigner};
-use types::{
-    CommitteeSelectionBeaconPhase,
-    ExecutionError,
-    Metadata,
-    TransactionReceipt,
-    TransactionResponse,
-    UpdateMethod,
-    Value,
-};
+use types::{CommitteeSelectionBeaconPhase, Metadata, TransactionResponse, UpdateMethod, Value};
 
 use crate::CommitteeBeaconError;
 
@@ -93,19 +85,39 @@ impl<C: NodeComponents> CommitteeBeaconTimer<C> {
                         .await;
                     match result {
                         Ok(_) => {},
-                        Err(TransactionClientError::Reverted((
-                            _,
-                            TransactionReceipt {
-                                response: TransactionResponse::Revert(ExecutionError::InvalidNonce),
-                                ..
-                            },
-                        ))) => {
-                            tracing::debug!(
-                                "ignoring timer tick transaction revert due to invalid nonce"
+                        Err(TransactionClientError::Reverted((tx, receipt))) => {
+                            match receipt.response {
+                                TransactionResponse::Success(_) => {
+                                    // This should never be returned as an error, and is returned
+                                    // with Ok(), so we can ignore it here.
+                                },
+                                TransactionResponse::Revert(_) => {
+                                    tracing::debug!(
+                                        "ignoring timer tick transaction revert due to invalid nonce (tx: {:?})",
+                                        tx.hash()
+                                    );
+                                },
+                            }
+                        },
+                        Err(TransactionClientError::Timeout(tx)) => {
+                            tracing::warn!(
+                                "ignoring transaction client timeout (tx: {:?})",
+                                tx.hash()
                             );
                         },
-                        Err(e) => {
-                            return Err(e.into());
+                        Err(TransactionClientError::MempoolSendFailed((tx, e))) => {
+                            tracing::warn!(
+                                "ignoring transaction client mempool send failure (tx: {:?}): {}",
+                                tx.hash(),
+                                e
+                            );
+                        },
+                        Err(TransactionClientError::Internal((tx, e))) => {
+                            tracing::warn!(
+                                "ignoring transaction client internal error (tx: {:?}): {}",
+                                tx.hash(),
+                                e
+                            );
                         },
                     }
 
