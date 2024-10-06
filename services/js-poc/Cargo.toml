@@ -32,9 +32,11 @@ deno_console = "0.164"
 deno_fs = "0.74"
 deno_io = "0.74"
 deno_url = "0.164"
+deno_napi = "0.95"
 deno_net = "0.156"
 deno_media_type = "0.1"
 deno_node = "0.101"
+deno_permissions = "0.24"
 deno_web = "0.195"
 deno_fetch = "0.188"
 deno_crypto = "0.178"
@@ -43,6 +45,7 @@ deno_webgpu = "0.131"
 deno_websocket = "0.169"
 
 [build-dependencies]
+anyhow.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 base64 = "0.22"
