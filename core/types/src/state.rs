@@ -23,12 +23,6 @@ pub type Epoch = u64;
 /// A nodes index
 pub type NodeIndex = u32;
 
-/// Committee selection beacon commit.
-pub type CommitteeSelectionBeaconCommit = [u8; 32];
-
-/// Committee selection beacon reveal.
-pub type CommitteeSelectionBeaconReveal = [u8; 32];
-
 #[derive(Serialize, Deserialize, Hash, Debug, Clone, Eq, PartialEq, schemars::JsonSchema)]
 pub enum Tokens {
     USDC,
@@ -106,6 +100,7 @@ pub enum Metadata {
     SubDagIndex,
     SubDagRound,
     CommitteeSelectionBeaconPhase,
+    CommitteeSelectionBeaconRound,
 }
 
 /// The Value enum is a data type used to represent values in a key-value pair for a metadata table
@@ -124,6 +119,7 @@ pub enum Value {
     SubDagRound(u64),
     BlockRange(u64, u64),
     CommitteeSelectionBeaconPhase(CommitteeSelectionBeaconPhase),
+    CommitteeSelectionBeaconRound(CommitteeSelectionBeaconRound),
 }
 
 impl Value {
@@ -140,6 +136,15 @@ pub type BlockNumber = u64;
 
 /// Range of block numbers.
 pub type BlockRange = (BlockNumber, BlockNumber);
+
+/// Committee selection beacon commit.
+pub type CommitteeSelectionBeaconCommit = [u8; 32];
+
+/// Committee selection beacon reveal.
+pub type CommitteeSelectionBeaconReveal = [u8; 32];
+
+/// Committee selection beacon round number.
+pub type CommitteeSelectionBeaconRound = u64;
 
 /// Phase of the committee selection beacon.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, schemars::JsonSchema)]
