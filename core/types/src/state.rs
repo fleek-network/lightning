@@ -186,6 +186,7 @@ pub enum Participation {
     Debug,
     schemars::JsonSchema
 )]
+
 #[repr(u8)]
 pub enum ProtocolParamKey {
     /// The time in milliseconds that an epoch lasts for. Genesis 24 hours(86400)
@@ -226,9 +227,9 @@ pub enum ProtocolParamKey {
     /// The minimum number of nodes to run the topology algorithm.
     TopologyMinNodes = 17,
     /// The committee selection beacon commit phase duration in blocks
-    CommitteeSelectionBeaconCommitPhaseDuration = 16,
+    CommitteeSelectionBeaconCommitPhaseDuration = 18,
     /// The committee selection beacon reveal phase duration in blocks
-    CommitteeSelectionBeaconRevealPhaseDuration = 17,
+    CommitteeSelectionBeaconRevealPhaseDuration = 19,
 }
 
 /// The Value enum is a data type used to represent values in a key-value pair for a metadata table

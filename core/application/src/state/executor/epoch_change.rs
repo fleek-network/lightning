@@ -122,16 +122,6 @@ impl<B: Backend> StateExecutor<B> {
             Err(e) => return e,
         };
 
-        // Check that the node has sufficient stake.
-        let node = match self.node_info.get(&node_index) {
-            Some(node) => node,
-            None => return TransactionResponse::Revert(ExecutionError::NodeDoesNotExist),
-        };
-        // TODO(snormore): What should the minimum stake be? Should it be a protocol parameter?
-        if node.stake.staked == HpUfixed::zero() {
-            return TransactionResponse::Revert(ExecutionError::InsufficientStake);
-        }
-
         // Revert if the node was a non-revealing node in the previous round.
         // TODO(snormore): Should we exclude non-revealing nodes from the "sufficient participation"
         // calculation? Otherwise, can we get stuck in the commit phase forever with too many nodes
@@ -201,16 +191,6 @@ impl<B: Backend> StateExecutor<B> {
             Ok(account) => account,
             Err(e) => return e,
         };
-
-        // Check that the node has sufficient stake.
-        // TODO(snormore): What should the minimum stake be?
-        let node = match self.node_info.get(&node_index) {
-            Some(node) => node,
-            None => return TransactionResponse::Revert(ExecutionError::NodeDoesNotExist),
-        };
-        if node.stake.staked == HpUfixed::zero() {
-            return TransactionResponse::Revert(ExecutionError::InsufficientStake);
-        }
 
         // Get the current block number.
         let current_block = self.get_last_block_number() + 1;
@@ -875,6 +855,7 @@ impl<B: Backend> StateExecutor<B> {
             if let Some(uptime) = uptime {
                 self.uptime.set(node, uptime);
                 if uptime < MINIMUM_UPTIME {
+                    tracing::debug!("node {:?} has uptime lower than minimum uptime", node);
                     if let Some(mut node_info) = self.node_info.get(&node) {
                         node_info.participation = Participation::False;
                         self.node_info.set(node, node_info);

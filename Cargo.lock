@@ -6972,6 +6972,7 @@ dependencies = [
  "lightning-blockstore-server",
  "lightning-broadcast",
  "lightning-checkpointer",
+ "lightning-committee-beacon",
  "lightning-consensus",
  "lightning-dack-aggregator",
  "lightning-guard",
