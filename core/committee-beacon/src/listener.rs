@@ -1,14 +1,18 @@
 use anyhow::{Context, Result};
 use fleek_crypto::SecretKey;
 use lightning_interfaces::prelude::*;
+use lightning_utils::application::QueryRunnerExt;
 use lightning_utils::transaction::{TransactionClient, TransactionSigner};
 use rand::Rng;
 use sha3::{Digest, Sha3_256};
 use types::{
     BlockExecutionResponse,
     BlockNumber,
+    CommitteeSelectionBeaconCommit,
     CommitteeSelectionBeaconPhase,
     CommitteeSelectionBeaconReveal,
+    CommitteeSelectionBeaconRound,
+    Epoch,
     Metadata,
     NodeIndex,
     UpdateMethod,
@@ -207,7 +211,13 @@ impl<C: NodeComponents> CommitteeBeaconListener<C> {
         // local database, and submit it.
         // Generate random beacon data.
         let reveal = self.generate_random_reveal();
-        let commit = Sha3_256::digest(reveal).into();
+        let epoch = self.app_query.get_current_epoch();
+        let round = self.app_query.get_committee_selection_beacon_round();
+        if round.is_none() {
+            tracing::error!("no committee selection beacon round found for commit");
+            return Ok(());
+        }
+        let commit = self.build_commit(epoch, round.unwrap(), reveal);
 
         // Save random beacon data to local database.
         self.db.set_beacon(commit, reveal);
@@ -305,5 +315,23 @@ impl<C: NodeComponents> CommitteeBeaconListener<C> {
         let mut reveal = [0u8; 32];
         rng.fill(&mut reveal);
         reveal
+    }
+
+    /// Build a new commitment hash using the given epoch, round, and reveal.
+    fn build_commit(
+        &self,
+        epoch: Epoch,
+        round: CommitteeSelectionBeaconRound,
+        reveal: CommitteeSelectionBeaconReveal,
+    ) -> CommitteeSelectionBeaconCommit {
+        Sha3_256::digest(
+            [
+                epoch.to_be_bytes().as_slice(),
+                round.to_be_bytes().as_slice(),
+                &reveal,
+            ]
+            .concat(),
+        )
+        .into()
     }
 }

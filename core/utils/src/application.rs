@@ -241,6 +241,15 @@ pub trait QueryRunnerExt: SyncQueryRunnerInterface {
             _ => 16,
         }
     }
+
+    /// Returns the current round of the committee selection beacon.
+    fn get_committee_selection_beacon_round(&self) -> Option<u64> {
+        match self.get_metadata(&Metadata::CommitteeSelectionBeaconRound) {
+            Some(Value::CommitteeSelectionBeaconRound(round)) => Some(round),
+            None => None,
+            _ => unreachable!("invalid committee selection beacon round in metadata"),
+        }
+    }
 }
 
 impl<T: SyncQueryRunnerInterface> QueryRunnerExt for T {}

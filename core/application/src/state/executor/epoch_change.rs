@@ -8,6 +8,7 @@ use lightning_interfaces::types::{
     CommitteeSelectionBeaconCommit,
     CommitteeSelectionBeaconPhase,
     CommitteeSelectionBeaconReveal,
+    CommitteeSelectionBeaconRound,
     Epoch,
     ExecutionData,
     ExecutionError,
@@ -93,6 +94,9 @@ impl<B: Backend> StateExecutor<B> {
                 ))),
             );
 
+            // Start the committee selection beacon round at 0.
+            self.set_committee_selection_beacon_round(0);
+
             // Return success.
             TransactionResponse::Success(ExecutionData::None)
         } else {
@@ -166,7 +170,9 @@ impl<B: Backend> StateExecutor<B> {
 
         // Check that the node has not already committed.
         if self.committee_selection_beacon.get(&node_index).is_some() {
-            return TransactionResponse::Revert(ExecutionError::CommitteeSelectionAlreadyCommitted);
+            return TransactionResponse::Revert(
+                ExecutionError::CommitteeSelectionBeaconAlreadyCommitted,
+            );
         }
 
         // Save the commit beacon.
@@ -238,12 +244,23 @@ impl<B: Backend> StateExecutor<B> {
 
         // Check that the node has not already revealed.
         if existing_reveal.is_some() {
-            return TransactionResponse::Revert(ExecutionError::CommitteeSelectionAlreadyRevealed);
+            return TransactionResponse::Revert(
+                ExecutionError::CommitteeSelectionBeaconAlreadyRevealed,
+            );
         }
 
+        // Get the current epoch.
+        let epoch = self.get_epoch();
+
         // Check that the reveal is valid.
-        let reveal_digest: [u8; 32] = Sha3_256::digest(reveal).into();
-        if existing_commit != reveal_digest {
+        let round = self.get_committee_selection_beacon_round();
+        if round.is_none() {
+            return TransactionResponse::Revert(
+                ExecutionError::CommitteeSelectionBeaconRoundNotFound,
+            );
+        }
+        let commit = self.build_committee_selection_beacon_commit(epoch, round.unwrap(), reveal);
+        if existing_commit != commit {
             return TransactionResponse::Revert(
                 ExecutionError::CommitteeSelectionBeaconInvalidReveal,
             );
@@ -252,9 +269,6 @@ impl<B: Backend> StateExecutor<B> {
         // Save the reveal beacon.
         self.committee_selection_beacon
             .set(node_index, (existing_commit, Some(reveal)));
-
-        // Get the current epoch.
-        let epoch = self.get_epoch();
 
         // If all nodes that committed have revealed, execute the epoch change.
         let revealed_beacons = self
@@ -277,11 +291,13 @@ impl<B: Backend> StateExecutor<B> {
                 epoch,
                 current_block,
             );
-            self.metadata
-                .remove(&Metadata::CommitteeSelectionBeaconPhase);
+            self.clear_committee_selection_beacon_phase();
+
+            // Remove the committee selection beacon round.
+            self.clear_committee_selection_beacon_round();
 
             // Reset the committee selection beacon.
-            self.committee_selection_beacon.clear();
+            self.clear_committee_selection_beacons();
 
             // Execute the epoch change.
             self.execute_epoch_change(epoch, committee);
@@ -357,13 +373,7 @@ impl<B: Backend> StateExecutor<B> {
                 reveal_start,
                 reveal_end
             );
-            self.metadata.set(
-                Metadata::CommitteeSelectionBeaconPhase,
-                Value::CommitteeSelectionBeaconPhase(CommitteeSelectionBeaconPhase::Reveal((
-                    reveal_start,
-                    reveal_end,
-                ))),
-            );
+            self.set_committee_selection_beacon_reveal_phase(reveal_start, reveal_end);
         } else {
             // If we don't have sufficient participation, start the commit phase again.
             let commit_start = current_block + 1;
@@ -374,13 +384,16 @@ impl<B: Backend> StateExecutor<B> {
                 commit_start,
                 commit_end
             );
-            self.metadata.set(
-                Metadata::CommitteeSelectionBeaconPhase,
-                Value::CommitteeSelectionBeaconPhase(CommitteeSelectionBeaconPhase::Commit((
-                    commit_start,
-                    commit_end,
-                ))),
-            );
+            self.set_committee_selection_beacon_commit_phase(commit_start, commit_end);
+
+            // Increment the committee selection beacon round.
+            let round = self.get_committee_selection_beacon_round();
+            if round.is_none() {
+                return TransactionResponse::Revert(
+                    ExecutionError::CommitteeSelectionBeaconRoundNotFound,
+                );
+            }
+            self.set_committee_selection_beacon_round(round.unwrap() + 1);
 
             // Clear the beacon state.
             self.committee_selection_beacon.clear();
@@ -440,13 +453,16 @@ impl<B: Backend> StateExecutor<B> {
             commit_start,
             commit_end
         );
-        self.metadata.set(
-            Metadata::CommitteeSelectionBeaconPhase,
-            Value::CommitteeSelectionBeaconPhase(CommitteeSelectionBeaconPhase::Commit((
-                commit_start,
-                commit_end,
-            ))),
-        );
+        self.set_committee_selection_beacon_commit_phase(commit_start, commit_end);
+
+        // Increment the committee selection beacon round.
+        let round = self.get_committee_selection_beacon_round();
+        if round.is_none() {
+            return TransactionResponse::Revert(
+                ExecutionError::CommitteeSelectionBeaconRoundNotFound,
+            );
+        }
+        self.set_committee_selection_beacon_round(round.unwrap() + 1);
 
         // Save non-revealing nodes to state so we can reject any commits in the next round.
         // Clear existing non-revealing nodes table first.
@@ -499,6 +515,71 @@ impl<B: Backend> StateExecutor<B> {
             None => unreachable!("missing reveal phase duration"),
             _ => unreachable!("invalid reveal phase duration"),
         }
+    }
+
+    fn set_committee_selection_beacon_commit_phase(&self, start: u64, end: u64) {
+        self.metadata.set(
+            Metadata::CommitteeSelectionBeaconPhase,
+            Value::CommitteeSelectionBeaconPhase(CommitteeSelectionBeaconPhase::Commit((
+                start, end,
+            ))),
+        );
+    }
+
+    fn set_committee_selection_beacon_reveal_phase(&self, start: u64, end: u64) {
+        self.metadata.set(
+            Metadata::CommitteeSelectionBeaconPhase,
+            Value::CommitteeSelectionBeaconPhase(CommitteeSelectionBeaconPhase::Reveal((
+                start, end,
+            ))),
+        );
+    }
+
+    fn clear_committee_selection_beacon_phase(&self) {
+        self.metadata
+            .remove(&Metadata::CommitteeSelectionBeaconPhase);
+    }
+
+    fn clear_committee_selection_beacons(&self) {
+        self.committee_selection_beacon.clear();
+    }
+
+    fn get_committee_selection_beacon_round(&self) -> Option<u64> {
+        match self.metadata.get(&Metadata::CommitteeSelectionBeaconRound) {
+            Some(Value::CommitteeSelectionBeaconRound(round)) => Some(round),
+            None => None,
+            _ => unreachable!("invalid committee selection beacon round in metadata"),
+        }
+    }
+
+    fn set_committee_selection_beacon_round(&self, round: u64) {
+        self.metadata.set(
+            Metadata::CommitteeSelectionBeaconRound,
+            Value::CommitteeSelectionBeaconRound(round + 1),
+        );
+    }
+
+    fn clear_committee_selection_beacon_round(&self) {
+        self.metadata
+            .remove(&Metadata::CommitteeSelectionBeaconRound);
+    }
+
+    /// Build a new commitment hash using the given epoch, round, and reveal.
+    fn build_committee_selection_beacon_commit(
+        &self,
+        epoch: Epoch,
+        round: CommitteeSelectionBeaconRound,
+        reveal: CommitteeSelectionBeaconReveal,
+    ) -> CommitteeSelectionBeaconCommit {
+        Sha3_256::digest(
+            [
+                epoch.to_be_bytes().as_slice(),
+                round.to_be_bytes().as_slice(),
+                &reveal,
+            ]
+            .concat(),
+        )
+        .into()
     }
 
     fn execute_epoch_change(&self, epoch: Epoch, current_committee: Committee) {
