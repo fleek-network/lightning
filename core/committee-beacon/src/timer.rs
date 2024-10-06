@@ -3,8 +3,19 @@ use std::time::Duration;
 use anyhow::{Context, Result};
 use lightning_interfaces::prelude::*;
 use lightning_utils::application::QueryRunnerExt;
-use lightning_utils::transaction::{TransactionClient, TransactionClientError, TransactionSigner};
-use types::{CommitteeSelectionBeaconPhase, Metadata, TransactionResponse, UpdateMethod, Value};
+use types::{
+    CommitteeSelectionBeaconPhase,
+    ExecuteTransactionError,
+    ExecuteTransactionOptions,
+    ExecuteTransactionRequest,
+    ExecuteTransactionRetry,
+    ExecuteTransactionWait,
+    Metadata,
+    TransactionReceipt,
+    TransactionResponse,
+    UpdateMethod,
+    Value,
+};
 
 use crate::CommitteeBeaconError;
 
@@ -18,28 +29,16 @@ use crate::CommitteeBeaconError;
 /// but this is necessary to ensure that the phase advances if no transactions are submitted.
 pub struct CommitteeBeaconTimer<C: NodeComponents> {
     app_query: c!(C::ApplicationInterface::SyncExecutor),
-    client: TransactionClient<C>,
+    signer: SignerSubmitTxSocket,
 }
 
 impl<C: NodeComponents> CommitteeBeaconTimer<C> {
     pub async fn new(
-        keystore: C::KeystoreInterface,
-        notifier: C::NotifierInterface,
+        signer: SignerSubmitTxSocket,
         app_query: c!(C::ApplicationInterface::SyncExecutor),
-        mempool: MempoolSocket,
     ) -> Result<Self> {
-        // Build a new transaction client for executing transactions signed by this node.
-        let client = TransactionClient::new(
-            app_query.clone(),
-            notifier.clone(),
-            mempool.clone(),
-            TransactionSigner::NodeMain(keystore.get_ed25519_sk()),
-        )
-        .await;
-
-        Ok(Self { app_query, client })
+        Ok(Self { app_query, signer })
     }
-
     /// Start the committee beacon timer.
     ///
     /// Every tick of the timer, we check if the block number has advanced and that we are in the
@@ -80,44 +79,29 @@ impl<C: NodeComponents> CommitteeBeaconTimer<C> {
                     // listener will just try again on the next tick, and likely means our
                     // goal of creating a block has already been achieved.
                     let result = self
-                        .client
                         .execute_transaction(UpdateMethod::IncrementNonce {})
                         .await;
                     match result {
-                        Ok(_) => {},
-                        Err(TransactionClientError::Reverted((tx, receipt))) => {
+                        Ok(receipt) => {
+                            tracing::debug!("successfully advanced phase: {:?}", receipt)
+                        },
+                        Err(ExecuteTransactionError::Reverted((tx, receipt, _))) => {
                             match receipt.response {
                                 TransactionResponse::Success(_) => {
                                     // This should never be returned as an error, and is returned
                                     // with Ok(), so we can ignore it here.
                                 },
-                                TransactionResponse::Revert(_) => {
+                                TransactionResponse::Revert(err) => {
                                     tracing::debug!(
-                                        "ignoring timer tick transaction revert due to invalid nonce (tx: {:?})",
-                                        tx.hash()
+                                        "ignoring timer tick transaction revert (tx: {:?}): {:?}",
+                                        tx.hash(),
+                                        err
                                     );
                                 },
                             }
                         },
-                        Err(TransactionClientError::Timeout(tx)) => {
-                            tracing::warn!(
-                                "ignoring transaction client timeout (tx: {:?})",
-                                tx.hash()
-                            );
-                        },
-                        Err(TransactionClientError::MempoolSendFailed((tx, e))) => {
-                            tracing::warn!(
-                                "ignoring transaction client mempool send failure (tx: {:?}): {}",
-                                tx.hash(),
-                                e
-                            );
-                        },
-                        Err(TransactionClientError::Internal((tx, e))) => {
-                            tracing::warn!(
-                                "ignoring transaction client internal error (tx: {:?}): {}",
-                                tx.hash(),
-                                e
-                            );
+                        Err(e) => {
+                            tracing::error!("ignoring transaction client error: {:?}", e);
                         },
                     }
 
@@ -153,6 +137,27 @@ impl<C: NodeComponents> CommitteeBeaconTimer<C> {
             // Sleep for the current tick delay.
             tokio::time::sleep(current_delay).await;
         }
+    }
+
+    /// Execute transaction via the signer component.
+    async fn execute_transaction(
+        &self,
+        method: UpdateMethod,
+    ) -> Result<TransactionReceipt, ExecuteTransactionError> {
+        let resp = self
+            .signer
+            .run(ExecuteTransactionRequest {
+                method,
+                options: Some(ExecuteTransactionOptions {
+                    retry: ExecuteTransactionRetry::Never,
+                    wait: ExecuteTransactionWait::Receipt,
+                    timeout: None,
+                }),
+            })
+            .await??;
+
+        let (_, receipt) = resp.as_receipt();
+        Ok(receipt)
     }
 
     fn in_commit_or_reveal_phase(&self) -> bool {

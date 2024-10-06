@@ -1,6 +1,7 @@
 use std::marker::PhantomData;
 
 use anyhow::Result;
+use fleek_crypto::SecretKey;
 use lightning_interfaces::prelude::*;
 
 use crate::config::CommitteeBeaconConfig;
@@ -49,7 +50,7 @@ impl<C: NodeComponents> CommitteeBeaconComponent<C> {
     /// Spawn and start the committee beacon listener, returning immediately without blocking.
     fn start(
         &self,
-        forwarder: &C::ForwarderInterface,
+        signer: fdi::Ref<C::SignerInterface>,
         fdi::Cloned(keystore): fdi::Cloned<C::KeystoreInterface>,
         fdi::Cloned(notifier): fdi::Cloned<C::NotifierInterface>,
         fdi::Cloned(app_query): fdi::Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
@@ -58,21 +59,26 @@ impl<C: NodeComponents> CommitteeBeaconComponent<C> {
         tracing::debug!("spawning committee beacon");
 
         let db = self.db.clone();
-        let listener_mempool_socket = forwarder.mempool_socket();
-        let timer_mempool_socket = forwarder.mempool_socket();
         let listener_shutdown = shutdown.clone();
         let timer_shutdown = shutdown.clone();
         spawn!(
             async move {
                 app_query.wait_for_genesis().await;
 
+                // Get the node index.
+                let node_secret_key = keystore.get_ed25519_sk();
+                let node_public_key = node_secret_key.to_pk();
+                let node_index = app_query
+                    .pubkey_to_index(&node_public_key)
+                    .expect("failed to get node index");
+
                 // Start the listener.
                 let listener = CommitteeBeaconListener::<C>::new(
                     db,
-                    keystore.clone(),
                     notifier.clone(),
+                    signer.get_socket(),
                     app_query.clone(),
-                    listener_mempool_socket,
+                    node_index,
                 )
                 .await
                 .expect("failed to create committee beacon listener");
@@ -90,14 +96,9 @@ impl<C: NodeComponents> CommitteeBeaconComponent<C> {
                 );
 
                 // Start the timer.
-                let timer = CommitteeBeaconTimer::<C>::new(
-                    keystore,
-                    notifier,
-                    app_query,
-                    timer_mempool_socket,
-                )
-                .await
-                .expect("failed to create committee beacon timer");
+                let timer = CommitteeBeaconTimer::<C>::new(signer.get_socket(), app_query)
+                    .await
+                    .expect("failed to create committee beacon timer");
                 let timer_waiter = timer_shutdown.clone();
                 spawn!(
                     async move {

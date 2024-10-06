@@ -930,6 +930,12 @@ impl<B: Backend> StateExecutor<B> {
         sender: TransactionSender,
         measurements: BTreeMap<NodeIndex, ReputationMeasurements>,
     ) -> TransactionResponse {
+        tracing::debug!(
+            "received reputation measurements (sender: {:?}): {:?}",
+            sender,
+            measurements
+        );
+
         let reporting_node = match self.only_node(sender) {
             Ok(index) => index,
             Err(e) => return e,

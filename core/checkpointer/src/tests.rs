@@ -15,10 +15,11 @@ use tempfile::tempdir;
 #[tokio::test]
 async fn test_start_shutdown() {
     let temp_dir = tempdir().unwrap();
-    let _node = TestNodeBuilder::new(temp_dir.path().to_path_buf())
+    let mut node = TestNodeBuilder::new(temp_dir.path().to_path_buf())
         .build()
         .await
         .unwrap();
+    node.shutdown().await;
 }
 
 #[tokio::test]

@@ -46,7 +46,8 @@ serial_test = "3.0.0"
 lightning-syncronizer = { path = "../syncronizer" }
 lightning-broadcast = { path = "../broadcast" }
 lightning-checkpointer.workspace = true
-lightning-consensus = { path = "../consensus" }
+lightning-consensus.workspace = true
+lightning-committee-beacon = { path = "../committee-beacon" }
 lightning-service-executor = { path = "../service-executor" }
 lightning-pool = { path = "../pool" }
 lightning-rep-collector = { path = "../rep-collector" }
