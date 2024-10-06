@@ -1,6 +1,9 @@
 //! Javascript runtime bindings for the SDK APIs
 
+use std::borrow::Cow;
 use std::cell::RefCell;
+use std::ffi::c_void;
+use std::path::Path;
 use std::rc::Rc;
 use std::str::FromStr;
 
@@ -8,15 +11,41 @@ use anyhow::{anyhow, bail, Context, Result};
 use arrayref::array_ref;
 use blake3_tree::utils::{tree_index, HashVec};
 use cid::Cid;
+use deno_core::error::{AnyError, JsError};
+use deno_core::serde::Serializer;
 use deno_core::url::Url;
-use deno_core::{extension, op2, OpState};
-use deno_node::deno_node;
+use deno_core::{extension, op2, v8, ByteString, JsBuffer, OpState, ResourceId};
+use deno_fetch::FetchPermissions;
+use deno_fs::FsPermissions;
+use deno_io::fs::FsError;
+use deno_net::NetPermissions;
+use deno_node::NodePermissions;
+use deno_napi::NapiPermissions;
+use deno_web::{JsMessageData, TimersPermission};
+use deno_websocket::WebSocketPermissions;
 use fleek_crypto::{ClientPublicKey, NodeSignature};
 use fn_sdk::blockstore::get_internal_path;
 use lightning_schema::task_broker::TaskScope;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
 use tracing::info;
 
-use crate::runtime::Permissions;
+use crate::runtime::permissions::Permissions;
+
+use crate::runtime::shared::{
+    op_bootstrap_color_depth,
+    op_bootstrap_unstable_args,
+    op_can_write_vectored,
+    op_create_worker,
+    op_host_post_message,
+    op_host_recv_ctrl,
+    op_host_recv_message,
+    op_host_terminate_worker,
+    op_http_set_response_trailers,
+    op_napi_open,
+    op_raw_write_vectored,
+    op_set_raw,
+};
 
 extension!(
     fleek,
@@ -35,6 +64,7 @@ extension!(
         deno_fs,
         deno_node
     ],
+    parameters = [P: NapiPermissions],
     ops = [
         run_task,
         log,
@@ -43,7 +73,19 @@ extension!(
         load_content,
         read_block,
         query_client_flk_balance,
-        query_client_bandwidth_balance
+        query_client_bandwidth_balance,
+        op_set_raw,
+        op_can_write_vectored,
+        op_raw_write_vectored,
+        op_bootstrap_unstable_args,
+        op_http_set_response_trailers,
+        op_bootstrap_color_depth,
+        op_create_worker,
+        op_host_post_message,
+        op_host_recv_ctrl,
+        op_host_recv_message,
+        op_host_terminate_worker,
+        op_napi_open<P>
     ],
     options = { depth: u8 },
     state = |state, config| {
@@ -52,15 +94,6 @@ extension!(
         state.put(TaskDepth(config.depth));
     }
 );
-
-/// Marker type for current task depth
-struct TaskDepth(u8);
-
-#[derive(serde::Serialize)]
-pub struct Task {
-    responses: Vec<Vec<u8>>,
-    signatures: Vec<NodeSignature>,
-}
 
 #[op2(async)]
 #[serde]
@@ -187,3 +220,12 @@ pub async fn query_client_bandwidth_balance(#[buffer(copy)] address: Vec<u8>) ->
             .to_string(),
     )
 }
+
+#[derive(serde::Serialize)]
+pub struct Task {
+    responses: Vec<Vec<u8>>,
+    signatures: Vec<NodeSignature>,
+}
+
+/// Marker type for current task depth
+pub struct TaskDepth(u8);
