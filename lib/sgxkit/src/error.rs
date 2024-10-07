@@ -1,3 +1,5 @@
+//! Error types
+
 use std::fmt::Display;
 
 use strum::EnumMessage;
