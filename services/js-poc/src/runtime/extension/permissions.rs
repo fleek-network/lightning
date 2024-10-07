@@ -7,11 +7,11 @@ use deno_core::url::Url;
 use deno_fetch::FetchPermissions;
 use deno_fs::FsPermissions;
 use deno_io::fs::FsError;
+use deno_napi::NapiPermissions;
 use deno_net::NetPermissions;
 use deno_node::NodePermissions;
 use deno_web::TimersPermission;
 use deno_websocket::WebSocketPermissions;
-use deno_napi::NapiPermissions;
 
 use super::params::FETCH_BLACKLIST;
 
