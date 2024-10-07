@@ -13,7 +13,7 @@ use deno_web::TimersPermission;
 use deno_websocket::WebSocketPermissions;
 use deno_napi::NapiPermissions;
 
-use crate::params::FETCH_BLACKLIST;
+use super::params::FETCH_BLACKLIST;
 
 pub struct Permissions {}
 

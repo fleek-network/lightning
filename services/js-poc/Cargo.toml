@@ -46,9 +46,12 @@ deno_websocket = "0.169"
 
 [build-dependencies]
 anyhow.workspace = true
+arrayref = "0.3"
+blake3-tree = { path = "../../lib/blake3-tree" }
 serde.workspace = true
 serde_json.workspace = true
 base64 = "0.22"
+cid = "0.11"
 hex = "0.4"
 deno_ast = { version = "0.42", features = ["transpiling"] }
 deno_core = "0.299"
@@ -68,6 +71,10 @@ deno_crypto = "0.178"
 deno_canvas = "0.33.0"
 deno_webgpu = "0.131"
 deno_websocket = "0.169"
+fleek-crypto.workspace = true
+fn-sdk = { path = "../../lib/sdk" }
+lightning-schema = { path = "../../core/schema" }
+tracing.workspace = true
 
 [[bin]]
 name = "fn-service-1"

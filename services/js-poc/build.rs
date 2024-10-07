@@ -1,7 +1,7 @@
 mod ext;
 
-#[path = "src/runtime/shared.rs"]
-mod shared;
+#[path = "src/runtime/rt/mod.rs"]
+mod rt;
 
 use std::borrow::Cow;
 use std::cell::RefCell;
@@ -46,8 +46,9 @@ use deno_web::JsMessageData;
 use deno_webgpu::deno_webgpu;
 use deno_webidl::deno_webidl;
 use serde::{Deserialize, Serialize};
-
-use crate::shared::{
+use crate::rt::extensions::fleek;
+use crate::rt::permissions::Permissions;
+use crate::rt::shared::{
     op_bootstrap_color_depth,
     op_bootstrap_unstable_args,
     op_can_write_vectored,
@@ -61,191 +62,191 @@ use crate::shared::{
     op_raw_write_vectored,
     op_set_raw,
 };
-
-extension!(
-    fleek,
-    deps = [
-        deno_webidl,
-        deno_console,
-        deno_url,
-        deno_web,
-        deno_fetch,
-        deno_websocket,
-        deno_crypto,
-        deno_webgpu,
-        deno_canvas,
-        deno_io,
-        deno_fs,
-        deno_node
-    ],
-    parameters = [P: NapiPermissions],
-    ops = [
-        op_set_raw,
-        op_can_write_vectored,
-        op_raw_write_vectored,
-        op_bootstrap_unstable_args,
-        op_http_set_response_trailers,
-        op_bootstrap_color_depth,
-        op_create_worker,
-        op_host_post_message,
-        op_host_recv_ctrl,
-        op_host_recv_message,
-        op_host_terminate_worker,
-        op_napi_open<P>
-    ],
-    esm_entry_point = "ext:fleek/bootstrap.js",
-    esm = [
-        dir "src/runtime/js",
-        "fleek.js",
-        "global.js",
-        "bootstrap.js",
-        "ext:runtime/98_global_scope_shared.js" = "98_global_scope_shared.js",
-        "ext:deno_http/00_serve.ts" = "00_serve.ts",
-        "ext:runtime/30_os.js" = "30_os.js",
-        "ext:deno_broadcast_channel/01_broadcast_channel.js" = "01_broadcast_channel.js",
-        "ext:deno_fs/30_fs.js" = "30_fs.js"
-    ]
-);
-
-struct Permissions {}
-impl TimersPermission for Permissions {
-    fn allow_hrtime(&mut self) -> bool {
-        unreachable!()
-    }
-}
-impl FetchPermissions for Permissions {
-    fn check_net_url(
-        &mut self,
-        _url: &deno_core::url::Url,
-        _api_name: &str,
-    ) -> Result<(), deno_core::error::AnyError> {
-        unreachable!()
-    }
-    fn check_read(
-        &mut self,
-        _p: &std::path::Path,
-        _api_name: &str,
-    ) -> Result<(), deno_core::error::AnyError> {
-        unreachable!()
-    }
-}
-impl WebSocketPermissions for Permissions {
-    fn check_net_url(
-        &mut self,
-        _url: &deno_core::url::Url,
-        _api_name: &str,
-    ) -> Result<(), deno_core::error::AnyError> {
-        unreachable!()
-    }
-}
-impl NetPermissions for Permissions {
-    fn check_net<T: AsRef<str>>(
-        &mut self,
-        _host: &(T, Option<u16>),
-        _api_name: &str,
-    ) -> Result<(), deno_core::error::AnyError> {
-        unreachable!()
-    }
-
-    fn check_read(
-        &mut self,
-        _p: &std::path::Path,
-        _api_name: &str,
-    ) -> Result<(), deno_core::error::AnyError> {
-        unreachable!()
-    }
-
-    fn check_write(
-        &mut self,
-        _p: &std::path::Path,
-        _api_name: &str,
-    ) -> Result<(), deno_core::error::AnyError> {
-        unreachable!()
-    }
-}
-
-impl NodePermissions for Permissions {
-    fn check_net_url(&mut self, url: &Url, api_name: &str) -> Result<(), AnyError> {
-        todo!()
-    }
-
-    fn check_read_with_api_name(
-        &mut self,
-        path: &Path,
-        api_name: Option<&str>,
-    ) -> Result<(), AnyError> {
-        todo!()
-    }
-
-    fn check_sys(&mut self, kind: &str, api_name: &str) -> Result<(), AnyError> {
-        todo!()
-    }
-
-    fn check_write_with_api_name(
-        &mut self,
-        path: &Path,
-        api_name: Option<&str>,
-    ) -> Result<(), AnyError> {
-        todo!()
-    }
-}
-
-impl FsPermissions for Permissions {
-    fn check_open<'a>(
-        &mut self,
-        resolved: bool,
-        read: bool,
-        write: bool,
-        path: &'a Path,
-        api_name: &str,
-    ) -> Result<Cow<'a, Path>, FsError> {
-        todo!()
-    }
-
-    fn check_read(&mut self, path: &Path, api_name: &str) -> Result<(), AnyError> {
-        todo!()
-    }
-
-    fn check_read_all(&mut self, api_name: &str) -> Result<(), AnyError> {
-        todo!()
-    }
-
-    fn check_read_blind(
-        &mut self,
-        p: &Path,
-        display: &str,
-        api_name: &str,
-    ) -> Result<(), AnyError> {
-        todo!()
-    }
-
-    fn check_write(&mut self, path: &Path, api_name: &str) -> Result<(), AnyError> {
-        todo!()
-    }
-
-    fn check_write_partial(&mut self, path: &Path, api_name: &str) -> Result<(), AnyError> {
-        todo!()
-    }
-
-    fn check_write_all(&mut self, api_name: &str) -> Result<(), AnyError> {
-        todo!()
-    }
-
-    fn check_write_blind(
-        &mut self,
-        p: &Path,
-        display: &str,
-        api_name: &str,
-    ) -> Result<(), AnyError> {
-        todo!()
-    }
-}
-
-impl NapiPermissions for Permissions {
-    fn check(&mut self, path: Option<&Path>) -> Result<(), AnyError> {
-        todo!()
-    }
-}
+//
+// extension!(
+//     fleek,
+//     deps = [
+//         deno_webidl,
+//         deno_console,
+//         deno_url,
+//         deno_web,
+//         deno_fetch,
+//         deno_websocket,
+//         deno_crypto,
+//         deno_webgpu,
+//         deno_canvas,
+//         deno_io,
+//         deno_fs,
+//         deno_node
+//     ],
+//     parameters = [P: NapiPermissions],
+//     ops = [
+//         op_set_raw,
+//         op_can_write_vectored,
+//         op_raw_write_vectored,
+//         op_bootstrap_unstable_args,
+//         op_http_set_response_trailers,
+//         op_bootstrap_color_depth,
+//         op_create_worker,
+//         op_host_post_message,
+//         op_host_recv_ctrl,
+//         op_host_recv_message,
+//         op_host_terminate_worker,
+//         op_napi_open<P>
+//     ],
+//     esm_entry_point = "ext:fleek/bootstrap.js",
+//     esm = [
+//         dir "src/runtime/js",
+//         "fleek.js",
+//         "global.js",
+//         "bootstrap.js",
+//         "ext:runtime/98_global_scope_shared.js" = "98_global_scope_shared.js",
+//         "ext:deno_http/00_serve.ts" = "00_serve.ts",
+//         "ext:runtime/30_os.js" = "30_os.js",
+//         "ext:deno_broadcast_channel/01_broadcast_channel.js" = "01_broadcast_channel.js",
+//         "ext:deno_fs/30_fs.js" = "30_fs.js"
+//     ]
+// );
+//
+// struct Permissions {}
+// impl TimersPermission for Permissions {
+//     fn allow_hrtime(&mut self) -> bool {
+//         unreachable!()
+//     }
+// }
+// impl FetchPermissions for Permissions {
+//     fn check_net_url(
+//         &mut self,
+//         _url: &deno_core::url::Url,
+//         _api_name: &str,
+//     ) -> Result<(), deno_core::error::AnyError> {
+//         unreachable!()
+//     }
+//     fn check_read(
+//         &mut self,
+//         _p: &std::path::Path,
+//         _api_name: &str,
+//     ) -> Result<(), deno_core::error::AnyError> {
+//         unreachable!()
+//     }
+// }
+// impl WebSocketPermissions for Permissions {
+//     fn check_net_url(
+//         &mut self,
+//         _url: &deno_core::url::Url,
+//         _api_name: &str,
+//     ) -> Result<(), deno_core::error::AnyError> {
+//         unreachable!()
+//     }
+// }
+// impl NetPermissions for Permissions {
+//     fn check_net<T: AsRef<str>>(
+//         &mut self,
+//         _host: &(T, Option<u16>),
+//         _api_name: &str,
+//     ) -> Result<(), deno_core::error::AnyError> {
+//         unreachable!()
+//     }
+//
+//     fn check_read(
+//         &mut self,
+//         _p: &std::path::Path,
+//         _api_name: &str,
+//     ) -> Result<(), deno_core::error::AnyError> {
+//         unreachable!()
+//     }
+//
+//     fn check_write(
+//         &mut self,
+//         _p: &std::path::Path,
+//         _api_name: &str,
+//     ) -> Result<(), deno_core::error::AnyError> {
+//         unreachable!()
+//     }
+// }
+//
+// impl NodePermissions for Permissions {
+//     fn check_net_url(&mut self, url: &Url, api_name: &str) -> Result<(), AnyError> {
+//         todo!()
+//     }
+//
+//     fn check_read_with_api_name(
+//         &mut self,
+//         path: &Path,
+//         api_name: Option<&str>,
+//     ) -> Result<(), AnyError> {
+//         todo!()
+//     }
+//
+//     fn check_sys(&mut self, kind: &str, api_name: &str) -> Result<(), AnyError> {
+//         todo!()
+//     }
+//
+//     fn check_write_with_api_name(
+//         &mut self,
+//         path: &Path,
+//         api_name: Option<&str>,
+//     ) -> Result<(), AnyError> {
+//         todo!()
+//     }
+// }
+//
+// impl FsPermissions for Permissions {
+//     fn check_open<'a>(
+//         &mut self,
+//         resolved: bool,
+//         read: bool,
+//         write: bool,
+//         path: &'a Path,
+//         api_name: &str,
+//     ) -> Result<Cow<'a, Path>, FsError> {
+//         todo!()
+//     }
+//
+//     fn check_read(&mut self, path: &Path, api_name: &str) -> Result<(), AnyError> {
+//         todo!()
+//     }
+//
+//     fn check_read_all(&mut self, api_name: &str) -> Result<(), AnyError> {
+//         todo!()
+//     }
+//
+//     fn check_read_blind(
+//         &mut self,
+//         p: &Path,
+//         display: &str,
+//         api_name: &str,
+//     ) -> Result<(), AnyError> {
+//         todo!()
+//     }
+//
+//     fn check_write(&mut self, path: &Path, api_name: &str) -> Result<(), AnyError> {
+//         todo!()
+//     }
+//
+//     fn check_write_partial(&mut self, path: &Path, api_name: &str) -> Result<(), AnyError> {
+//         todo!()
+//     }
+//
+//     fn check_write_all(&mut self, api_name: &str) -> Result<(), AnyError> {
+//         todo!()
+//     }
+//
+//     fn check_write_blind(
+//         &mut self,
+//         p: &Path,
+//         display: &str,
+//         api_name: &str,
+//     ) -> Result<(), AnyError> {
+//         todo!()
+//     }
+// }
+//
+// impl NapiPermissions for Permissions {
+//     fn check(&mut self, path: Option<&Path>) -> Result<(), AnyError> {
+//         todo!()
+//     }
+// }
 
 #[derive(Deserialize)]
 struct DenoJson {
@@ -281,7 +282,7 @@ fn main() {
             None,
             MaybeArc::new(InMemoryFs::default()),
         ),
-        fleek::init_ops_and_esm::<Permissions>(),
+        fleek::init_ops_and_esm::<Permissions>(0),
     ];
 
     let snapshot = deno_core::snapshot::create_snapshot(
