@@ -239,7 +239,7 @@ impl<C: NodeComponents> Rpc<C> {
         spawn!(
             async move {
                 shutdown.wait_for_shutdown().await;
-                server_handle.stop().unwrap();
+                let _ = server_handle.stop();
                 server_handle.stopped().await;
             },
             "RPC: shutdown waiter"
