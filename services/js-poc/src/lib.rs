@@ -2,14 +2,14 @@ use anyhow::{bail, Context};
 use deno_core::futures::stream::FuturesUnordered;
 use deno_core::futures::StreamExt;
 use deno_core::v8::{Global, IsolateHandle, Value};
-use deno_core::{JsRuntime, ModuleSpecifier, serde_v8, v8};
+use deno_core::{serde_v8, v8, JsRuntime, ModuleSpecifier};
 use fn_sdk::connection::Connection;
 use fn_sdk::header::TransportDetail;
 use fn_sdk::http_util::{respond, respond_with_error, respond_with_http_response};
+use runtime::extension::params;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio_util::task::LocalPoolHandle;
 use tracing::{debug, error, info};
-use runtime::rt::params;
 
 use crate::runtime::guard::IsolateGuard;
 use crate::runtime::Runtime;

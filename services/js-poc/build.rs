@@ -1,7 +1,7 @@
 mod ext;
 
-#[path = "src/runtime/rt/mod.rs"]
-mod rt;
+#[path = "src/runtime/extension/mod.rs"]
+mod extension;
 
 use std::borrow::Cow;
 use std::cell::RefCell;
@@ -46,9 +46,9 @@ use deno_web::JsMessageData;
 use deno_webgpu::deno_webgpu;
 use deno_webidl::deno_webidl;
 use serde::{Deserialize, Serialize};
-use crate::rt::extensions::fleek;
-use crate::rt::permissions::Permissions;
-use crate::rt::shared::{
+
+use crate::extension::fleek;
+use crate::extension::ops::{
     op_bootstrap_color_depth,
     op_bootstrap_unstable_args,
     op_can_write_vectored,
@@ -62,6 +62,7 @@ use crate::rt::shared::{
     op_raw_write_vectored,
     op_set_raw,
 };
+use crate::extension::permissions::Permissions;
 //
 // extension!(
 //     fleek,
