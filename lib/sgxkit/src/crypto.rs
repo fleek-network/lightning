@@ -1,3 +1,5 @@
+//! Cryptographic utilities
+
 use sgxkit_sys::fn0;
 
 use crate::error::HostError;
@@ -10,7 +12,9 @@ use crate::error::HostError;
 /// ```
 /// use sgxkit::DerivedKey;
 ///
-/// let key = DerivedKey::new(b"")
+/// let key = DerivedKey::root();
+/// let child = key.clone().with_child_path(&[0, 1, 2, 420]).unwrap();
+/// let other = DerivedKey::from_slice(b"foo_path").unwrap();
 /// ```
 pub struct DerivedKey {
     path: Vec<u16>,
