@@ -13,16 +13,12 @@ use deno_node::NodePermissions;
 use deno_web::TimersPermission;
 use deno_websocket::WebSocketPermissions;
 
-use super::params::FETCH_BLACKLIST;
+pub const FETCH_BLACKLIST: &[&str] = &["localhost", "127.0.0.1", "::1"];
 
 pub struct Permissions {}
 
 impl Permissions {
-    fn check_net_url(
-        &mut self,
-        url: &Url,
-        _api_name: &str,
-    ) -> anyhow::Result<(), deno_core::error::AnyError> {
+    fn check_net_url(&mut self, url: &Url, _api_name: &str) -> anyhow::Result<(), AnyError> {
         if let Some(host) = url.host_str() {
             if FETCH_BLACKLIST.contains(&host) {
                 return Err(anyhow!("{host} is blacklisted"));
@@ -39,29 +35,21 @@ impl TimersPermission for Permissions {
 }
 
 impl FetchPermissions for Permissions {
-    fn check_net_url(
-        &mut self,
-        url: &Url,
-        api_name: &str,
-    ) -> anyhow::Result<(), deno_core::error::AnyError> {
+    fn check_net_url(&mut self, url: &Url, api_name: &str) -> anyhow::Result<(), AnyError> {
         self.check_net_url(url, api_name)
     }
     fn check_read(
         &mut self,
         _p: &std::path::Path,
         _api_name: &str,
-    ) -> anyhow::Result<(), deno_core::error::AnyError> {
+    ) -> anyhow::Result<(), AnyError> {
         // Disable reading files via fetch
         Err(anyhow!("paths are disabled :("))
     }
 }
 
 impl WebSocketPermissions for Permissions {
-    fn check_net_url(
-        &mut self,
-        url: &Url,
-        api_name: &str,
-    ) -> anyhow::Result<(), deno_core::error::AnyError> {
+    fn check_net_url(&mut self, url: &Url, api_name: &str) -> anyhow::Result<(), AnyError> {
         self.check_net_url(url, api_name)
     }
 }
@@ -71,26 +59,18 @@ impl NetPermissions for Permissions {
         &mut self,
         host: &(T, Option<u16>),
         _api_name: &str,
-    ) -> anyhow::Result<(), deno_core::error::AnyError> {
+    ) -> anyhow::Result<(), AnyError> {
         if FETCH_BLACKLIST.contains(&host.0.as_ref()) {
             Err(anyhow!("{} is blacklisted", host.0.as_ref()))
         } else {
             Ok(())
         }
     }
-    fn check_read(
-        &mut self,
-        _p: &std::path::Path,
-        _api_name: &str,
-    ) -> anyhow::Result<(), deno_core::error::AnyError> {
+    fn check_read(&mut self, _p: &Path, _api_name: &str) -> anyhow::Result<(), AnyError> {
         // Disable reading file descriptors
         Err(anyhow!("paths are disabled :("))
     }
-    fn check_write(
-        &mut self,
-        _p: &std::path::Path,
-        _api_name: &str,
-    ) -> anyhow::Result<(), deno_core::error::AnyError> {
+    fn check_write(&mut self, _p: &Path, _api_name: &str) -> anyhow::Result<(), AnyError> {
         // Disable writing file descriptors
         Err(anyhow!("paths are disabled :("))
     }
@@ -99,86 +79,82 @@ impl NetPermissions for Permissions {
 impl FsPermissions for Permissions {
     fn check_open<'a>(
         &mut self,
-        resolved: bool,
-        read: bool,
-        write: bool,
-        path: &'a Path,
-        api_name: &str,
-    ) -> std::result::Result<Cow<'a, Path>, FsError> {
-        todo!()
+        _resolved: bool,
+        _read: bool,
+        _write: bool,
+        _path: &'a Path,
+        _api_name: &str,
+    ) -> Result<Cow<'a, Path>, FsError> {
+        unimplemented!()
     }
 
-    fn check_read(&mut self, path: &Path, api_name: &str) -> std::result::Result<(), AnyError> {
-        todo!()
+    fn check_read(&mut self, _path: &Path, _api_name: &str) -> Result<(), AnyError> {
+        unimplemented!()
     }
 
-    fn check_read_all(&mut self, api_name: &str) -> std::result::Result<(), AnyError> {
-        todo!()
+    fn check_read_all(&mut self, _api_name: &str) -> Result<(), AnyError> {
+        unimplemented!()
     }
 
     fn check_read_blind(
         &mut self,
-        p: &Path,
-        display: &str,
-        api_name: &str,
-    ) -> std::result::Result<(), AnyError> {
-        todo!()
+        _p: &Path,
+        _display: &str,
+        _api_name: &str,
+    ) -> Result<(), AnyError> {
+        unimplemented!()
     }
 
-    fn check_write(&mut self, path: &Path, api_name: &str) -> std::result::Result<(), AnyError> {
-        todo!()
+    fn check_write(&mut self, _path: &Path, _api_name: &str) -> Result<(), AnyError> {
+        unimplemented!()
     }
 
-    fn check_write_partial(
-        &mut self,
-        path: &Path,
-        api_name: &str,
-    ) -> std::result::Result<(), AnyError> {
-        todo!()
+    fn check_write_partial(&mut self, _path: &Path, _api_name: &str) -> Result<(), AnyError> {
+        unimplemented!()
     }
 
-    fn check_write_all(&mut self, api_name: &str) -> std::result::Result<(), AnyError> {
-        todo!()
+    fn check_write_all(&mut self, _api_name: &str) -> Result<(), AnyError> {
+        unimplemented!()
     }
 
     fn check_write_blind(
         &mut self,
-        p: &Path,
-        display: &str,
-        api_name: &str,
-    ) -> std::result::Result<(), AnyError> {
-        todo!()
+        _p: &Path,
+        _display: &str,
+        _api_name: &str,
+    ) -> Result<(), AnyError> {
+        unimplemented!()
     }
 }
 
 impl NodePermissions for Permissions {
-    fn check_net_url(&mut self, url: &Url, api_name: &str) -> std::result::Result<(), AnyError> {
-        todo!()
+    fn check_net_url(&mut self, _url: &Url, _api_name: &str) -> Result<(), AnyError> {
+        unimplemented!()
     }
 
     fn check_read_with_api_name(
         &mut self,
-        path: &Path,
-        api_name: Option<&str>,
-    ) -> std::result::Result<(), AnyError> {
-        todo!()
+        _path: &Path,
+        _api_name: Option<&str>,
+    ) -> Result<(), AnyError> {
+        unimplemented!()
     }
 
-    fn check_sys(&mut self, kind: &str, api_name: &str) -> std::result::Result<(), AnyError> {
-        todo!()
+    fn check_sys(&mut self, _kind: &str, _api_name: &str) -> Result<(), AnyError> {
+        unimplemented!()
     }
 
     fn check_write_with_api_name(
         &mut self,
-        path: &Path,
-        api_name: Option<&str>,
-    ) -> std::result::Result<(), AnyError> {
-        todo!()
+        _path: &Path,
+        _api_name: Option<&str>,
+    ) -> Result<(), AnyError> {
+        unimplemented!()
     }
 }
 
 impl NapiPermissions for Permissions {
-    fn check(&mut self, path: Option<&Path>) -> Result<(), AnyError> {
-        todo!()
+    fn check(&mut self, _path: Option<&Path>) -> Result<(), AnyError> {
+        unimplemented!()
     }
 }

@@ -1,14 +1,13 @@
-use std::borrow::Cow;
 use std::path::Path;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use ::deno_fetch::{deno_fetch, FetchPermissions, Options};
-use ::deno_net::{deno_net, NetPermissions};
-use ::deno_web::{deno_web, TimersPermission};
-use ::deno_websocket::{deno_websocket, WebSocketPermissions};
-use anyhow::{anyhow, bail, Result};
+use ::deno_fetch::{deno_fetch, Options};
+use ::deno_net::deno_net;
+use ::deno_web::deno_web;
+use ::deno_websocket::deno_websocket;
+use anyhow::{bail, Result};
 use deno_ast::{ParseParams, SourceMapOption};
 use deno_canvas::deno_canvas;
 use deno_console::deno_console;
@@ -27,19 +26,17 @@ use deno_core::{
 };
 use deno_crypto::deno_crypto;
 use deno_fs::sync::MaybeArc;
-use deno_fs::{FsPermissions, InMemoryFs};
-use deno_io::fs::FsError;
+use deno_fs::InMemoryFs;
 use deno_media_type::MediaType;
-use deno_node::NodePermissions;
 use deno_url::deno_url;
 use deno_webgpu::deno_webgpu;
 use deno_webidl::deno_webidl;
 use extension::fleek;
-use extension::params::{FETCH_BLACKLIST, HEAP_INIT, HEAP_LIMIT};
 use extension::permissions::Permissions;
 
 use self::module_loader::FleekModuleLoader;
 use self::tape::{Punch, Tape};
+use crate::params::{HEAP_INIT, HEAP_LIMIT};
 
 pub mod extension;
 pub mod guard;
@@ -71,7 +68,7 @@ impl Runtime {
                 deno_crypto::init_ops(None),
                 deno_webgpu::init_ops(),
                 deno_canvas::init_ops(),
-                deno_io::deno_io::init_ops(None),
+                deno_io::deno_io::init_ops(Some(Default::default())),
                 deno_fs::deno_fs::init_ops::<Permissions>(MaybeArc::new(InMemoryFs::default())),
                 deno_node::deno_node::init_ops::<Permissions>(
                     Default::default(),
