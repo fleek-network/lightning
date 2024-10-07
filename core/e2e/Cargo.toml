@@ -44,11 +44,15 @@ hp-fixed.workspace = true
 serial_test = "3.0.0"
 tracing.workspace = true
 fleek-blake3 = "1.5"
+thiserror.workspace = true
 
 toml = "0.7"
 resolve-path = "0.1.0"
 clap = { version = "4.2", features = ["derive"] }
 lightning-workspace-hack.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
 
 [features]
 services = ["lightning-node-bindings/services"]
