@@ -15,7 +15,6 @@ use rand::{Rng, SeedableRng};
 use tokio::net::UdpSocket;
 use tokio::sync::mpsc;
 use tracing::{error, info};
-use types::{ProtocolParamKey, ProtocolParamValue};
 
 use crate::config::Config;
 
@@ -197,7 +196,7 @@ impl<C: NodeComponents> PingerInner<C> {
                         let msg = Message::Request { sender: node_index, id };
                         let bytes: Vec<u8> = msg.into();
                         let addr = (node.domain, node.ports.pinger);
-                        let timeout = self.get_ping_timeout();
+                        let timeout = self.query_runner.get_reputation_ping_timeout();
                         if let Err(e) = socket.send_to(&bytes, addr).await {
                             error!("Failed to respond to ping message: {e:?}");
                         } else {
@@ -243,18 +242,6 @@ impl<C: NodeComponents> PingerInner<C> {
             .collect();
         nodes.shuffle(rng);
         nodes
-    }
-
-    fn get_ping_timeout(&self) -> Duration {
-        match self
-            .query_runner
-            .get_protocol_param(&ProtocolParamKey::ReputationPingTimeout)
-        {
-            Some(ProtocolParamValue::ReputationPingTimeout(timeout)) => timeout,
-            // Return 15s if the param is not set, for backwards compatibility.
-            None => Duration::from_secs(15),
-            _ => unreachable!(),
-        }
     }
 }
 
