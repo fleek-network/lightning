@@ -204,6 +204,16 @@ pub trait QueryRunnerExt: SyncQueryRunnerInterface {
                 .is_some_and(|node_stake| node_stake >= minimum_stake_amount)
         })
     }
+
+    /// Returns the ping timeout from the protocol parameters.
+    fn get_reputation_ping_timeout(&self) -> Duration {
+        match self.get_protocol_param(&ProtocolParamKey::ReputationPingTimeout) {
+            Some(ProtocolParamValue::ReputationPingTimeout(timeout)) => timeout,
+            // Return 15s if the param is not set, for backwards compatibility.
+            None => Duration::from_secs(15),
+            _ => unreachable!(),
+        }
+    }
 }
 
 impl<T: SyncQueryRunnerInterface> QueryRunnerExt for T {}
