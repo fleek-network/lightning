@@ -6,6 +6,7 @@ use std::time::Duration;
 use anyhow::Result;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::ShutdownController;
+use lightning_rpc::Rpc;
 use tokio::runtime::{Handle, Runtime};
 use tokio::task::JoinHandle;
 use tokio::time::timeout;
@@ -188,6 +189,11 @@ impl<C: NodeComponents> ContainedNode<C> {
     /// Returns a reference to the data provider.
     pub fn provider(&self) -> &fdi::MultiThreadedProvider {
         &self.provider
+    }
+
+    /// Wait for the RPC component to be ready.
+    pub async fn wait_for_rpc_ready(&self) {
+        self.provider.get::<Rpc<C>>().wait_for_ready().await;
     }
 }
 

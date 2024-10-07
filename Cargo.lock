@@ -7121,6 +7121,8 @@ dependencies = [
  "serde",
  "serde_json",
  "serial_test",
+ "tempfile",
+ "thiserror",
  "tokio",
  "toml 0.7.8",
  "tracing",

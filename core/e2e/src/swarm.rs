@@ -3,6 +3,7 @@ use std::fs;
 use std::path::Path;
 use std::time::Duration;
 
+use anyhow::Result;
 use fleek_crypto::{
     AccountOwnerSecretKey,
     ConsensusPublicKey,
@@ -10,7 +11,7 @@ use fleek_crypto::{
     NodePublicKey,
     SecretKey,
 };
-use futures::future::try_join_all;
+use futures::future::{join_all, try_join_all};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_application::app::Application;
 use lightning_application::config::{ApplicationConfig, StorageConfig};
@@ -36,14 +37,17 @@ use lightning_rep_collector::ReputationAggregator;
 use lightning_resolver::config::Config as ResolverConfig;
 use lightning_resolver::resolver::Resolver;
 use lightning_rpc::config::Config as RpcConfig;
-use lightning_rpc::Rpc;
+use lightning_rpc::interface::Fleek;
+use lightning_rpc::{Rpc, RpcClient};
 use lightning_service_executor::shim::{ServiceExecutor, ServiceExecutorConfig};
 use lightning_syncronizer::config::Config as SyncronizerConfig;
 use lightning_syncronizer::syncronizer::Syncronizer;
 use lightning_utils::config::TomlConfigProvider;
 use resolved_pathbuf::ResolvedPathBuf;
+use types::{Epoch, NodeIndex};
 
 use crate::containerized_node::ContainerizedNode;
+use crate::error::SwarmError;
 use crate::utils::networking::{PortAssigner, Transport};
 
 pub struct Swarm {
@@ -65,15 +69,15 @@ impl Swarm {
         SwarmBuilder::default()
     }
 
-    pub async fn launch(&self) -> anyhow::Result<()> {
-        try_join_all(self.nodes.values().map(|node| node.start())).await?;
+    pub async fn launch(&mut self) -> anyhow::Result<()> {
+        try_join_all(self.nodes.values_mut().map(|node| node.start())).await?;
         Ok(())
     }
 
-    pub async fn launch_genesis_committee(&self) -> anyhow::Result<()> {
+    pub async fn launch_genesis_committee(&mut self) -> anyhow::Result<()> {
         try_join_all(
             self.nodes
-                .values()
+                .values_mut()
                 .filter(|node| node.is_genesis_committee())
                 .map(|node| node.start()),
         )
@@ -81,10 +85,10 @@ impl Swarm {
         Ok(())
     }
 
-    pub async fn launch_non_genesis_committee(&self) -> anyhow::Result<()> {
+    pub async fn launch_non_genesis_committee(&mut self) -> anyhow::Result<()> {
         try_join_all(
             self.nodes
-                .values()
+                .values_mut()
                 .filter(|node| !node.is_genesis_committee())
                 .map(|node| node.start()),
         )
@@ -114,6 +118,13 @@ impl Swarm {
         self.nodes
             .iter()
             .map(|(pubkey, node)| (*pubkey, node.get_rpc_address()))
+            .collect()
+    }
+
+    pub fn get_rpc_clients(&self) -> HashMap<NodeIndex, RpcClient> {
+        self.nodes
+            .values()
+            .map(|node| (node.get_index(), node.get_rpc_client()))
             .collect()
     }
 
@@ -164,10 +175,62 @@ impl Swarm {
         self.nodes.get(node).map(|node| node.take_blockstore())
     }
 
+    pub fn nodes(&self) -> Vec<&ContainerizedNode> {
+        self.nodes.values().collect::<Vec<_>>()
+    }
+
+    pub fn started_nodes(&self) -> Vec<&ContainerizedNode> {
+        self.nodes
+            .values()
+            .filter(|node| node.is_started())
+            .collect()
+    }
+
+    pub async fn get_committee_by_node(&self) -> Result<HashMap<NodeIndex, Vec<NodePublicKey>>> {
+        join_all(self.started_nodes().iter().map(|node| async {
+            let index = node.get_index();
+            node.get_rpc_client()
+                .get_committee_members(None)
+                .await
+                .map(|committee| (index, committee))
+                .map_err(From::from)
+        }))
+        .await
+        .into_iter()
+        .collect::<Result<HashMap<_, _>, _>>()
+    }
+
     fn cleanup(&mut self) {
         if self.directory.exists() {
             fs::remove_dir_all(&self.directory).expect("Failed to clean up swarm directory.");
         }
+    }
+
+    pub async fn wait_for_rpc_ready(&self) {
+        join_all(
+            self.started_nodes()
+                .iter()
+                .map(|node| node.wait_for_rpc_ready()),
+        )
+        .await;
+    }
+
+    /// Wait for all nodes to reach a new epoch.
+    pub async fn wait_for_epoch_change(
+        &self,
+        new_epoch: Epoch,
+        timeout: Duration,
+    ) -> Result<(), SwarmError> {
+        join_all(
+            self.started_nodes()
+                .iter()
+                .map(|node| async { node.wait_for_epoch_change(new_epoch, timeout).await }),
+        )
+        .await
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(())
     }
 }
 
@@ -187,6 +250,8 @@ pub struct SwarmBuilder {
     specific_nodes: Option<Vec<SwarmNode>>,
     committee_size: Option<u64>,
     services: Vec<ServiceId>,
+    ping_interval: Option<Duration>,
+    ping_timeout: Option<Duration>,
 }
 
 impl SwarmBuilder {
@@ -261,6 +326,16 @@ impl SwarmBuilder {
         self
     }
 
+    pub fn with_ping_interval(mut self, ping_interval: Duration) -> Self {
+        self.ping_interval = Some(ping_interval);
+        self
+    }
+
+    pub fn with_ping_timeout(mut self, ping_timeout: Duration) -> Self {
+        self.ping_timeout = Some(ping_timeout);
+        self
+    }
+
     pub fn build(self) -> Swarm {
         let num_nodes = self.num_nodes.expect("Number of nodes must be provided.");
         let directory = self.directory.expect("Directory must be provided.");
@@ -291,6 +366,7 @@ impl SwarmBuilder {
             supply_at_genesis: 1000000,
             min_num_measurements: 2,
             chain_id: 59330,
+            reputation_ping_timeout: self.ping_timeout.unwrap_or(Duration::from_millis(1)),
 
             ..Default::default()
         };
@@ -349,6 +425,7 @@ impl SwarmBuilder {
                 self.archiver,
                 self.syncronizer_delta.unwrap_or(Duration::from_secs(300)),
                 &self.services,
+                self.ping_interval,
             );
 
             // Generate and store the node public key.
@@ -404,7 +481,14 @@ impl SwarmBuilder {
                 dev: None,
             });
 
-            let node = ContainerizedNode::new(config, owner_sk, ports, index, is_committee, stake);
+            let node = ContainerizedNode::new(
+                config,
+                owner_sk,
+                ports,
+                index as NodeIndex,
+                is_committee,
+                stake,
+            );
             nodes.insert(node_pk, node);
         }
 
@@ -446,13 +530,13 @@ fn assign_ports(port_assigner: &mut PortAssigner) -> NodePorts {
     }
 }
 
-/// Build the configuration object for a
 fn build_config(
     root: &Path,
     ports: NodePorts,
     archiver: bool,
     syncronizer_delta: Duration,
     services: &[ServiceId],
+    ping_interval: Option<Duration>,
 ) -> TomlConfigProvider<FullNodeComponents> {
     let config = TomlConfigProvider::<FullNodeComponents>::default();
 
@@ -529,7 +613,7 @@ fn build_config(
 
     config.inject::<Pinger<FullNodeComponents>>(PingerConfig {
         address: format!("127.0.0.1:{}", ports.pinger).parse().unwrap(),
-        ping_interval: Duration::from_millis(1000),
+        ping_interval: ping_interval.unwrap_or(Duration::from_millis(1000)),
     });
 
     config.inject::<Checkpointer<FullNodeComponents>>(CheckpointerConfig {

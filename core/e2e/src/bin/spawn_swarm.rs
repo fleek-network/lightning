@@ -74,7 +74,7 @@ fn main() -> Result<()> {
         if path.exists() {
             fs::remove_dir_all(&path).expect("Failed to clean up swarm directory before test.");
         }
-        let swarm = Swarm::builder()
+        let mut swarm = Swarm::builder()
             .with_directory(path)
             .with_min_port(12000)
             .with_num_nodes(args.num_nodes)

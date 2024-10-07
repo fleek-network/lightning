@@ -1,182 +1,124 @@
 use std::collections::{BTreeSet, HashMap};
-use std::fs;
 use std::time::{Duration, SystemTime};
 
-use anyhow::Result;
 use fleek_crypto::NodePublicKey;
 use hp_fixed::unsigned::HpUfixed;
 use lightning_e2e::swarm::{Swarm, SwarmNode};
 use lightning_interfaces::types::Staking;
 use lightning_rpc::interface::Fleek;
 use lightning_rpc::RpcClient;
-use lightning_test_utils::config::LIGHTNING_TEST_HOME_DIR;
 use lightning_test_utils::logging;
-use resolved_pathbuf::ResolvedPathBuf;
-use serial_test::serial;
+use tempfile::tempdir;
 
 #[tokio::test]
-#[serial]
-async fn e2e_epoch_change_all_nodes_on_committee() -> Result<()> {
+async fn e2e_epoch_change_all_nodes_on_committee() {
     logging::setup();
 
-    // Start epoch now and let it end in 40 seconds.
-    let epoch_start = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap()
-        .as_millis() as u64;
-
-    let path =
-        ResolvedPathBuf::try_from(LIGHTNING_TEST_HOME_DIR.join("e2e/epoch-change-committee"))
-            .unwrap();
-    if path.exists() {
-        fs::remove_dir_all(&path).expect("Failed to clean up swarm directory before test.");
-    }
-    let swarm = Swarm::builder()
-        .with_directory(path)
+    // Initialize the swarm.
+    let temp_dir = tempdir().unwrap();
+    let mut swarm = Swarm::builder()
+        .with_directory(temp_dir.path().to_path_buf().try_into().unwrap())
         .with_min_port(10100)
         .with_num_nodes(4)
-        .with_epoch_time(30000)
-        .with_epoch_start(epoch_start)
+        // We need to include enough time in this epoch time for the nodes to start up, or else it
+        // begins the epoch change immediately when they do. We can even get into a situation where
+        // another epoch change starts quickly after that, causing our expectation of epoch = 1
+        // below to fail.
+        .with_epoch_time(15000)
+        .with_epoch_start(
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64,
+        )
         .build();
     swarm.launch().await.unwrap();
 
-    // Wait a bit for the nodes to start.
-    tokio::time::sleep(Duration::from_secs(5)).await;
+    // Wait for RPC to be ready.
+    swarm.wait_for_rpc_ready().await;
 
-    for (_, address) in swarm.get_rpc_addresses() {
-        let client = RpcClient::new_no_auth(&address)?;
-
-        let epoch = client.get_epoch().await?;
+    // Check epoch across all nodes.
+    for (_, client) in swarm.get_rpc_clients() {
+        let epoch = client.get_epoch().await.unwrap();
         assert_eq!(epoch, 0);
     }
 
-    // The epoch will change after 40 seconds, and we already waited 5 seconds.
-    // To give some time for the epoch change, we will wait another 30 seconds here.
-    tokio::time::sleep(Duration::from_secs(30)).await;
+    // Wait for epoch to change across all nodes.
+    swarm
+        .wait_for_epoch_change(1, Duration::from_secs(60))
+        .await
+        .unwrap();
 
-    for (_, address) in swarm.get_rpc_addresses() {
-        let client = RpcClient::new_no_auth(&address)?;
-
-        let epoch = client.get_epoch().await?;
-        assert_eq!(epoch, 1);
-    }
-
+    // Shutdown the swarm.
     swarm.shutdown().await;
-    Ok(())
 }
 
 #[tokio::test]
-#[serial]
-async fn e2e_epoch_change_with_edge_node() -> Result<()> {
+async fn e2e_epoch_change_with_some_nodes_not_on_committee() {
     logging::setup();
 
-    // Start epoch now and let it end in 40 seconds.
-    let epoch_start = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap()
-        .as_millis() as u64;
-
-    let path =
-        ResolvedPathBuf::try_from(LIGHTNING_TEST_HOME_DIR.join("e2e/epoch-change-edge-node"))
-            .unwrap();
-    if path.exists() {
-        fs::remove_dir_all(&path).expect("Failed to clean up swarm directory before test.");
-    }
-    let swarm = Swarm::builder()
-        .with_directory(path)
+    // Initialize the swarm.
+    let temp_dir = tempdir().unwrap();
+    let mut swarm = Swarm::builder()
+        .with_directory(temp_dir.path().to_path_buf().try_into().unwrap())
         .with_min_port(10200)
         .with_num_nodes(5)
         .with_committee_size(4)
-        .with_epoch_time(30000)
-        .with_epoch_start(epoch_start)
+        // We need to include enough time in this epoch time for the nodes to start up, or else it
+        // begins the epoch change immediately when they do. We can even get into a situation where
+        // another epoch change starts quickly after that, causing our expectation of epoch = 1
+        // below to fail.
+        .with_epoch_time(15000)
+        .with_epoch_start(
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64,
+        )
         .build();
     swarm.launch().await.unwrap();
 
-    // Wait a bit for the nodes to start.
-    tokio::time::sleep(Duration::from_secs(5)).await;
+    // Wait for RPC to be ready.
+    swarm.wait_for_rpc_ready().await;
 
-    for (_, address) in swarm.get_rpc_addresses() {
-        let client = RpcClient::new_no_auth(&address)?;
-        let epoch = client.get_epoch().await?;
-
-        assert_eq!(epoch, 0);
+    // Check that the initial epoch is 0 across all nodes.
+    for (_, client) in swarm.get_rpc_clients() {
+        assert_eq!(client.get_epoch().await.unwrap(), 0);
     }
 
-    // The epoch will change after 40 seconds, and we already waited 5 seconds.
-    // To give some time for the epoch change, we will wait another 30 seconds here.
-    tokio::time::sleep(Duration::from_secs(30)).await;
-
-    for (_key, address) in swarm.get_rpc_addresses() {
-        let client = RpcClient::new_no_auth(&address)?;
-
-        let epoch = client.get_epoch().await?;
-        assert_eq!(epoch, 1);
+    // Check that the committee is the same across all nodes.
+    let committees = swarm.get_committee_by_node().await.unwrap();
+    for (i, committee) in &committees {
+        for (j, other_committee) in &committees {
+            if i != j {
+                assert_eq!(committee, other_committee);
+            }
+        }
     }
 
+    // Wait for epoch to change across all nodes.
+    swarm
+        .wait_for_epoch_change(1, Duration::from_secs(60))
+        .await
+        .unwrap();
+
+    // Check that the committee is the same across all nodes.
+    let committees = swarm.get_committee_by_node().await.unwrap();
+    for (i, committee) in &committees {
+        for (j, other_committee) in &committees {
+            if i != j {
+                assert_eq!(committee, other_committee);
+            }
+        }
+    }
+
+    // Shutdown the swarm.
     swarm.shutdown().await;
-    Ok(())
 }
 
 #[tokio::test]
-#[serial]
-async fn e2e_committee_change() -> Result<()> {
+async fn e2e_test_staking_auction() {
     logging::setup();
-
-    // Start epoch now and let it end in 40 seconds.
-    let epoch_start = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap()
-        .as_millis() as u64;
-
-    let path =
-        ResolvedPathBuf::try_from(LIGHTNING_TEST_HOME_DIR.join("e2e/committee-change")).unwrap();
-    if path.exists() {
-        fs::remove_dir_all(&path).expect("Failed to clean up swarm directory before test.");
-    }
-
-    let committee_size = 4;
-    let swarm = Swarm::builder()
-        .with_directory(path)
-        .with_min_port(10300)
-        .with_num_nodes(5)
-        .with_committee_size(committee_size)
-        .with_epoch_time(20000)
-        .with_epoch_start(epoch_start)
-        .build();
-    swarm.launch().await.unwrap();
-
-    // Wait a bit for the nodes to start.
-    tokio::time::sleep(Duration::from_secs(5)).await;
-
-    // Make sure all nodes start with the same committee.
-    compare_committee(swarm.get_rpc_addresses(), committee_size as usize).await;
-
-    // Wait for epoch to change.
-    tokio::time::sleep(Duration::from_secs(30)).await;
-
-    // Make sure all nodes still all have the same committee.
-    compare_committee(swarm.get_rpc_addresses(), committee_size as usize).await;
-
-    swarm.shutdown().await;
-    Ok(())
-}
-
-#[tokio::test]
-#[serial]
-async fn e2e_test_staking_auction() -> Result<()> {
-    logging::setup();
-
-    // Start epoch now and let it end in 40 seconds.
-    let epoch_start = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap()
-        .as_millis() as u64;
-
-    let path =
-        ResolvedPathBuf::try_from(LIGHTNING_TEST_HOME_DIR.join("e2e/staking-auction")).unwrap();
-    if path.exists() {
-        fs::remove_dir_all(&path).expect("Failed to clean up swarm directory before test.");
-    }
 
     // Set a node with high rep and a slightly lower stake then everyone else
     let high_rep_node = SwarmNode {
@@ -201,20 +143,29 @@ async fn e2e_test_staking_auction() -> Result<()> {
 
     // Spawn swarm with initially 1 more node than the node_count_param. This should cause one node
     // to be kicked off on epoch change
-    let swarm = Swarm::builder()
-        .with_directory(path)
+    let temp_dir = tempdir().unwrap();
+    let mut swarm = Swarm::builder()
+        .with_directory(temp_dir.path().to_path_buf().try_into().unwrap())
         .with_min_port(10400)
         .with_num_nodes(5)
         .with_node_count_param(4)
-        .with_epoch_time(20000)
-        .with_epoch_start(epoch_start)
+        // We need to include enough time in this epoch time for the nodes to start up and for
+        // enough pings to be successful on each, or else that node may be the one that is not on
+        // the next committee and cause our expectation below to fail.
+        .with_epoch_time(15000)
+        .with_epoch_start(
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64,
+        )
         .with_specific_nodes(vec![high_rep_node, low_rep_node])
         .build();
 
     swarm.launch().await.unwrap();
 
-    // Allow time for nodes to start
-    tokio::time::sleep(Duration::from_secs(5)).await;
+    // Wait for RPC to be ready.
+    swarm.wait_for_rpc_ready().await;
 
     // Get the stakes to figure out who our low staked nodes are
     let stake_map: HashMap<NodePublicKey, Staking> = swarm.get_genesis_stakes();
@@ -239,19 +190,24 @@ async fn e2e_test_staking_auction() -> Result<()> {
         .find(|node| node.0 != low_stake_nodes[0] && node.0 != low_stake_nodes[1])
         .unwrap();
 
-    // Wait for epoch to change.
-    tokio::time::sleep(Duration::from_secs(30)).await;
+    // Wait for epoch to change across all nodes.
+    swarm
+        .wait_for_epoch_change(1, Duration::from_secs(60))
+        .await
+        .unwrap();
 
-    let client = RpcClient::new_no_auth(rpc_endpoint.1)?;
-    let response = client.get_committee_members(None).await?;
+    let client = RpcClient::new_no_auth(rpc_endpoint.1).unwrap();
+    let response = client.get_committee_members(None).await.unwrap();
     let current_committee: BTreeSet<NodePublicKey> = response.into_iter().collect();
 
-    current_committee
-        .iter()
-        .for_each(|node| println!("{:?}", node));
-
-    let rep_one = client.get_reputation(*low_stake_nodes[0], None).await?;
-    let rep_two = client.get_reputation(*low_stake_nodes[1], None).await?;
+    let rep_one = client
+        .get_reputation(*low_stake_nodes[0], None)
+        .await
+        .unwrap();
+    let rep_two = client
+        .get_reputation(*low_stake_nodes[1], None)
+        .await
+        .unwrap();
 
     // Make sure the lower reputation node lost the tiebreaker and is not on the active node list
     if rep_one <= rep_two {
@@ -261,41 +217,4 @@ async fn e2e_test_staking_auction() -> Result<()> {
     }
 
     swarm.shutdown().await;
-    Ok(())
-}
-
-async fn compare_committee(
-    rpc_addresses: HashMap<NodePublicKey, String>,
-    committee_size: usize,
-) -> BTreeSet<NodePublicKey> {
-    let rpc_addresses: Vec<(NodePublicKey, String)> = rpc_addresses.into_iter().collect();
-
-    let client = RpcClient::new_no_auth(&rpc_addresses[0].1).unwrap();
-    let target_committee: BTreeSet<_> = client
-        .get_committee_members(None)
-        .await
-        .unwrap()
-        .into_iter()
-        .collect();
-
-    // Make sure that the committee size equals the configured size.
-    assert_eq!(target_committee.len(), committee_size);
-
-    for (_, address) in rpc_addresses.iter() {
-        if &rpc_addresses[0].1 == address {
-            continue;
-        }
-        let client = RpcClient::new_no_auth(address).unwrap();
-
-        let committee: BTreeSet<_> = client
-            .get_committee_members(None)
-            .await
-            .unwrap()
-            .into_iter()
-            .collect();
-
-        // Make sure all nodes have the same committee
-        assert_eq!(target_committee, committee);
-    }
-    target_committee
 }

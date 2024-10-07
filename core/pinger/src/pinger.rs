@@ -206,7 +206,11 @@ impl<C: NodeComponents> PingerInner<C> {
                             spawn!(async move {
                                 tokio::time::sleep(timeout).await;
                                 // We ignore the sending error because it can happen that the
+                                // pinger is shutdown while there are still pending timeout tasks.
+                                let _ = tx.send((peer_index, id)).await;
+                            },
                             "PINGER: request timeout");
+                        }
                     }
                 }
                 timeout = timeout_rx.recv() => {
