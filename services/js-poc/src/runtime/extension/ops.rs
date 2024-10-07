@@ -23,59 +23,59 @@ use tracing::info;
 // Here
 #[op2(fast)]
 pub fn op_set_raw(
-    state: &mut OpState,
-    rid: u32,
-    is_raw: bool,
-    cbreak: bool,
+    _state: &mut OpState,
+    _rid: u32,
+    _is_raw: bool,
+    _cbreak: bool,
 ) -> anyhow::Result<(), AnyError> {
-    todo!()
+    unimplemented!()
 }
 
 #[op2(fast)]
-pub fn op_can_write_vectored(state: &mut OpState, #[smi] rid: ResourceId) -> bool {
-    todo!()
+pub fn op_can_write_vectored(_state: &mut OpState, #[smi] _rid: ResourceId) -> bool {
+    unimplemented!()
 }
 
 #[op2(async)]
 #[number]
 pub async fn op_raw_write_vectored(
-    state: Rc<RefCell<OpState>>,
-    #[smi] rid: ResourceId,
-    #[buffer] buf1: JsBuffer,
-    #[buffer] buf2: JsBuffer,
+    _state: Rc<RefCell<OpState>>,
+    #[smi] _rid: ResourceId,
+    #[buffer] _buf1: JsBuffer,
+    #[buffer] _buf2: JsBuffer,
 ) -> anyhow::Result<usize, AnyError> {
-    todo!()
+    unimplemented!()
 }
 
 #[op2]
 #[serde]
-pub fn op_bootstrap_unstable_args(state: &mut OpState) -> Vec<String> {
-    todo!()
+pub fn op_bootstrap_unstable_args(_state: &mut OpState) -> Vec<String> {
+    unimplemented!()
 }
 
 #[op2]
 pub fn op_http_set_response_trailers(
-    external: *const c_void,
-    #[serde] trailers: Vec<(ByteString, ByteString)>,
+    _external: *const c_void,
+    #[serde] _trailers: Vec<(ByteString, ByteString)>,
 ) {
-    todo!()
+    unimplemented!()
 }
 
 #[op2(fast)]
-pub fn op_bootstrap_color_depth(state: &mut OpState) -> i32 {
-    todo!()
+pub fn op_bootstrap_color_depth(_state: &mut OpState) -> i32 {
+    unimplemented!()
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateWorkerArgs {
-    has_source_code: bool,
-    name: Option<String>,
-    permissions: Option<ChildPermissionsArg>,
-    source_code: String,
-    specifier: String,
-    worker_type: WebWorkerType,
-    close_on_idle: bool,
+    _has_source_code: bool,
+    _name: Option<String>,
+    _permissions: Option<ChildPermissionsArg>,
+    _source_code: String,
+    _specifier: String,
+    _worker_type: WebWorkerType,
+    _close_on_idle: bool,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -91,63 +91,64 @@ pub struct WorkerId(u32);
 #[op2]
 #[serde]
 pub fn op_create_worker(
-    state: &mut OpState,
-    #[serde] args: CreateWorkerArgs,
-    #[serde] maybe_worker_metadata: Option<JsMessageData>,
+    _state: &mut OpState,
+    #[serde] _args: CreateWorkerArgs,
+    #[serde] _maybe_worker_metadata: Option<JsMessageData>,
 ) -> anyhow::Result<WorkerId, AnyError> {
-    todo!()
+    unimplemented!()
 }
 
 #[op2]
 pub fn op_host_post_message(
-    state: &mut OpState,
-    #[serde] id: WorkerId,
-    #[serde] data: JsMessageData,
+    _state: &mut OpState,
+    #[serde] _id: WorkerId,
+    #[serde] _data: JsMessageData,
 ) -> anyhow::Result<(), AnyError> {
-    todo!()
+    unimplemented!()
 }
 
 #[op2(async)]
 #[serde]
 pub async fn op_host_recv_ctrl(
-    state: Rc<RefCell<OpState>>,
-    #[serde] id: WorkerId,
+    _state: Rc<RefCell<OpState>>,
+    #[serde] _id: WorkerId,
 ) -> anyhow::Result<WorkerControlEvent, AnyError> {
-    todo!()
+    unimplemented!()
 }
 
 #[op2(async)]
 #[serde]
 pub async fn op_host_recv_message(
-    state: Rc<RefCell<OpState>>,
-    #[serde] id: WorkerId,
+    _state: Rc<RefCell<OpState>>,
+    #[serde] _id: WorkerId,
 ) -> anyhow::Result<Option<JsMessageData>, AnyError> {
-    todo!()
+    unimplemented!()
 }
 
 #[op2]
-pub fn op_host_terminate_worker(state: &mut OpState, #[serde] id: WorkerId) {
-    todo!()
+pub fn op_host_terminate_worker(_state: &mut OpState, #[serde] _id: WorkerId) {
+    unimplemented!()
 }
 
 #[op2(reentrant)]
 pub fn op_napi_open<NP, 'scope>(
-    scope: &mut v8::HandleScope<'scope>,
-    isolate: *mut v8::Isolate,
-    op_state: Rc<RefCell<OpState>>,
-    #[string] path: String,
-    global: v8::Local<'scope, v8::Object>,
-    buffer_constructor: v8::Local<'scope, v8::Function>,
-    report_error: v8::Local<'scope, v8::Function>,
+    _scope: &mut v8::HandleScope<'scope>,
+    _isolate: *mut v8::Isolate,
+    _op_state: Rc<RefCell<OpState>>,
+    #[string] _path: String,
+    _global: v8::Local<'scope, v8::Object>,
+    _buffer_constructor: v8::Local<'scope, v8::Function>,
+    _report_error: v8::Local<'scope, v8::Function>,
 ) -> std::result::Result<v8::Local<'scope, v8::Value>, AnyError>
 where
     NP: NapiPermissions + 'static,
 {
-    todo!()
+    unimplemented!()
 }
 
 /// Events that are sent to host from child
 /// worker.
+#[allow(unused)]
 pub enum WorkerControlEvent {
     Error(AnyError),
     TerminalError(AnyError),
