@@ -34,19 +34,16 @@ use deno_node::NodePermissions;
 use deno_url::deno_url;
 use deno_webgpu::deno_webgpu;
 use deno_webidl::deno_webidl;
-use extensions::fleek;
-use permissions::Permissions;
-
+use rt::extensions::fleek;
+use rt::permissions::Permissions;
 use self::module_loader::FleekModuleLoader;
 use self::tape::{Punch, Tape};
-use crate::params::{FETCH_BLACKLIST, HEAP_INIT, HEAP_LIMIT};
+use rt::params::{FETCH_BLACKLIST, HEAP_INIT, HEAP_LIMIT};
 
-pub mod extensions;
 pub mod guard;
 pub mod module_loader;
-mod permissions;
-mod shared;
 pub mod tape;
+pub mod rt;
 
 /// Snapshot of the runtime after javascript modules have been initialized
 static SNAPSHOT: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/snapshot.bin"));
