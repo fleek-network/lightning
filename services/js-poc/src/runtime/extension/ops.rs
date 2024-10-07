@@ -1,23 +1,23 @@
 use std::cell::RefCell;
 use std::ffi::c_void;
 use std::rc::Rc;
+use std::str::FromStr;
 
+use anyhow::{anyhow, bail, Context};
+use arrayref::array_ref;
+use blake3_tree::utils::{tree_index, HashVec};
+use cid::Cid;
 use deno_core::error::{AnyError, JsError};
-use deno_core::{ByteString, JsBuffer, op2, OpState, ResourceId, v8};
+use deno_core::url::Url;
+use deno_core::{op2, v8, ByteString, JsBuffer, OpState, ResourceId};
 use deno_napi::NapiPermissions;
 use deno_permissions::ChildPermissionsArg;
 use deno_web::JsMessageData;
-use serde::{Deserialize, Serialize, Serializer};
-use serde_json::json;
-use deno_core::url::Url;
-use anyhow::{anyhow, bail, Context};
-use arrayref::array_ref;
-use blake3_tree::utils::{HashVec, tree_index};
-use cid::Cid;
 use fleek_crypto::{ClientPublicKey, NodeSignature};
 use fn_sdk::blockstore::get_internal_path;
 use lightning_schema::task_broker::TaskScope;
-use std::str::FromStr;
+use serde::{Deserialize, Serialize, Serializer};
+use serde_json::json;
 use tracing::info;
 
 // Here
@@ -306,7 +306,9 @@ pub async fn query_client_flk_balance(#[buffer(copy)] address: Vec<u8>) -> anyho
 
 #[op2(async)]
 #[string]
-pub async fn query_client_bandwidth_balance(#[buffer(copy)] address: Vec<u8>) -> anyhow::Result<String> {
+pub async fn query_client_bandwidth_balance(
+    #[buffer(copy)] address: Vec<u8>,
+) -> anyhow::Result<String> {
     if address.len() != 96 {
         return Err(anyhow!("address must be 32 bytes"));
     }

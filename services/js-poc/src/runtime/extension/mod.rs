@@ -1,11 +1,21 @@
-//! Javascript runtime bindings for the SDK APIs
+pub mod ops;
+pub mod permissions;
+pub mod params {
+    use std::time::Duration;
+
+    pub const HEAP_INIT: usize = 1 << 10;
+    pub const HEAP_LIMIT: usize = 50 << 20;
+    pub const REQ_TIMEOUT: Duration = Duration::from_secs(15);
+    pub const FETCH_BLACKLIST: &[&str] = &["localhost", "127.0.0.1", "::1"];
+}
 
 use deno_core::extension;
 use deno_napi::NapiPermissions;
-use super::permissions::Permissions;
-
-
-use super::shared::{
+use ops::{
+    fetch_blake3,
+    fetch_from_origin,
+    load_content,
+    log,
     op_bootstrap_color_depth,
     op_bootstrap_unstable_args,
     op_can_write_vectored,
@@ -18,16 +28,13 @@ use super::shared::{
     op_napi_open,
     op_raw_write_vectored,
     op_set_raw,
-    run_task,
-    log,
-    fetch_blake3,
-    fetch_from_origin,
-    load_content,
-    read_block,
-    query_client_flk_balance,
     query_client_bandwidth_balance,
-    TaskDepth
+    query_client_flk_balance,
+    read_block,
+    run_task,
+    TaskDepth,
 };
+use permissions::Permissions;
 
 extension!(
     fleek,
