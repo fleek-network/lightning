@@ -3,4 +3,4 @@ pub mod error;
 pub mod io;
 
 pub use sgxkit_macros::*;
-pub use sgxkit_sys::*;
+pub use sgxkit_sys as sys;
