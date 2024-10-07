@@ -36,8 +36,8 @@ pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let force_write_impl = quote! {
         unsafe {
-            sgxkit::fn0::output_data_clear();
-            sgxkit::fn0::output_data_append(buf.as_ptr() as usize, buf.len());
+            sgxkit::sys::fn0::output_data_clear();
+            sgxkit::sys::fn0::output_data_append(buf.as_ptr() as usize, buf.len());
         }
     };
 
