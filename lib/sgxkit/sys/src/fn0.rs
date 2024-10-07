@@ -1,8 +1,10 @@
+//! Raw unsafe bindings to the fleek runtime's host functions
+
 macro_rules! _fn0_module_ret {
     ( ( $_: ident : $t: ty ) ) => {
         $t
     };
-    ( ( $_i1: ident : $t1: ty , $_i2: ident : $t2: ty) ) => {
+    ( ( $_i1: ident : $t1: ty , $_i2: ident : $t2: ty ) ) => {
         ($t1, $t2)
     };
     ( ( $t: ty ) ) => {
@@ -63,6 +65,8 @@ macro_rules! fn0_module {
                     Usize(usize),
                     U32(u32),
                     I32(i32),
+                    U64(u64),
+                    I64(i64),
                     Trap(String),
                 }
 
@@ -134,6 +138,24 @@ macro_rules! fn0_module {
                             Response::I32(n) => n,
                             Response::Trap(m) => panic!("Canister trapped: {}", m),
                             _ => panic!("unexpected type cast."),
+                        }
+                    }
+                }
+
+                impl From<u64> for Response {
+                    #[inline(always)]
+                    fn from(n: u64) -> Self {
+                        Response::U64(n)
+                    }
+                }
+
+                impl From<Response> for u64 {
+                    #[inline(always)]
+                    fn from(n: Response) -> Self {
+                        match n {
+                            Response::U64(n) => n,
+                            Response::Trap(m) => panic!("Canister trapped: {}", m),
+                            _ => panic!("unexpected type cast.")
                         }
                     }
                 }

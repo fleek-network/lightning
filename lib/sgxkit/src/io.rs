@@ -1,3 +1,5 @@
+//! IO related utilites
+
 use std::io::{Read, Seek};
 use std::sync::{Mutex, MutexGuard};
 
