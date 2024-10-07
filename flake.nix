@@ -260,7 +260,7 @@
                 inherit cargoArtifacts;
                 partitions = 1;
                 partitionType = "count";
-                cargoNextestExtraArgs = "--workspace --exclude lightning-e2e";
+                cargoNextestExtraArgs = "--workspace";
               }
             );
           };
