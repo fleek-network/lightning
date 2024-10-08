@@ -139,7 +139,7 @@ impl<C: NodeComponents> IPFSOrigin<C> {
                 Some(IpldItem::ChunkedFile(chunk)) => {
                     let doc_id = chunk.id().clone();
                     let mut stream_file = stream.new_chunk_file_streamer(chunk).await;
-                    let mut file_writer = FileWriter::new(&bucket);
+                    let mut file_writer = FileWriter::new(&bucket).await?;
                     while let Some(chunk) = stream_file.next_chunk().await? {
                         file_writer.write(chunk.data()).await?;
                     }
@@ -148,7 +148,7 @@ impl<C: NodeComponents> IPFSOrigin<C> {
                 },
                 Some(IpldItem::File(file)) => {
                     let doc_id = file.id().clone();
-                    let mut file_writer = FileWriter::new(&bucket);
+                    let mut file_writer = FileWriter::new(&bucket).await?;
                     file_writer.write(file.data()).await?;
                     self.insert_file_into_dir(&mut last_dir, &mut hash, file_writer, &doc_id)
                         .await?;
