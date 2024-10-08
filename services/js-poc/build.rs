@@ -1,7 +1,6 @@
 #[path = "src/runtime/extension/mod.rs"]
 mod extension;
 
-use std::collections::HashMap;
 use std::path::Path;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -9,7 +8,6 @@ use std::sync::Arc;
 use ::deno_fetch::deno_fetch;
 use ::deno_net::deno_net;
 use ::deno_websocket::deno_websocket;
-use base64::Engine;
 use deno_ast::{ParseParams, SourceMapOption};
 use deno_canvas::deno_canvas;
 use deno_console::deno_console;
@@ -22,26 +20,9 @@ use deno_media_type::MediaType;
 use deno_url::deno_url;
 use deno_webgpu::deno_webgpu;
 use deno_webidl::deno_webidl;
-use serde::Deserialize;
 
 use crate::extension::fleek;
 use crate::extension::permissions::Permissions;
-
-#[derive(Deserialize)]
-struct DenoJson {
-    imports: HashMap<String, String>,
-}
-
-#[derive(Deserialize)]
-struct DenoLock {
-    remote: HashMap<String, String>,
-}
-
-fn create_integrity_url(import: &str, hex_sha256: &str) -> String {
-    let deno_hash = hex::decode(hex_sha256).unwrap();
-    let sri = base64::engine::general_purpose::STANDARD.encode(deno_hash);
-    format!("{import}#integrity=sha256-{sri}")
-}
 
 fn main() {
     let extensions = vec![
@@ -90,41 +71,9 @@ fn main() {
     std::fs::write(format!("{out}/snapshot.bin"), snapshot.output)
         .expect("failed to write snapshot");
 
-    // Read polyfill config and lock
-    let config: DenoJson = serde_json::from_reader(
-        std::fs::File::open("./ext/node/polyfill/deno.json").expect("failed to read deno.json"),
-    )
-    .expect("failed to parse deno.json");
-    let mut lock: DenoLock = serde_json::from_reader(
-        std::fs::File::open("./ext/node/polyfill/deno.lock").expect("failed to read deno.lock"),
-    )
-    .expect("failed to parse deno.lock");
-
     // Rebuild if polyfills change
     println!("cargo::rerun-if-changed=./ext/node/polyfill/deno.json");
     println!("cargo::rerun-if-changed=./ext/node/polyfill/deno.lock");
-
-    let mut map = HashMap::new();
-
-    // Insert our top level mappings and take them from the remote sri map
-    for (k, v) in config.imports {
-        println!("{k}, {v}");
-        let complete = create_integrity_url(&v, &lock.remote.remove(&v).unwrap());
-        map.insert(k, complete.clone());
-        map.insert(v, complete.clone());
-    }
-
-    // Insert the remaining remote sri mappings
-    for (k, v) in lock.remote {
-        let complete = create_integrity_url(&k, &v);
-        map.insert(k, complete);
-    }
-
-    std::fs::write(
-        format!("{out}/importmap.json"),
-        serde_json::to_string_pretty(&map).unwrap(),
-    )
-    .expect("failed to write importmap.json");
 }
 
 pub fn maybe_transpile_source(

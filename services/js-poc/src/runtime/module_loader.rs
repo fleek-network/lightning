@@ -74,12 +74,7 @@ impl ModuleLoader for FleekModuleLoader {
         _kind: deno_core::ResolutionKind,
     ) -> Result<ModuleSpecifier, anyhow::Error> {
         // Resolve import according to spec, reusing referrer base urls, etc
-        let mut import = deno_core::resolve_import(specifier, referrer)?;
-
-        // If we have an override in our importmap, use it instead
-        if let Some(mapped) = get_or_init_imports().get(&import) {
-            import = mapped.clone();
-        }
+        let import = deno_core::resolve_import(specifier, referrer)?;
 
         Ok(import)
     }
@@ -96,19 +91,19 @@ impl ModuleLoader for FleekModuleLoader {
             maybe_referrer.map(|m| m.as_str()).unwrap_or("none")
         );
 
-        // Manually override module
-        if module_specifier.as_str() == "node:util" {
-            return ModuleLoadResponse::Sync(Ok(ModuleSource::new(
-                ModuleType::JavaScript,
-                ModuleSourceCode::String(
-                    include_str!("../../ext/node/polyfill/overrides/util.js")
-                        .to_string()
-                        .into(),
-                ),
-                module_specifier,
-                None,
-            )));
-        }
+        // // Manually override module
+        // if module_specifier.as_str() == "node:util" {
+        //     return ModuleLoadResponse::Sync(Ok(ModuleSource::new(
+        //         ModuleType::JavaScript,
+        //         ModuleSourceCode::String(
+        //             include_str!("../../ext/node/polyfill/overrides/util.js")
+        //                 .to_string()
+        //                 .into(),
+        //         ),
+        //         module_specifier,
+        //         None,
+        //     )));
+        // }
 
         let module_type = match requested_module_type {
             RequestedModuleType::None => ModuleType::JavaScript,
