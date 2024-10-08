@@ -37,9 +37,6 @@ pub async fn main() {
     // Explicitly initialize the v8 platform on the main thread
     JsRuntime::init_platform(None);
 
-    // Initialize node polyfill imports
-    runtime::module_loader::get_or_init_imports();
-
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<IsolateHandle>();
     tokio::task::spawn(async move {
         let mut isolates = FuturesUnordered::new();
