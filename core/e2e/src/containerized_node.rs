@@ -131,7 +131,7 @@ impl ContainerizedNode {
                 let epoch = client
                     .get_epoch()
                     .await
-                    .map_err(|e| PollUntilError::ConditionError(e.to_string()))?;
+                    .map_err(|_| PollUntilError::ConditionNotSatisfied)?;
 
                 (epoch == new_epoch)
                     .then_some(())
