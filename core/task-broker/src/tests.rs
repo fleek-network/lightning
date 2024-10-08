@@ -127,6 +127,8 @@ fn build_cluster(
                     )
                 })
                 .collect(),
+            topology_target_k: 8,
+            topology_min_nodes: 16,
             ..Default::default()
         };
 

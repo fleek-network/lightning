@@ -58,6 +58,8 @@ pub struct Genesis {
     pub latencies: Option<Vec<GenesisLatency>>,
     #[serde(with = "humantime_serde")]
     pub reputation_ping_timeout: Duration,
+    pub topology_target_k: usize,
+    pub topology_min_nodes: usize,
 }
 
 impl Genesis {

@@ -306,6 +306,14 @@ impl ApplicationEnv {
                 ProtocolParamKey::ReputationPingTimeout,
                 ProtocolParamValue::ReputationPingTimeout(genesis.reputation_ping_timeout),
             );
+            param_table.insert(
+                ProtocolParamKey::TopologyTargetK,
+                ProtocolParamValue::TopologyTargetK(genesis.topology_target_k),
+            );
+            param_table.insert(
+                ProtocolParamKey::TopologyMinNodes,
+                ProtocolParamValue::TopologyMinNodes(genesis.topology_min_nodes),
+            );
 
             let epoch_end: u64 = genesis.epoch_time + genesis.epoch_start;
             let mut committee_members = Vec::with_capacity(4);
