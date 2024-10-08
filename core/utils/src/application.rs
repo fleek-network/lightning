@@ -209,7 +209,7 @@ pub trait QueryRunnerExt: SyncQueryRunnerInterface {
     fn get_reputation_ping_timeout(&self) -> Duration {
         match self.get_protocol_param(&ProtocolParamKey::ReputationPingTimeout) {
             Some(ProtocolParamValue::ReputationPingTimeout(timeout)) => timeout,
-            // Return 15s if the param is not set, for backwards compatibility.
+            // Default to 15s for backwards compatibility.
             None => Duration::from_secs(15),
             _ => unreachable!(),
         }
@@ -219,7 +219,8 @@ pub trait QueryRunnerExt: SyncQueryRunnerInterface {
     fn get_topology_target_k(&self) -> usize {
         match self.get_protocol_param(&ProtocolParamKey::TopologyTargetK) {
             Some(ProtocolParamValue::TopologyTargetK(target_k)) => target_k,
-            _ => 1,
+            // Default to 8 for backwards compatibility.
+            _ => 8,
         }
     }
 
@@ -227,7 +228,8 @@ pub trait QueryRunnerExt: SyncQueryRunnerInterface {
     fn get_topology_min_nodes(&self) -> usize {
         match self.get_protocol_param(&ProtocolParamKey::TopologyMinNodes) {
             Some(ProtocolParamValue::TopologyMinNodes(min_nodes)) => min_nodes,
-            _ => 1,
+            // Default to 16 for backwards compatibility.
+            _ => 16,
         }
     }
 }
