@@ -21,43 +21,6 @@ use fn_sdk::blockstore::ContentHandle;
 use tokio::sync::Semaphore;
 use tracing::{debug, trace, warn};
 
-static IMPORTS: OnceLock<HashMap<ModuleSpecifier, ModuleSpecifier>> = OnceLock::new();
-
-// Initialize the module loader
-pub fn get_or_init_imports<'a>() -> &'a HashMap<ModuleSpecifier, ModuleSpecifier> {
-    IMPORTS.get_or_init(|| {
-        let map: HashMap<ModuleSpecifier, ModuleSpecifier> =
-            serde_json::from_str(include_str!(concat!(env!("OUT_DIR"), "/importmap.json")))
-                .unwrap();
-
-        // Spawn a task to prefetch the imports
-        let to_fetch = map.clone();
-        tokio::spawn(async move {
-            // Limit number of concurrent requests
-            let semaphore = Semaphore::new(16);
-            if to_fetch
-                .values()
-                .map(|uri| async {
-                    let _ = semaphore.acquire().await.ok()?;
-                    let uri = uri.as_str();
-                    let hash = fetch_from_origin(fn_sdk::api::Origin::HTTP, uri).await;
-                    trace!("Fetched {uri} from origin");
-                    hash
-                })
-                .collect::<FuturesUnordered<_>>()
-                .any(|res| async move { res.is_none() })
-                .await
-            {
-                warn!("Failed to prefetch runtime imports");
-            } else {
-                debug!("Prefetched runtime imports successfully")
-            }
-        });
-
-        map
-    })
-}
-
 pub struct FleekModuleLoader {}
 
 impl FleekModuleLoader {
@@ -90,20 +53,6 @@ impl ModuleLoader for FleekModuleLoader {
             "LOAD specifier: {module_specifier} maybe_referrer {}",
             maybe_referrer.map(|m| m.as_str()).unwrap_or("none")
         );
-
-        // // Manually override module
-        // if module_specifier.as_str() == "node:util" {
-        //     return ModuleLoadResponse::Sync(Ok(ModuleSource::new(
-        //         ModuleType::JavaScript,
-        //         ModuleSourceCode::String(
-        //             include_str!("../../ext/node/polyfill/overrides/util.js")
-        //                 .to_string()
-        //                 .into(),
-        //         ),
-        //         module_specifier,
-        //         None,
-        //     )));
-        // }
 
         let module_type = match requested_module_type {
             RequestedModuleType::None => ModuleType::JavaScript,
