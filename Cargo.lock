@@ -8811,6 +8811,7 @@ dependencies = [
  "quote 1.0.36",
  "rand 0.8.5",
  "rand_chacha",
+ "rand_core 0.6.4",
  "regex",
  "regex-automata 0.4.7",
  "regex-syntax 0.8.4",
