@@ -76,10 +76,15 @@ async fn e2e_epoch_change_with_some_nodes_not_on_committee() {
                 .as_millis() as u64,
         )
         .build();
-    swarm.launch().await.unwrap();
 
-    // Wait for RPC to be ready.
-    swarm.wait_for_rpc_ready().await;
+    // Launch genesis committee and wait for RPC to be ready on them.
+    swarm.launch_genesis_committee().await.unwrap();
+    swarm.wait_for_rpc_ready_genesis_committee().await;
+
+    // Launch the non-committee node now that the committee/bootstrap nodes are up, and wait for RPC
+    // to be ready on them.
+    swarm.launch_non_genesis_committee().await.unwrap();
+    swarm.wait_for_rpc_ready_non_genesis_committee().await;
 
     // Check that the initial epoch is 0 across all nodes.
     for (_, client) in swarm.get_rpc_clients() {
