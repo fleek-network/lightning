@@ -1,5 +1,4 @@
 pub mod clustering;
-pub mod config;
 mod core;
 pub use core::{build_latency_matrix, suggest_connections_from_latency_matrix, Connections};
 pub mod divisive;
@@ -12,7 +11,6 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use anyhow::anyhow;
-pub use config::Config;
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::prelude::*;
 use lightning_utils::application::QueryRunnerExt;
@@ -29,8 +27,6 @@ struct TopologyInner<C: NodeComponents> {
     topology_tx: watch::Sender<Arc<Vec<Vec<NodePublicKey>>>>,
     topology_rx: watch::Receiver<Arc<Vec<Vec<NodePublicKey>>>>,
     our_public_key: NodePublicKey,
-    target_k: usize,
-    min_nodes: usize,
 }
 
 impl<C: NodeComponents> TopologyInner<C> {
@@ -44,8 +40,8 @@ impl<C: NodeComponents> TopologyInner<C> {
             .into_iter()
             .map(|node_info| node_info.info.public_key)
             .collect();
-        let min_nodes = self.min_nodes;
-        let target_k = self.target_k;
+        let min_nodes = self.query.get_topology_min_nodes();
+        let target_k = self.query.get_topology_target_k();
 
         // TODO(matthias): use rayon?
         tokio::task::spawn_blocking(move || {
@@ -97,17 +93,13 @@ impl<C: NodeComponents> TopologyInterface<C> for Topology<C> {
 
 impl<C: NodeComponents> Topology<C> {
     fn init(
-        config: &C::ConfigProviderInterface,
         signer: &C::KeystoreInterface,
         fdi::Cloned(notifier): fdi::Cloned<C::NotifierInterface>,
         fdi::Cloned(query): fdi::Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
     ) -> anyhow::Result<Self> {
-        let config = config.get::<Self>();
         let (topology_tx, topology_rx) = watch::channel(Arc::new(Vec::new()));
         let inner = TopologyInner {
-            target_k: config.testing_target_k,
             notifier,
-            min_nodes: config.testing_min_nodes,
             query,
             topology_tx,
             topology_rx,
@@ -135,10 +127,4 @@ impl<C: NodeComponents> BuildGraph for Topology<C> {
             Self::init.with_event_handler("start", Self::start.wrap_with_spawn_named("TOPOLOGY")),
         )
     }
-}
-
-impl<C: NodeComponents> ConfigConsumer for Topology<C> {
-    type Config = Config;
-
-    const KEY: &'static str = "topology";
 }
