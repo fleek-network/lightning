@@ -214,6 +214,22 @@ pub trait QueryRunnerExt: SyncQueryRunnerInterface {
             _ => unreachable!(),
         }
     }
+
+    /// Returns the target k for the topology.
+    fn get_topology_target_k(&self) -> usize {
+        match self.get_protocol_param(&ProtocolParamKey::TopologyTargetK) {
+            Some(ProtocolParamValue::TopologyTargetK(target_k)) => target_k,
+            _ => 1,
+        }
+    }
+
+    /// Returns the minimum number of nodes for the topology.
+    fn get_topology_min_nodes(&self) -> usize {
+        match self.get_protocol_param(&ProtocolParamKey::TopologyMinNodes) {
+            Some(ProtocolParamValue::TopologyMinNodes(min_nodes)) => min_nodes,
+            _ => 1,
+        }
+    }
 }
 
 impl<T: SyncQueryRunnerInterface> QueryRunnerExt for T {}

@@ -387,6 +387,8 @@ impl SwarmBuilder {
             min_num_measurements: 2,
             chain_id: 59330,
             reputation_ping_timeout: self.ping_timeout.unwrap_or(Duration::from_millis(1)),
+            topology_target_k: 8,
+            topology_min_nodes: 16,
 
             ..Default::default()
         };

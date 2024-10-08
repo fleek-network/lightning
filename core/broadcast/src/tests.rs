@@ -52,6 +52,9 @@ async fn get_broadcasts(temp_dir: &TempDir, port_offset: u16, num_peers: usize) 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
 
+    genesis.topology_target_k = 8;
+    genesis.topology_min_nodes = 16;
+
     genesis.node_info = vec![];
     let mut keystores = vec![];
     // Create signer configs and add nodes to state.

@@ -194,6 +194,10 @@ pub enum ProtocolParamKey {
     EpochsPerYear = 14,
     /// The ping timeout for node reputation.
     ReputationPingTimeout = 15,
+    /// Topology clustering target k value.
+    TopologyTargetK = 16,
+    /// The minimum number of nodes to run the topology algorithm.
+    TopologyMinNodes = 17,
 }
 
 /// The Value enum is a data type used to represent values in a key-value pair for a metadata table
@@ -215,6 +219,8 @@ pub enum ProtocolParamValue {
     MinNumMeasurements(u64),
     SGXSharedPubKey(String),
     ReputationPingTimeout(Duration),
+    TopologyTargetK(usize),
+    TopologyMinNodes(usize),
 }
 
 impl ProtocolParamValue {
@@ -238,6 +244,8 @@ impl ProtocolParamValue {
             ProtocolParamValue::ReputationPingTimeout(d) => {
                 Cow::Owned(d.as_millis().to_le_bytes().to_vec())
             },
+            ProtocolParamValue::TopologyTargetK(i) => Cow::Owned(i.to_le_bytes().to_vec()),
+            ProtocolParamValue::TopologyMinNodes(i) => Cow::Owned(i.to_le_bytes().to_vec()),
         }
     }
 }

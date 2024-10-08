@@ -74,6 +74,8 @@ async fn get_pools(
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
 
+    genesis.topology_target_k = 8;
+    genesis.topology_min_nodes = 16;
     genesis.node_info = vec![];
 
     // Create signer configs and add nodes to state.
