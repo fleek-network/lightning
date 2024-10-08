@@ -34,4 +34,5 @@ pub enum Action {
     FilterLeft,
     FilterRight,
     Next,
+    LearnModeToggle,
 }

@@ -54,14 +54,15 @@
     },
     "ProfileView": {
       "<i>": "Edit", // Enter edit mode.
-      "<b>": "Back", // Return back to the list of profiles.
+      "<l>": "LearnModeToggle", // Enter learning mode.
+      "<b>": "Back", // Return back to the list of profiles.      
       "<up>": "Up", // Scroll up.
       "<down>": "Down", // Scroll down.
       "<left>": "NavLeft", // Move left to the next page.
       "<right>": "NavRight", // Move right to the next page.
       "<Ctrl-c>": "Quit", // Quit the application.
       "<Ctrl-z>": "Suspend" // Suspend the application.
-    },
+    },   
     "ProfileViewEdit": {
       "<Ctrl-a>": "Add", // Open form to enter a new rule.
       "<Ctrl-r>": "Remove", // Remove a rule.
