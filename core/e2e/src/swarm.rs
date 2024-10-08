@@ -215,6 +215,26 @@ impl Swarm {
         .await;
     }
 
+    pub async fn wait_for_rpc_ready_genesis_committee(&self) {
+        join_all(
+            self.started_nodes()
+                .iter()
+                .filter(|node| node.is_genesis_committee())
+                .map(|node| node.wait_for_rpc_ready()),
+        )
+        .await;
+    }
+
+    pub async fn wait_for_rpc_ready_non_genesis_committee(&self) {
+        join_all(
+            self.started_nodes()
+                .iter()
+                .filter(|node| !node.is_genesis_committee())
+                .map(|node| node.wait_for_rpc_ready()),
+        )
+        .await;
+    }
+
     /// Wait for all nodes to reach a new epoch.
     pub async fn wait_for_epoch_change(
         &self,
