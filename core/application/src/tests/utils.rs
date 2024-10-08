@@ -414,7 +414,7 @@ pub(crate) fn test_genesis() -> Genesis {
         latencies: None,
         reputation_ping_timeout: Duration::from_secs(1),
         topology_target_k: 8,
-        topology_min_nodes: 9,
+        topology_min_nodes: 16,
     }
 }
 
