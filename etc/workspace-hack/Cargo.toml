@@ -115,7 +115,6 @@ once_cell = { version = "1", features = ["critical-section"] }
 p256 = { version = "0.13", features = ["ecdh"] }
 parity-scale-codec = { version = "3", features = ["derive", "max-encoded-len"] }
 pbkdf2 = { version = "0.12" }
-pkcs8 = { version = "0.10", default-features = false, features = ["pem", "std"] }
 plotters = { version = "0.3" }
 portable-atomic = { version = "1", features = ["require-cas"] }
 prettyplease = { version = "0.2", default-features = false, features = ["verbatim"] }
@@ -131,6 +130,7 @@ quinn-udp = { version = "0.4", default-features = false, features = ["log"] }
 quote = { version = "1" }
 rand = { version = "0.8", features = ["small_rng"] }
 rand_chacha = { version = "0.3" }
+rand_core = { version = "0.6", default-features = false, features = ["std"] }
 regex = { version = "1" }
 regex-automata = { version = "0.4", default-features = false, features = ["dfa-onepass", "dfa-search", "hybrid", "meta", "nfa-backtrack", "perf", "unicode"] }
 regex-syntax = { version = "0.8" }
@@ -287,7 +287,6 @@ p256 = { version = "0.13", features = ["ecdh"] }
 parity-scale-codec = { version = "3", features = ["derive", "max-encoded-len"] }
 parity-scale-codec-derive = { version = "3", default-features = false, features = ["max-encoded-len"] }
 pbkdf2 = { version = "0.12" }
-pkcs8 = { version = "0.10", default-features = false, features = ["pem", "std"] }
 plotters = { version = "0.3" }
 portable-atomic = { version = "1", features = ["require-cas"] }
 prettyplease = { version = "0.2", default-features = false, features = ["verbatim"] }
@@ -304,6 +303,7 @@ quinn-udp = { version = "0.4", default-features = false, features = ["log"] }
 quote = { version = "1" }
 rand = { version = "0.8", features = ["small_rng"] }
 rand_chacha = { version = "0.3" }
+rand_core = { version = "0.6", default-features = false, features = ["std"] }
 regex = { version = "1" }
 regex-automata = { version = "0.4", default-features = false, features = ["dfa-onepass", "dfa-search", "hybrid", "meta", "nfa-backtrack", "perf", "unicode"] }
 regex-syntax = { version = "0.8" }
