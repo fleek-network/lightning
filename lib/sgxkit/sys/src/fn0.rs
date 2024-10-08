@@ -265,7 +265,7 @@ fn0_module! {
     /// # Returns
     ///
     /// Length of the input data slice.
-    fn0.input_data_size: () -> usize;
+    fn0.input_data_size: () -> (length: usize);
 
     /// Copies data from the input into a memory location. Use
     /// [`fn0.input_data_size`](input_data_size) to get the length.
@@ -360,4 +360,15 @@ fn0_module! {
         data_len: usize,
         signature_buf_ptr: usize
     ) -> i32;
+
+    /// Get an insecure timestamp from the host os, outside of SGX.
+    ///
+    /// Should *NEVER* be used for cryptographic purposes, such as a
+    /// nonce, validating certificates, etc. This operation is *NOT* monotonic,
+    /// so subsequent calls may return a smaller value than the previous call.
+    ///
+    /// # Returns
+    ///
+    /// u64 timestamp in seconds
+    fn0.insecure_systemtime: () -> (seconds: u64);
 }
