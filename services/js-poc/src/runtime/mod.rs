@@ -25,20 +25,18 @@ use deno_core::{
     SourceMapData,
 };
 use deno_crypto::deno_crypto;
+use deno_fleek::{fleek, Permissions};
 use deno_fs::sync::MaybeArc;
 use deno_fs::InMemoryFs;
 use deno_media_type::MediaType;
 use deno_url::deno_url;
 use deno_webgpu::deno_webgpu;
 use deno_webidl::deno_webidl;
-use extension::fleek;
-use extension::permissions::Permissions;
 
 use self::module_loader::FleekModuleLoader;
 use self::tape::{Punch, Tape};
 use crate::params::{HEAP_INIT, HEAP_LIMIT};
 
-pub mod extension;
 pub mod guard;
 pub mod module_loader;
 pub mod tape;

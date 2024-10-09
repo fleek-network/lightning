@@ -1,6 +1,3 @@
-#[path = "src/runtime/extension/mod.rs"]
-mod extension;
-
 use std::path::Path;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -14,15 +11,13 @@ use deno_console::deno_console;
 use deno_core::error::AnyError;
 use deno_core::{ModuleCodeString, ModuleName, SourceMapData};
 use deno_crypto::deno_crypto;
+use deno_fleek::{fleek, Permissions};
 use deno_fs::sync::MaybeArc;
 use deno_fs::InMemoryFs;
 use deno_media_type::MediaType;
 use deno_url::deno_url;
 use deno_webgpu::deno_webgpu;
 use deno_webidl::deno_webidl;
-
-use crate::extension::fleek;
-use crate::extension::permissions::Permissions;
 
 fn main() {
     let extensions = vec![

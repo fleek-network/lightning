@@ -4,77 +4,63 @@ version = "0.0.1"
 edition.workspace = true
 
 [dependencies]
-fn-sdk = { path = "../../lib/sdk" }
-blake3-tree = { path = "../../lib/blake3-tree" }
-tokio.workspace = true
-tokio-util = { version = "0.7", features = ["rt"] }
-bytes.workspace = true
 anyhow.workspace = true
-tracing.workspace = true
-fleek-crypto.workspace = true
 arrayref = "0.3"
-triomphe = "0.1"
-serde.workspace = true
-serde_json.workspace = true
-hex = "0.4"
+blake3-tree = { path = "../../lib/blake3-tree" }
+bytes.workspace = true
 cid = "0.11"
-urlencoding = "2.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+fleek-crypto.workspace = true
+fn-sdk = { path = "../../lib/sdk" }
+hex = "0.4"
 lightning-schema = { path = "../../core/schema" }
 lightning-workspace-hack.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tokio-util = { version = "0.7", features = ["rt"] }
+tracing.workspace = true
+triomphe = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+urlencoding = "2.1"
 num_cpus = "1.16"
 
 # Deno core + webapi extensions
 deno_ast = { version = "0.42", features = ["transpiling"] }
-deno_core = "0.299"
-deno_webidl = "0.164"
+deno_canvas = "0.33.0"
+deno_crypto = "0.178"
 deno_console = "0.164"
+deno_core = "0.299"
+deno_fetch = "0.188"
+deno_fleek = { path = "deno_fleek" }
 deno_fs = "0.74"
 deno_io = "0.74"
-deno_url = "0.164"
-deno_napi = "0.95"
-deno_net = "0.156"
 deno_media_type = "0.1"
+deno_net = "0.156"
 deno_node = "0.101"
-deno_permissions = "0.24"
 deno_web = "0.195"
-deno_fetch = "0.188"
-deno_crypto = "0.178"
-deno_canvas = "0.33.0"
+deno_url = "0.164"
 deno_webgpu = "0.131"
+deno_webidl = "0.164"
 deno_websocket = "0.169"
 
 [build-dependencies]
-anyhow.workspace = true
-arrayref = "0.3"
-blake3-tree = { path = "../../lib/blake3-tree" }
-serde.workspace = true
-serde_json.workspace = true
-base64 = "0.22"
-cid = "0.11"
-hex = "0.4"
 deno_ast = { version = "0.42", features = ["transpiling"] }
-deno_core = "0.299"
-deno_webidl = "0.164"
+deno_canvas = "0.33.0"
+deno_crypto = "0.178"
 deno_console = "0.164"
+deno_core = "0.299"
+deno_fetch = "0.188"
+deno_fleek = { path = "deno_fleek" }
 deno_fs = "0.74"
 deno_io = "0.74"
-deno_url = "0.164"
 deno_media_type = "0.1"
 deno_net = "0.156"
 deno_node = "0.101"
-deno_permissions = "0.24"
-deno_napi = "0.95"
 deno_web = "0.195"
-deno_fetch = "0.188"
-deno_crypto = "0.178"
-deno_canvas = "0.33.0"
+deno_url = "0.164"
 deno_webgpu = "0.131"
+deno_webidl = "0.164"
 deno_websocket = "0.169"
-fleek-crypto.workspace = true
-fn-sdk = { path = "../../lib/sdk" }
-lightning-schema = { path = "../../core/schema" }
-tracing.workspace = true
 
 [[bin]]
 name = "fn-service-1"
