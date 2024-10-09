@@ -13,6 +13,7 @@ use crate::bucket::{errors, Bucket};
 use crate::hasher::b3::{BLOCK_SIZE_IN_CHUNKS, MAX_BLOCK_SIZE_IN_BYTES};
 use crate::hasher::byte_hasher::Blake3Hasher;
 use crate::hasher::collector::BufCollector;
+use crate::hasher::HashTreeCollector;
 use crate::utils::{self, tree_index};
 
 pub struct FileWriter {
@@ -48,6 +49,8 @@ impl FileWriter {
     /// Finalize this write and flush the data to the disk.
     pub async fn commit(mut self) -> Result<[u8; 32], errors::CommitError> {
         let (mut collector, root_hash) = self.hasher.finalize_tree();
+        // Force pushing the root hash to the collector.
+        collector.push(root_hash);
         self.state.commit(collector, root_hash).await
     }
 
@@ -58,14 +61,14 @@ impl FileWriter {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use std::env::temp_dir;
 
     use rand::random;
     use tokio::fs;
 
     use super::*;
-    use crate::bucket::file::test::{get_random_file, verify_writer};
+    use crate::bucket::file::tests::{get_random_file, verify_writer};
     use crate::bucket::file::B3FSFile;
 
     #[tokio::test]
@@ -77,9 +80,24 @@ mod test {
         ));
         let bucket = Bucket::open(&temp_dir).await.unwrap();
         let mut writer = FileWriter::new(&bucket).await.unwrap();
-        let data = get_random_file();
+        let data = get_random_file(8192 * 2);
         writer.write(&data).await.unwrap();
         writer.commit().await.unwrap();
-        verify_writer(&temp_dir).await;
+        verify_writer(&temp_dir, 2).await;
+    }
+
+    #[tokio::test]
+    async fn test_trusted_write_should_work_and_be_consistent_with_fs_more_blocks() {
+        let temp_dir_name = random::<[u8; 32]>();
+        let temp_dir = temp_dir().join(format!(
+            "test_write_should_work_more_blocks_{}",
+            utils::to_hex(&temp_dir_name)
+        ));
+        let bucket = Bucket::open(&temp_dir).await.unwrap();
+        let mut writer = FileWriter::new(&bucket).await.unwrap();
+        let data = get_random_file(32768);
+        writer.write(&data).await.unwrap();
+        writer.commit().await.unwrap();
+        verify_writer(&temp_dir, 4).await;
     }
 }

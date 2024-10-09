@@ -1297,6 +1297,7 @@ dependencies = [
  "smol_str",
  "thiserror",
  "tokio",
+ "tokio-stream",
  "triomphe",
 ]
 

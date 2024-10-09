@@ -1,7 +1,13 @@
 //! Forms a post-order binary tree over a flat hash slice.
 
 use std::fmt::Debug;
+use std::future::Future;
 use std::ops::Index;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+
+use tokio::io::{AsyncReadExt, AsyncSeekExt};
+use tokio_stream::Stream;
 
 use super::error::CollectionTryFromError;
 use super::flat::FlatHashSlice;
@@ -178,5 +184,199 @@ impl<'s> DoubleEndedIterator for HashTreeIter<'s> {
 impl<'s> Debug for HashTree<'s> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         super::printer::print(self, f)
+    }
+}
+
+enum State {
+    SeekPosition,
+    Reading,
+    ValueReady,
+}
+
+pub struct AsyncHashTree<T: AsyncReadExt + AsyncSeekExt + Unpin> {
+    file_reader: T,
+    number_of_hashes: u32,
+    current_block: u32,
+    current_hash: [u8; 32],
+    state: State,
+}
+
+/// An asynchronous stream that reads hashes from a file.
+impl<T> AsyncHashTree<T>
+where
+    T: AsyncReadExt + AsyncSeekExt + Unpin,
+{
+    pub fn new(file_reader: T, number_of_hashes: u32) -> Self {
+        Self {
+            file_reader,
+            number_of_hashes,
+            current_block: 0,
+            current_hash: [0; 32],
+            state: State::SeekPosition,
+        }
+    }
+}
+
+impl<T> Stream for AsyncHashTree<T>
+where
+    T: AsyncReadExt + AsyncSeekExt + Unpin,
+{
+    type Item = Result<[u8; 32], std::io::Error>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.as_mut().get_mut();
+
+        if this.current_block >= this.number_of_hashes {
+            return Poll::Ready(None);
+        }
+
+        loop {
+            match this.state {
+                State::SeekPosition => {
+                    let index = tree_index(this.current_block as usize) as u64 * 32 + 8;
+                    let seek_future = this.file_reader.seek(tokio::io::SeekFrom::Start(index));
+                    let mut seek_future = std::pin::pin!(seek_future);
+
+                    match seek_future.as_mut().poll(cx) {
+                        Poll::Ready(Ok(_)) => {
+                            this.state = State::Reading;
+                        },
+                        Poll::Ready(Err(e)) => return Poll::Ready(Some(Err(e))),
+                        Poll::Pending => return Poll::Pending,
+                    }
+                },
+                State::Reading => {
+                    let read_future = this.file_reader.read_exact(&mut this.current_hash);
+                    let mut read_future = std::pin::pin!(read_future);
+                    match read_future.as_mut().poll(cx) {
+                        Poll::Ready(Ok(_)) => {
+                            this.state = State::ValueReady;
+                        },
+                        Poll::Ready(Err(e)) => return Poll::Ready(Some(Err(e))),
+                        Poll::Pending => return Poll::Pending,
+                    }
+                },
+                State::ValueReady => {
+                    this.current_block += 1;
+                    this.state = State::SeekPosition;
+                    return Poll::Ready(Some(Ok(this.current_hash)));
+                },
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fmt::write;
+    use std::io::Seek;
+
+    use rand::random;
+    use tokio::io::{AsyncRead, AsyncSeek};
+    use tokio_stream::StreamExt;
+
+    use super::*;
+
+    struct MockReader {
+        data: Vec<u8>,
+        position: usize,
+    }
+
+    impl MockReader {
+        fn new(data: Vec<u8>) -> Self {
+            Self { data, position: 0 }
+        }
+    }
+
+    impl AsyncRead for MockReader {
+        fn poll_read(
+            mut self: Pin<&mut Self>,
+            _: &mut Context<'_>,
+            buf: &mut tokio::io::ReadBuf<'_>,
+        ) -> Poll<std::io::Result<()>> {
+            let remaining = self.data.len() - self.position;
+            let to_read = std::cmp::min(remaining, buf.remaining());
+            buf.put_slice(&self.data[self.position..self.position + to_read]);
+            self.position += to_read;
+            Poll::Ready(Ok(()))
+        }
+    }
+
+    impl AsyncSeek for MockReader {
+        fn start_seek(self: Pin<&mut Self>, position: std::io::SeekFrom) -> std::io::Result<()> {
+            Ok(())
+        }
+
+        fn poll_complete(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<std::io::Result<u64>> {
+            Poll::Ready(Ok(self.position as u64))
+        }
+    }
+
+    #[tokio::test]
+    async fn test_single_hash() {
+        let data = random::<[u8; 32]>();
+        let reader = MockReader::new(data.clone().to_vec());
+        let mut tree = AsyncHashTree::new(reader, 1);
+
+        let r = tree.next().await.unwrap();
+        assert!(r.is_ok());
+        assert_eq!(r.unwrap(), data);
+        let r = tree.next().await;
+        assert!(r.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_multiple_hashes() {
+        let data1 = random::<[u8; 32]>();
+        let data2 = random::<[u8; 32]>();
+        let data = data1
+            .iter()
+            .chain(data1.iter())
+            .chain(data2.iter())
+            .cloned()
+            .collect::<Vec<_>>();
+        let reader = MockReader::new(data);
+        let mut tree = AsyncHashTree::new(reader, 3);
+
+        let r = tree.next().await.unwrap();
+        assert!(r.is_ok());
+        assert_eq!(r.unwrap(), data1);
+        let r = tree.next().await.unwrap();
+        assert!(r.is_ok());
+        assert_eq!(r.unwrap(), data1);
+        let r = tree.next().await.unwrap();
+        assert!(r.is_ok());
+        assert_eq!(r.unwrap(), data2);
+        let r = tree.next().await;
+        assert!(r.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_incomplete_hash() {
+        let data = random::<[u8; 31]>(); // Not enough data for a full hash
+        let reader = MockReader::new(data.to_vec());
+        let mut tree = AsyncHashTree::new(reader, 1);
+
+        let r = tree.next().await.unwrap();
+        assert!(r.is_err()); // Should return an error
+    }
+
+    #[tokio::test]
+    async fn test_more_hashes_than_available() {
+        let data1 = random::<[u8; 32]>();
+        let data2 = random::<[u8; 32]>();
+        let binding = [data1, data2];
+        let data = binding.iter().flatten(); // Two complete hashes
+        let reader = MockReader::new(data.cloned().collect());
+        let mut tree = AsyncHashTree::new(reader, 3); // Ask for 3 hashes
+
+        let r = tree.next().await.unwrap();
+        assert!(r.is_ok());
+        assert_eq!(r.unwrap(), data1);
+        let r = tree.next().await.unwrap();
+        assert!(r.is_ok());
+        assert_eq!(r.unwrap(), data2);
+        let r = tree.next().await.unwrap();
+        assert!(r.is_err()); // Should return None after reading available hashes
     }
 }
