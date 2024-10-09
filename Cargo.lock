@@ -3207,9 +3207,9 @@ dependencies = [
  "fn-sdk",
  "lightning-schema",
  "lightning-workspace-hack",
+ "log",
  "serde",
  "serde_json",
- "tracing",
 ]
 
 [[package]]

@@ -16,9 +16,9 @@ use deno_web::JsMessageData;
 use fleek_crypto::{ClientPublicKey, NodeSignature};
 use fn_sdk::blockstore::get_internal_path;
 use lightning_schema::task_broker::TaskScope;
+use log::info;
 use serde::{Deserialize, Serialize, Serializer};
 use serde_json::json;
-use tracing::info;
 
 // Here
 #[op2(fast)]
