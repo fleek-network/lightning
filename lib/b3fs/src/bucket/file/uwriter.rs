@@ -70,14 +70,14 @@ impl UntrustedFileWriter {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use std::env::temp_dir;
 
     use rand::random;
     use tokio::fs;
 
     use super::*;
-    use crate::bucket::file::test::{get_random_file, verify_writer};
+    use crate::bucket::file::tests::{get_random_file, verify_writer};
     use crate::bucket::file::B3FSFile;
     use crate::collections::HashTree;
     use crate::hasher::byte_hasher::Blake3Hasher;
@@ -93,7 +93,7 @@ mod test {
         ));
         let bucket = Bucket::open(&temp_dir).await.unwrap();
         let mut blake3_hasher: Blake3Hasher<Vec<[u8; 32]>> = Blake3Hasher::default();
-        let block = get_random_file();
+        let block = get_random_file(8192 * 2);
         blake3_hasher.update(&block[..]);
 
         let (ref mut hashes, root) = blake3_hasher.finalize_tree();
@@ -109,6 +109,6 @@ mod test {
         writer.write(&block).await.unwrap();
         let proof = writer.commit().await.unwrap();
 
-        verify_writer(&temp_dir).await;
+        verify_writer(&temp_dir, 2).await;
     }
 }

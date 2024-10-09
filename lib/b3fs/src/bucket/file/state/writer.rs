@@ -85,12 +85,12 @@ impl WriterState for FileWriterState {
         if let Some(ref mut block_file) = self.inner_state.current_block_file {
             if let Some(block_hash) = collector.get_block_hash(self.inner_state.count_block) {
                 self.inner_state.new_block(block_hash).await?;
-                collector
-                    .write_hash(&mut self.inner_state.header_file.file)
-                    .await?;
             }
         }
 
+        collector
+            .write_hash(&mut self.inner_state.header_file.file)
+            .await?;
         self.inner_state.commit(&root_hash).await?;
 
         Ok(root_hash)

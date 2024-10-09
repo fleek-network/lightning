@@ -18,7 +18,8 @@ triomphe = "0.1.9"
 bytes = "1.5"
 
 # IO / multi-threading
-tokio = { version = "1.28", features = ["full"] }
+tokio.workspace = true
+tokio-stream.workspace = true
 rayon = "1.10"
 rayon-core = "1.12"
 
