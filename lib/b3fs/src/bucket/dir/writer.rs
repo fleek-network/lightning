@@ -2,13 +2,24 @@ use std::io::{self, Write};
 
 use crate::bucket::{errors, Bucket};
 use crate::entry::BorrowedEntry;
+use crate::hasher::byte_hasher::Blake3Hasher;
+use crate::hasher::collector::BufCollector;
+use crate::stream::verifier::{IncrementalVerifier, WithHashTreeCollector};
 
 /// A trusted directory writer.
-pub struct DirWriter {}
+pub struct DirWriter {
+    bucket: Bucket,
+    num_entries: usize,
+    hasher: Blake3Hasher<BufCollector>,
+}
 
 impl DirWriter {
     pub fn new(bucket: &Bucket, num_entries: usize) -> Self {
-        todo!()
+        Self {
+            bucket: bucket.clone(),
+            num_entries,
+            hasher: Blake3Hasher::default(),
+        }
     }
 
     pub async fn insert<'a>(

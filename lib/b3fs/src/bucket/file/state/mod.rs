@@ -68,7 +68,7 @@ impl InnerWriterState {
 
     pub(crate) async fn commit(mut self, root_hash: &[u8; 32]) -> Result<(), io::Error> {
         self.header_file
-            .flush(&self.bucket, &self.block_files, &root_hash)
+            .flush(&self.bucket, &self.block_files, root_hash)
             .await?;
         tokio::fs::remove_dir_all(self.temp_file_path).await?;
         Ok(())

@@ -50,10 +50,18 @@ impl B3FSFile {
     pub fn deserialize(data: &[u8]) -> Result<Self, bincode::Error> {
         let version: u32 = bincode::deserialize(&data[..4])?;
         let num_entries: u32 = bincode::deserialize(&data[4..8])?;
+        let num_hashes = (2 * num_entries) - 1;
+        assert!(
+            data.len() == 8 + num_hashes as usize * 32,
+            "Invalid data length {} - num_entries: {} - num_hashes: {}",
+            data.len(),
+            num_entries,
+            num_hashes
+        );
         let mut hashes = vec![];
-        for i in 0..num_entries {
+        for i in 0..num_hashes {
             let range_start = 8 + i as usize * 32_usize;
-            let range_end = 8 + (i as usize * 32_usize) + 32_usize;
+            let range_end = range_start + 32_usize;
             let dec: &[u8] = &data[range_start..range_end];
             let mut hash = [0u8; 32];
             hash.copy_from_slice(dec);
@@ -68,26 +76,32 @@ impl B3FSFile {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
+    use std::env::temp_dir;
     use std::path::PathBuf;
 
     use rand::random;
     use tokio::fs;
+    use tokio::io::{AsyncReadExt as _, AsyncSeekExt as _};
+    use tokio_stream::StreamExt;
 
+    use crate::bucket::file::reader::B3File;
+    use crate::bucket::file::writer::FileWriter;
     use crate::bucket::file::B3FSFile;
+    use crate::bucket::Bucket;
     use crate::hasher::b3::MAX_BLOCK_SIZE_IN_BYTES;
     use crate::utils;
 
-    pub(super) fn get_random_file() -> Vec<u8> {
+    pub(super) fn get_random_file(size: usize) -> Vec<u8> {
         let mut data = Vec::with_capacity(MAX_BLOCK_SIZE_IN_BYTES);
-        for _ in 0..8193 {
+        for _ in 0..size {
             let d: [u8; 32] = random();
             data.extend(d);
         }
         data
     }
 
-    pub(super) async fn verify_writer(temp_dir: &PathBuf) {
+    pub(super) async fn verify_writer(temp_dir: &PathBuf, n: usize) {
         let mut dir = std::fs::read_dir(temp_dir);
         assert!(dir.is_ok());
         let dir = dir.unwrap();
@@ -114,9 +128,10 @@ mod test {
         let file_header = file_header[0].path();
         let file_header = std::fs::read(file_header).unwrap();
         let b3fs = B3FSFile::deserialize(&file_header).unwrap();
+        let num_hashes = 2 * n - 1;
         assert_eq!(1, b3fs.version);
-        assert_eq!(2, b3fs.num_entries);
-        assert_eq!(2, b3fs.hashes.len());
+        assert_eq!(n, b3fs.num_entries as usize);
+        assert_eq!(num_hashes, b3fs.hashes.len());
 
         let hashes = b3fs.hashes();
 
@@ -127,27 +142,68 @@ mod test {
         assert!(block_dir.is_some());
         let block_dir = block_dir.unwrap().path();
         let files = std::fs::read_dir(&block_dir).unwrap();
-        let mut files = files.collect::<Result<Vec<_>, _>>().unwrap();
-        files.sort_by(|a, b| {
-            a.metadata()
-                .unwrap()
-                .len()
-                .cmp(&b.metadata().unwrap().len())
-        });
-        assert_eq!(2, files.len());
-        assert_eq!(32_u64, files[0].metadata().unwrap().len());
-        assert_eq!(
-            MAX_BLOCK_SIZE_IN_BYTES as u64,
-            files[1].metadata().unwrap().len()
-        );
-        let file_1 = files[0].file_name().to_str().unwrap().to_string();
-        let file_2 = files[1].file_name().to_str().unwrap().to_string();
-        let hash_1 = utils::to_hex(&hashes[0]).as_str().to_string();
-        let hash_2 = utils::to_hex(&hashes[1]).as_str().to_string();
-        let hashes_vec = [hash_1, hash_2];
-        assert!(hashes_vec.contains(&file_1.to_string()));
-        assert!(hashes_vec.contains(&file_2.to_string()));
+        let files = files.collect::<Result<Vec<_>, _>>().unwrap();
+        assert_eq!(n, files.len());
+        let hashes = hashes
+            .iter()
+            .map(|h| utils::to_hex(h).as_str().to_string())
+            .collect::<Vec<String>>();
+        for file in files.iter() {
+            assert_eq!(
+                MAX_BLOCK_SIZE_IN_BYTES as u64,
+                file.metadata().unwrap().len()
+            );
+            let file_name = file.file_name().to_str().unwrap().to_string();
+            assert!(hashes.contains(&file_name));
+        }
 
         fs::remove_dir_all(temp_dir).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_trusted_writer_follow_reader() {
+        let temp_dir_name = random::<[u8; 32]>();
+        let temp_dir = temp_dir().join(format!(
+            "test_writer_follow_reader_{}",
+            utils::to_hex(&temp_dir_name)
+        ));
+        let bucket = Bucket::open(&temp_dir).await.unwrap();
+        let mut writer = FileWriter::new(&bucket).await.unwrap();
+        let data = get_random_file(8192 * 4);
+        writer.write(&data).await.unwrap();
+        writer.commit().await.unwrap();
+
+        let binding = temp_dir.join("blocks");
+        let blocks_dir = binding.as_path();
+        let file_blocks = std::fs::read_dir(blocks_dir).unwrap();
+        let file_blocks = file_blocks
+            .map(|d| d.map(|x| x.file_name().into_string().unwrap()))
+            .collect::<Result<Vec<String>, _>>()
+            .unwrap();
+
+        let binding = temp_dir.join("headers");
+        let header_dir = binding.as_path();
+        let file_header = std::fs::read_dir(header_dir).unwrap();
+        let file_header = file_header.collect::<Result<Vec<_>, _>>().unwrap();
+        assert_eq!(1, file_header.len());
+        let file_header = file_header[0].path();
+
+        let mut file = tokio::fs::File::open(file_header).await.unwrap();
+        file.seek(tokio::io::SeekFrom::Start(4)).await.unwrap();
+        let num_entries = file.read_u32_le().await.unwrap();
+
+        let mut reader = B3File::new(num_entries, triomphe::Arc::new(file));
+        let mut hashtree = reader.hashtree().await.unwrap();
+        let mut counter = 0;
+        while let Some(Ok(block)) = hashtree.next().await {
+            counter += 1;
+            assert!(
+                file_blocks.contains(&utils::to_hex(&block).as_str().to_string()),
+                "Block not found: {}",
+                utils::to_hex(&block)
+            );
+        }
+        assert_eq!(counter, num_entries as usize);
+        fs::remove_dir_all(&temp_dir).await.unwrap();
     }
 }
