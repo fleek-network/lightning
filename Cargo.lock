@@ -3178,6 +3178,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "deno_fleek"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "arrayref",
+ "blake3-tree",
+ "cid 0.11.1",
+ "deno_ast",
+ "deno_canvas",
+ "deno_console",
+ "deno_core",
+ "deno_crypto",
+ "deno_fetch",
+ "deno_fs",
+ "deno_io",
+ "deno_media_type",
+ "deno_napi",
+ "deno_net",
+ "deno_node",
+ "deno_permissions",
+ "deno_url",
+ "deno_web",
+ "deno_webgpu",
+ "deno_webidl",
+ "deno_websocket",
+ "fleek-crypto",
+ "fn-sdk",
+ "lightning-schema",
+ "lightning-workspace-hack",
+ "serde",
+ "serde_json",
+ "tracing",
+]
+
+[[package]]
 name = "deno_fs"
 version = "0.74.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4966,7 +5001,6 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "arrayref",
- "base64 0.22.1",
  "blake3-tree",
  "bytes",
  "cid 0.11.1",
@@ -4976,13 +5010,12 @@ dependencies = [
  "deno_core",
  "deno_crypto",
  "deno_fetch",
+ "deno_fleek",
  "deno_fs",
  "deno_io",
  "deno_media_type",
- "deno_napi",
  "deno_net",
  "deno_node",
- "deno_permissions",
  "deno_url",
  "deno_web",
  "deno_webgpu",

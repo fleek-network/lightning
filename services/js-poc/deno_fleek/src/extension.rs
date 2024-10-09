@@ -1,9 +1,7 @@
-pub mod ops;
-pub mod permissions;
-
 use deno_core::extension;
 use deno_napi::NapiPermissions;
-use ops::{
+
+use crate::ops::{
     fetch_blake3,
     fetch_from_origin,
     load_content,
@@ -26,7 +24,7 @@ use ops::{
     run_task,
     TaskDepth,
 };
-use permissions::Permissions;
+use crate::permissions::Permissions;
 
 extension!(
     fleek,
@@ -70,7 +68,7 @@ extension!(
     ],
     esm_entry_point = "ext:fleek/bootstrap.js",
     esm = [
-        dir "src/runtime/js",
+        dir "src/js",
         "fleek.js",
         "global.js",
         "bootstrap.js",

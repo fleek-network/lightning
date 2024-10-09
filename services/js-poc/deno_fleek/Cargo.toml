@@ -1,0 +1,37 @@
+[package]
+name = "deno_fleek"
+version = "0.0.1"
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+arrayref = "0.3"
+blake3-tree = { path = "../../../lib/blake3-tree" }
+cid = "0.11"
+fn-sdk = { path = "../../../lib/sdk" }
+fleek-crypto.workspace = true
+lightning-schema = { path = "../../../core/schema" }
+lightning-workspace-hack.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+
+# Deno core + webapi extensions
+deno_ast = { version = "0.42", features = ["transpiling"] }
+deno_core = "0.299"
+deno_webidl = "0.164"
+deno_console = "0.164"
+deno_fs = "0.74"
+deno_io = "0.74"
+deno_url = "0.164"
+deno_napi = "0.95"
+deno_net = "0.156"
+deno_media_type = "0.1"
+deno_node = "0.101"
+deno_permissions = "0.24"
+deno_web = "0.195"
+deno_fetch = "0.188"
+deno_crypto = "0.178"
+deno_canvas = "0.33.0"
+deno_webgpu = "0.131"
+deno_websocket = "0.169"

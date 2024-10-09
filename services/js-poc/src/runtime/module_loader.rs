@@ -1,11 +1,6 @@
-use std::collections::HashMap;
-use std::sync::OnceLock;
-
 use anyhow::{anyhow, bail, Context};
 use arrayref::array_ref;
 use cid::Cid;
-use deno_core::futures::stream::FuturesUnordered;
-use deno_core::futures::StreamExt;
 use deno_core::url::Host;
 use deno_core::{
     ModuleLoadResponse,
@@ -18,8 +13,7 @@ use deno_core::{
 };
 use fn_sdk::api::fetch_from_origin;
 use fn_sdk::blockstore::ContentHandle;
-use tokio::sync::Semaphore;
-use tracing::{debug, trace, warn};
+use tracing::trace;
 
 pub struct FleekModuleLoader {}
 
