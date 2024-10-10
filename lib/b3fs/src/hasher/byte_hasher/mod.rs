@@ -244,6 +244,14 @@ impl<T: HashTreeCollector> Blake3Hasher<T> {
         let hash = self.final_output().root_hash();
         (self.tree, hash)
     }
+
+    pub fn get_tree_mut(&mut self) -> &mut T {
+        &mut self.tree
+    }
+
+    pub fn get_tree(&self) -> &T {
+        &self.tree
+    }
 }
 
 impl BlockHasher {
