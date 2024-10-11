@@ -191,7 +191,7 @@ impl ApplicationEnv {
             // This will return `None` only if the InMemory backend is used.
             if let Some((_, checkpoint)) = self.build_checkpoint() {
                 let bucket = get_blockstore().get_bucket();
-                let mut file_writer = FileWriter::new(&bucket);
+                let mut file_writer = FileWriter::new(&bucket).await?;
                 file_writer.write(checkpoint.as_slice()).await?;
                 let state_hash = file_writer.commit().await?;
                 // Only temporary: write the checkpoint to disk directly.
