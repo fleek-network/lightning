@@ -49,7 +49,7 @@ use std::path::{Path, PathBuf};
 use arrayref::array_ref;
 use rand::random;
 use tokio::fs::{self, File, OpenOptions};
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncReadExt, BufWriter};
 use triomphe::Arc;
 
 use crate::utils::{to_hex, Digest};
