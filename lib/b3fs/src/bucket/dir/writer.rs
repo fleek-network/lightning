@@ -1,41 +1,44 @@
 use std::io::{self, Write};
+use std::num::NonZeroU32;
+use std::sync::Arc;
 
+use bytes::BytesMut;
+use tokio::sync::RwLock;
+
+use super::phf::PhfGenerator;
+use super::state::writer::DirWriterState;
 use crate::bucket::{errors, Bucket};
-use crate::entry::BorrowedEntry;
+use crate::entry::{BorrowedEntry, BorrowedLink};
 use crate::hasher::byte_hasher::Blake3Hasher;
 use crate::hasher::collector::BufCollector;
+use crate::hasher::HashTreeCollector as _;
 use crate::stream::verifier::{IncrementalVerifier, WithHashTreeCollector};
 
 /// A trusted directory writer.
 pub struct DirWriter {
-    bucket: Bucket,
-    num_entries: usize,
-    hasher: Blake3Hasher<BufCollector>,
+    state: DirWriterState,
 }
 
 impl DirWriter {
-    pub fn new(bucket: &Bucket, num_entries: usize) -> Self {
-        Self {
-            bucket: bucket.clone(),
-            num_entries,
-            hasher: Blake3Hasher::default(),
-        }
+    pub async fn new(bucket: &Bucket, num_entries: usize) -> Result<Self, errors::WriteError> {
+        let inner_state = DirWriterState::new(bucket, num_entries).await?;
+        Ok(Self { state: inner_state })
     }
 
-    pub async fn insert<'a>(
+    pub async fn insert<'b>(
         &mut self,
-        entry: impl Into<BorrowedEntry<'a>>,
+        entry: impl Into<BorrowedEntry<'b>>,
     ) -> Result<(), errors::InsertError> {
-        todo!()
+        self.state.insert_entry(entry).await
     }
 
     /// Finalize this write and flush the data to the disk.
     pub async fn commit(self) -> Result<[u8; 32], errors::CommitError> {
-        todo!()
+        self.state.commit().await
     }
 
     /// Cancel this write and remove anything that this writer wrote to the disk.
     pub async fn rollback(self) -> Result<(), io::Error> {
-        todo!()
+        self.state.rollback().await
     }
 }

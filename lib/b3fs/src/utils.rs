@@ -1,6 +1,8 @@
 use std::fmt::Debug;
+use std::path::{Path, PathBuf};
 
 use arrayvec::ArrayString;
+use rand::random;
 
 /// Convert a hash digest to a human-readable string.
 #[inline]
@@ -221,6 +223,12 @@ impl Debug for OwnedDigest {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", to_hex(&self.0))
     }
+}
+
+#[inline(always)]
+pub fn random_file_from(path: &Path) -> PathBuf {
+    let random_file: [u8; 32] = random();
+    path.to_path_buf().join(to_hex(&random_file).as_str())
 }
 
 #[cfg(test)]
