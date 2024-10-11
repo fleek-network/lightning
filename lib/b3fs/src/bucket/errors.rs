@@ -43,6 +43,12 @@ pub enum InsertError {
     InvalidContent,
     #[error("The provided entry violates the entry name ordering.")]
     OrderingError,
+    #[error("Error while writing to disk. {0}")]
+    WritingError(#[from] WriteError),
+    #[error("Error writing to disk. {0}")]
+    IO(#[from] std::io::Error),
+    #[error("Invalid Hash or internal hashes content doing incremental validation")]
+    IncrementalVerification,
 }
 
 #[derive(Error, Debug)]
@@ -61,4 +67,8 @@ pub enum CommitError {
     BlockHashNotFound,
     #[error("Invalid block hash detected against incremental verifier")]
     InvalidBlockHash,
+    #[error("Error while serializing data to file. {0}")]
+    Serialization(String),
+    #[error("Error writing on spawn blocking file. {0}")]
+    SpawnError(#[from] tokio::task::JoinError),
 }
