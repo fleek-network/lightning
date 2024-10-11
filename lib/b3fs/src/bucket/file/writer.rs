@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::{cmp, io};
 
 use bytes::{Buf as _, BufMut, BytesMut};
@@ -6,6 +7,7 @@ use fleek_blake3::tree::HashTreeBuilder;
 use rand::random;
 use tokio::fs::{File, OpenOptions};
 use tokio::io::{AsyncReadExt, AsyncSeekExt as _, AsyncWriteExt, BufWriter};
+use tokio::sync::RwLock;
 
 use super::state::writer::FileWriterState;
 use super::state::WriterState;
@@ -17,14 +19,15 @@ use crate::hasher::HashTreeCollector;
 use crate::utils::{self, tree_index};
 
 pub struct FileWriter {
-    hasher: Blake3Hasher<BufCollector>,
+    hasher: Arc<RwLock<Blake3Hasher<BufCollector>>>,
     state: FileWriterState,
 }
 
 impl FileWriter {
     pub async fn new(bucket: &Bucket) -> Result<Self, errors::WriteError> {
+        let hasher = Arc::new(RwLock::new(Blake3Hasher::default()));
         Ok(Self {
-            hasher: Blake3Hasher::default(),
+            hasher,
             state: FileWriterState::new(bucket).await?,
         })
     }
@@ -37,10 +40,9 @@ impl FileWriter {
         while bytes_mut.has_remaining() {
             let want = cmp::min(BLOCK_SIZE_IN_CHUNKS, bytes_mut.len());
             let mut bytes = bytes_mut.split_to(want);
-            self.hasher.update(&bytes);
-            self.state
-                .next(self.hasher.get_tree_mut(), &mut bytes)
-                .await?;
+            let mut hasher = self.hasher.write().await;
+            hasher.update(&bytes);
+            self.state.next(hasher.get_tree_mut(), &mut bytes).await?;
         }
 
         Ok(())
@@ -48,7 +50,7 @@ impl FileWriter {
 
     /// Finalize this write and flush the data to the disk.
     pub async fn commit(mut self) -> Result<[u8; 32], errors::CommitError> {
-        let (mut collector, root_hash) = self.hasher.finalize_tree();
+        let (mut collector, root_hash) = self.hasher.write().await.clone().finalize_tree();
         // Force pushing the root hash to the collector.
         collector.push(root_hash);
         self.state.commit(collector, root_hash).await

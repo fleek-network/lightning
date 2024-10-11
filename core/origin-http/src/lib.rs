@@ -55,7 +55,7 @@ impl<C: NodeComponents> HttpOrigin<C> {
         }
 
         let bucket = self.blockstore.get_bucket();
-        let mut writer = FileWriter::new(&bucket);
+        let mut writer = FileWriter::new(&bucket).await?;
         writer
             .write(data.as_ref())
             .await
