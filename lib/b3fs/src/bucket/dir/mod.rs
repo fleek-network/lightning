@@ -1,5 +1,6 @@
 pub mod iter;
 pub mod reader;
+mod state;
 pub mod uwriter;
 pub mod writer;
 

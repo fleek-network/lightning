@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 pub mod reader;
-mod state;
+pub(crate) mod state;
 pub mod uwriter;
 pub mod writer;
 
