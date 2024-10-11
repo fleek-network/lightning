@@ -8,7 +8,7 @@ use tokio::fs::{File, OpenOptions};
 use tokio::io::AsyncWriteExt;
 
 use super::state::uwriter::UntrustedFileWriterState;
-use super::state::WriterState as _;
+use super::state::WriterState;
 use super::{writer, B3FSFile};
 use crate::bucket::{errors, Bucket};
 use crate::hasher::b3::{BLOCK_SIZE_IN_CHUNKS, MAX_BLOCK_SIZE_IN_BYTES};
