@@ -7,6 +7,31 @@ use sgxkit_sys::fn0;
 
 use crate::error::HostError;
 
+/// Print formatted text to debug log (if enabled on the node).
+#[macro_export]
+macro_rules! println {
+    () => {
+        #[cfg(target_family = "wasm")]
+        $crate::io::debug_print('\n');
+
+        #[cfg(not(target_family = "wasm"))]
+        std::println!();
+    };
+    ($($arg:tt)*) => {
+        #[cfg(target_family = "wasm")]
+        $crate::io::debug_print(format!($($arg)*) + "\n");
+
+        #[cfg(not(target_family = "wasm"))]
+        std::println!($($arg)*);
+    };
+}
+
+/// Print string to debug log (if enabled on the node).
+pub fn debug_print<S: AsRef<str>>(msg: S) {
+    let s = msg.as_ref();
+    unsafe { fn0::debug_print(s.as_ptr() as usize, s.len()) }
+}
+
 /// Global mutex for OutputWriter (similar to stdout)
 static IS_WRITER_OPEN: Mutex<()> = Mutex::new(());
 
