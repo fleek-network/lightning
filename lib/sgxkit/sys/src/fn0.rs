@@ -371,4 +371,12 @@ fn0_module! {
     ///
     /// u64 timestamp in seconds
     fn0.insecure_systemtime: () -> (seconds: u64);
+
+    /// Print a message to node logs if debug is enabled, otherwise no-op.
+    ///
+    /// # Parameters
+    ///
+    /// * `ptr`: Memory offset to read and print utf8 bytes from
+    /// * `len`: Length of utf8 bytes to print
+    fn0.debug_print: (ptr: usize, len: usize) -> ();
 }
