@@ -1558,7 +1558,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aa13fae8b6255872fd86f7faf4b41168661d7d78609f7bfe6771b85c6739a15b"
 dependencies = [
  "bs58 0.5.1",
- "hmac",
+ "hmac 0.12.1",
  "k256",
  "once_cell",
  "pbkdf2 0.12.2",
@@ -2392,7 +2392,7 @@ dependencies = [
  "bs58 0.5.1",
  "coins-core",
  "digest 0.10.7",
- "hmac",
+ "hmac 0.12.1",
  "k256",
  "serde",
  "sha2 0.10.8",
@@ -2407,7 +2407,7 @@ checksum = "3db8fba409ce3dc04f7d804074039eb68b960b0829161f8e06c95fea3f122528"
 dependencies = [
  "bitvec 1.0.1",
  "coins-bip32",
- "hmac",
+ "hmac 0.12.1",
  "once_cell",
  "pbkdf2 0.12.2",
  "rand 0.8.5",
@@ -2923,6 +2923,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "cstr"
+version = "0.2.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "68523903c8ae5aacfa32a0d9ae60cadeb764e1da14ee0d26b1f3089f13a54636"
+dependencies = [
+ "proc-macro2 1.0.86",
+ "quote 1.0.36",
+]
+
+[[package]]
+name = "crypto-mac"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b584a330336237c1eecd3e94266efb216c56ed91225d634cb2991c5f3fd1aeab"
+dependencies = [
+ "generic-array",
+ "subtle",
+]
+
+[[package]]
+>>>>>>> f11688b9 (chore: try libsecp256k1 in multisig example, add debug prints)
 name = "csv"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4469,7 +4490,7 @@ dependencies = [
  "ctr",
  "digest 0.10.7",
  "hex",
- "hmac",
+ "hmac 0.12.1",
  "pbkdf2 0.11.0",
  "rand 0.8.5",
  "scrypt 0.10.0",
@@ -6244,7 +6265,17 @@ version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b5f8eb2ad728638ea2c7d47a21db23b7b58a72ed6a38256b8a1849f15fbbdf7"
 dependencies = [
- "hmac",
+ "hmac 0.12.1",
+]
+
+[[package]]
+name = "hmac"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "126888268dcc288495a26bf004b38c5fdbb31682f992c84ceb046a1f0fe38840"
+dependencies = [
+ "crypto-mac",
+ "digest 0.9.0",
 ]
 
 [[package]]
@@ -6254,6 +6285,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c49c37c09c17a53d937dfbb742eb3a961d65a994e6bcdcf37e7399d0cc8ab5e"
 dependencies = [
  "digest 0.10.7",
+]
+
+[[package]]
+name = "hmac-drbg"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "17ea0a1394df5b6574da6e0c1ade9e78868c9fb0a4e5ef4428e32da4676b85b1"
+dependencies = [
+ "digest 0.9.0",
+ "generic-array",
+ "hmac 0.8.1",
 ]
 
 [[package]]
@@ -7627,12 +7669,14 @@ dependencies = [
  "arrayref",
  "base64 0.13.1",
  "digest 0.9.0",
+ "hmac-drbg",
  "libsecp256k1-core",
  "libsecp256k1-gen-ecmult",
  "libsecp256k1-gen-genmult",
  "rand 0.8.5",
  "serde",
  "sha2 0.9.9",
+ "typenum",
 ]
 
 [[package]]
@@ -9050,220 +9094,6 @@ dependencies = [
  "tokio",
  "toml 0.7.8",
  "tracing",
-]
-
-[[package]]
-name = "lightning-workspace-hack"
-version = "0.1.0"
-dependencies = [
- "aead",
- "aes-gcm",
- "ahash 0.8.11",
- "arc-swap",
- "arrayvec",
- "axum 0.6.20",
-<<<<<<< HEAD
- "axum 0.7.7",
- "axum-core 0.4.5",
-||||||| parent of 486db6a6 (fix: hakari generate)
- "axum 0.7.4",
- "axum-core 0.4.3",
-=======
- "axum 0.7.4",
- "axum-core 0.4.3",
- "base16ct",
->>>>>>> 486db6a6 (fix: hakari generate)
- "base64 0.13.1",
- "base64 0.21.7",
- "base64 0.22.1",
- "base64ct",
- "bit-set 0.5.3",
- "bit-vec 0.6.3",
- "bitflags 2.6.0",
- "blake2",
- "blake3",
- "block-buffer 0.9.0",
- "block-padding 0.3.3",
- "bs58 0.5.1",
- "bumpalo",
- "bytemuck",
- "byteorder",
- "bytes 1.8.0",
- "cbc",
- "cc",
- "chrono",
- "cid 0.11.1",
- "cipher",
- "clap",
- "clap_builder",
- "concurrent-queue",
- "console",
- "core-graphics-types",
- "criterion",
- "crossbeam-channel",
- "crossbeam-deque",
- "crossbeam-utils",
- "crunchy",
- "crypto-common",
- "curve25519-dalek",
- "curve25519-dalek-ng",
- "data-encoding",
- "der 0.7.9",
- "digest 0.10.7",
- "digest 0.9.0",
- "ecdsa",
- "either",
- "elliptic-curve",
- "ethers-contract-abigen",
- "event-listener 5.3.1",
- "fastcrypto 0.1.5",
- "fastcrypto 0.1.8",
-<<<<<<< HEAD
- "futures 0.3.31",
-||||||| parent of 486db6a6 (fix: hakari generate)
- "futures",
-=======
- "ff",
- "futures",
->>>>>>> 486db6a6 (fix: hakari generate)
- "futures-channel",
- "futures-core",
- "futures-executor",
- "futures-io",
- "futures-sink",
- "futures-task",
- "futures-util",
- "generic-array",
- "getrandom",
- "group",
- "half 2.4.1",
- "hashbrown 0.12.3",
- "hashbrown 0.14.5",
- "hashbrown 0.15.0",
- "hdrhistogram",
- "hex",
- "hmac",
- "hyper 0.14.31",
- "hyper 1.5.0",
- "hyper-rustls 0.24.2",
- "hyper-util",
- "image",
- "indexmap 1.9.3",
- "indexmap 2.6.0",
- "inout",
- "itertools 0.10.5",
- "itertools 0.11.0",
- "itertools 0.12.1",
- "jpeg-decoder",
- "k256",
- "lalrpop-util",
- "lazy_static",
- "libc",
- "libsecp256k1-core",
- "libz-sys",
- "log",
- "matrixmultiply",
- "memchr",
- "miniz_oxide 0.8.0",
- "mio",
- "multibase",
- "multihash 0.19.1",
- "nom",
- "num-bigint 0.4.6",
- "num-bigint-dig",
- "num-complex",
- "num-integer",
- "num-iter",
- "num-traits",
- "once_cell",
- "openssl",
- "openssl-sys",
- "p256",
- "parity-scale-codec 3.6.11",
- "parity-scale-codec-derive 3.6.9",
- "pbkdf2 0.12.2",
- "phf_shared 0.11.2",
- "pkcs8 0.10.2",
- "plotters",
- "portable-atomic",
- "prettyplease 0.2.24",
- "primitive-types 0.12.2",
- "proc-macro-error",
- "proc-macro2 1.0.89",
- "prost 0.11.9",
- "prost 0.12.6",
- "prost 0.13.3",
- "protobuf",
- "ptr_meta",
- "quinn",
- "quinn-proto",
- "quinn-udp",
- "quote 1.0.37",
- "rand 0.8.5",
- "rand_chacha",
- "rand_core 0.6.4",
- "regex",
- "regex-automata 0.4.8",
- "regex-syntax 0.8.5",
- "reqwest",
- "ring 0.16.20",
- "ring 0.17.8",
- "ripemd",
- "rocksdb",
- "ruint",
- "rustc-hex",
- "rustix",
- "rustls 0.21.12",
- "rustls-pki-types",
- "rustls-webpki 0.102.8",
- "schemars",
- "scopeguard",
- "scrypt 0.11.0",
- "sec1",
- "security-framework-sys",
- "semver 1.0.23",
- "serde",
- "serde_json",
- "serde_with 2.3.3",
- "sha1",
- "sha2 0.10.8",
- "sha2 0.9.9",
- "sha3 0.10.8",
- "signature 2.2.0",
- "simdutf8",
- "similar",
- "smallvec",
- "socket2 0.5.7",
- "spin 0.9.8",
- "spki 0.7.3",
- "stable_deref_trait",
- "subtle",
- "syn 1.0.109",
- "syn 2.0.84",
- "time",
- "tiny-keccak",
- "tokio",
- "tokio-rustls 0.24.1",
- "tokio-stream",
- "tokio-tungstenite",
- "tokio-util 0.7.12",
- "toml_datetime",
- "toml_edit 0.20.2",
- "tonic 0.12.3",
- "tower 0.4.13",
- "tower 0.5.1",
- "tower-http 0.3.5",
- "tracing",
- "tracing-core",
- "tracing-subscriber",
- "uint",
- "unicode-bidi",
- "unicode-normalization",
- "unicode-xid 0.2.6",
- "url",
- "uuid 1.11.0",
- "web-sys",
- "zeroize",
 ]
 
 [[package]]
@@ -11559,7 +11389,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "83a0692ec44e4cf1ef28ca317f14f8f07da2d95ec3fa01f86e4467b725e60917"
 dependencies = [
  "digest 0.10.7",
- "hmac",
+ "hmac 0.12.1",
  "password-hash 0.4.2",
  "sha2 0.10.8",
 ]
@@ -11571,7 +11401,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8ed6a7761f76e3b9f92dfb0a60a6a6477c61024b775147ff0973a02653abaf2"
 dependencies = [
  "digest 0.10.7",
- "hmac",
+ "hmac 0.12.1",
 ]
 
 [[package]]
@@ -13093,7 +12923,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8dd2a808d456c4a54e300a23e9f5a67e122c3024119acbfd73e3bf664491cb2"
 dependencies = [
- "hmac",
+ "hmac 0.12.1",
  "subtle",
 ]
 
@@ -13696,7 +13526,7 @@ version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f9e24d2b632954ded8ab2ef9fea0a0c769ea56ea98bddbafbad22caeeadf45d"
 dependencies = [
- "hmac",
+ "hmac 0.12.1",
  "pbkdf2 0.11.0",
  "salsa20",
  "sha2 0.10.8",
@@ -14169,30 +13999,6 @@ dependencies = [
  "bpaf",
  "ecies",
  "hex",
-]
-
-[[package]]
-name = "sgxkit"
-version = "0.1.0"
-dependencies = [
- "arrayref",
- "base64 0.22.1",
- "hex",
- "hex-literal",
- "k256",
- "serde",
- "serde_json",
- "anyhow",
- "arrayref",
- "base64 0.22.1",
- "blake3",
- "hex",
- "hex-literal",
- "k256",
- "serde",
- "serde_json",
- "sgxkit-macros",
- "sgxkit-sys",
 ]
 
 [[package]]
@@ -14878,7 +14684,7 @@ checksum = "d3f10d3f68e60168d81110410428a435dbde28cc5525f5f7c6fdec92dbdc2800"
 dependencies = [
  "combine",
  "crc",
- "hmac",
+ "hmac 0.12.1",
  "once_cell",
  "openssl",
  "openssl-sys",
@@ -15002,7 +14808,7 @@ dependencies = [
  "bytecodec",
  "byteorder",
  "crc",
- "hmac",
+ "hmac 0.12.1",
  "md5",
  "sha1",
  "trackable 1.3.0",
@@ -18202,7 +18008,7 @@ dependencies = [
  "crc32fast",
  "crossbeam-utils",
  "flate2",
- "hmac",
+ "hmac 0.12.1",
  "pbkdf2 0.11.0",
  "sha1",
  "time",
