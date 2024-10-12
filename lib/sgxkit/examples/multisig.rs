@@ -4,12 +4,13 @@ use arrayref::array_ref;
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use hex_literal::hex;
-use k256::ecdsa::signature::Verifier;
-use k256::ecdsa::{RecoveryId, Signature};
+use libsecp256k1::{RecoveryId, Signature};
 use serde::de::IntoDeserializer;
 use serde::{Deserialize, Deserializer};
 use sgxkit::crypto::DerivedKey;
 use sgxkit::io::output_writer;
+use sgxkit::println;
+use sha2::Digest;
 
 /// List of valid secp256k1 signers
 const PUBLIC_SIGNERS: &[[u8; 33]] = &[
@@ -19,7 +20,7 @@ const PUBLIC_SIGNERS: &[[u8; 33]] = &[
 ];
 
 /// Require ceil(signers * 2 / 3) valid signatures
-const MINIMUM_SIGNATURES: usize = const { (PUBLIC_SIGNERS.len() * 2).div_ceil(3) };
+const MINIMUM_SIGNATURES: usize = (PUBLIC_SIGNERS.len() * 2).div_ceil(3);
 
 #[derive(Deserialize)]
 struct InputData {
@@ -58,12 +59,14 @@ where
         let raw: [u8; 65] = decode_base64(base.into_deserializer())?
             .try_into()
             .map_err(|_| serde::de::Error::custom("invalid signature length"))?;
-        let signature = Signature::from_bytes(array_ref![raw, 0, 64].into())
+        let signature = Signature::parse_standard(array_ref![raw, 0, 64])
             .map_err(|_| serde::de::Error::custom("invalid signature"))?;
-        let rid = RecoveryId::from_byte(raw[64])
-            .ok_or(serde::de::Error::custom("invalid recovery id"))?;
+        let rid = RecoveryId::parse(raw[64])
+            .map_err(|_| serde::de::Error::custom("invalid recovery id"))?;
         sigs.push((signature, rid));
     }
+
+    println!("decoded signatures");
 
     Ok(sigs)
 }
@@ -77,30 +80,53 @@ pub fn main() -> Result<(), String> {
         signatures,
     } = serde_json::from_str(&input).map_err(|e| e.to_string())?;
 
+    println!("decoded input");
+
     let count = 0;
     for (sig, rid) in signatures {
+        // Hash input
+        let mut hasher = sha2::Sha256::new();
+        hasher.update(&payload);
+        let hash = hasher.finalize();
+        let msg = libsecp256k1::Message::parse(&hash.into());
+
+        println!("hashed message");
+
         // Recover the signature's public key
-        let pubkey = k256::ecdsa::VerifyingKey::recover_from_msg(&payload, &sig, rid)
-            .map_err(|e| e.to_string())?;
+        let pubkey = libsecp256k1::recover(&msg, &sig, &rid).map_err(|e| e.to_string())?;
+
+        println!("recovered pubkey");
+
         // Ensure public key is in the approved list
-        if !PUBLIC_SIGNERS.contains(&pubkey.to_sec1_bytes().as_ref().try_into().unwrap()) {
+        if !PUBLIC_SIGNERS.contains(&pubkey.serialize_compressed()) {
             return Err(format!(
                 "Invalid signer {}",
-                hex::encode(pubkey.to_sec1_bytes().as_ref())
+                hex::encode(pubkey.serialize_compressed())
             ));
         }
+
+        println!("pubkey valid");
+
         // Verify the signature
-        pubkey.verify(&payload, &sig).map_err(|e| e.to_string())?;
+        if !libsecp256k1::verify(&msg, &sig, &pubkey) {
+            return Err("Invalid signature".to_string());
+        }
     }
+
+    println!("verified input");
 
     if count < MINIMUM_SIGNATURES {
         return Err("Not enough valid signatures".to_string());
     }
 
+    println!("signing with key");
+
     // Create a derived key and sign the request data with it
     let wasm_sig = DerivedKey::root()
         .sign(&payload)
         .map_err(|e| e.to_string())?;
+
+    println!("signed");
 
     // Write base64 signature to certified output
     output_writer()
@@ -113,39 +139,36 @@ pub fn main() -> Result<(), String> {
 #[cfg(all(test, target_family = "unix"))]
 #[test]
 fn generate_example_request() {
-    use serde_json::json;
-
-    let alice = k256::ecdsa::SigningKey::from_bytes(&[1u8; 32].into()).unwrap();
-    let bob = k256::ecdsa::SigningKey::from_bytes(&[2u8; 32].into()).unwrap();
-    let charlie = k256::ecdsa::SigningKey::from_bytes(&[3u8; 32].into()).unwrap();
-
-    let keys = [alice, bob, charlie];
-
-    println!(
-        "{}",
-        keys.iter()
-            .map(|k| k.verifying_key().to_sec1_bytes())
-            .map(hex::encode)
-            .collect::<Vec<_>>()
-            .join("\n")
-    );
+    let keys = (1u8..=3)
+        .into_iter()
+        .map(|v| libsecp256k1::SecretKey::parse(&[v; 32]).unwrap())
+        .collect::<Vec<_>>();
 
     let payload = b"FOOBAR";
-    let signatures = keys
-        .map(|k| k.sign_recoverable(payload).unwrap())
-        .map(|(sig, rid)| {
-            let mut buf = sig.to_bytes().to_vec();
-            buf.push(rid.to_byte());
-            BASE64_STANDARD.encode(&buf)
-        });
+    let hash = sha2::Sha256::digest(payload);
+    let msg = libsecp256k1::Message::parse(&hash.into());
 
-    std::fs::write(
-        "./examples/multisig.json",
-        serde_json::to_string_pretty(&json!({
-            "payload": BASE64_STANDARD.encode(&payload),
-            "signatures": signatures
-        }))
-        .unwrap(),
-    )
+    let signatures = keys
+        .iter()
+        .map(|sk| {
+            let pk = libsecp256k1::PublicKey::from_secret_key(&sk);
+            println!("{}", hex::encode(pk.serialize_compressed()));
+
+            libsecp256k1::sign(&msg, &sk)
+        })
+        .map(|(sig, rid)| {
+            let mut buf = sig.serialize().to_vec();
+            buf.push(rid.serialize());
+            BASE64_STANDARD.encode(&buf)
+        })
+        .collect::<Vec<_>>();
+
+    let out = serde_json::to_string(&serde_json::json!({
+        "payload": BASE64_STANDARD.encode(&payload),
+        "signatures": signatures
+    }))
     .unwrap()
+    .replace('"', "\\\"");
+
+    println!("\n{out}");
 }
