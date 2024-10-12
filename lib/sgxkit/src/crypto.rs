@@ -10,12 +10,14 @@ use crate::error::HostError;
 /// for deriving children, signing hashes of data, and unsealing encrypted data.
 ///
 /// ```
-/// use sgxkit::DerivedKey;
+/// use sgxkit::crypto::DerivedKey;
 ///
 /// let key = DerivedKey::root();
 /// let child = key.clone().with_child_path(&[0, 1, 2, 420]).unwrap();
 /// let other = DerivedKey::from_slice(b"foo_path").unwrap();
 /// ```
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(transparent)]
 pub struct DerivedKey {
     path: Vec<u16>,
 }
