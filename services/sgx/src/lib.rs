@@ -164,6 +164,8 @@ pub fn main() {
 }
 
 async fn get_enclave_args() -> Vec<Vec<u8>> {
+    let mut args = vec![];
+
     let node_index = *OUR_NODE_INDEX;
     // First arg is either the sealed key or a list of peers to get it from
     let first_arg = {
@@ -188,11 +190,21 @@ async fn get_enclave_args() -> Vec<Vec<u8>> {
             arg
         }
     };
+    args.push(first_arg);
+
     // todo: actually get this from somewhere
     let our_ip = "127.0.0.1";
 
     let mut our_ip_arg = "--our-ip".as_bytes().to_vec();
     our_ip_arg.extend_from_slice(our_ip.as_bytes());
+    args.push(our_ip_arg);
 
-    vec![first_arg, our_ip_arg]
+    // enable debug prints if SGX_WASM_DEBUG is defined and not empty
+    if let Ok(v) = std::env::var("SGX_WASM_DEBUG") {
+        if !v.is_empty() {
+            args.push("--debug".as_bytes().to_vec())
+        }
+    }
+
+    args
 }
