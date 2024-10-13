@@ -207,6 +207,8 @@ where
         supply_at_genesis: 1000000,
         min_num_measurements: 2,
         node_info: nodes,
+        topology_min_nodes: 16,
+        topology_target_k: 8,
 
         ..Default::default()
     };
