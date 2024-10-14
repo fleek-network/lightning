@@ -3,25 +3,23 @@ name = "lightning-signer"
 version = "0.0.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-lightning-interfaces = { path = "../interfaces" }
-lightning-utils = { path = "../utils" }
-anyhow.workspace = true
-tracing.workspace = true
-serde.workspace = true
-tokio.workspace = true
-fleek-crypto.workspace = true
 affair.workspace = true
-resolved-pathbuf.workspace = true
+anyhow.workspace = true
+lightning-interfaces.workspace = true
+lightning-utils.workspace = true
 lightning-workspace-hack.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
 
 [dev-dependencies]
-lightning-test-utils = { path = "../test-utils" }
-lightning-application = { path = "../application", features = ["test"] }
-lightning-node.workspace = true
-lightning-notifier = { path = "../notifier" }
-hp-fixed.workspace = true
+fleek-crypto.workspace = true
 futures.workspace = true
+hp-fixed.workspace = true
+lightning-application.workspace = true
+lightning-node.workspace = true
+lightning-notifier.workspace = true
+lightning-test-utils.workspace = true
 tempfile.workspace = true
