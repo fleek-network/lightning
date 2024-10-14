@@ -122,7 +122,7 @@ async fn test_epoch_change_with_some_non_committee_nodes() {
         .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
         .await;
     match result.unwrap_err() {
-        ExecuteTransactionError::Reverted((_, TransactionReceipt { response, .. })) => {
+        ExecuteTransactionError::Reverted((_, TransactionReceipt { response, .. }, _)) => {
             assert_eq!(
                 response,
                 TransactionResponse::Revert(ExecutionError::NotCommitteeMember)
@@ -134,7 +134,7 @@ async fn test_epoch_change_with_some_non_committee_nodes() {
         .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
         .await;
     match result.unwrap_err() {
-        ExecuteTransactionError::Reverted((_, TransactionReceipt { response, .. })) => {
+        ExecuteTransactionError::Reverted((_, TransactionReceipt { response, .. }, _)) => {
             assert_eq!(
                 response,
                 TransactionResponse::Revert(ExecutionError::NotCommitteeMember)
@@ -267,7 +267,7 @@ async fn test_epoch_change_reverts_epoch_already_changed() {
         .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
         .await;
     match result.unwrap_err() {
-        ExecuteTransactionError::Reverted((_, TransactionReceipt { response, .. })) => {
+        ExecuteTransactionError::Reverted((_, TransactionReceipt { response, .. }, _)) => {
             assert_eq!(
                 response,
                 TransactionResponse::Revert(ExecutionError::EpochAlreadyChanged)
