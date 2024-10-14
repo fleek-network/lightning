@@ -22,7 +22,7 @@ pub use crate::{c, fdi, partial_node_components, schema, spawn, types, ShutdownW
 pub use crate::{
     ExecutionEngineSocket,
     OriginProviderSocket,
-    SubmitTxSocket,
+    SignerSubmitTxSocket,
     FetcherSocket,
     DeliveryAcknowledgmentSocket,
     MempoolSocket,
