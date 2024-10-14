@@ -1,10 +1,12 @@
 mod builder;
 mod client;
-mod error;
-mod listener;
+mod runner;
 mod signer;
+mod syncer;
 
 pub use builder::*;
 pub use client::*;
-pub use error::*;
 pub use signer::*;
+
+#[cfg(test)]
+mod tests;

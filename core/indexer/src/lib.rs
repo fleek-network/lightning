@@ -7,11 +7,12 @@ use std::sync::{Arc, OnceLock};
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Blake3Hash, ContentUpdate, NodeIndex, UpdateMethod};
-use lightning_interfaces::SubmitTxSocket;
+use types::ExecuteTransactionRequest;
+
 pub struct Indexer<C: NodeComponents> {
     pk: NodePublicKey,
     local_index: Arc<OnceLock<NodeIndex>>,
-    submit_tx: SubmitTxSocket,
+    submit_tx: SignerSubmitTxSocket,
     query_runner: c![C::ApplicationInterface::SyncExecutor],
     _marker: PhantomData<C>,
 }
@@ -82,7 +83,10 @@ impl<C: NodeComponents> IndexerInterface<C> for Indexer<C> {
                 let updates = vec![ContentUpdate { uri, remove: false }];
                 if let Err(e) = self
                     .submit_tx
-                    .enqueue(UpdateMethod::UpdateContentRegistry { updates })
+                    .enqueue(ExecuteTransactionRequest {
+                        method: UpdateMethod::UpdateContentRegistry { updates },
+                        options: None,
+                    })
                     .await
                 {
                     tracing::error!("Submitting content registry update failed: {e:?}");
@@ -103,7 +107,10 @@ impl<C: NodeComponents> IndexerInterface<C> for Indexer<C> {
 
                 if let Err(e) = self
                     .submit_tx
-                    .enqueue(UpdateMethod::UpdateContentRegistry { updates })
+                    .enqueue(ExecuteTransactionRequest {
+                        method: UpdateMethod::UpdateContentRegistry { updates },
+                        options: None,
+                    })
                     .await
                 {
                     tracing::error!("Submitting content registry update failed: {e:?}");

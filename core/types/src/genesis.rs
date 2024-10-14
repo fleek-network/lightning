@@ -82,7 +82,7 @@ impl Genesis {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
 pub struct GenesisAccount {
     pub public_key: EthAddress,
     pub flk_balance: HpUfixed<18>,

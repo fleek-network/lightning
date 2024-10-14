@@ -5,6 +5,7 @@ use fleek_crypto::{AccountOwnerSecretKey, NodeSecretKey, SecretKey};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::types::{
     DeliveryAcknowledgmentProof,
+    ExecuteTransactionError,
     ExecutionData,
     ExecutionError,
     TransactionReceipt,
@@ -15,7 +16,6 @@ use lightning_interfaces::SyncQueryRunnerInterface;
 use lightning_test_utils::e2e::TestNetwork;
 use lightning_utils::application::QueryRunnerExt;
 use lightning_utils::poll::{poll_until, PollUntilError};
-use lightning_utils::transaction::TransactionClientError;
 use tempfile::tempdir;
 
 use super::utils::*;
@@ -122,7 +122,7 @@ async fn test_epoch_change_with_some_non_committee_nodes() {
         .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
         .await;
     match result.unwrap_err() {
-        TransactionClientError::Reverted((_, TransactionReceipt { response, .. })) => {
+        ExecuteTransactionError::Reverted((_, TransactionReceipt { response, .. })) => {
             assert_eq!(
                 response,
                 TransactionResponse::Revert(ExecutionError::NotCommitteeMember)
@@ -134,7 +134,7 @@ async fn test_epoch_change_with_some_non_committee_nodes() {
         .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
         .await;
     match result.unwrap_err() {
-        TransactionClientError::Reverted((_, TransactionReceipt { response, .. })) => {
+        ExecuteTransactionError::Reverted((_, TransactionReceipt { response, .. })) => {
             assert_eq!(
                 response,
                 TransactionResponse::Revert(ExecutionError::NotCommitteeMember)
@@ -267,7 +267,7 @@ async fn test_epoch_change_reverts_epoch_already_changed() {
         .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
         .await;
     match result.unwrap_err() {
-        TransactionClientError::Reverted((_, TransactionReceipt { response, .. })) => {
+        ExecuteTransactionError::Reverted((_, TransactionReceipt { response, .. })) => {
             assert_eq!(
                 response,
                 TransactionResponse::Revert(ExecutionError::EpochAlreadyChanged)

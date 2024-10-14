@@ -6,6 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+affair.workspace = true
 anyhow.workspace = true
 ethers.workspace = true
 fleek-crypto.workspace = true
@@ -22,4 +23,10 @@ toml = "0.7"
 tracing.workspace = true
 
 [dev-dependencies]
+lightning-application.workspace = true
+lightning-forwarder.workspace = true
+lightning-keystore.workspace = true
+lightning-node.workspace = true
+lightning-notifier.workspace = true
 lightning-test-utils.workspace = true
+tempfile.workspace = true

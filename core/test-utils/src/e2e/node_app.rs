@@ -3,6 +3,10 @@ use fleek_crypto::{AccountOwnerSecretKey, EthAddress, SecretKey};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::types::{
     Epoch,
+    ExecuteTransactionError,
+    ExecuteTransactionOptions,
+    ExecuteTransactionRequest,
+    ExecuteTransactionWait,
     Metadata,
     ProofOfConsensus,
     Tokens,
@@ -17,7 +21,7 @@ use lightning_interfaces::{
     KeystoreInterface,
     SyncQueryRunnerInterface,
 };
-use lightning_utils::transaction::{TransactionClient, TransactionClientError, TransactionSigner};
+use lightning_utils::transaction::{TransactionClient, TransactionSigner};
 
 use super::{TestNode, TestNodeComponents};
 
@@ -116,30 +120,36 @@ impl TestNode {
         &self,
         amount: HpUfixed<18>,
         account: &AccountOwnerSecretKey,
-    ) -> Result<(), TransactionClientError> {
+    ) -> Result<(), ExecuteTransactionError> {
         let client = self
             .transaction_client(TransactionSigner::AccountOwner(account.clone()))
             .await;
         // Deposit FLK tokens.
         client
-            .execute_transaction(UpdateMethod::Deposit {
-                proof: ProofOfConsensus {},
-                token: Tokens::FLK,
-                amount: amount.clone(),
-            })
+            .execute_transaction_and_wait_for_receipt(
+                UpdateMethod::Deposit {
+                    proof: ProofOfConsensus {},
+                    token: Tokens::FLK,
+                    amount: amount.clone(),
+                },
+                None,
+            )
             .await?;
 
         // Stake FLK tokens.
         client
-            .execute_transaction(UpdateMethod::Stake {
-                amount: amount.clone(),
-                node_public_key: self.keystore.get_ed25519_pk(),
-                consensus_key: Some(self.keystore.get_bls_pk()),
-                node_domain: None,
-                worker_public_key: None,
-                worker_domain: None,
-                ports: None,
-            })
+            .execute_transaction_and_wait_for_receipt(
+                UpdateMethod::Stake {
+                    amount: amount.clone(),
+                    node_public_key: self.keystore.get_ed25519_pk(),
+                    consensus_key: Some(self.keystore.get_bls_pk()),
+                    node_domain: None,
+                    worker_public_key: None,
+                    worker_domain: None,
+                    ports: None,
+                },
+                None,
+            )
             .await?;
 
         Ok(())
@@ -149,16 +159,19 @@ impl TestNode {
         &self,
         locked_for: u64,
         account: &AccountOwnerSecretKey,
-    ) -> Result<(), TransactionClientError> {
+    ) -> Result<(), ExecuteTransactionError> {
         let client = self
             .transaction_client(TransactionSigner::AccountOwner(account.clone()))
             .await;
 
         client
-            .execute_transaction(UpdateMethod::StakeLock {
-                node: self.keystore.get_ed25519_pk(),
-                locked_for,
-            })
+            .execute_transaction_and_wait_for_receipt(
+                UpdateMethod::StakeLock {
+                    node: self.keystore.get_ed25519_pk(),
+                    locked_for,
+                },
+                None,
+            )
             .await?;
 
         Ok(())
@@ -168,16 +181,19 @@ impl TestNode {
         &self,
         amount: HpUfixed<18>,
         account: &AccountOwnerSecretKey,
-    ) -> Result<(), TransactionClientError> {
+    ) -> Result<(), ExecuteTransactionError> {
         let client = self
             .transaction_client(TransactionSigner::AccountOwner(account.clone()))
             .await;
 
         client
-            .execute_transaction(UpdateMethod::Unstake {
-                amount: amount.clone(),
-                node: self.keystore.get_ed25519_pk(),
-            })
+            .execute_transaction_and_wait_for_receipt(
+                UpdateMethod::Unstake {
+                    amount: amount.clone(),
+                    node: self.keystore.get_ed25519_pk(),
+                },
+                None,
+            )
             .await?;
 
         Ok(())
@@ -186,16 +202,30 @@ impl TestNode {
     pub async fn execute_transaction_from_node(
         &self,
         method: UpdateMethod,
-    ) -> Result<(TransactionRequest, TransactionReceipt), TransactionClientError> {
-        let client = self.transaction_client(self.get_node_signer()).await;
-        client.execute_transaction(method).await
+    ) -> Result<(TransactionRequest, TransactionReceipt), ExecuteTransactionError> {
+        let resp = self
+            .signer_socket
+            .run(ExecuteTransactionRequest {
+                method,
+                options: Some(ExecuteTransactionOptions {
+                    wait: ExecuteTransactionWait::Receipt(None),
+                    ..Default::default()
+                }),
+            })
+            .await??;
+
+        Ok(resp.as_receipt())
     }
 
     pub async fn execute_transaction_from_owner(
         &self,
         method: UpdateMethod,
-    ) -> Result<(TransactionRequest, TransactionReceipt), TransactionClientError> {
+    ) -> Result<(TransactionRequest, TransactionReceipt), ExecuteTransactionError> {
         let client = self.transaction_client(self.get_owner_signer()).await;
-        client.execute_transaction(method).await
+        let resp = client
+            .execute_transaction_and_wait_for_receipt(method, None)
+            .await?;
+
+        Ok(resp.as_receipt())
     }
 }
