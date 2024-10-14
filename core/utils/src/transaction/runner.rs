@@ -5,7 +5,6 @@ use std::time::Duration;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::BlockExecutedNotification;
 use tokio::task::JoinHandle;
-use tokio::time::Instant;
 use types::{
     ExecuteTransactionError,
     ExecuteTransactionOptions,
@@ -18,7 +17,7 @@ use types::{
     UpdateMethod,
 };
 
-use super::{TransactionBuilder, TransactionSigner, DEFAULT_RECEIPT_TIMEOUT, DEFAULT_TIMEOUT};
+use super::{TransactionBuilder, TransactionSigner, DEFAULT_RECEIPT_TIMEOUT};
 use crate::application::QueryRunnerExt;
 
 pub struct TransactionRunner<C: NodeComponents> {
@@ -70,20 +69,12 @@ impl<C: NodeComponents> TransactionRunner<C> {
         let chain_id = self.app_query.get_chain_id();
         let mut retry = 0;
 
-        let timeout = options.timeout.unwrap_or(DEFAULT_TIMEOUT);
-        let start = Instant::now();
-
         let receipt_timeout = match options.wait {
             ExecuteTransactionWait::Receipt(timeout) => timeout.unwrap_or(DEFAULT_RECEIPT_TIMEOUT),
             ExecuteTransactionWait::None => DEFAULT_RECEIPT_TIMEOUT,
         };
 
         loop {
-            // Check if the timeout has elapsed.
-            if start.elapsed() > timeout {
-                return Err(ExecuteTransactionError::Timeout((method.clone(), None)));
-            }
-
             // Get the next nonce for this transaction.
             let next_nonce = self.next_nonce.fetch_add(1, Ordering::SeqCst);
 
@@ -99,9 +90,63 @@ impl<C: NodeComponents> TransactionRunner<C> {
             self.send_to_mempool(tx.clone()).await?;
 
             // Wait for the transaction to be executed and get the receipt.
-            let receipt = self
+            let receipt = match self
                 .wait_for_receipt(method.clone(), tx.clone(), block_sub, receipt_timeout)
-                .await?;
+                .await
+            {
+                Ok(receipt) => receipt,
+                Err(ExecuteTransactionError::Timeout((method, Some(tx), _))) => {
+                    // Increment the retry counter.
+                    retry += 1;
+
+                    // If we have a max retries limit, check if we've hit it.
+                    let (should_retry, max_retries) = match options.retry {
+                        ExecuteTransactionRetry::OnlyWith((max_retries, _, retry_on_timeout)) => {
+                            (retry_on_timeout, max_retries)
+                        },
+                        ExecuteTransactionRetry::AlwaysExcept((
+                            max_retries,
+                            _,
+                            retry_on_timeout,
+                        )) => (retry_on_timeout, max_retries),
+                        ExecuteTransactionRetry::Always(max_retries) => (true, max_retries),
+                        ExecuteTransactionRetry::Never => (false, None),
+                        ExecuteTransactionRetry::Default => unreachable!(),
+                    };
+
+                    // If we shouldn't retry, return the timeout error.
+                    if !should_retry {
+                        return Err(ExecuteTransactionError::Timeout((method, Some(tx), retry)));
+                    }
+
+                    // If we have a max retries limit, check if we've hit it.
+                    if let Some(max_retries) = max_retries {
+                        if retry > max_retries {
+                            tracing::warn!(
+                                "transaction reverted after max retries reached (attempts: {}): {:?}",
+                                retry,
+                                method
+                            );
+                            return Err(ExecuteTransactionError::Timeout((
+                                method,
+                                Some(tx),
+                                retry,
+                            )));
+                        }
+                    }
+
+                    tracing::warn!(
+                        "retrying transaction after timeout (hash: {:?}, attempt: {}): {:?}",
+                        tx.hash(),
+                        retry + 1,
+                        tx
+                    );
+
+                    // Continue to retry.
+                    continue;
+                },
+                Err(e) => return Err(e),
+            };
 
             // Determine if we should retry the transaction based on the receipt.
             let (should_retry, max_retries) = match &receipt.response {
@@ -114,13 +159,21 @@ impl<C: NodeComponents> TransactionRunner<C> {
                 // If the transaction reverted, retry or return an error depending on the retry
                 // configuration and if we are within the limit.
                 TransactionResponse::Revert(error) => match options.retry {
-                    ExecuteTransactionRetry::OnlyWith((max_retries, ref errors)) => (
+                    ExecuteTransactionRetry::OnlyWith((
+                        max_retries,
+                        ref errors,
+                        _retry_on_timeout,
+                    )) => (
                         errors
                             .as_ref()
                             .map_or(false, |errors| errors.contains(error)),
                         max_retries,
                     ),
-                    ExecuteTransactionRetry::AlwaysExcept((max_retries, ref errors)) => (
+                    ExecuteTransactionRetry::AlwaysExcept((
+                        max_retries,
+                        ref errors,
+                        _retry_on_timeout,
+                    )) => (
                         errors
                             .as_ref()
                             .map_or(true, |errors| !errors.contains(error)),
@@ -134,14 +187,14 @@ impl<C: NodeComponents> TransactionRunner<C> {
                 },
             };
 
+            // Increment the retry counter.
+            retry += 1;
+
             // If we shouldn't retry, return the receipt.
             if !should_retry {
                 tracing::warn!("transaction reverted (no retries): {:?}", receipt);
-                return Err(ExecuteTransactionError::Reverted((tx, receipt)));
+                return Err(ExecuteTransactionError::Reverted((tx, receipt, retry)));
             }
-
-            // Increment the retry counter.
-            retry += 1;
 
             // If we have a max retries limit, check if we've hit it.
             if let Some(max_retries) = max_retries {
@@ -151,7 +204,7 @@ impl<C: NodeComponents> TransactionRunner<C> {
                         retry,
                         receipt
                     );
-                    return Err(ExecuteTransactionError::Reverted((tx, receipt)));
+                    return Err(ExecuteTransactionError::Reverted((tx, receipt, retry)));
                 }
             }
 
@@ -185,7 +238,10 @@ impl<C: NodeComponents> TransactionRunner<C> {
         loop {
             tokio::select! {
                 _ = tokio::time::sleep(timeout) => {
-                    return Err(ExecuteTransactionError::Timeout((method, Some(tx))));
+                    // NOTE: We can use 0 for the number of attempts in the timeout error here because
+                    // we will catch this in the caller and inject the actual attempt/retry counter
+                    // that's maintained in the main loop.
+                    return Err(ExecuteTransactionError::Timeout((method, Some(tx), 0)));
                 }
                 notification = block_sub.recv() => {
                     let Some(notification) = notification else {

@@ -37,13 +37,17 @@ use super::*;
 async fn test_execute_transaction_with_account_signer_wait_for_receipt() {
     // Build and start the node.
     let account_secret_key = AccountOwnerSecretKey::generate();
-    let mut node = TestNode::<TestNodeComponents>::with_genesis_mutator(|genesis| {
-        genesis.account = vec![GenesisAccount {
-            public_key: account_secret_key.to_pk().into(),
-            ..Default::default()
-        }];
-    })
-    .await;
+    let account_secret_key_clone = account_secret_key.clone();
+    let mut node = TestNodeBuilder::new()
+        .with_genesis_mutator(move |genesis| {
+            genesis.account = vec![GenesisAccount {
+                public_key: account_secret_key_clone.to_pk().into(),
+                ..Default::default()
+            }];
+        })
+        .build::<TestNodeComponents>()
+        .await
+        .unwrap();
     node.start().await;
 
     // Build a transaction client.
@@ -81,7 +85,10 @@ async fn test_execute_transaction_with_account_signer_wait_for_receipt() {
 #[tokio::test]
 async fn test_execute_transaction_with_node_signer_wait_for_receipt() {
     // Build and start the node.
-    let mut node = TestNode::<TestNodeComponents>::new().await;
+    let mut node = TestNodeBuilder::new()
+        .build::<TestNodeComponents>()
+        .await
+        .unwrap();
     node.start().await;
 
     // Build a transaction client.
@@ -127,13 +134,17 @@ async fn test_execute_transaction_with_node_signer_wait_for_receipt() {
 async fn test_execute_transaction_with_account_signer_wait_for_receipt_no_retry() {
     // Build and start the node.
     let account_secret_key = AccountOwnerSecretKey::generate();
-    let mut node = TestNode::<TestNodeComponents>::with_genesis_mutator(|genesis| {
-        genesis.account = vec![GenesisAccount {
-            public_key: account_secret_key.to_pk().into(),
-            ..Default::default()
-        }];
-    })
-    .await;
+    let account_secret_key_clone = account_secret_key.clone();
+    let mut node = TestNodeBuilder::new()
+        .with_genesis_mutator(move |genesis| {
+            genesis.account = vec![GenesisAccount {
+                public_key: account_secret_key_clone.to_pk().into(),
+                ..Default::default()
+            }];
+        })
+        .build::<TestNodeComponents>()
+        .await
+        .unwrap();
     node.start().await;
 
     // Build a transaction client.
@@ -149,18 +160,18 @@ async fn test_execute_transaction_with_account_signer_wait_for_receipt_no_retry(
             Some(ExecuteTransactionOptions {
                 wait: ExecuteTransactionWait::Receipt(None),
                 retry: ExecuteTransactionRetry::Never,
-                ..Default::default()
             }),
         )
         .await;
     match result.unwrap_err() {
-        ExecuteTransactionError::Reverted((tx, receipt)) => {
+        ExecuteTransactionError::Reverted((tx, receipt, attempts)) => {
             assert_eq!(
                 receipt.response,
                 TransactionResponse::Revert(ExecutionError::OnlyNode)
             );
             assert!(!tx.hash().is_empty());
             assert_eq!(receipt.transaction_hash, tx.hash());
+            assert_eq!(attempts, 1);
         },
         _ => panic!("unexpected error type"),
     }
@@ -175,7 +186,10 @@ async fn test_execute_transaction_with_account_signer_wait_for_receipt_no_retry(
 #[tokio::test]
 async fn test_execute_transaction_with_node_signer_wait_for_receipt_no_retry() {
     // Build and start the node.
-    let mut node = TestNode::<TestNodeComponents>::new().await;
+    let mut node = TestNodeBuilder::new()
+        .build::<TestNodeComponents>()
+        .await
+        .unwrap();
     node.start().await;
 
     // Build a transaction client.
@@ -191,18 +205,18 @@ async fn test_execute_transaction_with_node_signer_wait_for_receipt_no_retry() {
             Some(ExecuteTransactionOptions {
                 wait: ExecuteTransactionWait::Receipt(None),
                 retry: ExecuteTransactionRetry::Never,
-                ..Default::default()
             }),
         )
         .await;
     match result.unwrap_err() {
-        ExecuteTransactionError::Reverted((tx, receipt)) => {
+        ExecuteTransactionError::Reverted((tx, receipt, attempts)) => {
             assert_eq!(
                 receipt.response,
                 TransactionResponse::Revert(ExecutionError::EpochHasNotStarted)
             );
             assert!(!tx.hash().is_empty());
             assert_eq!(receipt.transaction_hash, tx.hash());
+            assert_eq!(attempts, 1);
         },
         _ => panic!("unexpected error type"),
     }
@@ -218,13 +232,17 @@ async fn test_execute_transaction_with_node_signer_wait_for_receipt_no_retry() {
 async fn test_execute_transaction_with_account_signer_wait_for_receipt_retry_on_revert() {
     // Build and start the node.
     let account_secret_key = AccountOwnerSecretKey::generate();
-    let mut node = TestNode::<TestNodeComponents>::with_genesis_mutator(|genesis| {
-        genesis.account = vec![GenesisAccount {
-            public_key: account_secret_key.to_pk().into(),
-            ..Default::default()
-        }];
-    })
-    .await;
+    let account_secret_key_clone = account_secret_key.clone();
+    let mut node = TestNodeBuilder::new()
+        .with_genesis_mutator(move |genesis| {
+            genesis.account = vec![GenesisAccount {
+                public_key: account_secret_key_clone.to_pk().into(),
+                ..Default::default()
+            }];
+        })
+        .build::<TestNodeComponents>()
+        .await
+        .unwrap();
     node.start().await;
 
     // Build a transaction client.
@@ -241,18 +259,18 @@ async fn test_execute_transaction_with_account_signer_wait_for_receipt_retry_on_
                 wait: ExecuteTransactionWait::Receipt(None),
                 // `None` means to use the default max retries.
                 retry: ExecuteTransactionRetry::Always(None),
-                ..Default::default()
             }),
         )
         .await;
     match result.unwrap_err() {
-        ExecuteTransactionError::Reverted((tx, receipt)) => {
+        ExecuteTransactionError::Reverted((tx, receipt, attempts)) => {
             assert_eq!(
                 receipt.response,
                 TransactionResponse::Revert(ExecutionError::OnlyNode)
             );
             assert!(!tx.hash().is_empty());
             assert_eq!(receipt.transaction_hash, tx.hash());
+            assert_eq!(attempts, 4);
         },
         _ => panic!("unexpected error type"),
     }
@@ -267,7 +285,10 @@ async fn test_execute_transaction_with_account_signer_wait_for_receipt_retry_on_
 #[tokio::test]
 async fn test_execute_transaction_with_node_signer_wait_for_receipt_retry_on_revert() {
     // Build and start the node.
-    let mut node = TestNode::<TestNodeComponents>::new().await;
+    let mut node = TestNodeBuilder::new()
+        .build::<TestNodeComponents>()
+        .await
+        .unwrap();
     node.start().await;
 
     // Build a transaction client.
@@ -284,24 +305,68 @@ async fn test_execute_transaction_with_node_signer_wait_for_receipt_retry_on_rev
                 wait: ExecuteTransactionWait::Receipt(None),
                 // `None` means to use the default max retries.
                 retry: ExecuteTransactionRetry::Always(None),
-                ..Default::default()
             }),
         )
         .await;
     match result.unwrap_err() {
-        ExecuteTransactionError::Reverted((tx, receipt)) => {
+        ExecuteTransactionError::Reverted((tx, receipt, attempts)) => {
             assert_eq!(
                 receipt.response,
                 TransactionResponse::Revert(ExecutionError::EpochHasNotStarted)
             );
             assert!(!tx.hash().is_empty());
             assert_eq!(receipt.transaction_hash, tx.hash());
+            assert_eq!(attempts, 4);
         },
         _ => panic!("unexpected error type"),
     }
 
     // Check that the nonce has been incremented 4 times, for the initial attempt and each retry.
     assert_eq!(node.get_node_nonce(), 4);
+
+    // Shutdown the node.
+    node.shutdown().await;
+}
+
+#[tokio::test]
+async fn test_execute_transaction_with_node_signer_wait_for_receipt_retry_on_timeout() {
+    // Build and start the node.
+    let mut node = TestNodeBuilder::new()
+        .with_mock_consensus_config(MockConsensusConfig {
+            probability_txn_lost: 1.0,
+            ..Default::default()
+        })
+        .build::<TestNodeComponents>()
+        .await
+        .unwrap();
+    node.start().await;
+
+    // Build a transaction client.
+    let client = node.node_transaction_client().await;
+
+    // Check that the nonce starts at 0.
+    assert_eq!(node.get_node_nonce(), 0);
+
+    // Execute a transaction that will be lost.
+    let result = client
+        .execute_transaction(
+            UpdateMethod::IncrementNonce {},
+            Some(ExecuteTransactionOptions {
+                wait: ExecuteTransactionWait::Receipt(Some(Duration::from_millis(200))),
+                retry: ExecuteTransactionRetry::Always(None),
+            }),
+        )
+        .await;
+    match result.unwrap_err() {
+        ExecuteTransactionError::Timeout((_, _, attempts)) => {
+            // Check that there were 4 attempts; 1 initial attempt and 3 retries.
+            assert_eq!(attempts, 4);
+        },
+        _ => panic!("unexpected error type"),
+    }
+
+    // Check that the nonce has not been incremented since no transaction was included.
+    assert_eq!(node.get_node_nonce(), 0);
 
     // Shutdown the node.
     node.shutdown().await;
@@ -326,28 +391,6 @@ struct TestNode<C: NodeComponents> {
 }
 
 impl<C: NodeComponents> TestNode<C> {
-    pub async fn new() -> Self {
-        Self::with_genesis_mutator(|_| {}).await
-    }
-
-    pub async fn with_genesis_mutator(mutator: impl FnOnce(&mut Genesis)) -> Self {
-        let temp_dir = tempdir().unwrap();
-        let inner = Self::build_inner(&temp_dir, mutator).await.unwrap();
-
-        let app = inner.provider.get::<C::ApplicationInterface>();
-        let notifier = inner.provider.get::<C::NotifierInterface>();
-        let forwarder = inner.provider.get::<C::ForwarderInterface>();
-
-        Self {
-            inner,
-            _temp_dir: temp_dir,
-
-            app,
-            notifier,
-            forwarder,
-        }
-    }
-
     pub async fn start(&mut self) {
         self.inner.start().await;
     }
@@ -394,11 +437,34 @@ impl<C: NodeComponents> TestNode<C> {
         TransactionSigner::AccountOwner(account_secret_key.clone())
             .get_nonce(&self.app.sync_query())
     }
+}
 
-    async fn build_inner(
-        temp_dir: &TempDir,
-        genesis_mutator: impl FnOnce(&mut Genesis),
-    ) -> Result<Node<C>> {
+type GenesisMutator = Box<dyn FnOnce(&mut Genesis)>;
+
+struct TestNodeBuilder {
+    genesis_mutator: Option<GenesisMutator>,
+    mock_consensus_config: Option<MockConsensusConfig>,
+}
+
+impl TestNodeBuilder {
+    pub fn new() -> Self {
+        Self {
+            genesis_mutator: None,
+            mock_consensus_config: None,
+        }
+    }
+
+    pub fn with_genesis_mutator(mut self, mutator: impl FnOnce(&mut Genesis) + 'static) -> Self {
+        self.genesis_mutator = Some(Box::new(mutator));
+        self
+    }
+
+    pub fn with_mock_consensus_config(mut self, config: MockConsensusConfig) -> Self {
+        self.mock_consensus_config = Some(config);
+        self
+    }
+
+    pub async fn build<C: NodeComponents>(self) -> Result<TestNode<C>> {
         let keystore = EphemeralKeystore::<C>::default();
         let node_secret_key = keystore.get_ed25519_sk();
         let mut genesis = Genesis {
@@ -429,23 +495,36 @@ impl<C: NodeComponents> TestNode<C> {
             }],
             ..Default::default()
         };
-        genesis_mutator(&mut genesis);
+        if let Some(mutator) = self.genesis_mutator {
+            mutator(&mut genesis);
+        }
+        let temp_dir = tempdir().unwrap();
         let genesis_path = genesis
             .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
             .unwrap();
-        Node::<C>::init_with_provider(
+        let node = Node::<C>::init_with_provider(
             fdi::Provider::default().with(keystore).with(
                 JsonConfigProvider::default()
                     .with::<Application<C>>(ApplicationConfig::test(genesis_path))
-                    .with::<MockConsensus<C>>(MockConsensusConfig {
-                        min_ordering_time: 0,
-                        max_ordering_time: 0,
-                        probability_txn_lost: 0.0,
-                        transactions_to_lose: HashSet::new(),
-                        new_block_interval: Duration::from_secs(0),
-                    }),
+                    .with::<MockConsensus<C>>(self.mock_consensus_config.unwrap_or(
+                        MockConsensusConfig {
+                            min_ordering_time: 0,
+                            max_ordering_time: 0,
+                            probability_txn_lost: 0.0,
+                            transactions_to_lose: HashSet::new(),
+                            new_block_interval: Duration::from_secs(0),
+                        },
+                    )),
             ),
         )
-        .map_err(anyhow::Error::from)
+        .map_err(anyhow::Error::from)?;
+        Ok(TestNode {
+            app: node.provider.get::<C::ApplicationInterface>(),
+            notifier: node.provider.get::<C::NotifierInterface>(),
+            forwarder: node.provider.get::<C::ForwarderInterface>(),
+
+            inner: node,
+            _temp_dir: temp_dir,
+        })
     }
 }

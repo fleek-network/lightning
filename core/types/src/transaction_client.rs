@@ -18,7 +18,6 @@ pub struct ExecuteTransactionRequest {
 pub struct ExecuteTransactionOptions {
     pub retry: ExecuteTransactionRetry,
     pub wait: ExecuteTransactionWait,
-    pub timeout: Option<Timeout>,
 }
 
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
@@ -57,19 +56,35 @@ pub enum ExecuteTransactionRetry {
     Default,
     Never,
     Always(Option<MaxRetries>),
-    AlwaysExcept((Option<MaxRetries>, Option<Vec<ExecutionError>>)),
-    OnlyWith((Option<MaxRetries>, Option<Vec<ExecutionError>>)),
+    AlwaysExcept(
+        (
+            Option<MaxRetries>,
+            Option<Vec<ExecutionError>>,
+            RetryOnTimeout,
+        ),
+    ),
+    OnlyWith(
+        (
+            Option<MaxRetries>,
+            Option<Vec<ExecutionError>>,
+            RetryOnTimeout,
+        ),
+    ),
 }
+
+pub type RetryOnTimeout = bool;
+
+pub type Attempts = u8;
 
 #[derive(Debug, Error, Eq, PartialEq)]
 pub enum ExecuteTransactionError {
     // The transaction was submitted but reverted during execution for the reason in the receipt.
     #[error("Transaction was reverted: {:?}", .0.0.hash())]
-    Reverted((TransactionRequest, TransactionReceipt)),
+    Reverted((TransactionRequest, TransactionReceipt, Attempts)),
 
     /// The transaction execution timed out.
     #[error("Transaction timeout: {:?}", .0)]
-    Timeout((UpdateMethod, Option<TransactionRequest>)),
+    Timeout((UpdateMethod, Option<TransactionRequest>, Attempts)),
 
     /// The transaction was not submitted to the signer.
     #[error("Failed to submit transaction to signer: {:?}", .0)]

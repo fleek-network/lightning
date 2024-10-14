@@ -18,11 +18,8 @@ use crate::transaction::runner::TransactionRunner;
 /// Default max number of times we will resend a transaction.
 pub(crate) const DEFAULT_MAX_RETRIES: u8 = 3;
 
-/// Default timeout for a transaction to be executed.
-pub(crate) const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
-
 /// Default timeout for waiting for a transaction receipt.
-pub(crate) const DEFAULT_RECEIPT_TIMEOUT: Duration = Duration::from_secs(20);
+pub(crate) const DEFAULT_RECEIPT_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// A client for submitting and executing transactions, and optionally waiting for a receipt, and/or
 /// retry if reverted.
@@ -89,7 +86,7 @@ impl<C: NodeComponents> TransactionClient<C> {
         let mut options = options.unwrap_or_default();
 
         // Default to retrying `MAX_RETRIES` times if not specified.
-        match &options.retry {
+        match options.retry {
             ExecuteTransactionRetry::Default => {
                 // Default to retrying `DEFAULT_MAX_RETRIES` times for backwards compatibility with
                 // signer component expectations.
@@ -98,25 +95,26 @@ impl<C: NodeComponents> TransactionClient<C> {
             ExecuteTransactionRetry::Always(None) => {
                 options.retry = ExecuteTransactionRetry::Always(Some(DEFAULT_MAX_RETRIES));
             },
-            ExecuteTransactionRetry::AlwaysExcept((None, errors)) => {
+            ExecuteTransactionRetry::AlwaysExcept((None, errors, retry_on_timeout)) => {
                 options.retry = ExecuteTransactionRetry::AlwaysExcept((
                     Some(DEFAULT_MAX_RETRIES),
                     errors.clone(),
+                    retry_on_timeout,
                 ));
             },
-            ExecuteTransactionRetry::OnlyWith((None, errors)) => {
-                options.retry =
-                    ExecuteTransactionRetry::OnlyWith((Some(DEFAULT_MAX_RETRIES), errors.clone()));
+            ExecuteTransactionRetry::OnlyWith((None, errors, retry_on_timeout)) => {
+                options.retry = ExecuteTransactionRetry::OnlyWith((
+                    Some(DEFAULT_MAX_RETRIES),
+                    errors.clone(),
+                    retry_on_timeout,
+                ));
             },
             _ => {},
         }
 
         // Default timeout to `DEFAULT_TIMEOUT` if not specified.
-        if options.timeout.is_none() {
-            options.timeout = Some(DEFAULT_TIMEOUT);
-        }
         if let ExecuteTransactionWait::Receipt(None) = options.wait {
-            options.wait = ExecuteTransactionWait::Receipt(Some(DEFAULT_TIMEOUT));
+            options.wait = ExecuteTransactionWait::Receipt(Some(DEFAULT_RECEIPT_TIMEOUT));
         }
 
         // Spawn a tokio task to wait for the transaction receipt, retry if reverted, and return the

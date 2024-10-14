@@ -175,18 +175,18 @@ async fn test_execute_transaction_and_wait_for_receipt_without_retry_on_revert()
             Some(ExecuteTransactionOptions {
                 wait: ExecuteTransactionWait::Receipt(None),
                 retry: ExecuteTransactionRetry::Never,
-                ..Default::default()
             }),
         )
         .await;
     match result.unwrap_err() {
-        ExecuteTransactionError::Reverted((tx, receipt)) => {
+        ExecuteTransactionError::Reverted((tx, receipt, attempts)) => {
             assert_eq!(
                 receipt.response,
                 TransactionResponse::Revert(ExecutionError::EpochHasNotStarted)
             );
             assert!(!tx.hash().is_empty());
             assert_eq!(receipt.transaction_hash, tx.hash());
+            assert_eq!(attempts, 1);
         },
         _ => panic!("unexpected error type"),
     }
@@ -214,7 +214,6 @@ async fn test_execute_transaction_and_no_wait_for_receipt_without_retry_on_rever
             Some(ExecuteTransactionOptions {
                 wait: ExecuteTransactionWait::None,
                 retry: ExecuteTransactionRetry::Never,
-                ..Default::default()
             }),
         )
         .await
@@ -255,18 +254,18 @@ async fn test_execute_transaction_and_wait_for_receipt_retry_on_revert() {
                 wait: ExecuteTransactionWait::Receipt(None),
                 // `None` means to use the default max retries.
                 retry: ExecuteTransactionRetry::Always(None),
-                ..Default::default()
             }),
         )
         .await;
     match result.unwrap_err() {
-        ExecuteTransactionError::Reverted((tx, receipt)) => {
+        ExecuteTransactionError::Reverted((tx, receipt, attempts)) => {
             assert_eq!(
                 receipt.response,
                 TransactionResponse::Revert(ExecutionError::EpochHasNotStarted)
             );
             assert!(!tx.hash().is_empty());
             assert_eq!(receipt.transaction_hash, tx.hash());
+            assert_eq!(attempts, 4);
         },
         _ => panic!("unexpected error type"),
     }
@@ -295,7 +294,6 @@ async fn test_execute_transaction_and_no_wait_for_receipt_retry_on_revert() {
                 wait: ExecuteTransactionWait::None,
                 // `None` means to use the default max retries.
                 retry: ExecuteTransactionRetry::Always(None),
-                ..Default::default()
             }),
         )
         .await
