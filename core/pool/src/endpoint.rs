@@ -756,6 +756,13 @@ where
             listen_address: self.listen_address(),
         });
 
+        // Wait for genesis to be applied, if it hasn't already.
+        // This is needed because when a new connection is attempted, we check for sufficient stake
+        // from the application state, and reject the connection if the incoming node fails that
+        // check. So this avoids that race condition where on startup, most likely in tests when
+        // genesis is applied after the node starts.
+        self.query_runner.wait_for_genesis().await;
+
         loop {
             tokio::select! {
                 next = muxer.accept() => {
