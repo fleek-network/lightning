@@ -22,6 +22,7 @@ mod rpc;
 mod state;
 mod state_proof;
 mod transaction;
+mod transaction_client;
 
 pub use application::*;
 pub use blockstore::*;
@@ -45,6 +46,7 @@ pub use rpc::*;
 pub use state::*;
 pub use state_proof::*;
 pub use transaction::*;
+pub use transaction_client::*;
 
 /// The physical address of a node where it can be reached, the port numbers are
 /// omitted since each node is responsible to open the standard port numbers for
