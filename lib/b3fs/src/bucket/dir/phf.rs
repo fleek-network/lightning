@@ -9,7 +9,8 @@ use siphasher::sip128::{Hash128, Hasher128};
 use crate::entry::InlineVec;
 
 // Offset of some entry on the file.
-pub type Offset = NonZeroU32;
+pub type Offset = u32;
+pub const PHF_TABLE_RANDOMIZED_KEY_SIZE: usize = 8;
 
 #[derive(Clone)]
 pub struct PhfGenerator {
@@ -65,7 +66,12 @@ pub fn hash(entry: &[u8], key: u64) -> Hashes {
     }
 }
 
-const DEFAULT_LAMBDA: usize = 5;
+const PHF_DEFAULT_LAMBDA: usize = 5;
+
+pub fn calculate_buckets_len(entries_len: usize) -> usize {
+    (entries_len + PHF_DEFAULT_LAMBDA - 1) / PHF_DEFAULT_LAMBDA
+}
+
 fn try_generate_hash(entries: &[(InlineVec, Offset)], key: u64) -> Option<HasherState> {
     struct Bucket {
         idx: usize,
@@ -73,7 +79,7 @@ fn try_generate_hash(entries: &[(InlineVec, Offset)], key: u64) -> Option<Hasher
     }
 
     let table_len = entries.len();
-    let buckets_len = (entries.len() + DEFAULT_LAMBDA - 1) / DEFAULT_LAMBDA;
+    let buckets_len = calculate_buckets_len(entries.len());
     assert!(table_len <= (u16::MAX as usize));
 
     let mut buckets = (0..buckets_len)
@@ -124,7 +130,7 @@ fn try_generate_hash(entries: &[(InlineVec, Offset)], key: u64) -> Option<Hasher
                         continue 'disps;
                     }
 
-                    map[idx] = u32::from(*offset);
+                    map[idx] = *offset;
                     values_to_clean.push(idx);
                 }
 
