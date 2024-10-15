@@ -44,8 +44,8 @@ pub struct Blake3Hasher<T: HashTreeCollector = Vec<[u8; 32]>> {
     pub tree: T,
 }
 
-unsafe impl<T: HashTreeCollector> Send for Blake3Hasher<T> {}
-unsafe impl<T: HashTreeCollector> Sync for Blake3Hasher<T> {}
+unsafe impl<T: HashTreeCollector> Send for Blake3Hasher<T> where T: Send {}
+unsafe impl<T: HashTreeCollector> Sync for Blake3Hasher<T> where T: Sync {}
 
 /// Incremental hasher for a single block, this can only be used to hash only one block.
 #[derive(Clone)]

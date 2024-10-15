@@ -88,18 +88,10 @@ mod tests {
     use crate::bucket::file::reader::B3File;
     use crate::bucket::file::writer::FileWriter;
     use crate::bucket::file::B3FSFile;
+    use crate::bucket::tests::get_random_file;
     use crate::bucket::Bucket;
     use crate::hasher::b3::MAX_BLOCK_SIZE_IN_BYTES;
     use crate::utils;
-
-    pub(super) fn get_random_file(size: usize) -> Vec<u8> {
-        let mut data = Vec::with_capacity(MAX_BLOCK_SIZE_IN_BYTES);
-        for _ in 0..size {
-            let d: [u8; 32] = random();
-            data.extend(d);
-        }
-        data
-    }
 
     pub(super) async fn verify_writer(temp_dir: &PathBuf, n: usize) {
         let mut dir = std::fs::read_dir(temp_dir);
@@ -199,8 +191,9 @@ mod tests {
             counter += 1;
             assert!(
                 file_blocks.contains(&utils::to_hex(&block).as_str().to_string()),
-                "Block not found: {}",
-                utils::to_hex(&block)
+                "Block not found: {} - Blocks: {:?}",
+                utils::to_hex(&block),
+                file_blocks
             );
         }
         assert_eq!(counter, num_entries as usize);
