@@ -7,6 +7,7 @@ use tokio::sync::RwLock;
 
 use super::phf::PhfGenerator;
 use super::state::writer::DirWriterState;
+use super::state::{DirState as _, InnerDirState};
 use crate::bucket::{errors, Bucket};
 use crate::entry::{BorrowedEntry, BorrowedLink};
 use crate::hasher::byte_hasher::Blake3Hasher;
@@ -21,15 +22,17 @@ pub struct DirWriter {
 
 impl DirWriter {
     pub async fn new(bucket: &Bucket, num_entries: usize) -> Result<Self, errors::WriteError> {
-        let inner_state = DirWriterState::new(bucket, num_entries).await?;
-        Ok(Self { state: inner_state })
+        let state = InnerDirState::new(bucket, num_entries)
+            .await
+            .map(|state| Self { state })?;
+        Ok(state)
     }
 
     pub async fn insert<'b>(
         &mut self,
         entry: impl Into<BorrowedEntry<'b>>,
     ) -> Result<(), errors::InsertError> {
-        self.state.insert_entry(entry).await
+        self.state.insert_entry(entry.into()).await
     }
 
     /// Finalize this write and flush the data to the disk.

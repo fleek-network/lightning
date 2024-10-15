@@ -1,6 +1,7 @@
 use std::io;
 
-use super::state::uwriter::DirUWriterState;
+use super::state::uwriter::{DirUWriterCollector, DirUWriterState};
+use super::state::{DirState, InnerDirState};
 use crate::bucket::{errors, Bucket};
 use crate::entry::BorrowedEntry;
 use crate::hasher::collector::BufCollector;
@@ -17,21 +18,22 @@ impl UntrustedDirWriter {
         num_entries: usize,
         hash: [u8; 32],
     ) -> Result<Self, errors::WriteError> {
-        let uwriter = DirUWriterState::new(bucket, num_entries, hash)
+        let collector = DirUWriterCollector::new(hash);
+        let state = InnerDirState::new_with_collector(bucket, num_entries, collector)
             .await
             .map(|state| Self { state })?;
-        Ok(uwriter)
+        Ok(state)
     }
 
     pub async fn feed_proof(&mut self, proof: &[u8]) -> Result<(), errors::FeedProofError> {
-        self.state.feed_proof(proof)
+        self.state.collector.feed_proof(proof)
     }
 
     pub async fn insert<'a>(
         &mut self,
         entry: impl Into<BorrowedEntry<'a>>,
     ) -> Result<(), errors::InsertError> {
-        self.state.insert_entry(entry).await
+        self.state.insert_entry(entry.into()).await
     }
 
     /// Finalize this write and flush the data to the disk.

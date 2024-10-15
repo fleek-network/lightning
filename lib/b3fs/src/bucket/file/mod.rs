@@ -199,8 +199,9 @@ mod tests {
             counter += 1;
             assert!(
                 file_blocks.contains(&utils::to_hex(&block).as_str().to_string()),
-                "Block not found: {}",
-                utils::to_hex(&block)
+                "Block not found: {} - Blocks: {:?}",
+                utils::to_hex(&block),
+                file_blocks
             );
         }
         assert_eq!(counter, num_entries as usize);
