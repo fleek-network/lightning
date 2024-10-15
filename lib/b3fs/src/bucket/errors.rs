@@ -2,6 +2,7 @@ use thiserror::Error;
 use triomphe::UniqueArc;
 
 use crate::hasher::collector::InvalidHashSize;
+use crate::{hasher, stream};
 
 #[derive(Error, Debug)]
 pub enum ReadError {
@@ -11,6 +12,14 @@ pub enum ReadError {
     RefFile,
     #[error("Error while converting hash tree")]
     HashTreeConversion,
+    #[error("Invalid hashtree {0}")]
+    InvalidHashtree(#[from] crate::collections::error::CollectionTryFromError),
+    #[error("Error while deserializing PHF table. {0}")]
+    Deserialization(String),
+    #[error("Invalid entry at offset {2}. Required name {0:?}, found {1:?}")]
+    InvalidEntryAtOffset(Vec<u8>, Vec<u8>, u32),
+    #[error("Invalid bloom filter")]
+    InvalidBloomFilter,
 }
 
 #[derive(Error, Debug)]
@@ -19,6 +28,8 @@ pub enum FeedProofError {
     UnexpectedCall,
     #[error("Proof is not matching the current root.")]
     InvalidProof,
+    #[error("Error while feeding proof. {0}")]
+    VerificationError(#[from] stream::verifier::VerificationError),
 }
 
 #[derive(Error, Debug)]
@@ -49,6 +60,8 @@ pub enum InsertError {
     IO(#[from] std::io::Error),
     #[error("Invalid Hash or internal hashes content doing incremental validation")]
     IncrementalVerification,
+    #[error("Error trying to insert entry in phf generator. {0}")]
+    InvalidEntry(#[from] hasher::dir_hasher::Error),
 }
 
 #[derive(Error, Debug)]
@@ -71,4 +84,6 @@ pub enum CommitError {
     Serialization(String),
     #[error("Error writing on spawn blocking file. {0}")]
     SpawnError(#[from] tokio::task::JoinError),
+    #[error("Error while committing. {0}")]
+    CommitError(#[from] WriteError),
 }

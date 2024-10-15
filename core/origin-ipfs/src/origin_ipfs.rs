@@ -157,7 +157,7 @@ impl<C: NodeComponents> IPFSOrigin<C> {
                     if last_dir.is_some() {
                         hash = last_dir.take().unwrap().commit().await?;
                     }
-                    let dir_writer = DirWriter::new(&bucket, dir.links().len());
+                    let dir_writer = DirWriter::new(&bucket, dir.links().len()).await?;
                     last_dir.replace(dir_writer);
                 },
                 Some(IpldItem::Chunk(_)) => {

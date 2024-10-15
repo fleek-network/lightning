@@ -16,6 +16,7 @@ smol_str = "0.2"
 smallvec = "1.11"
 triomphe = "0.1.9"
 bytes = "1.5"
+fastbloom-rs = "0.5.9"
 
 # IO / multi-threading
 tokio.workspace = true
