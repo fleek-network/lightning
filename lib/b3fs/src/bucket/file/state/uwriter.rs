@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::path::PathBuf;
 
 use bytes::BytesMut;
@@ -10,102 +11,98 @@ use crate::hasher::byte_hasher::BlockHasher;
 use crate::hasher::collector::BufCollector;
 use crate::stream::verifier::{IncrementalVerifier, WithHashTreeCollector};
 
-pub struct UntrustedFileWriterState {
-    inner_state: InnerWriterState,
+/// Collector for untrusted file writing operations
+pub(crate) struct UntrustedFileWriterCollector {
+    /// The current block hasher
     current_hasher: BlockHasher,
-}
-impl UntrustedFileWriterState {
-    pub(crate) async fn new(bucket: &Bucket) -> Result<Self, io::Error> {
-        let mut block_hasher = BlockHasher::new();
-        block_hasher.set_block(0);
-        InnerWriterState::new(bucket).await.map(|inner_state| Self {
-            inner_state,
-            current_hasher: block_hasher,
-        })
-    }
+    /// An incremental verifier for hash tree collection
+    increment_verifier: RefCell<IncrementalVerifier<WithHashTreeCollector<BufCollector>>>,
+    /// The root hash provided by the caller
+    root_hash: [u8; 32],
 }
 
-impl WriterState for UntrustedFileWriterState {
-    type Collector = IncrementalVerifier<WithHashTreeCollector<BufCollector>>;
-
-    fn get_mut_block_file(&mut self) -> &mut Option<BlockFile> {
-        &mut self.inner_state.current_block_file
+impl WithCollector for UntrustedFileWriterCollector {
+    /// In this case, we don't need to collect anything because the untrusted writer
+    /// will write the bytes directly to the block file
+    async fn collect(&mut self, bytes: &[u8]) -> Result<(), errors::WriteError> {
+        Ok(())
     }
 
-    /// This function is called when we have written `block_before_remaining` bytes to the current
-    /// block or when there is no current block file.
-    ///
-    /// - In the first case, since we already have a block file, we ask to the collector for the
-    ///   current block hash and we commit the block file to the final path. Then we create a new
-    ///   block file and write the remaining bytes.
-    ///
-    ///
-    /// - In the second case, we create a new block file and write the bytes to it.
+    /// In Untrusted case, we only need a new hasher for the new block. IncrementalVerifier remains
+    /// the same.
+    async fn on_new_block(
+        &mut self,
+        count_block: usize,
+        _writer: impl AsyncWriteExt + Unpin,
+    ) -> Result<(), io::Error> {
+        self.current_hasher = BlockHasher::new();
+        self.current_hasher.set_block(count_block);
+        Ok(())
+    }
+
+    /// Update hasher and validate block hash against verifier when reaching the maximum block size
     async fn reach_max_block(
         &mut self,
-        collector: &mut IncrementalVerifier<WithHashTreeCollector<BufCollector>>,
-        bytes_before_remaining: &[u8],
         bytes: &[u8],
-    ) -> Result<(), errors::WriteError> {
-        if let Some(ref mut block) = self.inner_state.current_block_file {
-            self.current_hasher.update(bytes_before_remaining);
-            let block_hash = self.current_hasher.clone().finalize(false);
-            collector
-                .verify_hash(block_hash)
-                .map_err(|_| errors::WriteError::InvalidBlockHash)?;
-            // Add the block hash and the block file path to the list of block files so far
-            // committed.
-            self.inner_state.new_block(block_hash).await?;
-            self.current_hasher = BlockHasher::new();
-            self.current_hasher.set_block(self.inner_state.count_block);
-
-            // Create a new file to write the remaining bytes.
-            self.inner_state.create_new_block_file(bytes).await?;
-            self.current_hasher.update(bytes);
-        } else {
-            return Err(errors::WriteError::BlockFileNotFound);
-        }
-        Ok(())
+        _count_block: usize,
+    ) -> Result<[u8; 32], errors::WriteError> {
+        self.current_hasher.update(bytes);
+        let block_hash = self.current_hasher.clone().finalize(false);
+        self.increment_verifier
+            .borrow_mut()
+            .verify_hash(block_hash)
+            .map_err(|_| errors::WriteError::InvalidBlockHash)?;
+        Ok(block_hash)
     }
 
-    async fn continue_write(&mut self, bytes: &[u8]) -> Result<(), errors::WriteError> {
-        self.inner_state.write_block_file(bytes).await?;
+    /// Processes bytes after collection. In this case, we need to update hasher with the remaining
+    /// bytes.
+    async fn post_collect(&mut self, bytes: &[u8]) -> Result<(), errors::WriteError> {
         self.current_hasher.update(bytes);
         Ok(())
     }
 
-    async fn no_block_file(&mut self, bytes: &[u8]) -> Result<(), errors::WriteError> {
-        self.inner_state.create_new_block_file(bytes).await?;
-        self.current_hasher.update(bytes);
-        Ok(())
+    /// Get the final block hash and verify it against the verifier
+    async fn final_block(
+        &mut self,
+        count_block: usize,
+    ) -> Result<Option<[u8; 32]>, errors::WriteError> {
+        let block_hash = self.current_hasher.clone().finalize(false);
+        self.increment_verifier
+            .borrow_mut()
+            .verify_hash(block_hash)
+            .map_err(|_| errors::WriteError::InvalidBlockHash)?;
+        Ok(Some(block_hash))
     }
 
-    async fn commit(
-        mut self,
-        mut collector: Self::Collector,
-        root_hash: [u8; 32],
-    ) -> Result<[u8; 32], errors::CommitError> {
-        if let Some(ref mut block_file) = self.inner_state.current_block_file {
-            let block_hash = self.current_hasher.clone().finalize(false);
-            collector
-                .verify_hash(block_hash)
-                .map_err(|_| errors::CommitError::InvalidBlockHash)?;
+    /// Finalizes the hash tree and return the root hash
+    async fn finalize_tree(&mut self) -> Result<(BufCollector, [u8; 32]), errors::WriteError> {
+        let mut collector = self.increment_verifier.take().finalize();
+        Ok((collector, self.root_hash))
+    }
+}
 
-            self.inner_state.new_block(block_hash).await?;
+/// Type alias for the untrusted file writer state
+pub type UntrustedFileWriterState = InnerWriterState<UntrustedFileWriterCollector>;
+
+impl UntrustedFileWriterCollector {
+    /// Creates a new UntrustedFileWriterCollector
+    pub(crate) fn new(root_hash: [u8; 32]) -> Self {
+        let current_hasher = BlockHasher::new();
+        let mut increment_verifier = IncrementalVerifier::default();
+        increment_verifier.set_root_hash(root_hash);
+        Self {
+            current_hasher,
+            increment_verifier: RefCell::new(increment_verifier),
+            root_hash,
         }
-
-        let mut finalize = collector.finalize();
-
-        finalize
-            .write_hash(&mut self.inner_state.header_file.file)
-            .await?;
-
-        self.inner_state.commit(&root_hash).await?;
-
-        Ok(root_hash)
     }
 
-    async fn rollback(self) -> Result<(), io::Error> {
-        tokio::fs::remove_dir_all(self.inner_state.temp_file_path).await
+    /// Feeds a proof to the incremental verifier
+    pub(crate) fn feed_proof(&mut self, proof: &[u8]) -> Result<(), errors::FeedProofError> {
+        self.increment_verifier
+            .borrow_mut()
+            .feed_proof(proof)
+            .map_err(|_| errors::FeedProofError::InvalidProof)
     }
 }
