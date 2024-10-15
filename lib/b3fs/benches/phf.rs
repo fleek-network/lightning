@@ -1,5 +1,3 @@
-use std::num::NonZeroU32;
-
 use criterion::*;
 use measurement::Measurement;
 use rand::rngs::SmallRng;
@@ -65,7 +63,7 @@ fn phf_run_bench<M: Measurement>(
         b.iter(|| {
             let mut x = b3fs::bucket::dir::phf::PhfGenerator::new(size);
             for (i, &w) in words.iter().enumerate() {
-                let pos = unsafe { NonZeroU32::new_unchecked((i as u32 + 1) * 40) };
+                let pos = (i as u32 + 1) * 40;
                 x.push(w, pos);
             }
             let output = x.finalize();

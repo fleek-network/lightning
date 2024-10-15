@@ -7,8 +7,8 @@ use fleek_blake3::tree::HashTreeBuilder;
 use tokio::fs::{File, OpenOptions};
 use tokio::io::AsyncWriteExt;
 
-use super::state::uwriter::UntrustedFileWriterState;
-use super::state::WriterState;
+use super::state::uwriter::{UntrustedFileWriterCollector, UntrustedFileWriterState};
+use super::state::{InnerWriterState, WriterState};
 use super::{writer, B3FSFile};
 use crate::bucket::{errors, Bucket};
 use crate::hasher::b3::{BLOCK_SIZE_IN_CHUNKS, MAX_BLOCK_SIZE_IN_BYTES};
@@ -18,49 +18,29 @@ use crate::stream::verifier::{IncrementalVerifier, VerifierCollector, WithHashTr
 use crate::utils::to_hex;
 
 pub struct UntrustedFileWriter {
-    root_hash: [u8; 32],
-    verifier: Box<IncrementalVerifier<WithHashTreeCollector<BufCollector>>>,
     state: UntrustedFileWriterState,
 }
 
 impl UntrustedFileWriter {
     pub async fn new(bucket: &Bucket, hash: [u8; 32]) -> Result<Self, errors::WriteError> {
-        let mut verifier = IncrementalVerifier::default();
-        verifier.set_root_hash(hash);
-        let state = UntrustedFileWriterState::new(bucket).await?;
-        Ok(Self {
-            verifier: Box::new(verifier),
-            state,
-            root_hash: hash,
-        })
+        let state = UntrustedFileWriterCollector::new(hash);
+        let s = InnerWriterState::new(bucket, state)
+            .await
+            .map(|state| Self { state })?;
+        Ok(s)
     }
 
     pub async fn feed_proof(&mut self, proof: &[u8]) -> Result<(), errors::FeedProofError> {
-        self.verifier
-            .feed_proof(proof)
-            .map_err(|_| errors::FeedProofError::InvalidProof)
+        self.state.collector.feed_proof(proof)
     }
 
     pub async fn write(&mut self, bytes: &[u8]) -> Result<(), errors::WriteError> {
-        // Wrap the bytes in a BytesMut so we can split it into chunks.
-        let mut bytes_mut = BytesMut::from(bytes);
-        // Write the bytes to the current random block file incrementally or create a new block file
-        // if the current block file is full.
-        while bytes_mut.has_remaining() {
-            let want = cmp::min(BLOCK_SIZE_IN_CHUNKS, bytes_mut.len());
-            let mut bytes = bytes_mut.split_to(want);
-            //self.hasher.update(&bytes);
-            self.state
-                .next(self.verifier.deref_mut(), &mut bytes)
-                .await?;
-        }
-
-        Ok(())
+        self.state.write(bytes).await
     }
 
     /// Finalize this write and flush the data to the disk.
     pub async fn commit(mut self) -> Result<[u8; 32], errors::CommitError> {
-        self.state.commit(*self.verifier, self.root_hash).await
+        self.state.commit().await
     }
 
     /// Cancel this write and remove anything that this writer wrote to the disk.
@@ -77,8 +57,9 @@ mod tests {
     use tokio::fs;
 
     use super::*;
-    use crate::bucket::file::tests::{get_random_file, verify_writer};
+    use crate::bucket::file::tests::verify_writer;
     use crate::bucket::file::B3FSFile;
+    use crate::bucket::tests::get_random_file;
     use crate::collections::HashTree;
     use crate::hasher::byte_hasher::Blake3Hasher;
     use crate::stream::walker::Mode;
