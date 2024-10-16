@@ -50,7 +50,7 @@ async fn test_execute_transaction_and_wait_for_receipt_success() {
         .execute_transaction(
             UpdateMethod::IncrementNonce {},
             Some(ExecuteTransactionOptions {
-                wait: ExecuteTransactionWait::Receipt(None),
+                wait: ExecuteTransactionWait::Receipt,
                 ..Default::default()
             }),
         )
@@ -73,7 +73,7 @@ async fn test_execute_transaction_and_wait_for_receipt_success() {
             .execute_transaction(
                 UpdateMethod::IncrementNonce {},
                 Some(ExecuteTransactionOptions {
-                    wait: ExecuteTransactionWait::Receipt(None),
+                    wait: ExecuteTransactionWait::Receipt,
                     ..Default::default()
                 }),
             )
@@ -173,8 +173,9 @@ async fn test_execute_transaction_and_wait_for_receipt_without_retry_on_revert()
         .execute_transaction(
             UpdateMethod::ChangeEpoch { epoch: 101 },
             Some(ExecuteTransactionOptions {
-                wait: ExecuteTransactionWait::Receipt(None),
+                wait: ExecuteTransactionWait::Receipt,
                 retry: ExecuteTransactionRetry::Never,
+                timeout: None,
             }),
         )
         .await;
@@ -188,7 +189,7 @@ async fn test_execute_transaction_and_wait_for_receipt_without_retry_on_revert()
             assert_eq!(receipt.transaction_hash, tx.hash());
             assert_eq!(attempts, 1);
         },
-        _ => panic!("unexpected error type"),
+        e => panic!("unexpected error type: {:?}", e),
     }
 
     // Check that the nonce has been incremented just once.
@@ -214,6 +215,7 @@ async fn test_execute_transaction_and_no_wait_for_receipt_without_retry_on_rever
             Some(ExecuteTransactionOptions {
                 wait: ExecuteTransactionWait::None,
                 retry: ExecuteTransactionRetry::Never,
+                timeout: None,
             }),
         )
         .await
@@ -251,9 +253,10 @@ async fn test_execute_transaction_and_wait_for_receipt_retry_on_revert() {
         .execute_transaction(
             UpdateMethod::ChangeEpoch { epoch: 101 },
             Some(ExecuteTransactionOptions {
-                wait: ExecuteTransactionWait::Receipt(None),
+                wait: ExecuteTransactionWait::Receipt,
                 // `None` means to use the default max retries.
                 retry: ExecuteTransactionRetry::Always(None),
+                timeout: None,
             }),
         )
         .await;
@@ -267,7 +270,7 @@ async fn test_execute_transaction_and_wait_for_receipt_retry_on_revert() {
             assert_eq!(receipt.transaction_hash, tx.hash());
             assert_eq!(attempts, 4);
         },
-        _ => panic!("unexpected error type"),
+        e => panic!("unexpected error type: {:?}", e),
     }
 
     // Check that the nonce has been incremented 4 times, for the initial attempt and each retry.
@@ -294,6 +297,7 @@ async fn test_execute_transaction_and_no_wait_for_receipt_retry_on_revert() {
                 wait: ExecuteTransactionWait::None,
                 // `None` means to use the default max retries.
                 retry: ExecuteTransactionRetry::Always(None),
+                timeout: None,
             }),
         )
         .await

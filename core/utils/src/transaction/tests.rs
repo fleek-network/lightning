@@ -12,6 +12,7 @@ use lightning_test_utils::consensus::{
     MockConsensus,
     MockForwarder,
 };
+use lightning_test_utils::e2e::try_init_tracing;
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
 use tempfile::{tempdir, TempDir};
@@ -27,11 +28,13 @@ use types::{
     GenesisNode,
     HandshakePorts,
     NodePorts,
+    TransactionRequest,
     TransactionResponse,
     UpdateMethod,
 };
 
 use super::*;
+use crate::poll::{poll_until, PollUntilError};
 
 #[tokio::test]
 async fn test_execute_transaction_with_account_signer_wait_for_receipt() {
@@ -61,7 +64,7 @@ async fn test_execute_transaction_with_account_signer_wait_for_receipt() {
         .execute_transaction(
             UpdateMethod::IncrementNonce {},
             Some(ExecuteTransactionOptions {
-                wait: ExecuteTransactionWait::Receipt(None),
+                wait: ExecuteTransactionWait::Receipt,
                 ..Default::default()
             }),
         )
@@ -109,7 +112,7 @@ async fn test_execute_transaction_with_node_signer_wait_for_receipt() {
         .execute_transaction(
             UpdateMethod::IncrementNonce {},
             Some(ExecuteTransactionOptions {
-                wait: ExecuteTransactionWait::Receipt(None),
+                wait: ExecuteTransactionWait::Receipt,
                 ..Default::default()
             }),
         )
@@ -158,8 +161,9 @@ async fn test_execute_transaction_with_account_signer_wait_for_receipt_no_retry(
         .execute_transaction(
             UpdateMethod::ChangeEpoch { epoch: 101 },
             Some(ExecuteTransactionOptions {
-                wait: ExecuteTransactionWait::Receipt(None),
+                wait: ExecuteTransactionWait::Receipt,
                 retry: ExecuteTransactionRetry::Never,
+                timeout: None,
             }),
         )
         .await;
@@ -173,7 +177,7 @@ async fn test_execute_transaction_with_account_signer_wait_for_receipt_no_retry(
             assert_eq!(receipt.transaction_hash, tx.hash());
             assert_eq!(attempts, 1);
         },
-        _ => panic!("unexpected error type"),
+        e => panic!("unexpected error type: {:?}", e),
     }
 
     // Check that the nonce has been incremented just once.
@@ -203,8 +207,9 @@ async fn test_execute_transaction_with_node_signer_wait_for_receipt_no_retry() {
         .execute_transaction(
             UpdateMethod::ChangeEpoch { epoch: 101 },
             Some(ExecuteTransactionOptions {
-                wait: ExecuteTransactionWait::Receipt(None),
+                wait: ExecuteTransactionWait::Receipt,
                 retry: ExecuteTransactionRetry::Never,
+                timeout: None,
             }),
         )
         .await;
@@ -218,7 +223,7 @@ async fn test_execute_transaction_with_node_signer_wait_for_receipt_no_retry() {
             assert_eq!(receipt.transaction_hash, tx.hash());
             assert_eq!(attempts, 1);
         },
-        _ => panic!("unexpected error type"),
+        e => panic!("unexpected error type: {:?}", e),
     }
 
     // Check that the nonce has been incremented just once.
@@ -256,9 +261,10 @@ async fn test_execute_transaction_with_account_signer_wait_for_receipt_retry_on_
         .execute_transaction(
             UpdateMethod::ChangeEpoch { epoch: 101 },
             Some(ExecuteTransactionOptions {
-                wait: ExecuteTransactionWait::Receipt(None),
+                wait: ExecuteTransactionWait::Receipt,
                 // `None` means to use the default max retries.
                 retry: ExecuteTransactionRetry::Always(None),
+                timeout: None,
             }),
         )
         .await;
@@ -272,7 +278,7 @@ async fn test_execute_transaction_with_account_signer_wait_for_receipt_retry_on_
             assert_eq!(receipt.transaction_hash, tx.hash());
             assert_eq!(attempts, 4);
         },
-        _ => panic!("unexpected error type"),
+        e => panic!("unexpected error type: {:?}", e),
     }
 
     // Check that the nonce has been incremented 4 times, for the initial attempt and each retry.
@@ -302,9 +308,10 @@ async fn test_execute_transaction_with_node_signer_wait_for_receipt_retry_on_rev
         .execute_transaction(
             UpdateMethod::ChangeEpoch { epoch: 101 },
             Some(ExecuteTransactionOptions {
-                wait: ExecuteTransactionWait::Receipt(None),
+                wait: ExecuteTransactionWait::Receipt,
                 // `None` means to use the default max retries.
                 retry: ExecuteTransactionRetry::Always(None),
+                timeout: None,
             }),
         )
         .await;
@@ -318,7 +325,7 @@ async fn test_execute_transaction_with_node_signer_wait_for_receipt_retry_on_rev
             assert_eq!(receipt.transaction_hash, tx.hash());
             assert_eq!(attempts, 4);
         },
-        _ => panic!("unexpected error type"),
+        e => panic!("unexpected error type: {:?}", e),
     }
 
     // Check that the nonce has been incremented 4 times, for the initial attempt and each retry.
@@ -352,8 +359,9 @@ async fn test_execute_transaction_with_node_signer_wait_for_receipt_retry_on_tim
         .execute_transaction(
             UpdateMethod::IncrementNonce {},
             Some(ExecuteTransactionOptions {
-                wait: ExecuteTransactionWait::Receipt(Some(Duration::from_millis(200))),
+                wait: ExecuteTransactionWait::Receipt,
                 retry: ExecuteTransactionRetry::Always(None),
+                timeout: Some(Duration::from_millis(200)),
             }),
         )
         .await;
@@ -362,11 +370,131 @@ async fn test_execute_transaction_with_node_signer_wait_for_receipt_retry_on_tim
             // Check that there were 4 attempts; 1 initial attempt and 3 retries.
             assert_eq!(attempts, 4);
         },
-        _ => panic!("unexpected error type"),
+        e => panic!("unexpected error type: {:?}", e),
     }
 
     // Check that the nonce has not been incremented since no transaction was included.
     assert_eq!(node.get_node_nonce(), 0);
+
+    // Shutdown the node.
+    node.shutdown().await;
+}
+
+#[tokio::test]
+async fn test_execute_transaction_wait_for_receipt_retry_on_timeout_avoids_resubmission() {
+    // Build and start the node.
+    let mut node = TestNodeBuilder::new()
+        .with_mock_consensus_config(MockConsensusConfig {
+            min_ordering_time: 0,
+            max_ordering_time: 0,
+            probability_txn_lost: 0.0,
+            // Lose the first transaction.
+            transactions_to_lose: HashSet::from_iter(vec![1]),
+            new_block_interval: Duration::from_secs(0),
+        })
+        .with_genesis_mutator(move |genesis| {
+            genesis.chain_id = 1337;
+        })
+        .build::<TestNodeComponents>()
+        .await
+        .unwrap();
+    node.start().await;
+
+    // Build a transaction client.
+    let client = node.node_transaction_client().await;
+
+    // Check that the nonce starts at 0.
+    assert_eq!(node.get_node_nonce(), 0);
+
+    // Execute a transaction that will be initially lost.
+    let (tx, receipt) = client
+        .execute_transaction(
+            UpdateMethod::UpdateContentRegistry {
+                updates: Default::default(),
+            },
+            Some(ExecuteTransactionOptions {
+                wait: ExecuteTransactionWait::Receipt,
+                retry: ExecuteTransactionRetry::Always(None),
+                timeout: Some(Duration::from_millis(200)),
+            }),
+        )
+        .await
+        .unwrap()
+        .as_receipt();
+
+    // Check that the transaction was executed successfully with the expected nonce.
+    assert_eq!(
+        receipt.response,
+        TransactionResponse::Success(ExecutionData::None)
+    );
+    let nonce = match &tx {
+        TransactionRequest::UpdateRequest(tx) => tx.payload.nonce,
+        TransactionRequest::EthereumRequest(tx) => tx.tx.nonce.as_u64(),
+    };
+    assert_eq!(nonce, 2);
+    assert!(!tx.hash().is_empty());
+    assert_eq!(receipt.transaction_hash, tx.hash());
+
+    // Check that the nonce has been incremented twice.
+    assert_eq!(node.get_node_nonce(), 2);
+
+    // Shutdown the node.
+    node.shutdown().await;
+}
+
+#[tokio::test]
+async fn test_execute_transaction_no_wait_for_receipt_retry_on_timeout_avoids_resubmission() {
+    // Build and start the node.
+    let mut node = TestNodeBuilder::new()
+        .with_mock_consensus_config(MockConsensusConfig {
+            min_ordering_time: 0,
+            max_ordering_time: 0,
+            probability_txn_lost: 0.0,
+            // Lose the first transaction.
+            transactions_to_lose: HashSet::from_iter(vec![1]),
+            new_block_interval: Duration::from_secs(0),
+        })
+        .with_genesis_mutator(move |genesis| {
+            genesis.chain_id = 1337;
+        })
+        .build::<TestNodeComponents>()
+        .await
+        .unwrap();
+    node.start().await;
+
+    // Build a transaction client.
+    let client = node.node_transaction_client().await;
+
+    // Check that the nonce starts at 0.
+    assert_eq!(node.get_node_nonce(), 0);
+
+    // Execute a transaction that will be initially lost.
+    client
+        .execute_transaction(
+            UpdateMethod::UpdateContentRegistry {
+                updates: Default::default(),
+            },
+            Some(ExecuteTransactionOptions {
+                wait: ExecuteTransactionWait::None,
+                retry: ExecuteTransactionRetry::Always(None),
+                timeout: Some(Duration::from_millis(200)),
+            }),
+        )
+        .await
+        .unwrap();
+
+    // Check that the nonce is eventually incremented twice.
+    poll_until(
+        || async {
+            (node.get_node_nonce() == 2)
+                .then_some(())
+                .ok_or(PollUntilError::ConditionNotSatisfied)
+        },
+        Duration::from_secs(5),
+        Duration::from_millis(100),
+    )
+    .await
+    .unwrap();
 
     // Shutdown the node.
     node.shutdown().await;
@@ -465,6 +593,7 @@ impl TestNodeBuilder {
     }
 
     pub async fn build<C: NodeComponents>(self) -> Result<TestNode<C>> {
+        let _ = try_init_tracing();
         let keystore = EphemeralKeystore::<C>::default();
         let node_secret_key = keystore.get_ed25519_sk();
         let mut genesis = Genesis {

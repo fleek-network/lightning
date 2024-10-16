@@ -1,16 +1,15 @@
-use std::sync::atomic::AtomicU64;
-use std::sync::Arc;
 use std::time::Duration;
 
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
     ExecuteTransactionOptions,
-    ExecuteTransactionRetry,
     ExecuteTransactionWait,
     UpdateMethod,
 };
+use tokio::task::JoinHandle;
 use types::{ExecuteTransactionError, ExecuteTransactionResponse};
 
+use super::nonce::NonceState;
 use super::syncer::TransactionClientNonceSyncer;
 use super::TransactionSigner;
 use crate::transaction::runner::TransactionRunner;
@@ -19,7 +18,7 @@ use crate::transaction::runner::TransactionRunner;
 pub(crate) const DEFAULT_MAX_RETRIES: u8 = 3;
 
 /// Default timeout for waiting for a transaction receipt.
-pub(crate) const DEFAULT_RECEIPT_TIMEOUT: Duration = Duration::from_secs(60);
+pub(crate) const DEFAULT_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// A client for submitting and executing transactions, and optionally waiting for a receipt, and/or
 /// retry if reverted.
@@ -31,7 +30,7 @@ pub struct TransactionClient<C: NodeComponents> {
     notifier: C::NotifierInterface,
     mempool: MempoolSocket,
     signer: TransactionSigner,
-    next_nonce: Arc<AtomicU64>,
+    nonce_state: NonceState,
 }
 
 impl<C: NodeComponents> TransactionClient<C> {
@@ -41,13 +40,13 @@ impl<C: NodeComponents> TransactionClient<C> {
         mempool: MempoolSocket,
         signer: TransactionSigner,
     ) -> Self {
-        let next_nonce = Arc::new(AtomicU64::new(signer.get_nonce(&app_query) + 1));
+        let nonce_state = NonceState::new(signer.get_nonce(&app_query));
 
         TransactionClientNonceSyncer::spawn::<C>(
             app_query.clone(),
             notifier.clone(),
             signer.clone(),
-            next_nonce.clone(),
+            nonce_state.clone(),
         )
         .await;
 
@@ -56,7 +55,7 @@ impl<C: NodeComponents> TransactionClient<C> {
             notifier,
             mempool,
             signer,
-            next_nonce,
+            nonce_state,
         }
     }
 
@@ -68,7 +67,7 @@ impl<C: NodeComponents> TransactionClient<C> {
         let mut options = options.unwrap_or_default();
 
         if let ExecuteTransactionWait::None = options.wait {
-            options.wait = ExecuteTransactionWait::Receipt(None);
+            options.wait = ExecuteTransactionWait::Receipt;
         }
 
         self.execute_transaction(method, Some(options)).await
@@ -83,52 +82,11 @@ impl<C: NodeComponents> TransactionClient<C> {
         method: UpdateMethod,
         options: Option<ExecuteTransactionOptions>,
     ) -> Result<ExecuteTransactionResponse, ExecuteTransactionError> {
-        let mut options = options.unwrap_or_default();
-
-        // Default to retrying `MAX_RETRIES` times if not specified.
-        match options.retry {
-            ExecuteTransactionRetry::Default => {
-                // Default to retrying `DEFAULT_MAX_RETRIES` times for backwards compatibility with
-                // signer component expectations.
-                options.retry = ExecuteTransactionRetry::Always(Some(DEFAULT_MAX_RETRIES));
-            },
-            ExecuteTransactionRetry::Always(None) => {
-                options.retry = ExecuteTransactionRetry::Always(Some(DEFAULT_MAX_RETRIES));
-            },
-            ExecuteTransactionRetry::AlwaysExcept((None, errors, retry_on_timeout)) => {
-                options.retry = ExecuteTransactionRetry::AlwaysExcept((
-                    Some(DEFAULT_MAX_RETRIES),
-                    errors.clone(),
-                    retry_on_timeout,
-                ));
-            },
-            ExecuteTransactionRetry::OnlyWith((None, errors, retry_on_timeout)) => {
-                options.retry = ExecuteTransactionRetry::OnlyWith((
-                    Some(DEFAULT_MAX_RETRIES),
-                    errors.clone(),
-                    retry_on_timeout,
-                ));
-            },
-            _ => {},
-        }
-
-        // Default timeout to `DEFAULT_TIMEOUT` if not specified.
-        if let ExecuteTransactionWait::Receipt(None) = options.wait {
-            options.wait = ExecuteTransactionWait::Receipt(Some(DEFAULT_RECEIPT_TIMEOUT));
-        }
+        let options = options.unwrap_or_default();
 
         // Spawn a tokio task to wait for the transaction receipt, retry if reverted, and return the
         // result containing the transaction request and receipt, or an error.
-        let runner_handle = TransactionRunner::<C>::spawn(
-            self.app_query.clone(),
-            self.notifier.clone(),
-            self.mempool.clone(),
-            self.signer.clone(),
-            self.next_nonce.clone(),
-            method,
-            options.clone(),
-        )
-        .await;
+        let runner_handle = self.spawn_runner(method, options.clone());
 
         // If we aren't waiting for a receipt, return immediately.
         if let ExecuteTransactionWait::None = options.wait {
@@ -138,5 +96,26 @@ impl<C: NodeComponents> TransactionClient<C> {
         // Otherwise, wait for the tokio task to complete and return the result.
         let resp = runner_handle.await??;
         Ok(resp)
+    }
+
+    fn spawn_runner(
+        &self,
+        method: UpdateMethod,
+        options: ExecuteTransactionOptions,
+    ) -> JoinHandle<Result<ExecuteTransactionResponse, ExecuteTransactionError>> {
+        let app_query = self.app_query.clone();
+        let notifier = self.notifier.clone();
+        let mempool = self.mempool.clone();
+        let signer = self.signer.clone();
+        let nonce_state = self.nonce_state.clone();
+
+        spawn!(
+            async move {
+                TransactionRunner::<C>::new(app_query, notifier, mempool, signer, nonce_state)
+                    .execute_transasction(method, options)
+                    .await
+            },
+            "TRANSACTION-CLIENT: runner"
+        )
     }
 }

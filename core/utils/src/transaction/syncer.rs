@@ -1,8 +1,6 @@
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
-
 use lightning_interfaces::prelude::*;
 
+use super::nonce::NonceState;
 use super::TransactionSigner;
 
 /// The transaction nonce syncer is responsible for listening for new blocks from the notifier
@@ -20,7 +18,7 @@ impl TransactionClientNonceSyncer {
         app_query: c!(C::ApplicationInterface::SyncExecutor),
         notifier: C::NotifierInterface,
         signer: TransactionSigner,
-        next_nonce: Arc<AtomicU64>,
+        nonce_state: NonceState,
     ) {
         spawn!(
             async move {
@@ -32,7 +30,7 @@ impl TransactionClientNonceSyncer {
                     };
 
                     // Update the next nonce counter from application state.
-                    next_nonce.store(signer.get_nonce(&app_query) + 1, Ordering::Relaxed);
+                    nonce_state.update(signer.get_nonce(&app_query)).await;
                 }
             },
             "TRANSACTION-CLIENT: syncer"
