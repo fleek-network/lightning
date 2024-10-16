@@ -128,7 +128,7 @@ async fn test_epoch_change_with_some_non_committee_nodes() {
                 TransactionResponse::Revert(ExecutionError::NotCommitteeMember)
             )
         },
-        _ => panic!("unexpected error type"),
+        e => panic!("unexpected error type: {:?}", e),
     }
     let result = non_committee_node2
         .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
@@ -140,7 +140,7 @@ async fn test_epoch_change_with_some_non_committee_nodes() {
                 TransactionResponse::Revert(ExecutionError::NotCommitteeMember)
             )
         },
-        _ => panic!("unexpected error type"),
+        e => panic!("unexpected error type: {:?}", e),
     }
 
     // Check that the epoch has not been changed within some time period.
@@ -273,7 +273,7 @@ async fn test_epoch_change_reverts_epoch_already_changed() {
                 TransactionResponse::Revert(ExecutionError::EpochAlreadyChanged)
             )
         },
-        _ => panic!("unexpected error type"),
+        e => panic!("unexpected error type: {:?}", e),
     }
 
     // Shutdown the network.

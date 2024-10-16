@@ -208,7 +208,7 @@ impl TestNode {
             .run(ExecuteTransactionRequest {
                 method,
                 options: Some(ExecuteTransactionOptions {
-                    wait: ExecuteTransactionWait::Receipt(None),
+                    wait: ExecuteTransactionWait::Receipt,
                     ..Default::default()
                 }),
             })

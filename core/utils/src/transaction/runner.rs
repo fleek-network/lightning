@@ -1,31 +1,35 @@
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
 use std::time::Duration;
 
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::BlockExecutedNotification;
-use tokio::task::JoinHandle;
 use types::{
+    ChainId,
     ExecuteTransactionError,
     ExecuteTransactionOptions,
     ExecuteTransactionResponse,
-    ExecuteTransactionRetry,
-    ExecuteTransactionWait,
+    ExecutionError,
     TransactionReceipt,
     TransactionRequest,
     TransactionResponse,
     UpdateMethod,
 };
 
-use super::{TransactionBuilder, TransactionSigner, DEFAULT_RECEIPT_TIMEOUT};
+use super::nonce::NonceState;
+use super::{TransactionBuilder, TransactionSigner, DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT};
 use crate::application::QueryRunnerExt;
+use crate::poll::{poll_until, PollUntilError};
+
+const RETRY_DELAY: Duration = Duration::from_millis(100);
+
+type RetryCount = u8;
 
 pub struct TransactionRunner<C: NodeComponents> {
     app_query: c!(C::ApplicationInterface::SyncExecutor),
     notifier: C::NotifierInterface,
     mempool: MempoolSocket,
     signer: TransactionSigner,
-    next_nonce: Arc<AtomicU64>,
+    nonce_state: NonceState,
+    chain_id: ChainId,
 }
 
 impl<C: NodeComponents> TransactionRunner<C> {
@@ -34,198 +38,221 @@ impl<C: NodeComponents> TransactionRunner<C> {
         notifier: C::NotifierInterface,
         mempool: MempoolSocket,
         signer: TransactionSigner,
-        next_nonce: Arc<AtomicU64>,
+        nonce_state: NonceState,
     ) -> Self {
+        let chain_id = app_query.get_chain_id();
         Self {
             app_query,
             notifier,
             mempool,
             signer,
-            next_nonce,
+            nonce_state,
+            chain_id,
         }
     }
 
-    pub async fn spawn(
-        app_query: c!(C::ApplicationInterface::SyncExecutor),
-        notifier: C::NotifierInterface,
-        mempool: MempoolSocket,
-        signer: TransactionSigner,
-        next_nonce: Arc<AtomicU64>,
-        method: UpdateMethod,
-        options: ExecuteTransactionOptions,
-    ) -> JoinHandle<Result<ExecuteTransactionResponse, ExecuteTransactionError>> {
-        let runner = Self::new(app_query, notifier, mempool, signer, next_nonce);
-        spawn!(
-            async move { runner.execute(method, options).await },
-            "TRANSACTION-CLIENT: runner"
-        )
-    }
-
-    pub async fn execute(
-        self,
+    pub async fn execute_transasction(
+        &self,
         method: UpdateMethod,
         options: ExecuteTransactionOptions,
     ) -> Result<ExecuteTransactionResponse, ExecuteTransactionError> {
-        let chain_id = self.app_query.get_chain_id();
         let mut retry = 0;
-
-        let receipt_timeout = match options.wait {
-            ExecuteTransactionWait::Receipt(timeout) => timeout.unwrap_or(DEFAULT_RECEIPT_TIMEOUT),
-            ExecuteTransactionWait::None => DEFAULT_RECEIPT_TIMEOUT,
-        };
 
         loop {
             // Get the next nonce for this transaction.
-            let next_nonce = self.next_nonce.fetch_add(1, Ordering::SeqCst);
+            let next_nonce = self.nonce_state.get_next_and_increment().await;
 
             // Build and sign the transaction.
-            let tx: TransactionRequest =
-                TransactionBuilder::from_update(method.clone(), chain_id, next_nonce, &self.signer)
-                    .into();
+            let tx: TransactionRequest = TransactionBuilder::from_update(
+                method.clone(),
+                self.chain_id,
+                next_nonce,
+                &self.signer,
+            )
+            .into();
 
             // Subscribe to executed blocks notifications before we enqueue the transaction.
             let block_sub = self.notifier.subscribe_block_executed();
 
             // Send transaction to the mempool.
-            self.send_to_mempool(tx.clone()).await?;
+            match self.mempool.enqueue(tx.clone()).await {
+                Ok(()) => {},
+                Err(e) => {
+                    retry += 1;
+                    self.handle_failed_mempool_enqueue(tx, &options, e.to_string(), retry)
+                        .await?;
+                    continue;
+                },
+            }
 
             // Wait for the transaction to be executed and get the receipt.
-            let receipt = match self
-                .wait_for_receipt(method.clone(), tx.clone(), block_sub, receipt_timeout)
-                .await
-            {
-                Ok(receipt) => receipt,
+            let timeout = options.timeout.unwrap_or(DEFAULT_TIMEOUT);
+            let result = self
+                .wait_for_receipt(method.clone(), tx.clone(), block_sub, timeout)
+                .await;
+            match result {
+                Ok(receipt) => match &receipt.response {
+                    TransactionResponse::Success(_) => {
+                        tracing::debug!("transaction executed: {:?}", receipt);
+                        return Ok(ExecuteTransactionResponse::Receipt((tx, receipt)));
+                    },
+                    TransactionResponse::Revert(error) => {
+                        retry += 1;
+                        self.handle_receipt_revert(&tx, &options, &receipt, error, retry)
+                            .await?;
+                        continue;
+                    },
+                },
                 Err(ExecuteTransactionError::Timeout((method, Some(tx), _))) => {
-                    // Increment the retry counter.
                     retry += 1;
-
-                    // If we have a max retries limit, check if we've hit it.
-                    let (should_retry, max_retries) = match options.retry {
-                        ExecuteTransactionRetry::OnlyWith((max_retries, _, retry_on_timeout)) => {
-                            (retry_on_timeout, max_retries)
-                        },
-                        ExecuteTransactionRetry::AlwaysExcept((
-                            max_retries,
-                            _,
-                            retry_on_timeout,
-                        )) => (retry_on_timeout, max_retries),
-                        ExecuteTransactionRetry::Always(max_retries) => (true, max_retries),
-                        ExecuteTransactionRetry::Never => (false, None),
-                        ExecuteTransactionRetry::Default => unreachable!(),
-                    };
-
-                    // If we shouldn't retry, return the timeout error.
-                    if !should_retry {
-                        return Err(ExecuteTransactionError::Timeout((method, Some(tx), retry)));
-                    }
-
-                    // If we have a max retries limit, check if we've hit it.
-                    if let Some(max_retries) = max_retries {
-                        if retry > max_retries {
-                            tracing::warn!(
-                                "transaction reverted after max retries reached (attempts: {}): {:?}",
-                                retry,
-                                method
-                            );
-                            return Err(ExecuteTransactionError::Timeout((
-                                method,
-                                Some(tx),
-                                retry,
-                            )));
-                        }
-                    }
-
-                    tracing::warn!(
-                        "retrying transaction after timeout (hash: {:?}, attempt: {}): {:?}",
-                        tx.hash(),
-                        retry + 1,
-                        tx
-                    );
-
-                    // Continue to retry.
+                    self.handle_receipt_timeout(method, tx, &options, retry, timeout)
+                        .await?;
                     continue;
                 },
                 Err(e) => return Err(e),
-            };
-
-            // Determine if we should retry the transaction based on the receipt.
-            let (should_retry, max_retries) = match &receipt.response {
-                // If the transaction was successful, return the receipt.
-                TransactionResponse::Success(_) => {
-                    tracing::debug!("transaction executed: {:?}", receipt);
-                    return Ok(ExecuteTransactionResponse::Receipt((tx, receipt)));
-                },
-
-                // If the transaction reverted, retry or return an error depending on the retry
-                // configuration and if we are within the limit.
-                TransactionResponse::Revert(error) => match options.retry {
-                    ExecuteTransactionRetry::OnlyWith((
-                        max_retries,
-                        ref errors,
-                        _retry_on_timeout,
-                    )) => (
-                        errors
-                            .as_ref()
-                            .map_or(false, |errors| errors.contains(error)),
-                        max_retries,
-                    ),
-                    ExecuteTransactionRetry::AlwaysExcept((
-                        max_retries,
-                        ref errors,
-                        _retry_on_timeout,
-                    )) => (
-                        errors
-                            .as_ref()
-                            .map_or(true, |errors| !errors.contains(error)),
-                        max_retries,
-                    ),
-                    ExecuteTransactionRetry::Always(max_retries) => (true, max_retries),
-                    ExecuteTransactionRetry::Never => (false, None),
-                    ExecuteTransactionRetry::Default => {
-                        unreachable!("default should be handled in caller")
-                    },
-                },
-            };
-
-            // Increment the retry counter.
-            retry += 1;
-
-            // If we shouldn't retry, return the receipt.
-            if !should_retry {
-                tracing::warn!("transaction reverted (no retries): {:?}", receipt);
-                return Err(ExecuteTransactionError::Reverted((tx, receipt, retry)));
             }
-
-            // If we have a max retries limit, check if we've hit it.
-            if let Some(max_retries) = max_retries {
-                if retry > max_retries {
-                    tracing::warn!(
-                        "transaction reverted after max retries reached (attempts: {}): {:?}",
-                        retry,
-                        receipt
-                    );
-                    return Err(ExecuteTransactionError::Reverted((tx, receipt, retry)));
-                }
-            }
-
-            // Otherwise, continue to retry.
-            tracing::info!(
-                "retrying reverted transaction (hash: {:?}, response: {:?}, attempt: {}): {:?}",
-                tx.hash(),
-                receipt,
-                retry + 1,
-                tx
-            );
-
-            // Sleep for a short duration before retrying.
-            tokio::time::sleep(Duration::from_millis(100)).await;
         }
     }
 
-    async fn send_to_mempool(&self, tx: TransactionRequest) -> Result<(), ExecuteTransactionError> {
-        self.mempool.enqueue(tx.clone()).await.map_err(|e| {
-            ExecuteTransactionError::FailedToSubmitTransactionToMempool((tx.clone(), e.to_string()))
-        })
+    async fn handle_failed_mempool_enqueue(
+        &self,
+        tx: TransactionRequest,
+        options: &ExecuteTransactionOptions,
+        error: String,
+        retry: RetryCount,
+    ) -> Result<(), ExecuteTransactionError> {
+        let max_retries = options.retry.get_max_retries(DEFAULT_MAX_RETRIES);
+
+        // Return error if we shouldn't retry.
+        if !options.retry.should_retry_on_failure_to_send_to_mempool() {
+            tracing::warn!(
+                "transaction failed to send to mempool (no retries): {:?}",
+                tx
+            );
+            return Err(ExecuteTransactionError::FailedToSubmitTransactionToMempool(
+                (tx, error),
+            ));
+        }
+
+        // Return error if max retries are reached.
+        if retry > max_retries {
+            tracing::warn!(
+                "transaction failed to send to mempool after max retries reached (attempts: {}): {:?}",
+                retry,
+                tx
+            );
+            return Err(ExecuteTransactionError::FailedToSubmitTransactionToMempool(
+                (tx, error),
+            ));
+        }
+
+        // Otherwise, continue to retry
+        tracing::warn!(
+            "retrying after failing to send transaction to mempool (attempt: {}): {:?}",
+            retry,
+            tx
+        );
+        tokio::time::sleep(RETRY_DELAY).await;
+
+        Ok(())
+    }
+
+    async fn handle_receipt_revert(
+        &self,
+        tx: &TransactionRequest,
+        options: &ExecuteTransactionOptions,
+        receipt: &TransactionReceipt,
+        error: &ExecutionError,
+        retry: RetryCount,
+    ) -> Result<(), ExecuteTransactionError> {
+        let max_retries = options.retry.get_max_retries(DEFAULT_MAX_RETRIES);
+
+        // Return error if we shouldn't retry.
+        if !options.retry.should_retry_on_error(error) {
+            tracing::warn!("transaction reverted (no retries): {:?}", receipt);
+            return Err(ExecuteTransactionError::Reverted((
+                tx.clone(),
+                receipt.clone(),
+                retry,
+            )));
+        }
+
+        // Return error if max retries are reached.
+        if retry > max_retries {
+            tracing::warn!(
+                "transaction reverted after max retries reached (attempts: {}): {:?}",
+                retry,
+                receipt
+            );
+            return Err(ExecuteTransactionError::Reverted((
+                tx.clone(),
+                receipt.clone(),
+                retry,
+            )));
+        }
+
+        // Otherwise, continue to retry.
+        tracing::info!(
+            "retrying reverted transaction (hash: {:?}, response: {:?}, attempt: {}): {:?}",
+            tx.hash(),
+            receipt,
+            retry,
+            tx
+        );
+        tokio::time::sleep(RETRY_DELAY).await;
+
+        Ok(())
+    }
+
+    async fn handle_receipt_timeout(
+        &self,
+        method: UpdateMethod,
+        tx: TransactionRequest,
+        options: &ExecuteTransactionOptions,
+        retry: RetryCount,
+        timeout: Duration,
+    ) -> Result<RetryCount, ExecuteTransactionError> {
+        let max_retries = options.retry.get_max_retries(DEFAULT_MAX_RETRIES);
+
+        // Return error if we shouldn't retry.
+        if !options.retry.should_retry_on_timeout() {
+            tracing::warn!("transaction timeout (no retries): {:?}", tx);
+            return Err(ExecuteTransactionError::Timeout((method, Some(tx), retry)));
+        }
+
+        // Return error if max retries are reached.
+        if retry > max_retries {
+            tracing::warn!(
+                "transaction reverted after max retries reached (attempts: {}): {:?}",
+                retry,
+                method
+            );
+            return Err(ExecuteTransactionError::Timeout((method, Some(tx), retry)));
+        }
+
+        // Ensure the previous transaction nonce has been used before retrying to
+        // avoid executing the same transaction twice.
+        match self.ensure_nonce_used(&tx, options, timeout).await {
+            Ok(()) => {
+                // Otherwise, continue to retry.
+                tracing::warn!(
+                    "retrying transaction after timeout (hash: {:?}, attempt: {}): {:?}",
+                    tx.hash(),
+                    retry,
+                    tx
+                );
+                Ok(retry)
+            },
+            Err(ExecuteTransactionError::FailedToIncrementNonceForRetry(_)) => {
+                // If the IncrementNonce transaction fails to execute and we still have
+                // some retries left, then we can continue on to retry again until we've
+                // exhausted the retries.
+                tracing::warn!("retrying after failing to execute IncrementNonce: {:?}", tx);
+                tokio::time::sleep(RETRY_DELAY).await;
+                Ok(retry)
+            },
+            Err(e) => Err(e),
+        }
     }
 
     async fn wait_for_receipt(
@@ -255,6 +282,121 @@ impl<C: NodeComponents> TransactionRunner<C> {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    async fn ensure_nonce_used(
+        &self,
+        tx: &TransactionRequest,
+        options: &ExecuteTransactionOptions,
+        timeout: Duration,
+    ) -> Result<(), ExecuteTransactionError> {
+        let tx_nonce = match tx {
+            TransactionRequest::UpdateRequest(tx) => tx.payload.nonce,
+            TransactionRequest::EthereumRequest(tx) => tx.tx.nonce.as_u64(),
+        };
+        let mut retry = 0;
+        let max_retries = options.retry.get_max_retries(DEFAULT_MAX_RETRIES);
+        loop {
+            let last_used_nonce = self.nonce_state.get_base().await;
+            if tx_nonce > last_used_nonce {
+                tracing::warn!(
+                    "previous transaction nonce {} not used, submitting an IncrementNonce in place before retrying",
+                    tx_nonce
+                );
+
+                // Build the IncrementNonce transaction.
+                let increment_nonce_txn: TransactionRequest = TransactionBuilder::from_update(
+                    UpdateMethod::IncrementNonce {},
+                    self.chain_id,
+                    tx_nonce,
+                    &self.signer,
+                )
+                .into();
+
+                // Send it to the mempool.
+                match self.mempool.enqueue(increment_nonce_txn.clone()).await {
+                    Ok(()) => {},
+                    Err(e) => {
+                        retry += 1;
+                        if retry > max_retries {
+                            tracing::warn!(
+                                "failed to enqueue IncrementNonce transaction after max retries (attempts: {}): {:?}",
+                                retry,
+                                e
+                            );
+                            return Err(ExecuteTransactionError::FailedToIncrementNonceForRetry((
+                                increment_nonce_txn,
+                                e.to_string(),
+                            )));
+                        }
+                        tracing::warn!(
+                            "retrying after failing to enqueue IncrementNonce (attempt {}): {:?}",
+                            retry,
+                            e
+                        );
+                        tokio::time::sleep(RETRY_DELAY).await;
+                        continue;
+                    },
+                }
+
+                // Wait for the nonce to be incremented.
+                let result = poll_until(
+                    || async {
+                        let last_used_nonce = self.nonce_state.get_base().await;
+                        (last_used_nonce >= tx_nonce)
+                            .then_some(())
+                            .ok_or(PollUntilError::ConditionNotSatisfied)
+                    },
+                    timeout,
+                    Duration::from_millis(100),
+                )
+                .await;
+                match result {
+                    Ok(()) => {},
+                    Err(e) => {
+                        retry += 1;
+                        if retry > max_retries {
+                            tracing::warn!(
+                                "failed to increment nonce after max retries (attempts: {}): {:?}",
+                                retry,
+                                e
+                            );
+                            // At this point it looks like there's a liveness issue with blocks not
+                            // moving forward or the node is in bad shape and is losing submitted
+                            // transactions.
+                            return Err(ExecuteTransactionError::FailedToIncrementNonceForRetry((
+                                increment_nonce_txn,
+                                e.to_string(),
+                            )));
+                        }
+                        tracing::warn!(
+                            "retrying after failing to increment nonce (attempt {}): {:?}",
+                            retry,
+                            e
+                        );
+                        tokio::time::sleep(RETRY_DELAY).await;
+                        continue;
+                    },
+                }
+
+                // Make sure that the original transaction was not executed in the meantime.
+                // This should be a very rare edge case.
+                if self.app_query.has_executed_digest(tx.hash()) {
+                    // If the original transaction was executed, we're done, no need to retry.
+                    // Unfortunately, we can't return a receipt here without using an archive node
+                    // to get historic transactions data because we stopped listening for the
+                    // receipt after timeout.
+                    return Err(
+                        ExecuteTransactionError::TransactionExecutedButReceiptNotAvailable(
+                            tx.clone(),
+                        ),
+                    );
+                }
+
+                // Otherwise, we're done.
+                return Ok(());
             }
         }
     }

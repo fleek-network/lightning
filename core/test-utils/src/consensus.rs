@@ -284,6 +284,7 @@ async fn group_worker<Q: SyncQueryRunnerInterface>(
                 tx_count += 1;
 
                 if config.transactions_to_lose.contains(&tx_count) {
+                    tracing::info!("losing transaction {}: {:?}", tx_count, req);
                     continue;
                 }
 

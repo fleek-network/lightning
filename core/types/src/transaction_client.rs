@@ -18,6 +18,7 @@ pub struct ExecuteTransactionRequest {
 pub struct ExecuteTransactionOptions {
     pub retry: ExecuteTransactionRetry,
     pub wait: ExecuteTransactionWait,
+    pub timeout: Option<Timeout>,
 }
 
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
@@ -47,7 +48,7 @@ impl ExecuteTransactionResponse {
 pub enum ExecuteTransactionWait {
     #[default]
     None,
-    Receipt(Option<Timeout>),
+    Receipt,
 }
 
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
@@ -72,6 +73,51 @@ pub enum ExecuteTransactionRetry {
     ),
 }
 
+impl ExecuteTransactionRetry {
+    pub fn get_max_retries(&self, default: MaxRetries) -> MaxRetries {
+        match self {
+            Self::Default => default,
+            Self::Never => 0,
+            Self::Always(max_retries) => max_retries.unwrap_or(default),
+            Self::AlwaysExcept((max_retries, _, _)) => max_retries.unwrap_or(default),
+            Self::OnlyWith((max_retries, _, _)) => max_retries.unwrap_or(default),
+        }
+    }
+
+    pub fn should_retry_on_failure_to_send_to_mempool(&self) -> bool {
+        match self {
+            Self::Default => true,
+            Self::Never => false,
+            Self::Always(_) => true,
+            Self::AlwaysExcept(_) => true,
+            Self::OnlyWith(_) => false,
+        }
+    }
+
+    pub fn should_retry_on_error(&self, error: &ExecutionError) -> bool {
+        match self {
+            Self::Default => true,
+            Self::Never => false,
+            Self::Always(_) => true,
+            Self::AlwaysExcept((_, errors, _)) => errors
+                .as_ref()
+                .map_or(true, |errors| !errors.contains(error)),
+            Self::OnlyWith((_, errors, _)) => errors
+                .as_ref()
+                .map_or(false, |errors| errors.contains(error)),
+        }
+    }
+
+    pub fn should_retry_on_timeout(&self) -> bool {
+        match self {
+            Self::Default => true,
+            Self::Never => false,
+            Self::Always(_) => true,
+            Self::AlwaysExcept((_, _, retry_on_timeout)) => *retry_on_timeout,
+            Self::OnlyWith((_, _, retry_on_timeout)) => *retry_on_timeout,
+        }
+    }
+}
 pub type RetryOnTimeout = bool;
 
 pub type Attempts = u8;
@@ -91,12 +137,20 @@ pub enum ExecuteTransactionError {
     FailedToSubmitRequestToSigner(ExecuteTransactionRequest),
 
     /// The transaction failed to be submitted to the mempool.
-    #[error("Failed to submit transaction to mempool: {:?}: {:?}", .0.0.hash(), .0.1)]
+    #[error("Failed to submit transaction to mempool (tx: {:?}): {:?}", .0.0.hash(), .0.1)]
     FailedToSubmitTransactionToMempool((TransactionRequest, String)),
 
     /// Failed to get response from signer.
     #[error("Failed to get response from signer")]
     FailedToGetResponseFromSigner,
+
+    /// Failed to increment nonce for retry.
+    #[error("Failed to increment nonce for retry (tx: {:?}): {:?}", .0.0.hash(), .0.1)]
+    FailedToIncrementNonceForRetry((TransactionRequest, String)),
+
+    /// The transaction was executed but the receipt is not available.
+    #[error("Transaction executed but receipt not available: {:?}", .0)]
+    TransactionExecutedButReceiptNotAvailable(TransactionRequest),
 
     /// The signer is not ready.
     #[error("Signer not ready")]
