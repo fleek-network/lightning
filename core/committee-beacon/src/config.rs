@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::time::Duration;
 
 use lightning_utils::config::LIGHTNING_HOME_DIR;
 use resolved_pathbuf::ResolvedPathBuf;
@@ -10,6 +11,7 @@ const DEFAULT_RELATIVE_DATABASE_PATH: &str = "data/committee-beacon";
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CommitteeBeaconConfig {
     pub database: CommitteeBeaconDatabaseConfig,
+    pub timer: CommitteeBeaconTimerConfig,
 }
 
 impl CommitteeBeaconConfig {
@@ -40,6 +42,21 @@ impl Default for CommitteeBeaconDatabaseConfig {
                 .join(DEFAULT_RELATIVE_DATABASE_PATH)
                 .try_into()
                 .expect("Failed to resolve path"),
+        }
+    }
+}
+
+/// The committee beacon timer configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommitteeBeaconTimerConfig {
+    #[serde(with = "humantime_serde")]
+    pub tick_delay: Duration,
+}
+
+impl Default for CommitteeBeaconTimerConfig {
+    fn default() -> Self {
+        Self {
+            tick_delay: Duration::from_millis(500),
         }
     }
 }

@@ -10,6 +10,7 @@ atomo.workspace = true
 atomo-rocks.workspace = true
 anyhow.workspace = true
 fleek-crypto.workspace = true
+humantime-serde.workspace = true
 lightning-interfaces.workspace = true
 lightning-utils.workspace = true
 lightning-workspace-hack.workspace = true
@@ -24,6 +25,10 @@ tracing.workspace = true
 
 [dev-dependencies]
 futures.workspace = true
+lightning-application.workspace = true
+lightning-node.workspace = true
+lightning-notifier.workspace = true
+lightning-signer.workspace = true
 lightning-test-utils.workspace = true
+lightning-utils.workspace = true
 tempfile.workspace = true
-tokio.workspace = true

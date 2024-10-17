@@ -2,6 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Result;
+use fleek_crypto::SecretKey;
 use futures::future::join_all;
 use lightning_application::state::QueryRunner;
 use lightning_interfaces::types::{Genesis, Staking};

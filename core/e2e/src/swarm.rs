@@ -662,6 +662,7 @@ fn build_config(
                 .try_into()
                 .expect("Failed to resolve path"),
         },
+        ..Default::default()
     });
 
     config
