@@ -7,9 +7,6 @@ mod query;
 mod rocks;
 mod timer;
 
-#[cfg(test)]
-mod tests;
-
 pub use component::*;
 pub use config::*;
 pub use error::*;

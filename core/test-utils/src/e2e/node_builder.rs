@@ -30,6 +30,7 @@ pub struct TestNodeBuilder {
     use_mock_consensus: bool,
     mock_consensus_group: Option<MockConsensusGroup>,
     is_genesis_committee: Option<bool>,
+    committee_beacon_config: Option<CommitteeBeaconConfig>,
 }
 
 impl Default for TestNodeBuilder {
@@ -48,6 +49,7 @@ impl TestNodeBuilder {
             use_mock_consensus: true,
             mock_consensus_group: None,
             is_genesis_committee: None,
+            committee_beacon_config: None,
         }
     }
 
@@ -65,6 +67,11 @@ impl TestNodeBuilder {
 
     pub fn with_is_genesis_committee(mut self, is_genesis_committee: bool) -> Self {
         self.is_genesis_committee = Some(is_genesis_committee);
+        self
+    }
+
+    pub fn with_committee_beacon_config(mut self, config: CommitteeBeaconConfig) -> Self {
+        self.committee_beacon_config = Some(config);
         self
     }
 
@@ -98,7 +105,7 @@ impl TestNodeBuilder {
             database: CommitteeBeaconDatabaseConfig {
                 path: self.home_dir.join("committee-beacon").try_into().unwrap(),
             },
-            ..Default::default()
+            ..self.committee_beacon_config.unwrap_or_default()
         });
 
         // Configure consensus component.
