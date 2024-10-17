@@ -57,11 +57,21 @@ impl InputReader {}
 
 impl Read for InputReader {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        let len = buf.len().min(self.len - self.cur);
-        // SAFETY: we initialized the string with the length that will be written
-        let res = unsafe { fn0::input_data_copy(buf.as_mut_ptr() as usize, 0, len) };
+        // Early return for end of stream
+        if self.cur == self.len {
+            return Ok(0);
+        }
+
+        // Compute the amount of bytes to write to the buffer
+        let size = buf.len().min(self.len - self.cur);
+
+        // Copy data from input source into buffer
+        let res = unsafe { fn0::input_data_copy(buf.as_mut_ptr() as usize, self.cur, size) };
         HostError::result(res)?;
-        Ok(len)
+
+        self.cur += size;
+
+        Ok(size)
     }
 }
 
