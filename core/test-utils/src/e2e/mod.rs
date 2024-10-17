@@ -1,5 +1,6 @@
 mod bindings;
 mod genesis;
+mod genesis_node;
 mod network;
 mod network_app;
 mod network_builder;
@@ -13,6 +14,7 @@ mod tracing;
 
 pub use bindings::*;
 pub use genesis::*;
+pub use genesis_node::*;
 pub use network::*;
 pub use network_builder::*;
 pub use node::*;

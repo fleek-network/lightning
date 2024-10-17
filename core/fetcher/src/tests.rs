@@ -4,6 +4,7 @@ use cid::Cid;
 use fleek_crypto::{AccountOwnerSecretKey, SecretKey};
 use lightning_application::app::Application;
 use lightning_application::config::ApplicationConfig;
+use lightning_application::state::QueryRunner;
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_blockstore_server::BlockstoreServer;
@@ -113,7 +114,7 @@ async fn get_fetchers(
         .unwrap();
 
     let consensus_group =
-        MockConsensusGroup::new::<TestBinding>(ConsensusConfig::default(), None, None);
+        MockConsensusGroup::new::<QueryRunner>(ConsensusConfig::default(), None, None);
     let peers = keystores
         .into_iter()
         .enumerate()

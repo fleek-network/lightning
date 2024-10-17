@@ -17,7 +17,7 @@ use types::{
     Value,
 };
 
-use crate::CommitteeBeaconError;
+use crate::{CommitteeBeaconError, CommitteeBeaconTimerConfig};
 
 /// The committee beacon timer is responsible for ensuring that time (blocks) move forward during
 /// commit and reveal phases.
@@ -28,16 +28,22 @@ use crate::CommitteeBeaconError;
 /// Most of the time in real world usage, transactions are being submitted by other actors,
 /// but this is necessary to ensure that the phase advances if no transactions are submitted.
 pub struct CommitteeBeaconTimer<C: NodeComponents> {
+    config: CommitteeBeaconTimerConfig,
     app_query: c!(C::ApplicationInterface::SyncExecutor),
     signer: SignerSubmitTxSocket,
 }
 
 impl<C: NodeComponents> CommitteeBeaconTimer<C> {
     pub async fn new(
+        config: CommitteeBeaconTimerConfig,
         signer: SignerSubmitTxSocket,
         app_query: c!(C::ApplicationInterface::SyncExecutor),
     ) -> Result<Self> {
-        Ok(Self { app_query, signer })
+        Ok(Self {
+            config,
+            app_query,
+            signer,
+        })
     }
     /// Start the committee beacon timer.
     ///
@@ -45,7 +51,7 @@ impl<C: NodeComponents> CommitteeBeaconTimer<C> {
     /// commit or reveal phase. If the block number has not advanced, we submit a benign
     /// transaction to move the phase forward.
     pub async fn start(&self) -> Result<(), CommitteeBeaconError> {
-        let base_delay = Duration::from_millis(500);
+        let base_delay = self.config.tick_delay;
         let mut current_delay = base_delay;
         let max_delay = Duration::from_secs(60);
 

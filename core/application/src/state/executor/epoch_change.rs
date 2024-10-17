@@ -363,24 +363,29 @@ impl<B: Backend> StateExecutor<B> {
             self.set_committee_selection_beacon_reveal_phase(reveal_start, reveal_end);
         } else {
             // If we don't have sufficient participation, start the commit phase again.
+
+            // Get the current round.
+            let round = self.get_committee_selection_beacon_round();
+            let Some(round) = round else {
+                return TransactionResponse::Revert(
+                    ExecutionError::CommitteeSelectionBeaconRoundNotFound,
+                );
+            };
+
+            // Start the commit phase again by setting the phase metadata.
             let commit_start = current_block + 1;
             let commit_end = commit_start + self.get_commit_phase_duration();
             tracing::debug!(
-                "transitioning to new committee selection beacon commit phase because commit phase timed out without sufficient participation (epoch: {}, start: {}, end: {})",
+                "transitioning to new committee selection beacon commit phase because commit phase timed out without sufficient participation (epoch: {}, round: {}, start: {}, end: {})",
                 epoch,
+                round + 1,
                 commit_start,
                 commit_end
             );
             self.set_committee_selection_beacon_commit_phase(commit_start, commit_end);
 
             // Increment the committee selection beacon round.
-            let round = self.get_committee_selection_beacon_round();
-            if round.is_none() {
-                return TransactionResponse::Revert(
-                    ExecutionError::CommitteeSelectionBeaconRoundNotFound,
-                );
-            }
-            self.set_committee_selection_beacon_round(round.unwrap() + 1);
+            self.set_committee_selection_beacon_round(round + 1);
 
             // Clear the beacon state.
             self.committee_selection_beacon.clear();
@@ -432,24 +437,30 @@ impl<B: Backend> StateExecutor<B> {
         }
 
         // The reveal phase has timed out.
+
+        // Get the current round.
+        let round = self.get_committee_selection_beacon_round();
+        let Some(round) = round else {
+            return TransactionResponse::Revert(
+                ExecutionError::CommitteeSelectionBeaconRoundNotFound,
+            );
+        };
+
         // Start the commit phase again.
         let commit_start = current_block + 1;
         let commit_end = commit_start + self.get_commit_phase_duration();
+        let epoch = self.get_epoch();
         tracing::debug!(
-            "transitioning to new committee selection beacon commit phase because reveal phase timed out (start: {}, end: {})",
+            "transitioning to new committee selection beacon commit phase because reveal phase timed out (epoch: {}, round: {}, start: {}, end: {})",
+            epoch,
+            round + 1,
             commit_start,
             commit_end
         );
         self.set_committee_selection_beacon_commit_phase(commit_start, commit_end);
 
         // Increment the committee selection beacon round.
-        let round = self.get_committee_selection_beacon_round();
-        if round.is_none() {
-            return TransactionResponse::Revert(
-                ExecutionError::CommitteeSelectionBeaconRoundNotFound,
-            );
-        }
-        self.set_committee_selection_beacon_round(round.unwrap() + 1);
+        self.set_committee_selection_beacon_round(round + 1);
 
         // Save non-revealing nodes to state so we can reject any commits in the next round.
         // Clear existing non-revealing nodes table first.
@@ -542,7 +553,7 @@ impl<B: Backend> StateExecutor<B> {
     fn set_committee_selection_beacon_round(&self, round: u64) {
         self.metadata.set(
             Metadata::CommitteeSelectionBeaconRound,
-            Value::CommitteeSelectionBeaconRound(round + 1),
+            Value::CommitteeSelectionBeaconRound(round),
         );
     }
 

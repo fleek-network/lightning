@@ -3,24 +3,25 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Result;
+use fleek_crypto::SecretKey;
 use futures::future::join_all;
-use lightning_interfaces::types::Genesis;
-use lightning_interfaces::{ApplicationInterface, PoolInterface};
+use lightning_application::state::QueryRunner;
+use lightning_interfaces::types::{Genesis, NodePorts, Staking};
+use lightning_interfaces::{ApplicationInterface, KeystoreInterface, PoolInterface};
 use lightning_utils::poll::{poll_until, PollUntilError};
 use ready::ReadyWaiter;
 use tempfile::tempdir;
 
 use super::{
     try_init_tracing,
+    GenesisMutator,
     TestGenesisBuilder,
+    TestGenesisNodeBuilder,
     TestNetwork,
     TestNode,
     TestNodeBuilder,
-    TestNodeComponents,
 };
 use crate::consensus::{Config as MockConsensusConfig, MockConsensusGroup};
-
-pub type GenesisMutator = Arc<dyn Fn(&mut Genesis)>;
 
 #[derive(Clone)]
 pub struct TestNetworkBuilder {
@@ -85,7 +86,7 @@ impl TestNetworkBuilder {
             if let Some(config) = &self.mock_consensus_config {
                 // Build the shared mock consensus group.
                 let consensus_group_start = Arc::new(tokio::sync::Notify::new());
-                let consensus_group = MockConsensusGroup::new::<TestNodeComponents>(
+                let consensus_group = MockConsensusGroup::new::<QueryRunner>(
                     config.clone(),
                     None,
                     Some(consensus_group_start.clone()),
@@ -124,7 +125,30 @@ impl TestNetworkBuilder {
                 builder = builder.with_mutator(mutator);
             }
             for (node_index, node) in node_by_index.iter() {
-                builder = builder.with_node(node, committee_nodes.contains_key(&node_index));
+                // builder = builder.with_node(node, committee_nodes.contains_key(&node_index));
+                builder = builder.with_node(
+                    TestGenesisNodeBuilder::new()
+                        .with_owner(node.owner_secret_key.to_pk().into())
+                        .with_node_secret_key(node.keystore.get_ed25519_sk())
+                        .with_consensus_secret_key(node.keystore.get_bls_sk())
+                        .with_node_ports(NodePorts {
+                            pool: node
+                                .before_genesis_ready
+                                .state()
+                                .unwrap()
+                                .pool_listen_address
+                                .port(),
+                            ..Default::default()
+                        })
+                        .with_stake(Staking {
+                            staked: 1000u32.into(),
+                            stake_locked_until: 0,
+                            locked: 0u32.into(),
+                            locked_until: 0,
+                        })
+                        .with_is_committee(committee_nodes.contains_key(&node_index))
+                        .build(),
+                )
             }
             builder.build()
         };

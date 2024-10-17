@@ -12,6 +12,7 @@ use crate::timer::CommitteeBeaconTimer;
 use crate::CommitteeBeaconQuery;
 
 pub struct CommitteeBeaconComponent<C: NodeComponents> {
+    config: CommitteeBeaconConfig,
     db: RocksCommitteeBeaconDatabase,
     _components: PhantomData<C>,
 }
@@ -40,8 +41,9 @@ impl<C: NodeComponents> CommitteeBeaconComponent<C> {
     /// beacon configuration.
     fn init(config: &C::ConfigProviderInterface) -> Result<Self> {
         let config = config.get::<Self>();
-        let db = RocksCommitteeBeaconDatabase::build(config.database);
+        let db = RocksCommitteeBeaconDatabase::build(config.database.clone());
         Ok(Self {
+            config,
             db,
             _components: PhantomData,
         })
@@ -61,6 +63,7 @@ impl<C: NodeComponents> CommitteeBeaconComponent<C> {
         let db = self.db.clone();
         let listener_shutdown = shutdown.clone();
         let timer_shutdown = shutdown.clone();
+        let timer_config = self.config.timer.clone();
         spawn!(
             async move {
                 app_query.wait_for_genesis().await;
@@ -96,9 +99,10 @@ impl<C: NodeComponents> CommitteeBeaconComponent<C> {
                 );
 
                 // Start the timer.
-                let timer = CommitteeBeaconTimer::<C>::new(signer.get_socket(), app_query)
-                    .await
-                    .expect("failed to create committee beacon timer");
+                let timer =
+                    CommitteeBeaconTimer::<C>::new(timer_config, signer.get_socket(), app_query)
+                        .await
+                        .expect("failed to create committee beacon timer");
                 let timer_waiter = timer_shutdown.clone();
                 spawn!(
                     async move {
