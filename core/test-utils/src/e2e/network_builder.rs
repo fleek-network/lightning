@@ -43,7 +43,7 @@ impl TestNetworkBuilder {
             committee_beacon_config: None,
         }
         .with_mock_consensus(MockConsensusConfig {
-            max_ordering_time: 0,
+            max_ordering_time: 1,
             min_ordering_time: 0,
             probability_txn_lost: 0.0,
             new_block_interval: Duration::from_secs(0),
