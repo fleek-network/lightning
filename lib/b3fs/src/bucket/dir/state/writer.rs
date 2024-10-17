@@ -1,0 +1,41 @@
+use std::num::NonZeroU32;
+use std::os::unix::fs::FileExt;
+use std::path::{Path, PathBuf};
+
+use bytes::BytesMut;
+use fastbloom_rs::{FilterBuilder, Membership};
+use rand::random;
+use serde::Serialize as _;
+use tokio::fs::{File, OpenOptions};
+use tokio::io::{self, AsyncWriteExt, BufWriter};
+
+use super::*;
+use crate::bucket::dir::phf::{HasherState, PhfGenerator};
+use crate::bucket::{errors, Bucket};
+use crate::entry::{BorrowedEntry, BorrowedLink};
+use crate::hasher::b3::MAX_BLOCK_SIZE_IN_BYTES;
+use crate::hasher::collector::BufCollector;
+use crate::hasher::dir_hasher::DirectoryHasher;
+use crate::hasher::HashTreeCollector;
+use crate::utils;
+
+#[derive(Default)]
+pub(crate) struct DirWriterCollector {
+    hasher: DirectoryHasher,
+}
+
+impl WithCollector for DirWriterCollector {
+    async fn on_insert(
+        &mut self,
+        borrowed_entry: BorrowedEntry<'_>,
+    ) -> Result<(), errors::InsertError> {
+        self.hasher.insert(borrowed_entry)?;
+        Ok(())
+    }
+
+    async fn on_commit(self) -> Result<([u8; 32], Vec<[u8; 32]>), errors::CommitError> {
+        Ok(self.hasher.finalize())
+    }
+}
+
+pub type DirWriterState = InnerDirState<DirWriterCollector>;

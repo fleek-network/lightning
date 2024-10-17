@@ -2,6 +2,7 @@ use thiserror::Error;
 use triomphe::UniqueArc;
 
 use crate::hasher::collector::InvalidHashSize;
+use crate::{hasher, stream};
 
 #[derive(Error, Debug)]
 pub enum ReadError {
@@ -19,6 +20,8 @@ pub enum FeedProofError {
     UnexpectedCall,
     #[error("Proof is not matching the current root.")]
     InvalidProof,
+    #[error("Error while feeding proof. {0}")]
+    VerificationError(#[from] stream::verifier::VerificationError),
 }
 
 #[derive(Error, Debug)]
@@ -43,6 +46,14 @@ pub enum InsertError {
     InvalidContent,
     #[error("The provided entry violates the entry name ordering.")]
     OrderingError,
+    #[error("Error while writing to disk. {0}")]
+    WritingError(#[from] WriteError),
+    #[error("Error writing to disk. {0}")]
+    IO(#[from] std::io::Error),
+    #[error("Invalid Hash or internal hashes content doing incremental validation")]
+    IncrementalVerification,
+    #[error("Error trying to insert entry in phf generator. {0}")]
+    InvalidEntry(#[from] hasher::dir_hasher::Error),
 }
 
 #[derive(Error, Debug)]
@@ -61,4 +72,10 @@ pub enum CommitError {
     BlockHashNotFound,
     #[error("Invalid block hash detected against incremental verifier")]
     InvalidBlockHash,
+    #[error("Error while serializing data to file. {0}")]
+    Serialization(String),
+    #[error("Error writing on spawn blocking file. {0}")]
+    SpawnError(#[from] tokio::task::JoinError),
+    #[error("Error while committing. {0}")]
+    CommitError(#[from] WriteError),
 }
