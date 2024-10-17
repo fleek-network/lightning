@@ -97,8 +97,7 @@ where
 
     pub fn get_committee_selection_beacon_phase(&self) -> Option<CommitteeSelectionBeaconPhase> {
         match self
-            .app
-            .sync_query()
+            .app_query()
             .get_metadata(&Metadata::CommitteeSelectionBeaconPhase)
         {
             Some(Value::CommitteeSelectionBeaconPhase(phase)) => Some(phase),

@@ -94,7 +94,7 @@ impl TestNodeBuilder {
         });
 
         // Configure committee beacon component.
-        config.inject::<CommitteeBeaconComponent<TestNodeComponents>>(CommitteeBeaconConfig {
+        config.inject::<CommitteeBeaconComponent<C>>(CommitteeBeaconConfig {
             database: CommitteeBeaconDatabaseConfig {
                 path: self.home_dir.join("committee-beacon").try_into().unwrap(),
             },

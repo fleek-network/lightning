@@ -272,6 +272,10 @@ impl<C: NodeComponents> TestFullNode<C> {
         self.provider().get::<Checkpointer<C>>()
     }
 
+    pub fn committee_beacon(&self) -> fdi::Ref<CommitteeBeaconComponent<C>> {
+        self.provider().get::<CommitteeBeaconComponent<C>>()
+    }
+
     pub fn pool(&self) -> fdi::Ref<PoolProvider<C>> {
         self.provider().get::<PoolProvider<C>>()
     }

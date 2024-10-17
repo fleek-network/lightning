@@ -79,8 +79,7 @@ impl TestNetwork {
         poll_until(
             || async {
                 self.node(0)
-                    .app
-                    .sync_query()
+                    .app_query()
                     .get_metadata(&Metadata::CommitteeSelectionBeaconPhase)
                     .is_none()
                     .then_some(())

@@ -2,7 +2,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Result;
-use fleek_crypto::SecretKey;
 use futures::future::join_all;
 use lightning_application::state::QueryRunner;
 use lightning_interfaces::types::{Genesis, Staking};
@@ -44,8 +43,9 @@ impl TestNetworkBuilder {
             max_ordering_time: 1,
             min_ordering_time: 0,
             probability_txn_lost: 0.0,
-            new_block_interval: Duration::from_millis(0),
+            new_block_interval: Duration::from_millis(500),
             transactions_to_lose: Default::default(),
+            send_empty_blocks: false,
         })
     }
 
