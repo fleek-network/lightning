@@ -27,21 +27,21 @@ macro_rules! println {
 }
 
 /// Print string to debug log (if enabled on the node).
+#[inline(always)]
 pub fn debug_print<S: AsRef<str>>(msg: S) {
     let s = msg.as_ref();
     unsafe { fn0::debug_print(s.as_ptr() as usize, s.len()) }
 }
 
-/// Global mutex for OutputWriter (similar to stdout)
-static IS_WRITER_OPEN: Mutex<()> = Mutex::new(());
-
 /// Construct a new reader for the input data.
+#[inline(always)]
 pub fn input_reader() -> InputReader {
     let len = unsafe { fn0::input_data_size() };
     InputReader { cur: 0, len }
 }
 
 /// Shorthand to read the input data as a string.
+#[inline(always)]
 pub fn get_input_data_string() -> Result<String, std::io::Error> {
     let mut input = input_reader();
     let mut string = String::with_capacity(input.len());
@@ -56,11 +56,13 @@ pub struct InputReader {
 
 impl InputReader {
     // Get the overall length of the input data
+    #[inline(always)]
     pub fn len(&self) -> usize {
         self.len
     }
 
     // Shorthand to check if the input data is empty
+    #[inline(always)]
     pub fn is_empty(&self) -> bool {
         self.len == 0
     }
@@ -108,11 +110,15 @@ impl Seek for InputReader {
     }
 }
 
+/// Global mutex for OutputWriter (similar to stdout)
+static IS_WRITER_OPEN: Mutex<()> = Mutex::new(());
+
 /// Construct a new handle to the current output.
 ///
 /// Each handle returned is a reference to a shared global buffer whose access
 /// is synchronized via a mutex. If you need more explicit control over
 /// locking, see the [`OutputWriter::lock`] method.
+#[inline(always)]
 pub fn output_writer() -> OutputWriter {
     OutputWriter { _private: () }
 }
