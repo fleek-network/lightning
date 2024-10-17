@@ -73,8 +73,12 @@ where
 
 #[sgxkit::main]
 pub fn main() -> Result<(), String> {
+    println!("started function");
+
     // Get json data and parse into input
     let input = sgxkit::io::get_input_data_string().unwrap();
+    println!("read input");
+
     let InputData {
         payload,
         signatures,
