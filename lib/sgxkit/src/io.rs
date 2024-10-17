@@ -43,8 +43,9 @@ pub fn input_reader() -> InputReader {
 
 /// Shorthand to read the input data as a string.
 pub fn get_input_data_string() -> Result<String, std::io::Error> {
-    let mut string = String::with_capacity(unsafe { fn0::input_data_size() });
-    input_reader().read_to_string(&mut string)?;
+    let mut input = input_reader();
+    let mut string = String::with_capacity(input.len());
+    input.read_to_string(&mut string)?;
     Ok(string)
 }
 
@@ -53,7 +54,17 @@ pub struct InputReader {
     len: usize,
 }
 
-impl InputReader {}
+impl InputReader {
+    // Get the overall length of the input data
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    // Shorthand to check if the input data is empty
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+}
 
 impl Read for InputReader {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
