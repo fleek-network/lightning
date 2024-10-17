@@ -1,11 +1,6 @@
-use std::collections::HashMap;
-use std::sync::OnceLock;
-
 use anyhow::{anyhow, bail, Context};
 use arrayref::array_ref;
 use cid::Cid;
-use deno_core::futures::stream::FuturesUnordered;
-use deno_core::futures::StreamExt;
 use deno_core::url::Host;
 use deno_core::{
     ModuleLoadResponse,
@@ -18,45 +13,7 @@ use deno_core::{
 };
 use fn_sdk::api::fetch_from_origin;
 use fn_sdk::blockstore::ContentHandle;
-use tokio::sync::Semaphore;
-use tracing::{debug, trace, warn};
-
-static IMPORTS: OnceLock<HashMap<ModuleSpecifier, ModuleSpecifier>> = OnceLock::new();
-
-// Initialize the module loader
-pub fn get_or_init_imports<'a>() -> &'a HashMap<ModuleSpecifier, ModuleSpecifier> {
-    IMPORTS.get_or_init(|| {
-        let map: HashMap<ModuleSpecifier, ModuleSpecifier> =
-            serde_json::from_str(include_str!(concat!(env!("OUT_DIR"), "/importmap.json")))
-                .unwrap();
-
-        // Spawn a task to prefetch the imports
-        let to_fetch = map.clone();
-        tokio::spawn(async move {
-            // Limit number of concurrent requests
-            let semaphore = Semaphore::new(16);
-            if to_fetch
-                .values()
-                .map(|uri| async {
-                    let _ = semaphore.acquire().await.ok()?;
-                    let uri = uri.as_str();
-                    let hash = fetch_from_origin(fn_sdk::api::Origin::HTTP, uri).await;
-                    trace!("Fetched {uri} from origin");
-                    hash
-                })
-                .collect::<FuturesUnordered<_>>()
-                .any(|res| async move { res.is_none() })
-                .await
-            {
-                warn!("Failed to prefetch runtime imports");
-            } else {
-                debug!("Prefetched runtime imports successfully")
-            }
-        });
-
-        map
-    })
-}
+use tracing::trace;
 
 pub struct FleekModuleLoader {}
 
@@ -74,12 +31,7 @@ impl ModuleLoader for FleekModuleLoader {
         _kind: deno_core::ResolutionKind,
     ) -> Result<ModuleSpecifier, anyhow::Error> {
         // Resolve import according to spec, reusing referrer base urls, etc
-        let mut import = deno_core::resolve_import(specifier, referrer)?;
-
-        // If we have an override in our importmap, use it instead
-        if let Some(mapped) = get_or_init_imports().get(&import) {
-            import = mapped.clone();
-        }
+        let import = deno_core::resolve_import(specifier, referrer)?;
 
         Ok(import)
     }
@@ -95,20 +47,6 @@ impl ModuleLoader for FleekModuleLoader {
             "LOAD specifier: {module_specifier} maybe_referrer {}",
             maybe_referrer.map(|m| m.as_str()).unwrap_or("none")
         );
-
-        // Manually override module
-        if module_specifier.as_str() == "node:util" {
-            return ModuleLoadResponse::Sync(Ok(ModuleSource::new(
-                ModuleType::JavaScript,
-                ModuleSourceCode::String(
-                    include_str!("../../polyfill/overrides/util.js")
-                        .to_string()
-                        .into(),
-                ),
-                module_specifier,
-                None,
-            )));
-        }
 
         let module_type = match requested_module_type {
             RequestedModuleType::None => ModuleType::JavaScript,

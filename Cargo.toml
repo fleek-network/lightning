@@ -7,6 +7,7 @@ members = [
   "lib/*",
   "lib/sgxkit/sys",
   "services/*",
+  "services/js-poc/deno_fleek",
   "services/ai/examples/rust/*",
 ]
 exclude = [
