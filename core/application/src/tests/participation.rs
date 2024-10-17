@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::time::Duration;
 
 use fleek_crypto::{AccountOwnerSecretKey, NodeSecretKey, SecretKey};
 use hp_fixed::unsigned::HpUfixed;
@@ -6,6 +7,7 @@ use lightning_interfaces::types::{ExecutionData, ExecutionError, Participation, 
 use lightning_interfaces::SyncQueryRunnerInterface;
 use lightning_test_utils::e2e::TestNetwork;
 use lightning_utils::application::QueryRunnerExt;
+use lightning_utils::poll::{poll_until, PollUntilError};
 use tempfile::tempdir;
 
 use super::utils::*;
@@ -40,23 +42,35 @@ async fn test_uptime_participation() {
         .unwrap();
 
     // Check that the content registries have been updated.
-    let peer1_content_registry = node
-        .app_query
-        .get_content_registry(&peer1.index())
-        .unwrap_or_default();
-    assert!(!peer1_content_registry.is_empty());
-
-    let peer2_content_registry = node
-        .app_query
-        .get_content_registry(&peer2.index())
-        .unwrap_or_default();
-    assert!(!peer2_content_registry.is_empty());
-
-    let providers = node
-        .app_query
-        .get_uri_providers(&[0u8; 32])
-        .unwrap_or_default();
-    assert_eq!(providers.len(), 2);
+    poll_until(
+        || async {
+            let providers = node
+                .app_query
+                .get_uri_providers(&[0u8; 32])
+                .unwrap_or_default();
+            (providers.len() == 2)
+                .then_some(())
+                .ok_or(PollUntilError::ConditionNotSatisfied)
+        },
+        Duration::from_secs(3),
+        Duration::from_millis(100),
+    )
+    .await
+    .unwrap();
+    assert!(
+        !node
+            .app_query
+            .get_content_registry(&peer1.index())
+            .unwrap_or_default()
+            .is_empty()
+    );
+    assert!(
+        !node
+            .app_query
+            .get_content_registry(&peer2.index())
+            .unwrap_or_default()
+            .is_empty()
+    );
 
     // Submit reputation measurements from node 0, for peer 1 and 2.
     let measurements: BTreeMap<u32, lightning_interfaces::types::ReputationMeasurements> =
