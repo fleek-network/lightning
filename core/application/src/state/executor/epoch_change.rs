@@ -123,10 +123,6 @@ impl<B: Backend> StateExecutor<B> {
         };
 
         // Revert if the node was a non-revealing node in the previous round.
-        // TODO(snormore): Should we exclude non-revealing nodes from the "sufficient participation"
-        // calculation? Otherwise, can we get stuck in the commit phase forever with too many nodes
-        // from previous round that did not reveal that we are rejecting commits from? Write a test
-        // for this scenario.
         if self
             .committee_selection_beacon_non_revealing_node
             .get(&node_index)
@@ -336,16 +332,27 @@ impl<B: Backend> StateExecutor<B> {
 
         // The commit phase has timed out.
         // Check if we have sufficient participation or not.
+        // Note that we exclude non-revealing nodes in the previous round from the participating
+        // nodes set for this calculation.
         let current_committee = self.committee_info.get(&epoch).unwrap_or_default();
+        let participating_nodes = current_committee
+            .members
+            .iter()
+            .filter(|node_index| {
+                self.committee_selection_beacon_non_revealing_node
+                    .get(*node_index)
+                    .is_none()
+            })
+            .collect::<Vec<_>>();
         let beacons = self.committee_selection_beacon.as_map();
         let committee_beacons = beacons
-            .into_iter()
-            .filter(|(node_index, _)| current_committee.members.contains(node_index))
+            .iter()
+            .filter(|(node_index, _)| participating_nodes.contains(node_index))
             .collect::<HashMap<_, _>>();
 
         // Check for sufficient participation; that 2/3 of the existing committee has committed. Any
         // other non-committee nodes can also optionally participate, but it's not required.
-        if committee_beacons.len() >= (2 * current_committee.members.len() / 3) {
+        if committee_beacons.len() >= (2 * participating_nodes.len() / 3) {
             // If we have sufficient participation, start the reveal phase.
             let reveal_start = current_block + 1;
             let reveal_end = reveal_start + self.get_reveal_phase_duration();
