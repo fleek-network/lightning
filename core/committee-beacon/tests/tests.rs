@@ -10,6 +10,7 @@ use lightning_interfaces::{
     CommitteeBeaconQueryInterface,
     SyncQueryRunnerInterface,
 };
+use lightning_test_utils::consensus::Config as MockConsensusConfig;
 use lightning_test_utils::e2e::{
     DowncastToTestFullNode,
     TestFullNodeComponentsWithMockConsensus,
@@ -216,6 +217,13 @@ async fn test_insufficient_participation_in_commit_phase() {
         ..Default::default()
     };
     let builder = TestNetwork::builder()
+        .with_mock_consensus(MockConsensusConfig {
+            max_ordering_time: 0,
+            min_ordering_time: 0,
+            probability_txn_lost: 0.0,
+            new_block_interval: Duration::from_secs(0),
+            transactions_to_lose: Default::default(),
+        })
         .with_committee_beacon_config(committee_beacon_config.clone())
         .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(1)
         .await
