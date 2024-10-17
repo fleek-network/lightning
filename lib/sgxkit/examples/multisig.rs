@@ -1,3 +1,25 @@
+//! Multisig Example
+//!
+//! # Example usage
+//!
+//! ```bash
+//! # Run the test to generate some public keys and signatures
+//! cargo test --example sgx-wasm-multisig --target x86_64-unknown-linux-gnu -- --nocapture
+//!
+//! # Build the example, with the PUBLIC_SIGNERS set to the output of the above command
+//! cargo build --target wasm32-unknown-unknown --example sgx-wasm-multisig -r
+//!
+//! # Put the content to node and get blake3 hash (can also use ipfs+fetcher to load, and b3sum to compute hash)
+//! lightning-node dev store
+//! ../../target/wasm32-unknown-unknown/release/examples/sgx-wasm-multisig.wasm
+//!
+//! # Call the service with the example signatures generated above
+//! curl localhost:4220/services/3 --data '{
+//!   "input":"{\"payload\":\"Rk9PQkFS\",\"signatures\":[\"C/FAWjjggEOZAjqWyxcF0PwiOIfcK1grt5zCk9rj2o8MEhl0Lxodu1h7Id3zSkByu3eZpqYgbNNB/hE1qem9DAE=\",\"7Eb6Z2knL4vhHjJUkfBEdHzIRvk0vTSq/K+h6M3JZwNHiIRCwh1V5Y+idXlGsWVy1c8+ha3A5Z1pcU0YyYRZdgE=\",\"0GXICyZa6cMHJthU1e2sSH76F5o7aLzJz8H9gU7UqX9nV5AslcXd8YwG79eXbzU2TrBPJWNvEV1ee46Rm/ybPAA=\"]}",
+//!   "hash":"4e923b6b4b3569eab0f251571a4e67312da925d458e9334f2d50c1ffe6f16e24"
+//! }'
+//! ```
+
 use std::io::Write;
 
 use arrayref::array_ref;
