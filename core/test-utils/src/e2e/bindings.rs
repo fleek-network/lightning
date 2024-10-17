@@ -32,3 +32,20 @@ partial_node_components!(TestFullNodeComponentsWithMockConsensus {
     SignerInterface = Signer<Self>;
     TopologyInterface = Topology<Self>;
 });
+
+partial_node_components!(TestFullNodeComponentsWithoutCommitteeBeacon {
+    ApplicationInterface = Application<Self>;
+    BroadcastInterface = SyncBroadcaster<Self>;
+    BlockstoreInterface = Blockstore<Self>;
+    CheckpointerInterface = Checkpointer<Self>;
+    ConfigProviderInterface = TomlConfigProvider<Self>;
+    ConsensusInterface = MockConsensus<Self>;
+    ForwarderInterface = MockForwarder<Self>;
+    KeystoreInterface = EphemeralKeystore<Self>;
+    NotifierInterface = Notifier<Self>;
+    PoolInterface = PoolProvider<Self>;
+    ReputationAggregatorInterface = ReputationAggregator<Self>;
+    RpcInterface = Rpc<Self>;
+    SignerInterface = Signer<Self>;
+    TopologyInterface = Topology<Self>;
+});

@@ -155,6 +155,8 @@ impl<C: NodeComponents> CommitteeBeaconTimer<C> {
             .run(ExecuteTransactionRequest {
                 method,
                 options: Some(ExecuteTransactionOptions {
+                    // No need to retry the tick transaction, since it is best-effort, and all we
+                    // need is any single node to do this to advance the phase.
                     retry: ExecuteTransactionRetry::Never,
                     wait: ExecuteTransactionWait::Receipt,
                     timeout: None,
