@@ -196,7 +196,7 @@ impl<T: WithCollector> DirState for InnerDirState<T> {
             BorrowedLink::Path(path) => path,
         };
         let i = self.next_position;
-        let pos = unsafe { NonZeroU32::new_unchecked(i) };
+        let pos = unsafe { NonZeroU32::new_unchecked(i + 1) };
         self.phf_generator.push(bytes, pos);
         self.next_position += borrowed_entry.name.len() as u32;
         self.header_file.insert_entry(borrowed_entry).await?;
