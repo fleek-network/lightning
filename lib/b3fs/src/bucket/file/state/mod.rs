@@ -1,4 +1,6 @@
+/// Module for untrusted writer functionality
 pub(crate) mod uwriter;
+/// Module for trusted writer functionality
 pub(crate) mod writer;
 
 use std::cmp;
@@ -16,17 +18,23 @@ use crate::hasher::collector::BufCollector;
 use crate::hasher::HashTreeCollector;
 use crate::utils::{self, random_file_from};
 
+/// Represents a file containing a block of data
 pub struct BlockFile {
+    /// Size of the block file in bytes
     size: usize,
+    /// Path to the block file
     path: PathBuf,
+    /// Buffered writer for the file
     file: BufWriter<File>,
 }
 
 impl BlockFile {
+    /// Returns the size of the block file
     pub fn size(&self) -> usize {
         self.size
     }
 
+    /// Creates a new BlockFile from a given WAL (Write-Ahead Log) path
     pub async fn from_wal_path(path: &Path) -> Result<Self, io::Error> {
         let path = random_file_from(path);
         let file = BufWriter::new(
@@ -43,23 +51,23 @@ impl BlockFile {
         })
     }
 
-    /// Write the bytes to the file and update the size of the file
+    /// Writes the given bytes to the file and updates the size
     pub async fn write_all(&mut self, bytes: &[u8]) -> Result<(), io::Error> {
         self.file.write_all(bytes).await?;
         self.size += bytes.len();
         Ok(())
     }
 
-    /// Flush the file
+    /// Flushes the file, ensuring all buffered contents are written
     pub async fn flush(&mut self) -> Result<(), io::Error> {
         self.file.flush().await
     }
 
-    /// Commit the block file to the final path
+    /// Commits the block file to its final path
     ///
-    /// This mean the following:
-    /// 1. Current block file is in temporary path "wal" directory with a random name
-    /// 2. Move that file to the final path "blocks" directory with the block hash as the name
+    /// This process involves:
+    /// 1. The current block file is in a temporary "wal" directory with a random name
+    /// 2. Moving that file to the final "blocks" directory with the block hash as the name
     pub async fn commit(
         &mut self,
         temp_path: &Path,
@@ -72,12 +80,16 @@ impl BlockFile {
     }
 }
 
+/// Represents the header file of the B3FS filesystem
 pub struct HeaderFile {
+    /// Path to the header file
     pub path: PathBuf,
+    /// Buffered writer for the file
     pub file: BufWriter<File>,
 }
 
 impl HeaderFile {
+    /// Creates a new HeaderFile from a given WAL path
     pub(crate) async fn from_wal_path(path: &Path) -> Result<Self, io::Error> {
         let path = random_file_from(path);
         let mut file = BufWriter::new(
@@ -96,6 +108,7 @@ impl HeaderFile {
         Ok(Self { path, file })
     }
 
+    /// Flushes the header file and moves block files to their final locations
     pub(crate) async fn flush(
         mut self,
         bucket: &Bucket,
@@ -116,6 +129,7 @@ impl HeaderFile {
         Ok(())
     }
 
+    /// Updates the number of entries in the header file
     async fn update_num_entries(self, num_entries: u32) -> Result<(), io::Error> {
         let mut file = self.file.into_inner().try_into_std().unwrap();
         let task = tokio::task::spawn_blocking(move || async move {
@@ -130,17 +144,26 @@ impl HeaderFile {
     }
 }
 
+/// Represents the internal state of a writer
 pub(crate) struct InnerWriterState<T> {
+    /// The bucket associated with this writer
     pub bucket: Bucket,
+    /// Temporary file path for WAL
     pub temp_file_path: PathBuf,
+    /// List of block files with their hashes and paths
     pub block_files: Vec<([u8; 32], PathBuf)>,
+    /// The current block file being written to
     pub current_block_file: Option<BlockFile>,
+    /// The header file for this write operation
     pub header_file: HeaderFile,
+    /// The count of blocks written so far
     pub count_block: usize,
+    /// The collector used for this write operation
     pub collector: T,
 }
 
 impl<T: WithCollector> InnerWriterState<T> {
+    /// Creates a new InnerWriterState
     pub(crate) async fn new(bucket: &Bucket, collector: T) -> Result<Self, io::Error> {
         let wal_path = bucket.get_new_wal_path();
         tokio::fs::create_dir_all(&wal_path).await?;
@@ -156,11 +179,12 @@ impl<T: WithCollector> InnerWriterState<T> {
         })
     }
 
+    /// Processes a block of data, creating new block files as necessary
     async fn process_block(&mut self, bytes: &mut BytesMut) -> Result<(), errors::WriteError> {
         if let Some(ref mut block) = self.current_block_file {
             if block.size() + bytes.len() > MAX_BLOCK_SIZE_IN_BYTES {
                 // Write `block_before_remaining` bytes to the current block file and create a
-                // ew block file where we will write the remaining bytes which is in `bytes`.
+                // new block file where we will write the remaining bytes which is in `bytes`.
                 let remaining = MAX_BLOCK_SIZE_IN_BYTES - block.size();
                 let block_before_remaining = bytes.split_to(remaining);
                 block.write_all(&block_before_remaining).await?;
@@ -185,6 +209,7 @@ impl<T: WithCollector> InnerWriterState<T> {
         Ok(())
     }
 
+    /// Creates a new block and updates the state
     async fn new_block(&mut self, block_hash: [u8; 32]) -> Result<(), io::Error> {
         if let Some(ref mut block) = self.current_block_file {
             let new_block_file_path = block.commit(&self.temp_file_path, block_hash).await?;
@@ -196,6 +221,7 @@ impl<T: WithCollector> InnerWriterState<T> {
         Ok(())
     }
 
+    /// Writes data to the current block file
     async fn write_block_file(&mut self, bytes: &[u8]) -> Result<(), io::Error> {
         if let Some(ref mut block) = self.current_block_file {
             block.write_all(bytes).await?;
@@ -205,12 +231,14 @@ impl<T: WithCollector> InnerWriterState<T> {
         Ok(())
     }
 
+    /// Creates a new block file
     async fn create_new_block_file(&mut self, bytes: &[u8]) -> Result<(), io::Error> {
         let mut block_file = BlockFile::from_wal_path(&self.temp_file_path).await?;
         self.current_block_file = Some(block_file);
         Ok(())
     }
 
+    /// Flushes all data to disk and finalizes the write operation
     async fn flush(mut self, root_hash: &[u8; 32]) -> Result<(), io::Error> {
         self.header_file
             .flush(&self.bucket, &self.block_files, root_hash)
@@ -220,34 +248,45 @@ impl<T: WithCollector> InnerWriterState<T> {
     }
 }
 
+/// Trait for collectors used in the write process
 pub trait WithCollector {
+    /// Collects bytes during the write process
     async fn collect(&mut self, bytes: &[u8]) -> Result<(), errors::WriteError>;
 
+    /// Called when a block reaches its maximum size
     async fn reach_max_block(
         &mut self,
         bytes: &[u8],
         count_block: usize,
     ) -> Result<[u8; 32], errors::WriteError>;
 
+    /// Called when a new block is created
     async fn on_new_block(
         &mut self,
         count_block: usize,
         writer: impl AsyncWriteExt + Unpin,
     ) -> Result<(), io::Error>;
 
+    /// Called after processing the bytes and after check if the block has reached the max size.
     async fn post_collect(&mut self, bytes: &[u8]) -> Result<(), errors::WriteError>;
 
+    /// Called for the final block in the write process
     async fn final_block(
         &mut self,
         count_block: usize,
     ) -> Result<Option<[u8; 32]>, errors::WriteError>;
 
+    /// Finalizes the hash tree
     async fn finalize_tree(&mut self) -> Result<(BufCollector, [u8; 32]), errors::WriteError>;
 }
 
+/// Trait defining the behavior of a writer state
 pub trait WriterState {
+    /// Writes bytes to the state
     async fn write(&mut self, bytes: &[u8]) -> Result<(), errors::WriteError>;
+    /// Commits the write operation
     async fn commit(self) -> Result<[u8; 32], errors::CommitError>;
+    /// Rolls back the write operation
     async fn rollback(self) -> Result<(), io::Error>;
 }
 

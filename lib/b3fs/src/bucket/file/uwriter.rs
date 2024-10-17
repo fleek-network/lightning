@@ -57,8 +57,9 @@ mod tests {
     use tokio::fs;
 
     use super::*;
-    use crate::bucket::file::tests::{get_random_file, verify_writer};
+    use crate::bucket::file::tests::verify_writer;
     use crate::bucket::file::B3FSFile;
+    use crate::bucket::tests::get_random_file;
     use crate::collections::HashTree;
     use crate::hasher::byte_hasher::Blake3Hasher;
     use crate::stream::walker::Mode;

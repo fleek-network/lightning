@@ -34,6 +34,17 @@ pub struct HeaderFile {
 }
 
 impl HeaderFile {
+    /// Creates a new HeaderFile from a WAL (Write-Ahead Logging) path.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The path to create the HeaderFile.
+    /// * `num_entries` - The number of entries expected in the file.
+    /// * `hashes` - The number of hash functions used in the Bloom filter.
+    ///
+    /// # Returns
+    ///
+    /// Returns a Result containing the new HeaderFile or an IO error.
     pub(crate) async fn from_wal_path(
         path: &Path,
         num_entries: usize,
@@ -77,6 +88,19 @@ impl HeaderFile {
         })
     }
 
+    /// Commits the HeaderFile by writing all necessary data and moving it to its final location.
+    ///
+    /// # Arguments
+    ///
+    /// * `bucket` - The Bucket to which this HeaderFile belongs.
+    /// * `root_hash` - The root hash of the directory.
+    /// * `hashes` - A vector of hashes for all entries.
+    /// * `bloom_filter` - The Bloom filter for quick membership tests.
+    /// * `hash_table` - The perfect hash function table.
+    ///
+    /// # Returns
+    ///
+    /// Returns a Result indicating success or a CommitError.
     pub(crate) async fn commit(
         mut self,
         bucket: &Bucket,
@@ -129,6 +153,15 @@ impl HeaderFile {
         Ok(())
     }
 
+    /// Inserts a new entry into the HeaderFile.
+    ///
+    /// # Arguments
+    ///
+    /// * `borrowed_entry` - The entry to be inserted.
+    ///
+    /// # Returns
+    ///
+    /// Returns a Result indicating success or an InsertError.
     async fn insert_entry<'a>(
         &mut self,
         borrowed_entry: BorrowedEntry<'a>,
@@ -159,6 +192,7 @@ impl HeaderFile {
     }
 }
 
+/// Represents the internal state of a directory.
 pub(super) struct InnerDirState<T> {
     bucket: Bucket,
     phf_generator: PhfGenerator,
@@ -169,20 +203,30 @@ pub(super) struct InnerDirState<T> {
     pub collector: T,
 }
 
+/// Trait for types that can collect and process directory entries.
 pub trait WithCollector {
+    /// Processes a new entry being inserted into the directory.
     async fn on_insert(
         &mut self,
         borrowed_entry: BorrowedEntry<'_>,
     ) -> Result<(), errors::InsertError>;
+
+    /// Finalizes the collection process and returns the root hash and hash tree.
     async fn on_commit(self) -> Result<([u8; 32], Vec<[u8; 32]>), errors::CommitError>;
 }
 
+/// Trait defining the operations that can be performed on a directory state.
 pub trait DirState {
+    /// Inserts a new entry into the directory.
     async fn insert_entry<'a>(
         &mut self,
         borrowed_entry: BorrowedEntry<'a>,
     ) -> Result<(), errors::InsertError>;
+
+    /// Commits the changes made to the directory.
     async fn commit(self) -> Result<[u8; 32], errors::CommitError>;
+
+    /// Rolls back any changes made to the directory.
     async fn rollback(self) -> Result<(), io::Error>;
 }
 
@@ -196,7 +240,7 @@ impl<T: WithCollector> DirState for InnerDirState<T> {
             BorrowedLink::Path(path) => path,
         };
         let i = self.next_position;
-        let pos = unsafe { NonZeroU32::new_unchecked(i) };
+        let pos = unsafe { NonZeroU32::new_unchecked(i + 1) };
         self.phf_generator.push(bytes, pos);
         self.next_position += borrowed_entry.name.len() as u32;
         self.header_file.insert_entry(borrowed_entry).await?;
@@ -221,6 +265,17 @@ impl<T: WithCollector> DirState for InnerDirState<T> {
 }
 
 impl<T: WithCollector + Default> InnerDirState<T> {
+    /// Creates a new InnerDirState with a custom collector.
+    ///
+    /// # Arguments
+    ///
+    /// * `bucket` - The Bucket to which this directory belongs.
+    /// * `num_entries` - The expected number of entries in the directory.
+    /// * `collector` - The custom collector to use.
+    ///
+    /// # Returns
+    ///
+    /// Returns a Result containing the new InnerDirState or an IO error.
     pub(crate) async fn new_with_collector(
         bucket: &Bucket,
         num_entries: usize,
@@ -243,6 +298,16 @@ impl<T: WithCollector + Default> InnerDirState<T> {
         })
     }
 
+    /// Creates a new InnerDirState with a default collector.
+    ///
+    /// # Arguments
+    ///
+    /// * `bucket` - The Bucket to which this directory belongs.
+    /// * `num_entries` - The expected number of entries in the directory.
+    ///
+    /// # Returns
+    ///
+    /// Returns a Result containing the new InnerDirState or an IO error.
     pub(crate) async fn new(bucket: &Bucket, num_entries: usize) -> Result<Self, io::Error> {
         Self::new_with_collector(bucket, num_entries, T::default()).await
     }

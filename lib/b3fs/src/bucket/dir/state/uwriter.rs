@@ -22,13 +22,15 @@ use crate::utils;
 
 #[derive(Default)]
 pub(crate) struct DirUWriterCollector {
-    hasher: IncrementalVerifier<WithHashTreeCollector>,
+    hasher: Box<IncrementalVerifier<WithHashTreeCollector>>,
     root_hash: [u8; 32],
 }
 impl DirUWriterCollector {
     pub(crate) fn new(hash: [u8; 32]) -> Self {
+        let mut hasher = Box::new(IncrementalVerifier::<WithHashTreeCollector>::dir());
+        hasher.set_root_hash(hash);
         Self {
-            hasher: IncrementalVerifier::<WithHashTreeCollector>::dir(),
+            hasher,
             root_hash: hash,
         }
     }
@@ -45,9 +47,15 @@ impl WithCollector for DirUWriterCollector {
     ) -> Result<(), errors::InsertError> {
         let mut dir_hasher: DirectoryHasher<Vec<[u8; 32]>> = DirectoryHasher::default();
         dir_hasher.insert_unchecked(borrowed_entry);
+
         let (_, tree) = dir_hasher.finalize();
+
+        let this_entry_hash = tree
+            .first()
+            .ok_or(errors::InsertError::IncrementalVerification)?;
+
         self.hasher
-            .verify_hash(tree[0])
+            .verify_hash(*this_entry_hash)
             .map_err(|_| errors::InsertError::IncrementalVerification)
     }
 
