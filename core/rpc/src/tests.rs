@@ -1,18 +1,25 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::time::Duration;
 
 use bit_set::BitSet;
 use fleek_crypto::{AccountOwnerSecretKey, EthAddress, SecretKey};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_application::env::ApplicationStateTree;
 use lightning_interfaces::prelude::*;
-use lightning_test_utils::e2e::TestNetwork;
+use lightning_test_utils::e2e::{
+    DowncastToTestFullNode,
+    TestFullNodeComponentsWithMockConsensus,
+    TestNetwork,
+};
 use lightning_types::{
     AccountInfo,
     AggregateCheckpoint,
+    Epoch,
     Event,
     GenesisAccount,
     GenesisNodeServed,
     Metadata,
+    NodeIndex,
     NodeServed,
     Staking,
     StateProofKey,
@@ -22,6 +29,7 @@ use lightning_types::{
     Value,
 };
 use lightning_utils::application::QueryRunnerExt;
+use lightning_utils::poll::{poll_until, PollUntilError};
 use lightning_utils::transaction::TransactionBuilder;
 use merklize::{StateProof, StateRootHash};
 use types::ProtocolParamKey;
@@ -31,13 +39,16 @@ use crate::api::{AdminApiClient, FleekApiClient};
 #[tokio::test]
 async fn test_rpc_send_txn() {
     let mut network = TestNetwork::builder()
-        .with_num_nodes(1)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(1)
+        .await
         .build()
         .await
         .unwrap();
-    let node = network.node(0);
+    let node = network
+        .node(0)
+        .downcast::<TestFullNodeComponentsWithMockConsensus>();
 
-    let chain_id = node.app_query.get_chain_id();
+    let chain_id = node.app_query().get_chain_id();
     let nonce = node.get_nonce();
     FleekApiClient::send_txn(
         &node.rpc_client().unwrap(),
@@ -60,7 +71,8 @@ async fn test_rpc_get_flk_balance() {
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let eth_address: EthAddress = owner_secret_key.to_pk().into();
     let mut network = TestNetwork::builder()
-        .with_num_nodes(1)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(1)
+        .await
         .with_genesis_mutator(move |genesis| {
             genesis.account.push(GenesisAccount {
                 public_key: owner_secret_key.to_pk().into(),
@@ -72,7 +84,9 @@ async fn test_rpc_get_flk_balance() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0);
+    let node = network
+        .node(0)
+        .downcast::<TestFullNodeComponentsWithMockConsensus>();
 
     let response = FleekApiClient::get_flk_balance(&node.rpc_client().unwrap(), eth_address, None)
         .await
@@ -85,20 +99,25 @@ async fn test_rpc_get_flk_balance() {
 #[tokio::test]
 async fn test_rpc_get_reputation() {
     let mut network = TestNetwork::builder()
-        .with_num_nodes(1)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(1)
+        .await
         .with_genesis_mutator(move |genesis| {
             genesis.node_info[0].reputation = Some(46);
         })
         .build()
         .await
         .unwrap();
-    let node = network.node(0);
-    let node_public_key = node.keystore.get_ed25519_pk();
+    let node = network
+        .node(0)
+        .downcast::<TestFullNodeComponentsWithMockConsensus>();
 
-    let response =
-        FleekApiClient::get_reputation(&node.rpc_client().unwrap(), node_public_key, None)
-            .await
-            .unwrap();
+    let response = FleekApiClient::get_reputation(
+        &node.rpc_client().unwrap(),
+        node.get_node_public_key(),
+        None,
+    )
+    .await
+    .unwrap();
     assert_eq!(Some(46), response);
 
     network.shutdown().await;
@@ -107,7 +126,8 @@ async fn test_rpc_get_reputation() {
 #[tokio::test]
 async fn test_rpc_get_staked() {
     let mut network = TestNetwork::builder()
-        .with_num_nodes(1)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(1)
+        .await
         .with_genesis_mutator(move |genesis| {
             genesis.node_info[0].stake = Staking {
                 staked: 1_000_u32.into(),
@@ -119,12 +139,17 @@ async fn test_rpc_get_staked() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0);
-    let node_public_key = node.keystore.get_ed25519_pk();
+    let node = network
+        .node(0)
+        .downcast::<TestFullNodeComponentsWithMockConsensus>();
 
-    let response = FleekApiClient::get_staked(&node.rpc_client().unwrap(), node_public_key, None)
-        .await
-        .unwrap();
+    let response = FleekApiClient::get_staked(
+        &node.rpc_client().unwrap(),
+        node.get_node_public_key(),
+        None,
+    )
+    .await
+    .unwrap();
     assert_eq!(HpUfixed::<18>::from(1_000_u32), response);
 
     network.shutdown().await;
@@ -135,7 +160,8 @@ async fn test_rpc_get_stables_balance() {
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let eth_address: EthAddress = owner_secret_key.to_pk().into();
     let mut network = TestNetwork::builder()
-        .with_num_nodes(1)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(1)
+        .await
         .with_genesis_mutator(move |genesis| {
             genesis.account.push(GenesisAccount {
                 public_key: owner_secret_key.to_pk().into(),
@@ -147,7 +173,9 @@ async fn test_rpc_get_stables_balance() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0);
+    let node = network
+        .node(0)
+        .downcast::<TestFullNodeComponentsWithMockConsensus>();
 
     let response =
         FleekApiClient::get_stables_balance(&node.rpc_client().unwrap(), eth_address, None)
@@ -161,7 +189,8 @@ async fn test_rpc_get_stables_balance() {
 #[tokio::test]
 async fn test_rpc_get_stake_locked_until() {
     let mut network = TestNetwork::builder()
-        .with_num_nodes(1)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(1)
+        .await
         .with_genesis_mutator(move |genesis| {
             genesis.node_info[0].stake = Staking {
                 staked: 1_000_u32.into(),
@@ -173,13 +202,17 @@ async fn test_rpc_get_stake_locked_until() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0);
-    let node_public_key = node.keystore.get_ed25519_pk();
+    let node = network
+        .node(0)
+        .downcast::<TestFullNodeComponentsWithMockConsensus>();
 
-    let response =
-        FleekApiClient::get_stake_locked_until(&node.rpc_client().unwrap(), node_public_key, None)
-            .await
-            .unwrap();
+    let response = FleekApiClient::get_stake_locked_until(
+        &node.rpc_client().unwrap(),
+        node.get_node_public_key(),
+        None,
+    )
+    .await
+    .unwrap();
     assert_eq!(365, response);
 
     network.shutdown().await;
@@ -188,7 +221,8 @@ async fn test_rpc_get_stake_locked_until() {
 #[tokio::test]
 async fn test_rpc_get_locked_time() {
     let mut network = TestNetwork::builder()
-        .with_num_nodes(1)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(1)
+        .await
         .with_genesis_mutator(move |genesis| {
             genesis.node_info[0].stake = Staking {
                 staked: 1_000_u32.into(),
@@ -200,13 +234,17 @@ async fn test_rpc_get_locked_time() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0);
-    let node_public_key = node.keystore.get_ed25519_pk();
+    let node = network
+        .node(0)
+        .downcast::<TestFullNodeComponentsWithMockConsensus>();
 
-    let response =
-        FleekApiClient::get_locked_time(&node.rpc_client().unwrap(), node_public_key, None)
-            .await
-            .unwrap();
+    let response = FleekApiClient::get_locked_time(
+        &node.rpc_client().unwrap(),
+        node.get_node_public_key(),
+        None,
+    )
+    .await
+    .unwrap();
     assert_eq!(2, response);
 
     network.shutdown().await;
@@ -215,7 +253,8 @@ async fn test_rpc_get_locked_time() {
 #[tokio::test]
 async fn test_rpc_get_locked() {
     let mut network = TestNetwork::builder()
-        .with_num_nodes(1)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(1)
+        .await
         .with_genesis_mutator(move |genesis| {
             genesis.node_info[0].stake = Staking {
                 staked: 1_000_u32.into(),
@@ -227,12 +266,17 @@ async fn test_rpc_get_locked() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0);
-    let node_public_key = node.keystore.get_ed25519_pk();
+    let node = network
+        .node(0)
+        .downcast::<TestFullNodeComponentsWithMockConsensus>();
 
-    let response = FleekApiClient::get_locked(&node.rpc_client().unwrap(), node_public_key, None)
-        .await
-        .unwrap();
+    let response = FleekApiClient::get_locked(
+        &node.rpc_client().unwrap(),
+        node.get_node_public_key(),
+        None,
+    )
+    .await
+    .unwrap();
     assert_eq!(HpUfixed::<18>::from(500_u32), response);
 
     network.shutdown().await;
@@ -243,7 +287,8 @@ async fn test_rpc_get_bandwidth_balance() {
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let eth_address: EthAddress = owner_secret_key.to_pk().into();
     let mut network = TestNetwork::builder()
-        .with_num_nodes(1)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(1)
+        .await
         .with_genesis_mutator(move |genesis| {
             genesis.account.push(GenesisAccount {
                 public_key: owner_secret_key.to_pk().into(),
@@ -255,7 +300,9 @@ async fn test_rpc_get_bandwidth_balance() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0);
+    let node = network
+        .node(0)
+        .downcast::<TestFullNodeComponentsWithMockConsensus>();
 
     let response =
         FleekApiClient::get_bandwidth_balance(&node.rpc_client().unwrap(), eth_address, None)
@@ -269,20 +316,24 @@ async fn test_rpc_get_bandwidth_balance() {
 #[tokio::test]
 async fn test_rpc_get_node_info() {
     let mut network = TestNetwork::builder()
-        .with_num_nodes(1)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(1)
+        .await
         .build()
         .await
         .unwrap();
-    let node = network.node(0);
-    let node_public_key = node.keystore.get_ed25519_pk();
+    let node = network
+        .node(0)
+        .downcast::<TestFullNodeComponentsWithMockConsensus>();
 
-    let response =
-        FleekApiClient::get_node_info(&node.rpc_client().unwrap(), node_public_key, None)
-            .await
-            .unwrap();
+    let response = FleekApiClient::get_node_info(
+        &node.rpc_client().unwrap(),
+        node.get_node_public_key(),
+        None,
+    )
+    .await
+    .unwrap();
     let node_info = node
-        .app
-        .sync_query()
+        .app_query()
         .get_node_info(&0, |node_info| node_info)
         .unwrap();
     assert_eq!(Some(node_info), response);
@@ -293,16 +344,19 @@ async fn test_rpc_get_node_info() {
 #[tokio::test]
 async fn test_rpc_get_staking_amount() {
     let mut network = TestNetwork::builder()
-        .with_num_nodes(1)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(1)
+        .await
         .build()
         .await
         .unwrap();
-    let node = network.node(0);
+    let node = network
+        .node(0)
+        .downcast::<TestFullNodeComponentsWithMockConsensus>();
 
     let response = FleekApiClient::get_staking_amount(&node.rpc_client().unwrap())
         .await
         .unwrap();
-    assert_eq!(node.app_query.get_staking_amount(), response);
+    assert_eq!(node.app_query().get_staking_amount(), response);
 
     network.shutdown().await;
 }
@@ -310,16 +364,19 @@ async fn test_rpc_get_staking_amount() {
 #[tokio::test]
 async fn test_rpc_get_committee_members() {
     let mut network = TestNetwork::builder()
-        .with_num_nodes(1)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(1)
+        .await
         .build()
         .await
         .unwrap();
-    let node = network.node(0);
+    let node = network
+        .node(0)
+        .downcast::<TestFullNodeComponentsWithMockConsensus>();
 
     let response = FleekApiClient::get_committee_members(&node.rpc_client().unwrap(), None)
         .await
         .unwrap();
-    assert_eq!(node.app_query.get_committee_members(), response);
+    assert_eq!(node.app_query().get_committee_members(), response);
 
     network.shutdown().await;
 }
@@ -327,16 +384,19 @@ async fn test_rpc_get_committee_members() {
 #[tokio::test]
 async fn test_rpc_get_epoch() {
     let mut network = TestNetwork::builder()
-        .with_num_nodes(1)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(1)
+        .await
         .build()
         .await
         .unwrap();
-    let node = network.node(0);
+    let node = network
+        .node(0)
+        .downcast::<TestFullNodeComponentsWithMockConsensus>();
 
     let response = FleekApiClient::get_epoch(&node.rpc_client().unwrap())
         .await
         .unwrap();
-    assert_eq!(node.app_query.get_current_epoch(), response);
+    assert_eq!(node.app_query().get_current_epoch(), response);
 
     network.shutdown().await;
 }
@@ -344,16 +404,19 @@ async fn test_rpc_get_epoch() {
 #[tokio::test]
 async fn test_rpc_get_epoch_info() {
     let mut network = TestNetwork::builder()
-        .with_num_nodes(1)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(1)
+        .await
         .build()
         .await
         .unwrap();
-    let node = network.node(0);
+    let node = network
+        .node(0)
+        .downcast::<TestFullNodeComponentsWithMockConsensus>();
 
     let response = FleekApiClient::get_epoch_info(&node.rpc_client().unwrap())
         .await
         .unwrap();
-    assert_eq!(node.app_query.get_epoch_info(), response);
+    assert_eq!(node.app_query().get_epoch_info(), response);
 
     network.shutdown().await;
 }
@@ -361,16 +424,19 @@ async fn test_rpc_get_epoch_info() {
 #[tokio::test]
 async fn test_rpc_get_total_supply() {
     let mut network = TestNetwork::builder()
-        .with_num_nodes(1)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(1)
+        .await
         .build()
         .await
         .unwrap();
-    let node = network.node(0);
+    let node = network
+        .node(0)
+        .downcast::<TestFullNodeComponentsWithMockConsensus>();
 
     let response = FleekApiClient::get_total_supply(&node.rpc_client().unwrap(), None)
         .await
         .unwrap();
-    let total_supply = match node.app_query.get_metadata(&Metadata::TotalSupply) {
+    let total_supply = match node.app_query().get_metadata(&Metadata::TotalSupply) {
         Some(Value::HpUfixed(s)) => s,
         _ => panic!("TotalSupply is set genesis and should never be empty"),
     };
@@ -382,20 +448,19 @@ async fn test_rpc_get_total_supply() {
 #[tokio::test]
 async fn test_rpc_get_year_start_supply() {
     let mut network = TestNetwork::builder()
-        .with_num_nodes(1)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(1)
+        .await
         .build()
         .await
         .unwrap();
-    let node = network.node(0);
+    let node = network
+        .node(0)
+        .downcast::<TestFullNodeComponentsWithMockConsensus>();
 
     let response = FleekApiClient::get_year_start_supply(&node.rpc_client().unwrap(), None)
         .await
         .unwrap();
-    let supply_year_start = match node
-        .app
-        .sync_query()
-        .get_metadata(&Metadata::SupplyYearStart)
-    {
+    let supply_year_start = match node.app_query().get_metadata(&Metadata::SupplyYearStart) {
         Some(Value::HpUfixed(s)) => s,
         _ => panic!("SupplyYearStart is set genesis and should never be empty"),
     };
@@ -407,18 +472,20 @@ async fn test_rpc_get_year_start_supply() {
 #[tokio::test]
 async fn test_rpc_get_protocol_fund_address() {
     let mut network = TestNetwork::builder()
-        .with_num_nodes(1)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(1)
+        .await
         .build()
         .await
         .unwrap();
-    let node = network.node(0);
+    let node = network
+        .node(0)
+        .downcast::<TestFullNodeComponentsWithMockConsensus>();
 
     let response = FleekApiClient::get_protocol_fund_address(&node.rpc_client().unwrap())
         .await
         .unwrap();
     let protocol_account = match node
-        .app
-        .sync_query()
+        .app_query()
         .get_metadata(&Metadata::ProtocolFundAddress)
     {
         Some(Value::AccountPublicKey(s)) => s,
@@ -432,11 +499,14 @@ async fn test_rpc_get_protocol_fund_address() {
 #[tokio::test]
 async fn test_rpc_get_protocol_param_lock_time() {
     let mut network = TestNetwork::builder()
-        .with_num_nodes(1)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(1)
+        .await
         .build()
         .await
         .unwrap();
-    let node = network.node(0);
+    let node = network
+        .node(0)
+        .downcast::<TestFullNodeComponentsWithMockConsensus>();
 
     let response = FleekApiClient::get_protocol_params(
         &node.rpc_client().unwrap(),
@@ -446,8 +516,7 @@ async fn test_rpc_get_protocol_param_lock_time() {
     .unwrap();
     assert_eq!(
         serde_json::to_value(
-            node.app
-                .sync_query()
+            node.app_query()
                 .get_protocol_param(&ProtocolParamKey::LockTime)
                 .unwrap()
         )
@@ -461,7 +530,8 @@ async fn test_rpc_get_protocol_param_lock_time() {
 #[tokio::test]
 async fn test_rpc_get_total_served() {
     let mut network = TestNetwork::builder()
-        .with_num_nodes(1)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(1)
+        .await
         .with_genesis_mutator(move |genesis| {
             genesis.total_served.insert(
                 0,
@@ -475,7 +545,9 @@ async fn test_rpc_get_total_served() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0);
+    let node = network
+        .node(0)
+        .downcast::<TestFullNodeComponentsWithMockConsensus>();
 
     let response = FleekApiClient::get_total_served(&node.rpc_client().unwrap(), 0)
         .await
@@ -494,7 +566,8 @@ async fn test_rpc_get_total_served() {
 #[tokio::test]
 async fn test_rpc_get_node_served() {
     let mut network = TestNetwork::builder()
-        .with_num_nodes(1)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(1)
+        .await
         .with_genesis_mutator(move |genesis| {
             genesis.node_info[0].current_epoch_served = Some(GenesisNodeServed {
                 served: vec![1000],
@@ -504,13 +577,17 @@ async fn test_rpc_get_node_served() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0);
-    let node_public_key = node.keystore.get_ed25519_pk();
+    let node = network
+        .node(0)
+        .downcast::<TestFullNodeComponentsWithMockConsensus>();
 
-    let response =
-        FleekApiClient::get_node_served(&node.rpc_client().unwrap(), node_public_key, None)
-            .await
-            .unwrap();
+    let response = FleekApiClient::get_node_served(
+        &node.rpc_client().unwrap(),
+        node.get_node_public_key(),
+        None,
+    )
+    .await
+    .unwrap();
     assert_eq!(
         NodeServed {
             served: vec![1000],
@@ -525,7 +602,8 @@ async fn test_rpc_get_node_served() {
 #[tokio::test]
 async fn test_rpc_is_valid_node() {
     let mut network = TestNetwork::builder()
-        .with_num_nodes(1)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(1)
+        .await
         .with_genesis_mutator(move |genesis| {
             genesis.node_info[0].current_epoch_served = Some(GenesisNodeServed {
                 served: vec![1000],
@@ -535,12 +613,14 @@ async fn test_rpc_is_valid_node() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0);
-    let node_public_key = node.keystore.get_ed25519_pk();
+    let node = network
+        .node(0)
+        .downcast::<TestFullNodeComponentsWithMockConsensus>();
 
-    let response = FleekApiClient::is_valid_node(&node.rpc_client().unwrap(), node_public_key)
-        .await
-        .unwrap();
+    let response =
+        FleekApiClient::is_valid_node(&node.rpc_client().unwrap(), node.get_node_public_key())
+            .await
+            .unwrap();
     assert!(response);
 
     network.shutdown().await;
@@ -549,14 +629,17 @@ async fn test_rpc_is_valid_node() {
 #[tokio::test]
 async fn test_rpc_get_node_registry() {
     let mut network = TestNetwork::builder()
-        .with_num_nodes(3)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(3)
+        .await
         .with_genesis_mutator(move |genesis| {
             genesis.node_info[0].genesis_committee = false;
         })
         .build()
         .await
         .unwrap();
-    let node = network.node(0);
+    let node = network
+        .node(0)
+        .downcast::<TestFullNodeComponentsWithMockConsensus>();
 
     let response = FleekApiClient::get_node_registry(&node.rpc_client().unwrap(), None)
         .await
@@ -564,9 +647,8 @@ async fn test_rpc_get_node_registry() {
     assert_eq!(response.len(), 3);
 
     let node_public_keys = network
-        .node_by_id
-        .values()
-        .map(|n| n.keystore.get_ed25519_pk())
+        .nodes()
+        .map(|n| n.get_node_public_key())
         .collect::<HashSet<_>>();
 
     assert!(node_public_keys.contains(&response[0].public_key));
@@ -579,14 +661,17 @@ async fn test_rpc_get_node_registry() {
 #[tokio::test]
 async fn test_admin_ping() {
     let mut network = TestNetwork::builder()
-        .with_num_nodes(1)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(1)
+        .await
         .with_genesis_mutator(move |genesis| {
             genesis.node_info[0].genesis_committee = false;
         })
         .build()
         .await
         .unwrap();
-    let node = network.node(0);
+    let node = network
+        .node(0)
+        .downcast::<TestFullNodeComponentsWithMockConsensus>();
 
     // Should fail because we are not authenticated.
     assert!(
@@ -608,7 +693,8 @@ async fn test_admin_ping() {
 async fn test_rpc_events() {
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let mut network = TestNetwork::builder()
-        .with_num_nodes(1)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(1)
+        .await
         .with_genesis_mutator(move |genesis| {
             genesis.account.push(GenesisAccount {
                 public_key: owner_secret_key.to_pk().into(),
@@ -620,8 +706,10 @@ async fn test_rpc_events() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0);
-    let sender = node.rpc.event_tx();
+    let node = network
+        .node(0)
+        .downcast::<TestFullNodeComponentsWithMockConsensus>();
+    let sender = node.rpc().event_tx();
 
     let client = node.rpc_ws_client().await.unwrap();
     let mut sub = FleekApiClient::handle_subscription(&client, None)
@@ -646,7 +734,8 @@ async fn test_rpc_events() {
 async fn test_rpc_get_state_root() {
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let mut network = TestNetwork::builder()
-        .with_num_nodes(1)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(1)
+        .await
         .with_genesis_mutator(move |genesis| {
             genesis.account.push(GenesisAccount {
                 public_key: owner_secret_key.to_pk().into(),
@@ -658,7 +747,9 @@ async fn test_rpc_get_state_root() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0);
+    let node = network
+        .node(0)
+        .downcast::<TestFullNodeComponentsWithMockConsensus>();
 
     let response = FleekApiClient::get_state_root(&node.rpc_client().unwrap(), None)
         .await
@@ -675,7 +766,8 @@ async fn test_rpc_get_state_proof() {
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_eth_address: EthAddress = owner_secret_key.to_pk().into();
     let mut network = TestNetwork::builder()
-        .with_num_nodes(1)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(1)
+        .await
         .with_genesis_mutator(move |genesis| {
             genesis.account.push(GenesisAccount {
                 public_key: owner_secret_key.to_pk().into(),
@@ -687,7 +779,9 @@ async fn test_rpc_get_state_proof() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0);
+    let node = network
+        .node(0)
+        .downcast::<TestFullNodeComponentsWithMockConsensus>();
     let client = node.rpc_client().unwrap();
 
     let state_key = StateProofKey::Accounts(owner_eth_address);
@@ -731,7 +825,8 @@ async fn test_rpc_get_state_proof() {
 async fn test_rpc_get_aggregate_checkpoint() {
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let mut network = TestNetwork::builder()
-        .with_num_nodes(1)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(1)
+        .await
         .with_genesis_mutator(move |genesis| {
             genesis.account.push(GenesisAccount {
                 public_key: owner_secret_key.to_pk().into(),
@@ -743,7 +838,9 @@ async fn test_rpc_get_aggregate_checkpoint() {
         .build()
         .await
         .unwrap();
-    let node = network.node(0);
+    let node = network
+        .node(0)
+        .downcast::<TestFullNodeComponentsWithMockConsensus>();
     let client = node.rpc_client().unwrap();
     let epoch = 1001;
 
@@ -764,8 +861,8 @@ async fn test_rpc_get_aggregate_checkpoint() {
         .await;
 
     // Wait for the aggregate checkpoint to be available.
-    let _aggregate_checkpoint_by_node = network
-        .wait_for_aggregate_checkpoint(epoch, |header_by_node| {
+    let _aggregate_checkpoint_by_node =
+        wait_for_aggregate_checkpoint(&network, epoch, |header_by_node| {
             header_by_node.values().all(|header| header.is_some())
         })
         .await;
@@ -787,4 +884,45 @@ async fn test_rpc_get_aggregate_checkpoint() {
     );
 
     network.shutdown().await;
+}
+
+pub async fn wait_for_aggregate_checkpoint<F>(
+    network: &TestNetwork,
+    epoch: Epoch,
+    condition: F,
+) -> Result<HashMap<NodeIndex, AggregateCheckpoint>, PollUntilError>
+where
+    F: Fn(&HashMap<NodeIndex, Option<AggregateCheckpoint>>) -> bool,
+{
+    const TIMEOUT: Duration = Duration::from_secs(10);
+    const DELAY: Duration = Duration::from_millis(100);
+
+    poll_until(
+        || async {
+            let header_by_node = network
+                .nodes()
+                .map(|node| {
+                    let query = node
+                        .downcast::<TestFullNodeComponentsWithMockConsensus>()
+                        .checkpointer()
+                        .query();
+                    let header = query.get_aggregate_checkpoint(epoch);
+
+                    (node.index(), header)
+                })
+                .collect::<HashMap<_, _>>();
+
+            condition(&header_by_node)
+                .then(|| {
+                    header_by_node
+                        .into_iter()
+                        .map(|(node_id, header)| (node_id, header.unwrap()))
+                        .collect::<HashMap<_, _>>()
+                })
+                .ok_or(PollUntilError::ConditionNotSatisfied)
+        },
+        TIMEOUT,
+        DELAY,
+    )
+    .await
 }

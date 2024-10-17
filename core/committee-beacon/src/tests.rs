@@ -25,6 +25,8 @@ use lightning_test_utils::consensus::{
 };
 use lightning_test_utils::e2e::{
     try_init_tracing,
+    DowncastToTestFullNode,
+    TestFullNodeComponentsWithMockConsensus,
     TestGenesisBuilder,
     TestGenesisNodeBuilder,
     TestNetworkBuilder,
@@ -32,6 +34,7 @@ use lightning_test_utils::e2e::{
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_utils::application::QueryRunnerExt;
+use lightning_utils::poll::{poll_until, PollUntilError};
 use lightning_utils::transaction::{TransactionClient, TransactionSigner};
 use tempfile::{tempdir, TempDir};
 use tokio::time::Instant;
@@ -52,9 +55,8 @@ use crate::{
 
 #[tokio::test]
 async fn test_start_shutdown() {
-    let temp_dir = tempdir().unwrap();
-    let mut node = lightning_test_utils::e2e::TestNodeBuilder::new(temp_dir.path().to_path_buf())
-        .build()
+    let node = lightning_test_utils::e2e::TestNodeBuilder::new()
+        .build::<TestFullNodeComponentsWithMockConsensus>()
         .await
         .unwrap();
     node.shutdown().await;
@@ -63,11 +65,14 @@ async fn test_start_shutdown() {
 #[tokio::test]
 async fn test_epoch_change_single_node() {
     let mut network = TestNetworkBuilder::new()
-        .with_num_nodes(1)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(1)
+        .await
         .build()
         .await
         .unwrap();
-    let node = network.node(0);
+    let node = network
+        .node(0)
+        .downcast::<TestFullNodeComponentsWithMockConsensus>();
 
     // Send epoch change transaction from all nodes.
     let epoch = network.change_epoch().await;
@@ -75,19 +80,29 @@ async fn test_epoch_change_single_node() {
     // Check that beacon phase is set.
     // We don't check for commit phase specifically because we can't be sure it hasn't transitioned
     // to the reveal phase before checking.
-    let phase = node.get_committee_selection_beacon_phase();
-    assert!(phase.is_some());
+    poll_until(
+        || async {
+            node.get_committee_selection_beacon_phase()
+                .is_some()
+                .then_some(())
+                .ok_or(PollUntilError::ConditionNotSatisfied)
+        },
+        Duration::from_secs(3),
+        Duration::from_millis(100),
+    )
+    .await
+    .unwrap();
 
     // Check that beacons are in app state.
     // These difficult to catch this at the right time with queries, so we just check that the
     // number is less than or equal to the number of nodes.
-    let beacons = node.app_query.get_committee_selection_beacons();
+    let beacons = node.app_query().get_committee_selection_beacons();
     assert!(beacons.len() <= network.node_count());
 
     // Check that beacons are in local database.
     // These difficult to catch this at the right time with queries, so we just check that the
     // number is less than or equal to the number of nodes.
-    let beacons = node.committee_beacon.query().get_beacons();
+    let beacons = node.committee_beacon().query().get_beacons();
     assert!(beacons.len() <= network.node_count());
 
     // Wait for reveal phase to complete and beacon phase to be unset.
@@ -101,14 +116,14 @@ async fn test_epoch_change_single_node() {
     assert_eq!(new_epoch, epoch);
 
     // Check that there are no node beacons (commits and reveals) in app state.
-    let beacons = node.app_query.get_committee_selection_beacons();
+    let beacons = node.app_query().get_committee_selection_beacons();
     assert!(beacons.is_empty());
 
     // Clearing the beacons at epoch change is best-effort, since we can't guarantee that
     // the notification will be received or the listener will be running, in the case of a
     // deployment for example. This is fine, since the beacons will be cleared on the next
     // committee selection phase anyway, and we don't rely on it for correctness.
-    let beacons = node.committee_beacon.query().get_beacons();
+    let beacons = node.committee_beacon().query().get_beacons();
     assert!(beacons.len() <= network.node_count());
 
     // Shutdown the network.
@@ -118,11 +133,14 @@ async fn test_epoch_change_single_node() {
 #[tokio::test]
 async fn test_epoch_change_multiple_nodes() {
     let mut network = TestNetworkBuilder::new()
-        .with_num_nodes(3)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(3)
+        .await
         .build()
         .await
         .unwrap();
-    let node = network.node(0);
+    let node = network
+        .node(0)
+        .downcast::<TestFullNodeComponentsWithMockConsensus>();
 
     // Send epoch change transaction from all nodes.
     let epoch = network.change_epoch().await;
@@ -130,19 +148,29 @@ async fn test_epoch_change_multiple_nodes() {
     // Check that beacon phase is set.
     // We don't check for commit phase specifically because we can't be sure it hasn't transitioned
     // to the reveal phase before checking.
-    let phase = node.get_committee_selection_beacon_phase();
-    assert!(phase.is_some());
+    poll_until(
+        || async {
+            node.get_committee_selection_beacon_phase()
+                .is_some()
+                .then_some(())
+                .ok_or(PollUntilError::ConditionNotSatisfied)
+        },
+        Duration::from_secs(3),
+        Duration::from_millis(100),
+    )
+    .await
+    .unwrap();
 
     // Check that beacons are in app state.
     // It's difficult to catch this at the right time with queries, so we just check that the
     // number is less than or equal to the number of nodes.
-    let beacons = node.app_query.get_committee_selection_beacons();
+    let beacons = node.app_query().get_committee_selection_beacons();
     assert!(beacons.len() <= network.node_count());
 
     // Check that beacons are in local database.
     // It's difficult to catch this at the right time with queries, so we just check that the
     // number is less than or equal to the number of nodes.
-    let beacons = node.committee_beacon.query().get_beacons();
+    let beacons = node.committee_beacon().query().get_beacons();
     assert!(beacons.len() <= network.node_count());
 
     // Wait for reveal phase to complete and beacon phase to be unset.
@@ -156,14 +184,14 @@ async fn test_epoch_change_multiple_nodes() {
     assert_eq!(new_epoch, epoch);
 
     // Check that there are no node beacons (commits and reveals) in app state.
-    let beacons = node.app_query.get_committee_selection_beacons();
+    let beacons = node.app_query().get_committee_selection_beacons();
     assert!(beacons.is_empty());
 
     // Clearing the beacons at epoch change is best-effort, since we can't guarantee that
     // the notification will be received or the listener will be running, in the case of a
     // deployment for example. This is fine, since the beacons will be cleared on the next
     // committee selection phase anyway, and we don't rely on it for correctness.
-    let beacons = node.committee_beacon.query().get_beacons();
+    let beacons = node.committee_beacon().query().get_beacons();
     assert!(beacons.len() <= network.node_count());
 
     // Shutdown the network.
@@ -173,31 +201,37 @@ async fn test_epoch_change_multiple_nodes() {
 #[tokio::test]
 async fn test_block_executed_in_waiting_phase_should_do_nothing() {
     let mut network = TestNetworkBuilder::new()
-        .with_num_nodes(2)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(2)
+        .await
         .build()
         .await
         .unwrap();
-    let node = network.node(0);
+    let node = network
+        .node(0)
+        .downcast::<TestFullNodeComponentsWithMockConsensus>();
+    let query = node.app_query();
 
     // Check beacon phase before submitting transaction.
-    let phase = node.get_committee_selection_beacon_phase();
+    let phase = query.get_committee_selection_beacon_phase();
     assert!(phase.is_none());
 
     // Submit a transaction that does nothing except increment the node's nonce.
-    node.execute_transaction_from_node(UpdateMethod::IncrementNonce {})
+    network
+        .node(0)
+        .execute_transaction_from_node(UpdateMethod::IncrementNonce {}, None)
         .await
         .unwrap();
 
     // Check that beacon phase has not changed.
-    let phase = node.get_committee_selection_beacon_phase();
+    let phase = query.get_committee_selection_beacon_phase();
     assert!(phase.is_none());
 
     // Check that there are no node beacons (commits and reveals) in app state.
-    let beacons = node.app_query.get_committee_selection_beacons();
+    let beacons = query.get_committee_selection_beacons();
     assert!(beacons.is_empty());
 
     // Check that there are no beacons in our local database.
-    let beacons = node.committee_beacon.query().get_beacons();
+    let beacons = node.committee_beacon().query().get_beacons();
     assert!(beacons.is_empty());
 
     // Shutdown the network.
@@ -495,7 +529,7 @@ partial_node_components!(TestNodeComponentsWithMockCommitteeBeacon {
     SignerInterface = Signer<Self>;
 });
 
-struct TestNode<C: NodeComponents> {
+struct LocalTestNode<C: NodeComponents> {
     inner: Node<C>,
     _temp_dir: TempDir,
 
@@ -505,7 +539,7 @@ struct TestNode<C: NodeComponents> {
     forwarder: fdi::Ref<C::ForwarderInterface>,
 }
 
-impl<C: NodeComponents> TestNode<C> {
+impl<C: NodeComponents> LocalTestNode<C> {
     pub async fn start(&mut self) {
         self.inner.start().await;
     }
@@ -553,7 +587,7 @@ impl TestNodeBuilder {
         self
     }
 
-    pub async fn build<C: NodeComponents>(self) -> Result<TestNode<C>> {
+    pub async fn build<C: NodeComponents>(self) -> Result<LocalTestNode<C>> {
         let _ = try_init_tracing();
         let keystore = EphemeralKeystore::<C>::default();
         let temp_dir = tempdir().unwrap();
@@ -600,7 +634,7 @@ impl TestNodeBuilder {
             provider = provider.with(mock_consensus_group);
         }
         let node = Node::<C>::init_with_provider(provider).map_err(anyhow::Error::from)?;
-        Ok(TestNode {
+        Ok(LocalTestNode {
             keystore: node.provider.get::<C::KeystoreInterface>(),
             app: node.provider.get::<C::ApplicationInterface>(),
             notifier: node.provider.get::<C::NotifierInterface>(),
