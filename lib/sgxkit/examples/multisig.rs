@@ -66,19 +66,13 @@ where
         sigs.push((signature, rid));
     }
 
-    println!("decoded signatures");
-
     Ok(sigs)
 }
 
 #[sgxkit::main]
 pub fn main() -> Result<(), String> {
-    println!("started function");
-
     // Get json data and parse into input
     let input = sgxkit::io::get_input_data_string().unwrap();
-    println!("read input");
-
     let InputData {
         payload,
         signatures,
@@ -86,20 +80,23 @@ pub fn main() -> Result<(), String> {
 
     println!("decoded input");
 
-    let count = 0;
+    // Hash input
+    let mut hasher = sha2::Sha256::new();
+    hasher.update(&payload);
+    let hash = hasher.finalize();
+    let msg = libsecp256k1::Message::parse(&hash.into());
+
+    println!("hashed message");
+
+    let mut count = 0;
     for (sig, rid) in signatures {
-        // Hash input
-        let mut hasher = sha2::Sha256::new();
-        hasher.update(&payload);
-        let hash = hasher.finalize();
-        let msg = libsecp256k1::Message::parse(&hash.into());
-
-        println!("hashed message");
-
         // Recover the signature's public key
         let pubkey = libsecp256k1::recover(&msg, &sig, &rid).map_err(|e| e.to_string())?;
 
-        println!("recovered pubkey");
+        println!(
+            "recovered pubkey: {}",
+            hex::encode(pubkey.serialize_compressed())
+        );
 
         // Ensure public key is in the approved list
         if !PUBLIC_SIGNERS.contains(&pubkey.serialize_compressed()) {
@@ -109,15 +106,14 @@ pub fn main() -> Result<(), String> {
             ));
         }
 
-        println!("pubkey valid");
-
         // Verify the signature
         if !libsecp256k1::verify(&msg, &sig, &pubkey) {
             return Err("Invalid signature".to_string());
         }
-    }
 
-    println!("verified input");
+        println!("verified signature");
+        count += 1;
+    }
 
     if count < MINIMUM_SIGNATURES {
         return Err("Not enough valid signatures".to_string());
@@ -129,8 +125,6 @@ pub fn main() -> Result<(), String> {
     let wasm_sig = DerivedKey::root()
         .sign(&payload)
         .map_err(|e| e.to_string())?;
-
-    println!("signed");
 
     // Write base64 signature to certified output
     output_writer()
