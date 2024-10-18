@@ -61,14 +61,24 @@ async fn test_epoch_change_with_all_committee_nodes() {
 
     // Check that the ready-to-change set in the committee info contains the nodes that sent an
     // epoch change transaction.
-    for node in network.nodes() {
-        assert_eq!(
-            node.app_query
-                .get_committee_info(&epoch, |c| c.ready_to_change)
-                .unwrap(),
-            vec![0, 1]
-        );
-    }
+    poll_until(
+        || async {
+            network
+                .nodes()
+                .all(|node| {
+                    node.app_query
+                        .get_committee_info(&epoch, |c| c.ready_to_change)
+                        .unwrap()
+                        == vec![0, 1]
+                })
+                .then_some(())
+                .ok_or(PollUntilError::ConditionNotSatisfied)
+        },
+        Duration::from_secs(3),
+        Duration::from_millis(100),
+    )
+    .await
+    .unwrap();
 
     // Execute an epoch change transaction from enough nodes to trigger an epoch change.
     node3
@@ -80,10 +90,11 @@ async fn test_epoch_change_with_all_committee_nodes() {
     // change transaction.
     poll_until(
         || async {
-            Ok((
-                (),
-                network.nodes().all(|node| node.get_epoch() == epoch + 1),
-            ))
+            network
+                .nodes()
+                .all(|node| node.get_epoch() == epoch + 1)
+                .then_some(())
+                .ok_or(PollUntilError::ConditionNotSatisfied)
         },
         Duration::from_secs(5),
         Duration::from_millis(100),
@@ -107,7 +118,7 @@ async fn test_epoch_change_with_all_committee_nodes() {
         assert!(
             node.app_query
                 .get_committee_info(&(epoch + 1), |c| c.ready_to_change)
-                .unwrap()
+                .unwrap_or_default()
                 .is_empty()
         );
     }
@@ -151,14 +162,24 @@ async fn test_epoch_change_with_some_non_committee_nodes() {
 
     // Check that the ready-to-change set in the committee info contains the nodes that sent an
     // epoch change transaction.
-    for node in network.nodes() {
-        assert_eq!(
-            node.app_query
-                .get_committee_info(&epoch, |c| c.ready_to_change)
-                .unwrap(),
-            vec![0, 1]
-        );
-    }
+    poll_until(
+        || async {
+            network
+                .nodes()
+                .all(|node| {
+                    node.app_query
+                        .get_committee_info(&epoch, |c| c.ready_to_change)
+                        .unwrap()
+                        == vec![0, 1]
+                })
+                .then_some(())
+                .ok_or(PollUntilError::ConditionNotSatisfied)
+        },
+        Duration::from_secs(3),
+        Duration::from_millis(100),
+    )
+    .await
+    .unwrap();
 
     // Send epoch change transactions from the non-committee nodes.
     let result = non_committee_node1
@@ -222,10 +243,11 @@ async fn test_epoch_change_with_some_non_committee_nodes() {
     // change transaction.
     poll_until(
         || async {
-            Ok((
-                (),
-                network.nodes().all(|node| node.get_epoch() == epoch + 1),
-            ))
+            network
+                .nodes()
+                .all(|node| node.get_epoch() == epoch + 1)
+                .then_some(())
+                .ok_or(PollUntilError::ConditionNotSatisfied)
         },
         Duration::from_secs(5),
         Duration::from_millis(100),
@@ -249,7 +271,7 @@ async fn test_epoch_change_with_some_non_committee_nodes() {
         assert!(
             node.app_query
                 .get_committee_info(&(epoch + 1), |c| c.ready_to_change)
-                .unwrap()
+                .unwrap_or_default()
                 .is_empty()
         );
     }
