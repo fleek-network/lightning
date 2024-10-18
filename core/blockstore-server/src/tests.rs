@@ -82,6 +82,9 @@ async fn get_peers(
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let owner_public_key = owner_secret_key.to_pk();
 
+    genesis.topology_target_k = 8;
+    genesis.topology_min_nodes = 16;
+
     genesis.node_info = vec![];
     for i in 0..num_peers {
         let keystore = EphemeralKeystore::<TestBinding>::default();

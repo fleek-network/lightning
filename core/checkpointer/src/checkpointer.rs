@@ -31,7 +31,7 @@ pub struct Checkpointer<C: NodeComponents> {
     notifier: C::NotifierInterface,
     app_query: c!(C::ApplicationInterface::SyncExecutor),
     ready: TokioReadyWaiter<()>,
-    _collection: PhantomData<C>,
+    _components: PhantomData<C>,
 }
 
 impl<C: NodeComponents> Checkpointer<C> {
@@ -49,7 +49,7 @@ impl<C: NodeComponents> Checkpointer<C> {
             notifier: notifier.clone(),
             app_query,
             ready: Default::default(),
-            _collection: PhantomData,
+            _components: PhantomData,
         }
     }
 

@@ -7893,6 +7893,7 @@ version = "0.0.0"
 dependencies = [
  "affair",
  "anyhow",
+ "async-trait",
  "atomo",
  "axum 0.6.20",
  "chrono",
@@ -8056,6 +8057,7 @@ dependencies = [
  "anyhow",
  "ethers",
  "fleek-crypto",
+ "hp-fixed",
  "lazy_static",
  "lightning-application",
  "lightning-forwarder",

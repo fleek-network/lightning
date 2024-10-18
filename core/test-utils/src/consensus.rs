@@ -37,9 +37,9 @@ pub struct MockConsensusGroup {
 }
 
 impl MockConsensusGroup {
-    pub fn new<C: NodeComponents>(
+    pub fn new<Q: SyncQueryRunnerInterface>(
         config: MockConsensusConfig,
-        app_query: Option<c![C::ApplicationInterface::SyncExecutor]>,
+        app_query: Option<Q>,
         start: Option<Arc<tokio::sync::Notify>>,
     ) -> Self {
         let (req_tx, req_rx) = mpsc::channel(128);
@@ -185,7 +185,7 @@ impl<C: NodeComponents> BuildGraph for MockConsensus<C> {
                 config: fdi::Ref<C::ConfigProviderInterface>,
                 fdi::Cloned(app_query): fdi::Cloned<c![C::ApplicationInterface::SyncExecutor]>
             | {
-                MockConsensusGroup::new::<C>(config.get::<Self>(), Some(app_query), None)
+                MockConsensusGroup::new(config.get::<Self>(), Some(app_query), None)
             })
             .with_infallible(
                 Self::new.with_event_handler(

@@ -186,6 +186,11 @@ impl<C: NodeComponents> ContainedNode<C> {
         }
     }
 
+    /// Returns a shutdown waiter for the node.
+    pub fn shutdown_waiter(&self) -> ShutdownWaiter {
+        self.shutdown.waiter()
+    }
+
     /// Returns a reference to the data provider.
     pub fn provider(&self) -> &fdi::MultiThreadedProvider {
         &self.provider

@@ -10,7 +10,7 @@ use lightning_interfaces::types::{
     MAX_MEASUREMENTS_SUBMIT,
 };
 use lightning_interfaces::SyncQueryRunnerInterface;
-use lightning_test_utils::e2e::TestNetwork;
+use lightning_test_utils::e2e::{TestFullNodeComponentsWithMockConsensus, TestNetwork};
 use lightning_test_utils::random;
 use lightning_test_utils::reputation::generate_reputation_measurements;
 use lightning_utils::application::QueryRunnerExt;
@@ -97,7 +97,8 @@ async fn test_submit_rep_measurements_too_many_times() {
 #[tokio::test]
 async fn test_rep_scores() {
     let mut network = TestNetwork::builder()
-        .with_num_nodes(4)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(4)
+        .await
         .with_genesis_mutator(|genesis| {
             genesis.node_info[0].reputation = Some(40);
             genesis.node_info[1].reputation = Some(80);
@@ -122,9 +123,12 @@ async fn test_rep_scores() {
             generate_reputation_measurements(&mut rng, 0.1),
         ),
     ]);
-    node.execute_transaction_from_node(UpdateMethod::SubmitReputationMeasurements { measurements })
-        .await
-        .unwrap();
+    node.execute_transaction_from_node(
+        UpdateMethod::SubmitReputationMeasurements { measurements },
+        None,
+    )
+    .await
+    .unwrap();
 
     // Submit reputation measurements from node 1, for peer 1 and 2.
     let measurements = BTreeMap::from_iter(vec![
@@ -137,21 +141,24 @@ async fn test_rep_scores() {
             generate_reputation_measurements(&mut rng, 0.1),
         ),
     ]);
-    node.execute_transaction_from_node(UpdateMethod::SubmitReputationMeasurements { measurements })
-        .await
-        .unwrap();
+    node.execute_transaction_from_node(
+        UpdateMethod::SubmitReputationMeasurements { measurements },
+        None,
+    )
+    .await
+    .unwrap();
 
     // Change epoch and wait for it to be complete.
     network.change_epoch_and_wait_for_complete().await.unwrap();
 
     // Check the reputation scores.
     assert!(
-        node.app_query
+        node.app_query()
             .get_reputation_score(&peer1.index())
             .is_some()
     );
     assert!(
-        node.app_query
+        node.app_query()
             .get_reputation_score(&peer2.index())
             .is_some()
     );

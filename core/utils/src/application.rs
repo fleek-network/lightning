@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
-use fleek_crypto::NodePublicKey;
+use fleek_crypto::{EthAddress, NodePublicKey};
+use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
     Epoch,
@@ -106,6 +107,15 @@ pub trait QueryRunnerExt: SyncQueryRunnerInterface {
         }
     }
 
+    /// Returns the latest block number.
+    fn get_block_number(&self) -> Option<u64> {
+        match self.get_metadata(&Metadata::BlockNumber) {
+            Some(Value::BlockNumber(block)) => Some(block),
+            None => None,
+            _ => unreachable!("invalid block number in metadata"),
+        }
+    }
+
     /// Returns last executed block hash. [0;32] is genesis
     fn get_last_block(&self) -> [u8; 32] {
         match self.get_metadata(&Metadata::LastBlockHash) {
@@ -203,6 +213,33 @@ pub trait QueryRunnerExt: SyncQueryRunnerInterface {
             self.get_node_info(&node_idx, |n| n.stake.staked)
                 .is_some_and(|node_stake| node_stake >= minimum_stake_amount)
         })
+    }
+
+    /// Returns the protocol fund address.
+    fn get_protocol_fund_address(&self) -> Option<EthAddress> {
+        match self.get_metadata(&Metadata::ProtocolFundAddress) {
+            Some(Value::AccountPublicKey(value)) => Some(value),
+            None => None,
+            _ => unreachable!("invalid protocol fund address in metadata"),
+        }
+    }
+
+    /// Returns the total supply of FLK.
+    fn get_total_supply(&self) -> Option<HpUfixed<18>> {
+        match self.get_metadata(&Metadata::TotalSupply) {
+            Some(Value::HpUfixed(value)) => Some(value),
+            None => None,
+            _ => unreachable!("invalid total supply in metadata"),
+        }
+    }
+
+    /// Returns the supply at the start of the year.
+    fn get_supply_year_start(&self) -> Option<HpUfixed<18>> {
+        match self.get_metadata(&Metadata::SupplyYearStart) {
+            Some(Value::HpUfixed(value)) => Some(value),
+            None => None,
+            _ => unreachable!("invalid supply year start in metadata"),
+        }
     }
 
     /// Returns the ping timeout from the protocol parameters.
