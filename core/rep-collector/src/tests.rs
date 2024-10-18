@@ -10,7 +10,7 @@ use lightning_interfaces::Weight;
 use lightning_node::Node;
 use lightning_notifier::Notifier;
 use lightning_signer::Signer;
-use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus, MockForwarder};
+use lightning_test_utils::consensus::{MockConsensus, MockConsensusConfig, MockForwarder};
 use lightning_test_utils::e2e::TestNetwork;
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
@@ -75,7 +75,7 @@ async fn test_query() {
             .with(
                 JsonConfigProvider::default()
                     .with::<Application<TestBinding>>(ApplicationConfig::test(genesis_path))
-                    .with::<MockConsensus<TestBinding>>(ConsensusConfig::default())
+                    .with::<MockConsensus<TestBinding>>(MockConsensusConfig::default())
                     .with::<ReputationAggregator<TestBinding>>(Config {
                         reporter_buffer_size: 1,
                     }),
@@ -199,7 +199,7 @@ async fn test_submit_measurements() {
             .with(
                 JsonConfigProvider::default()
                     .with::<Application<TestBinding>>(ApplicationConfig::test(genesis_path))
-                    .with::<MockConsensus<TestBinding>>(ConsensusConfig::default())
+                    .with::<MockConsensus<TestBinding>>(MockConsensusConfig::default())
                     .with::<ReputationAggregator<TestBinding>>(Config {
                         reporter_buffer_size: 1,
                     }),

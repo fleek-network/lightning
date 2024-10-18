@@ -18,7 +18,7 @@ use super::{
     TestNodeBuilder,
     TestNodeComponents,
 };
-use crate::consensus::{Config as MockConsensusConfig, MockConsensusGroup};
+use crate::consensus::{MockConsensusConfig, MockConsensusGroup};
 
 pub type GenesisMutator = Arc<dyn Fn(&mut Genesis)>;
 

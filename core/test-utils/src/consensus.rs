@@ -30,7 +30,7 @@ use tokio::time::{sleep, Interval};
 /// group into a brodcast sender and the receiver will be all of the [ExecutionEngineSocket]s of
 /// all of the nodes.
 pub struct MockConsensusGroup {
-    pub config: Config,
+    pub config: MockConsensusConfig,
     req_tx: Option<mpsc::Sender<TransactionRequest>>,
     block_producer_rx: Option<broadcast::Receiver<Block>>,
     start: Option<Arc<tokio::sync::Notify>>,
@@ -38,7 +38,7 @@ pub struct MockConsensusGroup {
 
 impl MockConsensusGroup {
     pub fn new<C: NodeComponents>(
-        config: Config,
+        config: MockConsensusConfig,
         app_query: Option<c![C::ApplicationInterface::SyncExecutor]>,
         start: Option<Arc<tokio::sync::Notify>>,
     ) -> Self {
@@ -198,11 +198,11 @@ impl<C: NodeComponents> BuildGraph for MockConsensus<C> {
 
 impl<C: NodeComponents> ConfigConsumer for MockConsensus<C> {
     const KEY: &'static str = "mock_consensus";
-    type Config = Config;
+    type Config = MockConsensusConfig;
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-pub struct Config {
+pub struct MockConsensusConfig {
     /// Lower bound for the random time it takes to order a transaction.
     pub min_ordering_time: u64,
     /// Upper bound for the random time it takes to order a transaction.
@@ -223,7 +223,7 @@ pub struct Config {
     pub block_buffering_interval: Duration,
 }
 
-impl Default for Config {
+impl Default for MockConsensusConfig {
     fn default() -> Self {
         Self {
             min_ordering_time: 0,
@@ -237,7 +237,7 @@ impl Default for Config {
 }
 
 async fn group_worker<Q: SyncQueryRunnerInterface>(
-    config: Config,
+    config: MockConsensusConfig,
     app_query: Option<Q>,
     start: Option<Arc<tokio::sync::Notify>>,
     mut req_rx: mpsc::Receiver<TransactionRequest>,
