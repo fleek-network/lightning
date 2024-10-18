@@ -37,9 +37,9 @@ pub struct MockConsensusGroup {
 }
 
 impl MockConsensusGroup {
-    pub fn new<C: NodeComponents>(
+    pub fn new<Q: SyncQueryRunnerInterface>(
         config: Config,
-        app_query: Option<c![C::ApplicationInterface::SyncExecutor]>,
+        app_query: Option<Q>,
         start: Option<Arc<tokio::sync::Notify>>,
     ) -> Self {
         let (req_tx, req_rx) = mpsc::channel(128);
@@ -185,7 +185,7 @@ impl<C: NodeComponents> BuildGraph for MockConsensus<C> {
                 config: fdi::Ref<C::ConfigProviderInterface>,
                 fdi::Cloned(app_query): fdi::Cloned<c![C::ApplicationInterface::SyncExecutor]>
             | {
-                MockConsensusGroup::new::<C>(config.get::<Self>(), Some(app_query), None)
+                MockConsensusGroup::new(config.get::<Self>(), Some(app_query), None)
             })
             .with_infallible(
                 Self::new.with_event_handler(
@@ -217,16 +217,20 @@ pub struct Config {
     /// This specifies the interval for new blocks being pretend submitted to the application.
     #[serde(with = "humantime_serde")]
     pub new_block_interval: Duration,
+    /// Whether to send an empty block when there are no transactions to send during the interval
+    /// tick.
+    pub execute_empty_blocks: bool,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
             min_ordering_time: 0,
-            max_ordering_time: 5,
+            max_ordering_time: 3,
             probability_txn_lost: 0.0,
             transactions_to_lose: HashSet::new(),
-            new_block_interval: Duration::from_secs(5),
+            new_block_interval: Duration::from_millis(0),
+            execute_empty_blocks: false,
         }
     }
 }
@@ -260,6 +264,10 @@ async fn group_worker<Q: SyncQueryRunnerInterface>(
     // realistic.
     let mut delayed_queue = JoinSet::new();
 
+    // Transactions are buffered in the pending queue and sent together in a single block, to make
+    // it more realistic and consistent with the real consensus process.
+    let mut pending_transactions = Vec::new();
+
     // This is a hack to force the JoinSet to never return `None`. This simplifies the
     // tokio::select. Maybe there is utility future somewhere
     delayed_queue.spawn(futures::future::pending::<TransactionRequest>());
@@ -273,17 +281,27 @@ async fn group_worker<Q: SyncQueryRunnerInterface>(
     loop {
         let mut block = tokio::select! {
             Some(req) = delayed_queue.join_next() => {
-                Block {
-                    transactions: vec![req.unwrap()],
-                    digest: [0; 32],
-                    sub_dag_index: 0,
-                    sub_dag_round: 0,
+                if config.new_block_interval.is_zero() {
+                    // If the block interval is zero, we send a new block immediately when a
+                    // transaction is received and makes it through the delayed queue.
+                    Block {
+                        transactions: vec![req.unwrap()],
+                        digest: [0; 32],
+                        sub_dag_index: 0,
+                        sub_dag_round: 0,
+                    }
+                } else {
+                    // Otherwise we buffer the transaction in the pending queue and send a new block
+                    // when the interval tick happens.
+                    pending_transactions.push(req.unwrap());
+                    continue;
                 }
             },
             Some(req) = req_rx.recv() => {
                 tx_count += 1;
 
                 if config.transactions_to_lose.contains(&tx_count) {
+                    tracing::info!("losing transaction {}: {:?}", tx_count, req);
                     continue;
                 }
 
@@ -306,15 +324,19 @@ async fn group_worker<Q: SyncQueryRunnerInterface>(
                 continue;
             },
             _ = interval.tick() => {
-                if config.new_block_interval.is_zero() {
+                if pending_transactions.is_empty() && !config.execute_empty_blocks {
                     continue;
                 }
-                Block {
-                    transactions: vec![],
+
+                // Send the buffered transactions as a single block.
+                let block = Block {
+                    transactions: pending_transactions.clone(),
                     digest: [0; 32],
                     sub_dag_index: 0,
                     sub_dag_round: 0,
-                }
+                };
+                pending_transactions.clear();
+                block
             },
             else => {
                 break;

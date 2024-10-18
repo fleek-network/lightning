@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
-use fleek_crypto::NodePublicKey;
+use fleek_crypto::{EthAddress, NodePublicKey};
+use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
     Epoch,
@@ -15,6 +16,7 @@ use lightning_interfaces::types::{
     Value,
 };
 use lightning_interfaces::PagingParams;
+use types::CommitteeSelectionBeaconPhase;
 
 pub trait QueryRunnerExt: SyncQueryRunnerInterface {
     /// Returns the chain id
@@ -103,6 +105,15 @@ pub trait QueryRunnerExt: SyncQueryRunnerInterface {
                 // unreachable seeded at genesis
                 Vec::new()
             },
+        }
+    }
+
+    /// Returns the latest block number.
+    fn get_block_number(&self) -> Option<u64> {
+        match self.get_metadata(&Metadata::BlockNumber) {
+            Some(Value::BlockNumber(block)) => Some(block),
+            None => None,
+            _ => unreachable!("invalid block number in metadata"),
         }
     }
 
@@ -205,6 +216,33 @@ pub trait QueryRunnerExt: SyncQueryRunnerInterface {
         })
     }
 
+    /// Returns the protocol fund address.
+    fn get_protocol_fund_address(&self) -> Option<EthAddress> {
+        match self.get_metadata(&Metadata::ProtocolFundAddress) {
+            Some(Value::AccountPublicKey(value)) => Some(value),
+            None => None,
+            _ => unreachable!("invalid protocol fund address in metadata"),
+        }
+    }
+
+    /// Returns the total supply of FLK.
+    fn get_total_supply(&self) -> Option<HpUfixed<18>> {
+        match self.get_metadata(&Metadata::TotalSupply) {
+            Some(Value::HpUfixed(value)) => Some(value),
+            None => None,
+            _ => unreachable!("invalid total supply in metadata"),
+        }
+    }
+
+    /// Returns the supply at the start of the year.
+    fn get_supply_year_start(&self) -> Option<HpUfixed<18>> {
+        match self.get_metadata(&Metadata::SupplyYearStart) {
+            Some(Value::HpUfixed(value)) => Some(value),
+            None => None,
+            _ => unreachable!("invalid supply year start in metadata"),
+        }
+    }
+
     /// Returns the ping timeout from the protocol parameters.
     fn get_reputation_ping_timeout(&self) -> Duration {
         match self.get_protocol_param(&ProtocolParamKey::ReputationPingTimeout) {
@@ -230,6 +268,24 @@ pub trait QueryRunnerExt: SyncQueryRunnerInterface {
             Some(ProtocolParamValue::TopologyMinNodes(min_nodes)) => min_nodes,
             // Default to 16 for backwards compatibility.
             _ => 16,
+        }
+    }
+
+    /// Returns the current phase of the committee selection beacon.
+    fn get_committee_selection_beacon_phase(&self) -> Option<CommitteeSelectionBeaconPhase> {
+        match self.get_metadata(&Metadata::CommitteeSelectionBeaconPhase) {
+            Some(Value::CommitteeSelectionBeaconPhase(phase)) => Some(phase),
+            None => None,
+            _ => unreachable!("invalid committee selection beacon phase in metadata"),
+        }
+    }
+
+    /// Returns the current round of the committee selection beacon.
+    fn get_committee_selection_beacon_round(&self) -> Option<u64> {
+        match self.get_metadata(&Metadata::CommitteeSelectionBeaconRound) {
+            Some(Value::CommitteeSelectionBeaconRound(round)) => Some(round),
+            None => None,
+            _ => unreachable!("invalid committee selection beacon round in metadata"),
         }
     }
 }

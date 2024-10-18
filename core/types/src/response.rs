@@ -111,6 +111,19 @@ pub enum ExecutionData {
 /// Error type for transaction execution on the application layer
 #[derive(Clone, Debug, PartialEq, PartialOrd, Hash, Eq, Serialize, Deserialize)]
 pub enum ExecutionError {
+    CommitteeSelectionBeaconNotCommitted,
+    CommitteeSelectionBeaconNotInCommitPhase,
+    CommitteeSelectionBeaconCommitPhaseNotStarted,
+    CommitteeSelectionBeaconAlreadyCommitted,
+    CommitteeSelectionBeaconRevealPhaseNotStarted,
+    CommitteeSelectionBeaconAlreadyRevealed,
+    CommitteeSelectionBeaconNotInRevealPhase,
+    CommitteeSelectionBeaconInvalidReveal,
+    CommitteeSelectionBeaconCommitPhaseNotTimedOut,
+    CommitteeSelectionBeaconRevealPhaseNotTimedOut,
+    CommitteeSelectionBeaconNonRevealingNode,
+    CommitteeSelectionBeaconRoundNotFound,
+    MissingCommittee,
     InsufficientBalance,
     InvalidChainId,
     InvalidSignature,

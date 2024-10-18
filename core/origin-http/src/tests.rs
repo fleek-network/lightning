@@ -1,5 +1,4 @@
-use std::collections::HashSet;
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 
 use fleek_crypto::{AccountOwnerSecretKey, ConsensusSecretKey, NodeSecretKey, SecretKey};
 use lightning_application::app::Application;
@@ -123,13 +122,7 @@ async fn create_app_state(temp_dir: &TempDir) -> AppState {
                             .unwrap(),
                     })
                     .with::<Application<TestBinding>>(ApplicationConfig::test(genesis_path))
-                    .with::<MockConsensus<TestBinding>>(ConsensusConfig {
-                        min_ordering_time: 0,
-                        max_ordering_time: 1,
-                        probability_txn_lost: 0.0,
-                        transactions_to_lose: HashSet::new(),
-                        new_block_interval: Duration::from_secs(5),
-                    }),
+                    .with::<MockConsensus<TestBinding>>(ConsensusConfig::default()),
             )
             .with(keystore),
     )

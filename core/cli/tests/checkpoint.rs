@@ -12,6 +12,11 @@ use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_blockstore_server::{BlockstoreServer, Config as BlockstoreServerConfig};
 use lightning_checkpointer::{Checkpointer, CheckpointerConfig, CheckpointerDatabaseConfig};
+use lightning_committee_beacon::{
+    CommitteeBeaconComponent,
+    CommitteeBeaconConfig,
+    CommitteeBeaconDatabaseConfig,
+};
 use lightning_consensus::config::Config as ConsensusConfig;
 use lightning_consensus::consensus::Consensus;
 use lightning_dack_aggregator::{
@@ -392,6 +397,16 @@ fn build_node_config(
                 .try_into()
                 .expect("Failed to resolve path"),
         },
+    });
+
+    config.inject::<CommitteeBeaconComponent<FullNodeComponents>>(CommitteeBeaconConfig {
+        database: CommitteeBeaconDatabaseConfig {
+            path: path
+                .join("data/committee_beacon")
+                .try_into()
+                .expect("Failed to resolve path"),
+        },
+        ..Default::default()
     });
 
     config

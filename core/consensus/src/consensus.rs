@@ -29,6 +29,7 @@ use tokio::sync::{mpsc, oneshot, Notify};
 use tokio::{pin, select, task, time};
 use tracing::{error, info};
 use typed_store::DBMetrics;
+use types::ExecuteTransactionRequest;
 
 use crate::config::Config;
 use crate::execution::parcel::{AuthenticStampedParcel, CommitteeAttestation, Digest};
@@ -81,7 +82,7 @@ struct EpochState<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, N
     /// We still use this socket on consensus struct because a node is not always on the committee,
     /// so its not always sending     a transaction to its own mempool. The signer interface
     /// also takes care of nonce bookkeeping and retry logic
-    txn_socket: SubmitTxSocket,
+    txn_socket: SignerSubmitTxSocket,
     /// Interface for sending messages through the gossip layer
     pub_sub: P,
     /// Send consensus output from the execution state to the execution worker.
@@ -107,7 +108,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
         query_runner: Q,
         narwhal_args: NarwhalArgs,
         store_path: ResolvedPathBuf,
-        txn_socket: SubmitTxSocket,
+        txn_socket: SignerSubmitTxSocket,
         notifier: NE,
         pub_sub: P,
         consensus_output_tx: Sender<FilteredConsensusOutput>,
@@ -268,8 +269,12 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
                         info!("Narwhal: Signalling ready to change epoch");
 
                         if let Err(e) = txn_socket
-                        .enqueue(UpdateMethod::ChangeEpoch { epoch })
-                        .await {
+                            .enqueue(ExecuteTransactionRequest {
+                                method: UpdateMethod::ChangeEpoch { epoch },
+                                options: None,
+                            })
+                            .await
+                        {
                             error!("Error sending change epoch signal to socket {}", e);
                         }
 

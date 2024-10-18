@@ -167,10 +167,14 @@ async fn e2e_test_staking_auction() {
         .with_specific_nodes(vec![high_rep_node, low_rep_node])
         .build();
 
-    swarm.launch().await.unwrap();
+    // Launch the genesis committee and wait for RPC to be ready on them.
+    swarm.launch_genesis_committee().await.unwrap();
+    swarm.wait_for_rpc_ready_genesis_committee().await;
 
-    // Wait for RPC to be ready.
-    swarm.wait_for_rpc_ready().await;
+    // Launch the non-committee node now that the committee/bootstrap nodes are up, and wait for RPC
+    // to be ready on them.
+    swarm.launch_non_genesis_committee().await.unwrap();
+    swarm.wait_for_rpc_ready_non_genesis_committee().await;
 
     // Get the stakes to figure out who our low staked nodes are
     let stake_map: HashMap<NodePublicKey, Staking> = swarm.get_genesis_stakes();
