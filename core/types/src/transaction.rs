@@ -27,6 +27,8 @@ use super::{
 };
 use crate::content_registry::ContentUpdate;
 use crate::{
+    CommitteeSelectionBeaconCommit,
+    CommitteeSelectionBeaconReveal,
     DeliveryAcknowledgmentProof,
     NodeIndex,
     NodePorts,
@@ -401,6 +403,18 @@ pub enum UpdateMethod {
     },
     /// Sent by committee member to signal he is ready to change epoch
     ChangeEpoch { epoch: Epoch },
+    /// Sent by nodes to commit their committee selection random beacon.
+    CommitteeSelectionBeaconCommit {
+        commit: CommitteeSelectionBeaconCommit,
+    },
+    /// Sent by nodes to reveal their committee selection random beacon.
+    CommitteeSelectionBeaconReveal {
+        reveal: CommitteeSelectionBeaconReveal,
+    },
+    /// Sent by nodes when they see that the committee selection beacon commit phase has timed out.
+    CommitteeSelectionBeaconCommitPhaseTimeout,
+    /// Sent by nodes when they see that the committee selection beacon reveal phase has timed out.
+    CommitteeSelectionBeaconRevealPhaseTimeout,
     /// Adding a new service to the protocol
     AddService {
         service: Service,
@@ -590,6 +604,30 @@ impl ToDigest for UpdatePayload {
                     .with("transaction_name", &"change_epoch")
                     .with_prefix("input".to_owned())
                     .with("epoch", epoch);
+            },
+            UpdateMethod::CommitteeSelectionBeaconCommit { commit } => {
+                transcript_builder = transcript_builder
+                    .with("transaction_name", &"committee_selection_beacon_commit")
+                    .with("commit", commit)
+                    .with_prefix("input".to_owned());
+            },
+            UpdateMethod::CommitteeSelectionBeaconReveal { reveal } => {
+                transcript_builder = transcript_builder
+                    .with("transaction_name", &"committee_selection_beacon_reveal")
+                    .with("reveal", reveal)
+                    .with_prefix("input".to_owned());
+            },
+            UpdateMethod::CommitteeSelectionBeaconCommitPhaseTimeout => {
+                transcript_builder = transcript_builder.with(
+                    "transaction_name",
+                    &"committee_selection_beacon_commit_phase_timeout",
+                );
+            },
+            UpdateMethod::CommitteeSelectionBeaconRevealPhaseTimeout => {
+                transcript_builder = transcript_builder.with(
+                    "transaction_name",
+                    &"committee_selection_beacon_reveal_phase_timeout",
+                );
             },
             UpdateMethod::AddService {
                 service,

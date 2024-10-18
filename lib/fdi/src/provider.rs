@@ -202,6 +202,17 @@ impl Provider {
 }
 
 impl MultiThreadedProvider {
+    /// Helper to insert the given value to the provider inline during construction.
+    ///
+    /// # Panics
+    ///
+    /// If a value with the same type already exists in the provider.
+    #[inline(always)]
+    pub fn with<T: 'static + Send + Sync>(self, value: T) -> Self {
+        self.insert(value);
+        self
+    }
+
     /// Insert the given value to the provider.
     ///
     /// # Panics

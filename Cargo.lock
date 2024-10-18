@@ -6781,6 +6781,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with 3.9.0",
+ "sha3 0.10.8",
  "tempfile",
  "tokio",
  "toml 0.7.8",
@@ -6971,6 +6972,7 @@ dependencies = [
  "lightning-blockstore-server",
  "lightning-broadcast",
  "lightning-checkpointer",
+ "lightning-committee-beacon",
  "lightning-consensus",
  "lightning-dack-aggregator",
  "lightning-guard",
@@ -7006,6 +7008,35 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "tui-logger",
+]
+
+[[package]]
+name = "lightning-committee-beacon"
+version = "0.0.0"
+dependencies = [
+ "affair",
+ "anyhow",
+ "atomo",
+ "atomo-rocks",
+ "fleek-crypto",
+ "futures",
+ "humantime-serde",
+ "lightning-application",
+ "lightning-interfaces",
+ "lightning-node",
+ "lightning-notifier",
+ "lightning-signer",
+ "lightning-test-utils",
+ "lightning-utils",
+ "lightning-workspace-hack",
+ "rand 0.8.5",
+ "resolved-pathbuf",
+ "serde",
+ "sha3 0.10.8",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -7094,6 +7125,7 @@ dependencies = [
  "lightning-blockstore-server",
  "lightning-broadcast",
  "lightning-checkpointer",
+ "lightning-committee-beacon",
  "lightning-consensus",
  "lightning-firewall",
  "lightning-handshake",
@@ -7401,6 +7433,7 @@ dependencies = [
  "lightning-blockstore-server",
  "lightning-broadcast",
  "lightning-checkpointer",
+ "lightning-committee-beacon",
  "lightning-consensus",
  "lightning-fetcher",
  "lightning-forwarder",
@@ -7829,9 +7862,9 @@ dependencies = [
  "lightning-test-utils",
  "lightning-utils",
  "lightning-workspace-hack",
- "resolved-pathbuf",
  "serde",
  "tempfile",
+ "thiserror",
  "tokio",
  "tracing",
 ]
@@ -7893,6 +7926,7 @@ version = "0.0.0"
 dependencies = [
  "affair",
  "anyhow",
+ "async-trait",
  "atomo",
  "axum 0.6.20",
  "chrono",
@@ -7910,6 +7944,7 @@ dependencies = [
  "lightning-blockstore-server",
  "lightning-broadcast",
  "lightning-checkpointer",
+ "lightning-committee-beacon",
  "lightning-consensus",
  "lightning-forwarder",
  "lightning-interfaces",
@@ -8017,6 +8052,7 @@ dependencies = [
 name = "lightning-types"
 version = "0.1.0"
 dependencies = [
+ "affair",
  "anyhow",
  "atomo",
  "bincode",
@@ -8042,6 +8078,7 @@ dependencies = [
  "serde_with 3.9.0",
  "tempfile",
  "thiserror",
+ "tokio",
  "toml 0.7.8",
  "url",
 ]
@@ -8050,17 +8087,25 @@ dependencies = [
 name = "lightning-utils"
 version = "0.0.0"
 dependencies = [
+ "affair",
  "anyhow",
  "ethers",
  "fleek-crypto",
+ "hp-fixed",
  "lazy_static",
+ "lightning-application",
+ "lightning-forwarder",
  "lightning-interfaces",
+ "lightning-keystore",
+ "lightning-node",
+ "lightning-notifier",
  "lightning-test-utils",
  "lightning-workspace-hack",
  "reqwest",
  "resolved-pathbuf",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror",
  "tokio",
  "toml 0.7.8",

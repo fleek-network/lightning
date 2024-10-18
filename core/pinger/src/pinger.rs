@@ -96,6 +96,8 @@ impl<C: NodeComponents> PingerInner<C> {
     }
 
     async fn run(self) {
+        self.query_runner.wait_for_genesis().await;
+
         // Note(matthias): should a node be able to respond to pings before it knows its node index?
         // In my opinion it should not because it is not fully functioning.
         let mut interval = tokio::time::interval(Duration::from_secs(60));

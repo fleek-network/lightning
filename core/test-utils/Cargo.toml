@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 affair.workspace = true
 anyhow.workspace = true
+async-trait.workspace = true
 atomo.workspace = true
 axum.workspace = true
 chrono = "0.4.26"
@@ -26,6 +27,7 @@ lightning-blockstore.workspace = true
 lightning-consensus.workspace = true
 lightning-broadcast.workspace = true
 lightning-checkpointer.workspace = true
+lightning-committee-beacon.workspace = true
 lightning-forwarder.workspace = true
 lightning-interfaces.workspace = true
 lightning-node.workspace = true

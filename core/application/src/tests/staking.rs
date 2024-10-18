@@ -16,8 +16,13 @@ use lightning_interfaces::types::{
     NodePorts,
     UpdateMethod,
 };
-use lightning_interfaces::{KeystoreInterface, SyncQueryRunnerInterface};
-use lightning_test_utils::e2e::TestNetwork;
+use lightning_interfaces::SyncQueryRunnerInterface;
+use lightning_test_utils::e2e::{
+    DowncastToTestFullNode,
+    TestFullNodeComponentsWithMockConsensus,
+    TestNetwork,
+    TestNetworkNode,
+};
 use tempfile::tempdir;
 
 use super::utils::*;
@@ -702,16 +707,19 @@ async fn test_withdraw_unstaked_reverts_no_locked_tokens() {
 #[tokio::test]
 async fn test_withdraw_unstaked_works_properly() {
     let mut network = TestNetwork::builder()
-        .with_num_nodes(4)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(4)
+        .await
         .build()
         .await
         .unwrap();
-    let node = network.node(0);
+    let node = network
+        .node(0)
+        .downcast::<TestFullNodeComponentsWithMockConsensus>();
     let node_initial_stake = node.get_stake();
 
     // Execute deposit and stake transasctions from the node owner account.
     let amount: HpUfixed<18> = 1_000u64.into();
-    node.deposit_and_stake(amount.clone(), &node.owner_secret_key)
+    node.deposit_and_stake(amount.clone(), &node.get_owner_secret_key())
         .await
         .unwrap();
 
@@ -719,7 +727,7 @@ async fn test_withdraw_unstaked_works_properly() {
     assert_eq!(node.get_stake(), node_initial_stake + amount.clone());
 
     // Execute unstake transaction from node owner account.
-    node.unstake(amount.clone(), &node.owner_secret_key)
+    node.unstake(amount.clone(), &node.get_owner_secret_key())
         .await
         .unwrap();
 
@@ -730,11 +738,14 @@ async fn test_withdraw_unstaked_works_properly() {
     }
 
     // Get node owner flk balance.
-    let prev_balance = node.get_flk_balance(node.get_owner_address());
+    let prev_balance = node
+        .app_query()
+        .get_account_info(&node.get_owner_address(), |a| a.flk_balance)
+        .unwrap();
 
     // Execute withdraw unstaked transaction.
     node.execute_transaction_from_owner(UpdateMethod::WithdrawUnstaked {
-        node: node.keystore.get_ed25519_pk(),
+        node: node.get_node_public_key(),
         recipient: Some(node.get_owner_address()),
     })
     .await
@@ -742,17 +753,19 @@ async fn test_withdraw_unstaked_works_properly() {
 
     // Check that the flk balance was updated.
     assert_eq!(
-        node.get_flk_balance(node.get_owner_address()),
+        node.app_query()
+            .get_account_info(&node.get_owner_address(), |a| a.flk_balance)
+            .unwrap(),
         prev_balance + amount
     );
 
     // Check that the node's locked stake is reset.
     assert_eq!(
-        node.app_query
+        node.app_query()
             .get_node_info::<HpUfixed<18>>(
                 &node
-                    .app_query
-                    .pubkey_to_index(&node.keystore.get_ed25519_pk())
+                    .app_query()
+                    .pubkey_to_index(&node.get_node_public_key())
                     .unwrap(),
                 |n| n.stake.locked
             )
