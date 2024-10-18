@@ -11,7 +11,7 @@ use ready::ReadyWaiter;
 use tempfile::tempdir;
 
 use super::{TestGenesisBuilder, TestNetwork, TestNode, TestNodeBuilder, TestNodeComponents};
-use crate::consensus::{Config as MockConsensusConfig, MockConsensusGroup};
+use crate::consensus::{MockConsensusConfig, MockConsensusGroup};
 
 pub type GenesisMutator = Arc<dyn Fn(&mut Genesis)>;
 
@@ -33,8 +33,9 @@ impl TestNetworkBuilder {
                 max_ordering_time: 1,
                 min_ordering_time: 0,
                 probability_txn_lost: 0.0,
+                transactions_to_lose: Default::default(),
                 new_block_interval: Duration::from_secs(0),
-                ..Default::default()
+                block_buffering_interval: Duration::from_secs(0),
             }),
         }
     }

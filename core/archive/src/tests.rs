@@ -10,11 +10,7 @@ use lightning_interfaces::types::Genesis;
 use lightning_interfaces::{partial_node_components, Ref};
 use lightning_node::Node;
 use lightning_notifier::Notifier;
-use lightning_test_utils::consensus::{
-    Config as MockConsensusConfig,
-    MockConsensus,
-    MockForwarder,
-};
+use lightning_test_utils::consensus::{MockConsensus, MockConsensusConfig, MockForwarder};
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::transaction::get_update_transactions;
 use tempfile::tempdir;
@@ -54,6 +50,7 @@ async fn get_node() -> Node<TestBinding> {
                 probability_txn_lost: 0.0,
                 transactions_to_lose: Default::default(),
                 new_block_interval: Duration::from_secs(0),
+                block_buffering_interval: Duration::from_secs(0),
             }),
     )
     .unwrap();

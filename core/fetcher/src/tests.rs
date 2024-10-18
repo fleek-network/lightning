@@ -31,8 +31,8 @@ use lightning_resolver::config::Config as ResolverConfig;
 use lightning_resolver::resolver::Resolver;
 use lightning_signer::Signer;
 use lightning_test_utils::consensus::{
-    Config as ConsensusConfig,
     MockConsensus,
+    MockConsensusConfig,
     MockConsensusGroup,
     MockForwarder,
 };
@@ -113,7 +113,7 @@ async fn get_fetchers(
         .unwrap();
 
     let consensus_group =
-        MockConsensusGroup::new::<TestBinding>(ConsensusConfig::default(), None, None);
+        MockConsensusGroup::new::<TestBinding>(MockConsensusConfig::default(), None, None);
     let peers = keystores
         .into_iter()
         .enumerate()
