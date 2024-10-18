@@ -10,7 +10,7 @@ use lightning_interfaces::types::{Genesis, GenesisNode, NodePorts};
 use lightning_node::Node;
 use lightning_notifier::Notifier;
 use lightning_signer::Signer;
-use lightning_test_utils::consensus::{Config as ConsensusConfig, MockConsensus, MockForwarder};
+use lightning_test_utils::consensus::{MockConsensus, MockConsensusConfig, MockForwarder};
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
 use tempfile::tempdir;
@@ -105,7 +105,7 @@ async fn test_submission() {
             .with(
                 JsonConfigProvider::default()
                     .with::<Application<TestBinding>>(ApplicationConfig::test(genesis_path))
-                    .with::<MockConsensus<TestBinding>>(ConsensusConfig {
+                    .with::<MockConsensus<TestBinding>>(MockConsensusConfig {
                         min_ordering_time: 0,
                         max_ordering_time: 1,
                         probability_txn_lost: 0.0,

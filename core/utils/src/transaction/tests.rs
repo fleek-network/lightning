@@ -7,11 +7,7 @@ use lightning_application::{Application, ApplicationConfig};
 use lightning_interfaces::prelude::*;
 use lightning_node::Node;
 use lightning_notifier::Notifier;
-use lightning_test_utils::consensus::{
-    Config as MockConsensusConfig,
-    MockConsensus,
-    MockForwarder,
-};
+use lightning_test_utils::consensus::{MockConsensus, MockConsensusConfig, MockForwarder};
 use lightning_test_utils::e2e::try_init_tracing;
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;

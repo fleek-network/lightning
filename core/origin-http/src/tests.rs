@@ -11,11 +11,7 @@ use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Genesis, GenesisNode, NodePorts};
 use lightning_node::Node;
 use lightning_signer::Signer;
-use lightning_test_utils::consensus::{
-    Config as MockConsensusConfig,
-    MockConsensus,
-    MockForwarder,
-};
+use lightning_test_utils::consensus::{MockConsensus, MockConsensusConfig, MockForwarder};
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_test_utils::server;

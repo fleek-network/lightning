@@ -32,8 +32,8 @@ use lightning_resolver::config::Config as ResolverConfig;
 use lightning_resolver::resolver::Resolver;
 use lightning_signer::Signer;
 use lightning_test_utils::consensus::{
-    Config as ConsensusConfig,
     MockConsensus,
+    MockConsensusConfig,
     MockConsensusGroup,
     MockForwarder,
 };
@@ -113,7 +113,7 @@ async fn get_fetchers(
 
     let consensus_group_start = Arc::new(tokio::sync::Notify::new());
     let consensus_group = MockConsensusGroup::new::<TestBinding>(
-        ConsensusConfig::default(),
+        MockConsensusConfig::default(),
         None,
         Some(consensus_group_start.clone()),
     );

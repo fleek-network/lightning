@@ -10,11 +10,7 @@ use lightning_interfaces::types::Genesis;
 use lightning_interfaces::{partial_node_components, Ref};
 use lightning_node::Node;
 use lightning_notifier::Notifier;
-use lightning_test_utils::consensus::{
-    Config as MockConsensusConfig,
-    MockConsensus,
-    MockForwarder,
-};
+use lightning_test_utils::consensus::{MockConsensus, MockConsensusConfig, MockForwarder};
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::transaction::get_update_transactions;
 use tempfile::tempdir;
