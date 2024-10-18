@@ -10,7 +10,7 @@
 //! cargo build --target wasm32-unknown-unknown --example sgx-wasm-multisig -r
 //!
 //! # Put the content to node and get blake3 hash (can also use ipfs+fetcher to load, and b3sum to compute hash)
-//! lightning-node dev store ../../target/wasm32-unknown-unknown/release/examples/sgx-wasm-multisig.wasm
+//! lightning-node dev store ./target/wasm32-unknown-unknown/release/examples/sgx-wasm-multisig.wasm
 //!
 //! # Call the service with the example signatures generated above
 //! curl localhost:4220/services/3 --data '{
