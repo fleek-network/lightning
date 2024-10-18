@@ -1,12 +1,12 @@
 //! Encrypt a file for a shared network public key
 
-use std::io::{stdout, Write};
+use std::io::{stdin, stdout, Read, Write};
 use std::path::PathBuf;
 use std::str::FromStr;
 
 use anyhow::{anyhow, Context};
 use bip32::{ChildNumber, XPub};
-use bpaf::{Bpaf, Parser};
+use bpaf::{literal, positional, Bpaf, Parser};
 
 /// Parse public key argument
 fn pubkey() -> impl Parser<XPub> {
@@ -22,16 +22,39 @@ fn pubkey() -> impl Parser<XPub> {
         .parse(|s| XPub::from_str(&s).context("invalid extended public key"))
 }
 
-/// Parse file input positional argument
-fn input() -> impl Parser<(PathBuf, Vec<u8>)> {
-    bpaf::positional::<PathBuf>("PATH")
-        .help("Input path to read and encrypt")
+/// Parse an input
+fn input() -> impl Parser<Input> {
+    let path = positional::<PathBuf>("FILE")
+        .help("Path to a file to read and encrypt")
         .guard(|p| p.exists(), "file not found")
-        .parse(|p| {
-            std::fs::read(&p)
-                .map(|b| (p, b))
-                .context("failed to read file")
-        })
+        .map(Input::File);
+    let dash = literal("-")
+        .help("Read and encrypt from stdin")
+        .map(|_| Input::Stdin);
+    bpaf::construct!([path, dash])
+}
+
+#[derive(Debug, Clone)]
+enum Input {
+    File(PathBuf),
+    Stdin,
+}
+
+impl Input {
+    fn read(self) -> anyhow::Result<(PathBuf, Vec<u8>)> {
+        match self {
+            Input::Stdin => {
+                let mut buf = Vec::new();
+                stdin()
+                    .read_to_end(&mut buf)
+                    .map(|_| ("stdin".into(), buf))
+                    .context("failed to read from stdin")
+            },
+            Input::File(file) => std::fs::read(&file)
+                .map(|d| (file, d))
+                .context("failed to read file"),
+        }
+    }
 }
 
 /// Output modes
@@ -64,7 +87,7 @@ enum SgxEncrypt {
         output: Output,
         /// Path to input file to encrypt.
         #[bpaf(external)]
-        input: (PathBuf, Vec<u8>),
+        input: Input,
     },
     /// Encrypt data to be accessed inside multiple wasm modules
     #[bpaf(command("shared"), fallback_to_usage)]
@@ -75,7 +98,7 @@ enum SgxEncrypt {
         output: Output,
         /// Path to input file to encrypt.
         #[bpaf(external)]
-        input: (PathBuf, Vec<u8>),
+        input: Input,
         /// List of approved wasm modules to access the data
         #[bpaf(
             positional::<String>("WASM HASH"),
@@ -84,6 +107,7 @@ enum SgxEncrypt {
                 v.try_into().map_err(|_| anyhow!("invalid blake3 hex length"))
             }),
             some("At least one approved hash is required"),
+
         )]
         approved: Vec<[u8; 32]>,
     },
@@ -118,29 +142,32 @@ enum SgxEncrypt {
         wasm_module: [u8; 32],
         /// Path to input file to encrypt.
         #[bpaf(external)]
-        input: (PathBuf, Vec<u8>),
+        input: Input,
     },
 }
 
 impl SgxEncrypt {
-    /// Convert raw arguments into parameters to encrypt and output
-    fn into_parameters(self) -> anyhow::Result<([u8; 33], PathBuf, Vec<u8>, Output)> {
-        match self {
+    /// Derive encryption key, encrypt the input, and write the output
+    fn execute(self) -> anyhow::Result<()> {
+        let (pubkey, input, bytes, output) = match self {
             SgxEncrypt::WasmModule {
                 pubkey,
-                input: (input, bytes),
+                input,
                 output,
             } => {
                 // No derivation or encoding logic is needed for modules themselves
-                Ok((pubkey.to_bytes(), input, bytes, output))
+                let (file, bytes) = input.read()?;
+                (pubkey.to_bytes(), file, bytes, output)
             },
             SgxEncrypt::SharedData {
                 pubkey,
                 approved,
-                input: (input, mut bytes),
+                input,
                 output,
             } => {
                 const HEADER_PREFIX: [u8; 27] = *b"FLEEK_ENCLAVE_APPROVED_WASM";
+
+                let (file, mut bytes) = input.read()?;
 
                 // Encode header + content as plaintext
                 let mut buf =
@@ -153,18 +180,20 @@ impl SgxEncrypt {
                     buf.extend_from_slice(&hash);
                 }
 
-                // write user data
+                // append user data
                 buf.append(&mut bytes);
 
-                Ok((pubkey.to_bytes(), input, buf, output))
+                (pubkey.to_bytes(), file, buf, output)
             },
             SgxEncrypt::WasmData {
                 pubkey,
                 wasm_module,
                 derivation_path,
-                input: (input, bytes),
+                input,
                 output,
             } => {
+                let (file, bytes) = input.read()?;
+
                 // Derive wasm hash scope
                 let mut pk = pubkey.derive_child(bip32::ChildNumber(0)).unwrap();
                 for n in wasm_module
@@ -184,27 +213,27 @@ impl SgxEncrypt {
                     }
                 }
 
-                Ok((pk.to_bytes(), input, bytes, output))
+                (pk.to_bytes(), file, bytes, output)
+            },
+        };
+
+        // Encrypt the content
+        let cipher = ecies::encrypt(&pubkey, &bytes)
+            .map_err(|e| anyhow!("failed to encrypt content: {e}"))?;
+
+        // Write the output to a file or stdout
+        match output {
+            Output::Stdout => stdout().write_all(&cipher)?,
+            Output::File { path } => {
+                let path = path.unwrap_or(input.with_extension("cipher"));
+                std::fs::write(path, cipher).context("failed to write file")?;
             },
         }
+
+        Ok(())
     }
 }
 
 fn main() -> anyhow::Result<()> {
-    let (pubkey, input, plaintext, output) = sgx_encrypt().run().into_parameters()?;
-
-    // Encrypt the content
-    let cipher = ecies::encrypt(&pubkey, &plaintext)
-        .map_err(|e| anyhow!("failed to encrypt content: {e}"))?;
-
-    // Write the output to a file or stdout
-    match output {
-        Output::Stdout => stdout().write_all(&cipher)?,
-        Output::File { path } => {
-            let path = path.unwrap_or(input.with_extension("cipher"));
-            std::fs::write(path, cipher).context("failed to write file")?;
-        },
-    }
-
-    Ok(())
+    sgx_encrypt().run().execute()
 }
