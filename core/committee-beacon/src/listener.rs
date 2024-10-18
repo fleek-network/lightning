@@ -159,22 +159,28 @@ impl<C: NodeComponents> CommitteeBeaconListener<C> {
         end_block: BlockNumber,
         response: BlockExecutionResponse,
     ) -> Result<(), CommitteeBeaconError> {
+        // The current block is the next block after the response block, since the response block
+        // was just executed.
+        let current_block = response.block_number + 1;
+
+        // TODO(snormore): Should we just get the last block from the application state?
+
         tracing::debug!(
             "handling commit phase ({}, {}) at block {}",
             start_block,
             end_block,
-            response.block_number
+            current_block
         );
 
         // If we are not in the commit phase block range, do nothing.
-        if response.block_number < start_block || response.block_number > end_block {
+        if current_block < start_block || current_block > end_block {
             return Ok(());
         }
 
         // If this was the last block of the commit phase, or we are outside of the range, trigger
         // an update in the application executor that will move onto the reveal phase, or
         // restart the commit phase, depending on participation.
-        if response.block_number >= end_block {
+        if current_block >= end_block {
             tracing::debug!("submitting commit phase timeout transaction");
             self.execute_transaction(UpdateMethod::CommitteeSelectionBeaconCommitPhaseTimeout)
                 .await?;
@@ -229,22 +235,28 @@ impl<C: NodeComponents> CommitteeBeaconListener<C> {
         end_block: BlockNumber,
         response: BlockExecutionResponse,
     ) -> Result<(), CommitteeBeaconError> {
+        // The current block is the next block after the response block, since the response block
+        // was just executed.
+        let current_block = response.block_number + 1;
+
+        // TODO(snormore): Should we just get the last block from the application state?
+
         tracing::debug!(
             "handling reveal phase ({}, {}) at block {}",
             start_block,
             end_block,
-            response.block_number
+            current_block
         );
 
         // If we are not in the reveal phase block range, do nothing.
-        if response.block_number < start_block {
+        if current_block < start_block {
             return Ok(());
         }
 
         // If this was the last block of the reveal phase, or we are outside of the range, trigger
         // an update in the application executor that will restart back to a new commit
         // phase.
-        if response.block_number >= end_block {
+        if current_block >= end_block {
             tracing::debug!("submitting reveal phase timeout transaction");
             self.execute_transaction(UpdateMethod::CommitteeSelectionBeaconRevealPhaseTimeout)
                 .await?;
