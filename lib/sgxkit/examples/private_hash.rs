@@ -10,7 +10,7 @@
 //! cargo build --target wasm32-unknown-unknown --example sgx-wasm-private-hash -r
 //!
 //! # Put the content to node and get blake3 hash (can also use ipfs+fetcher to load, and b3sum to compute hash)
-//! lightning-node dev store ../../target/wasm32-unknown-unknown/release/examples/sgx-wasm-private-hash.wasm
+//! lightning-node dev store ./target/wasm32-unknown-unknown/release/examples/sgx-wasm-private-hash.wasm
 //!
 //! # Encrypt some data for the shared key with wasm approved, and encrypt with base64
 //! echo "hi" | sgxencrypt shared --stdout - <hash> | base64 -w0

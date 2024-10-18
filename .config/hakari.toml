@@ -66,8 +66,5 @@ workspace-members = [
   "resolved-pathbuf",
   "safetensors-ndarray",
   "simulon",
-  "sgxkit",
-  "sgxkit-sys",
-  "sgxkit-macros",
   "sgxencrypt"
 ]
