@@ -6,17 +6,16 @@
 //! # Run the test to generate some public keys and signatures
 //! cargo test --example sgx-wasm-multisig --target x86_64-unknown-linux-gnu -- --nocapture
 //!
-//! # Build the example, with the PUBLIC_SIGNERS set to the output of the above command
+//! # Build the example, with the PUBLIC_SIGNERS const set to the output of the above command
 //! cargo build --target wasm32-unknown-unknown --example sgx-wasm-multisig -r
 //!
 //! # Put the content to node and get blake3 hash (can also use ipfs+fetcher to load, and b3sum to compute hash)
-//! lightning-node dev store
-//! ../../target/wasm32-unknown-unknown/release/examples/sgx-wasm-multisig.wasm
+//! lightning-node dev store ../../target/wasm32-unknown-unknown/release/examples/sgx-wasm-multisig.wasm
 //!
 //! # Call the service with the example signatures generated above
 //! curl localhost:4220/services/3 --data '{
 //!   "input":"{\"payload\":\"Rk9PQkFS\",\"signatures\":[\"C/FAWjjggEOZAjqWyxcF0PwiOIfcK1grt5zCk9rj2o8MEhl0Lxodu1h7Id3zSkByu3eZpqYgbNNB/hE1qem9DAE=\",\"7Eb6Z2knL4vhHjJUkfBEdHzIRvk0vTSq/K+h6M3JZwNHiIRCwh1V5Y+idXlGsWVy1c8+ha3A5Z1pcU0YyYRZdgE=\",\"0GXICyZa6cMHJthU1e2sSH76F5o7aLzJz8H9gU7UqX9nV5AslcXd8YwG79eXbzU2TrBPJWNvEV1ee46Rm/ybPAA=\"]}",
-//!   "hash":"4e923b6b4b3569eab0f251571a4e67312da925d458e9334f2d50c1ffe6f16e24"
+//!   "hash":"<your hash>"
 //! }'
 //! ```
 
@@ -64,7 +63,7 @@ where
         .map_err(|e| serde::de::Error::custom(e.to_string()))
 }
 
-/// Decode `Seq<Base64( [r . s . v] )>`
+/// Decode `Vec<Base64<[r . s . v]>>`
 fn decode_signatures<'de, D>(de: D) -> Result<Vec<(Signature, RecoveryId)>, D::Error>
 where
     D: Deserializer<'de>,
@@ -156,39 +155,49 @@ pub fn main() -> Result<(), String> {
     Ok(())
 }
 
-#[cfg(all(test, target_family = "unix"))]
-#[test]
-fn generate_example_request() {
-    let keys = (1u8..=3)
-        .into_iter()
-        .map(|v| libsecp256k1::SecretKey::parse(&[v; 32]).unwrap())
-        .collect::<Vec<_>>();
+#[cfg(test)]
+mod tests {
+    /// Generate some example data on a host system
+    #[cfg(target_family = "unix")]
+    #[test]
+    fn generate_example_request() {
+        // Create some secret keys
+        let keys = (1u8..=3)
+            .into_iter()
+            .map(|v| libsecp256k1::SecretKey::parse(&[v; 32]).unwrap())
+            .collect::<Vec<_>>();
 
-    let payload = b"FOOBAR";
-    let hash = sha2::Sha256::digest(payload);
-    let msg = libsecp256k1::Message::parse(&hash.into());
+        // Make a payload and hash it into a message to sign
+        let payload = b"FOOBAR";
+        let hash = sha2::Sha256::digest(payload);
+        let msg = libsecp256k1::Message::parse(&hash.into());
 
-    let signatures = keys
-        .iter()
-        .map(|sk| {
-            let pk = libsecp256k1::PublicKey::from_secret_key(&sk);
-            println!("{}", hex::encode(pk.serialize_compressed()));
+        // Sign the message with each key
+        let signatures = keys
+            .iter()
+            .map(|sk| {
+                // print pubkeys for debugging
+                let pk = libsecp256k1::PublicKey::from_secret_key(&sk);
+                println!("{}", hex::encode(pk.serialize_compressed()));
 
-            libsecp256k1::sign(&msg, &sk)
-        })
-        .map(|(sig, rid)| {
-            let mut buf = sig.serialize().to_vec();
-            buf.push(rid.serialize());
-            BASE64_STANDARD.encode(&buf)
-        })
-        .collect::<Vec<_>>();
+                libsecp256k1::sign(&msg, &sk)
+            })
+            .map(|(sig, rid)| {
+                // serialize signature as `Base64<[r . s . v]>`
+                let mut buf = sig.serialize().to_vec();
+                buf.push(rid.serialize());
+                BASE64_STANDARD.encode(&buf)
+            })
+            .collect::<Vec<_>>();
 
-    let out = serde_json::to_string(&serde_json::json!({
-        "payload": BASE64_STANDARD.encode(&payload),
-        "signatures": signatures
-    }))
-    .unwrap()
-    .replace('"', "\\\"");
+        // encode json and escape quotes (for terminal pasting)
+        let out = serde_json::to_string(&serde_json::json!({
+            "payload": BASE64_STANDARD.encode(&payload),
+            "signatures": signatures
+        }))
+        .unwrap()
+        .replace('"', "\\\"");
 
-    println!("\n{out}");
+        println!("\n{out}");
+    }
 }
