@@ -10,6 +10,7 @@ affair.workspace = true
 anyhow.workspace = true
 ethers.workspace = true
 fleek-crypto.workspace = true
+hp-fixed.workspace = true
 lazy_static.workspace = true
 lightning-interfaces = { path = "../interfaces" }
 lightning-workspace-hack.workspace = true

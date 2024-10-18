@@ -11,7 +11,11 @@ use lightning_node::Node;
 use lightning_notifier::Notifier;
 use lightning_signer::Signer;
 use lightning_test_utils::consensus::{MockConsensus, MockConsensusConfig, MockForwarder};
-use lightning_test_utils::e2e::TestNetwork;
+use lightning_test_utils::e2e::{
+    DowncastToTestFullNode,
+    TestFullNodeComponentsWithMockConsensus,
+    TestNetwork,
+};
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_utils::poll::{poll_until, PollUntilError};
@@ -259,7 +263,8 @@ async fn test_submit_measurements() {
 #[tokio::test]
 async fn test_reputation_calculation_and_query() {
     let mut network = TestNetwork::builder()
-        .with_num_nodes(4)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(4)
+        .await
         .with_genesis_mutator(|genesis| {
             genesis.epoch_start = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
@@ -270,10 +275,16 @@ async fn test_reputation_calculation_and_query() {
         .build()
         .await
         .unwrap();
-    let app_query = network.node(0).app_query.clone();
+    let node1 = network
+        .node(0)
+        .downcast::<TestFullNodeComponentsWithMockConsensus>();
+    let node2 = network
+        .node(1)
+        .downcast::<TestFullNodeComponentsWithMockConsensus>();
+    let app_query = node1.app_query().clone();
 
-    let reporter1 = network.node(0).reputation_reporter.clone();
-    let reporter2 = network.node(1).reputation_reporter.clone();
+    let reporter1 = node1.reputation_reporter().clone();
+    let reporter2 = node2.reputation_reporter().clone();
 
     let alice = network.node(2).index();
     let bob = network.node(3).index();

@@ -5,7 +5,7 @@ use fleek_crypto::{AccountOwnerSecretKey, NodeSecretKey, SecretKey};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::types::{ExecutionData, ExecutionError, Participation, UpdateMethod};
 use lightning_interfaces::SyncQueryRunnerInterface;
-use lightning_test_utils::e2e::TestNetwork;
+use lightning_test_utils::e2e::{TestFullNodeComponentsWithMockConsensus, TestNetwork};
 use lightning_utils::application::QueryRunnerExt;
 use lightning_utils::poll::{poll_until, PollUntilError};
 use tempfile::tempdir;
@@ -15,7 +15,8 @@ use super::utils::*;
 #[tokio::test]
 async fn test_uptime_participation() {
     let mut network = TestNetwork::builder()
-        .with_num_nodes(4)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(4)
+        .await
         .with_genesis_mutator(|genesis| {
             genesis.node_info[0].reputation = Some(40);
             genesis.node_info[1].reputation = Some(80);
@@ -29,15 +30,21 @@ async fn test_uptime_participation() {
 
     // Add records in the content registry for the peers.
     peer1
-        .execute_transaction_from_node(UpdateMethod::UpdateContentRegistry {
-            updates: vec![Default::default()],
-        })
+        .execute_transaction_from_node(
+            UpdateMethod::UpdateContentRegistry {
+                updates: vec![Default::default()],
+            },
+            None,
+        )
         .await
         .unwrap();
     peer2
-        .execute_transaction_from_node(UpdateMethod::UpdateContentRegistry {
-            updates: vec![Default::default()],
-        })
+        .execute_transaction_from_node(
+            UpdateMethod::UpdateContentRegistry {
+                updates: vec![Default::default()],
+            },
+            None,
+        )
         .await
         .unwrap();
 
@@ -45,7 +52,7 @@ async fn test_uptime_participation() {
     poll_until(
         || async {
             let providers = node
-                .app_query
+                .app_query()
                 .get_uri_providers(&[0u8; 32])
                 .unwrap_or_default();
             (providers.len() == 2)
@@ -59,14 +66,14 @@ async fn test_uptime_participation() {
     .unwrap();
     assert!(
         !node
-            .app_query
+            .app_query()
             .get_content_registry(&peer1.index())
             .unwrap_or_default()
             .is_empty()
     );
     assert!(
         !node
-            .app_query
+            .app_query()
             .get_content_registry(&peer2.index())
             .unwrap_or_default()
             .is_empty()
@@ -80,7 +87,10 @@ async fn test_uptime_participation() {
         ]);
     network
         .node(0)
-        .execute_transaction_from_node(UpdateMethod::SubmitReputationMeasurements { measurements })
+        .execute_transaction_from_node(
+            UpdateMethod::SubmitReputationMeasurements { measurements },
+            None,
+        )
         .await
         .unwrap();
 
@@ -91,7 +101,10 @@ async fn test_uptime_participation() {
     ]);
     network
         .node(1)
-        .execute_transaction_from_node(UpdateMethod::SubmitReputationMeasurements { measurements })
+        .execute_transaction_from_node(
+            UpdateMethod::SubmitReputationMeasurements { measurements },
+            None,
+        )
         .await
         .unwrap();
 
@@ -100,29 +113,35 @@ async fn test_uptime_participation() {
 
     // Check participation.
     assert_eq!(
-        peer1.get_node_info().unwrap().participation,
+        peer1
+            .app_query()
+            .get_node_info(&peer1.index(), |n| n.participation)
+            .unwrap(),
         Participation::False
     );
     assert_eq!(
-        peer2.get_node_info().unwrap().participation,
+        peer2
+            .app_query()
+            .get_node_info(&peer2.index(), |n| n.participation)
+            .unwrap(),
         Participation::True
     );
 
     // Check that the content registries have been updated.
     let peer1_content_registry = node
-        .app_query
+        .app_query()
         .get_content_registry(&peer1.index())
         .unwrap_or_default();
     assert!(peer1_content_registry.is_empty());
 
     let peer2_content_registry = node
-        .app_query
+        .app_query()
         .get_content_registry(&peer2.index())
         .unwrap_or_default();
     assert!(!peer2_content_registry.is_empty());
 
     let providers = node
-        .app_query
+        .app_query()
         .get_uri_providers(&[0u8; 32])
         .unwrap_or_default();
     assert_eq!(providers.len(), 1);

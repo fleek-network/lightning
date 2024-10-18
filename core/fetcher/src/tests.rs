@@ -5,6 +5,7 @@ use cid::Cid;
 use fleek_crypto::{AccountOwnerSecretKey, SecretKey};
 use lightning_application::app::Application;
 use lightning_application::config::{ApplicationConfig, StorageConfig};
+use lightning_application::state::QueryRunner;
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_blockstore_server::BlockstoreServer;
@@ -112,7 +113,7 @@ async fn get_fetchers(
     };
 
     let consensus_group_start = Arc::new(tokio::sync::Notify::new());
-    let consensus_group = MockConsensusGroup::new::<TestBinding>(
+    let consensus_group = MockConsensusGroup::new::<QueryRunner>(
         MockConsensusConfig::default(),
         None,
         Some(consensus_group_start.clone()),
