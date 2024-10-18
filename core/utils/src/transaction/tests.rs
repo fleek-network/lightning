@@ -177,7 +177,7 @@ async fn test_execute_transaction_with_account_signer_wait_for_receipt_no_retry(
             assert_eq!(receipt.transaction_hash, tx.hash());
             assert_eq!(attempts, 1);
         },
-        e => panic!("unexpected error type: {:?}", e),
+        e => panic!("unexpected error type: {e:?}"),
     }
 
     // Check that the nonce has been incremented just once.
@@ -223,7 +223,7 @@ async fn test_execute_transaction_with_node_signer_wait_for_receipt_no_retry() {
             assert_eq!(receipt.transaction_hash, tx.hash());
             assert_eq!(attempts, 1);
         },
-        e => panic!("unexpected error type: {:?}", e),
+        e => panic!("unexpected error type: {e:?}"),
     }
 
     // Check that the nonce has been incremented just once.
@@ -278,7 +278,7 @@ async fn test_execute_transaction_with_account_signer_wait_for_receipt_retry_on_
             assert_eq!(receipt.transaction_hash, tx.hash());
             assert_eq!(attempts, 4);
         },
-        e => panic!("unexpected error type: {:?}", e),
+        e => panic!("unexpected error type: {e:?}"),
     }
 
     // Check that the nonce has been incremented 4 times, for the initial attempt and each retry.
@@ -325,7 +325,7 @@ async fn test_execute_transaction_with_node_signer_wait_for_receipt_retry_on_rev
             assert_eq!(receipt.transaction_hash, tx.hash());
             assert_eq!(attempts, 4);
         },
-        e => panic!("unexpected error type: {:?}", e),
+        e => panic!("unexpected error type: {e:?}"),
     }
 
     // Check that the nonce has been incremented 4 times, for the initial attempt and each retry.
@@ -370,7 +370,7 @@ async fn test_execute_transaction_with_node_signer_wait_for_receipt_retry_on_tim
             // Check that there were 4 attempts; 1 initial attempt and 3 retries.
             assert_eq!(attempts, 4);
         },
-        e => panic!("unexpected error type: {:?}", e),
+        e => panic!("unexpected error type: {e:?}"),
     }
 
     // Check that the nonce has not been incremented since no transaction was included.
