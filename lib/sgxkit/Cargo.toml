@@ -39,5 +39,5 @@ name = "sgx-wasm-multisig"
 path = "./examples/multisig.rs"
 
 [[example]]
-name = "sgx-wasm-private-data"
-path = "./examples/private_data.rs"
+name = "sgx-wasm-private-hash"
+path = "./examples/private_hash.rs"

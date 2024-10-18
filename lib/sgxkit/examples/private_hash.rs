@@ -1,7 +1,29 @@
 //! This example computes the hash of some private sealed data given by the user.
 //!
 //! The data can either be encrypted for the shared key (given the wasm is approved),
-//! or the root wasm key.
+//! or the wasm module's root key.
+//!
+//! # Example usage
+//!
+//! ```bash
+//! # Build the example, with the PUBLIC_SIGNERS const set to the output of the above command
+//! cargo build --target wasm32-unknown-unknown --example sgx-wasm-private-hash -r
+//!
+//! # Put the content to node and get blake3 hash (can also use ipfs+fetcher to load, and b3sum to compute hash)
+//! lightning-node dev store ../../target/wasm32-unknown-unknown/release/examples/sgx-wasm-private-hash.wasm
+//!
+//! # Encrypt some data for the shared key with wasm approved, and encrypt with base64
+//! echo "hi" | sgxencrypt shared --stdout - <hash> | base64 -w0
+//!
+//! # Or, encrypt some data for the wasm key and base64 encode it
+//! echo "hi" | sgxencrypt wasm --stdout <hash> - | base64 -w0
+//!
+//! # Call the service with the data generated
+//! curl localhost:4220/services/3 --data '{
+//!   "input":"{\"type\":\"shared\",\"data\":\"<your base64 data>\"}",
+//!   "hash":"<your hash>"
+//! }'
+//! ```
 
 use std::io::Write;
 
