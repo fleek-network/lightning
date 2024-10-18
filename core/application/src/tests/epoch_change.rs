@@ -13,7 +13,11 @@ use lightning_interfaces::types::{
     UpdateMethod,
 };
 use lightning_interfaces::SyncQueryRunnerInterface;
-use lightning_test_utils::e2e::TestNetwork;
+use lightning_test_utils::e2e::{
+    DowncastToTestFullNode,
+    TestFullNodeComponentsWithMockConsensus,
+    TestNetwork,
+};
 use lightning_utils::application::QueryRunnerExt;
 use lightning_utils::poll::{poll_until, PollUntilError};
 use tempfile::tempdir;
@@ -23,7 +27,8 @@ use super::utils::*;
 #[tokio::test]
 async fn test_epoch_change_with_all_committee_nodes() {
     let mut network = TestNetwork::builder()
-        .with_num_nodes(4)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(4)
+        .await
         .build()
         .await
         .unwrap();
@@ -32,15 +37,15 @@ async fn test_epoch_change_with_all_committee_nodes() {
     let node3 = network.node(2);
 
     // Get the current epoch.
-    let epoch = node1.get_epoch();
+    let epoch = node1.app_query().get_current_epoch();
 
     // Execute an epoch change transaction from less than 2/3 of the nodes.
     node1
-        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
+        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch }, None)
         .await
         .unwrap();
     node2
-        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
+        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch }, None)
         .await
         .unwrap();
 
@@ -49,7 +54,7 @@ async fn test_epoch_change_with_all_committee_nodes() {
         || async {
             network
                 .nodes()
-                .all(|node| node.get_epoch() != epoch)
+                .all(|node| node.app_query().get_current_epoch() != epoch)
                 .then_some(())
                 .ok_or(PollUntilError::ConditionNotSatisfied)
         },
@@ -61,7 +66,7 @@ async fn test_epoch_change_with_all_committee_nodes() {
 
     // Execute an epoch change transaction from enough nodes to trigger an epoch change.
     node3
-        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
+        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch }, None)
         .await
         .unwrap();
 
@@ -71,7 +76,9 @@ async fn test_epoch_change_with_all_committee_nodes() {
         || async {
             Ok((
                 (),
-                network.nodes().all(|node| node.get_epoch() == epoch + 1),
+                network
+                    .nodes()
+                    .all(|node| node.app_query().get_current_epoch() == epoch + 1),
             ))
         },
         Duration::from_secs(5),
@@ -87,8 +94,10 @@ async fn test_epoch_change_with_all_committee_nodes() {
 #[tokio::test]
 async fn test_epoch_change_with_some_non_committee_nodes() {
     let mut network = TestNetwork::builder()
-        .with_num_nodes(6)
-        .with_committee_size(4)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(4)
+        .await
+        .with_non_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(2)
+        .await
         .build()
         .await
         .unwrap();
@@ -109,17 +118,17 @@ async fn test_epoch_change_with_some_non_committee_nodes() {
 
     // Execute an epoch change transaction from less than 2/3 of the committee nodes.
     committee_node1
-        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
+        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch }, None)
         .await
         .unwrap();
     committee_node2
-        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
+        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch }, None)
         .await
         .unwrap();
 
     // Send epoch change transactions from the non-committee nodes.
     let result = non_committee_node1
-        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
+        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch }, None)
         .await;
     match result.unwrap_err() {
         ExecuteTransactionError::Reverted((_, TransactionReceipt { response, .. }, _)) => {
@@ -131,7 +140,7 @@ async fn test_epoch_change_with_some_non_committee_nodes() {
         e => panic!("unexpected error type: {e:?}"),
     }
     let result = non_committee_node2
-        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
+        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch }, None)
         .await;
     match result.unwrap_err() {
         ExecuteTransactionError::Reverted((_, TransactionReceipt { response, .. }, _)) => {
@@ -148,7 +157,7 @@ async fn test_epoch_change_with_some_non_committee_nodes() {
         || async {
             network
                 .nodes()
-                .all(|node| node.get_epoch() != epoch)
+                .all(|node| node.app_query().get_current_epoch() != epoch)
                 .then_some(())
                 .ok_or(PollUntilError::ConditionNotSatisfied)
         },
@@ -160,7 +169,7 @@ async fn test_epoch_change_with_some_non_committee_nodes() {
 
     // Execute an epoch change transaction from enough nodes to trigger an epoch change.
     committee_node3
-        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
+        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch }, None)
         .await
         .unwrap();
 
@@ -170,7 +179,9 @@ async fn test_epoch_change_with_some_non_committee_nodes() {
         || async {
             Ok((
                 (),
-                network.nodes().all(|node| node.get_epoch() == epoch + 1),
+                network
+                    .nodes()
+                    .all(|node| node.app_query().get_current_epoch() == epoch + 1),
             ))
         },
         Duration::from_secs(5),
@@ -252,19 +263,20 @@ async fn test_change_epoch_reverts_insufficient_stake() {
 #[tokio::test]
 async fn test_epoch_change_reverts_epoch_already_changed() {
     let mut network = TestNetwork::builder()
-        .with_num_nodes(4)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(4)
+        .await
         .build()
         .await
         .unwrap();
     let node = network.node(0);
-    let epoch = node.get_epoch();
+    let epoch = node.app_query().get_current_epoch();
 
     // Trigger epoch change and wait for it to complete.
     network.change_epoch_and_wait_for_complete().await.unwrap();
 
     // Send epoch change transaction from a node for same epoch, and expect it to be reverted.
     let result = node
-        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
+        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch }, None)
         .await;
     match result.unwrap_err() {
         ExecuteTransactionError::Reverted((_, TransactionReceipt { response, .. }, _)) => {
@@ -346,7 +358,8 @@ async fn test_epoch_change_reverts_already_signaled() {
 #[tokio::test]
 async fn test_distribute_rewards() {
     let mut network = TestNetwork::builder()
-        .with_num_nodes(4)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(4)
+        .await
         .with_genesis_mutator(|genesis| {
             genesis.max_inflation = 10;
             genesis.node_share = 80;
@@ -371,16 +384,20 @@ async fn test_distribute_rewards() {
     let service_share = HpUfixed::from(genesis.service_builder_share) / &percentage_divisor;
 
     // Deposit and stake FLK tokens, and stake lock in node 2.
-    node1
-        .deposit_and_stake(10_000_u64.into(), &node1.owner_secret_key)
+    network
+        .node(0)
+        .downcast::<TestFullNodeComponentsWithMockConsensus>()
+        .deposit_and_stake(10_000_u64.into(), &node1.get_owner_secret_key())
         .await
         .unwrap();
     node2
-        .deposit_and_stake(10_000_u64.into(), &node2.owner_secret_key)
+        .downcast::<TestFullNodeComponentsWithMockConsensus>()
+        .deposit_and_stake(10_000_u64.into(), &node2.get_owner_secret_key())
         .await
         .unwrap();
     node2
-        .stake_lock(1460, &node2.owner_secret_key)
+        .downcast::<TestFullNodeComponentsWithMockConsensus>()
+        .stake_lock(1460, &node2.get_owner_secret_key())
         .await
         .unwrap();
 
@@ -420,20 +437,35 @@ async fn test_distribute_rewards() {
     ];
 
     // Execute delivery acknowledgment transactions.
-    node1.execute_transaction_from_node(pod_10).await.unwrap();
-    node1.execute_transaction_from_node(pod_11).await.unwrap();
-    node2.execute_transaction_from_node(pod_21).await.unwrap();
+    node1
+        .execute_transaction_from_node(pod_10, None)
+        .await
+        .unwrap();
+    node1
+        .execute_transaction_from_node(pod_11, None)
+        .await
+        .unwrap();
+    node2
+        .execute_transaction_from_node(pod_21, None)
+        .await
+        .unwrap();
 
     // Trigger epoch change and distribute rewards.
     network.change_epoch_and_wait_for_complete().await.unwrap();
 
     // Check node stables balances.
     assert_eq!(
-        node1.get_stables_balance(node1.get_owner_address()),
+        node1
+            .app_query()
+            .get_account_info(&node1.get_owner_address(), |a| a.stables_balance)
+            .unwrap(),
         HpUfixed::<6>::from(node_1_usd) * node_share.convert_precision()
     );
     assert_eq!(
-        node1.get_stables_balance(node2.get_owner_address()),
+        node1
+            .app_query()
+            .get_account_info(&node2.get_owner_address(), |a| a.stables_balance)
+            .unwrap(),
         HpUfixed::<6>::from(node_2_usd) * node_share.convert_precision()
     );
 
@@ -446,21 +478,33 @@ async fn test_distribute_rewards() {
     let total_share =
         &node_1_proportion * HpUfixed::from(1_u64) + &node_2_proportion * HpUfixed::from(4_u64);
     assert_eq!(
-        node1.get_flk_balance(node1.get_owner_address()),
+        node1
+            .app_query()
+            .get_account_info(&node1.get_owner_address(), |a| a.flk_balance)
+            .unwrap(),
         (&emissions_for_node * &node_1_proportion) / &total_share
     );
     assert_eq!(
-        node2.get_flk_balance(node2.get_owner_address()),
+        node2
+            .app_query()
+            .get_account_info(&node2.get_owner_address(), |a| a.flk_balance)
+            .unwrap(),
         (&emissions_for_node * (&node_2_proportion * HpUfixed::from(4_u64))) / &total_share
     );
 
     // Check the protocol fund balances.
-    let protocol_account = node1.get_protocol_fund_address();
-    let protocol_balance = node1.get_flk_balance(protocol_account);
+    let protocol_account = node1.app_query().get_protocol_fund_address().unwrap();
+    let protocol_balance = node1
+        .app_query()
+        .get_account_info(&protocol_account, |a| a.flk_balance)
+        .unwrap();
     let protocol_rewards = &emissions * &protocol_share;
     assert_eq!(protocol_balance, protocol_rewards);
 
-    let protocol_stables_balance = node1.get_stables_balance(protocol_account);
+    let protocol_stables_balance = node1
+        .app_query()
+        .get_account_info(&protocol_account, |a| a.stables_balance)
+        .unwrap();
     assert_eq!(
         &reward_pool * &protocol_share.convert_precision(),
         protocol_stables_balance
@@ -468,13 +512,19 @@ async fn test_distribute_rewards() {
 
     // Check the service owner balances.
     for s in 0..2 {
-        let service_owner = node1.app_query.get_service_info(&s).unwrap().owner;
-        let service_balance = node1.get_flk_balance(service_owner);
+        let service_owner = node1.app_query().get_service_info(&s).unwrap().owner;
+        let service_balance = node1
+            .app_query()
+            .get_account_info(&service_owner, |a| a.flk_balance)
+            .unwrap();
         assert_eq!(
             service_balance,
             &emissions * &service_share * &service_proportions[s as usize]
         );
-        let service_stables_balance = node1.get_stables_balance(service_owner);
+        let service_stables_balance = node1
+            .app_query()
+            .get_account_info(&service_owner, |a| a.stables_balance)
+            .unwrap();
         assert_eq!(
             service_stables_balance,
             &reward_pool
@@ -490,7 +540,8 @@ async fn test_distribute_rewards() {
 #[tokio::test]
 async fn test_supply_across_epoch() {
     let mut network = TestNetwork::builder()
-        .with_num_nodes(4)
+        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(4)
+        .await
         .with_genesis_mutator(|genesis| {
             genesis.epoch_time = 100;
             genesis.epochs_per_year = 3;
@@ -516,7 +567,8 @@ async fn test_supply_across_epoch() {
     let service_share = HpUfixed::from(genesis.service_builder_share) / &percentage_divisor;
 
     // Deposit and stake FLK tokens.
-    node.deposit_and_stake(10_000_u64.into(), &node.owner_secret_key)
+    node.downcast::<TestFullNodeComponentsWithMockConsensus>()
+        .deposit_and_stake(10_000_u64.into(), &node.get_owner_secret_key())
         .await
         .unwrap();
 
@@ -531,12 +583,15 @@ async fn test_supply_across_epoch() {
     // supply are as expected.
     for epoch in 0..genesis.epochs_per_year {
         // Add at least one transaction per epoch, so reward pool is not zero.
-        node.execute_transaction_from_node(UpdateMethod::SubmitDeliveryAcknowledgmentAggregation {
-            commodity: 10000,
-            service_id: 0,
-            proofs: vec![DeliveryAcknowledgmentProof],
-            metadata: None,
-        })
+        node.execute_transaction_from_node(
+            UpdateMethod::SubmitDeliveryAcknowledgmentAggregation {
+                commodity: 10000,
+                service_id: 0,
+                proofs: vec![DeliveryAcknowledgmentProof],
+                metadata: None,
+            },
+            None,
+        )
         .await
         .unwrap();
 
@@ -553,9 +608,10 @@ async fn test_supply_across_epoch() {
 
                 map.insert(peer.index(), measurements.clone());
             }
-            node.execute_transaction_from_node(UpdateMethod::SubmitReputationMeasurements {
-                measurements: map,
-            })
+            node.execute_transaction_from_node(
+                UpdateMethod::SubmitReputationMeasurements { measurements: map },
+                None,
+            )
             .await
             .unwrap();
         }
@@ -567,13 +623,13 @@ async fn test_supply_across_epoch() {
         let supply_increase = &emissions_per_epoch * &node_share
             + &emissions_per_epoch * &protocol_share
             + &emissions_per_epoch * &service_share;
-        let total_supply = node.get_total_supply();
+        let total_supply = node.app_query().get_total_supply().unwrap();
         supply += supply_increase;
         assert_eq!(total_supply, supply);
 
         // If this is the last epoch, check if the supply_year_start is updated correctly.
         if epoch == genesis.epochs_per_year - 1 {
-            let supply_year_start = node.get_supply_year_start();
+            let supply_year_start = node.app_query().get_supply_year_start().unwrap();
             assert_eq!(total_supply, supply_year_start);
         }
     }
