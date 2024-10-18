@@ -69,6 +69,10 @@ impl<B: Backend> StateExecutor<B> {
         }
         current_committee.ready_to_change.push(index);
 
+        // Save the updated committee info and ready-to-change set.
+        self.committee_info
+            .set(current_epoch, current_committee.clone());
+
         // If more than 2/3rds of the committee have signaled, start the epoch change process
         if current_committee.ready_to_change.len() > (2 * current_committee.members.len() / 3) {
             // Todo: Reward nodes, choose new committee, increment epoch.
@@ -101,7 +105,6 @@ impl<B: Backend> StateExecutor<B> {
                 .set(Metadata::Epoch, Value::Epoch(current_epoch));
             TransactionResponse::Success(ExecutionData::EpochChange)
         } else {
-            self.committee_info.set(current_epoch, current_committee);
             TransactionResponse::Success(ExecutionData::None)
         }
     }
