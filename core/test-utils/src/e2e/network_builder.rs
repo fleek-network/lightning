@@ -10,7 +10,14 @@ use lightning_utils::poll::{poll_until, PollUntilError};
 use ready::ReadyWaiter;
 use tempfile::tempdir;
 
-use super::{TestGenesisBuilder, TestNetwork, TestNode, TestNodeBuilder, TestNodeComponents};
+use super::{
+    try_init_tracing,
+    TestGenesisBuilder,
+    TestNetwork,
+    TestNode,
+    TestNodeBuilder,
+    TestNodeComponents,
+};
 use crate::consensus::{Config as MockConsensusConfig, MockConsensusGroup};
 
 pub type GenesisMutator = Arc<dyn Fn(&mut Genesis)>;
@@ -69,6 +76,8 @@ impl TestNetworkBuilder {
 
     /// Builds a new test network with the given number of nodes, and starts each of them.
     pub async fn build(self) -> Result<TestNetwork> {
+        let _ = try_init_tracing();
+
         let temp_dir = tempdir()?;
 
         // Configure mock consensus if enabled.
@@ -87,7 +96,7 @@ impl TestNetworkBuilder {
             };
 
         // Build and start the nodes.
-        let mut nodes = join_all((0..self.num_nodes).map(|i| {
+        let nodes = join_all((0..self.num_nodes).map(|i| {
             let mut builder = TestNodeBuilder::new(temp_dir.path().join(format!("node-{}", i)));
             if let Some(consensus_group) = &consensus_group {
                 builder = builder.with_mock_consensus(Some(consensus_group.clone()));
@@ -99,12 +108,7 @@ impl TestNetworkBuilder {
         .collect::<Result<Vec<_>, _>>()?;
 
         // Wait for ready before building genesis.
-        join_all(
-            nodes
-                .iter_mut()
-                .map(|node| node.before_genesis_ready.wait()),
-        )
-        .await;
+        join_all(nodes.iter().map(|node| node.before_genesis_ready.wait())).await;
 
         // Decide which nodes will be on the genesis committee.
         let node_by_index = nodes.iter().enumerate().collect::<HashMap<_, _>>();
@@ -128,7 +132,7 @@ impl TestNetworkBuilder {
         // Apply genesis on each node.
         join_all(
             nodes
-                .iter_mut()
+                .iter()
                 .map(|node| node.app.apply_genesis(genesis.clone())),
         )
         .await;
@@ -137,7 +141,7 @@ impl TestNetworkBuilder {
         self.wait_for_connected_peers(&nodes).await?;
 
         // Wait for ready after genesis.
-        join_all(nodes.iter_mut().map(|node| node.after_genesis_ready.wait())).await;
+        join_all(nodes.iter().map(|node| node.after_genesis_ready.wait())).await;
 
         // Notify the shared mock consensus group that it can start.
         if let Some(consensus_group_start) = &consensus_group_start {

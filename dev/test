@@ -4,5 +4,8 @@ script_dir="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 "$script_dir"/common/install-nextest.sh
 
+# Increase open file limit for running the tests.
+ulimit -n 65536
+
 set -x
 cargo nextest run "$@"

@@ -18,6 +18,7 @@ use lightning_notifier::Notifier;
 use lightning_pool::PoolProvider;
 use lightning_rep_collector::MyReputationReporter;
 use lightning_rpc::Rpc;
+use lightning_signer::Signer;
 use lightning_utils::transaction::TransactionSigner;
 use ready::tokio::TokioReadyWaiter;
 use types::{NodeIndex, NodeInfo};
@@ -42,6 +43,8 @@ pub struct TestNode {
     pub pool: fdi::Ref<PoolProvider<TestNodeComponents>>,
     pub rpc: fdi::Ref<Rpc<TestNodeComponents>>,
     pub reputation_reporter: fdi::Ref<MyReputationReporter>,
+    pub signer: fdi::Ref<Signer<TestNodeComponents>>,
+    pub signer_socket: SignerSubmitTxSocket,
 }
 
 impl TestNode {

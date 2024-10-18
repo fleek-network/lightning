@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::time::Duration;
 
 use anyhow::Result;
 use fleek_crypto::{AccountOwnerSecretKey, SecretKey};
@@ -14,6 +15,7 @@ use lightning_pool::{Config as PoolConfig, PoolProvider};
 use lightning_rep_collector::MyReputationReporter;
 use lightning_rpc::config::Config as RpcConfig;
 use lightning_rpc::Rpc;
+use lightning_signer::Signer;
 use lightning_utils::config::TomlConfigProvider;
 use ready::tokio::TokioReadyWaiter;
 use ready::ReadyWaiter;
@@ -107,7 +109,7 @@ impl TestNodeBuilder {
         let node = Node::<TestNodeComponents>::init_with_provider(provider)?;
 
         // Start the node.
-        node.start().await;
+        tokio::time::timeout(Duration::from_secs(15), node.start()).await?;
 
         // Wait for the node to be ready.
         let shutdown = node
@@ -122,19 +124,23 @@ impl TestNodeBuilder {
             let before_genesis_ready = before_genesis_ready.clone();
             let shutdown = shutdown.clone();
             spawn!(
-                async move {
-                    // Wait for pool to be ready.
-                    let pool_state = pool.wait_for_ready().await;
+                async {
+                    tokio::time::timeout(Duration::from_secs(15), async move {
+                        // Wait for pool to be ready.
+                        let pool_state = pool.wait_for_ready().await;
 
-                    // Wait for rpc to be ready.
-                    let rpc_state = rpc.wait_for_ready().await;
+                        // Wait for rpc to be ready.
+                        let rpc_state = rpc.wait_for_ready().await;
 
-                    // Notify that we are ready.
-                    let state = TestNodeBeforeGenesisReadyState {
-                        pool_listen_address: pool_state.listen_address.unwrap(),
-                        rpc_listen_address: rpc_state.listen_address,
-                    };
-                    before_genesis_ready.notify(state);
+                        // Notify that we are ready.
+                        let state = TestNodeBeforeGenesisReadyState {
+                            pool_listen_address: pool_state.listen_address.unwrap(),
+                            rpc_listen_address: rpc_state.listen_address,
+                        };
+                        before_genesis_ready.notify(state);
+                    })
+                    .await
+                    .unwrap();
                 },
                 "TEST-NODE before genesis ready watcher",
                 crucial(shutdown)
@@ -152,15 +158,19 @@ impl TestNodeBuilder {
             let after_genesis_ready = after_genesis_ready.clone();
             let shutdown = shutdown.clone();
             spawn!(
-                async move {
-                    // Wait for genesis to be applied.
-                    app_query.wait_for_genesis().await;
+                async {
+                    tokio::time::timeout(Duration::from_secs(15), async move {
+                        // Wait for genesis to be applied.
+                        app_query.wait_for_genesis().await;
 
-                    // Wait for the checkpointer to be ready.
-                    checkpointer.wait_for_ready().await;
+                        // Wait for the checkpointer to be ready.
+                        checkpointer.wait_for_ready().await;
 
-                    // Notify that we are ready.
-                    after_genesis_ready.notify(());
+                        // Notify that we are ready.
+                        after_genesis_ready.notify(());
+                    })
+                    .await
+                    .unwrap();
                 },
                 "TEST-NODE after genesis ready watcher",
                 crucial(shutdown)
@@ -168,6 +178,8 @@ impl TestNodeBuilder {
         }
 
         let app = node.provider.get::<Application<TestNodeComponents>>();
+        let signer = node.provider.get::<Signer<TestNodeComponents>>();
+        let signer_socket = signer.get_socket();
         Ok(TestNode {
             app_query: app.sync_query(),
             app,
@@ -179,6 +191,8 @@ impl TestNodeBuilder {
             pool: node.provider.get::<PoolProvider<TestNodeComponents>>(),
             rpc: node.provider.get::<Rpc<TestNodeComponents>>(),
             reputation_reporter: node.provider.get::<MyReputationReporter>(),
+            signer,
+            signer_socket,
 
             inner: node,
             before_genesis_ready,

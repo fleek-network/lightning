@@ -7,7 +7,6 @@ use anyhow::{anyhow, Context, Result};
 use lazy_static::lazy_static;
 use lightning_interfaces::prelude::*;
 use toml::{Table, Value};
-use tracing::debug;
 
 lazy_static! {
     pub static ref LIGHTNING_HOME_DIR: PathBuf = env::var("LIGHTNING_HOME")
@@ -105,7 +104,7 @@ impl<C: NodeComponents> TomlConfigProvider<C> {
 
 impl<C: NodeComponents> ConfigProviderInterface<C> for TomlConfigProvider<C> {
     fn get<S: ConfigConsumer>(&self) -> S::Config {
-        debug!("Getting the config for {}", std::any::type_name::<S>());
+        tracing::trace!("Getting the config for {}", std::any::type_name::<S>());
 
         let mut table = self.table.lock().expect("failed to acquire lock");
 
