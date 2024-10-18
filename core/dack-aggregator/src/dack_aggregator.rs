@@ -13,6 +13,7 @@ use lightning_metrics::increment_counter_by;
 use queue_file::QueueFile;
 use tokio::sync::mpsc;
 use tracing::error;
+use types::ExecuteTransactionRequest;
 
 use crate::config::Config;
 
@@ -71,7 +72,7 @@ impl<C: NodeComponents> DeliveryAcknowledgmentAggregatorInterface<C>
 struct AggregatorInner {
     config: Config,
     #[allow(unused)]
-    submit_tx: SubmitTxSocket,
+    submit_tx: SignerSubmitTxSocket,
     #[allow(clippy::type_complexity)]
     socket_rx: mpsc::Receiver<Task<DeliveryAcknowledgment, ()>>,
     queue: QueueFile,
@@ -80,7 +81,7 @@ struct AggregatorInner {
 impl AggregatorInner {
     fn new(
         config: Config,
-        submit_tx: SubmitTxSocket,
+        submit_tx: SignerSubmitTxSocket,
         socket_rx: mpsc::Receiver<Task<DeliveryAcknowledgment, ()>>,
     ) -> anyhow::Result<Self> {
         let queue = QueueFile::open(&config.db_path)?;
@@ -155,7 +156,10 @@ impl AggregatorInner {
                         let submit_tx = self.submit_tx.clone();
                         spawn!(async move {
                             if let Err(e) = submit_tx
-                                .run(update)
+                                .run(ExecuteTransactionRequest {
+                                    method: update,
+                                    options: None,
+                                })
                                 .await
                             {
                                 error!("Failed to submit DACK to signer: {e:?}");

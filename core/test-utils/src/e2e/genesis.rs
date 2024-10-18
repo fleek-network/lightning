@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::str::FromStr;
+use std::sync::Arc;
 use std::time::Duration;
 
 use fleek_crypto::{AccountOwnerSecretKey, EthAddress, SecretKey};
@@ -12,13 +13,9 @@ use lightning_interfaces::types::{
     GenesisNode,
     GenesisPrices,
     GenesisService,
-    NodePorts,
-    Staking,
 };
-use lightning_interfaces::KeystoreInterface;
-use ready::ReadyWaiter;
 
-use super::{GenesisMutator, TestNode};
+pub type GenesisMutator = Arc<dyn Fn(&mut Genesis)>;
 
 #[derive(Clone)]
 pub struct TestGenesisBuilder {
@@ -68,49 +65,16 @@ impl TestGenesisBuilder {
         }
     }
 
-    pub fn with_node(mut self, node: &TestNode, is_committee: bool) -> Self {
-        let node_secret_key = node.keystore.get_ed25519_sk();
-        let node_public_key = node_secret_key.to_pk();
-        let node_owner_address = node.owner_secret_key.to_pk().into();
-        let consensus_secret_key = node.keystore.get_bls_sk();
-        let consensus_public_key = consensus_secret_key.to_pk();
-        let node_domain = "127.0.0.1".parse().unwrap();
-        let ready = node.before_genesis_ready.state().expect("node not ready");
-        let ports = NodePorts {
-            pool: ready.pool_listen_address.port(),
-            ..Default::default()
-        };
-
-        if !self
-            .accounts
-            .iter()
-            .any(|a| a.public_key == node_owner_address)
-        {
+    pub fn with_node(mut self, node: GenesisNode) -> Self {
+        if !self.accounts.iter().any(|a| a.public_key == node.owner) {
             self.accounts.push(GenesisAccount {
-                public_key: node_owner_address,
+                public_key: node.owner,
                 flk_balance: HpUfixed::<18>::zero(),
                 stables_balance: 0,
                 bandwidth_balance: 0,
             });
         }
-
-        self.nodes.push(GenesisNode::new(
-            node.owner_secret_key.to_pk().into(),
-            node_public_key,
-            node_domain,
-            consensus_public_key,
-            node_domain,
-            node_public_key,
-            ports,
-            Some(Staking {
-                staked: HpUfixed::<18>::from(1000u32),
-                stake_locked_until: 0,
-                locked: HpUfixed::<18>::zero(),
-                locked_until: 0,
-            }),
-            is_committee,
-        ));
-
+        self.nodes.push(node);
         self
     }
 
