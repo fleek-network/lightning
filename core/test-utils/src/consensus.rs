@@ -217,6 +217,9 @@ pub struct Config {
     /// This specifies the interval for new blocks being pretend submitted to the application.
     #[serde(with = "humantime_serde")]
     pub new_block_interval: Duration,
+    /// Whether to send an empty block when there are no transactions to send during the interval
+    /// tick.
+    pub send_empty_blocks: bool,
 }
 
 impl Default for Config {
@@ -227,6 +230,7 @@ impl Default for Config {
             probability_txn_lost: 0.0,
             transactions_to_lose: HashSet::new(),
             new_block_interval: Duration::from_secs(5),
+            send_empty_blocks: true,
         }
     }
 }
@@ -260,6 +264,10 @@ async fn group_worker<Q: SyncQueryRunnerInterface>(
     // realistic.
     let mut delayed_queue = JoinSet::new();
 
+    // Transactions are buffered in the pending queue and sent together in a single block, to make
+    // it more realistic and consistent with the real consensus process.
+    let mut pending_transactions = Vec::new();
+
     // This is a hack to force the JoinSet to never return `None`. This simplifies the
     // tokio::select. Maybe there is utility future somewhere
     delayed_queue.spawn(futures::future::pending::<TransactionRequest>());
@@ -273,11 +281,20 @@ async fn group_worker<Q: SyncQueryRunnerInterface>(
     loop {
         let mut block = tokio::select! {
             Some(req) = delayed_queue.join_next() => {
-                Block {
-                    transactions: vec![req.unwrap()],
-                    digest: [0; 32],
-                    sub_dag_index: 0,
-                    sub_dag_round: 0,
+                if config.new_block_interval.is_zero() {
+                    // If the block interval is zero, we send a new block immediately when a
+                    // transaction is received and makes it through the delayed queue.
+                    Block {
+                        transactions: vec![req.unwrap()],
+                        digest: [0; 32],
+                        sub_dag_index: 0,
+                        sub_dag_round: 0,
+                    }
+                } else {
+                    // Otherwise we buffer the transaction in the pending queue and send a new block
+                    // when the interval tick happens.
+                    pending_transactions.push(req.unwrap());
+                    continue;
                 }
             },
             Some(req) = req_rx.recv() => {
@@ -307,15 +324,19 @@ async fn group_worker<Q: SyncQueryRunnerInterface>(
                 continue;
             },
             _ = interval.tick() => {
-                if config.new_block_interval.is_zero() {
+                if pending_transactions.is_empty() && !config.send_empty_blocks {
                     continue;
                 }
-                Block {
-                    transactions: vec![],
+
+                // Send the buffered transactions as a single block.
+                let block = Block {
+                    transactions: pending_transactions.clone(),
                     digest: [0; 32],
                     sub_dag_index: 0,
                     sub_dag_round: 0,
-                }
+                };
+                pending_transactions.clear();
+                block
             },
             else => {
                 break;

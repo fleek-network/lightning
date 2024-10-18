@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::time::{Duration, SystemTime};
 
 use fleek_crypto::{AccountOwnerSecretKey, SecretKey};
@@ -99,8 +98,9 @@ async fn init_aggregator(temp_dir: &TempDir) -> Node<TestBinding> {
                         min_ordering_time: 0,
                         max_ordering_time: 1,
                         probability_txn_lost: 0.0,
-                        transactions_to_lose: HashSet::new(),
-                        new_block_interval: Duration::from_secs(5),
+                        transactions_to_lose: Default::default(),
+                        new_block_interval: Duration::from_millis(500),
+                        send_empty_blocks: false,
                     })
                     .with::<DeliveryAcknowledgmentAggregator<TestBinding>>(Config {
                         submit_interval: Duration::from_secs(1),
