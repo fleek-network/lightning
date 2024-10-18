@@ -1452,6 +1452,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "bip32"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aa13fae8b6255872fd86f7faf4b41168661d7d78609f7bfe6771b85c6739a15b"
+dependencies = [
+ "bs58 0.5.1",
+ "hmac",
+ "k256",
+ "once_cell",
+ "pbkdf2 0.12.2",
+ "rand_core 0.6.4",
+ "ripemd",
+ "sha2 0.10.8",
+ "subtle",
+ "zeroize",
+]
+
+[[package]]
 name = "bit-set"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1587,9 +1605,9 @@ dependencies = [
 
 [[package]]
 name = "blake3"
-version = "1.5.3"
+version = "1.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9ec96fe9a81b5e365f9db71fe00edc4fe4ca2cc7dcb7861f0603012a7caa210"
+checksum = "d82033247fd8e890df8f740e407ad4d038debb9eb1f40533fffb32e7d17dc6f7"
 dependencies = [
  "arrayref",
  "arrayvec",
@@ -1711,9 +1729,9 @@ dependencies = [
 
 [[package]]
 name = "bpaf"
-version = "0.9.12"
+version = "0.9.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3280efcf6d66bc77c2cf9b67dc8acee47a217d9be67dd590b3230dffe663724d"
+checksum = "8d4e5ca9929037866947af4b8b7418124f2ec7c411a8b9ee24e46ad2b8470497"
 dependencies = [
  "bpaf_derive",
  "owo-colors",
@@ -1722,9 +1740,9 @@ dependencies = [
 
 [[package]]
 name = "bpaf_derive"
-version = "0.5.10"
+version = "0.5.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a8d5b11f7fa1068e5bbac8ab6c8c2c6940047f69185987446b60c995d4bf89c"
+checksum = "cf95d9c7e6aba67f8fc07761091e93254677f4db9e27197adecebc7039a58722"
 dependencies = [
  "proc-macro2 1.0.86",
  "quote 1.0.36",
@@ -1998,12 +2016,13 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.1.7"
+version = "1.1.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "26a5c3fd7bfa1ce3897a3a3501d362b2d87b7f2583ebcb4a949ec25911025cbc"
+checksum = "07b1695e2c7e8fc85310cde85aeaab7e3097f593c91d209d3f9df76c928100f0"
 dependencies = [
  "jobserver",
  "libc",
+ "shlex",
 ]
 
 [[package]]
@@ -8079,6 +8098,7 @@ dependencies = [
  "axum 0.6.20",
  "axum 0.7.4",
  "axum-core 0.4.3",
+ "base16ct",
  "base64 0.13.1",
  "base64 0.21.7",
  "base64 0.22.1",
@@ -8089,6 +8109,7 @@ dependencies = [
  "blake3",
  "block-buffer 0.9.0",
  "block-padding 0.3.3",
+ "bs58 0.5.1",
  "bytemuck",
  "byteorder",
  "bytes",
@@ -8122,6 +8143,7 @@ dependencies = [
  "event-listener 5.3.1",
  "fastcrypto 0.1.5",
  "fastcrypto 0.1.8",
+ "ff",
  "futures",
  "futures-channel",
  "futures-core",
@@ -8132,6 +8154,7 @@ dependencies = [
  "futures-util",
  "generic-array",
  "getrandom",
+ "group",
  "half 2.4.1",
  "hashbrown 0.12.3",
  "hashbrown 0.14.5",
@@ -8175,6 +8198,7 @@ dependencies = [
  "p256",
  "parity-scale-codec 3.6.11",
  "parity-scale-codec-derive 3.6.9",
+ "pbkdf2 0.12.2",
  "plotters",
  "portable-atomic",
  "prettyplease 0.2.20",
@@ -8217,6 +8241,7 @@ dependencies = [
  "sha2 0.10.8",
  "sha2 0.9.9",
  "sha3 0.10.8",
+ "signature 2.2.0",
  "simdutf8",
  "similar",
  "smallvec",
@@ -12849,24 +12874,10 @@ name = "sgxencrypt"
 version = "0.0.3"
 dependencies = [
  "anyhow",
+ "bip32",
  "bpaf",
  "ecies",
  "hex",
-]
-
-[[package]]
-name = "sgxkit"
-version = "0.1.0"
-dependencies = [
- "sgxkit-sys",
-]
-
-[[package]]
-name = "sgxkit-sys"
-version = "0.1.0"
-dependencies = [
- "futures",
- "tokio",
 ]
 
 [[package]]
