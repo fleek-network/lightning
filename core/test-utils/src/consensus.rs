@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::{broadcast, mpsc};
 use tokio::task::JoinSet;
-use tokio::time::{interval, sleep};
+use tokio::time::{sleep, Interval};
 
 /// The mock consensus group object is used to attach multiple mock nodes into the same 'consensus'
 /// mechanism.
@@ -217,6 +217,10 @@ pub struct Config {
     /// This specifies the interval for new blocks being pretend submitted to the application.
     #[serde(with = "humantime_serde")]
     pub new_block_interval: Duration,
+    /// The interval for buffering transactions before they are sent to the application batched in
+    /// a single block.
+    #[serde(with = "humantime_serde")]
+    pub block_buffering_interval: Duration,
 }
 
 impl Default for Config {
@@ -226,6 +230,7 @@ impl Default for Config {
             max_ordering_time: 5,
             probability_txn_lost: 0.0,
             transactions_to_lose: HashSet::new(),
+            block_buffering_interval: Duration::from_secs(0),
             new_block_interval: Duration::from_secs(5),
         }
     }
@@ -248,17 +253,21 @@ async fn group_worker<Q: SyncQueryRunnerInterface>(
         start.notified().await;
     }
 
-    let period = if config.new_block_interval.is_zero() {
-        Duration::from_secs(120)
-    } else {
-        config.new_block_interval
-    };
-    let mut interval = interval(period);
+    let mut new_block_interval =
+        OptionalInterval::new(Some(config.new_block_interval).filter(|d| !d.is_zero()));
+    let mut block_buffering_interval =
+        OptionalInterval::new(Some(config.block_buffering_interval).filter(|d| !d.is_zero()));
+    block_buffering_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    let mut last_block_executed = tokio::time::Instant::now();
     let mut tx_count = 0;
 
     // After each tx is received we want to add some random delay to it to make it more
     // realistic.
     let mut delayed_queue = JoinSet::new();
+
+    // Transactions are buffered in the pending queue and sent together in a single block, to make
+    // it more realistic and consistent with the real consensus process.
+    let mut pending_transactions = Vec::new();
 
     // This is a hack to force the JoinSet to never return `None`. This simplifies the
     // tokio::select. Maybe there is utility future somewhere
@@ -273,11 +282,20 @@ async fn group_worker<Q: SyncQueryRunnerInterface>(
     loop {
         let mut block = tokio::select! {
             Some(req) = delayed_queue.join_next() => {
-                Block {
-                    transactions: vec![req.unwrap()],
-                    digest: [0; 32],
-                    sub_dag_index: 0,
-                    sub_dag_round: 0,
+                if config.block_buffering_interval.is_zero() {
+                    // If the block interval is None, we send a new block immediately when a
+                    // transaction is received and makes it through the delayed queue.
+                    Block {
+                        transactions: vec![req.unwrap()],
+                        digest: [0; 32],
+                        sub_dag_index: 0,
+                        sub_dag_round: 0,
+                    }
+                } else {
+                    // Otherwise we buffer the transaction in the pending queue and send a new block
+                    // when the interval tick happens.
+                    pending_transactions.push(req.unwrap());
+                    continue;
                 }
             },
             Some(req) = req_rx.recv() => {
@@ -306,15 +324,41 @@ async fn group_worker<Q: SyncQueryRunnerInterface>(
 
                 continue;
             },
-            _ = interval.tick() => {
-                if config.new_block_interval.is_zero() {
+            _ = block_buffering_interval.tick() => {
+                if pending_transactions.is_empty() {
                     continue;
                 }
-                Block {
-                    transactions: vec![],
+
+                // Execute the accumulated transactions in a block.
+                let now = tokio::time::Instant::now();
+                last_block_executed = now;
+                let block = Block {
+                    transactions: pending_transactions.clone(),
                     digest: [0; 32],
                     sub_dag_index: 0,
                     sub_dag_round: 0,
+                };
+                pending_transactions.clear();
+                block
+            },
+            _ = new_block_interval.tick() => {
+                // If the new block interval elapses and there are no pending transactions, send an
+                // empty block.
+                let now = tokio::time::Instant::now();
+                let time_since_last_block = now.duration_since(last_block_executed);
+
+                if pending_transactions.is_empty()
+                    && time_since_last_block >= config.new_block_interval
+                {
+                    last_block_executed = now;
+                    Block {
+                        transactions: vec![],
+                        digest: [0; 32],
+                        sub_dag_index: 0,
+                        sub_dag_round: 0,
+                    }
+                } else {
+                    continue;
                 }
             },
             else => {
@@ -333,6 +377,31 @@ async fn group_worker<Q: SyncQueryRunnerInterface>(
 
         if block_producer_tx.send(block).is_err() {
             return;
+        }
+    }
+}
+
+struct OptionalInterval {
+    interval: Option<Interval>,
+}
+
+impl OptionalInterval {
+    fn new(interval: Option<Duration>) -> Self {
+        let interval = interval.map(tokio::time::interval);
+        OptionalInterval { interval }
+    }
+
+    async fn tick(&mut self) {
+        if let Some(interval) = self.interval.as_mut() {
+            interval.tick().await;
+        } else {
+            futures::future::pending::<()>().await;
+        }
+    }
+
+    fn set_missed_tick_behavior(&mut self, behavior: tokio::time::MissedTickBehavior) {
+        if let Some(interval) = self.interval.as_mut() {
+            interval.set_missed_tick_behavior(behavior);
         }
     }
 }

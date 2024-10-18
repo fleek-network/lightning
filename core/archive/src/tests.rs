@@ -54,6 +54,7 @@ async fn get_node() -> Node<TestBinding> {
                 probability_txn_lost: 0.0,
                 transactions_to_lose: Default::default(),
                 new_block_interval: Duration::from_secs(0),
+                block_buffering_interval: Duration::from_secs(0),
             }),
     )
     .unwrap();
