@@ -59,6 +59,17 @@ async fn test_epoch_change_with_all_committee_nodes() {
     .await;
     assert_eq!(result.unwrap_err(), PollUntilError::Timeout);
 
+    // Check that the ready-to-change set in the committee info contains the nodes that sent an
+    // epoch change transaction.
+    for node in network.nodes() {
+        assert_eq!(
+            node.app_query
+                .get_committee_info(&epoch, |c| c.ready_to_change)
+                .unwrap(),
+            vec![0, 1]
+        );
+    }
+
     // Execute an epoch change transaction from enough nodes to trigger an epoch change.
     node3
         .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
@@ -79,6 +90,27 @@ async fn test_epoch_change_with_all_committee_nodes() {
     )
     .await
     .unwrap();
+
+    // Check that the ready-to-change set in the committee info contains all the nodes that sent an
+    // epoch change transaction.
+    for node in network.nodes() {
+        assert_eq!(
+            node.app_query
+                .get_committee_info(&epoch, |c| c.ready_to_change)
+                .unwrap(),
+            vec![0, 1, 2]
+        );
+    }
+
+    // Check that the ready-to-change set for the next epoch is empty.
+    for node in network.nodes() {
+        assert!(
+            node.app_query
+                .get_committee_info(&(epoch + 1), |c| c.ready_to_change)
+                .unwrap()
+                .is_empty()
+        );
+    }
 
     // Shutdown the network.
     network.shutdown().await;
@@ -116,6 +148,17 @@ async fn test_epoch_change_with_some_non_committee_nodes() {
         .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
         .await
         .unwrap();
+
+    // Check that the ready-to-change set in the committee info contains the nodes that sent an
+    // epoch change transaction.
+    for node in network.nodes() {
+        assert_eq!(
+            node.app_query
+                .get_committee_info(&epoch, |c| c.ready_to_change)
+                .unwrap(),
+            vec![0, 1]
+        );
+    }
 
     // Send epoch change transactions from the non-committee nodes.
     let result = non_committee_node1
@@ -158,6 +201,17 @@ async fn test_epoch_change_with_some_non_committee_nodes() {
     .await;
     assert_eq!(result.unwrap_err(), PollUntilError::Timeout);
 
+    // Check that the ready-to-change set in the committee info contains the nodes that sent an
+    // epoch change transaction.
+    for node in network.nodes() {
+        assert_eq!(
+            node.app_query
+                .get_committee_info(&epoch, |c| c.ready_to_change)
+                .unwrap(),
+            vec![0, 1]
+        );
+    }
+
     // Execute an epoch change transaction from enough nodes to trigger an epoch change.
     committee_node3
         .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
@@ -178,6 +232,27 @@ async fn test_epoch_change_with_some_non_committee_nodes() {
     )
     .await
     .unwrap();
+
+    // Check that the ready-to-change set in the committee info contains all the nodes that sent an
+    // epoch change transaction.
+    for node in network.nodes() {
+        assert_eq!(
+            node.app_query
+                .get_committee_info(&epoch, |c| c.ready_to_change)
+                .unwrap(),
+            vec![0, 1, 2]
+        );
+    }
+
+    // Check that the ready-to-change set for the next epoch is empty.
+    for node in network.nodes() {
+        assert!(
+            node.app_query
+                .get_committee_info(&(epoch + 1), |c| c.ready_to_change)
+                .unwrap()
+                .is_empty()
+        );
+    }
 
     // Shutdown the network.
     network.shutdown().await;
