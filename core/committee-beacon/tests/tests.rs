@@ -221,8 +221,9 @@ async fn test_insufficient_participation_in_commit_phase() {
             max_ordering_time: 0,
             min_ordering_time: 0,
             probability_txn_lost: 0.0,
-            new_block_interval: Duration::from_secs(0),
+            new_block_interval: Duration::from_millis(200),
             transactions_to_lose: Default::default(),
+            execute_empty_blocks: false,
         })
         .with_committee_beacon_config(committee_beacon_config.clone())
         .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(1)

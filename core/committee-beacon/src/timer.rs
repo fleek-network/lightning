@@ -11,7 +11,6 @@ use types::{
     ExecuteTransactionRetry,
     ExecuteTransactionWait,
     Metadata,
-    TransactionReceipt,
     TransactionResponse,
     UpdateMethod,
     Value,
@@ -149,9 +148,8 @@ impl<C: NodeComponents> CommitteeBeaconTimer<C> {
     async fn execute_transaction(
         &self,
         method: UpdateMethod,
-    ) -> Result<TransactionReceipt, ExecuteTransactionError> {
-        let resp = self
-            .signer
+    ) -> Result<(), ExecuteTransactionError> {
+        self.signer
             .run(ExecuteTransactionRequest {
                 method,
                 options: Some(ExecuteTransactionOptions {
@@ -163,9 +161,7 @@ impl<C: NodeComponents> CommitteeBeaconTimer<C> {
                 }),
             })
             .await??;
-
-        let (_, receipt) = resp.as_receipt();
-        Ok(receipt)
+        Ok(())
     }
 
     fn in_commit_or_reveal_phase(&self) -> bool {

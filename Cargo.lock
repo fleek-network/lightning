@@ -6766,6 +6766,7 @@ dependencies = [
  "futures",
  "hp-fixed",
  "lazy_static",
+ "lightning-committee-beacon",
  "lightning-interfaces",
  "lightning-metrics",
  "lightning-node",

@@ -19,7 +19,6 @@ use types::{
     ExecutionError,
     Metadata,
     NodeIndex,
-    TransactionReceipt,
     UpdateMethod,
     Value,
 };
@@ -102,6 +101,10 @@ impl<C: NodeComponents> CommitteeBeaconListener<C> {
             .app_query
             .get_metadata(&Metadata::CommitteeSelectionBeaconPhase);
 
+        // Get the current block number.
+        // TODO(snormore): Should we just get the last block from the application state?
+        let current_block = response.block_number + 1;
+
         // Handle the current phase.
         match phase {
             None => {
@@ -112,7 +115,7 @@ impl<C: NodeComponents> CommitteeBeaconListener<C> {
                 (start_block, end_block),
             ))) => {
                 let result = self
-                    .handle_commit_phase(start_block, end_block, response.clone())
+                    .handle_commit_phase(start_block, end_block, current_block)
                     .await;
 
                 // Handling executed block responses is best-effort, and so if the commit phase
@@ -126,7 +129,7 @@ impl<C: NodeComponents> CommitteeBeaconListener<C> {
                 (start_block, end_block),
             ))) => {
                 let result = self
-                    .handle_reveal_phase(start_block, end_block, response.clone())
+                    .handle_reveal_phase(start_block, end_block, current_block)
                     .await;
 
                 // Handling executed block responses is best-effort, and so if the reveal phase
@@ -157,35 +160,28 @@ impl<C: NodeComponents> CommitteeBeaconListener<C> {
         &self,
         start_block: BlockNumber,
         end_block: BlockNumber,
-        response: BlockExecutionResponse,
+        current_block: BlockNumber,
     ) -> Result<(), CommitteeBeaconError> {
-        // The current block is the next block after the response block, since the response block
-        // was just executed.
-        let current_block = response.block_number + 1;
-
-        // TODO(snormore): Should we just get the last block from the application state?
-
-        tracing::debug!(
+        tracing::info!(
             "handling commit phase ({}, {}) at block {}",
             start_block,
             end_block,
             current_block
         );
 
-        // If we are not in the commit phase block range, do nothing.
-        if current_block < start_block || current_block > end_block {
-            return Ok(());
-        }
-
-        // If this was the last block of the commit phase, or we are outside of the range, trigger
-        // an update in the application executor that will move onto the reveal phase, or
-        // restart the commit phase, depending on participation.
-        if current_block >= end_block {
+        // If this is the first block outside of the commit phase range, execute a commit timeout
+        // transaction and return.
+        // TODO(snormore): Should we do this if current_block > end_block until the phase metadata
+        // is updated?
+        if current_block > end_block {
             tracing::debug!("submitting commit phase timeout transaction");
             self.execute_transaction(UpdateMethod::CommitteeSelectionBeaconCommitPhaseTimeout)
                 .await?;
+            return Ok(());
+        }
 
-            // Return, we don't need to do anything else.
+        // If we are not in the commit phase block range, do nothing and return.
+        if current_block < start_block || current_block > end_block {
             return Ok(());
         }
 
@@ -214,7 +210,7 @@ impl<C: NodeComponents> CommitteeBeaconListener<C> {
         self.db.set_beacon(commit, reveal);
 
         // Build commit and submit it.
-        tracing::debug!("submitting commit transaction: {:?}", commit);
+        tracing::info!("submitting commit transaction: {:?}", commit);
         self.execute_transaction(UpdateMethod::CommitteeSelectionBeaconCommit { commit })
             .await?;
 
@@ -233,14 +229,8 @@ impl<C: NodeComponents> CommitteeBeaconListener<C> {
         &self,
         start_block: BlockNumber,
         end_block: BlockNumber,
-        response: BlockExecutionResponse,
+        current_block: BlockNumber,
     ) -> Result<(), CommitteeBeaconError> {
-        // The current block is the next block after the response block, since the response block
-        // was just executed.
-        let current_block = response.block_number + 1;
-
-        // TODO(snormore): Should we just get the last block from the application state?
-
         tracing::debug!(
             "handling reveal phase ({}, {}) at block {}",
             start_block,
@@ -248,20 +238,20 @@ impl<C: NodeComponents> CommitteeBeaconListener<C> {
             current_block
         );
 
-        // If we are not in the reveal phase block range, do nothing.
-        if current_block < start_block {
-            return Ok(());
-        }
-
-        // If this was the last block of the reveal phase, or we are outside of the range, trigger
-        // an update in the application executor that will restart back to a new commit
-        // phase.
-        if current_block >= end_block {
+        // If this is the first block outside of the reveal phase range, execute a reveal timeout
+        // transaction and return. This will trigger an update in the application executor that will
+        // restart a new round and commit phase.
+        // TODO(snormore): Should we do this if current_block > end_block until the phase metadata
+        // is updated?
+        if current_block > end_block {
             tracing::debug!("submitting reveal phase timeout transaction");
             self.execute_transaction(UpdateMethod::CommitteeSelectionBeaconRevealPhaseTimeout)
                 .await?;
+            return Ok(());
+        }
 
-            // Return, we don't need to do anything else.
+        // If we are not in the reveal phase block range, do nothing and return.
+        if current_block < start_block || current_block > end_block {
             return Ok(());
         }
 
@@ -299,9 +289,8 @@ impl<C: NodeComponents> CommitteeBeaconListener<C> {
     async fn execute_transaction(
         &self,
         method: UpdateMethod,
-    ) -> Result<TransactionReceipt, ExecuteTransactionError> {
-        let resp = self
-            .signer
+    ) -> Result<(), ExecuteTransactionError> {
+        self.signer
             .run(ExecuteTransactionRequest {
                 method,
                 options: Some(ExecuteTransactionOptions {
@@ -315,9 +304,7 @@ impl<C: NodeComponents> CommitteeBeaconListener<C> {
                 }),
             })
             .await??;
-
-        let (_, receipt) = resp.as_receipt();
-        Ok(receipt)
+        Ok(())
     }
 
     /// Generate random reveal value.

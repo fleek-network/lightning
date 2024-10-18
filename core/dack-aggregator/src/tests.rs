@@ -100,7 +100,7 @@ async fn init_aggregator(temp_dir: &TempDir) -> Node<TestBinding> {
                         probability_txn_lost: 0.0,
                         transactions_to_lose: Default::default(),
                         new_block_interval: Duration::from_millis(500),
-                        send_empty_blocks: false,
+                        execute_empty_blocks: false,
                     })
                     .with::<DeliveryAcknowledgmentAggregator<TestBinding>>(Config {
                         submit_interval: Duration::from_secs(1),

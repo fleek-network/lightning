@@ -3,6 +3,7 @@ use std::time::Duration;
 
 use fleek_crypto::{AccountOwnerSecretKey, NodeSecretKey, SecretKey};
 use hp_fixed::unsigned::HpUfixed;
+use lightning_committee_beacon::{CommitteeBeaconConfig, CommitteeBeaconTimerConfig};
 use lightning_interfaces::types::{
     DeliveryAcknowledgmentProof,
     ExecuteTransactionError,
@@ -66,14 +67,24 @@ async fn test_epoch_change_with_all_committee_nodes() {
 
     // Check that the ready-to-change set in the committee info contains the nodes that sent an
     // epoch change transaction.
-    for node in network.nodes() {
-        assert_eq!(
-            node.app_query
-                .get_committee_info(&epoch, |c| c.ready_to_change)
-                .unwrap(),
-            vec![0, 1]
-        );
-    }
+    poll_until(
+        || async {
+            network
+                .nodes()
+                .all(|node| {
+                    node.app_query()
+                        .get_committee_info(&epoch, |c| c.ready_to_change)
+                        .unwrap()
+                        == vec![0, 1]
+                })
+                .then_some(())
+                .ok_or(PollUntilError::ConditionNotSatisfied)
+        },
+        Duration::from_secs(3),
+        Duration::from_millis(100),
+    )
+    .await
+    .unwrap();
 
     // Execute an epoch change transaction from enough nodes to trigger an epoch change.
     node3
@@ -100,24 +111,44 @@ async fn test_epoch_change_with_all_committee_nodes() {
 
     // Check that the ready-to-change set in the committee info contains all the nodes that sent an
     // epoch change transaction.
-    for node in network.nodes() {
-        assert_eq!(
-            node.app_query
-                .get_committee_info(&epoch, |c| c.ready_to_change)
-                .unwrap(),
-            vec![0, 1, 2]
-        );
-    }
+    poll_until(
+        || async {
+            network
+                .nodes()
+                .all(|node| {
+                    node.app_query()
+                        .get_committee_info(&epoch, |c| c.ready_to_change)
+                        .unwrap()
+                        == vec![0, 1, 2]
+                })
+                .then_some(())
+                .ok_or(PollUntilError::ConditionNotSatisfied)
+        },
+        Duration::from_secs(3),
+        Duration::from_millis(100),
+    )
+    .await
+    .unwrap();
 
     // Check that the ready-to-change set for the next epoch is empty.
-    for node in network.nodes() {
-        assert!(
-            node.app_query
-                .get_committee_info(&(epoch + 1), |c| c.ready_to_change)
-                .unwrap()
-                .is_empty()
-        );
-    }
+    poll_until(
+        || async {
+            network
+                .nodes()
+                .all(|node| {
+                    node.app_query()
+                        .get_committee_info(&(epoch + 1), |c| c.ready_to_change)
+                        .unwrap_or_default()
+                        .is_empty()
+                })
+                .then_some(())
+                .ok_or(PollUntilError::ConditionNotSatisfied)
+        },
+        Duration::from_secs(3),
+        Duration::from_millis(100),
+    )
+    .await
+    .unwrap();
 
     // Shutdown the network.
     network.shutdown().await;
@@ -160,14 +191,24 @@ async fn test_epoch_change_with_some_non_committee_nodes() {
 
     // Check that the ready-to-change set in the committee info contains the nodes that sent an
     // epoch change transaction.
-    for node in network.nodes() {
-        assert_eq!(
-            node.app_query
-                .get_committee_info(&epoch, |c| c.ready_to_change)
-                .unwrap(),
-            vec![0, 1]
-        );
-    }
+    poll_until(
+        || async {
+            network
+                .nodes()
+                .all(|node| {
+                    node.app_query()
+                        .get_committee_info(&epoch, |c| c.ready_to_change)
+                        .unwrap()
+                        == vec![0, 1]
+                })
+                .then_some(())
+                .ok_or(PollUntilError::ConditionNotSatisfied)
+        },
+        Duration::from_secs(3),
+        Duration::from_millis(100),
+    )
+    .await
+    .unwrap();
 
     // Send epoch change transactions from the non-committee nodes.
     let result = non_committee_node1
@@ -212,14 +253,24 @@ async fn test_epoch_change_with_some_non_committee_nodes() {
 
     // Check that the ready-to-change set in the committee info contains the nodes that sent an
     // epoch change transaction.
-    for node in network.nodes() {
-        assert_eq!(
-            node.app_query
-                .get_committee_info(&epoch, |c| c.ready_to_change)
-                .unwrap(),
-            vec![0, 1]
-        );
-    }
+    poll_until(
+        || async {
+            network
+                .nodes()
+                .all(|node| {
+                    node.app_query()
+                        .get_committee_info(&epoch, |c| c.ready_to_change)
+                        .unwrap()
+                        == vec![0, 1]
+                })
+                .then_some(())
+                .ok_or(PollUntilError::ConditionNotSatisfied)
+        },
+        Duration::from_secs(3),
+        Duration::from_millis(100),
+    )
+    .await
+    .unwrap();
 
     // Execute an epoch change transaction from enough nodes to trigger an epoch change.
     committee_node3
@@ -246,24 +297,44 @@ async fn test_epoch_change_with_some_non_committee_nodes() {
 
     // Check that the ready-to-change set in the committee info contains all the nodes that sent an
     // epoch change transaction.
-    for node in network.nodes() {
-        assert_eq!(
-            node.app_query
-                .get_committee_info(&epoch, |c| c.ready_to_change)
-                .unwrap(),
-            vec![0, 1, 2]
-        );
-    }
+    poll_until(
+        || async {
+            network
+                .nodes()
+                .all(|node| {
+                    node.app_query()
+                        .get_committee_info(&epoch, |c| c.ready_to_change)
+                        .unwrap()
+                        == vec![0, 1, 2]
+                })
+                .then_some(())
+                .ok_or(PollUntilError::ConditionNotSatisfied)
+        },
+        Duration::from_secs(3),
+        Duration::from_millis(100),
+    )
+    .await
+    .unwrap();
 
     // Check that the ready-to-change set for the next epoch is empty.
-    for node in network.nodes() {
-        assert!(
-            node.app_query
-                .get_committee_info(&(epoch + 1), |c| c.ready_to_change)
-                .unwrap()
-                .is_empty()
-        );
-    }
+    poll_until(
+        || async {
+            network
+                .nodes()
+                .all(|node| {
+                    node.app_query()
+                        .get_committee_info(&(epoch + 1), |c| c.ready_to_change)
+                        .unwrap_or_default()
+                        .is_empty()
+                })
+                .then_some(())
+                .ok_or(PollUntilError::ConditionNotSatisfied)
+        },
+        Duration::from_secs(3),
+        Duration::from_millis(100),
+    )
+    .await
+    .unwrap();
 
     // Shutdown the network.
     network.shutdown().await;
@@ -615,6 +686,12 @@ async fn test_distribute_rewards() {
 #[tokio::test]
 async fn test_supply_across_epoch() {
     let mut network = TestNetwork::builder()
+        .with_committee_beacon_config(CommitteeBeaconConfig {
+            timer: CommitteeBeaconTimerConfig {
+                tick_delay: Duration::from_millis(100),
+            },
+            ..Default::default()
+        })
         .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(4)
         .await
         .with_genesis_mutator(|genesis| {
@@ -626,6 +703,8 @@ async fn test_supply_across_epoch() {
             genesis.service_builder_share = 10;
             genesis.max_boost = 4;
             genesis.supply_at_genesis = 1000000;
+            genesis.committee_selection_beacon_commit_phase_duration = 3;
+            genesis.committee_selection_beacon_reveal_phase_duration = 3;
         })
         .build()
         .await

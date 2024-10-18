@@ -219,18 +219,18 @@ pub struct Config {
     pub new_block_interval: Duration,
     /// Whether to send an empty block when there are no transactions to send during the interval
     /// tick.
-    pub send_empty_blocks: bool,
+    pub execute_empty_blocks: bool,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
             min_ordering_time: 0,
-            max_ordering_time: 5,
+            max_ordering_time: 3,
             probability_txn_lost: 0.0,
             transactions_to_lose: HashSet::new(),
-            new_block_interval: Duration::from_secs(5),
-            send_empty_blocks: true,
+            new_block_interval: Duration::from_millis(0),
+            execute_empty_blocks: false,
         }
     }
 }
@@ -324,7 +324,7 @@ async fn group_worker<Q: SyncQueryRunnerInterface>(
                 continue;
             },
             _ = interval.tick() => {
-                if pending_transactions.is_empty() && !config.send_empty_blocks {
+                if pending_transactions.is_empty() && !config.execute_empty_blocks {
                     continue;
                 }
 

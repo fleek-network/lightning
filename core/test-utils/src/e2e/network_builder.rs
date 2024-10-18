@@ -48,7 +48,7 @@ impl TestNetworkBuilder {
             probability_txn_lost: 0.0,
             new_block_interval: Duration::from_millis(500),
             transactions_to_lose: Default::default(),
-            send_empty_blocks: false,
+            execute_empty_blocks: false,
         })
     }
 
@@ -66,6 +66,9 @@ impl TestNetworkBuilder {
             if let Some(consensus_group) = &self.mock_consensus_group {
                 builder = builder.with_mock_consensus(consensus_group.clone());
             }
+            if let Some(committee_beacon_config) = &self.committee_beacon_config {
+                builder = builder.with_committee_beacon_config(committee_beacon_config.clone());
+            }
             let node = builder.build::<C>().await.unwrap();
             self.nodes.push(node);
         }
@@ -80,6 +83,9 @@ impl TestNetworkBuilder {
             let mut builder = TestNodeBuilder::new().with_is_genesis_committee(false);
             if let Some(consensus_group) = &self.mock_consensus_group {
                 builder = builder.with_mock_consensus(consensus_group.clone());
+            }
+            if let Some(committee_beacon_config) = &self.committee_beacon_config {
+                builder = builder.with_committee_beacon_config(committee_beacon_config.clone());
             }
             let node = builder.build::<C>().await.unwrap();
             self.nodes.push(node);

@@ -87,7 +87,7 @@ impl<B: Backend> StateExecutor<B> {
             let end_block = start_block + self.get_commit_phase_duration();
 
             // Store the start and end block number for the committee selection commit phase.
-            tracing::debug!(
+            tracing::info!(
                 "transitioning to committee selection beacon commit phase because epoch change is starting (epoch: {}, start: {}, end: {})",
                 epoch,
                 start_block,
@@ -268,7 +268,7 @@ impl<B: Backend> StateExecutor<B> {
             // Reset the committee selection beacon phase metadata to indicate we are no longer in
             // commit or reveal phases, we are transitioning to epoch change execution and pre-epoch
             // change waiting phase.
-            tracing::debug!(
+            tracing::info!(
                 "transitioning to committee selection beacon to epoch change execution phase because all committed nodes have revealed (epoch: {}, start: {})",
                 epoch,
                 current_block,
@@ -360,7 +360,7 @@ impl<B: Backend> StateExecutor<B> {
             // If we have sufficient participation, start the reveal phase.
             let reveal_start = current_block + 1;
             let reveal_end = reveal_start + self.get_reveal_phase_duration();
-            tracing::debug!(
+            tracing::info!(
                 "transitioning to committee selection beacon reveal phase because commit phase timed out with sufficient participation (epoch: {}, start: {}, end: {})",
                 epoch,
                 reveal_start,
@@ -381,7 +381,7 @@ impl<B: Backend> StateExecutor<B> {
             // Start the commit phase again by setting the phase metadata.
             let commit_start = current_block + 1;
             let commit_end = commit_start + self.get_commit_phase_duration();
-            tracing::debug!(
+            tracing::info!(
                 "transitioning to new committee selection beacon commit phase because commit phase timed out without sufficient participation (epoch: {}, round: {}, start: {}, end: {})",
                 epoch,
                 round + 1,
@@ -456,7 +456,7 @@ impl<B: Backend> StateExecutor<B> {
         let commit_start = current_block + 1;
         let commit_end = commit_start + self.get_commit_phase_duration();
         let epoch = self.get_epoch();
-        tracing::debug!(
+        tracing::info!(
             "transitioning to new committee selection beacon commit phase because reveal phase timed out (epoch: {}, round: {}, start: {}, end: {})",
             epoch,
             round + 1,
