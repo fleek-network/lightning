@@ -75,7 +75,10 @@ impl<B: Backend> StateExecutor<B> {
 
         // If more than 2/3rds of the committee have signaled, start the committee selection
         // process.
-        if current_committee.ready_to_change.len() > (2 * current_committee.members.len() / 3) {
+        // Note that we do NOT want to execute this code after 2/3+1 nodes have signaled, since
+        // we only want to do it once to start the process.
+        if current_committee.ready_to_change.len() == (2 * current_committee.members.len() / 3) + 1
+        {
             let start_block = self.get_last_block_number() + 1;
             let end_block = start_block + self.get_commit_phase_duration();
 
