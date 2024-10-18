@@ -1558,7 +1558,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aa13fae8b6255872fd86f7faf4b41168661d7d78609f7bfe6771b85c6739a15b"
 dependencies = [
  "bs58 0.5.1",
- "hmac 0.12.1",
+ "hmac",
  "k256",
  "once_cell",
  "pbkdf2 0.12.2",
@@ -2392,7 +2392,7 @@ dependencies = [
  "bs58 0.5.1",
  "coins-core",
  "digest 0.10.7",
- "hmac 0.12.1",
+ "hmac",
  "k256",
  "serde",
  "sha2 0.10.8",
@@ -2407,7 +2407,7 @@ checksum = "3db8fba409ce3dc04f7d804074039eb68b960b0829161f8e06c95fea3f122528"
 dependencies = [
  "bitvec 1.0.1",
  "coins-bip32",
- "hmac 0.12.1",
+ "hmac",
  "once_cell",
  "pbkdf2 0.12.2",
  "rand 0.8.5",
@@ -4490,7 +4490,7 @@ dependencies = [
  "ctr",
  "digest 0.10.7",
  "hex",
- "hmac 0.12.1",
+ "hmac",
  "pbkdf2 0.11.0",
  "rand 0.8.5",
  "scrypt 0.10.0",
@@ -6265,17 +6265,7 @@ version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b5f8eb2ad728638ea2c7d47a21db23b7b58a72ed6a38256b8a1849f15fbbdf7"
 dependencies = [
- "hmac 0.12.1",
-]
-
-[[package]]
-name = "hmac"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "126888268dcc288495a26bf004b38c5fdbb31682f992c84ceb046a1f0fe38840"
-dependencies = [
- "crypto-mac",
- "digest 0.9.0",
+ "hmac",
 ]
 
 [[package]]
@@ -6285,17 +6275,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c49c37c09c17a53d937dfbb742eb3a961d65a994e6bcdcf37e7399d0cc8ab5e"
 dependencies = [
  "digest 0.10.7",
-]
-
-[[package]]
-name = "hmac-drbg"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17ea0a1394df5b6574da6e0c1ade9e78868c9fb0a4e5ef4428e32da4676b85b1"
-dependencies = [
- "digest 0.9.0",
- "generic-array",
- "hmac 0.8.1",
 ]
 
 [[package]]
@@ -7669,14 +7648,12 @@ dependencies = [
  "arrayref",
  "base64 0.13.1",
  "digest 0.9.0",
- "hmac-drbg",
  "libsecp256k1-core",
  "libsecp256k1-gen-ecmult",
  "libsecp256k1-gen-genmult",
  "rand 0.8.5",
  "serde",
  "sha2 0.9.9",
- "typenum",
 ]
 
 [[package]]
@@ -8674,61 +8651,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lightning-rpc"
-version = "0.0.0"
-dependencies = [
- "affair",
- "alloy-primitives",
- "anyhow",
- "async-trait",
- "bit-set 0.8.0",
- "clap",
- "ethers",
- "fleek-crypto 0.0.0",
- "futures 0.3.31",
- "hex",
- "hmac",
- "hp-fixed 0.1.0",
- "hyper 0.14.31",
- "jsonrpsee",
- "lightning-application",
- "lightning-blockstore",
- "lightning-blockstore-server",
- "lightning-fetcher",
- "lightning-firewall",
- "lightning-indexer",
- "lightning-interfaces",
- "lightning-notifier",
- "lightning-openrpc",
- "lightning-openrpc-macros",
- "lightning-origin-demuxer",
- "lightning-pool",
- "lightning-rep-collector",
- "lightning-signer",
- "lightning-test-utils",
- "lightning-topology",
- "lightning-types 0.1.0",
- "lightning-utils",
- "lightning-workspace-hack",
- "merklize 0.0.0",
- "once_cell",
- "prometheus",
- "rand 0.8.5",
- "ready",
- "reqwest",
- "resolved-pathbuf 0.2.0",
- "ruint",
- "serde",
- "serde_json",
- "sha2 0.10.8",
- "tempfile",
- "thiserror",
- "tokio",
- "tower 0.4.13",
- "tracing",
-]
-
-[[package]]
 name = "lightning-schema"
 version = "0.0.0"
 dependencies = [
@@ -9096,11 +9018,6 @@ dependencies = [
  "tracing",
 ]
 
-[[package]]
-name = "linked-hash-map"
-version = "0.5.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0717cef1bc8b636c6e1c1bbdefc09e6322da8a9321966e8928ef80d20f7f770f"
 
 [[package]]
 name = "linux-raw-sys"
@@ -11389,7 +11306,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "83a0692ec44e4cf1ef28ca317f14f8f07da2d95ec3fa01f86e4467b725e60917"
 dependencies = [
  "digest 0.10.7",
- "hmac 0.12.1",
+ "hmac",
  "password-hash 0.4.2",
  "sha2 0.10.8",
 ]
@@ -11401,7 +11318,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8ed6a7761f76e3b9f92dfb0a60a6a6477c61024b775147ff0973a02653abaf2"
 dependencies = [
  "digest 0.10.7",
- "hmac 0.12.1",
+ "hmac",
 ]
 
 [[package]]
@@ -12923,7 +12840,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8dd2a808d456c4a54e300a23e9f5a67e122c3024119acbfd73e3bf664491cb2"
 dependencies = [
- "hmac 0.12.1",
+ "hmac",
  "subtle",
 ]
 
@@ -13526,7 +13443,7 @@ version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f9e24d2b632954ded8ab2ef9fea0a0c769ea56ea98bddbafbad22caeeadf45d"
 dependencies = [
- "hmac 0.12.1",
+ "hmac",
  "pbkdf2 0.11.0",
  "salsa20",
  "sha2 0.10.8",
@@ -14001,13 +13918,6 @@ dependencies = [
  "hex",
 ]
 
-[[package]]
-name = "sgxkit-macros"
-version = "0.1.0"
-dependencies = [
- "quote 1.0.36",
- "syn 2.0.72",
-]
 
 [[package]]
 name = "sgxkit-sys"
@@ -14050,6 +13960,45 @@ dependencies = [
 ]
 
 [[package]]
+||||||| parent of d9fee30a (refactor: exclude sgxkit from workspace, update example docs)
+name = "sgxkit"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arrayref",
+ "base64 0.22.1",
+ "blake3",
+ "hex",
+ "hex-literal",
+ "libsecp256k1",
+ "serde",
+ "serde_json",
+ "sgxkit-macros",
+ "sgxkit-sys",
+ "sha2 0.10.8",
+ "strum 0.26.3",
+ "thiserror",
+]
+
+[[package]]
+name = "sgxkit-macros"
+version = "0.1.0"
+dependencies = [
+ "quote 1.0.36",
+ "syn 2.0.72",
+]
+
+[[package]]
+name = "sgxkit-sys"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "tokio",
+]
+
+[[package]]
+=======
+>>>>>>> d9fee30a (refactor: exclude sgxkit from workspace, update example docs)
 name = "sha-1"
 version = "0.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -14684,7 +14633,7 @@ checksum = "d3f10d3f68e60168d81110410428a435dbde28cc5525f5f7c6fdec92dbdc2800"
 dependencies = [
  "combine",
  "crc",
- "hmac 0.12.1",
+ "hmac",
  "once_cell",
  "openssl",
  "openssl-sys",
@@ -14808,7 +14757,7 @@ dependencies = [
  "bytecodec",
  "byteorder",
  "crc",
- "hmac 0.12.1",
+ "hmac",
  "md5",
  "sha1",
  "trackable 1.3.0",
@@ -18008,7 +17957,7 @@ dependencies = [
  "crc32fast",
  "crossbeam-utils",
  "flate2",
- "hmac 0.12.1",
+ "hmac",
  "pbkdf2 0.11.0",
  "sha1",
  "time",
