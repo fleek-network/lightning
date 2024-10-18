@@ -53,8 +53,9 @@ mod tests {
     use tokio::fs;
 
     use super::*;
-    use crate::bucket::file::tests::{get_random_file, verify_writer};
+    use crate::bucket::file::tests::verify_writer;
     use crate::bucket::file::B3FSFile;
+    use crate::bucket::tests::get_random_file;
 
     #[tokio::test]
     async fn test_trusted_write_should_work_and_be_consistent_with_fs() {

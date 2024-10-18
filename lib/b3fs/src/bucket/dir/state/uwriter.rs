@@ -45,7 +45,9 @@ impl WithCollector for DirUWriterCollector {
     ) -> Result<(), errors::InsertError> {
         let mut dir_hasher: DirectoryHasher<Vec<[u8; 32]>> = DirectoryHasher::default();
         dir_hasher.insert_unchecked(borrowed_entry);
+
         let (_, tree) = dir_hasher.finalize();
+
         self.hasher
             .verify_hash(tree[0])
             .map_err(|_| errors::InsertError::IncrementalVerification)

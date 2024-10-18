@@ -27,7 +27,7 @@ pub(crate) struct FileWriterCollector {
 }
 
 impl WithCollector for FileWriterCollector {
-    /// Collects bytes by updating the hasher
+    /// Collects bytes by updating the hasher.
     async fn collect(&mut self, bytes: &[u8]) -> Result<(), errors::WriteError> {
         self.hasher.write().await.update(bytes);
         Ok(())

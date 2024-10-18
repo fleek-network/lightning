@@ -51,14 +51,9 @@ mod tests {
     use std::env::temp_dir;
 
     use super::*;
+    use crate::bucket::dir::tests::setup_bucket;
     use crate::bucket::Bucket;
     use crate::entry::{BorrowedEntry, BorrowedLink, OwnedEntry, OwnedLink};
-
-    async fn setup_bucket() -> Result<Bucket, Box<dyn std::error::Error>> {
-        let temp_dir = temp_dir().join("b3fs_test");
-        tokio::fs::create_dir_all(&temp_dir).await?;
-        Ok(Bucket::open(&temp_dir).await?)
-    }
 
     #[tokio::test]
     async fn test_dir_writer_basic() -> Result<(), Box<dyn std::error::Error>> {
