@@ -4,6 +4,7 @@ use std::time::Duration;
 use anyhow::Result;
 use futures::future::join_all;
 use lightning_application::state::QueryRunner;
+use lightning_committee_beacon::CommitteeBeaconConfig;
 use lightning_interfaces::types::{Genesis, Staking};
 use lightning_interfaces::{ApplicationInterface, NodeComponents};
 use lightning_utils::poll::{poll_until, PollUntilError};
@@ -27,6 +28,7 @@ pub struct TestNetworkBuilder {
     pub genesis_mutator: Option<GenesisMutator>,
     pub mock_consensus_config: Option<MockConsensusConfig>,
     pub mock_consensus_group: Option<MockConsensusGroup>,
+    pub committee_beacon_config: Option<CommitteeBeaconConfig>,
 }
 
 impl TestNetworkBuilder {
@@ -38,12 +40,13 @@ impl TestNetworkBuilder {
             genesis_mutator: None,
             mock_consensus_config: None,
             mock_consensus_group: None,
+            committee_beacon_config: None,
         }
         .with_mock_consensus(MockConsensusConfig {
             max_ordering_time: 1,
             min_ordering_time: 0,
             probability_txn_lost: 0.0,
-            new_block_interval: Duration::from_millis(0),
+            new_block_interval: Duration::from_millis(500),
             transactions_to_lose: Default::default(),
             block_buffering_interval: Duration::from_secs(0),
         })
@@ -63,6 +66,9 @@ impl TestNetworkBuilder {
             if let Some(consensus_group) = &self.mock_consensus_group {
                 builder = builder.with_mock_consensus(consensus_group.clone());
             }
+            if let Some(committee_beacon_config) = &self.committee_beacon_config {
+                builder = builder.with_committee_beacon_config(committee_beacon_config.clone());
+            }
             let node = builder.build::<C>().await.unwrap();
             self.nodes.push(node);
         }
@@ -78,6 +84,9 @@ impl TestNetworkBuilder {
             if let Some(consensus_group) = &self.mock_consensus_group {
                 builder = builder.with_mock_consensus(consensus_group.clone());
             }
+            if let Some(committee_beacon_config) = &self.committee_beacon_config {
+                builder = builder.with_committee_beacon_config(committee_beacon_config.clone());
+            }
             let node = builder.build::<C>().await.unwrap();
             self.nodes.push(node);
         }
@@ -89,6 +98,11 @@ impl TestNetworkBuilder {
         F: Fn(&mut Genesis) + 'static,
     {
         self.genesis_mutator = Some(Arc::new(mutator));
+        self
+    }
+
+    pub fn with_committee_beacon_config(mut self, config: CommitteeBeaconConfig) -> Self {
+        self.committee_beacon_config = Some(config);
         self
     }
 

@@ -3,6 +3,7 @@ use std::time::Duration;
 
 use fleek_crypto::{AccountOwnerSecretKey, NodeSecretKey, SecretKey};
 use hp_fixed::unsigned::HpUfixed;
+use lightning_committee_beacon::{CommitteeBeaconConfig, CommitteeBeaconTimerConfig};
 use lightning_interfaces::types::{
     DeliveryAcknowledgmentProof,
     ExecuteTransactionError,
@@ -13,6 +14,7 @@ use lightning_interfaces::types::{
     UpdateMethod,
 };
 use lightning_interfaces::SyncQueryRunnerInterface;
+use lightning_test_utils::consensus::MockConsensusConfig;
 use lightning_test_utils::e2e::{
     DowncastToTestFullNode,
     TestFullNodeComponentsWithMockConsensus,
@@ -27,6 +29,21 @@ use super::utils::*;
 #[tokio::test]
 async fn test_epoch_change_with_all_committee_nodes() {
     let mut network = TestNetwork::builder()
+        .with_mock_consensus(MockConsensusConfig {
+            block_buffering_interval: Duration::from_millis(100),
+            max_ordering_time: 1,
+            ..Default::default()
+        })
+        .with_committee_beacon_config(CommitteeBeaconConfig {
+            timer: CommitteeBeaconTimerConfig {
+                tick_delay: Duration::from_millis(100),
+            },
+            ..Default::default()
+        })
+        .with_genesis_mutator(|genesis| {
+            genesis.committee_selection_beacon_commit_phase_duration = 3;
+            genesis.committee_selection_beacon_reveal_phase_duration = 3;
+        })
         .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(4)
         .await
         .build()
@@ -101,7 +118,7 @@ async fn test_epoch_change_with_all_committee_nodes() {
                 .then_some(())
                 .ok_or(PollUntilError::ConditionNotSatisfied)
         },
-        Duration::from_secs(5),
+        Duration::from_secs(20),
         Duration::from_millis(100),
     )
     .await
@@ -135,6 +152,21 @@ async fn test_epoch_change_with_all_committee_nodes() {
 #[tokio::test]
 async fn test_epoch_change_with_some_non_committee_nodes() {
     let mut network = TestNetwork::builder()
+        .with_mock_consensus(MockConsensusConfig {
+            block_buffering_interval: Duration::from_millis(100),
+            max_ordering_time: 1,
+            ..Default::default()
+        })
+        .with_committee_beacon_config(CommitteeBeaconConfig {
+            timer: CommitteeBeaconTimerConfig {
+                tick_delay: Duration::from_millis(100),
+            },
+            ..Default::default()
+        })
+        .with_genesis_mutator(|genesis| {
+            genesis.committee_selection_beacon_commit_phase_duration = 3;
+            genesis.committee_selection_beacon_reveal_phase_duration = 3;
+        })
         .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(4)
         .await
         .with_non_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(2)
@@ -155,7 +187,7 @@ async fn test_epoch_change_with_some_non_committee_nodes() {
     let non_committee_node2 = non_committee_nodes[1];
 
     // Get the current epoch.
-    let epoch = network.get_epoch();
+    let epoch = network.node(0).app_query().get_current_epoch();
 
     // Execute an epoch change transaction from less than 2/3 of the committee nodes.
     committee_node1
@@ -256,7 +288,7 @@ async fn test_epoch_change_with_some_non_committee_nodes() {
                 .then_some(())
                 .ok_or(PollUntilError::ConditionNotSatisfied)
         },
-        Duration::from_secs(5),
+        Duration::from_secs(20),
         Duration::from_millis(100),
     )
     .await
@@ -451,6 +483,17 @@ async fn test_epoch_change_reverts_already_signaled() {
 #[tokio::test]
 async fn test_distribute_rewards() {
     let mut network = TestNetwork::builder()
+        .with_mock_consensus(MockConsensusConfig {
+            block_buffering_interval: Duration::from_millis(100),
+            max_ordering_time: 1,
+            ..Default::default()
+        })
+        .with_committee_beacon_config(CommitteeBeaconConfig {
+            timer: CommitteeBeaconTimerConfig {
+                tick_delay: Duration::from_millis(100),
+            },
+            ..Default::default()
+        })
         .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(4)
         .await
         .with_genesis_mutator(|genesis| {
@@ -460,6 +503,8 @@ async fn test_distribute_rewards() {
             genesis.service_builder_share = 10;
             genesis.max_boost = 4;
             genesis.supply_at_genesis = 1_000_000;
+            genesis.committee_selection_beacon_commit_phase_duration = 3;
+            genesis.committee_selection_beacon_reveal_phase_duration = 3;
         })
         .build()
         .await
@@ -633,6 +678,17 @@ async fn test_distribute_rewards() {
 #[tokio::test]
 async fn test_supply_across_epoch() {
     let mut network = TestNetwork::builder()
+        .with_mock_consensus(MockConsensusConfig {
+            block_buffering_interval: Duration::from_millis(100),
+            max_ordering_time: 1,
+            ..Default::default()
+        })
+        .with_committee_beacon_config(CommitteeBeaconConfig {
+            timer: CommitteeBeaconTimerConfig {
+                tick_delay: Duration::from_millis(100),
+            },
+            ..Default::default()
+        })
         .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(4)
         .await
         .with_genesis_mutator(|genesis| {
@@ -644,6 +700,8 @@ async fn test_supply_across_epoch() {
             genesis.service_builder_share = 10;
             genesis.max_boost = 4;
             genesis.supply_at_genesis = 1000000;
+            genesis.committee_selection_beacon_commit_phase_duration = 3;
+            genesis.committee_selection_beacon_reveal_phase_duration = 3;
         })
         .build()
         .await

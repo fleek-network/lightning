@@ -1,5 +1,6 @@
 use std::any::Any;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::hash::Hash;
 
 use atomo::{KeyIterator, SerdeBackend, StorageBackend, TableRef as AtomoTableRef, TableSelector};
@@ -25,6 +26,7 @@ pub trait TableRef<K, V> {
     fn keys(&self) -> KeyIterator<K>;
     fn remove(&self, key: &K);
     fn clear(&self);
+    fn as_map(&self) -> HashMap<K, V>;
 }
 
 pub struct StateContext<'selector, B: StorageBackend, S: SerdeBackend> {
@@ -82,6 +84,10 @@ impl<
 
     fn clear(&self) {
         self.0.borrow_mut().clear();
+    }
+
+    fn as_map(&self) -> HashMap<K, V> {
+        self.0.borrow().as_map()
     }
 }
 
@@ -171,6 +177,39 @@ mod tests {
             };
             let table = ctx.get_table_reference::<String, String>("data");
             table.clear();
+        });
+    }
+
+    #[test]
+    fn test_as_map() {
+        let mut db = new_test_db_with_enable_iter();
+        db.run(|ctx| {
+            let ctx = StateContext {
+                table_selector: ctx,
+            };
+            let table = ctx.get_table_reference::<String, String>("data");
+            table.set("key1".to_string(), "value1".to_string());
+            table.set("key2".to_string(), "value2".to_string());
+            assert_eq!(
+                table.as_map(),
+                HashMap::from([
+                    ("key1".to_string(), "value1".to_string()),
+                    ("key2".to_string(), "value2".to_string())
+                ])
+            );
+        });
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_as_map_should_panic_without_enable_iter() {
+        let mut db = new_test_db();
+        db.run(|ctx| {
+            let ctx = StateContext {
+                table_selector: ctx,
+            };
+            let table = ctx.get_table_reference::<String, String>("data");
+            table.as_map();
         });
     }
 

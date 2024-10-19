@@ -18,6 +18,7 @@ use fleek_crypto::{
 use lightning_application::state::QueryRunner;
 use lightning_application::Application;
 use lightning_checkpointer::Checkpointer;
+use lightning_committee_beacon::CommitteeBeaconComponent;
 use lightning_interfaces::prelude::*;
 use lightning_node::ContainedNode;
 use lightning_notifier::Notifier;
@@ -269,6 +270,10 @@ impl<C: NodeComponents> TestFullNode<C> {
 
     pub fn checkpointer(&self) -> fdi::Ref<Checkpointer<C>> {
         self.provider().get::<Checkpointer<C>>()
+    }
+
+    pub fn committee_beacon(&self) -> fdi::Ref<CommitteeBeaconComponent<C>> {
+        self.provider().get::<CommitteeBeaconComponent<C>>()
     }
 
     pub fn pool(&self) -> fdi::Ref<PoolProvider<C>> {

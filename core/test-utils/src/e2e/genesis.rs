@@ -84,8 +84,12 @@ impl TestGenesisBuilder {
             epoch_start: 1684276288383,
             epoch_time: 120000,
             epochs_per_year: 365,
-            committee_size: 10,
-            node_count: 10,
+            committee_size: self
+                .nodes
+                .iter()
+                .filter(|node| node.genesis_committee)
+                .count() as u64,
+            node_count: self.nodes.len() as u64,
             min_stake: 1000,
             eligibility_time: 1,
             lock_time: 5,
@@ -132,6 +136,8 @@ impl TestGenesisBuilder {
             reputation_ping_timeout: Duration::from_secs(1),
             topology_target_k: 8,
             topology_min_nodes: 16,
+            committee_selection_beacon_commit_phase_duration: 10,
+            committee_selection_beacon_reveal_phase_duration: 10,
         };
 
         if let Some(mutator) = self.mutator {

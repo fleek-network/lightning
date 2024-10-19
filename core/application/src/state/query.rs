@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::path::Path;
 use std::time::Duration;
 
@@ -18,6 +18,8 @@ use lightning_interfaces::types::{
     AccountInfo,
     Blake3Hash,
     Committee,
+    CommitteeSelectionBeaconCommit,
+    CommitteeSelectionBeaconReveal,
     CommodityTypes,
     Epoch,
     Metadata,
@@ -68,6 +70,14 @@ pub struct QueryRunner {
     uptime_table: ResolvedTableReference<NodeIndex, u8>,
     uri_to_node: ResolvedTableReference<Blake3Hash, BTreeSet<NodeIndex>>,
     node_to_uri: ResolvedTableReference<NodeIndex, BTreeSet<Blake3Hash>>,
+    committee_selection_beacon: ResolvedTableReference<
+        NodeIndex,
+        (
+            CommitteeSelectionBeaconCommit,
+            Option<CommitteeSelectionBeaconReveal>,
+        ),
+    >,
+    _committee_selection_beacon_non_revealing_node: ResolvedTableReference<NodeIndex, ()>,
 }
 
 impl QueryRunner {
@@ -105,6 +115,13 @@ impl SyncQueryRunnerInterface for QueryRunner {
             uptime_table: atomo.resolve::<NodeIndex, u8>("uptime"),
             uri_to_node: atomo.resolve::<Blake3Hash, BTreeSet<NodeIndex>>("uri_to_node"),
             node_to_uri: atomo.resolve::<NodeIndex, BTreeSet<Blake3Hash>>("node_to_uri"),
+            committee_selection_beacon: atomo.resolve::<NodeIndex, (
+                CommitteeSelectionBeaconCommit,
+                Option<CommitteeSelectionBeaconReveal>,
+            )>("committee_selection_beacon"),
+            _committee_selection_beacon_non_revealing_node: atomo
+                .resolve::<NodeIndex, ()>("committee_selection_beacon_non_revealing_node"),
+
             inner: atomo,
         }
     }
@@ -193,6 +210,30 @@ impl SyncQueryRunnerInterface for QueryRunner {
         self.inner
             .run(|ctx| self.committee_table.get(ctx).get(epoch))
             .map(selector)
+    }
+
+    fn get_committee_selection_beacons(
+        &self,
+    ) -> HashMap<
+        NodeIndex,
+        (
+            CommitteeSelectionBeaconCommit,
+            Option<CommitteeSelectionBeaconReveal>,
+        ),
+    > {
+        self.inner
+            .run(|ctx| self.committee_selection_beacon.get(ctx).as_map())
+    }
+
+    fn get_committee_selection_beacon(
+        &self,
+        node: &NodeIndex,
+    ) -> Option<(
+        CommitteeSelectionBeaconCommit,
+        Option<CommitteeSelectionBeaconReveal>,
+    )> {
+        self.inner
+            .run(|ctx| self.committee_selection_beacon.get(ctx).get(node))
     }
 
     fn get_service_info(&self, id: &ServiceId) -> Option<Service> {

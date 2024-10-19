@@ -19,6 +19,8 @@ use lightning_interfaces::types::{
     AccountInfo,
     Blake3Hash,
     Committee,
+    CommitteeSelectionBeaconCommit,
+    CommitteeSelectionBeaconReveal,
     CommodityTypes,
     ContentUpdate,
     DeliveryAcknowledgmentProof,
@@ -120,6 +122,14 @@ pub struct StateExecutor<B: Backend> {
     pub uptime: B::Ref<NodeIndex, u8>,
     pub uri_to_node: B::Ref<Blake3Hash, BTreeSet<NodeIndex>>,
     pub node_to_uri: B::Ref<NodeIndex, BTreeSet<Blake3Hash>>,
+    pub committee_selection_beacon: B::Ref<
+        NodeIndex,
+        (
+            CommitteeSelectionBeaconCommit,
+            Option<CommitteeSelectionBeaconReveal>,
+        ),
+    >,
+    pub committee_selection_beacon_non_revealing_node: B::Ref<NodeIndex, ()>,
     pub backend: B,
 }
 
@@ -148,6 +158,9 @@ impl<B: Backend> StateExecutor<B> {
             uptime: backend.get_table_reference("uptime"),
             uri_to_node: backend.get_table_reference("uri_to_node"),
             node_to_uri: backend.get_table_reference("node_to_uri"),
+            committee_selection_beacon: backend.get_table_reference("committee_selection_beacon"),
+            committee_selection_beacon_non_revealing_node: backend
+                .get_table_reference("committee_selection_beacon_non_revealing_node"),
             backend,
         }
     }
@@ -228,6 +241,22 @@ impl<B: Backend> StateExecutor<B> {
             },
 
             UpdateMethod::ChangeEpoch { epoch } => self.change_epoch(txn.payload.sender, epoch),
+
+            UpdateMethod::CommitteeSelectionBeaconCommit { commit } => {
+                self.committee_selection_beacon_commit(txn.payload.sender, commit)
+            },
+
+            UpdateMethod::CommitteeSelectionBeaconReveal { reveal } => {
+                self.committee_selection_beacon_reveal(txn.payload.sender, reveal)
+            },
+
+            UpdateMethod::CommitteeSelectionBeaconCommitPhaseTimeout => {
+                self.committee_selection_beacon_commit_phase_timeout(txn.payload.sender)
+            },
+
+            UpdateMethod::CommitteeSelectionBeaconRevealPhaseTimeout => {
+                self.committee_selection_beacon_reveal_phase_timeout(txn.payload.sender)
+            },
 
             UpdateMethod::AddService {
                 service,
@@ -865,7 +894,7 @@ impl<B: Backend> StateExecutor<B> {
             .set(Metadata::SubDagRound, Value::SubDagRound(sub_dag_round));
         self.metadata.set(
             Metadata::BlockNumber,
-            Value::BlockNumber(self.get_block_number() + 1),
+            Value::BlockNumber(self.get_last_block_number() + 1),
         );
     }
 
@@ -901,6 +930,12 @@ impl<B: Backend> StateExecutor<B> {
         sender: TransactionSender,
         measurements: BTreeMap<NodeIndex, ReputationMeasurements>,
     ) -> TransactionResponse {
+        tracing::debug!(
+            "received reputation measurements (sender: {:?}): {:?}",
+            sender,
+            measurements
+        );
+
         let reporting_node = match self.only_node(sender) {
             Ok(index) => index,
             Err(e) => return e,
@@ -1359,7 +1394,7 @@ impl<B: Backend> StateExecutor<B> {
 
     /// Increments block number after executing a block and returns the new number
     pub fn increment_block_number(&self) -> u64 {
-        let new_block_number = self.get_block_number() + 1;
+        let new_block_number = self.get_last_block_number() + 1;
 
         self.metadata
             .set(Metadata::BlockNumber, Value::BlockNumber(new_block_number));
@@ -1447,7 +1482,7 @@ impl<B: Backend> StateExecutor<B> {
         }
     }
 
-    pub fn get_block_number(&self) -> u64 {
+    pub fn get_last_block_number(&self) -> u64 {
         // Safe unwrap this value is set on genesis and never removed
         if let Value::BlockNumber(block_number) = self.metadata.get(&Metadata::BlockNumber).unwrap()
         {
@@ -1485,13 +1520,39 @@ impl<B: Backend> StateExecutor<B> {
         }
     }
 
-    fn _get_epoch(&self) -> u64 {
+    fn get_epoch(&self) -> u64 {
         if let Some(Value::Epoch(epoch)) = self.metadata.get(&Metadata::Epoch) {
             epoch
         } else {
             // unreachable set at genesis
             0
         }
+    }
+
+    fn get_epoch_time(&self) -> u64 {
+        match self.parameters.get(&ProtocolParamKey::EpochTime) {
+            Some(ProtocolParamValue::EpochTime(epoch_time)) => epoch_time,
+            _ => unreachable!("invalid epoch time in protocol parameters"),
+        }
+    }
+
+    fn get_committee_size(&self) -> u64 {
+        match self.parameters.get(&ProtocolParamKey::CommitteeSize) {
+            Some(ProtocolParamValue::CommitteeSize(committee_size)) => committee_size,
+            _ => unreachable!("invalid committee size in protocol parameters"),
+        }
+    }
+
+    fn get_active_nodes(&self) -> Vec<NodeIndex> {
+        let node_registry: Vec<(NodeIndex, NodeInfo)> = self
+            .get_node_registry()
+            .into_iter()
+            .filter(|(_, node)| node.participation == Participation::True)
+            .collect();
+        self.settle_auction(node_registry)
+            .into_iter()
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>()
     }
 
     fn clear_content_registry(&self, node_index: &NodeIndex) -> Result<(), ExecutionError> {

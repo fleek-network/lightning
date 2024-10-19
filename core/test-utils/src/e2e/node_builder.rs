@@ -7,6 +7,11 @@ use lightning_application::{Application, ApplicationConfig};
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_checkpointer::{Checkpointer, CheckpointerConfig, CheckpointerDatabaseConfig};
+use lightning_committee_beacon::{
+    CommitteeBeaconComponent,
+    CommitteeBeaconConfig,
+    CommitteeBeaconDatabaseConfig,
+};
 use lightning_interfaces::prelude::*;
 use lightning_node::ContainedNode;
 use lightning_pool::{Config as PoolConfig, PoolProvider};
@@ -25,6 +30,7 @@ pub struct TestNodeBuilder {
     use_mock_consensus: bool,
     mock_consensus_group: Option<MockConsensusGroup>,
     is_genesis_committee: Option<bool>,
+    committee_beacon_config: Option<CommitteeBeaconConfig>,
 }
 
 impl Default for TestNodeBuilder {
@@ -43,6 +49,7 @@ impl TestNodeBuilder {
             use_mock_consensus: true,
             mock_consensus_group: None,
             is_genesis_committee: None,
+            committee_beacon_config: None,
         }
     }
 
@@ -60,6 +67,11 @@ impl TestNodeBuilder {
 
     pub fn with_is_genesis_committee(mut self, is_genesis_committee: bool) -> Self {
         self.is_genesis_committee = Some(is_genesis_committee);
+        self
+    }
+
+    pub fn with_committee_beacon_config(mut self, config: CommitteeBeaconConfig) -> Self {
+        self.committee_beacon_config = Some(config);
         self
     }
 
@@ -86,6 +98,14 @@ impl TestNodeBuilder {
             database: CheckpointerDatabaseConfig {
                 path: self.home_dir.join("checkpointer").try_into().unwrap(),
             },
+        });
+
+        // Configure committee beacon component.
+        config.inject::<CommitteeBeaconComponent<C>>(CommitteeBeaconConfig {
+            database: CommitteeBeaconDatabaseConfig {
+                path: self.home_dir.join("committee-beacon").try_into().unwrap(),
+            },
+            ..self.committee_beacon_config.unwrap_or_default()
         });
 
         // Configure consensus component.
