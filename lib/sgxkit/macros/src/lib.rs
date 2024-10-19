@@ -10,10 +10,12 @@ use syn::{parse_macro_input, Ident, ItemFn};
 /// ```
 /// #[sgxkit::main]
 /// fn main() -> Result<(), &str> {
-///     // ...
+///     if false {
+///         return Err("...");
+///     }
 ///
-///     if true {
-///         panic!("nobody fought the foo!");
+///     if false {
+///         panic!("...");
 ///     }
 ///
 ///     Ok(())
@@ -32,46 +34,22 @@ pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
         return quote!(compile_error!("cannot be async")).into();
     }
 
-    let is_res = sig.output.to_token_stream().to_string().contains("Result");
-
-    let force_write_impl = quote! {
-        unsafe {
-            sgxkit::sys::fn0::output_data_clear();
-            sgxkit::sys::fn0::output_data_append(buf.as_ptr() as usize, buf.len());
-        }
-    };
-
     let new_ident = Ident::new(&format!("_{}", sig.ident), sig.ident.span());
     sig.ident = new_ident.clone();
 
     let main_impl = {
-        if is_res {
+        if sig.output.to_token_stream().to_string().contains("Result") {
             let span = sig.output.span();
             quote_spanned! {span=>
                 let res = #new_ident();
                 match res {
-                    Ok(_) => {},
-                    Err(e) => {
-                        let string = format!("Error: {e}");
-                        let buf = string.as_bytes();
-                        #force_write_impl
-                    },
+                    Ok(v) => v,
+                    Err(e) => panic!("Error: {e}"),
                 }
             }
         } else {
-            quote! {
-                #new_ident();
-            }
+            quote! { #new_ident(); }
         }
-    };
-
-    let panic_impl = quote! {
-        // Clears output and writes "panicked at '$reason', src/main.rs:27:4"
-        std::panic::set_hook(Box::new(|info| {
-            let string = info.to_string();
-            let buf = string.as_bytes();
-            #force_write_impl
-        }));
     };
 
     quote! {
@@ -79,7 +57,7 @@ pub fn main(_attr: TokenStream, item: TokenStream) -> TokenStream {
         #vis #sig #block
 
         pub fn main() {
-            #panic_impl
+            sgxkit::panic::set_default_hook();
             #main_impl
         }
     }
