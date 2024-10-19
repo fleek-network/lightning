@@ -21,6 +21,8 @@ governance_address = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
 reputation_ping_timeout = "15s"
 topology_target_k = 8
 topology_min_nodes = 16
+committee_selection_beacon_commit_phase_duration = 10
+committee_selection_beacon_reveal_phase_duration = 10
 
 [[node_info]]
 owner = "0x959807B8D94B324A74117956731F09E2893aCd72"

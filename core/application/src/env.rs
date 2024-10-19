@@ -314,6 +314,18 @@ impl ApplicationEnv {
                 ProtocolParamKey::TopologyMinNodes,
                 ProtocolParamValue::TopologyMinNodes(genesis.topology_min_nodes),
             );
+            param_table.insert(
+                ProtocolParamKey::CommitteeSelectionBeaconCommitPhaseDuration,
+                ProtocolParamValue::CommitteeSelectionBeaconCommitPhaseDuration(
+                    genesis.committee_selection_beacon_commit_phase_duration,
+                ),
+            );
+            param_table.insert(
+                ProtocolParamKey::CommitteeSelectionBeaconRevealPhaseDuration,
+                ProtocolParamValue::CommitteeSelectionBeaconRevealPhaseDuration(
+                    genesis.committee_selection_beacon_reveal_phase_duration,
+                ),
+            );
 
             let epoch_end: u64 = genesis.epoch_time + genesis.epoch_start;
             let mut committee_members = Vec::with_capacity(4);
