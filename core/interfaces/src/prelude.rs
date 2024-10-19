@@ -46,6 +46,7 @@ pub use crate::{
     ConfigConsumer,
     ConfigProviderInterface,
     ConsensusInterface,
+    CommitteeBeaconInterface,
     DeliveryAcknowledgmentAggregatorInterface,
     Emitter,
     EventHandlerInterface,

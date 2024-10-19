@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
 use fleek_crypto::{EthAddress, NodePublicKey};
@@ -16,6 +16,7 @@ use lightning_interfaces::types::{
     Value,
 };
 use lightning_interfaces::PagingParams;
+use types::CommitteeSelectionBeaconPhase;
 
 pub trait QueryRunnerExt: SyncQueryRunnerInterface {
     /// Returns the chain id
@@ -180,13 +181,7 @@ pub trait QueryRunnerExt: SyncQueryRunnerInterface {
 
     /// Gets the current active node set for a given epoch
     fn get_active_nodes(&self) -> Vec<NodeInfoWithIndex> {
-        let current_epoch = self.get_current_epoch();
-
-        let node_indexes = self
-            .get_committee_info(&current_epoch, |committee| committee.active_node_set)
-            .unwrap_or_default();
-
-        node_indexes
+        self.get_active_node_set()
             .iter()
             .filter_map(|index| {
                 self.get_node_info(index, |node_info| node_info)
@@ -195,6 +190,15 @@ pub trait QueryRunnerExt: SyncQueryRunnerInterface {
                         info,
                     })
             })
+            .collect()
+    }
+
+    /// Get the active node indexes.
+    fn get_active_node_set(&self) -> HashSet<NodeIndex> {
+        let current_epoch = self.get_current_epoch();
+        self.get_committee_info(&current_epoch, |committee| committee.active_node_set)
+            .unwrap_or_default()
+            .into_iter()
             .collect()
     }
 
@@ -267,6 +271,24 @@ pub trait QueryRunnerExt: SyncQueryRunnerInterface {
             Some(ProtocolParamValue::TopologyMinNodes(min_nodes)) => min_nodes,
             // Default to 16 for backwards compatibility.
             _ => 16,
+        }
+    }
+
+    /// Returns the current phase of the committee selection beacon.
+    fn get_committee_selection_beacon_phase(&self) -> Option<CommitteeSelectionBeaconPhase> {
+        match self.get_metadata(&Metadata::CommitteeSelectionBeaconPhase) {
+            Some(Value::CommitteeSelectionBeaconPhase(phase)) => Some(phase),
+            None => None,
+            _ => unreachable!("invalid committee selection beacon phase in metadata"),
+        }
+    }
+
+    /// Returns the current round of the committee selection beacon.
+    fn get_committee_selection_beacon_round(&self) -> Option<u64> {
+        match self.get_metadata(&Metadata::CommitteeSelectionBeaconRound) {
+            Some(Value::CommitteeSelectionBeaconRound(round)) => Some(round),
+            None => None,
+            _ => unreachable!("invalid committee selection beacon round in metadata"),
         }
     }
 }

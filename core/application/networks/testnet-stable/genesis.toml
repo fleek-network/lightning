@@ -22,6 +22,12 @@ reputation_ping_timeout = "15s"
 topology_target_k = 8
 topology_min_nodes = 16
 
+# Committee selection beacon phase durations (in number of blocks).
+# TODO(snormore): Figure out what this should be for production.
+committee_selection_beacon_commit_phase_duration = 60
+committee_selection_beacon_reveal_phase_duration = 60
+
+
 [[node_info]]
 owner = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
 primary_public_key = "AuKT4zYJJ5zQ5eBiZ5peUAn2HXR8HdPaQufrc4xR3ikh"

@@ -227,7 +227,7 @@ impl Default for MockConsensusConfig {
     fn default() -> Self {
         Self {
             min_ordering_time: 0,
-            max_ordering_time: 5,
+            max_ordering_time: 3,
             probability_txn_lost: 0.0,
             transactions_to_lose: HashSet::new(),
             block_buffering_interval: Duration::from_secs(0),

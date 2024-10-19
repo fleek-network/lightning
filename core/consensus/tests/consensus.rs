@@ -254,7 +254,7 @@ async fn test_epoch_change_via_transactions() {
                 .then_some(())
                 .ok_or(PollUntilError::ConditionNotSatisfied)
         },
-        Duration::from_secs(10),
+        Duration::from_secs(20),
         Duration::from_millis(100),
     )
     .await

@@ -1,6 +1,7 @@
 use lightning_application::Application;
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_checkpointer::Checkpointer;
+use lightning_committee_beacon::CommitteeBeaconComponent;
 use lightning_consensus::consensus::Consensus;
 use lightning_forwarder::Forwarder;
 use lightning_interfaces::partial_node_components;
@@ -21,6 +22,7 @@ partial_node_components!(TestFullNodeComponentsWithRealConsensus {
     BroadcastInterface = SyncBroadcaster<Self>;
     BlockstoreInterface = Blockstore<Self>;
     CheckpointerInterface = Checkpointer<Self>;
+    CommitteeBeaconInterface = CommitteeBeaconComponent<Self>;
     ConfigProviderInterface = TomlConfigProvider<Self>;
     ConsensusInterface = Consensus<Self>;
     ForwarderInterface = Forwarder<Self>;
@@ -34,6 +36,24 @@ partial_node_components!(TestFullNodeComponentsWithRealConsensus {
 });
 
 partial_node_components!(TestFullNodeComponentsWithMockConsensus {
+    ApplicationInterface = Application<Self>;
+    BroadcastInterface = SyncBroadcaster<Self>;
+    BlockstoreInterface = Blockstore<Self>;
+    CheckpointerInterface = Checkpointer<Self>;
+    CommitteeBeaconInterface = CommitteeBeaconComponent<Self>;
+    ConfigProviderInterface = TomlConfigProvider<Self>;
+    ConsensusInterface = MockConsensus<Self>;
+    ForwarderInterface = MockForwarder<Self>;
+    KeystoreInterface = EphemeralKeystore<Self>;
+    NotifierInterface = Notifier<Self>;
+    PoolInterface = PoolProvider<Self>;
+    ReputationAggregatorInterface = ReputationAggregator<Self>;
+    RpcInterface = Rpc<Self>;
+    SignerInterface = Signer<Self>;
+    TopologyInterface = Topology<Self>;
+});
+
+partial_node_components!(TestFullNodeComponentsWithoutCommitteeBeacon {
     ApplicationInterface = Application<Self>;
     BroadcastInterface = SyncBroadcaster<Self>;
     BlockstoreInterface = Blockstore<Self>;

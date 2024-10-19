@@ -81,6 +81,7 @@ macro_rules! partial_node_components {
             BlockstoreInterface,
             BlockstoreServerInterface,
             CheckpointerInterface,
+            CommitteeBeaconInterface,
             SyncronizerInterface,
             BroadcastInterface,
             TopologyInterface,

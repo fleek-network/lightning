@@ -11,6 +11,7 @@ use ink_quill::TranscriptBuilderInput;
 use multiaddr::Multiaddr;
 use num_derive::FromPrimitive;
 use serde::{Deserialize, Serialize};
+use sha3::{Digest, Sha3_256};
 
 use super::ReputationMeasurements;
 
@@ -99,6 +100,8 @@ pub enum Metadata {
     GenesisCommittee,
     SubDagIndex,
     SubDagRound,
+    CommitteeSelectionBeaconPhase,
+    CommitteeSelectionBeaconRound,
 }
 
 /// The Value enum is a data type used to represent values in a key-value pair for a metadata table
@@ -115,6 +118,9 @@ pub enum Value {
     GenesisCommittee(Vec<NodeIndex>),
     SubDagIndex(u64),
     SubDagRound(u64),
+    BlockRange(u64, u64),
+    CommitteeSelectionBeaconPhase(CommitteeSelectionBeaconPhase),
+    CommitteeSelectionBeaconRound(CommitteeSelectionBeaconRound),
 }
 
 impl Value {
@@ -124,6 +130,68 @@ impl Value {
             _ => None,
         }
     }
+}
+
+/// Block number.
+pub type BlockNumber = u64;
+
+/// Range of block numbers.
+pub type BlockRange = (BlockNumber, BlockNumber);
+
+/// Committee selection beacon round number.
+pub type CommitteeSelectionBeaconRound = u64;
+
+/// Committee selection beacon commit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(transparent)]
+pub struct CommitteeSelectionBeaconCommit {
+    pub hash: [u8; 32],
+}
+
+impl CommitteeSelectionBeaconCommit {
+    pub fn new(hash: [u8; 32]) -> Self {
+        Self { hash }
+    }
+
+    pub fn build(
+        epoch: Epoch,
+        round: CommitteeSelectionBeaconRound,
+        reveal: CommitteeSelectionBeaconReveal,
+    ) -> Self {
+        let hash = Sha3_256::digest(
+            [
+                epoch.to_be_bytes().as_slice(),
+                round.to_be_bytes().as_slice(),
+                &reveal,
+            ]
+            .concat(),
+        )
+        .into();
+
+        Self::new(hash)
+    }
+}
+
+impl From<[u8; 32]> for CommitteeSelectionBeaconCommit {
+    fn from(hash: [u8; 32]) -> Self {
+        Self::new(hash)
+    }
+}
+
+impl From<CommitteeSelectionBeaconCommit> for [u8; 32] {
+    fn from(commit: CommitteeSelectionBeaconCommit) -> Self {
+        commit.hash
+    }
+}
+
+/// Committee selection beacon reveal.
+pub type CommitteeSelectionBeaconReveal = [u8; 32];
+
+/// Phase of the committee selection beacon.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, schemars::JsonSchema)]
+pub enum CommitteeSelectionBeaconPhase {
+    Commit(BlockRange),
+    Reveal(BlockRange),
 }
 
 /// Indicates the participation status of a node.
@@ -159,6 +227,7 @@ pub enum Participation {
     Debug,
     schemars::JsonSchema
 )]
+
 #[repr(u8)]
 pub enum ProtocolParamKey {
     /// The time in milliseconds that an epoch lasts for. Genesis 24 hours(86400)
@@ -198,6 +267,10 @@ pub enum ProtocolParamKey {
     TopologyTargetK = 16,
     /// The minimum number of nodes to run the topology algorithm.
     TopologyMinNodes = 17,
+    /// The committee selection beacon commit phase duration in blocks
+    CommitteeSelectionBeaconCommitPhaseDuration = 18,
+    /// The committee selection beacon reveal phase duration in blocks
+    CommitteeSelectionBeaconRevealPhaseDuration = 19,
 }
 
 /// The Value enum is a data type used to represent values in a key-value pair for a metadata table
@@ -221,6 +294,8 @@ pub enum ProtocolParamValue {
     ReputationPingTimeout(Duration),
     TopologyTargetK(usize),
     TopologyMinNodes(usize),
+    CommitteeSelectionBeaconCommitPhaseDuration(u64),
+    CommitteeSelectionBeaconRevealPhaseDuration(u64),
 }
 
 impl ProtocolParamValue {
@@ -246,6 +321,12 @@ impl ProtocolParamValue {
             },
             ProtocolParamValue::TopologyTargetK(i) => Cow::Owned(i.to_le_bytes().to_vec()),
             ProtocolParamValue::TopologyMinNodes(i) => Cow::Owned(i.to_le_bytes().to_vec()),
+            ProtocolParamValue::CommitteeSelectionBeaconCommitPhaseDuration(i) => {
+                Cow::Owned(i.to_le_bytes().to_vec())
+            },
+            ProtocolParamValue::CommitteeSelectionBeaconRevealPhaseDuration(i) => {
+                Cow::Owned(i.to_le_bytes().to_vec())
+            },
         }
     }
 }

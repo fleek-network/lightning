@@ -170,7 +170,7 @@ impl<C: NodeComponents> TransactionRunner<C> {
 
         // Return error if we shouldn't retry.
         if !options.retry.should_retry_on_error(error) {
-            tracing::warn!("transaction reverted (no retries): {:?}", receipt);
+            tracing::debug!("transaction reverted (no retries): {:?}", receipt);
             self.ensure_nonce_used_before_giving_up(tx, options, timeout)
                 .await?;
             return Err(ExecuteTransactionError::Reverted((

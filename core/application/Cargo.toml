@@ -21,6 +21,7 @@ lightning-metrics = { path = "../metrics" }
 num-traits.workspace = true
 rand.workspace = true
 fleek-blake3 = "1.5"
+sha3.workspace = true
 tracing.workspace = true
 tokio.workspace = true
 
@@ -37,6 +38,7 @@ merklize.workspace = true
 
 
 [dev-dependencies]
+lightning-committee-beacon.workspace = true
 lightning-node.workspace = true
 lightning-test-utils = { path = "../test-utils" }
 tokio.workspace = true
