@@ -144,6 +144,8 @@ async fn create_app_state(temp_dir: &TempDir) -> AppState {
 
 #[tokio::test]
 async fn test_origin_dag_pb() {
+    let listen_port = spawn_server(0).unwrap();
+
     let req_cid =
         Cid::try_from("bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi").unwrap();
     let mut config = Config::default();
@@ -155,37 +157,28 @@ async fn test_origin_dag_pb() {
     let temp_dir = tempdir().unwrap();
     let mut state = create_app_state(&temp_dir).await;
 
-    let req_fut = async move {
-        config.gateways = vec![Gateway {
-            protocol: Protocol::Http,
-            authority: "127.0.0.1:30100".to_string(),
-            request_format: RequestFormat::CidLast,
-        }];
-        let ipfs_origin =
-            IPFSOrigin::<TestBinding>::new(config, state.blockstore().clone()).unwrap();
+    config.gateways = vec![Gateway {
+        protocol: Protocol::Http,
+        authority: format!("127.0.0.1:{}", listen_port),
+        request_format: RequestFormat::CidLast,
+    }];
+    let ipfs_origin = IPFSOrigin::<TestBinding>::new(config, state.blockstore().clone()).unwrap();
 
-        let hash = ipfs_origin
-            .fetch(req_cid.to_bytes().as_slice())
-            .await
-            .unwrap();
+    let hash = ipfs_origin
+        .fetch(req_cid.to_bytes().as_slice())
+        .await
+        .unwrap();
 
-        let bytes = state.blockstore().read_all_to_vec(&hash).await.unwrap();
-        assert_eq!(bytes, target_bytes);
+    let bytes = state.blockstore().read_all_to_vec(&hash).await.unwrap();
+    assert_eq!(bytes, target_bytes);
 
-        state.node.shutdown().await;
-    };
-
-    tokio::select! {
-        biased;
-        Err(e) = spawn_server(30100) => {
-            panic!("{e}");
-        }
-        _ = req_fut => {}
-    }
+    state.node.shutdown().await;
 }
 
 #[tokio::test]
 async fn test_origin_bbb_dag_pb() {
+    let listen_port = spawn_server(0).unwrap();
+
     let req_cid =
         Cid::try_from("bafybeibi5vlbuz3jstustlxbxk7tmxsyjjrxak6us4yqq6z2df3jwidiwi").unwrap();
     let mut config = Config::default();
@@ -197,37 +190,28 @@ async fn test_origin_bbb_dag_pb() {
     let temp_dir = tempdir().unwrap();
     let mut state = create_app_state(&temp_dir).await;
 
-    let req_fut = async move {
-        config.gateways = vec![Gateway {
-            protocol: Protocol::Http,
-            authority: "127.0.0.1:30200".to_string(),
-            request_format: RequestFormat::CidLast,
-        }];
-        let ipfs_origin =
-            IPFSOrigin::<TestBinding>::new(config, state.blockstore().clone()).unwrap();
+    config.gateways = vec![Gateway {
+        protocol: Protocol::Http,
+        authority: format!("127.0.0.1:{}", listen_port),
+        request_format: RequestFormat::CidLast,
+    }];
+    let ipfs_origin = IPFSOrigin::<TestBinding>::new(config, state.blockstore().clone()).unwrap();
 
-        let hash = ipfs_origin
-            .fetch(req_cid.to_bytes().as_slice())
-            .await
-            .unwrap();
+    let hash = ipfs_origin
+        .fetch(req_cid.to_bytes().as_slice())
+        .await
+        .unwrap();
 
-        let bytes = state.blockstore().read_all_to_vec(&hash).await.unwrap();
-        assert_eq!(bytes, target_bytes);
+    let bytes = state.blockstore().read_all_to_vec(&hash).await.unwrap();
+    assert_eq!(bytes, target_bytes);
 
-        state.node.shutdown().await;
-    };
-
-    tokio::select! {
-        biased;
-        Err(e) = spawn_server(30200) => {
-            panic!("{e}");
-        }
-        _ = req_fut => {}
-    }
+    state.node.shutdown().await;
 }
 
 #[tokio::test]
 async fn test_origin_raw() {
+    let listen_port = spawn_server(0).unwrap();
+
     let req_cid =
         Cid::try_from("bafkreihiruy5ng7d5v26c6g4gwhtastyencrefjkruqe33vwrnbyhvr74u").unwrap();
     let mut config = Config::default();
@@ -239,37 +223,28 @@ async fn test_origin_raw() {
     let temp_dir = tempdir().unwrap();
     let mut state = create_app_state(&temp_dir).await;
 
-    let req_fut = async move {
-        config.gateways = vec![Gateway {
-            protocol: Protocol::Http,
-            authority: "127.0.0.1:30201".to_string(),
-            request_format: RequestFormat::CidLast,
-        }];
-        let ipfs_origin =
-            IPFSOrigin::<TestBinding>::new(config, state.blockstore().clone()).unwrap();
+    config.gateways = vec![Gateway {
+        protocol: Protocol::Http,
+        authority: format!("127.0.0.1:{}", listen_port),
+        request_format: RequestFormat::CidLast,
+    }];
+    let ipfs_origin = IPFSOrigin::<TestBinding>::new(config, state.blockstore().clone()).unwrap();
 
-        let hash = ipfs_origin
-            .fetch(req_cid.to_bytes().as_slice())
-            .await
-            .unwrap();
+    let hash = ipfs_origin
+        .fetch(req_cid.to_bytes().as_slice())
+        .await
+        .unwrap();
 
-        let bytes = state.blockstore().read_all_to_vec(&hash).await.unwrap();
-        assert_eq!(bytes, target_bytes);
+    let bytes = state.blockstore().read_all_to_vec(&hash).await.unwrap();
+    assert_eq!(bytes, target_bytes);
 
-        state.node.shutdown().await;
-    };
-
-    tokio::select! {
-        biased;
-        Err(e) = spawn_server(30201) => {
-            panic!("{e}");
-        }
-        _ = req_fut => {}
-    }
+    state.node.shutdown().await;
 }
 
 #[tokio::test]
 async fn test_origin_bbb_dag_pb_and_raw() {
+    let listen_port = spawn_server(0).unwrap();
+
     let req_cid =
         Cid::try_from("bafybeieb3754ppknuruchkb5pxdizi5rzz42kldrps4qvjmouomyt3xkte").unwrap();
     let mut config = Config::default();
@@ -281,32 +256,18 @@ async fn test_origin_bbb_dag_pb_and_raw() {
     let temp_dir = tempdir().unwrap();
     let state = create_app_state(&temp_dir).await;
 
-    let req_fut = async move {
-        config.gateways = vec![Gateway {
-            protocol: Protocol::Http,
-            authority: "127.0.0.1:30202".to_string(),
-            request_format: RequestFormat::CidLast,
-        }];
-        let ipfs_origin =
-            IPFSOrigin::<TestBinding>::new(config, state.blockstore().clone()).unwrap();
+    config.gateways = vec![Gateway {
+        protocol: Protocol::Http,
+        authority: format!("127.0.0.1:{}", listen_port),
+        request_format: RequestFormat::CidLast,
+    }];
+    let ipfs_origin = IPFSOrigin::<TestBinding>::new(config, state.blockstore().clone()).unwrap();
 
-        let hash = ipfs_origin
-            .fetch(req_cid.to_bytes().as_slice())
-            .await
-            .unwrap();
+    let hash = ipfs_origin
+        .fetch(req_cid.to_bytes().as_slice())
+        .await
+        .unwrap();
 
-        let bytes = state.blockstore().read_all_to_vec(&hash).await.unwrap();
-        assert_eq!(bytes, target_bytes);
-    };
-
-    tokio::select! {
-        biased;
-        Err(e) = spawn_server(30202) => {
-            panic!("{e}");
-        }
-        _ = req_fut => {
-
-        }
-
-    }
+    let bytes = state.blockstore().read_all_to_vec(&hash).await.unwrap();
+    assert_eq!(bytes, target_bytes);
 }
