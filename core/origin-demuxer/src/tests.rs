@@ -153,12 +153,16 @@ async fn create_app_state(temp_dir: &TempDir) -> AppState {
 
 #[tokio::test]
 async fn test_origin_muxer() {
+    let listen_port = server::spawn_server(0).unwrap();
+
     // Given: s ts file that will be returned by the server.
     let ts_file: Vec<u8> = std::fs::read("../test-utils/files/index.ts").unwrap();
     // Given: a pointer for that content.
     let pointer_ts_file = ImmutablePointer {
         origin: OriginProvider::HTTP,
-        uri: "http://127.0.0.1:31000/bar/index.ts".as_bytes().to_vec(),
+        uri: format!("http://127.0.0.1:{}/bar/index.ts", listen_port)
+            .as_bytes()
+            .to_vec(),
     };
 
     // Given: an IPFS-encoded file that will be returned by the server.
@@ -169,36 +173,33 @@ async fn test_origin_muxer() {
     // Given: a pointer for that content.
     let pointer_ipfs_file = ImmutablePointer {
         origin: OriginProvider::HTTP,
-        uri: "http://127.0.0.1:31000/ipfs/bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi".as_bytes().to_vec(),
+        uri: format!(
+            "http://127.0.0.1:{}/ipfs/bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi",
+            listen_port
+        )
+        .as_bytes()
+        .to_vec(),
     };
 
     // Given: some state.
     let temp_dir = tempdir().unwrap();
     let mut state = create_app_state(&temp_dir).await;
 
-    let test_fut = async move {
-        let origin = state.demuxer();
-        let socket = origin.get_socket();
+    let origin = state.demuxer();
+    let socket = origin.get_socket();
 
-        // When: we request content from an HTTP origin.
-        let hash = socket.run(pointer_ts_file).await.unwrap().unwrap();
-        let bytes = state.blockstore().read_all_to_vec(&hash).await.unwrap();
-        // Then: we get the expected content.
-        assert_eq!(ts_file, bytes);
+    // When: we request content from an HTTP origin.
+    let hash = socket.run(pointer_ts_file).await.unwrap().unwrap();
+    let bytes = state.blockstore().read_all_to_vec(&hash).await.unwrap();
+    // Then: we get the expected content.
+    assert_eq!(ts_file, bytes);
 
-        // When: we request content given from an IPFS origin.
-        let hash = socket.run(pointer_ipfs_file).await.unwrap().unwrap();
-        let bytes = state.blockstore().read_all_to_vec(&hash).await.unwrap();
-        // Then: we get the expected content.
-        assert_eq!(ipfs_file, bytes);
+    // When: we request content given from an IPFS origin.
+    let hash = socket.run(pointer_ipfs_file).await.unwrap().unwrap();
+    let bytes = state.blockstore().read_all_to_vec(&hash).await.unwrap();
+    // Then: we get the expected content.
+    assert_eq!(ipfs_file, bytes);
 
-        // Clean up.
-        state.node.shutdown().await;
-    };
-
-    tokio::select! {
-        biased;
-        _ = server::spawn_server(31000) => {}
-        _ = test_fut => {}
-    }
+    // Clean up.
+    state.node.shutdown().await;
 }

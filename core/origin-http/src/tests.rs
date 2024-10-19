@@ -142,11 +142,13 @@ async fn create_app_state(temp_dir: &TempDir) -> AppState {
 
 #[tokio::test]
 async fn test_http_origin() {
+    let listen_port = server::spawn_server(0).unwrap();
+
     // Todo: let's use a different type of content.
     // Given: Some content that will be returned by gateway.
     let file: Vec<u8> = std::fs::read("../test-utils/files/index.ts").unwrap();
     // Given: an identifier for some resource.
-    let url = "http://127.0.0.1:30233/bar/index.ts".to_string();
+    let url = format!("http://127.0.0.1:{}/bar/index.ts", listen_port);
     // Given: an origin.
     let temp_dir = tempdir().unwrap();
     let mut state = create_app_state(&temp_dir).await;
@@ -154,28 +156,25 @@ async fn test_http_origin() {
         HttpOrigin::<TestBinding>::new(Default::default(), state.blockstore().clone()).unwrap();
 
     // When: we fetch some content using the origin.
-    let test_fut = async move {
-        let hash = origin.fetch(url.as_bytes()).await.unwrap();
-        let bytes = state.blockstore().read_all_to_vec(&hash).await.unwrap();
-        // Then: we get the expected content.
-        assert_eq!(file, bytes);
+    let hash = origin.fetch(url.as_bytes()).await.unwrap();
+    let bytes = state.blockstore().read_all_to_vec(&hash).await.unwrap();
+    // Then: we get the expected content.
+    assert_eq!(file, bytes);
 
-        state.node.shutdown().await;
-    };
-
-    tokio::select! {
-        biased;
-        _ = server::spawn_server(30233) => {}
-        _ = test_fut => {}
-    }
+    state.node.shutdown().await;
 }
 
 #[tokio::test]
 async fn test_http_origin_with_integrity_check() {
+    let listen_port = server::spawn_server(0).unwrap();
+
     // Given: Some content that will be returned by gateway.
     let file: Vec<u8> = std::fs::read("../test-utils/files/index.ts").unwrap();
     // Given: an identifier for some resource.
-    let url = "http://127.0.0.1:30400/bar/index.ts#integrity=sha256-61z/GbpXJljbPypnYd2389IVCTbzU/taXTCVOUR67is=".to_string();
+    let url = format!(
+        "http://127.0.0.1:{}/bar/index.ts#integrity=sha256-61z/GbpXJljbPypnYd2389IVCTbzU/taXTCVOUR67is=",
+        listen_port
+    );
     // Given: an origin.
     let temp_dir = tempdir().unwrap();
     let mut state = create_app_state(&temp_dir).await;
@@ -183,25 +182,22 @@ async fn test_http_origin_with_integrity_check() {
         HttpOrigin::<TestBinding>::new(Default::default(), state.blockstore().clone()).unwrap();
 
     // When: we fetch some content using the origin.
-    let test_fut = async move {
-        let hash = origin.fetch(url.as_bytes()).await.unwrap();
-        let bytes = state.blockstore().read_all_to_vec(&hash).await.unwrap();
-        // Then: we get the expected content.
-        assert_eq!(file, bytes);
-        state.node.shutdown().await;
-    };
-
-    tokio::select! {
-        biased;
-        _ = server::spawn_server(30400) => {}
-        _ = test_fut => {}
-    }
+    let hash = origin.fetch(url.as_bytes()).await.unwrap();
+    let bytes = state.blockstore().read_all_to_vec(&hash).await.unwrap();
+    // Then: we get the expected content.
+    assert_eq!(file, bytes);
+    state.node.shutdown().await;
 }
 
 #[tokio::test]
 async fn test_http_origin_with_integrity_check_invalid_hash() {
+    let listen_port = server::spawn_server(0).unwrap();
+
     // Given: an identifier for some resource with an invalid digest.
-    let url = "http://127.0.0.1:30401/bar/index.ts#integrity=sha256-23lFzBrGtqXuPufwrMw+G3hWOwdtehDz/izclz/3gVw=".to_string();
+    let url = format!(
+        "http://127.0.0.1:{}/bar/index.ts#integrity=sha256-23lFzBrGtqXuPufwrMw+G3hWOwdtehDz/izclz/3gVw=",
+        listen_port
+    );
     // Given: an origin.
     let temp_dir = tempdir().unwrap();
     let mut state = create_app_state(&temp_dir).await;
@@ -209,26 +205,18 @@ async fn test_http_origin_with_integrity_check_invalid_hash() {
         HttpOrigin::<TestBinding>::new(Default::default(), state.blockstore().clone()).unwrap();
 
     // When: we fetch some content using the origin.
-    let test_fut = async move {
-        // Then: sri verification fails.
-        assert_eq!(
-            origin
-                .fetch(url.as_bytes())
-                .await
-                .unwrap_err()
-                .to_string()
-                .as_str(),
-            "sri failed: invalid digest"
-        );
+    // Then: sri verification fails.
+    assert_eq!(
+        origin
+            .fetch(url.as_bytes())
+            .await
+            .unwrap_err()
+            .to_string()
+            .as_str(),
+        "sri failed: invalid digest"
+    );
 
-        state.node.shutdown().await;
-    };
-
-    tokio::select! {
-        biased;
-        _ = server::spawn_server(30401) => {}
-        _ = test_fut => {}
-    }
+    state.node.shutdown().await;
 }
 
 #[test]
