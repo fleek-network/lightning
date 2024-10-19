@@ -415,6 +415,8 @@ pub(crate) fn test_genesis() -> Genesis {
         reputation_ping_timeout: Duration::from_secs(1),
         topology_target_k: 8,
         topology_min_nodes: 16,
+        committee_selection_beacon_commit_phase_duration: 10,
+        committee_selection_beacon_reveal_phase_duration: 10,
     }
 }
 

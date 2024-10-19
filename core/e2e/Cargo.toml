@@ -12,6 +12,7 @@ lightning-node-bindings = { path = "../node-bindings" }
 lightning-rpc = { path = "../rpc" }
 lightning-application = { path = "../application" }
 lightning-checkpointer.workspace = true
+lightning-committee-beacon.workspace = true
 lightning-syncronizer = { path = "../syncronizer" }
 lightning-broadcast = { path = "../broadcast" }
 lightning-consensus = { path = "../consensus" }

@@ -19,6 +19,8 @@ use lightning_interfaces::types::{
     AccountInfo,
     Blake3Hash,
     Committee,
+    CommitteeSelectionBeaconCommit,
+    CommitteeSelectionBeaconReveal,
     CommodityTypes,
     ContentUpdate,
     DeliveryAcknowledgmentProof,
@@ -120,6 +122,14 @@ pub struct StateExecutor<B: Backend> {
     pub uptime: B::Ref<NodeIndex, u8>,
     pub uri_to_node: B::Ref<Blake3Hash, BTreeSet<NodeIndex>>,
     pub node_to_uri: B::Ref<NodeIndex, BTreeSet<Blake3Hash>>,
+    pub committee_selection_beacon: B::Ref<
+        NodeIndex,
+        (
+            CommitteeSelectionBeaconCommit,
+            Option<CommitteeSelectionBeaconReveal>,
+        ),
+    >,
+    pub committee_selection_beacon_non_revealing_node: B::Ref<NodeIndex, ()>,
     pub backend: B,
 }
 
@@ -148,6 +158,9 @@ impl<B: Backend> StateExecutor<B> {
             uptime: backend.get_table_reference("uptime"),
             uri_to_node: backend.get_table_reference("uri_to_node"),
             node_to_uri: backend.get_table_reference("node_to_uri"),
+            committee_selection_beacon: backend.get_table_reference("committee_selection_beacon"),
+            committee_selection_beacon_non_revealing_node: backend
+                .get_table_reference("committee_selection_beacon_non_revealing_node"),
             backend,
         }
     }
@@ -228,6 +241,22 @@ impl<B: Backend> StateExecutor<B> {
             },
 
             UpdateMethod::ChangeEpoch { epoch } => self.change_epoch(txn.payload.sender, epoch),
+
+            UpdateMethod::CommitteeSelectionBeaconCommit { commit } => {
+                self.committee_selection_beacon_commit(txn.payload.sender, commit)
+            },
+
+            UpdateMethod::CommitteeSelectionBeaconReveal { reveal } => {
+                self.committee_selection_beacon_reveal(txn.payload.sender, reveal)
+            },
+
+            UpdateMethod::CommitteeSelectionBeaconCommitPhaseTimeout => {
+                self.committee_selection_beacon_commit_phase_timeout(txn.payload.sender)
+            },
+
+            UpdateMethod::CommitteeSelectionBeaconRevealPhaseTimeout => {
+                self.committee_selection_beacon_reveal_phase_timeout(txn.payload.sender)
+            },
 
             UpdateMethod::AddService {
                 service,
@@ -1485,7 +1514,7 @@ impl<B: Backend> StateExecutor<B> {
         }
     }
 
-    fn _get_epoch(&self) -> u64 {
+    fn get_epoch(&self) -> u64 {
         if let Some(Value::Epoch(epoch)) = self.metadata.get(&Metadata::Epoch) {
             epoch
         } else {

@@ -34,6 +34,7 @@ serde_with.workspace = true
 tokio.workspace = true
 toml.workspace = true
 humantime-serde.workspace = true
+sha3.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

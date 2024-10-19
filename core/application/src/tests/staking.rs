@@ -1,4 +1,5 @@
 use std::net::IpAddr;
+use std::time::Duration;
 
 use fleek_crypto::{
     AccountOwnerSecretKey,
@@ -9,6 +10,7 @@ use fleek_crypto::{
     SecretKey,
 };
 use hp_fixed::unsigned::HpUfixed;
+use lightning_committee_beacon::{CommitteeBeaconConfig, CommitteeBeaconTimerConfig};
 use lightning_interfaces::types::{
     ExecutionData,
     ExecutionError,
@@ -17,6 +19,7 @@ use lightning_interfaces::types::{
     UpdateMethod,
 };
 use lightning_interfaces::SyncQueryRunnerInterface;
+use lightning_test_utils::consensus::MockConsensusConfig;
 use lightning_test_utils::e2e::{
     DowncastToTestFullNode,
     TestFullNodeComponentsWithMockConsensus,
@@ -707,6 +710,20 @@ async fn test_withdraw_unstaked_reverts_no_locked_tokens() {
 #[tokio::test]
 async fn test_withdraw_unstaked_works_properly() {
     let mut network = TestNetwork::builder()
+        .with_committee_beacon_config(CommitteeBeaconConfig {
+            timer: CommitteeBeaconTimerConfig {
+                tick_delay: Duration::from_millis(100),
+            },
+            ..Default::default()
+        })
+        .with_mock_consensus(MockConsensusConfig {
+            max_ordering_time: 0,
+            min_ordering_time: 0,
+            probability_txn_lost: 0.0,
+            new_block_interval: Duration::from_millis(0),
+            transactions_to_lose: Default::default(),
+            block_buffering_interval: Duration::from_millis(0),
+        })
         .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(4)
         .await
         .build()

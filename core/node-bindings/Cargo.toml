@@ -10,6 +10,7 @@ lightning-blockstore = { path = "../blockstore" }
 lightning-blockstore-server = { path = "../blockstore-server" }
 lightning-broadcast = { path = "../broadcast" }
 lightning-checkpointer = { path = "../checkpointer" }
+lightning-committee-beacon.workspace = true
 lightning-forwarder = { path = "../forwarder" }
 lightning-consensus = { path = "../consensus" }
 lightning-fetcher = { path = "../fetcher" }

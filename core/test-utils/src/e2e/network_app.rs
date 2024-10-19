@@ -11,9 +11,11 @@ use super::{BoxedTestNode, TestNetwork};
 
 impl TestNetwork {
     /// Execute epoch change transaction from all nodes and wait for epoch to be incremented.
-    pub async fn change_epoch_and_wait_for_complete(&self) -> Result<Epoch, PollUntilError> {
+    ///
+    /// Returns an error if the epoch does not change within a timeout.
+    pub async fn change_epoch_and_wait_for_complete(&self) -> Result<Epoch> {
         // Execute epoch change transaction from all nodes.
-        let new_epoch = self.change_epoch().await;
+        let new_epoch = self.change_epoch().await?;
 
         // Wait for epoch to be incremented across all nodes.
         self.wait_for_epoch_change(new_epoch).await?;
@@ -22,15 +24,25 @@ impl TestNetwork {
         Ok(new_epoch)
     }
 
-    pub async fn change_epoch(&self) -> Epoch {
+    /// Execute epoch change transaction from all nodes and return the new epoch.
+    ///
+    /// This method does not wait for the epoch to be incremented across all nodes, but it does wait
+    /// for each of the transactions to be executed.
+    pub async fn change_epoch(&self) -> Result<Epoch> {
         let epoch = self.node(0).app_query().get_current_epoch();
         join_all(self.nodes().map(|node| {
             node.execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch }, None)
         }))
-        .await;
-        epoch + 1
+        .await
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+        Ok(epoch + 1)
     }
 
+    /// Wait for the epoch to match the given epoch across all nodes.
+    ///
+    /// Returns an error if the epoch does not match the given epoch within 20 seconds.
     pub async fn wait_for_epoch_change(&self, new_epoch: Epoch) -> Result<(), PollUntilError> {
         poll_until(
             || async {
@@ -45,6 +57,9 @@ impl TestNetwork {
         .await
     }
 
+    /// Returns the nodes that are part of the current committee.
+    ///
+    /// This method uses the first node in the network to get the current epoch and committee.
     pub fn committee_nodes(&self) -> Vec<&BoxedTestNode> {
         let node = self.node(0);
         let epoch = node.app_query().get_current_epoch();
@@ -56,6 +71,9 @@ impl TestNetwork {
             .collect()
     }
 
+    /// Returns the nodes that are not part of the current committee.
+    ///
+    /// This method uses the first node in the network to get the current epoch and committee.
     pub fn non_committee_nodes(&self) -> Vec<&BoxedTestNode> {
         let node = self.node(0);
         let epoch = node.app_query().get_current_epoch();
@@ -66,9 +84,5 @@ impl TestNetwork {
         self.nodes()
             .filter(|node| !committee_nodes.contains(&node.index()))
             .collect()
-    }
-
-    pub fn get_epoch(&self) -> Epoch {
-        self.node(0).app_query().get_current_epoch()
     }
 }

@@ -371,6 +371,17 @@ impl<const N: usize> TranscriptBuilderInput for [u8; N] {
     }
 }
 
+impl<const N: usize> TranscriptBuilderInput for Option<[u8; N]> {
+    const TYPE: &'static str = "buffer";
+
+    fn to_transcript_builder_input(&self) -> Vec<u8> {
+        match self {
+            Some(v) => Vec::from(v.as_ref()),
+            None => Vec::new(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use fleek_blake3::derive_key;
