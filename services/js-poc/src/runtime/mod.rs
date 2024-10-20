@@ -52,6 +52,7 @@ pub struct Runtime {
 impl Runtime {
     /// Create a new runtime
     pub fn new(location: Url, depth: u8) -> Result<Self> {
+        let memory_fs = MaybeArc::new(InMemoryFs::default());
         let tape = Tape::new(location.clone());
         let mut deno = JsRuntime::new(RuntimeOptions {
             extensions: vec![
@@ -67,13 +68,10 @@ impl Runtime {
                 deno_webgpu::init_ops(),
                 deno_canvas::init_ops(),
                 deno_io::deno_io::init_ops(Some(Default::default())),
-                deno_fs::deno_fs::init_ops::<Permissions>(MaybeArc::new(InMemoryFs::default())),
-                deno_node::deno_node::init_ops::<Permissions>(
-                    Default::default(),
-                    MaybeArc::new(InMemoryFs::default()),
-                ),
+                deno_fs::deno_fs::init_ops::<Permissions>(memory_fs.clone()),
+                deno_node::deno_node::init_ops::<Permissions>(Default::default(), memory_fs),
                 // Fleek runtime
-                fleek::init_ops::<Permissions>(depth),
+                fleek::init_ops(depth),
             ],
             startup_snapshot: Some(SNAPSHOT),
             op_metrics_factory_fn: Some(tape.op_metrics_factory_fn()),

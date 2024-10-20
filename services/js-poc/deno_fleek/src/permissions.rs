@@ -7,12 +7,11 @@ use deno_core::url::Url;
 use deno_fetch::FetchPermissions;
 use deno_fs::FsPermissions;
 use deno_io::fs::FsError;
-use deno_napi::NapiPermissions;
 use deno_net::NetPermissions;
 use deno_node::NodePermissions;
 use deno_web::TimersPermission;
 use deno_websocket::WebSocketPermissions;
-use log::debug;
+use tracing::debug;
 
 pub const FETCH_BLACKLIST: &[&str] = &["localhost", "127.0.0.1", "::1"];
 pub const BUILTIN_API_NOT_ALLOWED: &[&str] = &["node:os"];
@@ -160,12 +159,6 @@ impl NodePermissions for Permissions {
         _path: &Path,
         _api_name: Option<&str>,
     ) -> Result<(), AnyError> {
-        unimplemented!()
-    }
-}
-
-impl NapiPermissions for Permissions {
-    fn check(&mut self, _path: Option<&Path>) -> Result<(), AnyError> {
         unimplemented!()
     }
 }

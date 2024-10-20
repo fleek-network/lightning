@@ -20,6 +20,7 @@ use deno_webgpu::deno_webgpu;
 use deno_webidl::deno_webidl;
 
 fn main() {
+    let memory_fs = MaybeArc::new(InMemoryFs::default());
     let extensions = vec![
         deno_webidl::init_ops_and_esm(),
         deno_console::init_ops_and_esm(),
@@ -32,12 +33,9 @@ fn main() {
         deno_webgpu::init_ops_and_esm(),
         deno_canvas::init_ops_and_esm(),
         deno_io::deno_io::init_ops_and_esm(Some(Default::default())),
-        deno_fs::deno_fs::init_ops::<Permissions>(MaybeArc::new(InMemoryFs::default())),
-        deno_node::deno_node::init_ops_and_esm::<Permissions>(
-            None,
-            MaybeArc::new(InMemoryFs::default()),
-        ),
-        fleek::init_ops_and_esm::<Permissions>(0),
+        deno_fs::deno_fs::init_ops::<Permissions>(memory_fs.clone()),
+        deno_node::deno_node::init_ops_and_esm::<Permissions>(None, memory_fs),
+        fleek::init_ops_and_esm(0),
     ];
 
     let snapshot = deno_core::snapshot::create_snapshot(
@@ -65,10 +63,6 @@ fn main() {
     // Write snapshot to output dir
     std::fs::write(format!("{out}/snapshot.bin"), snapshot.output)
         .expect("failed to write snapshot");
-
-    // Rebuild if polyfills change
-    println!("cargo::rerun-if-changed=./ext/node/polyfill/deno.json");
-    println!("cargo::rerun-if-changed=./ext/node/polyfill/deno.lock");
 }
 
 pub fn maybe_transpile_source(
