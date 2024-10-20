@@ -20,7 +20,6 @@ pub mod stream;
 pub mod params {
     use std::time::Duration;
 
-    // FETCH_BLACKLIST was moved to permissions.rs.
     pub const HEAP_INIT: usize = 1 << 10;
     pub const HEAP_LIMIT: usize = 50 << 20;
     pub const REQ_TIMEOUT: Duration = Duration::from_secs(15);

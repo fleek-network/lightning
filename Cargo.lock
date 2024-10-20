@@ -3185,31 +3185,22 @@ dependencies = [
  "arrayref",
  "blake3-tree",
  "cid 0.11.1",
- "deno_ast",
- "deno_canvas",
- "deno_console",
  "deno_core",
- "deno_crypto",
  "deno_fetch",
  "deno_fs",
  "deno_io",
- "deno_media_type",
- "deno_napi",
  "deno_net",
  "deno_node",
  "deno_permissions",
- "deno_url",
  "deno_web",
- "deno_webgpu",
- "deno_webidl",
  "deno_websocket",
  "fleek-crypto",
  "fn-sdk",
  "lightning-schema",
  "lightning-workspace-hack",
- "log",
  "serde",
  "serde_json",
+ "tracing",
 ]
 
 [[package]]
@@ -3262,17 +3253,6 @@ dependencies = [
  "data-url",
  "serde",
  "url",
-]
-
-[[package]]
-name = "deno_napi"
-version = "0.95.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d5332ad3491822d85b7080fbcc38af598d0bf4d9c72f02966cb5013047ff56a"
-dependencies = [
- "deno_core",
- "deno_permissions",
- "libloading 0.7.4",
 ]
 
 [[package]]

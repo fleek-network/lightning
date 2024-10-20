@@ -1,5 +1,4 @@
 use deno_core::extension;
-use deno_napi::NapiPermissions;
 
 use crate::ops::{
     fetch_blake3,
@@ -43,7 +42,6 @@ extension!(
         deno_fs,
         deno_node
     ],
-    parameters = [P: NapiPermissions],
     ops = [
         run_task,
         log,
@@ -64,7 +62,7 @@ extension!(
         op_host_recv_ctrl,
         op_host_recv_message,
         op_host_terminate_worker,
-        op_napi_open<P>
+        op_napi_open
     ],
     esm_entry_point = "ext:fleek/bootstrap.js",
     esm = [
