@@ -25,7 +25,6 @@ urlencoding = "2.1"
 num_cpus = "1.16"
 
 # Deno core + webapi extensions
-deno_ast = { version = "0.42", features = ["transpiling"] }
 deno_canvas = "0.33.0"
 deno_crypto = "0.178"
 deno_console = "0.164"
@@ -34,7 +33,6 @@ deno_fetch = "0.188"
 deno_fleek = { path = "deno_fleek" }
 deno_fs = "0.74"
 deno_io = "0.74"
-deno_media_type = "0.1"
 deno_net = "0.156"
 deno_node = "0.101"
 deno_web = "0.195"
@@ -44,7 +42,6 @@ deno_webidl = "0.164"
 deno_websocket = "0.169"
 
 [build-dependencies]
-deno_ast = { version = "0.42", features = ["transpiling"] }
 deno_canvas = "0.33.0"
 deno_crypto = "0.178"
 deno_console = "0.164"
@@ -53,7 +50,6 @@ deno_fetch = "0.188"
 deno_fleek = { path = "deno_fleek" }
 deno_fs = "0.74"
 deno_io = "0.74"
-deno_media_type = "0.1"
 deno_net = "0.156"
 deno_node = "0.101"
 deno_web = "0.195"
