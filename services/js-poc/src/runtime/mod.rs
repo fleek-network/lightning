@@ -1,4 +1,3 @@
-use std::path::Path;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -8,27 +7,16 @@ use ::deno_net::deno_net;
 use ::deno_web::deno_web;
 use ::deno_websocket::deno_websocket;
 use anyhow::{bail, Result};
-use deno_ast::{ParseParams, SourceMapOption};
 use deno_canvas::deno_canvas;
 use deno_console::deno_console;
-use deno_core::error::AnyError;
 use deno_core::serde_v8::{self, to_v8};
 use deno_core::url::Url;
 use deno_core::v8::{self, CreateParams, Global, Value};
-use deno_core::{
-    JsRuntime,
-    ModuleCodeString,
-    ModuleName,
-    ModuleSpecifier,
-    PollEventLoopOptions,
-    RuntimeOptions,
-    SourceMapData,
-};
+use deno_core::{JsRuntime, ModuleSpecifier, PollEventLoopOptions, RuntimeOptions};
 use deno_crypto::deno_crypto;
-use deno_fleek::{fleek, Permissions};
+use deno_fleek::{fleek, maybe_transpile_source, Permissions};
 use deno_fs::sync::MaybeArc;
 use deno_fs::InMemoryFs;
-use deno_media_type::MediaType;
 use deno_url::deno_url;
 use deno_webgpu::deno_webgpu;
 use deno_webidl::deno_webidl;
@@ -166,56 +154,4 @@ impl Runtime {
     pub fn end(self) -> Vec<Punch> {
         self.tape.end()
     }
-}
-
-pub fn maybe_transpile_source(
-    name: ModuleName,
-    source: ModuleCodeString,
-) -> std::result::Result<(ModuleCodeString, Option<SourceMapData>), AnyError> {
-    // Always transpile `node:` built-in modules, since they might be TypeScript.
-    let media_type = if name.starts_with("node:") {
-        MediaType::TypeScript
-    } else {
-        MediaType::from_path(Path::new(&name))
-    };
-
-    match media_type {
-        MediaType::TypeScript => {},
-        MediaType::JavaScript => return Ok((source, None)),
-        MediaType::Mjs => return Ok((source, None)),
-        _ => panic!(
-            "Unsupported media type for snapshotting {media_type:?} for file {}",
-            name
-        ),
-    }
-
-    let parsed = deno_ast::parse_module(ParseParams {
-        specifier: deno_core::url::Url::parse(&name).unwrap(),
-        text: source.into(),
-        media_type,
-        capture_tokens: false,
-        scope_analysis: false,
-        maybe_syntax: None,
-    })?;
-    let transpiled_source = parsed
-        .transpile(
-            &deno_ast::TranspileOptions {
-                imports_not_used_as_values: deno_ast::ImportsNotUsedAsValues::Remove,
-                ..Default::default()
-            },
-            &deno_ast::EmitOptions {
-                source_map: if cfg!(debug_assertions) {
-                    SourceMapOption::Separate
-                } else {
-                    SourceMapOption::None
-                },
-                ..Default::default()
-            },
-        )?
-        .into_source();
-
-    let maybe_source_map: Option<SourceMapData> = transpiled_source.source_map.map(|sm| sm.into());
-    let source_text = String::from_utf8(transpiled_source.source)?;
-
-    Ok((source_text.into(), maybe_source_map))
 }
