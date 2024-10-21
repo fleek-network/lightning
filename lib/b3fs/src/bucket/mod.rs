@@ -49,7 +49,7 @@ use std::path::{Path, PathBuf};
 use arrayref::array_ref;
 use rand::random;
 use tokio::fs::{self, File, OpenOptions};
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncReadExt, BufWriter};
 use triomphe::Arc;
 
 use crate::utils::{to_hex, Digest};
@@ -201,6 +201,7 @@ mod tests {
     use std::env::temp_dir;
 
     use super::*;
+    use crate::hasher::b3::MAX_BLOCK_SIZE_IN_BYTES;
 
     #[tokio::test]
     async fn open_should_work_multiple_times() {
@@ -211,5 +212,14 @@ mod tests {
         fs::remove_dir_all(&temp_dir);
         assert!(Bucket::open(&temp_dir).await.is_ok());
         fs::remove_dir_all(&temp_dir);
+    }
+
+    pub(super) fn get_random_file(size: usize) -> Vec<u8> {
+        let mut data = Vec::with_capacity(MAX_BLOCK_SIZE_IN_BYTES);
+        for _ in 0..size {
+            let d: [u8; 32] = random();
+            data.extend(d);
+        }
+        data
     }
 }

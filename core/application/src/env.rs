@@ -169,7 +169,7 @@ impl ApplicationEnv {
             let exclude_tables = ApplicationStateTree::state_tree_tables();
             if let Some(checkpoint) = storage.serialize(&exclude_tables) {
                 let bucket = get_blockstore().get_bucket();
-                let mut file_writer = FileWriter::new(&bucket);
+                let mut file_writer = FileWriter::new(&bucket).await?;
                 file_writer.write(checkpoint.as_slice()).await?;
                 let state_hash = file_writer.commit().await?;
                 // Only temporary: write the checkpoint to disk directly.
