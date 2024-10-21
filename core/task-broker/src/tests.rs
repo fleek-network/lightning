@@ -402,7 +402,7 @@ async fn run_cluster_echo_task_1_offline_of_8() -> anyhow::Result<()> {
             },
             Err(e) => {
                 if !matches!(e, TaskError::PeerDisconnect | TaskError::Timeout) {
-                    panic!("unexpected error")
+                    panic!("unexpected error: {e}")
                 }
             },
         }
