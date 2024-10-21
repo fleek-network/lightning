@@ -4,10 +4,10 @@ use sgxkit_sys::fn0;
 
 use crate::error::HostError;
 
-/// Derived wasm module specific key. Full path can be at maximum [u16; 128].
+/// Derived, wasm module specific, secp256k1 keys. Full path can be at maximum [u16; 128].
 ///
 /// Secret material is never available directly, but rather supports methods
-/// for deriving children, signing hashes of data, and unsealing encrypted data.
+/// for signing hashes of data, unsealing encrypted data, and getting raw public keys.
 ///
 /// ```
 /// use sgxkit::crypto::DerivedKey;
@@ -70,7 +70,7 @@ impl DerivedKey {
         let res = unsafe {
             fn0::derived_key_sign(
                 self.path.as_ptr() as usize,
-                self.path.len(),
+                self.path.len() * 2,
                 data.as_ptr() as usize,
                 data.len(),
                 buf.as_mut_ptr() as usize,
@@ -90,7 +90,7 @@ impl DerivedKey {
         let res = unsafe {
             fn0::derived_key_unseal(
                 self.path.as_ptr() as usize,
-                self.path.len(),
+                self.path.len() * 2,
                 cipher.as_mut_ptr() as usize,
                 cipher.len(),
             )
@@ -101,6 +101,36 @@ impl DerivedKey {
         cipher.truncate(len as usize);
 
         Ok(())
+    }
+
+    /// Get the raw compressed public key for the current derived key.
+    pub fn to_public(&self) -> Result<[u8; 33], HostError> {
+        let mut buf = [0; 33];
+        let res = unsafe {
+            fn0::derived_key_public(
+                0, // derive for the current module
+                self.path.as_ptr() as usize,
+                self.path.len() * 2,
+                buf.as_mut_ptr() as usize,
+            )
+        };
+        HostError::result(res)?;
+        Ok(buf)
+    }
+
+    /// Derive a raw uncompressed public key for an external wasm module
+    pub fn external_public_key(wasm: [u8; 32], path: &[u16]) -> Result<[u8; 33], HostError> {
+        let mut buf = [0; 33];
+        let res = unsafe {
+            fn0::derived_key_public(
+                wasm.as_ptr() as usize,
+                path.as_ptr() as usize,
+                path.len() * 2,
+                buf.as_mut_ptr() as usize,
+            )
+        };
+        HostError::result(res)?;
+        Ok(buf)
     }
 }
 
