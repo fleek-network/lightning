@@ -173,7 +173,7 @@ impl HeaderFile {
             },
         };
 
-        let mut buffer = BytesMut::with_capacity(4 + borrowed_entry.name.len() + clen);
+        let mut buffer = Vec::with_capacity(4 + borrowed_entry.name.len() + clen);
         buffer.put_u8(flag);
         buffer.extend_from_slice(borrowed_entry.name);
 
