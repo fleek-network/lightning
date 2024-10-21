@@ -16,6 +16,7 @@ use lightning_interfaces::types::{
     Value,
 };
 use lightning_interfaces::PagingParams;
+use types::CommitteeSelectionBeaconPhase;
 
 pub trait QueryRunnerExt: SyncQueryRunnerInterface {
     /// Returns the chain id
@@ -267,6 +268,24 @@ pub trait QueryRunnerExt: SyncQueryRunnerInterface {
             Some(ProtocolParamValue::TopologyMinNodes(min_nodes)) => min_nodes,
             // Default to 16 for backwards compatibility.
             _ => 16,
+        }
+    }
+
+    /// Returns the current phase of the committee selection beacon.
+    fn get_committee_selection_beacon_phase(&self) -> Option<CommitteeSelectionBeaconPhase> {
+        match self.get_metadata(&Metadata::CommitteeSelectionBeaconPhase) {
+            Some(Value::CommitteeSelectionBeaconPhase(phase)) => Some(phase),
+            None => None,
+            _ => unreachable!("invalid committee selection beacon phase in metadata"),
+        }
+    }
+
+    /// Returns the current round of the committee selection beacon.
+    fn get_committee_selection_beacon_round(&self) -> Option<u64> {
+        match self.get_metadata(&Metadata::CommitteeSelectionBeaconRound) {
+            Some(Value::CommitteeSelectionBeaconRound(round)) => Some(round),
+            None => None,
+            _ => unreachable!("invalid committee selection beacon round in metadata"),
         }
     }
 }

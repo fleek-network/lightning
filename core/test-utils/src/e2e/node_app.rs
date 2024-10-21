@@ -3,8 +3,13 @@ use fleek_crypto::{AccountOwnerSecretKey, EthAddress, SecretKey};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_application::state::QueryRunner;
 use lightning_interfaces::types::{
+    CommitteeSelectionBeaconPhase,
     Epoch,
     ExecuteTransactionError,
+    ExecuteTransactionOptions,
+    ExecuteTransactionRequest,
+    ExecuteTransactionResponse,
+    ExecuteTransactionWait,
     Metadata,
     ProofOfConsensus,
     Tokens,
@@ -18,6 +23,7 @@ use lightning_interfaces::{
     ForwarderInterface,
     KeystoreInterface,
     NodeComponents,
+    SignerInterface,
     SyncQueryRunnerInterface,
 };
 use lightning_notifier::Notifier;
@@ -91,6 +97,17 @@ where
         {
             Some(balance) => balance,
             None => HpUfixed::<18>::zero(),
+        }
+    }
+
+    pub fn get_committee_selection_beacon_phase(&self) -> Option<CommitteeSelectionBeaconPhase> {
+        match self
+            .app_query()
+            .get_metadata(&Metadata::CommitteeSelectionBeaconPhase)
+        {
+            Some(Value::CommitteeSelectionBeaconPhase(phase)) => Some(phase),
+            None => None,
+            _ => unreachable!("invalid committee selection beacon phase in metadata"),
         }
     }
 
@@ -187,5 +204,28 @@ where
             .await?;
 
         Ok(resp.as_receipt())
+    }
+
+    pub async fn execute_transaction_from_node(
+        &self,
+        method: UpdateMethod,
+        options: Option<ExecuteTransactionOptions>,
+    ) -> Result<ExecuteTransactionResponse, ExecuteTransactionError>
+    where
+        C::ApplicationInterface: ApplicationInterface<C, SyncExecutor = QueryRunner>,
+    {
+        let resp = self
+            .signer()
+            .get_socket()
+            .run(ExecuteTransactionRequest {
+                method,
+                options: Some(options.unwrap_or(ExecuteTransactionOptions {
+                    wait: ExecuteTransactionWait::Receipt,
+                    ..Default::default()
+                })),
+            })
+            .await??;
+
+        Ok(resp)
     }
 }

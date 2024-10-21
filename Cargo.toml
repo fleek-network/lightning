@@ -77,6 +77,7 @@ hyper = { version = "0.14.27", features = ["server", "full"] }
 tower = { version = "0.4.13", features = ["tokio", "steer"] }
 hex = { version = "0.4.3", features = ["serde"] }
 url = { version = "2.4.1", features = ["serde"] }
+sha3 = "0.10.8"
 
 # Our libraries
 lightning-application = { path = "core/application" }
@@ -85,6 +86,7 @@ lightning-blockstore-server = { path = "core/blockstore-server" }
 lightning-broadcast = { path = "core/broadcast" }
 lightning-checkpointer = { path = "core/checkpointer" }
 lightning-consensus = { path = "core/consensus" }
+lightning-committee-beacon = { path = "core/committee-beacon" }
 lightning-firewall = { path = "core/firewall" }
 lightning-forwarder = { path = "core/forwarder" }
 lightning-interfaces = { path = "core/interfaces" }
