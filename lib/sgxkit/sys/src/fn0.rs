@@ -361,6 +361,13 @@ fn0_module! {
         signature_buf_ptr: usize
     ) -> i32;
 
+    fn0.derived_key_public: (
+        wasm_ptr: usize,
+        path_ptr: usize,
+        path_len: usize,
+        buf_ptr: usize
+    ) -> i32;
+
     /// Get an insecure timestamp from the host os, outside of SGX.
     ///
     /// Should *NEVER* be used for cryptographic purposes, such as a
