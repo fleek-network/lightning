@@ -17,14 +17,12 @@ use crate::stream::{Origin, Request};
 mod http;
 mod runtime;
 pub mod stream;
-
-pub(crate) mod params {
+pub mod params {
     use std::time::Duration;
 
     pub const HEAP_INIT: usize = 1 << 10;
     pub const HEAP_LIMIT: usize = 50 << 20;
     pub const REQ_TIMEOUT: Duration = Duration::from_secs(15);
-    pub const FETCH_BLACKLIST: &[&str] = &["localhost", "127.0.0.1", "::1"];
 }
 
 #[tokio::main]
@@ -37,9 +35,6 @@ pub async fn main() {
 
     // Explicitly initialize the v8 platform on the main thread
     JsRuntime::init_platform(None);
-
-    // Initialize node polyfill imports
-    runtime::module_loader::get_or_init_imports();
 
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<IsolateHandle>();
     tokio::task::spawn(async move {
