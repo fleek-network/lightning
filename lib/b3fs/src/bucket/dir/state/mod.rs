@@ -180,7 +180,6 @@ impl HeaderFile {
         // A valid file name never contains the "null" byte. So we can use it as terminator
         // instead of prefixing the length.
         buffer.put_u8(0x00);
-
         // Fill the rest of the bytes with the content link.
         buffer.extend_from_slice(content);
         if is_sym {

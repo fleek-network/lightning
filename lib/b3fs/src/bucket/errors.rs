@@ -12,6 +12,10 @@ pub enum ReadError {
     RefFile,
     #[error("Error while converting hash tree")]
     HashTreeConversion,
+    #[error("Invalid hashtree {0}")]
+    InvalidHashtree(#[from] crate::collections::error::CollectionTryFromError),
+    #[error("Error while deserializing PHF table. {0}")]
+    Deserialization(String),
 }
 
 #[derive(Error, Debug)]
