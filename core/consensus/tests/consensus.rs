@@ -16,7 +16,7 @@ async fn test_execute_transaction() {
         .await
         .unwrap();
 
-    // Execute an `IncrementNonce` transaction from the first node.
+    // Execute an increment nonce transaction from the first node.
     let (_, receipt) = network
         .node(0)
         .execute_transaction_from_node(UpdateMethod::IncrementNonce {}, None)
@@ -55,12 +55,12 @@ async fn test_execute_transaction() {
 }
 
 #[tokio::test]
-async fn test_epoch_change() {
+async fn test_epoch_change_via_time() {
     let mut network = TestNetwork::builder()
         .with_real_consensus()
         .with_genesis_mutator(|genesis| {
+            // Trigger epoch change on startup.
             genesis.epoch_start = 0;
-            genesis.epoch_time = 120000;
         })
         .with_committee_nodes::<TestFullNodeComponentsWithRealConsensus>(4)
         .await
@@ -71,6 +71,47 @@ async fn test_epoch_change() {
     // Check that the current epoch is 0 across the network.
     for node in network.nodes() {
         assert_eq!(node.app_query().get_current_epoch(), 0);
+    }
+
+    // Wait for epoch to be incremented across the network.
+    poll_until(
+        || async {
+            network
+                .nodes()
+                .all(|node| node.app_query().get_current_epoch() == 1)
+                .then_some(())
+                .ok_or(PollUntilError::ConditionNotSatisfied)
+        },
+        Duration::from_secs(20),
+        Duration::from_millis(100),
+    )
+    .await
+    .unwrap();
+
+    // Shutdown the network.
+    network.shutdown().await;
+}
+
+#[tokio::test]
+async fn test_epoch_change_via_transactions() {
+    let mut network = TestNetwork::builder()
+        .with_real_consensus()
+        .with_committee_nodes::<TestFullNodeComponentsWithRealConsensus>(4)
+        .await
+        .build()
+        .await
+        .unwrap();
+
+    // Check that the current epoch is 0 across the network.
+    for node in network.nodes() {
+        assert_eq!(node.app_query().get_current_epoch(), 0);
+    }
+
+    // Execute change epoch transactions from 2/3+1 of the committee nodes.
+    for node in network.nodes().take(3) {
+        node.execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch: 0 }, None)
+            .await
+            .unwrap();
     }
 
     // Wait for epoch to be incremented across the network.
