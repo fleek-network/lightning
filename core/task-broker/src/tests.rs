@@ -401,7 +401,7 @@ async fn run_cluster_echo_task_1_offline_of_8() -> anyhow::Result<()> {
                 assert_eq!(response.request, digest);
             },
             Err(e) => {
-                if !matches!(e, TaskError::PeerDisconnect | TaskError::Timeout) {
+                if !matches!(e, TaskError::Connect | TaskError::Timeout) {
                     panic!("unexpected error: {e}")
                 }
             },
