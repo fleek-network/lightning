@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Result;
@@ -377,7 +378,7 @@ async fn test_execute_transaction_with_node_signer_wait_for_receipt_retry_on_tim
 }
 
 #[tokio::test]
-async fn test_execute_transaction_wait_for_receipt_retry_on_timeout_avoids_resubmission() {
+async fn test_execute_transaction_wait_for_receipt_retry_on_timeout_reuses_same_nonce() {
     // Build and start the node.
     let mut node = TestNodeBuilder::new()
         .with_mock_consensus_config(MockConsensusConfig {
@@ -420,6 +421,150 @@ async fn test_execute_transaction_wait_for_receipt_retry_on_timeout_avoids_resub
         .as_receipt();
 
     // Check that the transaction was executed successfully with the expected nonce.
+    assert_eq!(
+        receipt.response,
+        TransactionResponse::Success(ExecutionData::None)
+    );
+    let nonce = match &tx {
+        TransactionRequest::UpdateRequest(tx) => tx.payload.nonce,
+        TransactionRequest::EthereumRequest(tx) => tx.tx.nonce.as_u64(),
+    };
+    assert_eq!(nonce, 1);
+    assert!(!tx.hash().is_empty());
+    assert_eq!(receipt.transaction_hash, tx.hash());
+
+    // Check that the nonce has been incremented only once.
+    assert_eq!(node.get_node_nonce(), 1);
+
+    // Shutdown the node.
+    node.shutdown().await;
+}
+
+#[tokio::test]
+async fn test_execute_transaction_no_wait_for_receipt_retry_on_timeout_reuses_same_nonce() {
+    // Build and start the node.
+    let mut node = TestNodeBuilder::new()
+        .with_mock_consensus_config(MockConsensusConfig {
+            min_ordering_time: 0,
+            max_ordering_time: 0,
+            probability_txn_lost: 0.0,
+            // Lose the first transaction.
+            transactions_to_lose: HashSet::from_iter(vec![1]),
+            new_block_interval: Duration::from_secs(0),
+            block_buffering_interval: Duration::from_secs(0),
+        })
+        .with_genesis_mutator(move |genesis| {
+            genesis.chain_id = 1337;
+        })
+        .build::<TestNodeComponents>()
+        .await
+        .unwrap();
+    node.start().await;
+
+    // Build a transaction client.
+    let client = node.node_transaction_client().await;
+
+    // Check that the nonce starts at 0.
+    assert_eq!(node.get_node_nonce(), 0);
+
+    // Execute a transaction that will be initially lost.
+    client
+        .execute_transaction(
+            UpdateMethod::UpdateContentRegistry {
+                updates: Default::default(),
+            },
+            Some(ExecuteTransactionOptions {
+                wait: ExecuteTransactionWait::None,
+                retry: ExecuteTransactionRetry::Always(None),
+                timeout: Some(Duration::from_millis(200)),
+            }),
+        )
+        .await
+        .unwrap();
+
+    // Check that the nonce is eventually incremented only once.
+    poll_until(
+        || async {
+            (node.get_node_nonce() == 1)
+                .then_some(())
+                .ok_or(PollUntilError::ConditionNotSatisfied)
+        },
+        Duration::from_secs(5),
+        Duration::from_millis(100),
+    )
+    .await
+    .unwrap();
+
+    // Shutdown the node.
+    node.shutdown().await;
+}
+
+#[tokio::test]
+async fn test_execute_transaction_wait_for_receipt_retry_on_timeout_avoids_resubmission() {
+    // Build and start the node.
+    let mut node = TestNodeBuilder::new()
+        .with_mock_consensus_config(MockConsensusConfig {
+            min_ordering_time: 0,
+            max_ordering_time: 0,
+            probability_txn_lost: 0.0,
+            // Lose the first transaction.
+            transactions_to_lose: HashSet::from_iter(vec![1]),
+            new_block_interval: Duration::from_secs(0),
+            block_buffering_interval: Duration::from_secs(0),
+        })
+        .with_genesis_mutator(move |genesis| {
+            genesis.chain_id = 1337;
+        })
+        .build::<TestNodeComponents>()
+        .await
+        .unwrap();
+    node.start().await;
+
+    // Build a transaction client.
+    let client = Arc::new(node.node_transaction_client().await);
+
+    // Check that the nonce starts at 0.
+    assert_eq!(node.get_node_nonce(), 0);
+
+    // Execute a transaction that will be initially lost.
+    let client1 = client.clone();
+    let handle = tokio::spawn(async move {
+        client1
+            .execute_transaction(
+                UpdateMethod::UpdateContentRegistry {
+                    updates: Default::default(),
+                },
+                Some(ExecuteTransactionOptions {
+                    wait: ExecuteTransactionWait::Receipt,
+                    retry: ExecuteTransactionRetry::Always(None),
+                    timeout: Some(Duration::from_millis(200)),
+                }),
+            )
+            .await
+            .unwrap()
+            .as_receipt()
+    });
+
+    // Wait for a very brief period to give the first transaction time to be submitted first, before
+    // submitting our next transaction.
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    // Execute a second transaction immediately after the first, before it has been included.
+    client
+        .execute_transaction(
+            UpdateMethod::IncrementNonce {},
+            Some(ExecuteTransactionOptions {
+                wait: ExecuteTransactionWait::Receipt,
+                retry: ExecuteTransactionRetry::Always(None),
+                timeout: Some(Duration::from_secs(2)),
+            }),
+        )
+        .await
+        .unwrap()
+        .as_receipt();
+
+    // Check that the transaction was executed successfully with the expected nonce.
+    let (tx, receipt) = handle.await.unwrap();
     assert_eq!(
         receipt.response,
         TransactionResponse::Success(ExecutionData::None)
@@ -476,6 +621,19 @@ async fn test_execute_transaction_no_wait_for_receipt_retry_on_timeout_avoids_re
                 wait: ExecuteTransactionWait::None,
                 retry: ExecuteTransactionRetry::Always(None),
                 timeout: Some(Duration::from_millis(200)),
+            }),
+        )
+        .await
+        .unwrap();
+
+    // Execute a second transaction immediately after the first, before it has been included.
+    client
+        .execute_transaction(
+            UpdateMethod::IncrementNonce {},
+            Some(ExecuteTransactionOptions {
+                wait: ExecuteTransactionWait::None,
+                retry: ExecuteTransactionRetry::Always(None),
+                timeout: Some(Duration::from_secs(2)),
             }),
         )
         .await
