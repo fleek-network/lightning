@@ -90,8 +90,10 @@ impl B3Dir {
         Ok(None)
     }
 
-    pub fn entries(&self) -> DirEntriesIter {
-        todo!()
+    pub async fn entries<'a>(&'a self) -> Result<DirEntriesIter<'a>, errors::ReadError> {
+        let result =
+            DirEntriesIter::new(self.file.try_clone().await?, self.position_start_entries).await?;
+        Ok(result)
     }
 
     async fn position_file(&self, position: u64) -> Result<fs::File, errors::ReadError> {
