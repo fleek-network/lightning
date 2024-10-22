@@ -13,7 +13,10 @@ use lightning_pool::{Config as PoolConfig, PoolProvider};
 use lightning_rpc::config::Config as RpcConfig;
 use lightning_rpc::Rpc;
 use lightning_utils::config::TomlConfigProvider;
+use rand::Rng;
+use rand_distr::Alphanumeric;
 use tempfile::{tempdir, TempDir};
+use types::{ConnectionPolicyConfig, FirewallConfig, RateLimitingConfig};
 
 use super::{BoxedTestNode, TestFullNode};
 use crate::consensus::{MockConsensus, MockConsensusGroup};
@@ -110,6 +113,22 @@ impl TestNodeBuilder {
             // Specify port 0 to get a random available port.
             addr: "0.0.0.0:0".parse().unwrap(),
             hmac_secret_dir: Some(self.home_dir.clone()),
+            firewall: FirewallConfig {
+                // Generate a random name for the firewall.
+                // Since the firewall uses a shared OnceCell, the RPC firewall from multiple nodes
+                // can collide if not using different names, so we generate a random suffix for
+                // each node.
+                name: format!(
+                    "rpc-{}",
+                    rand::thread_rng()
+                        .sample_iter(&Alphanumeric)
+                        .take(7)
+                        .map(char::from)
+                        .collect::<String>(),
+                ),
+                connection_policy: ConnectionPolicyConfig::All,
+                rate_limiting: RateLimitingConfig::None,
+            },
             ..Default::default()
         });
 
