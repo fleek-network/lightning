@@ -34,7 +34,7 @@ pub async fn main() {
     let mut listener = fn_sdk::ipc::conn_bind().await;
 
     // Explicitly initialize the v8 platform on the main thread
-    JsRuntime::init_platform(None);
+    JsRuntime::init_platform(None, false);
 
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<IsolateHandle>();
     tokio::task::spawn(async move {

@@ -18,13 +18,13 @@ serde_json.workspace = true
 
 # Deno core + webapi extensions
 deno_ast = { version = "0.42", features = ["transpiling"] }
-deno_core = "0.299"
-deno_fs = "0.74"
-deno_io = "0.74"
+deno_core = "0.314.2"
+deno_fs = "0.83.0"
+deno_io = "0.83.0"
 deno_media_type = "0.1"
-deno_net = "0.156"
-deno_node = "0.101"
-deno_permissions = "0.24"
-deno_web = "0.195"
-deno_fetch = "0.188"
-deno_websocket = "0.169"
+deno_net = "0.165.0"
+deno_node = "0.110.0"
+deno_permissions = "0.33.0"
+deno_web = "0.204.0"
+deno_fetch = "0.197.0"
+deno_websocket = "0.178.0"
