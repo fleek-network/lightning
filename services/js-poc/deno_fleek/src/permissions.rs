@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::anyhow;
 use deno_core::error::AnyError;
@@ -39,11 +39,7 @@ impl FetchPermissions for Permissions {
     fn check_net_url(&mut self, url: &Url, api_name: &str) -> anyhow::Result<(), AnyError> {
         self.check_net_url(url, api_name)
     }
-    fn check_read(
-        &mut self,
-        _p: &std::path::Path,
-        _api_name: &str,
-    ) -> anyhow::Result<(), AnyError> {
+    fn check_read<'a>(&mut self, _p: &'a Path, _api_name: &str) -> Result<Cow<'a, Path>, AnyError> {
         // Disable reading files via fetch
         Err(anyhow!("paths are disabled :("))
     }
@@ -67,12 +63,20 @@ impl NetPermissions for Permissions {
             Ok(())
         }
     }
-    fn check_read(&mut self, _p: &Path, _api_name: &str) -> anyhow::Result<(), AnyError> {
+    fn check_read(&mut self, _p: &str, _api_name: &str) -> anyhow::Result<PathBuf, AnyError> {
         // Disable reading file descriptors
         Err(anyhow!("paths are disabled :("))
     }
-    fn check_write(&mut self, _p: &Path, _api_name: &str) -> anyhow::Result<(), AnyError> {
+    fn check_write(&mut self, _p: &str, _api_name: &str) -> anyhow::Result<PathBuf, AnyError> {
         // Disable writing file descriptors
+        Err(anyhow!("paths are disabled :("))
+    }
+
+    fn check_write_path<'a>(
+        &mut self,
+        _p: &'a Path,
+        _api_name: &str,
+    ) -> Result<Cow<'a, Path>, AnyError> {
         Err(anyhow!("paths are disabled :("))
     }
 }
@@ -89,7 +93,15 @@ impl FsPermissions for Permissions {
         unimplemented!()
     }
 
-    fn check_read(&mut self, _path: &Path, _api_name: &str) -> Result<(), AnyError> {
+    fn check_read(&mut self, _path: &str, _api_name: &str) -> Result<PathBuf, AnyError> {
+        unimplemented!()
+    }
+
+    fn check_read_path<'a>(
+        &mut self,
+        _path: &'a Path,
+        _api_name: &str,
+    ) -> Result<Cow<'a, Path>, AnyError> {
         unimplemented!()
     }
 
@@ -106,11 +118,19 @@ impl FsPermissions for Permissions {
         unimplemented!()
     }
 
-    fn check_write(&mut self, _path: &Path, _api_name: &str) -> Result<(), AnyError> {
+    fn check_write(&mut self, _path: &str, _api_name: &str) -> Result<PathBuf, AnyError> {
         unimplemented!()
     }
 
-    fn check_write_partial(&mut self, _path: &Path, _api_name: &str) -> Result<(), AnyError> {
+    fn check_write_path<'a>(
+        &mut self,
+        _path: &'a Path,
+        _api_name: &str,
+    ) -> Result<Cow<'a, Path>, AnyError> {
+        unimplemented!()
+    }
+
+    fn check_write_partial(&mut self, _path: &str, _api_name: &str) -> Result<PathBuf, AnyError> {
         unimplemented!()
     }
 
@@ -135,9 +155,17 @@ impl NodePermissions for Permissions {
 
     fn check_read_with_api_name(
         &mut self,
-        _path: &Path,
+        _path: &str,
         _api_name: Option<&str>,
-    ) -> Result<(), AnyError> {
+    ) -> Result<PathBuf, AnyError> {
+        unimplemented!()
+    }
+
+    fn check_read_path<'a>(&mut self, _path: &'a Path) -> Result<Cow<'a, Path>, AnyError> {
+        unimplemented!()
+    }
+
+    fn query_read_all(&mut self) -> bool {
         unimplemented!()
     }
 
@@ -156,9 +184,9 @@ impl NodePermissions for Permissions {
 
     fn check_write_with_api_name(
         &mut self,
-        _path: &Path,
+        _path: &str,
         _api_name: Option<&str>,
-    ) -> Result<(), AnyError> {
+    ) -> Result<PathBuf, AnyError> {
         unimplemented!()
     }
 }
