@@ -23,6 +23,7 @@ pub struct B3Dir {
     /// The actual header file.
     file: Arc<fs::File>,
     bloom_filter: OnceCell<BloomFilter>,
+    hashtree: OnceCell<HashTree<'static>>,
     position_start_hashes: u64,
     position_start_bloom_filter: u64,
     position_start_entries: u64,
@@ -58,19 +59,24 @@ impl B3Dir {
             num_entries: num_entries as u16,
             file,
             bloom_filter: OnceCell::new(),
+            hashtree: OnceCell::new(),
             position_start_hashes,
             position_start_bloom_filter,
             position_start_entries,
         }
     }
 
-    pub async fn hashtree(&mut self) -> Result<HashTree<'_>, errors::ReadError> {
-        let mut buffer = Vec::with_capacity(self.num_entries as usize * 32);
-        let mut file_reader = self.position_file(self.position_start_hashes).await?;
-        file_reader.read_exact(&mut buffer).await?;
-        let boxed_slice = buffer.into_boxed_slice();
-        let static_slice: &'static [u8] = Box::leak(boxed_slice);
-        HashTree::try_from(static_slice).map_err(|e| errors::ReadError::InvalidHashtree(e))
+    pub async fn hashtree(&mut self) -> Result<&HashTree<'static>, errors::ReadError> {
+        self.hashtree
+            .get_or_try_init(|| async {
+                let mut buffer = Vec::with_capacity(self.num_entries as usize * 32);
+                let mut file_reader = self.position_file(self.position_start_hashes).await?;
+                file_reader.read_exact(&mut buffer).await?;
+                let boxed_slice = buffer.into_boxed_slice();
+                let static_slice: &'static [u8] = Box::leak(boxed_slice);
+                HashTree::try_from(static_slice).map_err(|e| errors::ReadError::InvalidHashtree(e))
+            })
+            .await
     }
 
     pub async fn get_entry<'a>(
