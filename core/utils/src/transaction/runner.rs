@@ -211,7 +211,7 @@ impl<C: NodeComponents> TransactionRunner<C> {
         options: &ExecuteTransactionOptions,
         retry: RetryCount,
         timeout: Duration,
-    ) -> Result<RetryCount, ExecuteTransactionError> {
+    ) -> Result<(), ExecuteTransactionError> {
         let max_retries = options.retry.get_max_retries(DEFAULT_MAX_RETRIES);
 
         // Return error if we shouldn't retry.
@@ -241,7 +241,7 @@ impl<C: NodeComponents> TransactionRunner<C> {
                     retry,
                     tx
                 );
-                Ok(retry)
+                Ok(())
             },
             Err(ExecuteTransactionError::FailedToIncrementNonceForRetry(_)) => {
                 // If the IncrementNonce transaction fails to execute and we still have
@@ -249,7 +249,7 @@ impl<C: NodeComponents> TransactionRunner<C> {
                 // exhausted the retries.
                 tracing::warn!("retrying after failing to execute IncrementNonce: {:?}", tx);
                 tokio::time::sleep(RETRY_DELAY).await;
-                Ok(retry)
+                Ok(())
             },
             Err(e) => Err(e),
         }
@@ -300,104 +300,103 @@ impl<C: NodeComponents> TransactionRunner<C> {
         let max_retries = options.retry.get_max_retries(DEFAULT_MAX_RETRIES);
         loop {
             let last_used_nonce = self.nonce_state.get_base().await;
-            if tx_nonce > last_used_nonce {
-                tracing::warn!(
-                    "previous transaction nonce {} not used, submitting an IncrementNonce in place before retrying",
-                    tx_nonce
-                );
-
-                // Build the IncrementNonce transaction.
-                let increment_nonce_txn: TransactionRequest = TransactionBuilder::from_update(
-                    UpdateMethod::IncrementNonce {},
-                    self.chain_id,
-                    tx_nonce,
-                    &self.signer,
-                )
-                .into();
-
-                // Send it to the mempool.
-                match self.mempool.enqueue(increment_nonce_txn.clone()).await {
-                    Ok(()) => {},
-                    Err(e) => {
-                        retry += 1;
-                        if retry > max_retries {
-                            tracing::warn!(
-                                "failed to enqueue IncrementNonce transaction after max retries (attempts: {}): {:?}",
-                                retry,
-                                e
-                            );
-                            return Err(ExecuteTransactionError::FailedToIncrementNonceForRetry((
-                                increment_nonce_txn,
-                                e.to_string(),
-                            )));
-                        }
-                        tracing::warn!(
-                            "retrying after failing to enqueue IncrementNonce (attempt {}): {:?}",
-                            retry,
-                            e
-                        );
-                        tokio::time::sleep(RETRY_DELAY).await;
-                        continue;
-                    },
-                }
-
-                // Wait for the nonce to be incremented.
-                let result = poll_until(
-                    || async {
-                        let last_used_nonce = self.nonce_state.get_base().await;
-                        (last_used_nonce >= tx_nonce)
-                            .then_some(())
-                            .ok_or(PollUntilError::ConditionNotSatisfied)
-                    },
-                    timeout,
-                    Duration::from_millis(100),
-                )
-                .await;
-                match result {
-                    Ok(()) => {},
-                    Err(e) => {
-                        retry += 1;
-                        if retry > max_retries {
-                            tracing::warn!(
-                                "failed to increment nonce after max retries (attempts: {}): {:?}",
-                                retry,
-                                e
-                            );
-                            // At this point it looks like there's a liveness issue with blocks not
-                            // moving forward or the node is in bad shape and is losing submitted
-                            // transactions.
-                            return Err(ExecuteTransactionError::FailedToIncrementNonceForRetry((
-                                increment_nonce_txn,
-                                e.to_string(),
-                            )));
-                        }
-                        tracing::warn!(
-                            "retrying after failing to increment nonce (attempt {}): {:?}",
-                            retry,
-                            e
-                        );
-                        tokio::time::sleep(RETRY_DELAY).await;
-                        continue;
-                    },
-                }
-
-                // Make sure that the original transaction was not executed in the meantime.
-                // This should be a very rare edge case.
-                if self.app_query.has_executed_digest(tx.hash()) {
-                    // If the original transaction was executed, we're done, no need to retry.
-                    // Unfortunately, we can't return a receipt here without using an archive node
-                    // to get historic transactions data because we stopped listening for the
-                    // receipt after timeout.
-                    return Err(
-                        ExecuteTransactionError::TransactionExecutedButReceiptNotAvailable(
-                            tx.clone(),
-                        ),
-                    );
-                }
-
-                // Otherwise, we're done.
+            if tx_nonce <= last_used_nonce {
                 return Ok(());
             }
+            tracing::warn!(
+                "previous transaction nonce {} not used, submitting an IncrementNonce in place before retrying",
+                tx_nonce
+            );
+
+            // Build the IncrementNonce transaction.
+            let increment_nonce_txn: TransactionRequest = TransactionBuilder::from_update(
+                UpdateMethod::IncrementNonce {},
+                self.chain_id,
+                tx_nonce,
+                &self.signer,
+            )
+            .into();
+
+            // Send it to the mempool.
+            match self.mempool.enqueue(increment_nonce_txn.clone()).await {
+                Ok(()) => {},
+                Err(e) => {
+                    retry += 1;
+                    if retry > max_retries {
+                        tracing::warn!(
+                            "failed to enqueue IncrementNonce transaction after max retries (attempts: {}): {:?}",
+                            retry,
+                            e
+                        );
+                        return Err(ExecuteTransactionError::FailedToIncrementNonceForRetry((
+                            increment_nonce_txn,
+                            e.to_string(),
+                        )));
+                    }
+                    tracing::warn!(
+                        "retrying after failing to enqueue IncrementNonce (attempt {}): {:?}",
+                        retry,
+                        e
+                    );
+                    tokio::time::sleep(RETRY_DELAY).await;
+                    continue;
+                },
+            }
+
+            // Wait for the nonce to be incremented.
+            let result = poll_until(
+                || async {
+                    let last_used_nonce = self.nonce_state.get_base().await;
+                    (last_used_nonce >= tx_nonce)
+                        .then_some(())
+                        .ok_or(PollUntilError::ConditionNotSatisfied)
+                },
+                timeout,
+                Duration::from_millis(100),
+            )
+            .await;
+            match result {
+                Ok(()) => {},
+                Err(e) => {
+                    retry += 1;
+                    if retry > max_retries {
+                        tracing::warn!(
+                            "failed to increment nonce after max retries (attempts: {}): {:?}",
+                            retry,
+                            e
+                        );
+                        // At this point it looks like there's a liveness issue with blocks not
+                        // moving forward or the node is in bad shape and is losing submitted
+                        // transactions.
+                        return Err(ExecuteTransactionError::FailedToIncrementNonceForRetry((
+                            increment_nonce_txn,
+                            e.to_string(),
+                        )));
+                    }
+                    tracing::warn!(
+                        "retrying after failing to increment nonce (attempt {}): {:?}",
+                        retry,
+                        e
+                    );
+                    tokio::time::sleep(RETRY_DELAY).await;
+                    continue;
+                },
+            }
+
+            // Make sure that the original transaction was not executed in the meantime.
+            // This should be a very rare edge case.
+            if self.app_query.has_executed_digest(tx.hash()) {
+                // If the original transaction was executed, we're done, no need to retry.
+                // Unfortunately, we can't return a receipt here without using an archive node
+                // to get historic transactions data because we stopped listening for the
+                // receipt after timeout.
+                return Err(
+                    ExecuteTransactionError::TransactionExecutedButReceiptNotAvailable(tx.clone()),
+                );
+            }
+
+            // Otherwise, we're done.
+            return Ok(());
         }
     }
 }
