@@ -30,7 +30,7 @@ use std::io::Write;
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use serde::{Deserialize, Deserializer};
-use sgxkit::crypto::{shared_key_unseal, DerivedKey};
+use sgxkit::crypto::{DerivedKey, SharedKey};
 use sgxkit::io::{get_input_data_string, output_writer};
 
 #[derive(Deserialize, strum::EnumString)]
@@ -66,7 +66,7 @@ fn main() -> anyhow::Result<()> {
         mut data,
     } = serde_json::from_str::<Request>(&get_input_data_string()?)?;
     match content_type {
-        ContentType::Shared => shared_key_unseal(&mut data)?,
+        ContentType::Shared => SharedKey::unseal(&mut data)?,
         ContentType::Wasm => {
             DerivedKey::root().unseal(&mut data)?;
         },
