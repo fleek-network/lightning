@@ -98,7 +98,7 @@ impl<C: NodeComponents> TransactionRunner<C> {
                     },
                     TransactionResponse::Revert(error) => {
                         retry += 1;
-                        self.handle_receipt_revert(&tx, &options, &receipt, error, retry)
+                        self.handle_receipt_revert(&tx, &options, &receipt, error, retry, timeout)
                             .await?;
                         continue;
                     },
@@ -164,12 +164,14 @@ impl<C: NodeComponents> TransactionRunner<C> {
         receipt: &TransactionReceipt,
         error: &ExecutionError,
         retry: RetryCount,
+        timeout: Duration,
     ) -> Result<(), ExecuteTransactionError> {
         let max_retries = options.retry.get_max_retries(DEFAULT_MAX_RETRIES);
 
         // Return error if we shouldn't retry.
         if !options.retry.should_retry_on_error(error) {
             tracing::warn!("transaction reverted (no retries): {:?}", receipt);
+            self.ensure_nonce_used(&tx, options, timeout).await?;
             return Err(ExecuteTransactionError::Reverted((
                 tx.clone(),
                 receipt.clone(),
@@ -184,6 +186,7 @@ impl<C: NodeComponents> TransactionRunner<C> {
                 retry,
                 receipt
             );
+            self.ensure_nonce_used(&tx, options, timeout).await?;
             return Err(ExecuteTransactionError::Reverted((
                 tx.clone(),
                 receipt.clone(),
@@ -217,6 +220,7 @@ impl<C: NodeComponents> TransactionRunner<C> {
         // Return error if we shouldn't retry.
         if !options.retry.should_retry_on_timeout() {
             tracing::warn!("transaction timeout (no retries): {:?}", tx);
+            self.ensure_nonce_used(&tx, options, timeout).await?;
             return Err(ExecuteTransactionError::Timeout((method, Some(tx), retry)));
         }
 
@@ -227,32 +231,21 @@ impl<C: NodeComponents> TransactionRunner<C> {
                 retry,
                 method
             );
+            self.ensure_nonce_used(&tx, options, timeout).await?;
             return Err(ExecuteTransactionError::Timeout((method, Some(tx), retry)));
         }
 
-        // Ensure the previous transaction nonce has been used before retrying to
-        // avoid executing the same transaction twice.
-        match self.ensure_nonce_used(&tx, options, timeout).await {
-            Ok(()) => {
-                // Otherwise, continue to retry.
-                tracing::warn!(
-                    "retrying transaction after timeout (hash: {:?}, attempt: {}): {:?}",
-                    tx.hash(),
-                    retry,
-                    tx
-                );
-                Ok(())
-            },
-            Err(ExecuteTransactionError::FailedToIncrementNonceForRetry(_)) => {
-                // If the IncrementNonce transaction fails to execute and we still have
-                // some retries left, then we can continue on to retry again until we've
-                // exhausted the retries.
-                tracing::warn!("retrying after failing to execute IncrementNonce: {:?}", tx);
-                tokio::time::sleep(RETRY_DELAY).await;
-                Ok(())
-            },
-            Err(e) => Err(e),
-        }
+        // Otherwise, we can retry again, but we need to backfill the nonce first to avoid
+        // submitting the same transaction more than once with different nonces.
+        self.ensure_nonce_used(&tx, options, timeout).await?;
+        tracing::warn!(
+            "retrying transaction after timeout (hash: {:?}, attempt: {}): {:?}",
+            tx.hash(),
+            retry,
+            tx
+        );
+
+        Ok(())
     }
 
     async fn wait_for_receipt(
@@ -328,10 +321,9 @@ impl<C: NodeComponents> TransactionRunner<C> {
                             retry,
                             e
                         );
-                        return Err(ExecuteTransactionError::FailedToIncrementNonceForRetry((
-                            increment_nonce_txn,
-                            e.to_string(),
-                        )));
+                        // We give up trying to backfill the nonce here, but we don't want to error
+                        // out of this, so we log and continue.
+                        return Ok(());
                     }
                     tracing::warn!(
                         "retrying after failing to enqueue IncrementNonce (attempt {}): {:?}",
