@@ -28,10 +28,12 @@ use hex_literal::hex;
 use libsecp256k1::{RecoveryId, Signature};
 use serde::de::IntoDeserializer;
 use serde::{Deserialize, Deserializer};
+use serde_json::json;
 use sgxkit::crypto::DerivedKey;
 use sgxkit::io::output_writer;
 use sgxkit::println;
-use sha2::Digest;
+use sha2::{Digest, Sha256};
+use sha3::Keccak256;
 
 /// List of valid secp256k1 signers
 const PUBLIC_SIGNERS: &[[u8; 33]] = &[
@@ -102,7 +104,7 @@ pub fn main() -> Result<(), String> {
     println!("decoded input");
 
     // Hash input
-    let mut hasher = sha2::Sha256::new();
+    let mut hasher = Sha256::new();
     hasher.update(&payload);
     let hash = hasher.finalize();
     let msg = libsecp256k1::Message::parse(&hash.into());
@@ -140,16 +142,32 @@ pub fn main() -> Result<(), String> {
         return Err("Not enough valid signatures".to_string());
     }
 
-    println!("signing with key");
+    let key = DerivedKey::root();
 
-    // Create a derived key and sign the request data with it
-    let wasm_sig = DerivedKey::root()
-        .sign(&payload)
-        .map_err(|e| e.to_string())?;
+    // Encode public key as ethereum account id
+    // - hash uncompressed with keccack256
+    // - take last 20 bytes (drop the first 12)
+    // - hex encode with 0x prefix
+    let compressed = key.public_key().unwrap();
+    let uncompressed = libsecp256k1::PublicKey::parse_compressed(&compressed)
+        .unwrap()
+        .serialize();
+    let hash = Keccak256::digest(uncompressed);
+    let pk = format!("0x{}", hex::encode_upper(&hash[12..]));
 
-    // Write base64 signature to certified output
+    println!("signing with key {pk}");
+
+    // Sign the request data with the derived key
+    let wasm_sig = key.sign(&payload).map_err(|e| e.to_string())?;
+
+    let res = json!({
+        "account": pk,
+        "signature": BASE64_STANDARD.encode(wasm_sig),
+    });
+
+    // Write to certified output
     output_writer()
-        .write_all(BASE64_STANDARD.encode(wasm_sig).as_bytes())
+        .write_all(serde_json::to_string_pretty(&res).unwrap().as_bytes())
         .unwrap();
 
     Ok(())
@@ -169,7 +187,7 @@ mod tests {
 
         // Make a payload and hash it into a message to sign
         let payload = b"FOOBAR";
-        let hash = sha2::Sha256::digest(payload);
+        let hash = Sha256::digest(payload);
         let msg = libsecp256k1::Message::parse(&hash.into());
 
         // Sign the message with each key
