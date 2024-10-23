@@ -65,17 +65,18 @@ elliptic-curve = { version = "0.13", features = ["ecdh", "hash2curve", "hazmat",
 ethers-contract-abigen = { version = "2", default-features = false, features = ["providers", "rustls"] }
 fastcrypto-b0db73ecc1bbc313 = { package = "fastcrypto", git = "https://github.com/MystenLabs/fastcrypto", rev = "c961a01596a87e76f590c7e43aca9d57106dbbb1", features = ["copy_key"] }
 fastcrypto-e49888412d456f9d = { package = "fastcrypto", git = "https://github.com/MystenLabs/fastcrypto", rev = "55e7e568842939e01c8545a71d72e2402ad74538", features = ["aes", "copy_key"] }
-futures = { version = "0.3", features = ["bilock", "unstable"] }
+futures = { version = "0.3", features = ["bilock", "io-compat", "unstable"] }
 futures-channel = { version = "0.3", features = ["sink", "unstable"] }
 futures-core = { version = "0.3", features = ["unstable"] }
 futures-executor = { version = "0.3" }
 futures-io = { version = "0.3", features = ["unstable"] }
 futures-sink = { version = "0.3" }
 futures-task = { version = "0.3", features = ["unstable"] }
-futures-util = { version = "0.3", features = ["bilock", "channel", "io", "sink", "unstable"] }
+futures-util = { version = "0.3", features = ["bilock", "channel", "io-compat", "sink", "unstable"] }
 generic-array = { version = "0.14", default-features = false, features = ["more_lengths", "serde", "zeroize"] }
 getrandom = { version = "0.2", default-features = false, features = ["std"] }
 half = { version = "2" }
+hashbrown-3575ec1268b04181 = { package = "hashbrown", version = "0.15" }
 hashbrown-582f2526e08bb6a0 = { package = "hashbrown", version = "0.14", features = ["raw"] }
 hashbrown-5ef9efb8ec2df382 = { package = "hashbrown", version = "0.12", features = ["raw"] }
 hdrhistogram = { version = "7" }
@@ -100,7 +101,7 @@ libz-sys = { version = "1", default-features = false, features = ["static"] }
 log = { version = "0.4", default-features = false, features = ["kv_unstable", "std"] }
 matrixmultiply = { version = "0.3", features = ["cgemm"] }
 memchr = { version = "2" }
-miniz_oxide = { version = "0.7", features = ["simd"] }
+miniz_oxide = { version = "0.8", features = ["simd"] }
 multibase = { version = "0.9" }
 multihash = { version = "0.19" }
 nom = { version = "7" }
@@ -111,6 +112,8 @@ num-integer = { version = "0.1", features = ["i128"] }
 num-iter = { version = "0.1", features = ["i128"] }
 num-traits = { version = "0.2", features = ["i128", "libm"] }
 once_cell = { version = "1", features = ["critical-section"] }
+openssl = { version = "0.10", features = ["vendored"] }
+openssl-sys = { version = "0.9", default-features = false, features = ["vendored"] }
 p256 = { version = "0.13", features = ["ecdh", "jwk"] }
 parity-scale-codec = { version = "3", features = ["derive", "max-encoded-len"] }
 phf_shared = { version = "0.11", default-features = false, features = ["std"] }
@@ -172,8 +175,10 @@ tokio-rustls = { version = "0.24" }
 tokio-stream = { version = "0.1", features = ["net", "sync"] }
 tokio-util = { version = "0.7", features = ["codec", "compat", "io", "rt", "time"] }
 toml_datetime = { version = "0.6", default-features = false, features = ["serde"] }
+toml_edit = { version = "0.20", features = ["serde"] }
 tonic = { version = "0.12" }
-tower = { version = "0.4", features = ["full"] }
+tower-9fbad63c4bcf4a8f = { package = "tower", version = "0.4", features = ["full"] }
+tower-d8f496e17d97b5cb = { package = "tower", version = "0.5", default-features = false, features = ["log", "make", "util"] }
 tower-http = { version = "0.3", features = ["full"] }
 tracing = { version = "0.1", features = ["log"] }
 tracing-core = { version = "0.1" }
@@ -238,17 +243,18 @@ elliptic-curve = { version = "0.13", features = ["ecdh", "hash2curve", "hazmat",
 ethers-contract-abigen = { version = "2", default-features = false, features = ["providers", "rustls"] }
 fastcrypto-b0db73ecc1bbc313 = { package = "fastcrypto", git = "https://github.com/MystenLabs/fastcrypto", rev = "c961a01596a87e76f590c7e43aca9d57106dbbb1", features = ["copy_key"] }
 fastcrypto-e49888412d456f9d = { package = "fastcrypto", git = "https://github.com/MystenLabs/fastcrypto", rev = "55e7e568842939e01c8545a71d72e2402ad74538", features = ["aes", "copy_key"] }
-futures = { version = "0.3", features = ["bilock", "unstable"] }
+futures = { version = "0.3", features = ["bilock", "io-compat", "unstable"] }
 futures-channel = { version = "0.3", features = ["sink", "unstable"] }
 futures-core = { version = "0.3", features = ["unstable"] }
 futures-executor = { version = "0.3" }
 futures-io = { version = "0.3", features = ["unstable"] }
 futures-sink = { version = "0.3" }
 futures-task = { version = "0.3", features = ["unstable"] }
-futures-util = { version = "0.3", features = ["bilock", "channel", "io", "sink", "unstable"] }
+futures-util = { version = "0.3", features = ["bilock", "channel", "io-compat", "sink", "unstable"] }
 generic-array = { version = "0.14", default-features = false, features = ["more_lengths", "serde", "zeroize"] }
 getrandom = { version = "0.2", default-features = false, features = ["std"] }
 half = { version = "2" }
+hashbrown-3575ec1268b04181 = { package = "hashbrown", version = "0.15" }
 hashbrown-582f2526e08bb6a0 = { package = "hashbrown", version = "0.14", features = ["raw"] }
 hashbrown-5ef9efb8ec2df382 = { package = "hashbrown", version = "0.12", features = ["raw"] }
 hdrhistogram = { version = "7" }
@@ -274,7 +280,7 @@ libz-sys = { version = "1", default-features = false, features = ["static"] }
 log = { version = "0.4", default-features = false, features = ["kv_unstable", "std"] }
 matrixmultiply = { version = "0.3", features = ["cgemm"] }
 memchr = { version = "2" }
-miniz_oxide = { version = "0.7", features = ["simd"] }
+miniz_oxide = { version = "0.8", features = ["simd"] }
 multibase = { version = "0.9" }
 multihash = { version = "0.19" }
 nom = { version = "7" }
@@ -285,6 +291,8 @@ num-integer = { version = "0.1", features = ["i128"] }
 num-iter = { version = "0.1", features = ["i128"] }
 num-traits = { version = "0.2", features = ["i128", "libm"] }
 once_cell = { version = "1", features = ["critical-section"] }
+openssl = { version = "0.10", features = ["vendored"] }
+openssl-sys = { version = "0.9", default-features = false, features = ["vendored"] }
 p256 = { version = "0.13", features = ["ecdh", "jwk"] }
 parity-scale-codec = { version = "3", features = ["derive", "max-encoded-len"] }
 parity-scale-codec-derive = { version = "3", default-features = false, features = ["max-encoded-len"] }
@@ -349,8 +357,10 @@ tokio-rustls = { version = "0.24" }
 tokio-stream = { version = "0.1", features = ["net", "sync"] }
 tokio-util = { version = "0.7", features = ["codec", "compat", "io", "rt", "time"] }
 toml_datetime = { version = "0.6", default-features = false, features = ["serde"] }
+toml_edit = { version = "0.20", features = ["serde"] }
 tonic = { version = "0.12" }
-tower = { version = "0.4", features = ["full"] }
+tower-9fbad63c4bcf4a8f = { package = "tower", version = "0.4", features = ["full"] }
+tower-d8f496e17d97b5cb = { package = "tower", version = "0.5", default-features = false, features = ["log", "make", "util"] }
 tower-http = { version = "0.3", features = ["full"] }
 tracing = { version = "0.1", features = ["log"] }
 tracing-core = { version = "0.1" }
@@ -370,8 +380,6 @@ bitflags = { version = "2", default-features = false, features = ["serde"] }
 event-listener = { version = "5" }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
 mio = { version = "0.8", features = ["net", "os-ext"] }
-openssl = { version = "0.10", features = ["vendored"] }
-openssl-sys = { version = "0.9", default-features = false, features = ["vendored"] }
 rustix = { version = "0.38", features = ["event", "fs", "net", "pipe", "process", "system", "termios", "time"] }
 tokio-tungstenite = { version = "0.20", features = ["rustls-tls-webpki-roots"] }
 web-sys = { version = "0.3", default-features = false, features = ["Worker"] }
@@ -382,8 +390,6 @@ bitflags = { version = "2", default-features = false, features = ["serde"] }
 event-listener = { version = "5" }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
 mio = { version = "0.8", features = ["net", "os-ext"] }
-openssl = { version = "0.10", features = ["vendored"] }
-openssl-sys = { version = "0.9", default-features = false, features = ["vendored"] }
 rustix = { version = "0.38", features = ["event", "fs", "net", "pipe", "process", "system", "termios", "time"] }
 tokio-tungstenite = { version = "0.20", features = ["rustls-tls-webpki-roots"] }
 web-sys = { version = "0.3", default-features = false, features = ["Worker"] }
@@ -391,8 +397,6 @@ web-sys = { version = "0.3", default-features = false, features = ["Worker"] }
 [target.aarch64-apple-darwin.dependencies]
 arrayvec = { version = "0.7", default-features = false, features = ["serde"] }
 bitflags = { version = "2", default-features = false, features = ["serde"] }
-core-foundation = { version = "0.9" }
-core-foundation-sys = { version = "0.8" }
 core-graphics-types = { version = "0.1" }
 event-listener = { version = "5" }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
@@ -405,8 +409,6 @@ web-sys = { version = "0.3", default-features = false, features = ["Worker"] }
 [target.aarch64-apple-darwin.build-dependencies]
 arrayvec = { version = "0.7", default-features = false, features = ["serde"] }
 bitflags = { version = "2", default-features = false, features = ["serde"] }
-core-foundation = { version = "0.9" }
-core-foundation-sys = { version = "0.8" }
 core-graphics-types = { version = "0.1" }
 event-listener = { version = "5" }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
