@@ -19,9 +19,9 @@ use tokio::{pin, select};
 use typed_store::DBMetrics;
 
 use crate::config::ConsensusConfig;
+use crate::epoch_state::EpochState;
 use crate::execution::parcel::{AuthenticStampedParcel, CommitteeAttestation, Digest};
 use crate::narwhal::NarwhalArgs;
-use crate::state::EpochState;
 
 pub type ConsensusReadyWaiter = TokioReadyWaiter<()>;
 
