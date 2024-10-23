@@ -5,3 +5,6 @@ pub mod narwhal;
 #[cfg(test)]
 mod tests;
 pub mod validator;
+
+pub use config::ConsensusConfig;
+pub use consensus::Consensus;
