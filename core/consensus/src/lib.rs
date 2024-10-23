@@ -1,8 +1,8 @@
 pub mod config;
 pub mod consensus;
+mod epoch_state;
 pub mod execution;
 pub mod narwhal;
-mod state;
 #[cfg(test)]
 mod tests;
 pub mod validator;
