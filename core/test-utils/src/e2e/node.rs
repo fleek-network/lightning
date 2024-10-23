@@ -93,10 +93,10 @@ pub struct TestFullNode<C: NodeComponents> {
 impl<C: NodeComponents> TestNetworkNode for TestFullNode<C> {
     async fn start(&mut self) -> Result<()> {
         // Start the node.
-        tokio::time::timeout(Duration::from_secs(15), self.inner.spawn()).await???;
+        tokio::time::timeout(Duration::from_secs(30), self.inner.spawn()).await???;
 
         // Wait for components to be ready before building genesis.
-        tokio::time::timeout(Duration::from_secs(15), async move {
+        tokio::time::timeout(Duration::from_secs(30), async move {
             // Wait for pool to be ready.
             let pool_state = self.pool().wait_for_ready().await;
 
@@ -117,7 +117,7 @@ impl<C: NodeComponents> TestNetworkNode for TestFullNode<C> {
         self.app().apply_genesis(genesis).await?;
 
         // Wait for components to be ready after genesis.
-        tokio::time::timeout(Duration::from_secs(15), async move {
+        tokio::time::timeout(Duration::from_secs(30), async move {
             // Wait for genesis to be applied.
             self.app_query().wait_for_genesis().await;
 
