@@ -5,7 +5,6 @@ members = [
   "core/interfaces/proc",
   "etc/workspace-hack",
   "lib/*",
-  "lib/sgxkit/sys",
   "services/*",
   "services/ai/examples/rust/*",
 ]
@@ -14,6 +13,8 @@ exclude = [
   "lib/blake3-js",
   "lib/cdk-x-platform-test",
   "lib/dcap-quoteprov",
+  "lib/sgxkit",
+  "lib/sgxkit/*",
   "services/sgx",
   "etc/ebpf-apps/ebpf",
   "etc/ebpf-apps/common",
