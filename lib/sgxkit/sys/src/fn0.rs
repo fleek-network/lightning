@@ -298,6 +298,9 @@ fn0_module! {
     /// Clear the output buffer, ie to write an error message mid-write.
     fn0.output_data_clear: () -> ();
 
+
+    fn0.shared_key_public: (buf_ptr: usize) -> i32;
+
     /// Unseal a section of memory in-place using the shared extended key.
     ///
     /// # Handling permissions
@@ -321,6 +324,14 @@ fn0_module! {
     /// * `>0`: length of decrypted content written to `cipher_ptr`
     /// * `<0`: Host error
     fn0.shared_key_unseal: (data_ptr: usize, data_len: usize) -> i32;
+
+
+    fn0.derived_key_public: (
+        wasm_ptr: usize,
+        path_ptr: usize,
+        path_len: usize,
+        buf_ptr: usize
+    ) -> i32;
 
     /// Derive a wasm specific key from the shared key, with a given path up to `[u16; 128]`, and
     /// unseal encrypted data with it.
@@ -361,12 +372,6 @@ fn0_module! {
         signature_buf_ptr: usize
     ) -> i32;
 
-    fn0.derived_key_public: (
-        wasm_ptr: usize,
-        path_ptr: usize,
-        path_len: usize,
-        buf_ptr: usize
-    ) -> i32;
 
     /// Get an insecure timestamp from the host os, outside of SGX.
     ///
