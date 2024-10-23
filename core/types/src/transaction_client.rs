@@ -96,7 +96,7 @@ impl ExecuteTransactionRetry {
 
     pub fn should_retry_on_error(&self, error: &ExecutionError) -> bool {
         match self {
-            Self::Default => true,
+            Self::Default => *error == ExecutionError::InvalidNonce,
             Self::Never => false,
             Self::Always(_) => true,
             Self::AlwaysExcept((_, errors, _)) => errors
