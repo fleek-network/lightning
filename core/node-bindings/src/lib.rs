@@ -4,7 +4,7 @@ use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore_server::BlockstoreServer;
 use lightning_broadcast::Broadcast;
 use lightning_checkpointer::Checkpointer;
-use lightning_consensus::consensus::Consensus;
+use lightning_consensus::Consensus;
 use lightning_fetcher::fetcher::Fetcher;
 use lightning_forwarder::Forwarder;
 use lightning_handshake::handshake::Handshake;

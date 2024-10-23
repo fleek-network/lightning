@@ -31,7 +31,7 @@ use tracing::{error, info};
 use typed_store::DBMetrics;
 use types::ExecuteTransactionRequest;
 
-use crate::config::Config;
+use crate::config::ConsensusConfig;
 use crate::execution::parcel::{AuthenticStampedParcel, CommitteeAttestation, Digest};
 use crate::execution::state::FilteredConsensusOutput;
 use crate::execution::worker::ExecutionWorker;
@@ -405,7 +405,7 @@ impl<C: NodeComponents> Consensus<C> {
 
 impl<C: NodeComponents> ConfigConsumer for Consensus<C> {
     const KEY: &'static str = "consensus";
-    type Config = Config;
+    type Config = ConsensusConfig;
 }
 
 impl<C: NodeComponents> BuildGraph for Consensus<C> {

@@ -12,8 +12,7 @@ use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_blockstore_server::{BlockstoreServer, Config as BlockstoreServerConfig};
 use lightning_checkpointer::{Checkpointer, CheckpointerConfig, CheckpointerDatabaseConfig};
-use lightning_consensus::config::Config as ConsensusConfig;
-use lightning_consensus::consensus::Consensus;
+use lightning_consensus::{Consensus, ConsensusConfig};
 use lightning_dack_aggregator::{
     Config as DeliveryAcknowledgmentConfig,
     DeliveryAcknowledgmentAggregator,
