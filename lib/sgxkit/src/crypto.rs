@@ -106,7 +106,7 @@ impl DerivedKey {
     }
 
     /// Get the raw compressed public key for the current derived key.
-    pub fn to_public_key(&self) -> Result<[u8; 33], HostError> {
+    pub fn public_key(&self) -> Result<[u8; 33], HostError> {
         let mut buf = [0; 33];
         let res = unsafe {
             fn0::derived_key_public(
@@ -141,7 +141,7 @@ pub struct SharedKey;
 
 impl SharedKey {
     /// Get the bip32 xpub encoded key for the network
-    pub fn to_public_key() -> &'static str {
+    pub fn public_key() -> &'static str {
         static SHARED_PUB: LazyLock<String> = LazyLock::new(|| unsafe {
             let mut buf = vec![0; 112];
             fn0::shared_key_public(buf.as_mut_ptr() as usize);
