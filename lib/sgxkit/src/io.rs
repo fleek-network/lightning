@@ -19,7 +19,7 @@ macro_rules! println {
     };
     ($($arg:tt)*) => {
         #[cfg(target_family = "wasm")]
-        $crate::io::debug_print(format!($($arg)*) + "\n");
+        $crate::io::debug_print(format!($($arg)*));
 
         #[cfg(not(target_family = "wasm"))]
         std::println!($($arg)*);
