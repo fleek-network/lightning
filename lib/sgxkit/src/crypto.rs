@@ -1,5 +1,7 @@
 //! Cryptographic utilities
 
+use std::sync::LazyLock;
+
 use sgxkit_sys::fn0;
 
 use crate::error::HostError;
@@ -104,7 +106,7 @@ impl DerivedKey {
     }
 
     /// Get the raw compressed public key for the current derived key.
-    pub fn to_public(&self) -> Result<[u8; 33], HostError> {
+    pub fn to_public_key(&self) -> Result<[u8; 33], HostError> {
         let mut buf = [0; 33];
         let res = unsafe {
             fn0::derived_key_public(
@@ -134,24 +136,39 @@ impl DerivedKey {
     }
 }
 
-/// Unseal data in-place using the network's shared extended key.
-///
-/// Accepts a mutable vector of sealed data, and decrypts it in-place.
-/// Encrypted data length must not exceed [`i32::MAX`] (roughly 2GiB).
-///
-/// Encrypted content must contain a permissions header with a list of approved wasm hashes that
-/// can access the data, formatted as follows:
-///
-/// ```text
-/// [ b"FLEEK_ENCLAVE_APPROVED_WASM" . num hashes (u8) . hash one (32 bytes) ... content (unsized) ]
-/// ```
-pub fn shared_key_unseal(data: &mut Vec<u8>) -> Result<(), HostError> {
-    // Unseal the data
-    let res = unsafe { fn0::shared_key_unseal(data.as_mut_ptr() as usize, data.len()) };
-    let len = HostError::result(res)?;
+/// Network shared key operations
+pub struct SharedKey;
 
-    // Truncate the (previously) cipher data into the written plaintext length
-    data.truncate(len as usize);
+impl SharedKey {
+    /// Get the bip32 xpub encoded key for the network
+    pub fn to_public_key() -> &'static str {
+        static SHARED_PUB: LazyLock<String> = LazyLock::new(|| unsafe {
+            let mut buf = vec![0; 112];
+            fn0::shared_key_public(buf.as_mut_ptr() as usize);
+            String::from_utf8_unchecked(buf)
+        });
+        &SHARED_PUB
+    }
 
-    Ok(())
+    /// Unseal data in-place using the network's shared extended key.
+    ///
+    /// Accepts a mutable vector of sealed data, and decrypts it in-place.
+    /// Encrypted data length must not exceed [`i32::MAX`] (roughly 2GiB).
+    ///
+    /// Encrypted content must contain a permissions header with a list of approved wasm hashes that
+    /// can access the data, formatted as follows:
+    ///
+    /// ```text
+    /// [ b"FLEEK_ENCLAVE_APPROVED_WASM" . num hashes (u8) . hash one (32 bytes) ... content (unsized) ]
+    /// ```
+    pub fn unseal(data: &mut Vec<u8>) -> Result<(), HostError> {
+        // Unseal the data
+        let res = unsafe { fn0::shared_key_unseal(data.as_mut_ptr() as usize, data.len()) };
+        let len = HostError::result(res)?;
+
+        // Truncate the (previously) cipher data into the written plaintext length
+        data.truncate(len as usize);
+
+        Ok(())
+    }
 }
