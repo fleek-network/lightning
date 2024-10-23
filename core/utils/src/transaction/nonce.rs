@@ -30,6 +30,11 @@ impl NonceState {
         next
     }
 
+    pub async fn get_next(&self) -> u64 {
+        let inner = self.inner.read().await;
+        inner.next
+    }
+
     pub async fn get_base(&self) -> u64 {
         let inner = self.inner.read().await;
         inner.base
