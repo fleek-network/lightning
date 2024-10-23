@@ -225,6 +225,7 @@ impl<C: NodeComponents> TestNetworkNode for TestFullNode<C> {
                 method,
                 options: Some(options.unwrap_or(ExecuteTransactionOptions {
                     wait: ExecuteTransactionWait::Receipt,
+                    timeout: Some(Duration::from_secs(10)),
                     ..Default::default()
                 })),
             })
