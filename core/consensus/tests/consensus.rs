@@ -1,10 +1,11 @@
 use std::time::Duration;
 
+use futures::future::join_all;
 use lightning_interfaces::prelude::*;
 use lightning_test_utils::e2e::{TestFullNodeComponentsWithRealConsensus, TestNetwork};
 use lightning_utils::application::QueryRunnerExt;
 use lightning_utils::poll::{poll_until, PollUntilError};
-use types::{ExecutionData, TransactionResponse, UpdateMethod};
+use types::{ExecuteTransactionOptions, ExecutionData, TransactionResponse, UpdateMethod};
 
 #[tokio::test]
 async fn test_execute_transaction() {
@@ -19,7 +20,16 @@ async fn test_execute_transaction() {
     // Execute an increment nonce transaction from the first node.
     let (_, receipt) = network
         .node(0)
-        .execute_transaction_from_node(UpdateMethod::IncrementNonce {}, None)
+        .execute_transaction_from_node(
+            UpdateMethod::IncrementNonce {},
+            Some(ExecuteTransactionOptions {
+                // Transactions that are submitted immediately after startup will sometimes
+                // timeout and need to be retried.
+                wait: types::ExecuteTransactionWait::Receipt,
+                retry: types::ExecuteTransactionRetry::Always(Some(10)),
+                timeout: Some(Duration::from_secs(2)),
+            }),
+        )
         .await
         .unwrap()
         .as_receipt();
@@ -108,11 +118,22 @@ async fn test_epoch_change_via_transactions() {
     }
 
     // Execute change epoch transactions from 2/3+1 of the committee nodes.
-    for node in network.nodes().take(3) {
-        node.execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch: 0 }, None)
-            .await
-            .unwrap();
-    }
+    join_all(network.nodes().take(3).map(|node| {
+        node.execute_transaction_from_node(
+            UpdateMethod::ChangeEpoch { epoch: 0 },
+            Some(ExecuteTransactionOptions {
+                // Transactions that are submitted immediately after startup will sometimes
+                // timeout and need to be retried.
+                wait: types::ExecuteTransactionWait::Receipt,
+                retry: types::ExecuteTransactionRetry::Always(Some(5)),
+                timeout: Some(Duration::from_secs(5)),
+            }),
+        )
+    }))
+    .await
+    .into_iter()
+    .collect::<Result<Vec<_>, _>>()
+    .unwrap();
 
     // Wait for epoch to be incremented across the network.
     poll_until(
@@ -123,7 +144,7 @@ async fn test_epoch_change_via_transactions() {
                 .then_some(())
                 .ok_or(PollUntilError::ConditionNotSatisfied)
         },
-        Duration::from_secs(20),
+        Duration::from_secs(10),
         Duration::from_millis(100),
     )
     .await

@@ -32,14 +32,14 @@ impl ExecuteTransactionResponse {
     pub fn as_receipt(&self) -> (TransactionRequest, TransactionReceipt) {
         match self {
             Self::Receipt(v) => v.clone(),
-            _ => unreachable!("invalid receipt in response"),
+            _ => unreachable!("invalid receipt in response: {:?}", self),
         }
     }
 
     pub fn as_none(&self) {
         match self {
             Self::None => (),
-            _ => unreachable!("invalid receipt in response"),
+            _ => unreachable!("invalid receipt in response: {:?}", self),
         }
     }
 }
