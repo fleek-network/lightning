@@ -21,7 +21,8 @@ pub mod params {
     use std::time::Duration;
 
     pub const HEAP_INIT: usize = 1 << 10;
-    pub const HEAP_LIMIT: usize = 50 << 20;
+    pub const ALIGNED_SNAPSHOT_SIZE: usize = crate::runtime::SNAPSHOT.len().next_power_of_two();
+    pub const HEAP_LIMIT: usize = (50 << 20) + ALIGNED_SNAPSHOT_SIZE;
     pub const REQ_TIMEOUT: Duration = Duration::from_secs(15);
 }
 
