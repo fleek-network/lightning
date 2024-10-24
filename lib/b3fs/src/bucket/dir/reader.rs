@@ -121,12 +121,19 @@ impl B3Dir {
             .get_or_try_init(|| async {
                 let mut file = self.position_file(self.position_start_bloom_filter).await?;
                 let hashes_bloom_filter_len = file.read_u32_le().await?;
-                let mut bloom_filter = vec![0; self.num_entries as usize];
-                file.read_exact(&mut bloom_filter).await?;
-                Ok(BloomFilter::from_u8_array(
-                    bloom_filter.as_slice(),
-                    hashes_bloom_filter_len,
-                )) as Result<BloomFilter, errors::ReadError>
+
+                let bloom_filter_len = self.num_entries as usize * 4;
+                let mut bloom_filter = vec![0; bloom_filter_len];
+                let bytes_read = file.read_exact(&mut bloom_filter).await?;
+
+                if bloom_filter.len() != bloom_filter_len {
+                    return Err(errors::ReadError::InvalidBloomFilter);
+                }
+
+                let filter =
+                    BloomFilter::from_u8_array(bloom_filter.as_slice(), hashes_bloom_filter_len);
+
+                Ok(filter)
             })
             .await?;
         Ok(result)
@@ -229,7 +236,7 @@ mod tests {
     ) -> Result<B3Dir, Box<dyn std::error::Error>> {
         let bucket = Bucket::open(&temp_dir).await?;
 
-        let mut writer = DirWriter::new(&bucket, 2).await?;
+        let mut writer = DirWriter::new(&bucket, entries.len()).await?;
 
         for entry in entries {
             writer.insert(&entry).await?;

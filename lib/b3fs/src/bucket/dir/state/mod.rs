@@ -1,3 +1,4 @@
+use std::io::Write;
 use std::num::NonZeroU32;
 use std::os::unix::fs::FileExt;
 use std::path::{Path, PathBuf};
@@ -76,6 +77,8 @@ impl HeaderFile {
         // 4 bytes for each entry
         file.write_all(&vec![0; num_entries * 4]).await?;
 
+        file.flush().await?;
+
         let position_start_hashes = 8;
         let position_start_bloom_filter = position_start_hashes + (num_entries * 32) as u64;
         let position_start_phf_table = position_start_bloom_filter + num_entries as u64 + 4;
@@ -122,6 +125,11 @@ impl HeaderFile {
                 self.position_start_bloom_filter,
             )
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+            assert_eq!(
+                bloom_filter.get_u8_array().len(),
+                hash_table.map.len() * 4,
+                "Number of bloom filter entries does not match with entries in hasher state"
+            );
             file.write_at(
                 bloom_filter.get_u8_array(),
                 self.position_start_bloom_filter + 4,
@@ -140,6 +148,7 @@ impl HeaderFile {
                 &map_bytes,
                 self.position_start_phf_table + 8 + disp_bytes.len() as u64,
             )?;
+            file.flush()?;
             Ok(()) as Result<(), errors::CommitError>
         })
         .await?
@@ -186,7 +195,7 @@ impl HeaderFile {
             buffer.put_u8(0x00);
         }
         self.file.write_all(&buffer).await?;
-
+        self.file.flush().await?;
         Ok(())
     }
 }

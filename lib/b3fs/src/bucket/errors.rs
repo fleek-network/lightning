@@ -18,6 +18,8 @@ pub enum ReadError {
     Deserialization(String),
     #[error("Invalid entry at offset {2}. Required name {0:?}, found {1:?}")]
     InvalidEntryAtOffset(Vec<u8>, Vec<u8>, u32),
+    #[error("Invalid bloom filter")]
+    InvalidBloomFilter,
 }
 
 #[derive(Error, Debug)]

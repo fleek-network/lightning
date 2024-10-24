@@ -104,6 +104,7 @@ impl HeaderFile {
         let num_entries: u32 = 0;
         file.write_u32_le(version).await?;
         file.write_u32_le(num_entries).await?;
+        file.flush().await?;
 
         Ok(Self { path, file })
     }
