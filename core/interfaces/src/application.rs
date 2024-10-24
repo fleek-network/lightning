@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::path::Path;
 use std::time::Duration;
 
@@ -12,6 +12,8 @@ use lightning_types::{
     Blake3Hash,
     ChainId,
     Committee,
+    CommitteeSelectionBeaconCommit,
+    CommitteeSelectionBeaconReveal,
     Genesis,
     NodeIndex,
     ProtocolParamKey,
@@ -143,6 +145,27 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
         epoch: &Epoch,
         selector: impl FnOnce(Committee) -> V,
     ) -> Option<V>;
+
+    /// Get all committee selection beacons, as a map of node indices to their corresponding
+    /// committee selection commit and reveal values.
+    fn get_committee_selection_beacons(
+        &self,
+    ) -> HashMap<
+        NodeIndex,
+        (
+            CommitteeSelectionBeaconCommit,
+            Option<CommitteeSelectionBeaconReveal>,
+        ),
+    >;
+
+    /// Get committee selection beacon for the given node.
+    fn get_committee_selection_beacon(
+        &self,
+        node: &NodeIndex,
+    ) -> Option<(
+        CommitteeSelectionBeaconCommit,
+        Option<CommitteeSelectionBeaconReveal>,
+    )>;
 
     /// Query Services Table
     /// Returns the service information for a given [`ServiceId`]

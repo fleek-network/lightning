@@ -21,6 +21,11 @@ use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_blockstore_server::{BlockstoreServer, Config as BlockstoreServerConfig};
 use lightning_checkpointer::{Checkpointer, CheckpointerConfig, CheckpointerDatabaseConfig};
+use lightning_committee_beacon::{
+    CommitteeBeaconComponent,
+    CommitteeBeaconConfig,
+    CommitteeBeaconDatabaseConfig,
+};
 use lightning_consensus::{Consensus, ConsensusConfig};
 use lightning_handshake::config::{HandshakeConfig, TransportConfig};
 use lightning_handshake::handshake::Handshake;
@@ -389,6 +394,9 @@ impl SwarmBuilder {
             topology_target_k: 8,
             topology_min_nodes: 16,
 
+            committee_selection_beacon_commit_phase_duration: 10,
+            committee_selection_beacon_reveal_phase_duration: 10,
+
             ..Default::default()
         };
 
@@ -644,6 +652,16 @@ fn build_config(
                 .try_into()
                 .expect("Failed to resolve path"),
         },
+    });
+
+    config.inject::<CommitteeBeaconComponent<FullNodeComponents>>(CommitteeBeaconConfig {
+        database: CommitteeBeaconDatabaseConfig {
+            path: root
+                .join("data/committee-beacon")
+                .try_into()
+                .expect("Failed to resolve path"),
+        },
+        ..Default::default()
     });
 
     config
