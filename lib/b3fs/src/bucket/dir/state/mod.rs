@@ -234,13 +234,9 @@ impl<T: WithCollector> DirState for InnerDirState<T> {
         &mut self,
         borrowed_entry: BorrowedEntry<'b>,
     ) -> Result<(), errors::InsertError> {
-        let mut bytes = match borrowed_entry.link {
-            BorrowedLink::Content(content) => content,
-            BorrowedLink::Path(path) => path,
-        };
         let i = self.next_position;
         let pos = unsafe { NonZeroU32::new_unchecked(i + 1) };
-        self.phf_generator.push(bytes, pos);
+        self.phf_generator.push(borrowed_entry.name, pos);
         self.next_position += borrowed_entry.name.len() as u32;
         self.header_file.insert_entry(borrowed_entry).await?;
         self.bloom_filter.add(borrowed_entry.name);

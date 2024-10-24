@@ -16,6 +16,8 @@ pub enum ReadError {
     InvalidHashtree(#[from] crate::collections::error::CollectionTryFromError),
     #[error("Error while deserializing PHF table. {0}")]
     Deserialization(String),
+    #[error("Invalid entry at offset {2}. Required name {0:?}, found {1:?}")]
+    InvalidEntryAtOffset(Vec<u8>, Vec<u8>, u32),
 }
 
 #[derive(Error, Debug)]

@@ -11,7 +11,7 @@ use tokio::sync::OnceCell;
 use triomphe::Arc;
 
 use super::iter::DirEntriesIter;
-use crate::bucket::dir::phf::HasherState;
+use crate::bucket::dir::phf::{displace, hash, HasherState};
 use crate::bucket::errors;
 use crate::collections::HashTree;
 use crate::entry::{BorrowedEntry, BorrowedLink, OwnedLink};
@@ -27,6 +27,8 @@ pub struct B3Dir {
     position_start_hashes: u64,
     position_start_bloom_filter: u64,
     position_start_entries: u64,
+    position_start_phf_table: u64,
+    phf_table: OnceCell<HasherState>,
 }
 
 #[macro_use]
@@ -34,7 +36,7 @@ macro_rules! check_eof {
     ($flag:expr) => {
         if let Err(e) = $flag {
             if e.kind() == std::io::ErrorKind::UnexpectedEof {
-                break;
+                return Ok(None);
             } else {
                 return Err(errors::ReadError::from(e));
             }
@@ -49,6 +51,7 @@ impl B3Dir {
         let position_start_bloom_filter =
             position_start_hashes + (num_entries as usize * 32) as u64;
         let length_bloom_filter = 4 + num_entries as usize;
+        let position_start_phf_table = position_start_bloom_filter + length_bloom_filter as u64;
         let key_phf_table = 8;
         let disps_len = (num_entries as f64 / 5.0).ceil() as usize * 4;
         let entries_len = num_entries as usize * 4;
@@ -63,6 +66,8 @@ impl B3Dir {
             position_start_hashes,
             position_start_bloom_filter,
             position_start_entries,
+            position_start_phf_table,
+            phf_table: OnceCell::new(),
         }
     }
 
@@ -85,7 +90,9 @@ impl B3Dir {
     ) -> Result<Option<BorrowedEntry<'a>>, errors::ReadError> {
         let bloom_filter = self.get_bloom_filter().await?;
         if bloom_filter.contains(name) {
-            return self.search_entry(name).await;
+            let phf_table = self.get_phf_table().await?;
+            let entry_offset = self.get_entry_offset(name, phf_table)?;
+            return self.read_entry_at_offset(name, entry_offset).await;
         }
         Ok(None)
     }
@@ -108,42 +115,6 @@ impl B3Dir {
         Ok(file)
     }
 
-    async fn search_entry<'a>(
-        &'a self,
-        name: &'a [u8],
-    ) -> Result<Option<BorrowedEntry<'a>>, errors::ReadError> {
-        loop {
-            let mut file = BufReader::new(self.position_file(self.position_start_entries).await?);
-            let flag = file.read_u8().await;
-            check_eof!(flag);
-            let flag = flag.unwrap();
-            let mut entry_name = Vec::new();
-            let entry_to_check = file.read_until(0x00, &mut entry_name).await;
-            check_eof!(entry_to_check);
-            if &entry_name == name {
-                if flag == B3_DIR_IS_SYM_LINK {
-                    let mut content = Vec::new();
-                    file.read_until(0x00, &mut content).await?;
-                    let content = content.into_boxed_slice();
-                    let static_slice: &'static [u8] = Box::leak(content);
-                    return Ok(Some(BorrowedEntry {
-                        name,
-                        link: BorrowedLink::Path(static_slice),
-                    }));
-                } else {
-                    let mut buffer: [u8; 32] = vec![0u8; 32].try_into().unwrap();
-                    file.read_exact(&mut buffer).await?;
-                    let static_slice: &'static [u8; 32] = unsafe { mem::transmute_copy(&buffer) };
-                    return Ok(Some(BorrowedEntry {
-                        name,
-                        link: BorrowedLink::Content(static_slice),
-                    }));
-                }
-            }
-        }
-        Ok(None)
-    }
-
     async fn get_bloom_filter(&self) -> Result<&BloomFilter, errors::ReadError> {
         let result = self
             .bloom_filter
@@ -159,5 +130,81 @@ impl B3Dir {
             })
             .await?;
         Ok(result)
+    }
+
+    async fn get_phf_table(&self) -> Result<&HasherState, errors::ReadError> {
+        self.phf_table
+            .get_or_try_init(|| async {
+                let mut file = self.position_file(self.position_start_phf_table).await?;
+                let key = file.read_u64_le().await?;
+                let disps_len = (self.num_entries as usize + 4) / 5;
+                let mut disps = vec![(0u16, 0u16); disps_len];
+                for disp in &mut disps {
+                    disp.0 = file.read_u16_le().await?;
+                    disp.1 = file.read_u16_le().await?;
+                }
+                let mut map = vec![0u32; self.num_entries as usize];
+                for offset in &mut map {
+                    *offset = file.read_u32_le().await?;
+                }
+                Ok(HasherState { key, disps, map })
+            })
+            .await
+    }
+
+    fn get_entry_offset(
+        &self,
+        name: &[u8],
+        phf_table: &HasherState,
+    ) -> Result<u32, errors::ReadError> {
+        let hashes = hash(name, phf_table.key);
+        let bucket = (hashes.g as usize) % phf_table.disps.len();
+        let (d1, d2) = phf_table.disps[bucket];
+        let idx =
+            displace(hashes.f1, hashes.f2, d1 as u32, d2 as u32) as usize % phf_table.map.len();
+        Ok(phf_table.map[idx])
+    }
+
+    async fn read_entry_at_offset<'a>(
+        &'a self,
+        name: &'a [u8],
+        offset: u32,
+    ) -> Result<Option<BorrowedEntry<'a>>, errors::ReadError> {
+        let file = self
+            .position_file(self.position_start_entries + offset as u64)
+            .await?;
+        let mut file = BufReader::new(file);
+        let flag = file.read_u8().await;
+        check_eof!(flag);
+        let flag = flag.unwrap();
+        let mut entry_name = Vec::new();
+        let entry_to_check = file.read_until(0x00, &mut entry_name).await;
+        check_eof!(entry_to_check);
+        if &entry_name != name {
+            return Err(errors::ReadError::InvalidEntryAtOffset(
+                name.to_vec(),
+                entry_name.to_vec(),
+                offset,
+            ));
+        }
+        if flag == B3_DIR_IS_SYM_LINK {
+            let mut content = Vec::new();
+            file.read_until(0x00, &mut content).await?;
+            let content = content.into_boxed_slice();
+            let static_slice: &'static [u8] = Box::leak(content);
+            return Ok(Some(BorrowedEntry {
+                name,
+                link: BorrowedLink::Path(static_slice),
+            }));
+        } else {
+            let mut buffer: [u8; 32] = vec![0u8; 32].try_into().unwrap();
+            file.read_exact(&mut buffer).await?;
+            let static_slice: &'static [u8; 32] = unsafe { mem::transmute_copy(&buffer) };
+            return Ok(Some(BorrowedEntry {
+                name,
+                link: BorrowedLink::Content(static_slice),
+            }));
+        }
+        Ok(None)
     }
 }
