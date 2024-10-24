@@ -8,7 +8,8 @@ use fastbloom_rs::{BloomFilter, FilterBuilder, Hashes, Membership};
 use tokio::fs::{File, OpenOptions};
 use tokio::io::{self, AsyncWriteExt, BufWriter};
 
-use super::phf::{HasherState, PhfGenerator};
+use super::phf::{calculate_buckets_len, HasherState, PhfGenerator};
+use super::HeaderPositions;
 use crate::bucket::{errors, Bucket};
 use crate::entry::{BorrowedEntry, BorrowedLink};
 use crate::hasher::dir_hasher::B3_DIR_IS_SYM_LINK;
@@ -29,9 +30,7 @@ pub(super) mod writer;
 pub struct HeaderFile {
     path: PathBuf,
     file: BufWriter<File>,
-    position_start_hashes: u64,
-    position_start_bloom_filter: u64,
-    position_start_phf_table: u64,
+    positions: HeaderPositions,
 }
 
 impl HeaderFile {
@@ -60,34 +59,28 @@ impl HeaderFile {
                 .open(path.clone())
                 .await?,
         );
+        let positions = HeaderPositions::new(num_entries);
         let version: u32 = 1;
         file.write_u32_le(version).await?;
         file.write_u32_le(num_entries as u32).await?;
         // Reserve space for hashes
-        file.write_all(&vec![0; num_entries * 32]).await?;
+        file.write_all(&vec![0; positions.length_hashes]).await?;
         // Reserve space for bloom filter (4 bytes for hashes + 1 byte for each entry) See https://docs.rs/fastbloom-rs/0.5.9/fastbloom_rs/struct.BloomFilter.html#method.from_u8_array
         file.write_u32_le(hashes).await?;
-        file.write_all(&vec![0; num_entries]).await?;
+        file.write_all(&vec![0; positions.bloom_filter_len]).await?;
         // Reserve space for PHF table
         // 8 bytes for key
         file.write_u64_le(0).await?;
-        // entries.len() + 5 -1 / 5
-        let disps_len = (num_entries as f64 / 5.0).ceil() as usize;
-        file.write_all(&vec![0; disps_len * 4]).await?;
+        file.write_all(&vec![0; positions.phf_disps_len]).await?;
         // 4 bytes for each entry
-        file.write_all(&vec![0; num_entries * 4]).await?;
+        file.write_all(&vec![0; positions.phf_entries_len]).await?;
 
         file.flush().await?;
 
-        let position_start_hashes = 8;
-        let position_start_bloom_filter = position_start_hashes + (num_entries * 32) as u64;
-        let position_start_phf_table = position_start_bloom_filter + num_entries as u64 + 4;
         Ok(Self {
             path,
             file,
-            position_start_hashes,
-            position_start_bloom_filter,
-            position_start_phf_table,
+            positions,
         })
     }
 
@@ -116,37 +109,47 @@ impl HeaderFile {
         let bytes = hashes.iter().flatten().copied().collect::<Vec<u8>>();
         tokio::task::spawn_blocking(move || async move {
             // Write the hashes
-            file.write_at(&bytes, self.position_start_hashes)
+            file.write_at(&bytes, self.positions.position_start_hashes as u64)
                 .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
 
             // Write the bloom filter
             file.write_at(
                 &bloom_filter.hashes().to_le_bytes(),
-                self.position_start_bloom_filter,
+                self.positions.position_start_bloom_filter as u64,
             )
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
             assert_eq!(
                 bloom_filter.get_u8_array().len(),
-                hash_table.map.len() * 4,
+                self.positions.bloom_filter_len,
                 "Number of bloom filter entries does not match with entries in hasher state"
             );
             file.write_at(
                 bloom_filter.get_u8_array(),
-                self.position_start_bloom_filter + 4,
+                self.positions.bloom_filter_start_entries() as u64,
             )
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
 
             // Write the PHF table
             let hash_table = hash_table;
-            let disp_bytes = bincode::serialize(&hash_table.disps)
-                .map_err(|e| errors::CommitError::Serialization(e.to_string()))?;
-            let map_bytes = bincode::serialize(&hash_table.map)
-                .map_err(|e| errors::CommitError::Serialization(e.to_string()))?;
-            file.write_at(&hash_table.key.to_le_bytes(), self.position_start_phf_table)?;
-            file.write_at(&disp_bytes, self.position_start_phf_table + 8)?;
+            let disps_len = hash_table.disps.len() * 4;
+            let mut disp_bytes = BytesMut::with_capacity(disps_len);
+
+            for disp in hash_table.disps.iter() {
+                disp_bytes.put_u16_le(disp.0);
+                disp_bytes.put_u16_le(disp.1);
+            }
             file.write_at(
-                &map_bytes,
-                self.position_start_phf_table + 8 + disp_bytes.len() as u64,
+                &hash_table.key.to_le_bytes(),
+                self.positions.position_start_phf_table as u64,
+            )?;
+            file.write_at(&disp_bytes, self.positions.phf_table_start_disps() as u64)?;
+            let mut map_bytes_buffer = BytesMut::with_capacity(hash_table.map.len() * 4);
+            for offset in hash_table.map.iter() {
+                map_bytes_buffer.put_u32_le(*offset);
+            }
+            file.write_at(
+                &map_bytes_buffer,
+                self.positions.phf_table_start_entries() as u64,
             )?;
             file.flush()?;
             Ok(()) as Result<(), errors::CommitError>
@@ -244,7 +247,7 @@ impl<T: WithCollector> DirState for InnerDirState<T> {
         borrowed_entry: BorrowedEntry<'b>,
     ) -> Result<(), errors::InsertError> {
         let i = self.next_position;
-        let pos = unsafe { NonZeroU32::new_unchecked(i + 1) };
+        let pos = unsafe { NonZeroU32::new_unchecked(i) };
         self.phf_generator.push(borrowed_entry.name, pos);
         self.next_position += borrowed_entry.name.len() as u32;
         self.header_file.insert_entry(borrowed_entry).await?;
@@ -294,7 +297,7 @@ impl<T: WithCollector + Default> InnerDirState<T> {
         Ok(Self {
             bucket: bucket.clone(),
             phf_generator,
-            next_position: 0,
+            next_position: 1,
             temp_file_path,
             header_file,
             bloom_filter,
