@@ -208,3 +208,133 @@ impl B3Dir {
         Ok(None)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::env::temp_dir;
+    use std::path::{Path, PathBuf};
+
+    use tokio::io::AsyncWriteExt;
+    use tokio_stream::StreamExt;
+
+    use super::*;
+    use crate::bucket::dir::writer::DirWriter;
+    use crate::bucket::Bucket;
+    use crate::entry::OwnedEntry;
+    use crate::utils::to_hex;
+
+    async fn create_test_dir(
+        temp_dir: &Path,
+        entries: Vec<OwnedEntry>,
+    ) -> Result<B3Dir, Box<dyn std::error::Error>> {
+        let bucket = Bucket::open(&temp_dir).await?;
+
+        let mut writer = DirWriter::new(&bucket, 2).await?;
+
+        for entry in entries {
+            writer.insert(&entry).await?;
+        }
+
+        // Test commit()
+        let root_hash = writer.commit().await?;
+        assert_eq!(root_hash.len(), 32);
+
+        let mut file = tokio::fs::File::open(
+            temp_dir
+                .join("headers")
+                .join(to_hex(&root_hash).to_string()),
+        )
+        .await?;
+        let version = file.read_u32_le().await?;
+        let num_entries = file.read_u32_le().await?;
+        let file = Arc::new(file);
+
+        Ok(B3Dir::new(num_entries, file))
+    }
+
+    #[tokio::test]
+    async fn test_get_entry() {
+        let temp_dir = temp_dir().join("b3fs");
+        let entries = vec![
+            OwnedEntry {
+                name: "file1".as_bytes().into(),
+                link: OwnedLink::Content([1; 32]),
+            },
+            OwnedEntry {
+                name: "file2".as_bytes().into(),
+                link: OwnedLink::Content([2; 32]),
+            },
+        ];
+        let mut dir = create_test_dir(&temp_dir, entries).await.unwrap();
+
+        // Test existing file
+        let entry = dir.get_entry(b"file1").await.unwrap().unwrap();
+        assert_eq!(entry.name, b"file1");
+        assert!(matches!(entry.link, BorrowedLink::Content(_)));
+
+        let entry = dir.get_entry(b"file2").await.unwrap().unwrap();
+        assert_eq!(entry.name, b"file2");
+        assert!(matches!(entry.link, BorrowedLink::Content(_)));
+
+        // Test non-existent entry
+        let entry = dir.get_entry(b"nonexistent").await.unwrap();
+        assert!(entry.is_none());
+        tokio::fs::remove_dir_all(temp_dir).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_entries_iterator() {
+        let temp_dir = temp_dir().join("b3fs");
+        let entries = vec![
+            OwnedEntry {
+                name: "file1".as_bytes().into(),
+                link: OwnedLink::Content([1; 32]),
+            },
+            OwnedEntry {
+                name: "file2".as_bytes().into(),
+                link: OwnedLink::Content([2; 32]),
+            },
+            OwnedEntry {
+                name: "symlink".as_bytes().into(),
+                link: OwnedLink::Link("target".as_bytes().into()),
+            },
+        ];
+        let dir = create_test_dir(&temp_dir, entries).await.unwrap();
+
+        let mut iter = dir.entries().await.unwrap();
+        let mut count = 0;
+
+        while let Some(entry) = iter.next().await {
+            let entry = entry.unwrap();
+            count += 1;
+            match entry.name {
+                b"file1" | b"file2" => assert!(matches!(entry.link, BorrowedLink::Content(_))),
+                b"symlink" => assert!(matches!(entry.link, BorrowedLink::Path(_))),
+                _ => panic!("Unexpected entry: {:?}", entry.name),
+            }
+        }
+
+        assert_eq!(count, 3);
+        tokio::fs::remove_dir_all(temp_dir).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_hashtree() {
+        let temp_dir = temp_dir().join("b3fs");
+        let entries = vec![
+            OwnedEntry {
+                name: "file1".as_bytes().into(),
+                link: OwnedLink::Content([1; 32]),
+            },
+            OwnedEntry {
+                name: "file2".as_bytes().into(),
+                link: OwnedLink::Content([2; 32]),
+            },
+        ];
+        let mut dir = create_test_dir(&temp_dir, entries).await.unwrap();
+
+        let hashtree = dir.hashtree().await.unwrap();
+        assert_eq!(hashtree.len(), 2);
+        tokio::fs::remove_dir_all(temp_dir).await.unwrap();
+    }
+}
