@@ -32,14 +32,14 @@ impl ExecuteTransactionResponse {
     pub fn as_receipt(&self) -> (TransactionRequest, TransactionReceipt) {
         match self {
             Self::Receipt(v) => v.clone(),
-            _ => unreachable!("invalid receipt in response"),
+            _ => unreachable!("invalid receipt in response: {:?}", self),
         }
     }
 
     pub fn as_none(&self) {
         match self {
             Self::None => (),
-            _ => unreachable!("invalid receipt in response"),
+            _ => unreachable!("invalid receipt in response: {:?}", self),
         }
     }
 }
@@ -96,7 +96,7 @@ impl ExecuteTransactionRetry {
 
     pub fn should_retry_on_error(&self, error: &ExecutionError) -> bool {
         match self {
-            Self::Default => true,
+            Self::Default => *error == ExecutionError::InvalidNonce,
             Self::Never => false,
             Self::Always(_) => true,
             Self::AlwaysExcept((_, errors, _)) => errors

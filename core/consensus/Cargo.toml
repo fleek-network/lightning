@@ -50,4 +50,5 @@ fastcrypto = { git = "https://github.com/MystenLabs/fastcrypto", rev = "55e7e568
 lightning-workspace-hack.workspace = true
 
 [dev-dependencies]
+lightning-test-utils.workspace = true
 tempfile.workspace = true

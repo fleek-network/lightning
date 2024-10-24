@@ -41,6 +41,7 @@ use types::{
     UpdateMethod,
 };
 
+use super::ports::get_available_port;
 use super::SyncBroadcaster;
 use crate::consensus::MockForwarder;
 use crate::keys::EphemeralKeystore;
@@ -142,6 +143,9 @@ impl<C: NodeComponents> TestNetworkNode for TestFullNode<C> {
         Ok(NodePorts {
             rpc: self.rpc_listen_address.unwrap().port(),
             pool: self.pool_listen_address.unwrap().port(),
+            primary: get_available_port("127.0.0.1"),
+            worker: get_available_port("127.0.0.1"),
+            mempool: get_available_port("127.0.0.1"),
             ..Default::default()
         })
     }

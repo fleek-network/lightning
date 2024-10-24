@@ -7595,6 +7595,7 @@ dependencies = [
  "gethostname",
  "lightning-interfaces",
  "lightning-metrics",
+ "lightning-test-utils",
  "lightning-utils",
  "lightning-workspace-hack",
  "multiaddr",

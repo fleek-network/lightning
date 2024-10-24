@@ -10,6 +10,7 @@ mod node;
 mod node_app;
 mod node_builder;
 mod node_rpc;
+mod ports;
 mod tracing;
 
 pub use bindings::*;

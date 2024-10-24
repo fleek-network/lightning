@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use fleek_crypto::{AccountOwnerSecretKey, EthAddress, SecretKey};
 use hp_fixed::unsigned::HpUfixed;
@@ -23,6 +23,7 @@ pub struct TestGenesisBuilder {
     protocol_address: EthAddress,
     nodes: Vec<GenesisNode>,
     accounts: Vec<GenesisAccount>,
+    epoch_time: u64,
     mutator: Option<GenesisMutator>,
 }
 
@@ -39,6 +40,7 @@ impl TestGenesisBuilder {
             nodes: Vec::new(),
             protocol_address: AccountOwnerSecretKey::generate().to_pk().into(),
             accounts: Vec::new(),
+            epoch_time: 120000,
             mutator: None,
         }
     }
@@ -78,11 +80,18 @@ impl TestGenesisBuilder {
         self
     }
 
+    pub fn with_epoch_time(self, epoch_time: u64) -> Self {
+        Self { epoch_time, ..self }
+    }
+
     pub fn build(self) -> Genesis {
         let mut genesis = Genesis {
             chain_id: self.chain_id,
-            epoch_start: 1684276288383,
-            epoch_time: 120000,
+            epoch_start: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as u64,
+            epoch_time: self.epoch_time,
             epochs_per_year: 365,
             committee_size: 10,
             node_count: 10,

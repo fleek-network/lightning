@@ -332,7 +332,7 @@ async fn test_execute_transaction_with_node_signer_wait_for_receipt_retry_on_rev
 }
 
 #[tokio::test]
-async fn test_execute_transaction_with_node_signer_wait_for_receipt_retry_on_timeout() {
+async fn test_execute_transaction_with_node_signer_wait_for_receipt_retry_on_timeout_no_recovery() {
     // Build and start the node.
     let mut node = TestNodeBuilder::new()
         .with_mock_consensus_config(MockConsensusConfig {
@@ -362,15 +362,62 @@ async fn test_execute_transaction_with_node_signer_wait_for_receipt_retry_on_tim
         )
         .await;
     match result.unwrap_err() {
-        ExecuteTransactionError::Timeout((_, _, attempts)) => {
-            // Check that there were 4 attempts; 1 initial attempt and 3 retries.
-            assert_eq!(attempts, 4);
-        },
+        ExecuteTransactionError::FailedToIncrementNonceForRetry(_) => {},
         e => panic!("unexpected error type: {e:?}"),
     }
 
     // Check that the nonce has not been incremented since no transaction was included.
     assert_eq!(node.get_node_nonce(), 0);
+
+    // Shutdown the node.
+    node.shutdown().await;
+}
+
+#[tokio::test]
+async fn test_execute_transaction_with_node_signer_wait_for_receipt_retry_on_timeout_recovers() {
+    // Build and start the node.
+    let mut node = TestNodeBuilder::new()
+        .with_mock_consensus_config(MockConsensusConfig {
+            min_ordering_time: 0,
+            max_ordering_time: 0,
+            probability_txn_lost: 0.0,
+            // Lose the first 2 transactions.
+            transactions_to_lose: HashSet::from_iter(vec![1, 2]),
+            new_block_interval: Duration::from_secs(0),
+            block_buffering_interval: Duration::from_secs(0),
+        })
+        .build::<TestNodeComponents>()
+        .await
+        .unwrap();
+    node.start().await;
+
+    // Build a transaction client.
+    let client = node.node_transaction_client().await;
+
+    // Check that the nonce starts at 0.
+    assert_eq!(node.get_node_nonce(), 0);
+
+    // Execute a transaction that will be lost.
+    let (_, receipt) = client
+        .execute_transaction(
+            UpdateMethod::IncrementNonce {},
+            Some(ExecuteTransactionOptions {
+                wait: ExecuteTransactionWait::Receipt,
+                retry: ExecuteTransactionRetry::Always(None),
+                timeout: Some(Duration::from_millis(200)),
+            }),
+        )
+        .await
+        .unwrap()
+        .as_receipt();
+    assert_eq!(
+        receipt.response,
+        TransactionResponse::Success(ExecutionData::None)
+    );
+
+    // Check that the nonce has been incremented twice, for the nonce backfill of the initial
+    // attempt that timed out, and the actual transaction.
+    assert_eq!(node.get_node_nonce(), 2);
 
     // Shutdown the node.
     node.shutdown().await;

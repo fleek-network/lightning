@@ -7,6 +7,7 @@ use lightning_application::{Application, ApplicationConfig};
 use lightning_blockstore::blockstore::Blockstore;
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_checkpointer::{Checkpointer, CheckpointerConfig, CheckpointerDatabaseConfig};
+use lightning_consensus::{Consensus, ConsensusConfig};
 use lightning_interfaces::prelude::*;
 use lightning_node::ContainedNode;
 use lightning_pool::{Config as PoolConfig, PoolProvider};
@@ -43,6 +44,7 @@ impl TestNodeBuilder {
         Self {
             _temp_dir: temp_dir,
             home_dir,
+            // Default to using mock consensus.
             use_mock_consensus: true,
             mock_consensus_group: None,
             is_genesis_committee: None,
@@ -55,7 +57,7 @@ impl TestNodeBuilder {
         self
     }
 
-    pub fn without_mock_consensus(mut self) -> Self {
+    pub fn with_real_consensus(mut self) -> Self {
         self.use_mock_consensus = false;
         self.mock_consensus_group = None;
         self
@@ -99,6 +101,10 @@ impl TestNodeBuilder {
                     .map(|group| group.config.clone())
                     .unwrap_or_default(),
             );
+        } else {
+            config.inject::<Consensus<C>>(ConsensusConfig {
+                store_path: self.home_dir.join("consensus").try_into().unwrap(),
+            });
         }
 
         // Configure pool component.
