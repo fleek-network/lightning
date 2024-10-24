@@ -27,7 +27,7 @@ pub(crate) struct HeaderPositions {
 impl HeaderPositions {
     pub(crate) fn new(num_entries: usize) -> Self {
         let position_start_hashes = 4 + 4;
-        let length_hashes = num_entries * 32;
+        let length_hashes = num_entries * 64 - 32;
         let bloom_filter_hashes_len = 4;
         let bloom_filter_len = FilterBuilder::new(num_entries as u64, 0.01)
             .build_bloom_filter()

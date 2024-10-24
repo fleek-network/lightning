@@ -308,9 +308,12 @@ mod tests {
             let entry = entry.unwrap();
             count += 1;
             match entry.name {
-                b"file1" | b"file2" => assert!(matches!(entry.link, BorrowedLink::Content(_))),
+                b"file1\0" | b"file2\0" => assert!(matches!(entry.link, BorrowedLink::Content(_))),
                 b"symlink" => assert!(matches!(entry.link, BorrowedLink::Path(_))),
-                _ => panic!("Unexpected entry: {:?}", entry.name),
+                _ => panic!(
+                    "Unexpected entry: {:?}",
+                    String::from_utf8(entry.name.to_vec()).unwrap()
+                ),
             }
         }
 
