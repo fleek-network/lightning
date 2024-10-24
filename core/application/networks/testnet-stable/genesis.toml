@@ -36,6 +36,10 @@ committee_selection_beacon_commit_phase_duration = 600
 # and starting with a long duration for safety since non-revealing nodes will be slashed.
 committee_selection_beacon_reveal_phase_duration = 12000
 
+# Amount of stake to slash for non-revealing nodes.
+# 1000 is 100% of the minimum stake.
+committee_selection_beacon_non_reveal_slash_amount = 1000
+
 
 [[node_info]]
 owner = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"

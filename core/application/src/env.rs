@@ -334,6 +334,12 @@ impl ApplicationEnv {
                     genesis.committee_selection_beacon_reveal_phase_duration,
                 ),
             );
+            param_table.insert(
+                ProtocolParamKey::CommitteeSelectionBeaconNonRevealSlashAmount,
+                ProtocolParamValue::CommitteeSelectionBeaconNonRevealSlashAmount(
+                    genesis.committee_selection_beacon_non_reveal_slash_amount,
+                ),
+            );
 
             let epoch_end: u64 = genesis.epoch_time + genesis.epoch_start;
             let mut committee_members = Vec::with_capacity(4);
