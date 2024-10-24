@@ -30,7 +30,7 @@ pub mod module_loader;
 pub mod tape;
 
 /// Snapshot of the runtime after javascript modules have been initialized
-static SNAPSHOT: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/snapshot.bin"));
+pub const SNAPSHOT: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/snapshot.bin"));
 
 pub struct Runtime {
     pub deno: JsRuntime,
