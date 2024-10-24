@@ -225,6 +225,9 @@ fn build_genesis(keystore_config: &KeystoreConfig) -> Result<Genesis> {
         node_count: 100,
         min_stake: 1000,
 
+        topology_target_k: 8,
+        topology_min_nodes: 16,
+
         node_info: vec![GenesisNode {
             owner: AccountOwnerSecretKey::generate().to_pk().into(),
             primary_public_key: node_public_key,
