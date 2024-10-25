@@ -24,22 +24,19 @@ use std::io::Write;
 use arrayref::array_ref;
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
-use hex_literal::hex;
 use libsecp256k1::{RecoveryId, Signature};
-use serde::de::IntoDeserializer;
 use serde::{Deserialize, Deserializer};
 use serde_json::json;
 use sgxkit::crypto::DerivedKey;
 use sgxkit::io::output_writer;
 use sgxkit::println;
-use sha2::{Digest, Sha256};
-use sha3::Keccak256;
+use sha3::{Digest, Keccak256};
 
-/// List of valid secp256k1 signers
-const PUBLIC_SIGNERS: &[[u8; 33]] = &[
-    hex!("031b84c5567b126440995d3ed5aaba0565d71e1834604819ff9c17f5e9d5dd078f"),
-    hex!("024d4b6cd1361032ca9bd2aeb9d900aa4d45d9ead80ac9423374c451a7254d0766"),
-    hex!("02531fe6068134503d2723133227c867ac8fa6c83c537e9a44c3c5bdbdcb1fe337"),
+/// List of valid signing ethereum accounts
+const PUBLIC_SIGNERS: &[&str] = &[
+    "0xcd09987ab8141ec5b3646962e6810671d8f82434",
+    "0xfc8c3f631b82f20e54ae5f3547054f63c7f97db5",
+    "0x5a742918200f07183449b0ccba8b39818e269bac",
 ];
 
 /// Require ceil(signers * 2 / 3) valid signatures
@@ -77,16 +74,31 @@ where
         )));
     }
 
-    let mut sigs = vec![];
-    for base in inputs {
-        let raw: [u8; 65] = decode_base64(base.into_deserializer())?
+    let mut sigs = Vec::with_capacity(inputs.len());
+    for v in inputs {
+        println!("decoding hex");
+        let raw: [u8; 65] = hex::decode(v.trim_start_matches("0x"))
+            .map_err(|e| serde::de::Error::custom(e.to_string()))?
             .try_into()
             .map_err(|_| serde::de::Error::custom("invalid signature length"))?;
+
+        println!("parsing signature");
+
         let signature = Signature::parse_standard(array_ref![raw, 0, 64])
             .map_err(|_| serde::de::Error::custom("invalid signature"))?;
-        let rid = RecoveryId::parse(raw[64])
-            .map_err(|_| serde::de::Error::custom("invalid recovery id"))?;
+
+        println!("parsing recovery id");
+
+        let rid = RecoveryId::parse_rpc(raw[64])
+            .map_err(|_| serde::de::Error::custom("invalid ethereum recovery id"))?;
+
+        println!("done");
+
         sigs.push((signature, rid));
+    }
+
+    if sigs.len() < MINIMUM_SIGNATURES {
+        return Err(serde::de::Error::custom("not enough signatures"));
     }
 
     Ok(sigs)
@@ -94,8 +106,12 @@ where
 
 #[sgxkit::main]
 pub fn main() -> Result<(), String> {
+    println!("starting");
     // Get json data and parse into input
     let input = sgxkit::io::get_input_data_string().unwrap();
+
+    println!("got input");
+
     let InputData {
         payload,
         signatures,
@@ -104,29 +120,23 @@ pub fn main() -> Result<(), String> {
     println!("decoded input");
 
     // Hash input
-    let mut hasher = Sha256::new();
-    hasher.update(&payload);
-    let hash = hasher.finalize();
+    let hash = Keccak256::digest(&payload);
     let msg = libsecp256k1::Message::parse(&hash.into());
 
-    println!("hashed message");
+    println!("hashed message: 0x{}", hex::encode(hash));
 
     let mut count = 0;
     for (sig, rid) in signatures {
         // Recover the signature's public key
         let pubkey = libsecp256k1::recover(&msg, &sig, &rid).map_err(|e| e.to_string())?;
+        let hash = Keccak256::digest(pubkey.serialize());
+        let eth = format!("0x{}", hex::encode(&hash[12..]));
 
-        println!(
-            "recovered pubkey: {}",
-            hex::encode(pubkey.serialize_compressed())
-        );
+        println!("recovered signer: {eth}");
 
         // Ensure public key is in the approved list
-        if !PUBLIC_SIGNERS.contains(&pubkey.serialize_compressed()) {
-            return Err(format!(
-                "Invalid signer {}",
-                hex::encode(pubkey.serialize_compressed())
-            ));
+        if !PUBLIC_SIGNERS.contains(&eth.as_str()) {
+            return Err(format!("Invalid signer {eth}"));
         }
 
         // Verify the signature
@@ -153,16 +163,16 @@ pub fn main() -> Result<(), String> {
         .unwrap()
         .serialize();
     let hash = Keccak256::digest(uncompressed);
-    let pk = format!("0x{}", hex::encode_upper(&hash[12..]));
+    let eth = format!("0x{}", hex::encode(&hash[12..]));
 
-    println!("signing with key {pk}");
+    println!("signing with key {eth}");
 
     // Sign the request data with the derived key
-    let wasm_sig = key.sign(&payload).map_err(|e| e.to_string())?;
+    let wasm_sig = key.sign_eth(&payload).map_err(|e| e.to_string())?;
 
     let res = json!({
-        "account": pk,
-        "signature": BASE64_STANDARD.encode(wasm_sig),
+        "account": eth,
+        "signature": wasm_sig,
     });
 
     // Write to certified output
@@ -175,10 +185,14 @@ pub fn main() -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
+
     /// Generate some example data on a host system
-    #[cfg(target_family = "unix")]
+    #[cfg(not(target_family = "wasm"))]
     #[test]
     fn generate_example_request() {
+        use base64::Engine;
+        use sha3::Digest;
+
         // Create some secret keys
         let keys = (1u8..=3)
             .into_iter()
@@ -187,30 +201,31 @@ mod tests {
 
         // Make a payload and hash it into a message to sign
         let payload = b"FOOBAR";
-        let hash = Sha256::digest(payload);
+        let hash = sha3::Keccak256::digest(payload);
         let msg = libsecp256k1::Message::parse(&hash.into());
 
-        // Sign the message with each key
+        // Sign the message with each key and encode as ethereum signatures
         let signatures = keys
             .iter()
             .map(|sk| {
-                // print pubkeys for debugging
+                // print ethereum account ids for debugging
                 let pk = libsecp256k1::PublicKey::from_secret_key(&sk);
-                println!("{}", hex::encode(pk.serialize_compressed()));
+                let hash = sha3::Keccak256::digest(pk.serialize());
+                println!("0x{}", hex::encode(&hash[12..]));
 
                 libsecp256k1::sign(&msg, &sk)
             })
             .map(|(sig, rid)| {
-                // serialize signature as `Base64<[r . s . v]>`
+                // serialize signature as `Hex [r . s . v + 27]`
                 let mut buf = sig.serialize().to_vec();
-                buf.push(rid.serialize());
-                BASE64_STANDARD.encode(&buf)
+                buf.push(rid.serialize() + 27);
+                format!("0x{}", hex::encode(&buf))
             })
             .collect::<Vec<_>>();
 
         // encode json and escape quotes (for terminal pasting)
         let out = serde_json::to_string(&serde_json::json!({
-            "payload": BASE64_STANDARD.encode(&payload),
+            "payload": base64::prelude::BASE64_STANDARD.encode(&payload),
             "signatures": signatures
         }))
         .unwrap()
