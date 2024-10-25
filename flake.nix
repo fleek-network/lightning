@@ -261,6 +261,7 @@
                 partitions = 1;
                 partitionType = "count";
                 cargoNextestExtraArgs = "--workspace";
+                RUST_LOG = "debug";
               }
             );
           };
