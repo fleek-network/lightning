@@ -350,7 +350,7 @@ fn0_module! {
     fn0.derived_key_unseal: (path_ptr: usize, path_len: usize, data_ptr: usize, data_len: usize) -> i32;
 
     /// Derive a wasm specific key from the shared key, with a given path up to `[u16; 128]`, and
-    /// sign the sha256 hash of some data with it.
+    /// sign a 32 byte hash with it.
     ///
     /// # Parameters
     ///
@@ -368,7 +368,6 @@ fn0_module! {
         path_ptr: usize,
         path_len: usize,
         data_ptr: usize,
-        data_len: usize,
         signature_buf_ptr: usize
     ) -> i32;
 
