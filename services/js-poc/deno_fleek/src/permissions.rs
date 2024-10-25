@@ -94,7 +94,7 @@ impl FsPermissions for Permissions {
     }
 
     fn check_read(&mut self, _path: &str, _api_name: &str) -> Result<PathBuf, AnyError> {
-        unimplemented!()
+        Err(anyhow!("fs is disabled"))
     }
 
     fn check_read_path<'a>(
@@ -102,11 +102,11 @@ impl FsPermissions for Permissions {
         _path: &'a Path,
         _api_name: &str,
     ) -> Result<Cow<'a, Path>, AnyError> {
-        unimplemented!()
+        Err(anyhow!("fs is disabled"))
     }
 
     fn check_read_all(&mut self, _api_name: &str) -> Result<(), AnyError> {
-        unimplemented!()
+        Err(anyhow!("fs is disabled"))
     }
 
     fn check_read_blind(
@@ -115,11 +115,11 @@ impl FsPermissions for Permissions {
         _display: &str,
         _api_name: &str,
     ) -> Result<(), AnyError> {
-        unimplemented!()
+        Err(anyhow!("fs is disabled"))
     }
 
     fn check_write(&mut self, _path: &str, _api_name: &str) -> Result<PathBuf, AnyError> {
-        unimplemented!()
+        Err(anyhow!("fs is disabled"))
     }
 
     fn check_write_path<'a>(
@@ -127,15 +127,15 @@ impl FsPermissions for Permissions {
         _path: &'a Path,
         _api_name: &str,
     ) -> Result<Cow<'a, Path>, AnyError> {
-        unimplemented!()
+        Err(anyhow!("fs is disabled"))
     }
 
     fn check_write_partial(&mut self, _path: &str, _api_name: &str) -> Result<PathBuf, AnyError> {
-        unimplemented!()
+        Err(anyhow!("fs is disabled"))
     }
 
     fn check_write_all(&mut self, _api_name: &str) -> Result<(), AnyError> {
-        unimplemented!()
+        Err(anyhow!("fs is disabled"))
     }
 
     fn check_write_blind(
@@ -144,13 +144,13 @@ impl FsPermissions for Permissions {
         _display: &str,
         _api_name: &str,
     ) -> Result<(), AnyError> {
-        unimplemented!()
+        Err(anyhow!("fs is disabled"))
     }
 }
 
 impl NodePermissions for Permissions {
     fn check_net_url(&mut self, _url: &Url, _api_name: &str) -> Result<(), AnyError> {
-        unimplemented!()
+        Err(anyhow!("node permission operation is not allowed"))
     }
 
     fn check_read_with_api_name(
@@ -158,11 +158,11 @@ impl NodePermissions for Permissions {
         _path: &str,
         _api_name: Option<&str>,
     ) -> Result<PathBuf, AnyError> {
-        unimplemented!()
+        Err(anyhow!("node permission operation is not allowed"))
     }
 
     fn check_read_path<'a>(&mut self, _path: &'a Path) -> Result<Cow<'a, Path>, AnyError> {
-        unimplemented!()
+        Err(anyhow!("node permission operation is not allowed"))
     }
 
     fn query_read_all(&mut self) -> bool {
@@ -187,6 +187,6 @@ impl NodePermissions for Permissions {
         _path: &str,
         _api_name: Option<&str>,
     ) -> Result<PathBuf, AnyError> {
-        unimplemented!()
+        Err(anyhow!("node permission operation is not allowed"))
     }
 }
