@@ -11,10 +11,8 @@ use deno_net::NetPermissions;
 use deno_node::NodePermissions;
 use deno_web::TimersPermission;
 use deno_websocket::WebSocketPermissions;
-use tracing::debug;
 
 pub const FETCH_BLACKLIST: &[&str] = &["localhost", "127.0.0.1", "::1"];
-pub const BUILTIN_API_NOT_ALLOWED: &[&str] = &["node:os"];
 
 pub struct Permissions {}
 
@@ -169,17 +167,8 @@ impl NodePermissions for Permissions {
         unimplemented!()
     }
 
-    fn check_sys(&mut self, kind: &str, api_name: &str) -> Result<(), AnyError> {
-        debug!("checking sys for kind={kind} and api_name={api_name}");
-
-        if BUILTIN_API_NOT_ALLOWED
-            .iter()
-            .any(|api| api_name.starts_with(*api))
-        {
-            return Err(anyhow!("{kind} is not allowed"));
-        }
-
-        Ok(())
+    fn check_sys(&mut self, _kind: &str, _api_name: &str) -> Result<(), AnyError> {
+        Err(anyhow!("sys is disabled"))
     }
 
     fn check_write_with_api_name(
