@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 use std::net::IpAddr;
 use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use lightning_types::RateLimitingRule;
 use serde::{Deserialize, Serialize};
-use tokio::sync::{mpsc, oneshot, OnceCell};
+use tokio::sync::{mpsc, oneshot, OnceCell, SetError};
 
 use crate::rate_limiting::RateLimitingMode;
 use crate::AdminError;
@@ -27,12 +28,27 @@ impl CommandCenter {
         match COMMAND_CENTER.get() {
             Some(center) => center,
             None => {
-                let center = CommandCenter {
-                    senders: Mutex::new(HashMap::new()),
-                };
-
-                // we dont care if this fails as long as theres one in there
-                let _ = COMMAND_CENTER.set(center);
+                let start_time = Instant::now();
+                let timeout = Duration::from_millis(500);
+                loop {
+                    let center = CommandCenter {
+                        senders: Mutex::new(HashMap::new()),
+                    };
+                    match COMMAND_CENTER.set(center) {
+                        Ok(_) => break,
+                        // If the command center is already initialized, we can ignore the error.
+                        Err(SetError::AlreadyInitializedError(_)) => break,
+                        // If we get an initializing error, we try again unless the timeout is
+                        // reached.
+                        Err(SetError::InitializingError(_)) => {
+                            if start_time.elapsed() >= timeout {
+                                panic!("failed to initialize command center");
+                            }
+                            tracing::info!("failed to initialize command center, retrying...");
+                            std::thread::sleep(Duration::from_millis(50));
+                        },
+                    }
+                }
                 COMMAND_CENTER.get().unwrap()
             },
         }
