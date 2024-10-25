@@ -3,6 +3,7 @@
 use std::sync::LazyLock;
 
 use sgxkit_sys::fn0;
+use sha3::{Digest, Keccak256};
 
 use crate::error::HostError;
 
@@ -63,24 +64,36 @@ impl DerivedKey {
         }
     }
 
-    /// Sign the sha256 digest of some given data using the derived key.
-    ///
-    /// This can be used as a proof
-    pub fn sign(&self, data: &[u8]) -> Result<[u8; 65], HostError> {
+    /// Sign a given raw 32 byte digest with the derived secp256k1 key.
+    /// Recovery ID (last byte) is encoded as either 0 or 1.
+    pub fn sign(&self, digest: [u8; 32]) -> Result<[u8; 65], HostError> {
         let mut buf = [0u8; 65];
 
         let res = unsafe {
             fn0::derived_key_sign(
                 self.path.as_ptr() as usize,
                 self.path.len() * 2,
-                data.as_ptr() as usize,
-                data.len(),
+                digest.as_ptr() as usize,
                 buf.as_mut_ptr() as usize,
             )
         };
         HostError::result(res)?;
 
         Ok(buf)
+    }
+
+    /// Sign some given data according to ethereum spec.
+    ///
+    /// Signature is hex encoded, prefixed by `0x`.
+    /// The last byte contains the recovery id + 27.
+    pub fn sign_eth(&self, data: &[u8]) -> Result<String, HostError> {
+        // Hash data with keeccak 256
+        let digest = Keccak256::digest(data);
+        let mut buf = self.sign(digest.into())?;
+        // Eth compatible recovery id (chain id + v)
+        buf[64] += 27;
+        // Encode with hex with prefix
+        Ok(format!("0x{}", hex::encode(buf)))
     }
 
     /// Unseal a ciphertext in-place using the derived key.
