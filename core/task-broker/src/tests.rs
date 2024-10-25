@@ -346,14 +346,14 @@ async fn run_cluster_echo_task() -> anyhow::Result<()> {
         .run(0, schema::task_broker::TaskScope::Cluster, request)
         .await;
 
-    // Ensure at least 2/3 of nodes had a response
-    assert!(responses.len() >= (2. * (nodes.len() - 1) as f32 / 3.).ceil() as usize);
-
-    for response in responses {
-        let response = response.expect("task should succeed");
+    for response in &responses {
+        let response = response.as_ref().expect("task should succeed");
         assert_eq!(response.payload, PAYLOAD);
         assert_eq!(response.request, digest);
     }
+
+    // Ensure at least 2/3 of nodes had a response
+    assert!(responses.len() >= (2. * (nodes.len() - 1) as f32 / 3.).ceil() as usize);
 
     // Shutdown all nodes
     nodes
@@ -391,10 +391,7 @@ async fn run_cluster_echo_task_1_offline_of_8() -> anyhow::Result<()> {
         .run(0, schema::task_broker::TaskScope::Cluster, request)
         .await;
 
-    // Ensure at least 2/3 of nodes had a response
-    assert!(responses.len() >= (2. * nodes.len() as f32 / 3.).ceil() as usize);
-
-    for response in responses {
+    for response in &responses {
         match response {
             Ok(response) => {
                 assert_eq!(response.payload, PAYLOAD);
@@ -407,6 +404,9 @@ async fn run_cluster_echo_task_1_offline_of_8() -> anyhow::Result<()> {
             },
         }
     }
+
+    // Ensure at least 2/3 of nodes had a response
+    assert!(responses.len() >= (2. * nodes.len() as f32 / 3.).ceil() as usize);
 
     // Shutdown all nodes
     nodes
