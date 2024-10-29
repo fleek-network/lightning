@@ -1,5 +1,4 @@
-use std::collections::HashMap;
-
+use fxhash::FxHashMap;
 use lightning_interfaces::types::{CommitteeSelectionBeaconCommit, CommitteeSelectionBeaconReveal};
 use rand::Rng;
 use sha3::{Digest, Sha3_256};
@@ -50,7 +49,7 @@ fn test_get_beacons() {
     // Check that we get all the beacons.
     assert_eq!(
         query.get_beacons(),
-        HashMap::from([(commit1, reveal1), (commit2, reveal2)])
+        FxHashMap::from_iter([(commit1, reveal1), (commit2, reveal2)])
     );
 }
 
