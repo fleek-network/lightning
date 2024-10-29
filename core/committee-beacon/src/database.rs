@@ -1,5 +1,4 @@
-use std::collections::HashMap;
-
+use fxhash::FxHashMap;
 use lightning_interfaces::types::{CommitteeSelectionBeaconCommit, CommitteeSelectionBeaconReveal};
 
 use crate::config::CommitteeBeaconDatabaseConfig;
@@ -48,5 +47,5 @@ pub trait CommitteeBeaconDatabaseQuery {
     /// Get all the locally stored beacons.
     fn get_beacons(
         &self,
-    ) -> HashMap<CommitteeSelectionBeaconCommit, CommitteeSelectionBeaconReveal>;
+    ) -> FxHashMap<CommitteeSelectionBeaconCommit, CommitteeSelectionBeaconReveal>;
 }

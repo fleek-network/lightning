@@ -1,7 +1,6 @@
-use std::collections::HashMap;
-
 use atomo::{Atomo, DefaultSerdeBackend, QueryPerm};
 use atomo_rocks::RocksBackend;
+use fxhash::FxHashMap;
 use lightning_interfaces::types::{CommitteeSelectionBeaconCommit, CommitteeSelectionBeaconReveal};
 
 use super::database::BEACONS_TABLE;
@@ -36,7 +35,7 @@ impl CommitteeBeaconDatabaseQuery for RocksCommitteeBeaconDatabaseQuery {
 
     fn get_beacons(
         &self,
-    ) -> HashMap<CommitteeSelectionBeaconCommit, CommitteeSelectionBeaconReveal> {
+    ) -> FxHashMap<CommitteeSelectionBeaconCommit, CommitteeSelectionBeaconReveal> {
         self.atomo.query().run(|ctx| {
             let table = ctx
                 .get_table::<CommitteeSelectionBeaconCommit, CommitteeSelectionBeaconReveal>(

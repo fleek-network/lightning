@@ -1,5 +1,4 @@
-use std::collections::HashMap;
-
+use fxhash::FxHashMap;
 use lightning_interfaces::types::{CommitteeSelectionBeaconCommit, CommitteeSelectionBeaconReveal};
 use lightning_interfaces::CommitteeBeaconQueryInterface;
 
@@ -20,7 +19,7 @@ impl CommitteeBeaconQuery {
 impl CommitteeBeaconQueryInterface for CommitteeBeaconQuery {
     fn get_beacons(
         &self,
-    ) -> HashMap<CommitteeSelectionBeaconCommit, CommitteeSelectionBeaconReveal> {
+    ) -> FxHashMap<CommitteeSelectionBeaconCommit, CommitteeSelectionBeaconReveal> {
         self.db.get_beacons()
     }
 }

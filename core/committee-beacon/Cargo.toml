@@ -10,6 +10,7 @@ atomo.workspace = true
 atomo-rocks.workspace = true
 anyhow.workspace = true
 fleek-crypto.workspace = true
+fxhash.workspace = true
 humantime-serde.workspace = true
 lightning-interfaces.workspace = true
 lightning-utils.workspace = true
