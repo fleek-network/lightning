@@ -1,9 +1,9 @@
 use std::any::Any;
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::hash::Hash;
 
 use atomo::{KeyIterator, SerdeBackend, StorageBackend, TableRef as AtomoTableRef, TableSelector};
+use fxhash::FxHashMap;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -26,7 +26,7 @@ pub trait TableRef<K, V> {
     fn keys(&self) -> KeyIterator<K>;
     fn remove(&self, key: &K);
     fn clear(&self);
-    fn as_map(&self) -> HashMap<K, V>;
+    fn as_map(&self) -> FxHashMap<K, V>;
 }
 
 pub struct StateContext<'selector, B: StorageBackend, S: SerdeBackend> {
@@ -86,7 +86,7 @@ impl<
         self.0.borrow_mut().clear();
     }
 
-    fn as_map(&self) -> HashMap<K, V> {
+    fn as_map(&self) -> FxHashMap<K, V> {
         self.0.borrow().as_map()
     }
 }
@@ -192,7 +192,7 @@ mod tests {
             table.set("key2".to_string(), "value2".to_string());
             assert_eq!(
                 table.as_map(),
-                HashMap::from([
+                FxHashMap::from_iter([
                     ("key1".to_string(), "value1".to_string()),
                     ("key2".to_string(), "value2".to_string())
                 ])

@@ -1,12 +1,11 @@
 use std::any::{Any, TypeId};
 use std::borrow::Borrow;
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::hash::Hash;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use fxhash::FxHashSet;
+use fxhash::{FxHashMap, FxHashSet};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -331,7 +330,7 @@ where
     }
 
     /// Returns a map containing all values in this table.
-    pub fn as_map(&self) -> HashMap<K, V>
+    pub fn as_map(&self) -> FxHashMap<K, V>
     where
         K: Serialize + DeserializeOwned + Any,
         V: Serialize + DeserializeOwned + Any,

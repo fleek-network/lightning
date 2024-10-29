@@ -80,6 +80,7 @@ tower = { version = "0.4.13", features = ["tokio", "steer"] }
 hex = { version = "0.4.3", features = ["serde"] }
 url = { version = "2.4.1", features = ["serde"] }
 sha3 = "0.10.8"
+fxhash = "0.2"
 
 # Our libraries
 lightning-application = { path = "core/application" }
