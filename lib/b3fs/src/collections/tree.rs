@@ -11,6 +11,7 @@ use tokio_stream::Stream;
 
 use super::error::CollectionTryFromError;
 use super::flat::FlatHashSlice;
+use crate::bucket::POSITION_START_HASHES;
 use crate::stream::buffer::ProofBuf;
 use crate::stream::walker::Mode;
 use crate::utils::{is_valid_tree_len, tree_index};
@@ -233,7 +234,7 @@ where
         loop {
             match this.state {
                 State::SeekPosition => {
-                    let index = tree_index(this.current_block as usize) as u64 * 32 + 8;
+                    let index = tree_index(this.current_block as usize) as u64 * 32 + POSITION_START_HASHES as u64;
                     let seek_future = this.file_reader.seek(tokio::io::SeekFrom::Start(index));
                     let mut seek_future = std::pin::pin!(seek_future);
 
