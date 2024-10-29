@@ -58,6 +58,12 @@ pub mod dir;
 pub mod errors;
 pub mod file;
 
+pub const HEADER_VERSION: u32 = 1;
+pub const HEADER_TYPE_DIR: u8 = 0;
+pub const HEADER_TYPE_FILE: u8 = 1;
+pub const POSITION_START_HASHES: usize = 9;
+pub const POSITION_START_NUM_ENTRIES: usize = POSITION_START_HASHES - 4;
+
 /// An open b3fs bucket which can be used for both reads and writes.
 #[derive(Clone)]
 pub struct Bucket {

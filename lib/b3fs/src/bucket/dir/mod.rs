@@ -1,6 +1,8 @@
 use fastbloom_rs::{BloomFilter, FilterBuilder};
 use phf::{calculate_buckets_len, PHF_TABLE_RANDOMIZED_KEY_SIZE};
 
+use super::POSITION_START_HASHES;
+
 pub mod iter;
 pub mod reader;
 mod state;
@@ -10,9 +12,6 @@ pub mod writer;
 // Only exposed for benchmarks.
 #[doc(hidden)]
 pub mod phf;
-
-/// Starting position of hash entries in the directory file
-pub(crate) const POSITION_START_HASHES: usize = 8;
 
 /// Positions of different sections in the directory file header
 #[derive(Debug)]
