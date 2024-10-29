@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashMap};
+use std::collections::BTreeSet;
 use std::path::Path;
 use std::time::Duration;
 
@@ -13,6 +13,7 @@ use atomo::{
     TableSelector,
 };
 use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
+use fxhash::FxHashMap;
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::types::{
     AccountInfo,
@@ -214,7 +215,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
 
     fn get_committee_selection_beacons(
         &self,
-    ) -> HashMap<
+    ) -> FxHashMap<
         NodeIndex,
         (
             CommitteeSelectionBeaconCommit,

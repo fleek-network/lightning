@@ -2,6 +2,7 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 
 use fleek_crypto::TransactionSender;
+use fxhash::FxHashMap;
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::types::{
     Committee,
@@ -600,7 +601,7 @@ impl<B: Backend> StateExecutor<B> {
         &self,
         epoch: Epoch,
         current_committee: Committee,
-        beacons: HashMap<
+        beacons: FxHashMap<
             NodeIndex,
             (
                 CommitteeSelectionBeaconCommit,
@@ -641,7 +642,7 @@ impl<B: Backend> StateExecutor<B> {
 
     fn choose_new_committee(
         &self,
-        beacons: HashMap<
+        beacons: FxHashMap<
             NodeIndex,
             (
                 CommitteeSelectionBeaconCommit,
