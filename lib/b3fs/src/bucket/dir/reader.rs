@@ -21,10 +21,9 @@ use triomphe::Arc;
 
 use super::iter::DirEntriesIter;
 use super::phf::PHF_TABLE_RANDOMIZED_KEY_SIZE;
-use super::POSITION_START_HASHES;
 use crate::bucket::dir::phf::{calculate_buckets_len, displace, hash, HasherState};
 use crate::bucket::dir::HeaderPositions;
-use crate::bucket::errors;
+use crate::bucket::{errors, POSITION_START_HASHES};
 use crate::collections::HashTree;
 use crate::entry::{BorrowedEntry, BorrowedLink, OwnedLink};
 use crate::hasher::dir_hasher::B3_DIR_IS_SYM_LINK;
@@ -236,7 +235,7 @@ impl B3Dir {
         offset: u32,
     ) -> Result<Option<BorrowedEntry<'a>>, errors::ReadError> {
         let start_entry: u64 =
-            self.positions.position_start_entries as u64 + offset as u64 - name.len() as u64 - 3;
+            self.positions.position_start_entries as u64 + offset as u64 - name.len() as u64 - 4;
         let file = self.position_file(start_entry).await?;
         let mut file = BufReader::new(file);
         let flag = file.read_u8().await;
@@ -280,7 +279,7 @@ mod tests {
 
     use super::*;
     use crate::bucket::dir::writer::DirWriter;
-    use crate::bucket::Bucket;
+    use crate::bucket::{Bucket, HEADER_TYPE_DIR, HEADER_VERSION};
     use crate::entry::OwnedEntry;
     use crate::utils::to_hex;
 
@@ -306,7 +305,10 @@ mod tests {
                 .join(to_hex(&root_hash).to_string()),
         )
         .await?;
+        let ty = file.read_u8().await?;
+        assert_eq!(ty, HEADER_TYPE_DIR);
         let version = file.read_u32_le().await?;
+        assert_eq!(version, HEADER_VERSION);
         let num_entries = file.read_u32_le().await?;
         let file = Arc::new(file);
 

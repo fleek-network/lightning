@@ -1,4 +1,7 @@
+use arrayref::array_ref;
 use serde::{Deserialize, Serialize};
+
+use crate::bucket::POSITION_START_HASHES;
 
 pub mod reader;
 pub(crate) mod state;
@@ -47,12 +50,13 @@ impl B3FSFile {
         bincode::serialize(self).unwrap()
     }
 
-    pub fn deserialize(data: &[u8]) -> Result<Self, bincode::Error> {
-        let version: u32 = bincode::deserialize(&data[..4])?;
-        let num_entries: u32 = bincode::deserialize(&data[4..8])?;
+    pub fn deserialize(data: &[u8]) -> Self {
+        // Skip type
+        let version: u32 = u32::from_le_bytes(*array_ref!(data, 1, 4));
+        let num_entries: u32 = u32::from_le_bytes(*array_ref!(data, 5, 4));
         let num_hashes = (2 * num_entries) - 1;
         assert!(
-            data.len() == 8 + num_hashes as usize * 32,
+            data.len() == POSITION_START_HASHES + num_hashes as usize * 32,
             "Invalid data length {} - num_entries: {} - num_hashes: {}",
             data.len(),
             num_entries,
@@ -60,18 +64,18 @@ impl B3FSFile {
         );
         let mut hashes = vec![];
         for i in 0..num_hashes {
-            let range_start = 8 + i as usize * 32_usize;
+            let range_start = POSITION_START_HASHES + i as usize * 32_usize;
             let range_end = range_start + 32_usize;
             let dec: &[u8] = &data[range_start..range_end];
             let mut hash = [0u8; 32];
             hash.copy_from_slice(dec);
             hashes.push(hash);
         }
-        Ok(Self {
+        Self {
             version,
             num_entries,
             hashes,
-        })
+        }
     }
 }
 
@@ -89,7 +93,7 @@ mod tests {
     use crate::bucket::file::writer::FileWriter;
     use crate::bucket::file::B3FSFile;
     use crate::bucket::tests::get_random_file;
-    use crate::bucket::Bucket;
+    use crate::bucket::{Bucket, POSITION_START_HASHES, POSITION_START_NUM_ENTRIES};
     use crate::hasher::b3::MAX_BLOCK_SIZE_IN_BYTES;
     use crate::utils;
 
@@ -119,7 +123,7 @@ mod tests {
         assert_eq!(1, file_header.len());
         let file_header = file_header[0].path();
         let file_header = std::fs::read(file_header).unwrap();
-        let b3fs = B3FSFile::deserialize(&file_header).unwrap();
+        let b3fs = B3FSFile::deserialize(&file_header);
         let num_hashes = 2 * n - 1;
         assert_eq!(1, b3fs.version);
         assert_eq!(n, b3fs.num_entries as usize);
@@ -181,7 +185,7 @@ mod tests {
         let file_header = file_header[0].path();
 
         let mut file = tokio::fs::File::open(file_header).await.unwrap();
-        file.seek(tokio::io::SeekFrom::Start(4)).await.unwrap();
+        file.seek(tokio::io::SeekFrom::Start(POSITION_START_NUM_ENTRIES as u64)).await.unwrap();
         let num_entries = file.read_u32_le().await.unwrap();
 
         let mut reader = B3File::new(num_entries, triomphe::Arc::new(file));
