@@ -12,7 +12,7 @@ use rand::random;
 use tokio::fs::{File, OpenOptions};
 use tokio::io::{self, AsyncWriteExt, BufWriter};
 
-use crate::bucket::{errors, Bucket};
+use crate::bucket::{errors, Bucket, HEADER_TYPE_FILE, HEADER_VERSION, POSITION_START_HASHES, POSITION_START_NUM_ENTRIES};
 use crate::hasher::b3::{BLOCK_SIZE_IN_CHUNKS, MAX_BLOCK_SIZE_IN_BYTES};
 use crate::hasher::collector::BufCollector;
 use crate::hasher::HashTreeCollector;
@@ -100,9 +100,9 @@ impl HeaderFile {
                 .open(path.clone())
                 .await?,
         );
-        let version: u32 = 1;
         let num_entries: u32 = 0;
-        file.write_u32_le(version).await?;
+        file.write_u8(HEADER_TYPE_FILE).await?;
+        file.write_u32_le(HEADER_VERSION).await?;
         file.write_u32_le(num_entries).await?;
         file.flush().await?;
 
@@ -135,7 +135,7 @@ impl HeaderFile {
         let mut file = self.file.into_inner().try_into_std().unwrap();
         let task = tokio::task::spawn_blocking(move || async move {
             let bytes: [u8; 4] = num_entries.to_le_bytes();
-            file.write_at(&bytes, 4)
+            file.write_at(&bytes, POSITION_START_NUM_ENTRIES as u64)
                 .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
             Ok(()) as Result<(), io::Error>
         })
