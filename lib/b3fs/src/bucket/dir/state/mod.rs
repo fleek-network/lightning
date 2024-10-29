@@ -11,7 +11,7 @@ use tokio::io::{self, AsyncWriteExt, BufWriter};
 use super::phf::{calculate_buckets_len, HasherState, PhfGenerator};
 use super::HeaderPositions;
 use crate::bucket::dir::POSITION_START_HASHES;
-use crate::bucket::{errors, Bucket};
+use crate::bucket::{errors, Bucket, HEADER_TYPE_DIR, HEADER_VERSION};
 use crate::entry::{BorrowedEntry, BorrowedLink};
 use crate::hasher::dir_hasher::B3_DIR_IS_SYM_LINK;
 use crate::utils::random_file_from;
@@ -22,7 +22,7 @@ pub(super) mod writer;
 /// A block file is a file that contains the data of a block.
 ///
 /// ```text
-/// HEADER_DIR = VERSION-NUM_ENTRIES-VEC [HASHES] [BLOOM_FILTER based on the entries' names] PHF-TABLE [ENTRIES]
+/// HEADER_DIR = TYPE-VERSION-NUM_ENTRIES-VEC [HASHES] [BLOOM_FILTER based on the entries' names] PHF-TABLE [ENTRIES]
 /// [ENTRIES] = [NULL TERMINATED STRING: entry name] [IS_SYM_LINK] [ENTRY CONTENT]
 ///                         ;;^--- If a file/dir (not symlink), it's a 32byte hash
 ///                         ;;     otherwise, just a null terminated string for symlink
@@ -61,8 +61,8 @@ impl HeaderFile {
                 .await?,
         );
         let positions = HeaderPositions::new(num_entries);
-        let version: u32 = 1;
-        file.write_u32_le(version).await?;
+        file.write_u8(HEADER_TYPE_DIR).await?;
+        file.write_u32_le(HEADER_VERSION).await?;
         file.write_u32_le(num_entries as u32).await?;
         // Reserve space for hashes
         file.write_all(&vec![0; positions.length_hashes]).await?;
