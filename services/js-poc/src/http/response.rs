@@ -36,8 +36,6 @@ pub fn parse(scope: &mut v8::HandleScope, value: v8::Local<v8::Value>) -> Result
     };
 
     let headers = if let Some(headers_value) = get_property(scope, v8_object, "headers") {
-        tracing::error!("headers_value: {:?}", headers_value);
-
         let parsed_headers = &serde_v8::from_v8::<serde_json::Value>(scope, headers_value)
             .context("failed to deserialize headers")?
             .clone();
