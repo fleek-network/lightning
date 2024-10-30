@@ -229,18 +229,18 @@ async fn parse_and_respond(
 
         respond(connection, string.as_bytes()).await?;
     } else {
-        // Parse the response into a generic json value
-        let value = serde_v8::from_v8::<serde_json::Value>(scope, local)
-            .context("failed to deserialize response")?
-            .clone();
-
         // Attempt to parse and use the value as an http response override object
         if connection.is_http_request() {
-            if let Ok(http_response) = http::response::parse(&value) {
+            if let Ok(http_response) = http::response::parse(scope, local) {
                 respond_with_http_response(connection, http_response).await?;
                 return Ok(());
             }
         }
+
+        // Parse the response into a generic json value
+        let value = serde_v8::from_v8::<serde_json::Value>(scope, local)
+            .context("failed to deserialize response")?
+            .clone();
 
         // Otherwise, send the data as a json string
         let res = serde_json::to_string(&value).context("failed to encode json response")?;
