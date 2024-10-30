@@ -73,7 +73,21 @@ impl Runtime {
 
         {
             let safe_handle = deno.v8_isolate().thread_safe_handle();
-            deno.add_near_heap_limit_callback(move |current_limit, initial_limit| {
+            // Notes about the AddNearHeapLimitCallback API.
+            // Source https://groups.google.com/g/v8-users/c/qLs7-XT2Zvg/m/XHkkiFHrAgAJ.
+            //
+            // Caveats:
+            // - The callback may be invoked multiple times.
+            // - If the callback does not extend the heap limit, then the application is not
+            //   guaranteed to OOM. For example, if the application stops allocating and never
+            //   reaches the heap limit.
+            // - If the heap limit is extended by small number, then the application may still crash
+            //   with OOM. For example, if the application wants to allocate 10MB, but the limit is
+            //   extended by 5MB.
+            // - If V8 runs out of system memory without reaching the heap limit, then it will crash
+            //   with OOM without invoking the callback. For example, if malloc/mmap fails there is
+            //   no way to safely continue execution.
+            deno.add_near_heap_limit_callback(move |current_limit, _initial_limit| {
                 safe_handle.terminate_execution();
                 // We increase the current limit to allow us to terminate
                 // the current thread of execution.
