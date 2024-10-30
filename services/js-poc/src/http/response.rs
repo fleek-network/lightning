@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Context, Result};
+use deno_core::{serde_v8, v8, JsBuffer};
 use fn_sdk::header::HttpResponse;
 
 enum HeaderFormat {
@@ -8,16 +9,44 @@ enum HeaderFormat {
     Object,
 }
 
-pub fn parse(value: &serde_json::Value) -> Result<HttpResponse> {
-    let body = value_to_string(value.get("body").context("Body is missing")?);
-    let status = if let Some(status) = value.get("status") {
-        Some(parse_status(status)?)
+pub fn parse(scope: &mut v8::HandleScope, value: v8::Local<v8::Value>) -> Result<HttpResponse> {
+    let v8_object = value
+        .to_object(scope)
+        .context("failed to convert to object")?;
+
+    // Get body directly from V8
+    let body = if let Some(body_value) = get_property(scope, v8_object, "body") {
+        parse_body(scope, body_value)?
+    } else {
+        Vec::new()
+    };
+
+    let status = if let Some(status_value) = get_property(scope, v8_object, "status") {
+        let parsed_status = &serde_v8::from_v8::<serde_json::Value>(scope, status_value)
+            .context("failed to deserialize status")?
+            .clone();
+
+        if parsed_status.is_null() {
+            None
+        } else {
+            Some(parse_status(parsed_status)?)
+        }
     } else {
         None
     };
 
-    let headers = if let Some(headers) = value.get("headers") {
-        Some(parse_headers(headers)?)
+    let headers = if let Some(headers_value) = get_property(scope, v8_object, "headers") {
+        tracing::error!("headers_value: {:?}", headers_value);
+
+        let parsed_headers = &serde_v8::from_v8::<serde_json::Value>(scope, headers_value)
+            .context("failed to deserialize headers")?
+            .clone();
+
+        if parsed_headers.is_null() {
+            None
+        } else {
+            Some(parse_headers(parsed_headers)?)
+        }
     } else {
         None
     };
@@ -27,6 +56,54 @@ pub fn parse(value: &serde_json::Value) -> Result<HttpResponse> {
         status,
         body,
     })
+}
+
+fn get_property<'s>(
+    scope: &mut v8::HandleScope<'s>,
+    obj: v8::Local<'s, v8::Object>,
+    key: &str,
+) -> Option<v8::Local<'s, v8::Value>> {
+    let key = v8::String::new(scope, key).context("failed to create key");
+    if let Ok(k) = key {
+        obj.get(scope, k.into())
+    } else {
+        None
+    }
+}
+
+fn parse_body(scope: &mut v8::HandleScope, value: v8::Local<v8::Value>) -> Result<Vec<u8>> {
+    if value.is_null() || value.is_undefined() {
+        return Ok(Vec::new());
+    }
+
+    if value.is_string() {
+        return Ok(serde_v8::from_v8::<String>(scope, value)
+            .context("failed to deserialize body as string")?
+            .clone()
+            .into());
+    }
+
+    if value.is_uint8_array() {
+        let string_or_buffer = serde_v8::from_v8::<serde_v8::StringOrBuffer>(scope, value)
+            .map_err(|e| anyhow!("Failed to deserialize body as bytes: {}", e))?;
+
+        match string_or_buffer {
+            serde_v8::StringOrBuffer::String(s) => return Ok(s.into()),
+            serde_v8::StringOrBuffer::Buffer(b) => return Ok(b.to_vec()),
+        }
+    }
+
+    if value.is_array_buffer() || value.is_array_buffer_view() {
+        let bytes = serde_v8::from_v8::<JsBuffer>(scope, value)
+            .map_err(|_| anyhow!("Failed to convert to ArrayBuffer"))?;
+        return Ok(bytes.to_vec());
+    }
+
+    // For objects and other types, use JSON serialization
+    let serialized = serde_v8::from_v8::<serde_json::Value>(scope, value)
+        .map_err(|e| anyhow!("Failed to serialize value: {}", e))?;
+
+    Ok(serialized.to_string().into())
 }
 
 fn parse_headers(headers: &serde_json::Value) -> Result<Vec<(String, Vec<String>)>> {
@@ -155,7 +232,7 @@ fn parse_header(value: &serde_json::Value) -> Result<(String, Vec<String>)> {
 
 fn parse_status(status: &serde_json::Value) -> Result<u16> {
     if status.is_null() {
-        return Err(anyhow!("Status cannot be null"));
+        return Err(anyhow!("Status cannot be null {:?}", status));
     }
 
     if let Some(status) = status.as_u64() {
@@ -179,13 +256,26 @@ fn value_to_string(value: &serde_json::Value) -> String {
 
 #[cfg(test)]
 mod tests {
-    use fn_sdk::header::HttpResponse;
+    use deno_core::JsRuntime;
 
     use super::*;
 
+    fn setup_runtime() -> JsRuntime {
+        JsRuntime::new(Default::default())
+    }
+
+    fn eval_to_value<'s>(scope: &mut v8::HandleScope<'s>, code: &str) -> v8::Local<'s, v8::Value> {
+        let source = v8::String::new(scope, code).unwrap();
+        let script = v8::Script::compile(scope, source, None).unwrap();
+        script.run(scope).unwrap()
+    }
+
     #[test]
     fn test_array_of_key_val_objects() {
-        let res = r###"
+        let mut runtime = setup_runtime();
+        let scope = &mut runtime.handle_scope();
+        let value = eval_to_value(
+            scope,  r###"(
 {
   "headers": [
     {"key": "content-type", "value": "text"},
@@ -194,7 +284,7 @@ mod tests {
   "status": 200,
   "body": "hello"
 }
-        "###;
+        )"###);
 
         let target = HttpResponse {
             status: Some(200),
@@ -202,18 +292,19 @@ mod tests {
                 ("content-type".to_string(), vec!["text".to_string()]),
                 ("content-length".to_string(), vec!["300".to_string()]),
             ]),
-            body: "hello".to_string(),
+            body: "hello".into(),
         };
 
-        let value = serde_json::from_str::<serde_json::Value>(res).unwrap();
-        let http_res = parse(&value).unwrap();
+        let http_res = parse(scope, value).unwrap();
 
         assert_eq!(http_res, target);
     }
 
     #[test]
     fn test_array_of_key_val_objects_multiple_values() {
-        let res = r###"
+        let mut runtime = setup_runtime();
+        let scope = &mut runtime.handle_scope();
+        let res = eval_to_value(scope, r###"(
 {
   "status":"201",
   "headers":{
@@ -240,7 +331,7 @@ mod tests {
   },
   "body": "hello"
 }
-        "###;
+        )"###);
 
         let target = HttpResponse {
             status: Some(201),
@@ -258,18 +349,20 @@ mod tests {
                     ],
                 ),
             ]),
-            body: "hello".to_string(),
+            body: "hello".into(),
         };
 
-        let value = serde_json::from_str::<serde_json::Value>(res).unwrap();
-        let http_res = parse(&value).unwrap();
+
+        let http_res = parse(scope, res).unwrap();
 
         assert_eq!(http_res, target);
     }
 
     #[test]
     fn test_header_array_variants() {
-        let res = r###"
+        let mut runtime = setup_runtime();
+        let scope = &mut runtime.handle_scope();
+        let res = eval_to_value(scope, r###"(
 {
   "status":"201",
   "headers": [
@@ -281,7 +374,7 @@ mod tests {
   ],
   "body": "hello"
 }
-        "###;
+        )"###);
 
         let target = HttpResponse {
             status: Some(201),
@@ -298,18 +391,19 @@ mod tests {
                     vec![r#"{"foo":"bar"}"#.to_string()],
                 ),
             ]),
-            body: "hello".to_string(),
+            body: "hello".into(),
         };
 
-        let value = serde_json::from_str::<serde_json::Value>(res).unwrap();
-        let http_res = parse(&value).unwrap();
+        let http_res = parse(scope, res).unwrap();
 
         assert_eq!(http_res, target);
     }
 
     #[test]
     fn test_key_val_objects() {
-        let res = r###"
+        let mut runtime = setup_runtime();
+        let scope = &mut runtime.handle_scope();
+        let res = eval_to_value(scope, r###"(
 {
   "status":"200",
   "headers":{
@@ -324,7 +418,7 @@ mod tests {
   },
   "body": "hello world"
 }
-        "###;
+        )"###);
 
         let target = HttpResponse {
             status: Some(200),
@@ -335,18 +429,19 @@ mod tests {
                 ),
                 ("vary".to_string(), vec!["RSC".to_string()]),
             ]),
-            body: "hello world".to_string(),
+            body: "hello world".into(),
         };
 
-        let value = serde_json::from_str::<serde_json::Value>(res).unwrap();
-        let http_res = parse(&value).unwrap();
+        let http_res = parse(scope, res).unwrap();
 
         assert_eq!(http_res, target);
     }
 
     #[test]
     fn test_key_val_objects_dummy_value() {
-        let res = r###"
+        let mut runtime = setup_runtime();
+        let scope = &mut runtime.handle_scope();
+        let res = eval_to_value(scope, r###"(
 {
   "status":"200",
   "headers":{
@@ -362,7 +457,7 @@ mod tests {
   "body": "hello",
   "dummy": "abc"
 }
-        "###;
+        )"###);
 
         let target = HttpResponse {
             status: Some(200),
@@ -373,18 +468,19 @@ mod tests {
                 ),
                 ("vary".to_string(), vec!["RSC".to_string()]),
             ]),
-            body: "hello".to_string(),
+            body: "hello".into(),
         };
 
-        let value = serde_json::from_str::<serde_json::Value>(res).unwrap();
-        let http_res = parse(&value).unwrap();
+        let http_res = parse(scope, res).unwrap();
 
         assert_eq!(http_res, target);
     }
 
     #[test]
     fn test_key_val_object_list_for_each_header_name() {
-        let res = r###"
+        let mut runtime = setup_runtime();
+        let scope = &mut runtime.handle_scope();
+        let res = eval_to_value(scope, r###"(
 {
   "headers": {
     "content-type": [
@@ -407,7 +503,7 @@ mod tests {
   "status": "200",
   "body": "hello"
 }
-        "###;
+        )"###);
 
         let target = HttpResponse {
             status: Some(200),
@@ -421,18 +517,19 @@ mod tests {
                     vec!["RSC".to_string(), "Next-Router-State-Tree".to_string()],
                 ),
             ]),
-            body: "hello".to_string(),
+            body: "hello".into(),
         };
 
-        let value = serde_json::from_str::<serde_json::Value>(res).unwrap();
-        let http_res = parse(&value).unwrap();
+        let http_res = parse(scope, res).unwrap();
 
         assert_eq!(http_res, target);
     }
 
     #[test]
     fn test_key_val_object() {
-        let res = r###"
+        let mut runtime = setup_runtime();
+        let scope = &mut runtime.handle_scope();
+        let res = eval_to_value(scope, r###"(
 {
   "status":"200",
   "headers":{
@@ -441,7 +538,7 @@ mod tests {
   },
   "body": "hello"
 }
-        "###;
+        )"###);
 
         let target = HttpResponse {
             status: Some(200),
@@ -452,18 +549,19 @@ mod tests {
                 ),
                 ("vary".to_string(), vec!["RSC".to_string()]),
             ]),
-            body: "hello".to_string(),
+            body: "hello".into(),
         };
 
-        let value = serde_json::from_str::<serde_json::Value>(res).unwrap();
-        let http_res = parse(&value).unwrap();
+        let http_res = parse(scope, res).unwrap();
 
         assert_eq!(http_res, target);
     }
 
     #[test]
     fn test_list_of_values_for_each_header_name() {
-        let res = r###"
+        let mut runtime = setup_runtime();
+        let scope = &mut runtime.handle_scope();
+        let res = eval_to_value(scope, r###"(
 {
   "status":"200",
   "headers":{
@@ -472,7 +570,7 @@ mod tests {
   },
   "body": "hello"
 }
-        "###;
+        )"###);
 
         let target = HttpResponse {
             status: Some(200),
@@ -490,18 +588,19 @@ mod tests {
                     ],
                 ),
             ]),
-            body: "hello".to_string(),
+            body: "hello".into(),
         };
 
-        let value = serde_json::from_str::<serde_json::Value>(res).unwrap();
-        let http_res = parse(&value).unwrap();
+        let http_res = parse(scope, res).unwrap();
 
         assert_eq!(http_res, target);
     }
 
     #[test]
     fn test_inconsistent_header_names() {
-        let res = r###"
+        let mut runtime = setup_runtime();
+        let scope = &mut runtime.handle_scope();
+        let res = eval_to_value(scope, r###"(
 {
   "headers": {
     "content-type": [
@@ -524,16 +623,16 @@ mod tests {
   "status": "200",
   "body": "hello"
 }
-        "###;
+        )"###);
 
-        let value = serde_json::from_str::<serde_json::Value>(res).unwrap();
-
-        assert!(parse(&value).is_err());
+        assert!(parse(scope, res).is_err());
     }
 
     #[test]
     fn test_inconsistent_header_formats() {
-        let res = r###"
+        let mut runtime = setup_runtime();
+        let scope = &mut runtime.handle_scope();
+        let res = eval_to_value(scope, r###"(
 {
   "headers": {
     "content-type": [
@@ -547,15 +646,16 @@ mod tests {
   "status": "200",
   "body": "hello"
 }
-        "###;
+        )"###);
 
-        let value = serde_json::from_str::<serde_json::Value>(res).unwrap();
-        assert!(parse(&value).is_err());
+        assert!(parse(scope, res).is_err());
     }
 
     #[test]
     fn test_key_val_object_no_status() {
-        let res = r###"
+        let mut runtime = setup_runtime();
+        let scope = &mut runtime.handle_scope();
+        let res = eval_to_value(scope, r###"(
 {
   "headers":{
     "content-type":"text/html; charset=utf-8",
@@ -563,7 +663,7 @@ mod tests {
   },
   "body": "hello"
 }
-        "###;
+        )"###);
 
         let target = HttpResponse {
             status: None,
@@ -574,52 +674,53 @@ mod tests {
                 ),
                 ("vary".to_string(), vec!["RSC".to_string()]),
             ]),
-            body: "hello".to_string(),
+            body: "hello".into(),
         };
 
-        let value = serde_json::from_str::<serde_json::Value>(res).unwrap();
-        let http_res = parse(&value).unwrap();
+        let http_res = parse(scope, res).unwrap();
 
         assert_eq!(http_res, target);
     }
 
     #[test]
     fn test_key_val_object_no_headers() {
-        let res = r###"
+        let mut runtime = setup_runtime();
+        let scope = &mut runtime.handle_scope();
+        let res = eval_to_value(scope, r###"(
 {
   "status":"200",
   "body": "hello"
 }
-        "###;
+        )"###);
 
         let target = HttpResponse {
             status: Some(200),
             headers: None,
-            body: "hello".to_string(),
+            body: "hello".into(),
         };
 
-        let value = serde_json::from_str::<serde_json::Value>(res).unwrap();
-        let http_res = parse(&value).unwrap();
+        let http_res = parse(scope, res).unwrap();
 
         assert_eq!(http_res, target);
     }
 
     #[test]
     fn test_key_val_object_no_headers_no_status() {
-        let res = r###"
+        let mut runtime = setup_runtime();
+        let scope = &mut runtime.handle_scope();
+        let res = eval_to_value(scope, r###"(
 {
   "body": "hello"
 }
-        "###;
+        )"###);
 
         let target = HttpResponse {
             status: None,
             headers: None,
-            body: "hello".to_string(),
+            body: "hello".into(),
         };
 
-        let value = serde_json::from_str::<serde_json::Value>(res).unwrap();
-        let http_res = parse(&value).unwrap();
+        let http_res = parse(scope, res).unwrap();
 
         assert_eq!(http_res, target);
     }

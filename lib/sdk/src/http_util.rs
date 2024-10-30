@@ -55,7 +55,7 @@ pub async fn respond_with_http_response(
 
     // send body back
     connection
-        .write_payload(response.body.as_bytes())
+        .write_payload(&response.body)
         .await
         .context("failed to send body")?;
 
