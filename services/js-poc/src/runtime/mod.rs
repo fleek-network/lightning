@@ -72,6 +72,13 @@ impl Runtime {
         });
 
         {
+            let safe_handle = deno.v8_isolate().thread_safe_handle();
+            deno.add_near_heap_limit_callback(move |current_limit, initial_limit| {
+                safe_handle.terminate_execution();
+                // We increase the current limit to allow us to terminate
+                // the current thread of execution.
+                2 * current_limit
+            });
             // Get global scope
             let context = deno.main_context();
             let scope = &mut deno.handle_scope();
