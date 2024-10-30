@@ -273,7 +273,8 @@ mod tests {
         let mut runtime = setup_runtime();
         let scope = &mut runtime.handle_scope();
         let value = eval_to_value(
-            scope,  r###"(
+            scope,
+            r###"(
 {
   "headers": [
     {"key": "content-type", "value": "text"},
@@ -282,7 +283,8 @@ mod tests {
   "status": 200,
   "body": "hello"
 }
-        )"###);
+        )"###,
+        );
 
         let target = HttpResponse {
             status: Some(200),
@@ -302,7 +304,9 @@ mod tests {
     fn test_array_of_key_val_objects_multiple_values() {
         let mut runtime = setup_runtime();
         let scope = &mut runtime.handle_scope();
-        let res = eval_to_value(scope, r###"(
+        let res = eval_to_value(
+            scope,
+            r###"(
 {
   "status":"201",
   "headers":{
@@ -329,7 +333,8 @@ mod tests {
   },
   "body": "hello"
 }
-        )"###);
+        )"###,
+        );
 
         let target = HttpResponse {
             status: Some(201),
@@ -350,7 +355,6 @@ mod tests {
             body: "hello".into(),
         };
 
-
         let http_res = parse(scope, res).unwrap();
 
         assert_eq!(http_res, target);
@@ -360,7 +364,9 @@ mod tests {
     fn test_header_array_variants() {
         let mut runtime = setup_runtime();
         let scope = &mut runtime.handle_scope();
-        let res = eval_to_value(scope, r###"(
+        let res = eval_to_value(
+            scope,
+            r###"(
 {
   "status":"201",
   "headers": [
@@ -372,7 +378,8 @@ mod tests {
   ],
   "body": "hello"
 }
-        )"###);
+        )"###,
+        );
 
         let target = HttpResponse {
             status: Some(201),
@@ -401,7 +408,9 @@ mod tests {
     fn test_key_val_objects() {
         let mut runtime = setup_runtime();
         let scope = &mut runtime.handle_scope();
-        let res = eval_to_value(scope, r###"(
+        let res = eval_to_value(
+            scope,
+            r###"(
 {
   "status":"200",
   "headers":{
@@ -416,7 +425,8 @@ mod tests {
   },
   "body": "hello world"
 }
-        )"###);
+        )"###,
+        );
 
         let target = HttpResponse {
             status: Some(200),
@@ -439,7 +449,9 @@ mod tests {
     fn test_key_val_objects_dummy_value() {
         let mut runtime = setup_runtime();
         let scope = &mut runtime.handle_scope();
-        let res = eval_to_value(scope, r###"(
+        let res = eval_to_value(
+            scope,
+            r###"(
 {
   "status":"200",
   "headers":{
@@ -455,7 +467,8 @@ mod tests {
   "body": "hello",
   "dummy": "abc"
 }
-        )"###);
+        )"###,
+        );
 
         let target = HttpResponse {
             status: Some(200),
@@ -478,7 +491,9 @@ mod tests {
     fn test_key_val_object_list_for_each_header_name() {
         let mut runtime = setup_runtime();
         let scope = &mut runtime.handle_scope();
-        let res = eval_to_value(scope, r###"(
+        let res = eval_to_value(
+            scope,
+            r###"(
 {
   "headers": {
     "content-type": [
@@ -501,7 +516,8 @@ mod tests {
   "status": "200",
   "body": "hello"
 }
-        )"###);
+        )"###,
+        );
 
         let target = HttpResponse {
             status: Some(200),
@@ -527,7 +543,9 @@ mod tests {
     fn test_key_val_object() {
         let mut runtime = setup_runtime();
         let scope = &mut runtime.handle_scope();
-        let res = eval_to_value(scope, r###"(
+        let res = eval_to_value(
+            scope,
+            r###"(
 {
   "status":"200",
   "headers":{
@@ -536,7 +554,8 @@ mod tests {
   },
   "body": "hello"
 }
-        )"###);
+        )"###,
+        );
 
         let target = HttpResponse {
             status: Some(200),
@@ -559,7 +578,9 @@ mod tests {
     fn test_list_of_values_for_each_header_name() {
         let mut runtime = setup_runtime();
         let scope = &mut runtime.handle_scope();
-        let res = eval_to_value(scope, r###"(
+        let res = eval_to_value(
+            scope,
+            r###"(
 {
   "status":"200",
   "headers":{
@@ -568,7 +589,8 @@ mod tests {
   },
   "body": "hello"
 }
-        )"###);
+        )"###,
+        );
 
         let target = HttpResponse {
             status: Some(200),
@@ -598,7 +620,9 @@ mod tests {
     fn test_inconsistent_header_names() {
         let mut runtime = setup_runtime();
         let scope = &mut runtime.handle_scope();
-        let res = eval_to_value(scope, r###"(
+        let res = eval_to_value(
+            scope,
+            r###"(
 {
   "headers": {
     "content-type": [
@@ -621,7 +645,8 @@ mod tests {
   "status": "200",
   "body": "hello"
 }
-        )"###);
+        )"###,
+        );
 
         assert!(parse(scope, res).is_err());
     }
@@ -630,7 +655,9 @@ mod tests {
     fn test_inconsistent_header_formats() {
         let mut runtime = setup_runtime();
         let scope = &mut runtime.handle_scope();
-        let res = eval_to_value(scope, r###"(
+        let res = eval_to_value(
+            scope,
+            r###"(
 {
   "headers": {
     "content-type": [
@@ -644,7 +671,8 @@ mod tests {
   "status": "200",
   "body": "hello"
 }
-        )"###);
+        )"###,
+        );
 
         assert!(parse(scope, res).is_err());
     }
@@ -653,7 +681,9 @@ mod tests {
     fn test_key_val_object_no_status() {
         let mut runtime = setup_runtime();
         let scope = &mut runtime.handle_scope();
-        let res = eval_to_value(scope, r###"(
+        let res = eval_to_value(
+            scope,
+            r###"(
 {
   "headers":{
     "content-type":"text/html; charset=utf-8",
@@ -661,7 +691,8 @@ mod tests {
   },
   "body": "hello"
 }
-        )"###);
+        )"###,
+        );
 
         let target = HttpResponse {
             status: None,
@@ -684,12 +715,15 @@ mod tests {
     fn test_key_val_object_no_headers() {
         let mut runtime = setup_runtime();
         let scope = &mut runtime.handle_scope();
-        let res = eval_to_value(scope, r###"(
+        let res = eval_to_value(
+            scope,
+            r###"(
 {
   "status":"200",
   "body": "hello"
 }
-        )"###);
+        )"###,
+        );
 
         let target = HttpResponse {
             status: Some(200),
@@ -706,11 +740,14 @@ mod tests {
     fn test_key_val_object_no_headers_no_status() {
         let mut runtime = setup_runtime();
         let scope = &mut runtime.handle_scope();
-        let res = eval_to_value(scope, r###"(
+        let res = eval_to_value(
+            scope,
+            r###"(
 {
   "body": "hello"
 }
-        )"###);
+        )"###,
+        );
 
         let target = HttpResponse {
             status: None,
