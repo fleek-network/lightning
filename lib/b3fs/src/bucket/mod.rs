@@ -209,7 +209,7 @@ impl ContentHeader {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use std::env::temp_dir;
 
     use super::*;
@@ -226,7 +226,7 @@ mod tests {
         fs::remove_dir_all(&temp_dir);
     }
 
-    pub(super) fn get_random_file(size: usize) -> Vec<u8> {
+    pub(crate) fn get_random_file(size: usize) -> Vec<u8> {
         let mut data = Vec::with_capacity(MAX_BLOCK_SIZE_IN_BYTES);
         for _ in 0..size {
             let d: [u8; 32] = random();
