@@ -3,9 +3,10 @@ use std::path::PathBuf;
 /// Heap size for enclave
 const HEAP_SIZE: &str = "0x100000000"; // 4 GiB
 /// Stack size for enclave
-const STACK_SIZE: &str = "0x1000000"; // 10 MiB
-/// Number of threads to support in enclave
-const THREADS: &str = "16";
+const STACK_SIZE: &str = "0x200000"; // 2 MiB
+/// Maximum number of threads to reserve for the enclave
+/// 1 main + 1 worker + 1 tls + 1 mtls + 128 wasm
+const THREADS: &str = "134";
 
 /// URL of latest enclave
 /// TODO: Also download mrsigner signature and get checksum
