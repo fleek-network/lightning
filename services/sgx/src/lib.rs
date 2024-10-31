@@ -201,14 +201,11 @@ fn get_enclave_args() -> Vec<Vec<u8>> {
     let first_arg = {
         // todo: make a specific spot for this file
         if let Ok(sealed_shared_key) = fs::read(SGX_SEALED_DATA_PATH.join("sealedkey.bin")) {
-            let hex_encoded = hex::encode(sealed_shared_key);
-            format!("--encoded-secret-key={hex_encoded}")
-                .as_bytes()
-                .to_vec()
+            format!("--encoded-secret-key={}", hex::encode(sealed_shared_key)).into()
         } else if node_index == 0 {
             // We are the first node to start, so we should generate a new key if we dont have one
             // on disk
-            "--initial-node".as_bytes().to_vec()
+            "--initial-node".into()
         } else {
             // We dont have a sealed key saved to disk so we should pass in a list of peers to get
             // it from
@@ -223,18 +220,12 @@ fn get_enclave_args() -> Vec<Vec<u8>> {
     args.push(first_arg);
 
     // todo: actually get this from somewhere
-    let our_ip = "127.0.0.1";
+    args.push("--our-ip=127.0.0.1".into());
 
-    let mut our_ip_arg = "--our-ip".as_bytes().to_vec();
-    our_ip_arg.extend_from_slice(our_ip.as_bytes());
-    args.push(our_ip_arg);
-
-    // enable debug prints if SGX_WASM_DEBUG is defined and not empty
-    if let Ok(v) = std::env::var("SGX_WASM_DEBUG") {
-        if !v.is_empty() {
-            args.push("--debug".as_bytes().to_vec())
-        }
-    }
+    // tls configuration
+    args.push(format!("--tls-key-size={}", config::TLS_KEY_SIZE).into());
+    args.push(format!("--tls-port={}", config::TLS_PORT).into());
+    args.push(format!("--mtls-port={}", config::MTLS_PORT).into());
 
     // wasm configuration
     args.push(format!("--max-blockstore-size={}", config::MAX_BLOCKSTORE_SIZE).into());
@@ -249,10 +240,12 @@ fn get_enclave_args() -> Vec<Vec<u8>> {
         .into(),
     );
 
-    // tls configuration
-    args.push(format!("--tls-key-size={}", config::TLS_KEY_SIZE).into());
-    args.push(format!("--tls-port={}", config::TLS_PORT).into());
-    args.push(format!("--mtls-port={}", config::MTLS_PORT).into());
+    // enable debug prints if SGX_WASM_DEBUG is defined and not empty
+    if let Ok(v) = std::env::var("SGX_WASM_DEBUG") {
+        if !v.is_empty() {
+            args.push("--debug".as_bytes().to_vec())
+        }
+    }
 
     args
 }
