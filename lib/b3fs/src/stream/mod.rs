@@ -60,6 +60,8 @@ pub mod pretty;
 pub mod verifier;
 /// Provides [TreeWalker](walker::TreeWalker) to iterate a tree.
 pub mod walker;
+/// Provides [BucketStream](bucket::BucketStream) to stream either a File or a Directory exploring its contents.
+pub mod bucket;
 
 pub use buffer::ProofBuf;
 pub use encoder::ProofEncoder;
