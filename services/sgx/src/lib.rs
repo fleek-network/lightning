@@ -8,7 +8,6 @@ use std::sync::{Arc, LazyLock};
 use aesm_client::AesmClient;
 use enclave_runner::usercalls::{AsyncStream, UsercallExtension};
 use enclave_runner::EnclaveBuilder;
-use futures::executor::block_on;
 use futures::FutureExt;
 use req_res::AttestationEndpoint;
 use sgxs_loaders::isgx::Device as IsgxDevice;
@@ -18,6 +17,39 @@ use crate::blockstore::VerifiedStream;
 mod blockstore;
 mod connection;
 mod req_res;
+
+mod config {
+    /* WASM configuration */
+
+    /// Maximum size of blockstore content. 16 MiB
+    pub const MAX_BLOCKSTORE_SIZE: usize = 16 << 20;
+
+    /// Maxmimum fuel limit allowed to be set by the client. 40 billion
+    pub const MAX_FUEL_LIMIT: u64 = 10 << 32;
+
+    /// Maximum size of input parameter. 8 MiB
+    pub const MAX_INPUT_SIZE: usize = 8 << 20;
+
+    /// Maximum size of wasm output. 16 MiB
+    pub const MAX_OUTPUT_SIZE: usize = 16 << 20;
+
+    /// Maximum number of concurrent wasm threads.
+    /// Must not exceed threads reserved for enclave (134)
+    pub const MAX_CONCURRENT_WASM_THREADS: usize = 128;
+
+    /* TLS server configuration */
+
+    /// TLS key size, must be >= 2048
+    pub const TLS_KEY_SIZE: usize = 2048;
+
+    /// MTLS port to listen on for incoming enclave requests
+    pub const MTLS_PORT: u16 = 55855;
+
+    /// TLS port to listen on for incoming public key requests
+    pub const TLS_PORT: u16 = 55856;
+}
+
+const ENCLAVE: &[u8] = include_bytes!("../enclave.sgxs");
 
 static SGX_SEALED_DATA_PATH: LazyLock<PathBuf> = LazyLock::new(|| {
     std::env::var("SGX_SEALED_DATA_PATH")
@@ -40,8 +72,6 @@ static OUR_NODE_INDEX: LazyLock<u32> = LazyLock::new(|| {
         .parse()
         .expect("OUR_NODE_INDEX must be a valid integer")
 });
-
-const ENCLAVE: &[u8] = include_bytes!("../enclave.sgxs");
 
 #[derive(Debug)]
 struct ExternalService {
@@ -140,7 +170,7 @@ pub fn main() {
 
     let mut enclave_builder = EnclaveBuilder::new_from_memory(ENCLAVE);
 
-    let enclave_args = block_on(get_enclave_args());
+    let enclave_args = get_enclave_args();
     enclave_builder.args(enclave_args);
 
     // setup attestation state
@@ -163,7 +193,7 @@ pub fn main() {
         .unwrap();
 }
 
-async fn get_enclave_args() -> Vec<Vec<u8>> {
+fn get_enclave_args() -> Vec<Vec<u8>> {
     let mut args = vec![];
 
     let node_index = *OUR_NODE_INDEX;
@@ -205,6 +235,24 @@ async fn get_enclave_args() -> Vec<Vec<u8>> {
             args.push("--debug".as_bytes().to_vec())
         }
     }
+
+    // wasm configuration
+    args.push(format!("--max-blockstore-size={}", config::MAX_BLOCKSTORE_SIZE).into());
+    args.push(format!("--max-fuel-limit={}", config::MAX_FUEL_LIMIT).into());
+    args.push(format!("--max-input-size={}", config::MAX_INPUT_SIZE).into());
+    args.push(format!("--max-output-size={}", config::MAX_OUTPUT_SIZE).into());
+    args.push(
+        format!(
+            "--max-concurrent-wasm-threads={}",
+            config::MAX_CONCURRENT_WASM_THREADS
+        )
+        .into(),
+    );
+
+    // tls configuration
+    args.push(format!("--tls-key-size={}", config::TLS_KEY_SIZE).into());
+    args.push(format!("--tls-port={}", config::TLS_PORT).into());
+    args.push(format!("--mtls-port={}", config::MTLS_PORT).into());
 
     args
 }
