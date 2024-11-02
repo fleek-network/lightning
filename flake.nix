@@ -3,10 +3,7 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-    crane = {
-      url = "github:ipetkov/crane";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+    crane.url = "github:ipetkov/crane";
     fenix = {
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -92,7 +89,7 @@
                       };
                       cargoDeps = old.cargoDeps.overrideAttrs {
                         inherit src;
-                        outputHash = "sha256-zGW5+5dGHZmIrFo+kj3P2Vvn+IfzQB74pymve+YlpqQ=";
+                        outputHash = "sha256-uZHCnWVSQZwPwGr4Pov9qEqcwsozFNGL4OY8nrfUVIw=";
                       };
                     });
                   }
@@ -163,7 +160,8 @@
                 fontconfig
                 freetype
                 protobufc
-                openssl_3
+                openssl
+                curl
                 zstd
                 zlib
                 bzip2
@@ -194,8 +192,8 @@
             RUST_FONTCONFIG_DLOPEN = "on";
             LIBCLANG_PATH = "${lib.getLib pkgs.libclang}/lib";
             OPENSSL_NO_VENDOR = 1;
-            OPENSSL_LIB_DIR = "${lib.getLib pkgs.openssl_3}/lib";
-            OPENSSL_INCLUDE_DIR = "${lib.getDev pkgs.openssl_3.dev}/include";
+            OPENSSL_LIB_DIR = "${lib.getLib pkgs.openssl}/lib";
+            OPENSSL_INCLUDE_DIR = "${lib.getDev pkgs.openssl.dev}/include";
             RUSTY_V8_ARCHIVE = "${librusty_v8}";
             ROCKSDB_LIB_DIR = "${pkgs.rocksdb}/lib";
             Z_LIB_DIR = "${lib.getLib pkgs.zlib}/lib";
