@@ -128,7 +128,7 @@ impl TestNetworkBuilder {
 
     /// Builds a new test network with the given number of nodes, and starts each of them.
     pub async fn build(mut self) -> Result<TestNetwork> {
-        let _ = try_init_tracing();
+        let _ = try_init_tracing(None);
 
         let temp_dir = tempdir()?;
 

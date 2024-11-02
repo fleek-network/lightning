@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 affair.workspace = true
+ansi_term = "0.12"
 anyhow.workspace = true
 async-trait.workspace = true
 atomo.workspace = true

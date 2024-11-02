@@ -638,7 +638,7 @@ impl TestNodeBuilder {
     }
 
     pub async fn build<C: NodeComponents>(self) -> Result<TestNode<C>> {
-        let _ = try_init_tracing();
+        let _ = try_init_tracing(None);
         let keystore = EphemeralKeystore::<C>::default();
         let node_secret_key = keystore.get_ed25519_sk();
         let mut genesis = Genesis {
