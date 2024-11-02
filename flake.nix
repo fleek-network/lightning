@@ -54,44 +54,58 @@
                           pkg-config
                           protobuf
                         ];
-                        buildInputs = with prev; [ openssl_3 ];
-                        src = prev.fetchzip {
-                          inherit hash;
-                          url = "https://crates.io/api/v1/crates/${pname}/${version}/download";
-                          extension = "tar.gz";
-                        };
+                        buildInputs = with prev; [ openssl ];
+                        src = prev.fetchCrate { inherit pname version hash; };
                       }
                     );
                   in
                   {
-                    # todo(oz): contribute these to upstream nixpkgs
+                    # Upstream PR: https://github.com/NixOS/nixpkgs/pull/338280
                     fortanix-sgx-tools = mkRustSgxPackage {
                       pname = "fortanix-sgx-tools";
                       version = "0.5.1";
                       hash = "sha256-F0lZG1neAPVvyOxUtDPv0t7o+ZC+aQRtpFeq55QwcmE=";
                       cargoHash = "sha256-jYfsmPwhvt+ccUr4Vwq5q1YzNlxA+Vnpxd4KpWZrYo8=";
                     };
+                    # Upstream PR: https://github.com/NixOS/nixpkgs/pull/338282
                     sgxs-tools = mkRustSgxPackage {
                       pname = "sgxs-tools";
                       version = "0.8.6";
                       hash = "sha256-24lUhi4IPv+asM51/BfufkOUYVellXoXsbWXWN/zoBw=";
                       cargoHash = "sha256-vtuOCLo7qBOfqMynykqf9folmlETx3or35+CuTurh3s=";
                     };
-                    # update cargo-hakari until this makes it to nixpkgs-unstable:
-                    # https://github.com/NixOS/nixpkgs/pull/331820
-                    cargo-hakari = prev.cargo-hakari.overrideAttrs (old: rec {
-                      version = "0.9.30";
-                      src = final.fetchFromGitHub {
-                        owner = "guppy-rs";
-                        repo = "guppy";
-                        rev = "cargo-hakari-${version}";
-                        sha256 = "sha256-fwqMV8oTEYqS0Y/IXar1DSZ0Gns1qJ9oGhbdehScrgw=";
+                    # Upstream PR: https://github.com/NixOS/nixpkgs/pull/338278
+                    sgx-dcap-default-qpl = prev.stdenv.mkDerivation rec {
+                      pname = "sgx-dcap-default-qpl";
+                      version = "1.21";
+                      src = prev.fetchFromGitHub {
+                        owner = "intel";
+                        repo = "SGXDataCenterAttestationPrimitives";
+                        rev = "dcap_${version}_reproducible";
+                        hash = "sha256-2ZMu9F46yR4KmTV8Os3fcjgF1uoXxBT50aLx72Ri/WY=";
+                        fetchSubmodules = true;
                       };
-                      cargoDeps = old.cargoDeps.overrideAttrs {
-                        inherit src;
-                        outputHash = "sha256-uZHCnWVSQZwPwGr4Pov9qEqcwsozFNGL4OY8nrfUVIw=";
-                      };
-                    });
+                      nativeBuildInputs = [ prev.pkg-config ];
+                      buildInputs = with prev; [
+                        curl
+                        openssl
+                        boost
+                        sgx-sdk
+                      ];
+                      preBuild = ''
+                        source ${prev.sgx-sdk}/sgxsdk/environment
+                      '';
+                      makeFlags = [
+                        "-C QuoteGeneration"
+                        "qpl_wrapper"
+                      ];
+                      installPhase = ''
+                        mkdir -p $out/lib
+                        mv QuoteGeneration/build/linux/* $out/lib
+                        ln -s $out/lib/libdcap_quoteprov.so $out/lib/libdcap_quoteprov.so.1
+                        ln -s $out/lib/libsgx_default_qcnl_wrapper.so $out/lib/libsgx_default_qcnl_wrapper.so.1
+                      '';
+                    };
                   }
                 )
               ];
@@ -327,7 +341,7 @@
                     ]
                     ++ commonArgs.nativeBuildInputs
                   );
-                  buildInputs = ([ pkgs.sgx-azure-dcap-client ] ++ commonArgs.buildInputs);
+                  buildInputs = ([ pkgs.sgx-dcap-default-qpl ] ++ commonArgs.buildInputs);
 
                   # hack to use full source, but set cargo lock and deps to excluded workspace
                   cargoToml = "${src}/services/sgx/Cargo.toml";
@@ -367,7 +381,7 @@
                   # for debugging sgx service, not available on mac
                   fortanix-sgx-tools
                   sgxs-tools
-                  sgx-azure-dcap-client
+                  sgx-dcap-default-qpl
                 ];
               FN_ENCLAVE_SGXS = "";
             }
