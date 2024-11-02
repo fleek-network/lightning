@@ -5,7 +5,52 @@ use lightning_interfaces::prelude::*;
 use lightning_test_utils::e2e::{TestFullNodeComponentsWithRealConsensus, TestNetwork};
 use lightning_utils::application::QueryRunnerExt;
 use lightning_utils::poll::{poll_until, PollUntilError};
-use types::{ExecuteTransactionOptions, ExecutionData, TransactionResponse, UpdateMethod};
+use types::{
+    ExecuteTransactionError,
+    ExecuteTransactionOptions,
+    ExecutionData,
+    TransactionResponse,
+    UpdateMethod,
+};
+
+#[tokio::test]
+async fn test_insufficient_nodes_in_committee() {
+    let mut network = TestNetwork::builder()
+        .with_real_consensus()
+        // We need at least 2 nodes in the committee or else transactions will not execute.
+        .with_committee_nodes::<TestFullNodeComponentsWithRealConsensus>(1)
+        .await
+        .build()
+        .await
+        .unwrap();
+
+    // Attempt to execute an increment nonce transaction from the node.
+    let result = network
+        .node(0)
+        .execute_transaction_from_node(
+            UpdateMethod::IncrementNonce {},
+            Some(ExecuteTransactionOptions {
+                // Transactions that are submitted immediately after startup will sometimes
+                // timeout and need to be retried.
+                wait: types::ExecuteTransactionWait::Receipt,
+                retry: types::ExecuteTransactionRetry::Always(Some(3)),
+                timeout: Some(Duration::from_secs(1)),
+            }),
+        )
+        .await;
+    match result.unwrap_err() {
+        ExecuteTransactionError::FailedToIncrementNonceForRetry((_, msg)) => {
+            assert_eq!(msg, "Timeout reached");
+        },
+        error => panic!(
+            "expected FailedToIncrementNonceForRetry error, got {:?}",
+            error
+        ),
+    }
+
+    // Shutdown the network.
+    network.shutdown().await;
+}
 
 #[tokio::test]
 async fn test_execute_transaction_as_committee_node() {
