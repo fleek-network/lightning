@@ -15,6 +15,7 @@ const ENCLAVE_URL: &str =
 
 fn main() {
     println!("cargo::rerun-if-changed=build.rs");
+    println!("cargo::rerun-if-changed=enclave.sgxs");
     println!("cargo::rerun-if-env-changed=FN_ENCLAVE_SOURCE");
     println!("cargo::rerun-if-env-changed=FN_ENCLAVE_SGXS");
 
