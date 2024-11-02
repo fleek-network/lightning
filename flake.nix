@@ -367,6 +367,7 @@
                   # for debugging sgx service, not available on mac
                   fortanix-sgx-tools
                   sgxs-tools
+                  sgx-azure-dcap-client
                 ];
               FN_ENCLAVE_SGXS = "";
             }
