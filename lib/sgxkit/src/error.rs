@@ -7,20 +7,23 @@ use strum::EnumMessage;
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, strum::EnumMessage, strum::FromRepr)]
 #[repr(i32)]
 pub enum HostError {
+    /// Insufficient balance for call
+    InsufficientBalance = -1,
+
     /// Specified pointers were out of bounds
-    OutOfBounds = -1,
+    OutOfBounds = -2,
 
     /// Invalid key derivation path
-    KeyDerivationInvalidPath = -2,
+    KeyDerivationInvalidPath = -3,
     /// Key derivation error
-    KeyDerivation = -3,
+    KeyDerivation = -4,
 
     /// Invalid permission header for shared key
-    UnsealInvalidPermissionHeader = -4,
+    UnsealInvalidPermissionHeader = -5,
     /// Current wasm is not approved to access global content
-    UnsealPermissionDenied = -5,
+    UnsealPermissionDenied = -6,
     /// Sealed data could not be decrypted
-    UnsealFailed = -6,
+    UnsealFailed = -7,
 
     /// Unexpected error
     #[default]
@@ -30,7 +33,7 @@ pub enum HostError {
 impl HostError {
     // Convert a response int into a result, where any value less than
     // zero is a host error.
-    #[must_use = "asdf"]
+    #[must_use = "host errors should be used"]
     pub fn result(value: i32) -> Result<i32, Self> {
         match HostError::from_repr(value) {
             None => Ok(value),
@@ -53,7 +56,8 @@ impl From<HostError> for std::io::Error {
             HostError::KeyDerivationInvalidPath => std::io::ErrorKind::InvalidInput,
             HostError::UnsealInvalidPermissionHeader => std::io::ErrorKind::InvalidData,
             HostError::UnsealPermissionDenied => std::io::ErrorKind::PermissionDenied,
-            HostError::OutOfBounds
+            HostError::InsufficientBalance
+            | HostError::OutOfBounds
             | HostError::KeyDerivation
             | HostError::UnsealFailed
             | HostError::Unexpected => std::io::ErrorKind::Other,
