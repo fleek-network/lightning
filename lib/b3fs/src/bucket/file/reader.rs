@@ -1,7 +1,8 @@
+use std::sync::Arc;
+
 use bytes::BytesMut;
 use tokio::fs::{self};
 use tokio::io::AsyncReadExt;
-use triomphe::Arc;
 
 use crate::bucket::errors;
 use crate::collections::tree::AsyncHashTree;
@@ -10,18 +11,16 @@ use crate::hasher::b3::KEY_LEN;
 
 pub struct B3File {
     num_blocks: u32,
-    file: Arc<fs::File>,
+    file: fs::File,
 }
 
 impl B3File {
-    pub(crate) fn new(num_blocks: u32, file: Arc<fs::File>) -> Self {
+    pub(crate) fn new(num_blocks: u32, file: fs::File) -> Self {
         Self { num_blocks, file }
     }
 
-    pub async fn hashtree(&mut self) -> Result<AsyncHashTree<&mut fs::File>, errors::ReadError> {
-        let hash = triomphe::Arc::<tokio::fs::File>::get_mut(&mut self.file)
-            .ok_or(errors::ReadError::RefFile)
-            .map(|r| AsyncHashTree::new(r, self.num_blocks))?;
+    pub async fn hashtree(self) -> Result<AsyncHashTree<fs::File>, errors::ReadError> {
+        let hash = AsyncHashTree::new(self.file, self.num_blocks);
         Ok(hash)
     }
 }
@@ -59,8 +58,7 @@ mod tests {
         file.write_all(&data).await.unwrap();
 
         let file = fs::File::open(file_name.clone()).await.unwrap();
-        let file_arc = Arc::new(file);
-        let mut b3file = B3File::new(num_blocks, file_arc);
+        let mut b3file = B3File::new(num_blocks, file);
         let mut hash = b3file.hashtree().await.unwrap();
         for _ in 0..num_blocks {
             let _ = hash.next().await.unwrap();
