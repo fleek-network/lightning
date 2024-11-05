@@ -231,6 +231,25 @@ pub fn random_file_from(path: &Path) -> PathBuf {
     path.to_path_buf().join(to_hex(&random_file).as_str())
 }
 
+#[macro_export]
+#[macro_use]
+macro_rules! on_future {
+    ($self:expr, $flag:expr, $new_state:expr, $on_ok:expr) => {
+        match $flag {
+            Poll::Ready(Ok(r)) => return $on_ok(r),
+            Poll::Ready(Err(e)) => {
+                if e.kind() == std::io::ErrorKind::UnexpectedEof {
+                    $self.state = $new_state;
+                    return Poll::Ready(None);
+                } else {
+                    return Poll::Ready(Some(Err(errors::ReadError::from(e))));
+                }
+            },
+            Poll::Pending => return Poll::Pending,
+        }
+    };
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
