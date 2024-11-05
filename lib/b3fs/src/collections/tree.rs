@@ -4,9 +4,11 @@ use std::fmt::Debug;
 use std::future::Future;
 use std::ops::Index;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
+use tokio::sync::RwLock;
 use tokio_stream::Stream;
 
 use super::error::CollectionTryFromError;
@@ -191,14 +193,14 @@ impl<'s> Debug for HashTree<'s> {
 enum State {
     SeekPosition,
     Reading,
-    ValueReady,
+    ValueReady(Pin<Box<dyn Future<Output = std::io::Result<[u8; 32]>>>>),
+    WaitingSeek(Pin<Box<dyn Future<Output = std::io::Result<u64>>>>),
 }
 
 pub struct AsyncHashTree<T: AsyncReadExt + AsyncSeekExt + Unpin> {
-    file_reader: T,
+    file_reader: Arc<RwLock<T>>,
     number_of_hashes: u32,
     current_block: u32,
-    current_hash: [u8; 32],
     state: State,
 }
 
@@ -209,10 +211,9 @@ where
 {
     pub fn new(file_reader: T, number_of_hashes: u32) -> Self {
         Self {
-            file_reader,
+            file_reader: Arc::new(RwLock::new(file_reader)),
             number_of_hashes,
             current_block: 0,
-            current_hash: [0; 32],
             state: State::SeekPosition,
         }
     }
@@ -220,7 +221,7 @@ where
 
 impl<T> Stream for AsyncHashTree<T>
 where
-    T: AsyncReadExt + AsyncSeekExt + Unpin,
+    T: AsyncReadExt + AsyncSeekExt + Unpin + 'static,
 {
     type Item = Result<[u8; 32], std::io::Error>;
 
@@ -231,38 +232,58 @@ where
             return Poll::Ready(None);
         }
 
-        loop {
-            match this.state {
-                State::SeekPosition => {
-                    let index = tree_index(this.current_block as usize) as u64 * 32 + POSITION_START_HASHES as u64;
-                    let seek_future = this.file_reader.seek(tokio::io::SeekFrom::Start(index));
-                    let mut seek_future = std::pin::pin!(seek_future);
-
-                    match seek_future.as_mut().poll(cx) {
-                        Poll::Ready(Ok(_)) => {
-                            this.state = State::Reading;
-                        },
-                        Poll::Ready(Err(e)) => return Poll::Ready(Some(Err(e))),
-                        Poll::Pending => return Poll::Pending,
-                    }
+        match this.state {
+            State::SeekPosition => {
+                let index = tree_index(this.current_block as usize) as u64 * 32
+                    + POSITION_START_HASHES as u64;
+                let file = this.file_reader.clone();
+                let waker = cx.waker().clone();
+                let future = async move {
+                    let result = file
+                        .write()
+                        .await
+                        .seek(tokio::io::SeekFrom::Start(index))
+                        .await;
+                    waker.wake();
+                    result
+                };
+                let future = Box::pin(future);
+                this.state = State::WaitingSeek(future);
+                cx.waker().wake_by_ref();
+                Poll::Pending
+            },
+            State::WaitingSeek(ref mut future) => match future.as_mut().poll(cx) {
+                Poll::Ready(Ok(_)) => {
+                    this.state = State::Reading;
+                    cx.waker().wake_by_ref();
+                    Poll::Pending
                 },
-                State::Reading => {
-                    let read_future = this.file_reader.read_exact(&mut this.current_hash);
-                    let mut read_future = std::pin::pin!(read_future);
-                    match read_future.as_mut().poll(cx) {
-                        Poll::Ready(Ok(_)) => {
-                            this.state = State::ValueReady;
-                        },
-                        Poll::Ready(Err(e)) => return Poll::Ready(Some(Err(e))),
-                        Poll::Pending => return Poll::Pending,
-                    }
-                },
-                State::ValueReady => {
+                Poll::Ready(Err(e)) => Poll::Ready(Some(Err(e))),
+                Poll::Pending => Poll::Pending,
+            },
+            State::Reading => {
+                let file = this.file_reader.clone();
+                let waker = cx.waker().clone();
+                let future = async move {
+                    let mut hash = [0; 32];
+                    file.write().await.read_exact(&mut hash).await?;
+                    waker.wake();
+                    Ok(hash)
+                };
+                let future = Box::pin(future);
+                this.state = State::ValueReady(future);
+                cx.waker().wake_by_ref();
+                Poll::Pending
+            },
+            State::ValueReady(ref mut future) => match future.as_mut().poll(cx) {
+                Poll::Ready(Ok(hash)) => {
                     this.current_block += 1;
                     this.state = State::SeekPosition;
-                    return Poll::Ready(Some(Ok(this.current_hash)));
+                    Poll::Ready(Some(Ok(hash)))
                 },
-            }
+                Poll::Ready(Err(e)) => Poll::Ready(Some(Err(e))),
+                Poll::Pending => Poll::Pending,
+            },
         }
     }
 }

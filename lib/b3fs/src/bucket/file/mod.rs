@@ -185,10 +185,14 @@ mod tests {
         let file_header = file_header[0].path();
 
         let mut file = tokio::fs::File::open(file_header).await.unwrap();
-        file.seek(tokio::io::SeekFrom::Start(POSITION_START_NUM_ENTRIES as u64)).await.unwrap();
+        file.seek(tokio::io::SeekFrom::Start(
+            POSITION_START_NUM_ENTRIES as u64,
+        ))
+        .await
+        .unwrap();
         let num_entries = file.read_u32_le().await.unwrap();
 
-        let mut reader = B3File::new(num_entries, triomphe::Arc::new(file));
+        let mut reader = B3File::new(num_entries, file);
         let mut hashtree = reader.hashtree().await.unwrap();
         let mut counter = 0;
         while let Some(Ok(block)) = hashtree.next().await {
