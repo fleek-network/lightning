@@ -191,8 +191,14 @@ impl ContentHeader {
 
     /// If this content is a file returns a [B3File][file::reader::B3File].
     pub fn into_file(self) -> Option<file::reader::B3File> {
-        self.is_file()
-            .then(|| file::reader::B3File::new(self.num_entries, self.header_file))
+        let f = self.header_file.clone();
+        let file = Arc::try_unwrap(f).map(Some).unwrap_or_default();
+        if let Some(f) = file {
+            self.is_file()
+                .then(|| file::reader::B3File::new(self.num_entries, f))
+        } else {
+            None
+        }
     }
 
     /// If this content is a directory returns a [B3Dir][dir::reader::B3Dir].
