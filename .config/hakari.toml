@@ -30,14 +30,14 @@ workspace-hack-line-style = "workspace-dotted"
 # Crates to exclude while traversing the dependency graph.
 [traversal-excludes]
 third-party = [
-    # These crates are in the workspace exclude list. If not excluded here, because they have other
-    # members depending on them, they'll be included in the generated Cargo.toml and result in
-    # cyclic dependencies.
-    { name = "lightning-guard", path = "etc/ebpf-apps/guard" },
-    { name = "lightning-tui", path = "etc/tui" },
+  # These crates are in the workspace exclude list. If not excluded here, because they have other
+  # members depending on them, they'll be included in the generated Cargo.toml and result in
+  # cyclic dependencies.
+  { name = "lightning-guard", path = "etc/ebpf-apps/guard" },
+  { name = "lightning-tui", path = "etc/tui" },
 
-    # The generated workspace-hack/Cargo.toml entry for this crate is different depending on the system.
-    { name = "linux-raw-sys" },
+  # The generated workspace-hack/Cargo.toml entry for this crate is different depending on the system.
+  { name = "linux-raw-sys" },
 ]
 
 # Crates to remove at the end of computation.
@@ -68,4 +68,6 @@ workspace-members = [
   "simulon",
   "sgxencrypt",
   "deno_telemetry"
+  "fleek-service-sgx",
+  "dcap-quoteprov",
 ]
