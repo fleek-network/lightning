@@ -11,7 +11,7 @@ const THREADS: &str = "134";
 /// URL of latest enclave
 /// TODO: Also download mrsigner signature and get checksum
 const ENCLAVE_URL: &str =
-    "https://bafybeiez7pmrjtivpchbyhx7gw7iov76jbkwcgioiawzdgyrpygqr2cgp4.ipfs.flk-ipfs.xyz";
+    "https://bafybeifepixyjdgq5cfyvb4tlxfezkgwmyy6gvnua45pceh6fuxkbvwtly.ipfs.flk-ipfs.xyz";
 
 fn main() {
     println!("cargo::rerun-if-changed=build.rs");
