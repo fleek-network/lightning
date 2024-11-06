@@ -24,6 +24,7 @@ arrayvec = { version = "0.7" }
 axum-3b31131e45eafb45 = { package = "axum", version = "0.6", features = ["headers", "http2", "ws"] }
 axum-ca01ad9e24f5d932 = { package = "axum", version = "0.7", features = ["macros"] }
 axum-core = { version = "0.4", default-features = false, features = ["tracing"] }
+base16ct = { version = "0.2", default-features = false, features = ["alloc"] }
 base64-3c51e837cfc5589a = { package = "base64", version = "0.22" }
 base64-594e8ee84c453af0 = { package = "base64", version = "0.13", features = ["alloc"] }
 base64-647d43efb71741da = { package = "base64", version = "0.21" }
@@ -35,6 +36,7 @@ blake2 = { version = "0.10" }
 blake3 = { version = "1" }
 block-buffer = { version = "0.9", default-features = false, features = ["block-padding"] }
 block-padding = { version = "0.3", default-features = false, features = ["std"] }
+bs58 = { version = "0.5", features = ["check"] }
 bumpalo = { version = "3", features = ["allocator-api2", "boxed", "collections"] }
 bytemuck = { version = "1", default-features = false, features = ["extern_crate_alloc"] }
 byteorder = { version = "1", features = ["i128"] }
@@ -65,6 +67,7 @@ elliptic-curve = { version = "0.13", features = ["ecdh", "hash2curve", "hazmat",
 ethers-contract-abigen = { version = "2", default-features = false, features = ["providers", "rustls"] }
 fastcrypto-b0db73ecc1bbc313 = { package = "fastcrypto", git = "https://github.com/MystenLabs/fastcrypto", rev = "c961a01596a87e76f590c7e43aca9d57106dbbb1", features = ["copy_key"] }
 fastcrypto-e49888412d456f9d = { package = "fastcrypto", git = "https://github.com/MystenLabs/fastcrypto", rev = "55e7e568842939e01c8545a71d72e2402ad74538", features = ["aes", "copy_key"] }
+ff = { version = "0.13", default-features = false, features = ["alloc"] }
 futures = { version = "0.3", features = ["bilock", "io-compat", "unstable"] }
 futures-channel = { version = "0.3", features = ["sink", "unstable"] }
 futures-core = { version = "0.3", features = ["unstable"] }
@@ -75,6 +78,7 @@ futures-task = { version = "0.3", features = ["unstable"] }
 futures-util = { version = "0.3", features = ["bilock", "channel", "io-compat", "sink", "unstable"] }
 generic-array = { version = "0.14", default-features = false, features = ["more_lengths", "serde", "zeroize"] }
 getrandom = { version = "0.2", default-features = false, features = ["std"] }
+group = { version = "0.13", default-features = false, features = ["alloc"] }
 half = { version = "2" }
 hashbrown-3575ec1268b04181 = { package = "hashbrown", version = "0.15" }
 hashbrown-582f2526e08bb6a0 = { package = "hashbrown", version = "0.14", features = ["raw"] }
@@ -116,6 +120,7 @@ openssl = { version = "0.10", features = ["vendored"] }
 openssl-sys = { version = "0.9", default-features = false, features = ["vendored"] }
 p256 = { version = "0.13", features = ["ecdh", "jwk"] }
 parity-scale-codec = { version = "3", features = ["derive", "max-encoded-len"] }
+pbkdf2 = { version = "0.12" }
 phf_shared = { version = "0.11", default-features = false, features = ["std"] }
 pkcs8 = { version = "0.10", default-features = false, features = ["encryption", "pem", "std"] }
 plotters = { version = "0.3" }
@@ -145,7 +150,6 @@ rocksdb = { version = "0.21", features = ["multi-threaded-cf"] }
 ruint = { version = "1", features = ["num-bigint", "primitive-types", "serde"] }
 rustc-hex = { version = "2", default-features = false, features = ["std"] }
 rustls = { version = "0.21", features = ["dangerous_configuration", "quic"] }
-rustls-pki-types = { version = "1", features = ["std"] }
 rustls-webpki = { version = "0.102" }
 schemars = { version = "0.8", features = ["either"] }
 scopeguard = { version = "1" }
@@ -159,6 +163,7 @@ sha1 = { version = "0.10", features = ["oid"] }
 sha2-274715c4dabd11b0 = { package = "sha2", version = "0.9", default-features = false, features = ["std"] }
 sha2-93f6ce9d446188ac = { package = "sha2", version = "0.10", features = ["oid"] }
 sha3 = { version = "0.10", features = ["oid"] }
+signature = { version = "2", default-features = false, features = ["digest", "rand_core", "std"] }
 simdutf8 = { version = "0.1", features = ["aarch64_neon", "public_imp"] }
 similar = { version = "2", features = ["inline"] }
 smallvec = { version = "1", default-features = false, features = ["const_new", "union", "write"] }
@@ -187,6 +192,7 @@ uint = { version = "0.9" }
 unicode-bidi = { version = "0.3" }
 unicode-normalization = { version = "0.1" }
 unicode-xid = { version = "0.2" }
+ureq = { version = "2", features = ["socks-proxy"] }
 url = { version = "2", features = ["expose_internals", "serde"] }
 uuid = { version = "1", features = ["fast-rng", "serde", "v4"] }
 web-sys = { version = "0.3", default-features = false, features = ["AbortController", "AbortSignal", "AddEventListenerOptions", "BinaryType", "Cache", "CacheQueryOptions", "CacheStorage", "CloseEvent", "CloseEventInit", "Document", "ErrorEvent", "File", "FileReader", "FormData", "Headers", "History", "HtmlHeadElement", "Location", "MessageEvent", "ProgressEvent", "QueuingStrategy", "ReadableByteStreamController", "ReadableStream", "ReadableStreamByobReader", "ReadableStreamByobRequest", "ReadableStreamDefaultController", "ReadableStreamDefaultReader", "ReadableStreamGetReaderOptions", "ReadableStreamReadResult", "ReadableStreamReaderMode", "ReadableStreamType", "ReadableWritablePair", "Request", "RequestInit", "RequestRedirect", "Response", "ResponseInit", "StreamPipeOptions", "TransformStream", "TransformStreamDefaultController", "Transformer", "UnderlyingSink", "UnderlyingSource", "WebSocket", "Window", "WorkerGlobalScope", "WritableStream", "WritableStreamDefaultController", "WritableStreamDefaultWriter", "console"] }
@@ -201,6 +207,7 @@ arrayvec = { version = "0.7" }
 axum-3b31131e45eafb45 = { package = "axum", version = "0.6", features = ["headers", "http2", "ws"] }
 axum-ca01ad9e24f5d932 = { package = "axum", version = "0.7", features = ["macros"] }
 axum-core = { version = "0.4", default-features = false, features = ["tracing"] }
+base16ct = { version = "0.2", default-features = false, features = ["alloc"] }
 base64-3c51e837cfc5589a = { package = "base64", version = "0.22" }
 base64-594e8ee84c453af0 = { package = "base64", version = "0.13", features = ["alloc"] }
 base64-647d43efb71741da = { package = "base64", version = "0.21" }
@@ -212,6 +219,7 @@ blake2 = { version = "0.10" }
 blake3 = { version = "1" }
 block-buffer = { version = "0.9", default-features = false, features = ["block-padding"] }
 block-padding = { version = "0.3", default-features = false, features = ["std"] }
+bs58 = { version = "0.5", features = ["check"] }
 bumpalo = { version = "3", features = ["allocator-api2", "boxed", "collections"] }
 bytemuck = { version = "1", default-features = false, features = ["extern_crate_alloc"] }
 byteorder = { version = "1", features = ["i128"] }
@@ -243,6 +251,7 @@ elliptic-curve = { version = "0.13", features = ["ecdh", "hash2curve", "hazmat",
 ethers-contract-abigen = { version = "2", default-features = false, features = ["providers", "rustls"] }
 fastcrypto-b0db73ecc1bbc313 = { package = "fastcrypto", git = "https://github.com/MystenLabs/fastcrypto", rev = "c961a01596a87e76f590c7e43aca9d57106dbbb1", features = ["copy_key"] }
 fastcrypto-e49888412d456f9d = { package = "fastcrypto", git = "https://github.com/MystenLabs/fastcrypto", rev = "55e7e568842939e01c8545a71d72e2402ad74538", features = ["aes", "copy_key"] }
+ff = { version = "0.13", default-features = false, features = ["alloc"] }
 futures = { version = "0.3", features = ["bilock", "io-compat", "unstable"] }
 futures-channel = { version = "0.3", features = ["sink", "unstable"] }
 futures-core = { version = "0.3", features = ["unstable"] }
@@ -253,6 +262,7 @@ futures-task = { version = "0.3", features = ["unstable"] }
 futures-util = { version = "0.3", features = ["bilock", "channel", "io-compat", "sink", "unstable"] }
 generic-array = { version = "0.14", default-features = false, features = ["more_lengths", "serde", "zeroize"] }
 getrandom = { version = "0.2", default-features = false, features = ["std"] }
+group = { version = "0.13", default-features = false, features = ["alloc"] }
 half = { version = "2" }
 hashbrown-3575ec1268b04181 = { package = "hashbrown", version = "0.15" }
 hashbrown-582f2526e08bb6a0 = { package = "hashbrown", version = "0.14", features = ["raw"] }
@@ -296,6 +306,7 @@ openssl-sys = { version = "0.9", default-features = false, features = ["vendored
 p256 = { version = "0.13", features = ["ecdh", "jwk"] }
 parity-scale-codec = { version = "3", features = ["derive", "max-encoded-len"] }
 parity-scale-codec-derive = { version = "3", default-features = false, features = ["max-encoded-len"] }
+pbkdf2 = { version = "0.12" }
 phf_shared = { version = "0.11", default-features = false, features = ["std"] }
 pkcs8 = { version = "0.10", default-features = false, features = ["encryption", "pem", "std"] }
 plotters = { version = "0.3" }
@@ -326,7 +337,6 @@ rocksdb = { version = "0.21", features = ["multi-threaded-cf"] }
 ruint = { version = "1", features = ["num-bigint", "primitive-types", "serde"] }
 rustc-hex = { version = "2", default-features = false, features = ["std"] }
 rustls = { version = "0.21", features = ["dangerous_configuration", "quic"] }
-rustls-pki-types = { version = "1", features = ["std"] }
 rustls-webpki = { version = "0.102" }
 schemars = { version = "0.8", features = ["either"] }
 scopeguard = { version = "1" }
@@ -340,6 +350,7 @@ sha1 = { version = "0.10", features = ["oid"] }
 sha2-274715c4dabd11b0 = { package = "sha2", version = "0.9", default-features = false, features = ["std"] }
 sha2-93f6ce9d446188ac = { package = "sha2", version = "0.10", features = ["oid"] }
 sha3 = { version = "0.10", features = ["oid"] }
+signature = { version = "2", default-features = false, features = ["digest", "rand_core", "std"] }
 simdutf8 = { version = "0.1", features = ["aarch64_neon", "public_imp"] }
 similar = { version = "2", features = ["inline"] }
 smallvec = { version = "1", default-features = false, features = ["const_new", "union", "write"] }
@@ -369,6 +380,7 @@ uint = { version = "0.9" }
 unicode-bidi = { version = "0.3" }
 unicode-normalization = { version = "0.1" }
 unicode-xid = { version = "0.2" }
+ureq = { version = "2", features = ["socks-proxy"] }
 url = { version = "2", features = ["expose_internals", "serde"] }
 uuid = { version = "1", features = ["fast-rng", "serde", "v4"] }
 web-sys = { version = "0.3", default-features = false, features = ["AbortController", "AbortSignal", "AddEventListenerOptions", "BinaryType", "Cache", "CacheQueryOptions", "CacheStorage", "CloseEvent", "CloseEventInit", "Document", "ErrorEvent", "File", "FileReader", "FormData", "Headers", "History", "HtmlHeadElement", "Location", "MessageEvent", "ProgressEvent", "QueuingStrategy", "ReadableByteStreamController", "ReadableStream", "ReadableStreamByobReader", "ReadableStreamByobRequest", "ReadableStreamDefaultController", "ReadableStreamDefaultReader", "ReadableStreamGetReaderOptions", "ReadableStreamReadResult", "ReadableStreamReaderMode", "ReadableStreamType", "ReadableWritablePair", "Request", "RequestInit", "RequestRedirect", "Response", "ResponseInit", "StreamPipeOptions", "TransformStream", "TransformStreamDefaultController", "Transformer", "UnderlyingSink", "UnderlyingSource", "WebSocket", "Window", "WorkerGlobalScope", "WritableStream", "WritableStreamDefaultController", "WritableStreamDefaultWriter", "console"] }
