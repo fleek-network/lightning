@@ -354,7 +354,7 @@
                   # Vendor enclave bin
                   FN_ENCLAVE_SGXS = pkgs.fetchurl {
                     name = "enclave.sgxs";
-                    url = "https://bafybeiez7pmrjtivpchbyhx7gw7iov76jbkwcgioiawzdgyrpygqr2cgp4.ipfs.flk-ipfs.xyz";
+                    url = "https://bafybeifepixyjdgq5cfyvb4tlxfezkgwmyy6gvnua45pceh6fuxkbvwtly.ipfs.flk-ipfs.xyz";
                     hash = "sha256-LgJbqIKyhSdu8+W62ynETrynhIGAsUOg7KCd/xuC/N4=";
                   };
                 }
