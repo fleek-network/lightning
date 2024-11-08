@@ -22,10 +22,19 @@ reputation_ping_timeout = "15s"
 topology_target_k = 8
 topology_min_nodes = 16
 
-# Committee selection beacon phase durations (in number of blocks).
-# TODO(snormore): Figure out what this should be for production.
-committee_selection_beacon_commit_phase_duration = 60
-committee_selection_beacon_reveal_phase_duration = 60
+# The number of blocks that nodes have to commit their committee selection beacon.
+# There is no penalty for not participating in the commit phase. The phase will be retried until
+# there is sufficient participation.
+# 600 blocks = 1 minute (at 100ms per block) to commit.
+committee_selection_beacon_commit_phase_duration = 600
+
+# The number of blocks that nodes have to reveal their committee selection beacon.
+# If all committed nodes reveal their beacon, the phase will finalize immediately without waiting
+# for this full duration.
+# 12000 blocks = 20 minutes (at 100ms per block) to reveal.
+# This should be more than enough time for nodes to reveal their beacons. We're being conservative
+# and starting with a long duration for safety since non-revealing nodes will be slashed.
+committee_selection_beacon_reveal_phase_duration = 12000
 
 
 [[node_info]]
