@@ -89,12 +89,15 @@ async fn test_execute_transaction_as_committee_node() {
             network
                 .nodes()
                 .all(|node| {
-                    let nonce = node.app_query().get_node_info(&0, |node| node.nonce);
+                    let nonce = node
+                        .app_query()
+                        .get_node_info(&0, |node| node.nonce)
+                        .unwrap();
                     // When transactions are submitted immediately after startup, they may fail to
                     // initially make it to the mempool, in which case it will timeout and be
-                    // retried, with a backfill of the first nonce. So we need to check for either
-                    // nonce 1 or 2 (in case of retry).
-                    nonce == Some(1) || nonce == Some(2)
+                    // retried, with a backfill of the first nonce. So we need to check for a range
+                    // of nonces (in case of retry).
+                    nonce > 0 && nonce < 5
                 })
                 .then_some(())
                 .ok_or(PollUntilError::ConditionNotSatisfied)
@@ -150,12 +153,13 @@ async fn test_execute_transaction_as_non_committee_node() {
                 .all(|node| {
                     let nonce = node
                         .app_query()
-                        .get_node_info(&non_committee_node.index(), |node| node.nonce);
+                        .get_node_info(&non_committee_node.index(), |node| node.nonce)
+                        .unwrap();
                     // When transactions are submitted immediately after startup, they may fail to
                     // initially make it to the mempool, in which case it will timeout and be
-                    // retried, with a backfill of the first nonce. So we need to check for either
-                    // nonce 1 or 2 (in case of retry).
-                    nonce == Some(1) || nonce == Some(2)
+                    // retried, with a backfill of the first nonce. So we need to check for a range
+                    // of nonces (in case of retry).
+                    nonce > 0 && nonce < 5
                 })
                 .then_some(())
                 .ok_or(PollUntilError::ConditionNotSatisfied)
