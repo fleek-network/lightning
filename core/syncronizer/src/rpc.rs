@@ -90,11 +90,11 @@ pub async fn ask_node_info(
 }
 
 /// Returns the node info for our node, if it's already on the state.
-pub async fn check_is_valid_node(
+pub async fn check_if_node_has_sufficient_stake(
     node_public_key: NodePublicKey,
     nodes: Vec<(NodeIndex, NodeInfo)>,
 ) -> Result<bool> {
-    let mut is_valid = ask_is_valid_node(nodes, node_public_key).await;
+    let mut is_valid = ask_if_node_has_sufficient_stake(nodes, node_public_key).await;
 
     if is_valid.is_empty() {
         return Err(anyhow!("Failed to get node validity from bootstrap nodes"));
@@ -106,7 +106,7 @@ pub async fn check_is_valid_node(
 /// Ask the nodes if the given node is valid
 ///
 /// ### Empty if all the requests fail
-pub async fn ask_is_valid_node(
+pub async fn ask_if_node_has_sufficient_stake(
     nodes: Vec<(NodeIndex, NodeInfo)>,
     pk: NodePublicKey,
 ) -> Vec<(bool, Epoch)> {
@@ -117,7 +117,9 @@ pub async fn ask_is_valid_node(
                 RpcClient::new_no_auth(&format!("http://{}:{}", node.domain, node.ports.rpc))
                     .ok()?;
 
-            client.is_valid_node_epoch(pk).await.ok()
+            let epoch = client.get_epoch().await.ok()?;
+            let has_sufficient_stake = client.node_has_sufficient_stake(pk).await.ok()?;
+            Some((has_sufficient_stake, epoch))
         })
         .collect::<FuturesOrdered<_>>()
         .filter_map(std::future::ready)

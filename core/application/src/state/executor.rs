@@ -397,7 +397,8 @@ impl<B: Backend> StateExecutor<B> {
         _acknowledgments: Vec<DeliveryAcknowledgmentProof>,
     ) -> TransactionResponse {
         // Todo: function not done
-        let sender: NodeIndex = match self.only_node(sender) {
+        let sender: NodeIndex = match self.only_node_with_sufficient_stake_and_participating(sender)
+        {
             Ok(index) => index,
             Err(e) => return e,
         };
@@ -719,7 +720,7 @@ impl<B: Backend> StateExecutor<B> {
             Err(e) => return e,
         };
 
-        let (index, mut node) = match self.get_node_info(node_public_key.into()) {
+        let (node_index, mut node) = match self.get_node_info(node_public_key.into()) {
             Some(node) => node,
             None => return TransactionResponse::Revert(ExecutionError::NodeDoesNotExist),
         };
@@ -756,8 +757,14 @@ impl<B: Backend> StateExecutor<B> {
         node.stake.locked += amount;
         node.stake.locked_until = current_epoch + lock_time;
 
+        // If the node doesn't have sufficient stake and is participating, then set it to opted-out
+        // so that it will be removed from partipating on epoch change.
+        if !self.has_sufficient_stake(&node_index) && self.is_participating(&node_index) {
+            node.participation = Participation::OptedOut;
+        }
+
         // Save the changed node state and return success
-        self.node_info.set(index, node);
+        self.node_info.set(node_index, node);
         TransactionResponse::Success(ExecutionData::None)
     }
 
@@ -841,7 +848,7 @@ impl<B: Backend> StateExecutor<B> {
     }
 
     fn opt_in(&self, sender: TransactionSender) -> TransactionResponse {
-        let index = match self.only_node(sender) {
+        let index = match self.only_node_with_sufficient_unlocked_stake(sender) {
             Ok(account) => account,
             Err(e) => return e,
         };
@@ -856,7 +863,7 @@ impl<B: Backend> StateExecutor<B> {
     }
 
     fn opt_out(&self, sender: TransactionSender) -> TransactionResponse {
-        let index = match self.only_node(sender) {
+        let index = match self.only_node_with_sufficient_stake_and_participating(sender) {
             Ok(account) => account,
             Err(e) => return e,
         };
@@ -930,7 +937,7 @@ impl<B: Backend> StateExecutor<B> {
         sender: TransactionSender,
         measurements: BTreeMap<NodeIndex, ReputationMeasurements>,
     ) -> TransactionResponse {
-        let reporting_node = match self.only_node(sender) {
+        let reporting_node = match self.only_node_with_sufficient_stake_and_participating(sender) {
             Ok(index) => index,
             Err(e) => return e,
         };
@@ -955,7 +962,7 @@ impl<B: Backend> StateExecutor<B> {
             .into_iter()
             .for_each(|(peer_index, measurements)| {
                 if peer_index != reporting_node
-                    && self.is_valid_node(&peer_index).unwrap_or(false)
+                    && self.has_sufficient_stake(&peer_index)
                     && measurements.verify()
                 {
                     let mut node_measurements =
@@ -979,7 +986,7 @@ impl<B: Backend> StateExecutor<B> {
             return TransactionResponse::Revert(ExecutionError::TooManyUpdates);
         }
 
-        let node_index = match self.only_node(sender) {
+        let node_index = match self.only_node_with_sufficient_stake_and_participating(sender) {
             Ok(index) => index,
             Err(e) => return e,
         };
@@ -1408,8 +1415,8 @@ impl<B: Backend> StateExecutor<B> {
             )),
         }
     }
-    // Useful for transaction that nodes can call but an account owner can't
-    // Does not panic
+
+    /// Whether the sender is an existing node.
     fn only_node(&self, sender: TransactionSender) -> Result<NodeIndex, TransactionResponse> {
         let node_index = match sender {
             TransactionSender::NodeMain(public_key) => match self.pub_key_to_index.get(&public_key)
@@ -1434,7 +1441,30 @@ impl<B: Backend> StateExecutor<B> {
 
             _ => return Err(TransactionResponse::Revert(ExecutionError::OnlyNode)),
         };
-        if !self.is_valid_node(&node_index).unwrap_or(false) {
+        Ok(node_index)
+    }
+
+    /// Whether the sender is a node with sufficient unlocked + locked stake and is participating.
+    fn only_node_with_sufficient_stake_and_participating(
+        &self,
+        sender: TransactionSender,
+    ) -> Result<NodeIndex, TransactionResponse> {
+        let node_index = self.only_node_with_sufficient_stake(sender)?;
+        if !self.is_participating(&node_index) {
+            return Err(TransactionResponse::Revert(
+                ExecutionError::NodeNotParticipating,
+            ));
+        }
+        Ok(node_index)
+    }
+
+    /// Whether the sender is a node with sufficient unlocked + locked stake.
+    fn only_node_with_sufficient_stake(
+        &self,
+        sender: TransactionSender,
+    ) -> Result<NodeIndex, TransactionResponse> {
+        let node_index = self.only_node(sender)?;
+        if !self.has_sufficient_stake(&node_index) {
             return Err(TransactionResponse::Revert(
                 ExecutionError::InsufficientStake,
             ));
@@ -1442,13 +1472,27 @@ impl<B: Backend> StateExecutor<B> {
         Ok(node_index)
     }
 
-    // Checks if a node has staked the minimum required amount.
-    // Returns `None` if the
-    //
-    // Panics:
-    // This function can panic if ProtocolParams::MinimumNodeStake is missing from the parameters.
-    // This should not happen because this parameter is seeded in the genesis.
-    fn is_valid_node(&self, node_index: &NodeIndex) -> Option<bool> {
+    /// Whether the sender is a node with sufficient unlocked stake.
+    fn only_node_with_sufficient_unlocked_stake(
+        &self,
+        sender: TransactionSender,
+    ) -> Result<NodeIndex, TransactionResponse> {
+        let node_index = self.only_node(sender)?;
+        if !self.has_sufficient_stake(&node_index) {
+            return Err(TransactionResponse::Revert(
+                ExecutionError::InsufficientStake,
+            ));
+        }
+        Ok(node_index)
+    }
+
+    /// Whether a node has sufficient stake, including both unlocked and locked stake.
+    ///
+    /// Returns `false` if the node does not exist.
+    ///
+    /// Panics if `ProtocolParamKey::MinimumNodeStake` is missing from the parameters or has an
+    /// invalid type.
+    fn has_sufficient_stake(&self, node_index: &NodeIndex) -> bool {
         let min_amount = match self.parameters.get(&ProtocolParamKey::MinimumNodeStake) {
             Some(ProtocolParamValue::MinimumNodeStake(v)) => v,
             _ => unreachable!(), // set in genesis
@@ -1456,7 +1500,18 @@ impl<B: Backend> StateExecutor<B> {
 
         self.node_info
             .get(node_index)
-            .map(|node_info| node_info.stake.staked >= min_amount.into())
+            .map(|node_info| node_info.stake.staked + node_info.stake.locked >= min_amount.into())
+            .unwrap_or(false)
+    }
+
+    /// Whether the node is participating.
+    fn is_participating(&self, node_index: &NodeIndex) -> bool {
+        self.node_info.get(node_index).map_or(false, |info| {
+            matches!(
+                info.participation,
+                Participation::OptedIn | Participation::True
+            )
+        })
     }
 
     fn get_node_info(&self, sender: TransactionSender) -> Option<(NodeIndex, NodeInfo)> {

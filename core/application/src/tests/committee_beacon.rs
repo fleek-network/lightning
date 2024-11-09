@@ -1560,6 +1560,7 @@ async fn test_committee_beacon_node_can_reveal_after_committing_and_becoming_ina
 #[tokio::test]
 async fn test_committee_beacon_node_with_insufficient_stake_cannot_commit() {
     let network = TestNetwork::builder()
+        .with_stake_lock_time(0)
         .with_committee_nodes(2)
         .build()
         .await
@@ -1578,7 +1579,7 @@ async fn test_committee_beacon_node_with_insufficient_stake_cannot_commit() {
     );
     assert_eq!(query.get_committee_selection_beacon_round(), Some(0));
 
-    // Unstake the stake of 1 of the nodes.
+    // Unstake and withdraw the stake of 1 of the nodes.
     let node_public_key = network.node(0).keystore.get_ed25519_pk();
     let amount = query.get_node_info(&0, |node| node.stake).unwrap().staked;
     let resp = network
@@ -1590,6 +1591,16 @@ async fn test_committee_beacon_node_with_insufficient_stake_cannot_commit() {
                 },
                 network.chain_id,
                 1,
+                &TransactionSigner::AccountOwner(network.node(0).owner_secret_key.clone()),
+            )
+            .into(),
+            TransactionBuilder::from_update(
+                UpdateMethod::WithdrawUnstaked {
+                    node: node_public_key,
+                    recipient: Some(network.node(0).owner_secret_key.to_pk().into()),
+                },
+                network.chain_id,
+                2,
                 &TransactionSigner::AccountOwner(network.node(0).owner_secret_key.clone()),
             )
             .into(),
@@ -1617,6 +1628,7 @@ async fn test_committee_beacon_node_with_insufficient_stake_cannot_commit() {
 #[tokio::test]
 async fn test_committee_beacon_node_with_insufficient_stake_cannot_reveal() {
     let network = TestNetwork::builder()
+        .with_stake_lock_time(0)
         .with_committee_nodes(2)
         .build()
         .await
@@ -1660,7 +1672,7 @@ async fn test_committee_beacon_node_with_insufficient_stake_cannot_reveal() {
     );
     assert_eq!(query.get_committee_selection_beacon_round(), Some(0));
 
-    // Unstake the stake of 1 of the nodes.
+    // Unstake and withdraw the stake of 1 of the nodes.
     let node_public_key = network.node(0).keystore.get_ed25519_pk();
     let amount = query.get_node_info(&0, |node| node.stake).unwrap().staked;
     let resp = network
@@ -1672,6 +1684,16 @@ async fn test_committee_beacon_node_with_insufficient_stake_cannot_reveal() {
                 },
                 network.chain_id,
                 1,
+                &TransactionSigner::AccountOwner(network.node(0).owner_secret_key.clone()),
+            )
+            .into(),
+            TransactionBuilder::from_update(
+                UpdateMethod::WithdrawUnstaked {
+                    node: node_public_key,
+                    recipient: Some(network.node(0).owner_secret_key.to_pk().into()),
+                },
+                network.chain_id,
+                2,
                 &TransactionSigner::AccountOwner(network.node(0).owner_secret_key.clone()),
             )
             .into(),
@@ -2016,6 +2038,7 @@ struct TestNetworkBuilder {
     non_committee_nodes: usize,
     commit_phase_duration: u64,
     reveal_phase_duration: u64,
+    stake_lock_time: u64,
 }
 
 impl Default for TestNetworkBuilder {
@@ -2031,6 +2054,7 @@ impl TestNetworkBuilder {
             non_committee_nodes: 0,
             commit_phase_duration: 2,
             reveal_phase_duration: 2,
+            stake_lock_time: 5,
         }
     }
 
@@ -2054,6 +2078,11 @@ impl TestNetworkBuilder {
         self
     }
 
+    fn with_stake_lock_time(mut self, stake_lock_time: u64) -> Self {
+        self.stake_lock_time = stake_lock_time;
+        self
+    }
+
     async fn build(&self) -> Result<TestNetwork> {
         let _ = try_init_tracing(None);
 
@@ -2073,11 +2102,13 @@ impl TestNetworkBuilder {
         let app = node.provider.get::<Application<TestBinding>>();
 
         let chain_id = 1337;
+        let stake_lock_time = self.stake_lock_time;
         let commit_phase_duration = self.commit_phase_duration;
         let reveal_phase_duration = self.reveal_phase_duration;
         let mut builder = TestGenesisBuilder::new()
             .with_chain_id(chain_id)
             .with_mutator(Arc::new(move |genesis: &mut Genesis| {
+                genesis.lock_time = stake_lock_time;
                 genesis.committee_selection_beacon_commit_phase_duration = commit_phase_duration;
                 genesis.committee_selection_beacon_reveal_phase_duration = reveal_phase_duration;
             }));
