@@ -328,7 +328,64 @@ async fn test_opt_out_reverts_insufficient_stake() {
 }
 
 #[tokio::test]
-async fn test_opt_out_works() {
+async fn test_opt_out_success() {
+    let temp_dir = tempdir().unwrap();
+
+    // Create a genesis committee and seed the application state with it.
+    let committee_size = 4;
+    let (committee, _keystore) = create_genesis_committee(committee_size);
+    let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
+
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    let node_secret_key = NodeSecretKey::generate();
+    let node_pub_key = node_secret_key.to_pk();
+
+    // Stake the minimum required amount.
+    let minimum_stake_amount: HpUfixed<18> = query_runner.get_staking_amount().into();
+    deposit_and_stake(
+        &update_socket,
+        &owner_secret_key,
+        1,
+        &minimum_stake_amount,
+        &node_pub_key,
+        [0; 96].into(),
+    )
+    .await;
+
+    // Check that the node is initially not participating.
+    assert_eq!(
+        get_node_participation(&query_runner, &node_pub_key),
+        Participation::False
+    );
+
+    // Execute opt-in transaction.
+    expect_tx_success(
+        prepare_update_request_node(UpdateMethod::OptIn {}, &node_secret_key, 1),
+        &update_socket,
+        ExecutionData::None,
+    )
+    .await;
+
+    // Check that the node is now participating as opted-in.
+    assert_eq!(
+        get_node_participation(&query_runner, &node_pub_key),
+        Participation::OptedIn
+    );
+
+    // Execute opt-out transaction.
+    let opt_out = UpdateMethod::OptOut {};
+    let update = prepare_update_request_node(opt_out, &node_secret_key, 2);
+    expect_tx_success(update, &update_socket, ExecutionData::None).await;
+
+    // Check that the node is now not participating as opted-out.
+    assert_eq!(
+        get_node_participation(&query_runner, &node_pub_key),
+        Participation::OptedOut
+    );
+}
+
+#[tokio::test]
+async fn test_opt_out_reverts_when_participation_is_false() {
     let temp_dir = tempdir().unwrap();
 
     // Create a genesis committee and seed the application state with it.
@@ -353,17 +410,20 @@ async fn test_opt_out_works() {
     )
     .await;
 
-    assert_ne!(
-        get_node_participation(&query_runner, &node_pub_key),
-        Participation::OptedOut
-    );
-
-    let opt_out = UpdateMethod::OptOut {};
-    let update = prepare_update_request_node(opt_out, &node_secret_key, 1);
-    expect_tx_success(update, &update_socket, ExecutionData::None).await;
-
+    // Check that the node is initially not participating.
     assert_eq!(
         get_node_participation(&query_runner, &node_pub_key),
-        Participation::OptedOut
+        Participation::False
+    );
+
+    // Execute opt-out transaction.
+    let opt_out = UpdateMethod::OptOut {};
+    let update = prepare_update_request_node(opt_out, &node_secret_key, 1);
+    expect_tx_revert(update, &update_socket, ExecutionError::NodeNotParticipating).await;
+
+    // Check that the node is still not participating.
+    assert_eq!(
+        get_node_participation(&query_runner, &node_pub_key),
+        Participation::False
     );
 }

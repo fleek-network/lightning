@@ -151,6 +151,7 @@ pub enum ExecutionError {
     OnlyGovernance,
     InvalidServiceId,
     InsufficientStake,
+    NodeNotParticipating,
     LockExceededMaxStakeLockTime,
     LockedTokensUnstakeForbidden,
     EpochAlreadyChanged,

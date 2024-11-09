@@ -42,7 +42,7 @@ impl<B: Backend> StateExecutor<B> {
         epoch: Epoch,
     ) -> TransactionResponse {
         // Only Nodes can call this function
-        let index = match self.only_node(sender) {
+        let index = match self.only_node_with_sufficient_stake_and_participating(sender) {
             Ok(account) => account,
             Err(e) => return e,
         };
@@ -122,7 +122,7 @@ impl<B: Backend> StateExecutor<B> {
         commit: CommitteeSelectionBeaconCommit,
     ) -> TransactionResponse {
         // Check that a node is sending the transaction, and get the node's index.
-        let node_index = match self.only_node(sender) {
+        let node_index = match self.only_node_with_sufficient_stake(sender) {
             Ok(account) => account,
             Err(e) => return e,
         };
@@ -220,7 +220,7 @@ impl<B: Backend> StateExecutor<B> {
         reveal: CommitteeSelectionBeaconReveal,
     ) -> TransactionResponse {
         // Check that a node is sending the transaction, and get the node's index.
-        let node_index = match self.only_node(sender) {
+        let node_index = match self.only_node_with_sufficient_stake(sender) {
             Ok(account) => account,
             Err(e) => return e,
         };
@@ -330,7 +330,7 @@ impl<B: Backend> StateExecutor<B> {
         sender: TransactionSender,
     ) -> TransactionResponse {
         // Check that a node is sending the transaction, and get the node's index.
-        let _node_index = match self.only_node(sender) {
+        let _node_index = match self.only_node_with_sufficient_stake(sender) {
             Ok(account) => account,
             Err(e) => return e,
         };
@@ -440,7 +440,7 @@ impl<B: Backend> StateExecutor<B> {
         sender: TransactionSender,
     ) -> TransactionResponse {
         // Check that a node is sending the transaction, and get the node's index.
-        let _node_index = match self.only_node(sender) {
+        let _node_index = match self.only_node_with_sufficient_stake(sender) {
             Ok(account) => account,
             Err(e) => return e,
         };

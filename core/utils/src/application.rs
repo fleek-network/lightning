@@ -16,7 +16,7 @@ use lightning_interfaces::types::{
     Value,
 };
 use lightning_interfaces::PagingParams;
-use types::CommitteeSelectionBeaconPhase;
+use types::{CommitteeSelectionBeaconPhase, Participation};
 
 pub trait QueryRunnerExt: SyncQueryRunnerInterface {
     /// Returns the chain id
@@ -211,11 +211,21 @@ pub trait QueryRunnerExt: SyncQueryRunnerInterface {
     }
 
     /// Returns true if the node is a valid node in the network, with enough stake.
-    fn is_valid_node(&self, id: &NodePublicKey) -> bool {
+    fn has_sufficient_stake(&self, id: &NodePublicKey) -> bool {
         let minimum_stake_amount = self.get_staking_amount().into();
         self.pubkey_to_index(id).is_some_and(|node_idx| {
-            self.get_node_info(&node_idx, |n| n.stake.staked)
-                .is_some_and(|node_stake| node_stake >= minimum_stake_amount)
+            self.get_node_info(&node_idx, |n| n.stake)
+                .is_some_and(|stake| stake.staked + stake.locked >= minimum_stake_amount)
+        })
+    }
+
+    /// Returns true if the node is participating.
+    fn is_participating_node(&self, id: &NodePublicKey) -> bool {
+        self.pubkey_to_index(id).is_some_and(|node_idx| {
+            self.get_node_info(&node_idx, |n| n.participation)
+                .is_some_and(|participation| {
+                    matches!(participation, Participation::OptedIn | Participation::True)
+                })
         })
     }
 

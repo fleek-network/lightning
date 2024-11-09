@@ -150,11 +150,8 @@ pub trait FleekApi {
         epoch: Option<u64>,
     ) -> RpcResult<NodeServed>;
 
-    #[method(name = "is_valid_node")]
-    async fn is_valid_node(&self, public_key: NodePublicKey) -> RpcResult<bool>;
-
-    #[method(name = "is_valid_node_epoch")]
-    async fn is_valid_node_epoch(&self, public_key: NodePublicKey) -> RpcResult<(bool, Epoch)>;
+    #[method(name = "node_has_sufficient_stake")]
+    async fn node_has_sufficient_stake(&self, public_key: NodePublicKey) -> RpcResult<bool>;
 
     #[method(name = "get_node_registry")]
     async fn get_node_registry(&self, paging: Option<PagingParams>) -> RpcResult<Vec<NodeInfo>>;

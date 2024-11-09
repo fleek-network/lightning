@@ -20,7 +20,7 @@ use tempfile::tempdir;
 use super::utils::*;
 
 #[tokio::test]
-async fn test_is_valid_node() {
+async fn test_has_sufficient_stake() {
     let temp_dir = tempdir().unwrap();
 
     let (update_socket, query_runner) = init_app(&temp_dir, None);
@@ -41,7 +41,7 @@ async fn test_is_valid_node() {
     .await;
 
     // Make sure that this node is a valid node.
-    assert!(query_runner.is_valid_node(&node_pub_key));
+    assert!(query_runner.has_sufficient_stake(&node_pub_key));
 
     // Generate new keys for a different node.
     let owner_secret_key = AccountOwnerSecretKey::generate();
@@ -59,7 +59,7 @@ async fn test_is_valid_node() {
     )
     .await;
     // Make sure that this node is not a valid node.
-    assert!(!query_runner.is_valid_node(&node_pub_key));
+    assert!(!query_runner.has_sufficient_stake(&node_pub_key));
 }
 
 #[tokio::test]

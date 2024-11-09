@@ -457,8 +457,16 @@ async fn test_epoch_change_reverts_not_committee_member() {
     )
     .await;
 
+    // Execute opt-in transaction.
+    expect_tx_success(
+        prepare_update_request_node(UpdateMethod::OptIn {}, &node_secret_key, 1),
+        &update_socket,
+        ExecutionData::None,
+    )
+    .await;
+
     let change_epoch = UpdateMethod::ChangeEpoch { epoch: 0 };
-    let update = prepare_update_request_node(change_epoch, &node_secret_key, 1);
+    let update = prepare_update_request_node(change_epoch, &node_secret_key, 2);
     expect_tx_revert(update, &update_socket, ExecutionError::NotCommitteeMember).await;
 }
 

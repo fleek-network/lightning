@@ -298,15 +298,8 @@ impl<C: NodeComponents> FleekApiServer for FleekApi<C> {
             .unwrap_or_default())
     }
 
-    async fn is_valid_node(&self, pk: NodePublicKey) -> RpcResult<bool> {
-        Ok(self.data.query_runner.is_valid_node(&pk))
-    }
-
-    async fn is_valid_node_epoch(&self, pk: NodePublicKey) -> RpcResult<(bool, Epoch)> {
-        Ok((
-            self.data.query_runner.is_valid_node(&pk),
-            self.data.query_runner.get_epoch_info().epoch,
-        ))
+    async fn node_has_sufficient_stake(&self, pk: NodePublicKey) -> RpcResult<bool> {
+        Ok(self.data.query_runner.has_sufficient_stake(&pk))
     }
 
     async fn get_node_registry(&self, paging: Option<PagingParams>) -> RpcResult<Vec<NodeInfo>> {

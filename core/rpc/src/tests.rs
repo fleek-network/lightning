@@ -600,7 +600,7 @@ async fn test_rpc_get_node_served() {
 }
 
 #[tokio::test]
-async fn test_rpc_is_valid_node() {
+async fn test_rpc_node_has_sufficient_stake() {
     let mut network = TestNetwork::builder()
         .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(1)
         .await
@@ -617,10 +617,12 @@ async fn test_rpc_is_valid_node() {
         .node(0)
         .downcast::<TestFullNodeComponentsWithMockConsensus>();
 
-    let response =
-        FleekApiClient::is_valid_node(&node.rpc_client().unwrap(), node.get_node_public_key())
-            .await
-            .unwrap();
+    let response = FleekApiClient::node_has_sufficient_stake(
+        &node.rpc_client().unwrap(),
+        node.get_node_public_key(),
+    )
+    .await
+    .unwrap();
     assert!(response);
 
     network.shutdown().await;

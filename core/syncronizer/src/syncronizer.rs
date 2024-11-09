@@ -104,8 +104,8 @@ impl<C: NodeComponents> Syncronizer<C> {
         // The rpc calls are using a lot of clones. This is necessary because the futures are
         // passed into a thread, and thus need to satisfy the 'static lifetime.
 
-        // Check if node is staked.
-        let is_valid = rpc::sync_call(rpc::check_is_valid_node(
+        // Check if node has sufficient stake.
+        let is_valid = rpc::sync_call(rpc::check_if_node_has_sufficient_stake(
             our_public_key,
             genesis_committee.to_vec(),
         ))
@@ -226,7 +226,7 @@ impl<C: NodeComponents> SyncronizerInner<C> {
                     // has already been applied, otherwise we skip it.
                     // At this point the genesis should always already have been applied, but we keep the check anyway.
                     if !cfg!(debug_assertions) && self.query_runner.has_genesis() {
-                        if !self.query_runner.is_valid_node(&self.our_public_key) {
+                        if !self.query_runner.has_sufficient_stake(&self.our_public_key) {
                             println!("The node doesn't have enough stake to participate in the network.");
                             std::process::exit(1);
                         }
