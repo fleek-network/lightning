@@ -15,6 +15,7 @@ serde.workspace = true
 tracing.workspace = true
 affair.workspace = true
 rand = "0.8.5"
+thiserror.workspace = true
 
 # These dependencies MUST be pinned to the same versions used by `lightning-consensus`
 narwhal-types = { git = "https://github.com/MystenLabs/sui.git", rev = "b06ada015694890d7c46347b13fbc3e9a763513c", package = "narwhal-types" }

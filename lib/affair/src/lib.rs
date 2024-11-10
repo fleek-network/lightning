@@ -212,7 +212,7 @@ impl<Req, Res> Clone for WeakSocket<Req, Res> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum RunError<Req> {
     /// The [`Socket`] failed to put the [`Req`] to be processed, this can be caused
     /// when the socket is closed.

@@ -22,6 +22,7 @@ use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::{broadcast, mpsc};
 use tokio::task::JoinSet;
 use tokio::time::{sleep, Interval};
+use types::ForwarderError;
 
 /// The mock consensus group object is used to attach multiple mock nodes into the same 'consensus'
 /// mechanism.
@@ -95,9 +96,10 @@ impl<C: NodeComponents> MockForwarder<C> {
         struct ProxyWorker(mpsc::Sender<TransactionRequest>);
         impl AsyncWorkerUnordered for ProxyWorker {
             type Request = TransactionRequest;
-            type Response = ();
-            async fn handle(&self, req: Self::Request) {
-                self.0.send(req).await.expect("Failed to send transaction.")
+            type Response = Result<(), ForwarderError>;
+            async fn handle(&self, req: Self::Request) -> Self::Response {
+                self.0.send(req).await.expect("Failed to send transaction.");
+                Ok(())
             }
         }
         let worker = ProxyWorker(sender);

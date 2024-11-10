@@ -9,6 +9,7 @@ use types::{
     ExecuteTransactionError,
     ExecuteTransactionOptions,
     ExecutionData,
+    ForwarderError,
     TransactionResponse,
     UpdateMethod,
 };
@@ -30,20 +31,18 @@ async fn test_insufficient_nodes_in_committee() {
         .execute_transaction_from_node(
             UpdateMethod::IncrementNonce {},
             Some(ExecuteTransactionOptions {
-                // Transactions that are submitted immediately after startup will sometimes
-                // timeout and need to be retried.
                 wait: types::ExecuteTransactionWait::Receipt,
-                retry: types::ExecuteTransactionRetry::Always(Some(3)),
-                timeout: Some(Duration::from_secs(1)),
+                ..Default::default()
             }),
         )
         .await;
     match result.unwrap_err() {
-        ExecuteTransactionError::FailedToIncrementNonceForRetry((_, msg)) => {
-            assert_eq!(msg, "Timeout reached");
-        },
+        ExecuteTransactionError::ForwarderError((
+            _,
+            ForwarderError::FailedToSendToAnyConnection | ForwarderError::NoActiveConnections,
+        )) => (),
         error => panic!(
-            "expected FailedToIncrementNonceForRetry error, got {:?}",
+            "expected ForwarderError::FailedToSendToAnyConnection error, got {:?}",
             error
         ),
     }
@@ -68,11 +67,8 @@ async fn test_execute_transaction_as_committee_node() {
         .execute_transaction_from_node(
             UpdateMethod::IncrementNonce {},
             Some(ExecuteTransactionOptions {
-                // Transactions that are submitted immediately after startup will sometimes
-                // timeout and need to be retried.
                 wait: types::ExecuteTransactionWait::Receipt,
-                retry: types::ExecuteTransactionRetry::Always(Some(10)),
-                timeout: Some(Duration::from_secs(2)),
+                ..Default::default()
             }),
         )
         .await
@@ -130,11 +126,8 @@ async fn test_execute_transaction_as_non_committee_node() {
         .execute_transaction_from_node(
             UpdateMethod::IncrementNonce {},
             Some(ExecuteTransactionOptions {
-                // Transactions that are submitted immediately after startup will sometimes
-                // timeout and need to be retried.
                 wait: types::ExecuteTransactionWait::Receipt,
-                retry: types::ExecuteTransactionRetry::Always(Some(10)),
-                timeout: Some(Duration::from_secs(2)),
+                ..Default::default()
             }),
         )
         .await
@@ -232,11 +225,8 @@ async fn test_epoch_change_via_transactions() {
         node.execute_transaction_from_node(
             UpdateMethod::ChangeEpoch { epoch: 0 },
             Some(ExecuteTransactionOptions {
-                // Transactions that are submitted immediately after startup will sometimes
-                // timeout and need to be retried.
                 wait: types::ExecuteTransactionWait::Receipt,
-                retry: types::ExecuteTransactionRetry::Always(Some(5)),
-                timeout: Some(Duration::from_secs(5)),
+                ..Default::default()
             }),
         )
     }))

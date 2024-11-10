@@ -169,7 +169,8 @@ impl<C: NodeComponents> EthApiServer for EthApi<C> {
             .mempool_socket
             .run(transaction.into())
             .await
-            .map_err(RPCError::from)?;
+            .map_err(RPCError::from)?
+            .map_err(|e| RPCError::socket(e.to_string()))?;
 
         Ok(hash)
     }
