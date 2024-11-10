@@ -1,5 +1,5 @@
 use std::fs::read_to_string;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use anyhow::{Context, Result};
 use fleek_crypto::{AccountOwnerSecretKey, ConsensusSecretKey, NodeSecretKey, SecretKey};
@@ -40,6 +40,7 @@ use lightning_rpc::{Config as RpcConfig, Rpc};
 use lightning_service_executor::shim::{ServiceExecutor, ServiceExecutorConfig};
 use lightning_syncronizer::config::Config as SyncronizerConfig;
 use lightning_syncronizer::syncronizer::Syncronizer;
+use lightning_test_utils::e2e::try_init_tracing;
 use lightning_test_utils::lsof::wait_for_file_to_close;
 use lightning_utils::application::QueryRunnerExt;
 use lightning_utils::config::TomlConfigProvider;
@@ -105,11 +106,18 @@ async fn test_node_load_checkpoint_start_shutdown_iterations() {
 async fn test_node_load_checkpoint_start_ready_shutdown_iterations() {
     let temp_dir = tempdir().unwrap();
 
+    let _ = try_init_tracing(None);
+
     // Build the keystore config.
     let keystore_config = KeystoreConfig::test();
 
     // Build the genesis.
-    let genesis = build_genesis(&keystore_config).unwrap();
+    let mut genesis = build_genesis(&keystore_config).unwrap();
+    genesis.epoch_time = 120000;
+    genesis.epoch_start = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64;
     let genesis_path = genesis
         .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
         .unwrap();

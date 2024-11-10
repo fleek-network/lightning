@@ -5,7 +5,13 @@ use futures::future::join_all;
 use lightning_interfaces::prelude::*;
 use lightning_utils::application::QueryRunnerExt;
 use lightning_utils::poll::{poll_until, PollUntilError};
-use types::{Epoch, UpdateMethod};
+use types::{
+    Epoch,
+    ExecuteTransactionOptions,
+    ExecuteTransactionRetry,
+    ExecuteTransactionWait,
+    UpdateMethod,
+};
 
 use super::{BoxedTestNode, TestNetwork};
 
@@ -29,9 +35,21 @@ impl TestNetwork {
     /// This method does not wait for the epoch to be incremented across all nodes, but it does wait
     /// for each of the transactions to be executed.
     pub async fn change_epoch(&self) -> Result<Epoch> {
+        self.change_epoch_with_options(Some(ExecuteTransactionOptions {
+            wait: ExecuteTransactionWait::Receipt,
+            retry: ExecuteTransactionRetry::Default,
+            timeout: Some(Duration::from_secs(10)),
+        }))
+        .await
+    }
+
+    pub async fn change_epoch_with_options(
+        &self,
+        options: Option<ExecuteTransactionOptions>,
+    ) -> Result<Epoch> {
         let epoch = self.node(0).app_query().get_current_epoch();
         join_all(self.nodes().map(|node| {
-            node.execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch }, None)
+            node.execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch }, options.clone())
         }))
         .await
         .into_iter()

@@ -99,7 +99,7 @@ async fn test_archive_api() {
     // Run the transactions.
 
     for tx in &transactions {
-        socket.run(tx.clone()).await.unwrap();
+        socket.run(tx.clone()).await.unwrap().unwrap();
     }
 
     let mut block_receipts = Vec::new();

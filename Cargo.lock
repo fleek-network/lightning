@@ -7844,6 +7844,7 @@ dependencies = [
  "narwhal-types 0.1.0 (git+https://github.com/MystenLabs/sui.git?rev=b06ada015694890d7c46347b13fbc3e9a763513c)",
  "rand 0.8.5",
  "serde",
+ "thiserror",
  "tokio",
  "tonic 0.8.3",
  "tracing",

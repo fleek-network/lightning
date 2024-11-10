@@ -8,19 +8,18 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 
 use affair::AsyncWorker;
-use anyhow::{bail, Result};
+use anyhow::Result;
 use fleek_crypto::ConsensusPublicKey;
-use lightning_interfaces::types::{Epoch, EpochInfo, NodeInfo, TransactionRequest};
+use lightning_interfaces::types::{Epoch, EpochInfo, ForwarderError, NodeInfo, TransactionRequest};
 use lightning_interfaces::SyncQueryRunnerInterface;
 use lightning_utils::application::QueryRunnerExt;
 use narwhal_types::{TransactionProto, TransactionsClient};
 use rand::seq::SliceRandom;
 use tokio::time::{timeout, Duration};
 use tonic::transport::channel::Channel;
-use tracing::error;
 
 const TARGETED_CONNECTION_NUM: usize = 10;
-const TIMEOUT_DURATION: Duration = Duration::new(4, 0);
+const TIMEOUT_DURATION: Duration = Duration::from_secs(4);
 
 pub struct Worker<Q: SyncQueryRunnerInterface> {
     /// Query runner used to read application state
@@ -56,7 +55,7 @@ impl<Q: SyncQueryRunnerInterface> Worker<Q> {
         }
     }
 
-    async fn handle_forward(&mut self, req: &TransactionRequest) -> Result<()> {
+    async fn handle_forward(&mut self, req: &TransactionRequest) -> Result<(), ForwarderError> {
         // Grab the epoch
         let epoch = self.query_runner.get_current_epoch();
 
@@ -72,7 +71,9 @@ impl<Q: SyncQueryRunnerInterface> Worker<Q> {
         }
 
         // serialize transaction
-        let txn_bytes: Vec<u8> = req.try_into()?;
+        let txn_bytes: Vec<u8> = req.try_into().map_err(|e: anyhow::Error| {
+            ForwarderError::FailedToSerializeTransaction(e.to_string())
+        })?;
 
         let request = TransactionProto {
             transaction: txn_bytes.into(),
@@ -103,7 +104,7 @@ impl<Q: SyncQueryRunnerInterface> Worker<Q> {
         );
 
         if self.active_connections.is_empty() {
-            bail!("Failed sending transaction to any worker")
+            return Err(ForwarderError::FailedToSendToAnyConnection);
         }
 
         Ok(())
@@ -140,7 +141,7 @@ impl<Q: SyncQueryRunnerInterface> Worker<Q> {
         self.min_connections = self.max_connections / 3 * 2 + 1;
     }
 
-    async fn make_connections(&mut self) -> Result<()> {
+    async fn make_connections(&mut self) -> Result<(), ForwarderError> {
         let start_index = self.cursor;
 
         while self.active_connections.len() < self.min_connections {
@@ -164,9 +165,8 @@ impl<Q: SyncQueryRunnerInterface> Worker<Q> {
                 break;
             }
         }
-
         if self.active_connections.is_empty() {
-            bail!("Couldnt get a connection with a committee member")
+            return Err(ForwarderError::NoActiveConnections);
         }
 
         Ok(())
@@ -175,18 +175,9 @@ impl<Q: SyncQueryRunnerInterface> Worker<Q> {
 
 impl<Q: SyncQueryRunnerInterface + 'static> AsyncWorker for Worker<Q> {
     type Request = TransactionRequest;
-    type Response = ();
+    type Response = Result<(), ForwarderError>;
 
     async fn handle(&mut self, req: Self::Request) -> Self::Response {
-        // if it fails we should retry once to cover all edge cases
-        let mut retried = 0;
-        while retried < 2 {
-            if let Err(e) = self.handle_forward(&req).await {
-                error!("Failed to send transaction to a worker: {e}");
-                retried += 1;
-            } else {
-                break;
-            }
-        }
+        self.handle_forward(&req).await
     }
 }

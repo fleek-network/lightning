@@ -1,8 +1,9 @@
 use std::time::Duration;
 
+use affair::RunError;
 use thiserror::Error;
 
-use crate::{ExecutionError, TransactionReceipt, TransactionRequest, UpdateMethod};
+use crate::{ExecutionError, ForwarderError, TransactionReceipt, TransactionRequest, UpdateMethod};
 
 type MaxRetries = u8;
 
@@ -56,21 +57,6 @@ pub enum ExecuteTransactionRetry {
     #[default]
     Default,
     Never,
-    Always(Option<MaxRetries>),
-    AlwaysExcept(
-        (
-            Option<MaxRetries>,
-            Option<Vec<ExecutionError>>,
-            RetryOnTimeout,
-        ),
-    ),
-    OnlyWith(
-        (
-            Option<MaxRetries>,
-            Option<Vec<ExecutionError>>,
-            RetryOnTimeout,
-        ),
-    ),
 }
 
 impl ExecuteTransactionRetry {
@@ -78,33 +64,61 @@ impl ExecuteTransactionRetry {
         match self {
             Self::Default => default,
             Self::Never => 0,
-            Self::Always(max_retries) => max_retries.unwrap_or(default),
-            Self::AlwaysExcept((max_retries, _, _)) => max_retries.unwrap_or(default),
-            Self::OnlyWith((max_retries, _, _)) => max_retries.unwrap_or(default),
         }
     }
 
-    pub fn should_retry_on_failure_to_send_to_mempool(&self) -> bool {
+    pub fn should_retry_on_forwarder_error(
+        &self,
+        error: &ForwarderError,
+    ) -> Option<(MaxRetries, Duration)> {
         match self {
-            Self::Default => true,
-            Self::Never => false,
-            Self::Always(_) => true,
-            Self::AlwaysExcept(_) => true,
-            Self::OnlyWith(_) => false,
+            Self::Default => match error {
+                // Retry on no active connections error.
+                // This can happen sometimes if the forwarder is not ready yet, so retry a bunch of
+                // times with a moderate delay, since it's likely to happen on startup.
+                ForwarderError::NoActiveConnections => Some((50, Duration::from_millis(500))),
+                // Retry on failed to send to any connection error.
+                // This can happen sometimes if the forwarder is not ready yet, so retry a bunch of
+                // times with a moderate delay, since it's likely to happen on startup.
+                ForwarderError::FailedToSendToAnyConnection => {
+                    Some((50, Duration::from_millis(500)))
+                },
+                // Otherwise, don't retry.
+                ForwarderError::FailedToSerializeTransaction(_) => None,
+            },
+            Self::Never => None,
         }
     }
 
-    pub fn should_retry_on_error(&self, error: &ExecutionError) -> bool {
+    pub fn should_retry_on_forwarder_run_error(
+        &self,
+        error: &RunError<TransactionRequest>,
+    ) -> Option<(MaxRetries, Duration)> {
         match self {
-            Self::Default => *error == ExecutionError::InvalidNonce,
-            Self::Never => false,
-            Self::Always(_) => true,
-            Self::AlwaysExcept((_, errors, _)) => errors
-                .as_ref()
-                .map_or(true, |errors| !errors.contains(error)),
-            Self::OnlyWith((_, errors, _)) => errors
-                .as_ref()
-                .map_or(false, |errors| errors.contains(error)),
+            Self::Default => match error {
+                // Retry on enqueue error.
+                // This can happen sometimes if the component is not ready yet, so retry a bunch of
+                // times with a moderate delay, since it's likely to happen on startup.
+                RunError::FailedToEnqueueReq(_) => Some((50, Duration::from_millis(500))),
+                // Retry on get response error.
+                // This can happen sometimes if the component is not ready yet, so retry a bunch of
+                // times with a moderate delay, since it's likely to happen on startup.
+                RunError::FailedToGetResponse => Some((50, Duration::from_millis(500))),
+            },
+            Self::Never => None,
+        }
+    }
+
+    pub fn should_retry_on_revert(&self, error: &ExecutionError) -> Option<(MaxRetries, Duration)> {
+        match self {
+            Self::Default => match error {
+                // Retry on invalid nonce error.
+                // This can happen sometimes, so retry a few times with a short delay.
+                ExecutionError::InvalidNonce => Some((3, Duration::from_millis(100))),
+                // Otherwise, don't retry.
+                _ => None,
+            },
+            Self::Never => None,
         }
     }
 
@@ -112,9 +126,6 @@ impl ExecuteTransactionRetry {
         match self {
             Self::Default => true,
             Self::Never => false,
-            Self::Always(_) => true,
-            Self::AlwaysExcept((_, _, retry_on_timeout)) => *retry_on_timeout,
-            Self::OnlyWith((_, _, retry_on_timeout)) => *retry_on_timeout,
         }
     }
 }
@@ -136,9 +147,13 @@ pub enum ExecuteTransactionError {
     #[error("Failed to submit transaction to signer: {:?}", .0)]
     FailedToSubmitRequestToSigner(ExecuteTransactionRequest),
 
-    /// The transaction failed to be submitted to the mempool.
-    #[error("Failed to submit transaction to mempool (tx: {:?}): {:?}", .0.0.hash(), .0.1)]
-    FailedToSubmitTransactionToMempool((TransactionRequest, String)),
+    /// The transaction failed to be forwarded to the mempool.
+    #[error("Failed to forward transaction to mempool (tx: {:?}): {:?}", .0.0.hash(), .0.1)]
+    ForwarderError((TransactionRequest, ForwarderError)),
+
+    /// The transaction failed to be forwarded to the mempool.
+    #[error("Failed to forward transaction to mempool (tx: {:?}): {:?}", .0.0.hash(), .0.1)]
+    ForwarderRunError((TransactionRequest, RunError<TransactionRequest>)),
 
     /// Failed to get response from signer.
     #[error("Failed to get response from signer")]
