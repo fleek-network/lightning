@@ -58,6 +58,9 @@ impl BufCollector {
             return None;
         }
         let offset = index - flushed;
+        if self.buffer.len() < 32 {
+            return None;
+        }
         Some(*array_ref!(&self.buffer, offset * 32, 32))
     }
 }
