@@ -13,7 +13,6 @@ use types::{
     ExecuteTransactionRequest,
     ExecuteTransactionRetry,
     ExecuteTransactionWait,
-    ExecutionError,
     Metadata,
     NodeIndex,
     UpdateMethod,
@@ -325,11 +324,6 @@ impl<C: NodeComponents> CommitteeBeaconListener<C> {
             method,
             ExecuteTransactionOptions {
                 wait: ExecuteTransactionWait::Receipt,
-                retry: ExecuteTransactionRetry::OnlyWith((
-                    None,
-                    Some(vec![ExecutionError::InvalidNonce]),
-                    true,
-                )),
                 ..Default::default()
             },
         )

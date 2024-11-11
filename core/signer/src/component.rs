@@ -30,7 +30,7 @@ impl<C: NodeComponents> Signer<C> {
     ///
     /// This method is called once during node initialization.
     fn init(fdi::Cloned(shutdown): fdi::Cloned<ShutdownWaiter>) -> Result<Self> {
-        let worker = SignerWorker::new();
+        let worker = SignerWorker::new(shutdown.clone());
         let socket = spawn_worker!(worker.clone(), "SIGNER: worker socket", shutdown, crucial);
         Ok(Self {
             socket,
