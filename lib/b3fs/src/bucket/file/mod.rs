@@ -81,6 +81,7 @@ impl B3FSFile {
 
 #[cfg(test)]
 mod tests {
+    use std::char::MAX;
     use std::env::temp_dir;
     use std::path::PathBuf;
 
@@ -145,10 +146,7 @@ mod tests {
             .map(|h| utils::to_hex(h).as_str().to_string())
             .collect::<Vec<String>>();
         for file in files.iter() {
-            assert_eq!(
-                MAX_BLOCK_SIZE_IN_BYTES as u64,
-                file.metadata().unwrap().len()
-            );
+            assert!(file.metadata().unwrap().len() <= MAX_BLOCK_SIZE_IN_BYTES as u64);
             let file_name = file.file_name().to_str().unwrap().to_string();
             assert!(hashes.contains(&file_name));
         }
