@@ -5,6 +5,7 @@ use fleek_crypto::{AccountOwnerSecretKey, NodeSecretKey, SecretKey};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_committee_beacon::{CommitteeBeaconConfig, CommitteeBeaconTimerConfig};
 use lightning_interfaces::types::{
+    CommitteeSelectionBeaconPhase,
     DeliveryAcknowledgmentProof,
     ExecuteTransactionError,
     ExecutionData,
@@ -23,8 +24,18 @@ use lightning_test_utils::e2e::{
 use lightning_utils::application::QueryRunnerExt;
 use lightning_utils::poll::{poll_until, PollUntilError};
 use tempfile::tempdir;
+use utils::{
+    create_genesis_committee,
+    deposit_and_stake,
+    expect_tx_revert,
+    expect_tx_success,
+    prepare_update_request_account,
+    prepare_update_request_node,
+    test_init_app,
+    test_reputation_measurements,
+};
 
-use super::utils::*;
+use super::*;
 
 #[tokio::test]
 async fn test_epoch_change_with_all_committee_nodes() {
@@ -317,6 +328,95 @@ async fn test_epoch_change_with_some_non_committee_nodes() {
 
     // Shutdown the network.
     network.shutdown().await;
+}
+
+#[tokio::test]
+async fn test_change_epoch_with_only_locked_stake() {
+    let network = utils::TestNetwork::builder()
+        .with_committee_nodes(2)
+        .with_genesis_mutator(|genesis| {
+            genesis.min_stake = 1000;
+
+            // First node has only locked stake.
+            genesis.node_info[0].stake.staked = 0u32.into();
+            genesis.node_info[0].stake.locked = 1000u32.into();
+
+            // Second node has unlocked stake.
+            genesis.node_info[1].stake.staked = 1000u32.into();
+            genesis.node_info[1].stake.locked = 0u32.into();
+        })
+        .build()
+        .await
+        .unwrap();
+    let query = network.query();
+    let epoch = query.get_current_epoch();
+
+    // Execute epoch change transaction from the node with only locked stake.
+    let resp = network
+        .execute(vec![
+            network
+                .node(0)
+                .build_transaction(UpdateMethod::ChangeEpoch { epoch }),
+        ])
+        .await
+        .unwrap();
+    assert_eq!(resp.block_number, 1);
+    assert!(!resp.change_epoch);
+
+    // Execute epoch change transaction from the node with unlocked stake.
+    let resp = network
+        .execute(vec![
+            network
+                .node(1)
+                .build_transaction(UpdateMethod::ChangeEpoch { epoch }),
+        ])
+        .await
+        .unwrap();
+    assert_eq!(resp.block_number, 2);
+    assert!(!resp.change_epoch);
+
+    // Check that we have transitioned to the committee beacon commit phase.
+    assert_eq!(
+        query.get_committee_selection_beacon_phase(),
+        Some(CommitteeSelectionBeaconPhase::Commit((2, 4)))
+    );
+    assert_eq!(query.get_committee_selection_beacon_round(), Some(0));
+}
+
+#[tokio::test]
+async fn test_change_epoch_reverts_if_node_opted_out() {
+    let network = utils::TestNetwork::builder()
+        .with_committee_nodes(2)
+        .build()
+        .await
+        .unwrap();
+    let query = network.query();
+    let epoch = query.get_current_epoch();
+
+    // Execute opt-out transaction from the first node.
+    let resp = network
+        .execute(vec![
+            network.node(0).build_transaction(UpdateMethod::OptOut {}),
+        ])
+        .await
+        .unwrap();
+    assert_eq!(resp.block_number, 1);
+
+    // Execute epoch change transaction from the node and check that it reverts.
+    let resp = network
+        .maybe_execute(vec![
+            network
+                .node(0)
+                .build_transaction(UpdateMethod::ChangeEpoch { epoch }),
+        ])
+        .await
+        .unwrap();
+    assert_eq!(resp.block_number, 2);
+    assert!(!resp.change_epoch);
+    assert_eq!(
+        resp.txn_receipts[0].response,
+        TransactionResponse::Revert(ExecutionError::NodeNotParticipating)
+    );
 }
 
 #[tokio::test]
