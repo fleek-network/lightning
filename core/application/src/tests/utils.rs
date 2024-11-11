@@ -956,7 +956,10 @@ pub struct TestNetworkBuilder {
     commit_phase_duration: u64,
     reveal_phase_duration: u64,
     stake_lock_time: u64,
+    genesis_mutator: Option<GenesisMutator>,
 }
+
+pub type GenesisMutator = Arc<dyn Fn(&mut Genesis)>;
 
 impl Default for TestNetworkBuilder {
     fn default() -> Self {
@@ -972,6 +975,7 @@ impl TestNetworkBuilder {
             commit_phase_duration: 2,
             reveal_phase_duration: 2,
             stake_lock_time: 5,
+            genesis_mutator: None,
         }
     }
 
@@ -997,6 +1001,14 @@ impl TestNetworkBuilder {
 
     pub fn with_stake_lock_time(mut self, stake_lock_time: u64) -> Self {
         self.stake_lock_time = stake_lock_time;
+        self
+    }
+
+    pub fn with_genesis_mutator<F>(mut self, mutator: F) -> Self
+    where
+        F: Fn(&mut Genesis) + 'static,
+    {
+        self.genesis_mutator = Some(Arc::new(mutator));
         self
     }
 
@@ -1079,7 +1091,12 @@ impl TestNetworkBuilder {
             });
         }
 
-        let genesis = builder.build();
+        let mut genesis = builder.build();
+
+        if let Some(mutator) = self.genesis_mutator.clone() {
+            mutator(&mut genesis);
+        }
+
         app.apply_genesis(genesis).await?;
 
         let tx_socket = app.transaction_executor();
@@ -1183,6 +1200,20 @@ impl TestNode {
             self.chain_id,
             self.nonce.fetch_add(1, Ordering::Relaxed) + 1,
             &self.signer,
+        )
+        .into()
+    }
+
+    pub fn build_transasction_as_owner(
+        &self,
+        method: UpdateMethod,
+        nonce: u64,
+    ) -> TransactionRequest {
+        TransactionBuilder::from_update(
+            method,
+            self.chain_id,
+            nonce,
+            &TransactionSigner::AccountOwner(self.owner_secret_key.clone()),
         )
         .into()
     }

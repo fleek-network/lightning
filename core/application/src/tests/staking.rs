@@ -12,13 +12,15 @@ use fleek_crypto::{
 use hp_fixed::unsigned::HpUfixed;
 use lightning_committee_beacon::{CommitteeBeaconConfig, CommitteeBeaconTimerConfig};
 use lightning_interfaces::types::{
+    CommitteeSelectionBeaconCommit,
     ExecutionData,
     ExecutionError,
     HandshakePorts,
     NodePorts,
+    Participation,
     UpdateMethod,
 };
-use lightning_interfaces::SyncQueryRunnerInterface;
+use lightning_interfaces::{KeystoreInterface, SyncQueryRunnerInterface};
 use lightning_test_utils::consensus::MockConsensusConfig;
 use lightning_test_utils::e2e::{
     DowncastToTestFullNode,
@@ -26,9 +28,36 @@ use lightning_test_utils::e2e::{
     TestNetwork,
     TestNetworkNode,
 };
+use lightning_utils::application::QueryRunnerExt;
 use tempfile::tempdir;
+use utils::{
+    create_genesis_committee,
+    deposit,
+    deposit_and_stake,
+    expect_tx_revert,
+    expect_tx_success,
+    get_flk_balance,
+    get_locked,
+    get_locked_time,
+    get_node_info,
+    get_stake_locked_until,
+    get_staked,
+    init_app,
+    prepare_deposit_update,
+    prepare_initial_stake_update,
+    prepare_regular_stake_update,
+    prepare_stake_lock_update,
+    prepare_unstake_update,
+    prepare_update_request_consensus,
+    prepare_update_request_node,
+    prepare_withdraw_unstaked_update,
+    run_update,
+    run_updates,
+    test_genesis,
+    test_init_app,
+};
 
-use super::utils::*;
+use super::*;
 
 #[tokio::test]
 async fn test_stake() {
@@ -792,4 +821,175 @@ async fn test_withdraw_unstaked_works_properly() {
 
     // Shutdown the network.
     network.shutdown().await;
+}
+
+#[tokio::test]
+async fn test_unstake_as_non_committee_node_opts_out_node_and_removes_after_epoch_change() {
+    let network = utils::TestNetwork::builder()
+        .with_committee_nodes(4)
+        .with_non_committee_nodes(1)
+        .build()
+        .await
+        .unwrap();
+    let query = network.query();
+    let epoch = query.get_current_epoch();
+
+    // Check the initial stake.
+    let stake = query.get_node_info(&4, |n| n.stake).unwrap();
+    assert_eq!(stake.staked, 1000u64.into());
+    assert_eq!(stake.locked, 0u64.into());
+
+    // Execute unstake transaction from the first node.
+    let resp = network
+        .execute(vec![network.node(4).build_transasction_as_owner(
+            UpdateMethod::Unstake {
+                amount: 1000u64.into(),
+                node: network.node(4).keystore.get_ed25519_pk(),
+            },
+            1,
+        )])
+        .await
+        .unwrap();
+    assert_eq!(resp.block_number, 1);
+
+    // Check that the stake is now locked.
+    let stake = query.get_node_info(&4, |n| n.stake).unwrap();
+    assert_eq!(stake.staked, 0u64.into());
+    assert_eq!(stake.locked, 1000u64.into());
+
+    // Execute epoch change transactions.
+    let resp = network.execute_change_epoch(epoch).await.unwrap();
+    assert_eq!(resp.block_number, 2);
+
+    // Execute commit-reveal transactions to complete the epoch change process.
+    let resp = network
+        .execute(
+            network
+                .nodes
+                .iter()
+                .enumerate()
+                .map(|(i, n)| {
+                    n.build_transaction(UpdateMethod::CommitteeSelectionBeaconCommit {
+                        commit: CommitteeSelectionBeaconCommit::build(epoch, 0, [i as u8; 32]),
+                    })
+                })
+                .collect(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.block_number, 3);
+    let resp = network
+        .execute(
+            network
+                .nodes
+                .iter()
+                .enumerate()
+                .map(|(i, n)| {
+                    n.build_transaction(UpdateMethod::CommitteeSelectionBeaconReveal {
+                        reveal: [i as u8; 32],
+                    })
+                })
+                .collect(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.block_number, 4);
+
+    // Check that the epoch has changed.
+    assert_eq!(query.get_current_epoch(), epoch + 1);
+
+    // Check that the node is no longer participating.
+    assert_eq!(
+        query.get_node_info(&4, |n| n.participation).unwrap(),
+        Participation::False
+    );
+}
+
+#[tokio::test]
+async fn test_unstake_as_committee_node_opts_out_node_and_removes_after_epoch_change() {
+    let network = utils::TestNetwork::builder()
+        .with_committee_nodes(5)
+        .build()
+        .await
+        .unwrap();
+    let query = network.query();
+    let epoch = query.get_current_epoch();
+
+    // Check the initial stake.
+    let stake = query.get_node_info(&4, |n| n.stake).unwrap();
+    assert_eq!(stake.staked, 1000u64.into());
+    assert_eq!(stake.locked, 0u64.into());
+
+    // Execute unstake transaction from the first node.
+    let resp = network
+        .execute(vec![network.node(4).build_transasction_as_owner(
+            UpdateMethod::Unstake {
+                amount: 1000u64.into(),
+                node: network.node(4).keystore.get_ed25519_pk(),
+            },
+            1,
+        )])
+        .await
+        .unwrap();
+    assert_eq!(resp.block_number, 1);
+
+    // Check that the stake is now locked.
+    let stake = query.get_node_info(&4, |n| n.stake).unwrap();
+    assert_eq!(stake.staked, 0u64.into());
+    assert_eq!(stake.locked, 1000u64.into());
+
+    // Execute epoch change transactions from participating nodes.
+    let resp = network
+        .execute(
+            network.nodes[0..4]
+                .iter()
+                .map(|node| node.build_transaction(UpdateMethod::ChangeEpoch { epoch }))
+                .collect(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.block_number, 2);
+
+    // Execute commit-reveal transactions to complete the epoch change process.
+    let resp = network
+        .execute(
+            network
+                .nodes
+                .iter()
+                .enumerate()
+                .map(|(i, n)| {
+                    n.build_transaction(UpdateMethod::CommitteeSelectionBeaconCommit {
+                        commit: CommitteeSelectionBeaconCommit::build(epoch, 0, [i as u8; 32]),
+                    })
+                })
+                .collect(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.block_number, 3);
+    let resp = network
+        .execute(
+            network
+                .nodes
+                .iter()
+                .enumerate()
+                .map(|(i, n)| {
+                    n.build_transaction(UpdateMethod::CommitteeSelectionBeaconReveal {
+                        reveal: [i as u8; 32],
+                    })
+                })
+                .collect(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.block_number, 4);
+
+    // Check that the epoch has changed.
+    assert_eq!(query.get_current_epoch(), epoch + 1);
+
+    // Check that the node is no longer participating.
+    assert_eq!(
+        query.get_node_info(&4, |n| n.participation).unwrap(),
+        Participation::False
+    );
 }
