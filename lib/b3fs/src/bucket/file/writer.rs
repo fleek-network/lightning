@@ -58,10 +58,10 @@ mod tests {
     use crate::bucket::tests::get_random_file;
 
     #[tokio::test]
-    async fn test_trusted_write_should_work_and_be_consistent_with_fs() {
+    async fn test_writer_should_work() {
         let temp_dir_name = random::<[u8; 32]>();
         let temp_dir = temp_dir().join(format!(
-            "test_write_should_work_{}",
+            "test_writer_should_work_{}",
             utils::to_hex(&temp_dir_name)
         ));
         let bucket = Bucket::open(&temp_dir).await.unwrap();
@@ -73,10 +73,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_trusted_write_should_work_and_be_consistent_with_fs_more_blocks() {
+    async fn test_writer_should_work_more_blocks() {
         let temp_dir_name = random::<[u8; 32]>();
         let temp_dir = temp_dir().join(format!(
-            "test_write_should_work_more_blocks_{}",
+            "test_writer_should_work_more_blocks_{}",
             utils::to_hex(&temp_dir_name)
         ));
         let bucket = Bucket::open(&temp_dir).await.unwrap();
@@ -85,5 +85,50 @@ mod tests {
         writer.write(&data).await.unwrap();
         writer.commit().await.unwrap();
         verify_writer(&temp_dir, 4).await;
+    }
+
+    #[tokio::test]
+    async fn test_writer_should_work_exact_one_block() {
+        let temp_dir_name = random::<[u8; 32]>();
+        let temp_dir = temp_dir().join(format!(
+            "test_writer_should_work_exact_one_block_{}",
+            utils::to_hex(&temp_dir_name)
+        ));
+        let bucket = Bucket::open(&temp_dir).await.unwrap();
+        let mut writer = FileWriter::new(&bucket).await.unwrap();
+        let data = get_random_file(MAX_BLOCK_SIZE_IN_BYTES / 32);
+        writer.write(&data).await.unwrap();
+        writer.commit().await.unwrap();
+        verify_writer(&temp_dir, 1).await;
+    }
+
+    #[tokio::test]
+    async fn test_writer_should_work_with_few_bytes() {
+        let temp_dir_name = random::<[u8; 32]>();
+        let temp_dir = temp_dir().join(format!(
+            "ttest_writer_should_work_with_few_bytes_{}",
+            utils::to_hex(&temp_dir_name)
+        ));
+        let bucket = Bucket::open(&temp_dir).await.unwrap();
+        let mut writer = FileWriter::new(&bucket).await.unwrap();
+        let data = get_random_file(1);
+        writer.write(&data).await.unwrap();
+        writer.commit().await.unwrap();
+        verify_writer(&temp_dir, 1).await;
+    }
+
+    #[tokio::test]
+    async fn test_writer_should_work_with_one_block_and_few_more_bytes() {
+        let temp_dir_name = random::<[u8; 32]>();
+        let temp_dir = temp_dir().join(format!(
+            "ttest_writer_should_work_with_one_block_and_few_more_bytes_{}",
+            utils::to_hex(&temp_dir_name)
+        ));
+        let bucket = Bucket::open(&temp_dir).await.unwrap();
+        let mut writer = FileWriter::new(&bucket).await.unwrap();
+        let data = get_random_file(8193);
+        writer.write(&data).await.unwrap();
+        writer.commit().await.unwrap();
+        verify_writer(&temp_dir, 2).await;
     }
 }
