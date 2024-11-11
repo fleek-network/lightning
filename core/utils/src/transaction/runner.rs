@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use affair::RunError;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::BlockExecutedNotification;
 use types::{
@@ -8,6 +9,7 @@ use types::{
     ExecuteTransactionOptions,
     ExecuteTransactionResponse,
     ExecutionError,
+    ForwarderError,
     TransactionReceipt,
     TransactionRequest,
     TransactionResponse,
@@ -75,11 +77,19 @@ impl<C: NodeComponents> TransactionRunner<C> {
             let block_sub = self.notifier.subscribe_block_executed();
 
             // Send transaction to the mempool.
-            match self.mempool.enqueue(tx.clone()).await {
-                Ok(()) => {},
-                Err(e) => {
+            match self.mempool.run(tx.clone()).await {
+                Ok(result) => match result {
+                    Ok(()) => {},
+                    Err(error) => {
+                        retry += 1;
+                        self.handle_forwarder_error(tx, &options, error, retry)
+                            .await?;
+                        continue;
+                    },
+                },
+                Err(error) => {
                     retry += 1;
-                    self.handle_failed_mempool_enqueue(tx, &options, e.to_string(), retry)
+                    self.handle_forwarder_run_error(tx, &options, error, retry)
                         .await?;
                     continue;
                 },
@@ -114,25 +124,22 @@ impl<C: NodeComponents> TransactionRunner<C> {
         }
     }
 
-    async fn handle_failed_mempool_enqueue(
+    async fn handle_forwarder_run_error(
         &self,
         tx: TransactionRequest,
         options: &ExecuteTransactionOptions,
-        error: String,
+        error: RunError<TransactionRequest>,
         retry: RetryCount,
     ) -> Result<(), ExecuteTransactionError> {
-        let max_retries = options.retry.get_max_retries(DEFAULT_MAX_RETRIES);
-
         // Return error if we shouldn't retry.
-        if !options.retry.should_retry_on_failure_to_send_to_mempool() {
+        let Some((max_retries, delay)) = options.retry.should_retry_on_forwarder_run_error(&error)
+        else {
             tracing::warn!(
                 "transaction failed to send to mempool (no retries): {:?}",
                 tx
             );
-            return Err(ExecuteTransactionError::FailedToSubmitTransactionToMempool(
-                (tx, error),
-            ));
-        }
+            return Err(ExecuteTransactionError::ForwarderRunError((tx, error)));
+        };
 
         // Return error if max retries are reached.
         if retry > max_retries {
@@ -141,9 +148,7 @@ impl<C: NodeComponents> TransactionRunner<C> {
                 retry,
                 tx
             );
-            return Err(ExecuteTransactionError::FailedToSubmitTransactionToMempool(
-                (tx, error),
-            ));
+            return Err(ExecuteTransactionError::ForwarderRunError((tx, error)));
         }
 
         // Otherwise, continue to retry
@@ -152,7 +157,45 @@ impl<C: NodeComponents> TransactionRunner<C> {
             retry,
             tx
         );
-        tokio::time::sleep(RETRY_DELAY).await;
+        tokio::time::sleep(delay).await;
+
+        Ok(())
+    }
+
+    async fn handle_forwarder_error(
+        &self,
+        tx: TransactionRequest,
+        options: &ExecuteTransactionOptions,
+        error: ForwarderError,
+        retry: RetryCount,
+    ) -> Result<(), ExecuteTransactionError> {
+        // Return error if we shouldn't retry.
+        let Some((max_retries, delay)) = options.retry.should_retry_on_forwarder_error(&error)
+        else {
+            tracing::warn!(
+                "transaction failed to send to mempool (no retries): {:?}",
+                tx
+            );
+            return Err(ExecuteTransactionError::ForwarderError((tx, error)));
+        };
+
+        // Return error if max retries are reached.
+        if retry > max_retries {
+            tracing::warn!(
+                "transaction failed to send to mempool after max retries reached (attempts: {}): {:?}",
+                retry,
+                tx
+            );
+            return Err(ExecuteTransactionError::ForwarderError((tx, error)));
+        }
+
+        // Otherwise, continue to retry.
+        tracing::warn!(
+            "retrying after failing to send transaction to mempool (attempt: {}): {:?}",
+            retry,
+            tx
+        );
+        tokio::time::sleep(delay).await;
 
         Ok(())
     }
@@ -166,10 +209,8 @@ impl<C: NodeComponents> TransactionRunner<C> {
         retry: RetryCount,
         timeout: Duration,
     ) -> Result<(), ExecuteTransactionError> {
-        let max_retries = options.retry.get_max_retries(DEFAULT_MAX_RETRIES);
-
         // Return error if we shouldn't retry.
-        if !options.retry.should_retry_on_error(error) {
+        let Some((max_retries, delay)) = options.retry.should_retry_on_revert(error) else {
             tracing::debug!("transaction reverted (no retries): {:?}", receipt);
             self.ensure_nonce_used_before_giving_up(tx, options, timeout)
                 .await?;
@@ -178,7 +219,7 @@ impl<C: NodeComponents> TransactionRunner<C> {
                 receipt.clone(),
                 retry,
             )));
-        }
+        };
 
         // Return error if max retries are reached.
         if retry > max_retries {
@@ -204,7 +245,7 @@ impl<C: NodeComponents> TransactionRunner<C> {
             retry,
             tx
         );
-        tokio::time::sleep(RETRY_DELAY).await;
+        tokio::time::sleep(delay).await;
 
         Ok(())
     }

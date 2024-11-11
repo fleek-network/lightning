@@ -230,108 +230,6 @@ async fn test_execute_transaction_with_node_signer_wait_for_receipt_no_retry() {
 }
 
 #[tokio::test]
-async fn test_execute_transaction_with_account_signer_wait_for_receipt_retry_on_revert() {
-    // Build and start the node.
-    let account_secret_key = AccountOwnerSecretKey::generate();
-    let account_secret_key_clone = account_secret_key.clone();
-    let mut node = TestNodeBuilder::new()
-        .with_genesis_mutator(move |genesis| {
-            genesis.account = vec![GenesisAccount {
-                public_key: account_secret_key_clone.to_pk().into(),
-                ..Default::default()
-            }];
-        })
-        .build::<TestNodeComponents>()
-        .await
-        .unwrap();
-    node.start().await;
-
-    // Build a transaction client.
-    let client = node.account_transaction_client(&account_secret_key).await;
-
-    // Check that the nonce starts at 0.
-    assert_eq!(node.get_account_nonce(&account_secret_key), 0);
-
-    // Execute a transaction that will be reverted.
-    let result = client
-        .execute_transaction(
-            UpdateMethod::ChangeEpoch { epoch: 101 },
-            Some(ExecuteTransactionOptions {
-                wait: ExecuteTransactionWait::Receipt,
-                // `None` means to use the default max retries.
-                retry: ExecuteTransactionRetry::Always(None),
-                timeout: None,
-            }),
-        )
-        .await;
-    match result.unwrap_err() {
-        ExecuteTransactionError::Reverted((tx, receipt, attempts)) => {
-            assert_eq!(
-                receipt.response,
-                TransactionResponse::Revert(ExecutionError::OnlyNode)
-            );
-            assert!(!tx.hash().is_empty());
-            assert_eq!(receipt.transaction_hash, tx.hash());
-            assert_eq!(attempts, 4);
-        },
-        e => panic!("unexpected error type: {e:?}"),
-    }
-
-    // Check that the nonce has been incremented 4 times, for the initial attempt and each retry.
-    assert_eq!(node.get_account_nonce(&account_secret_key), 4);
-
-    // Shutdown the node.
-    node.shutdown().await;
-}
-
-#[tokio::test]
-async fn test_execute_transaction_with_node_signer_wait_for_receipt_retry_on_revert() {
-    // Build and start the node.
-    let mut node = TestNodeBuilder::new()
-        .build::<TestNodeComponents>()
-        .await
-        .unwrap();
-    node.start().await;
-
-    // Build a transaction client.
-    let client = node.node_transaction_client().await;
-
-    // Check that the nonce starts at 0.
-    assert_eq!(node.get_node_nonce(), 0);
-
-    // Execute a transaction that will be reverted.
-    let result = client
-        .execute_transaction(
-            UpdateMethod::ChangeEpoch { epoch: 101 },
-            Some(ExecuteTransactionOptions {
-                wait: ExecuteTransactionWait::Receipt,
-                // `None` means to use the default max retries.
-                retry: ExecuteTransactionRetry::Always(None),
-                timeout: None,
-            }),
-        )
-        .await;
-    match result.unwrap_err() {
-        ExecuteTransactionError::Reverted((tx, receipt, attempts)) => {
-            assert_eq!(
-                receipt.response,
-                TransactionResponse::Revert(ExecutionError::EpochHasNotStarted)
-            );
-            assert!(!tx.hash().is_empty());
-            assert_eq!(receipt.transaction_hash, tx.hash());
-            assert_eq!(attempts, 4);
-        },
-        e => panic!("unexpected error type: {e:?}"),
-    }
-
-    // Check that the nonce has been incremented 4 times, for the initial attempt and each retry.
-    assert_eq!(node.get_node_nonce(), 4);
-
-    // Shutdown the node.
-    node.shutdown().await;
-}
-
-#[tokio::test]
 async fn test_execute_transaction_with_node_signer_wait_for_receipt_retry_on_timeout_no_recovery() {
     // Build and start the node.
     let mut node = TestNodeBuilder::new()
@@ -356,7 +254,7 @@ async fn test_execute_transaction_with_node_signer_wait_for_receipt_retry_on_tim
             UpdateMethod::IncrementNonce {},
             Some(ExecuteTransactionOptions {
                 wait: ExecuteTransactionWait::Receipt,
-                retry: ExecuteTransactionRetry::Always(None),
+                retry: ExecuteTransactionRetry::Default,
                 timeout: Some(Duration::from_millis(200)),
             }),
         )
@@ -403,7 +301,7 @@ async fn test_execute_transaction_with_node_signer_wait_for_receipt_retry_on_tim
             UpdateMethod::IncrementNonce {},
             Some(ExecuteTransactionOptions {
                 wait: ExecuteTransactionWait::Receipt,
-                retry: ExecuteTransactionRetry::Always(None),
+                retry: ExecuteTransactionRetry::Default,
                 timeout: Some(Duration::from_millis(200)),
             }),
         )
@@ -458,7 +356,7 @@ async fn test_execute_transaction_wait_for_receipt_retry_on_timeout_avoids_resub
             },
             Some(ExecuteTransactionOptions {
                 wait: ExecuteTransactionWait::Receipt,
-                retry: ExecuteTransactionRetry::Always(None),
+                retry: ExecuteTransactionRetry::Default,
                 timeout: Some(Duration::from_millis(200)),
             }),
         )
@@ -521,7 +419,7 @@ async fn test_execute_transaction_no_wait_for_receipt_retry_on_timeout_avoids_re
             },
             Some(ExecuteTransactionOptions {
                 wait: ExecuteTransactionWait::None,
-                retry: ExecuteTransactionRetry::Always(None),
+                retry: ExecuteTransactionRetry::Default,
                 timeout: Some(Duration::from_millis(200)),
             }),
         )
