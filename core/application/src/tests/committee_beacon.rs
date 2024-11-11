@@ -1,38 +1,21 @@
 use std::collections::HashSet;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
 
-use anyhow::Result;
 use fleek_crypto::{AccountOwnerSecretKey, SecretKey};
 use lightning_interfaces::prelude::*;
-use lightning_node::Node;
-use lightning_test_utils::e2e::{try_init_tracing, TestGenesisBuilder, TestGenesisNodeBuilder};
-use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_utils::application::QueryRunnerExt;
 use lightning_utils::transaction::{TransactionBuilder, TransactionSigner};
 use rand::Rng;
 use types::{
-    Block,
-    BlockExecutionResponse,
-    ChainId,
     CommitteeSelectionBeaconCommit,
     CommitteeSelectionBeaconPhase,
     CommitteeSelectionBeaconReveal,
-    Epoch,
     ExecutionData,
     ExecutionError,
-    Genesis,
-    NodeIndex,
-    Staking,
-    TransactionRequest,
     TransactionResponse,
     UpdateMethod,
 };
 
-use super::*;
-use crate::config::StorageConfig;
-use crate::state::QueryRunner;
-use crate::ApplicationConfig;
+use crate::tests::utils::TestNetwork;
 
 #[tokio::test]
 async fn test_committee_beacon_epoch_change_success() {
@@ -2031,244 +2014,6 @@ async fn test_committee_beacon_non_committee_node_participation() {
     // Check that the new committee is different from the old committee, but is still the same size.
     assert_ne!(query.get_committee_members_by_index(), vec![0, 1, 2, 3]);
     assert_eq!(query.get_committee_members().len(), 4);
-}
-
-struct TestNetworkBuilder {
-    committee_nodes: usize,
-    non_committee_nodes: usize,
-    commit_phase_duration: u64,
-    reveal_phase_duration: u64,
-    stake_lock_time: u64,
-}
-
-impl Default for TestNetworkBuilder {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl TestNetworkBuilder {
-    fn new() -> Self {
-        Self {
-            committee_nodes: 0,
-            non_committee_nodes: 0,
-            commit_phase_duration: 2,
-            reveal_phase_duration: 2,
-            stake_lock_time: 5,
-        }
-    }
-
-    fn with_committee_nodes(mut self, committee_nodes: usize) -> Self {
-        self.committee_nodes = committee_nodes;
-        self
-    }
-
-    fn with_non_committee_nodes(mut self, non_committee_nodes: usize) -> Self {
-        self.non_committee_nodes = non_committee_nodes;
-        self
-    }
-
-    fn with_commit_phase_duration(mut self, commit_phase_duration: u64) -> Self {
-        self.commit_phase_duration = commit_phase_duration;
-        self
-    }
-
-    fn with_reveal_phase_duration(mut self, reveal_phase_duration: u64) -> Self {
-        self.reveal_phase_duration = reveal_phase_duration;
-        self
-    }
-
-    fn with_stake_lock_time(mut self, stake_lock_time: u64) -> Self {
-        self.stake_lock_time = stake_lock_time;
-        self
-    }
-
-    async fn build(&self) -> Result<TestNetwork> {
-        let _ = try_init_tracing(None);
-
-        let config = JsonConfigProvider::default()
-            .with::<Application<TestBinding>>(ApplicationConfig {
-                network: None,
-                genesis_path: None,
-                storage: StorageConfig::InMemory,
-                db_path: None,
-                db_options: None,
-                dev: None,
-            })
-            .with::<EphemeralKeystore<TestBinding>>(Default::default());
-        let provider = fdi::Provider::default().with(config);
-        let node = Node::<TestBinding>::init_with_provider(provider)?;
-
-        let app = node.provider.get::<Application<TestBinding>>();
-
-        let chain_id = 1337;
-        let stake_lock_time = self.stake_lock_time;
-        let commit_phase_duration = self.commit_phase_duration;
-        let reveal_phase_duration = self.reveal_phase_duration;
-        let mut builder = TestGenesisBuilder::new()
-            .with_chain_id(chain_id)
-            .with_mutator(Arc::new(move |genesis: &mut Genesis| {
-                genesis.lock_time = stake_lock_time;
-                genesis.committee_selection_beacon_commit_phase_duration = commit_phase_duration;
-                genesis.committee_selection_beacon_reveal_phase_duration = reveal_phase_duration;
-            }));
-
-        let mut nodes = vec![];
-
-        for _ in 0..self.committee_nodes {
-            let keystore = EphemeralKeystore::<TestBinding>::default();
-            let signer = TransactionSigner::NodeMain(keystore.get_ed25519_sk());
-            let owner_secret_key = AccountOwnerSecretKey::generate();
-            builder = builder.with_node(
-                TestGenesisNodeBuilder::new()
-                    .with_owner(owner_secret_key.to_pk().into())
-                    .with_node_secret_key(keystore.get_ed25519_sk())
-                    .with_consensus_secret_key(keystore.get_bls_sk())
-                    .with_stake(Staking {
-                        staked: 1000u32.into(),
-                        stake_locked_until: 0,
-                        locked: 0u32.into(),
-                        locked_until: 0,
-                    })
-                    .with_is_committee(true)
-                    .build(),
-            );
-            nodes.push(TestNode {
-                keystore,
-                signer,
-                chain_id,
-                nonce: Arc::new(AtomicU64::new(0)),
-                owner_secret_key,
-            });
-        }
-
-        for _ in 0..self.non_committee_nodes {
-            let keystore = EphemeralKeystore::<TestBinding>::default();
-            let signer = TransactionSigner::NodeMain(keystore.get_ed25519_sk());
-            let owner_secret_key = AccountOwnerSecretKey::generate();
-            builder = builder.with_node(
-                TestGenesisNodeBuilder::new()
-                    .with_owner(owner_secret_key.to_pk().into())
-                    .with_node_secret_key(keystore.get_ed25519_sk())
-                    .with_is_committee(false)
-                    .build(),
-            );
-            nodes.push(TestNode {
-                keystore,
-                signer,
-                chain_id,
-                nonce: Arc::new(AtomicU64::new(0)),
-                owner_secret_key,
-            });
-        }
-
-        let genesis = builder.build();
-        app.apply_genesis(genesis).await?;
-
-        let tx_socket = app.transaction_executor();
-        let query = app.sync_query();
-
-        Ok(TestNetwork {
-            chain_id,
-            _primary: node,
-            nodes,
-            tx_socket,
-            query,
-        })
-    }
-}
-
-struct TestNetwork {
-    _primary: Node<TestBinding>,
-    nodes: Vec<TestNode>,
-    tx_socket: ExecutionEngineSocket,
-    query: QueryRunner,
-    chain_id: ChainId,
-}
-
-impl TestNetwork {
-    fn builder() -> TestNetworkBuilder {
-        TestNetworkBuilder::new()
-    }
-
-    fn node(&self, index: NodeIndex) -> &TestNode {
-        &self.nodes[index as usize]
-    }
-
-    fn query(&self) -> QueryRunner {
-        self.query.clone()
-    }
-
-    async fn maybe_execute(
-        &self,
-        transactions: Vec<TransactionRequest>,
-    ) -> Result<BlockExecutionResponse> {
-        self.tx_socket
-            .run(Block {
-                transactions,
-                ..Default::default()
-            })
-            .await
-            .map_err(|e| anyhow::anyhow!(e))
-    }
-
-    async fn execute(
-        &self,
-        transactions: Vec<TransactionRequest>,
-    ) -> Result<BlockExecutionResponse> {
-        let resp = self.maybe_execute(transactions.clone()).await?;
-        for receipt in &resp.txn_receipts {
-            if !matches!(receipt.response, TransactionResponse::Success(_)) {
-                anyhow::bail!("transaction execution failed: {:?}", receipt);
-            }
-        }
-        if resp.txn_receipts.len() != transactions.len() {
-            anyhow::bail!(
-                "expected {} transactions, got {}",
-                transactions.len(),
-                resp.txn_receipts.len()
-            );
-        }
-        Ok(resp)
-    }
-
-    async fn execute_change_epoch(&self, epoch: Epoch) -> Result<BlockExecutionResponse> {
-        let current_committee = self.query.get_committee_members_by_index();
-        let transactions = self
-            .nodes
-            .iter()
-            .filter(|node| {
-                current_committee.contains(
-                    &self
-                        .query
-                        .pubkey_to_index(&node.keystore.get_ed25519_pk())
-                        .unwrap(),
-                )
-            })
-            .map(|node| node.build_transaction(UpdateMethod::ChangeEpoch { epoch }))
-            .collect();
-        self.execute(transactions).await
-    }
-}
-
-struct TestNode {
-    keystore: EphemeralKeystore<TestBinding>,
-    signer: TransactionSigner,
-    chain_id: ChainId,
-    nonce: Arc<AtomicU64>,
-    owner_secret_key: AccountOwnerSecretKey,
-}
-
-impl TestNode {
-    fn build_transaction(&self, method: UpdateMethod) -> TransactionRequest {
-        TransactionBuilder::from_update(
-            method,
-            self.chain_id,
-            self.nonce.fetch_add(1, Ordering::Relaxed) + 1,
-            &self.signer,
-        )
-        .into()
-    }
 }
 
 fn generate_random_reveal() -> CommitteeSelectionBeaconReveal {
