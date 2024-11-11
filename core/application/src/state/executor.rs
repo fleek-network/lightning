@@ -757,14 +757,18 @@ impl<B: Backend> StateExecutor<B> {
         node.stake.locked += amount;
         node.stake.locked_until = current_epoch + lock_time;
 
-        // If the node doesn't have sufficient stake and is participating, then set it to opted-out
-        // so that it will be removed from partipating on epoch change.
-        if !self.has_sufficient_stake(&node_index) && self.is_participating(&node_index) {
+        // Save the changed node state.
+        self.node_info.set(node_index, node.clone());
+
+        // If the node doesn't have sufficient unlocked stake and is participating, then set it to
+        // opted-out so that it will not be included as participating for this epoch and will be
+        // set as Participation::False on epoch change.
+        if !self.has_sufficient_unlocked_stake(&node_index) && self.is_participating(&node_index) {
             node.participation = Participation::OptedOut;
+            self.node_info.set(node_index, node);
         }
 
-        // Save the changed node state and return success
-        self.node_info.set(node_index, node);
+        // Return success.
         TransactionResponse::Success(ExecutionData::None)
     }
 
@@ -1489,18 +1493,22 @@ impl<B: Backend> StateExecutor<B> {
     /// Whether a node has sufficient stake, including both unlocked and locked stake.
     ///
     /// Returns `false` if the node does not exist.
-    ///
-    /// Panics if `ProtocolParamKey::MinimumNodeStake` is missing from the parameters or has an
-    /// invalid type.
     fn has_sufficient_stake(&self, node_index: &NodeIndex) -> bool {
-        let min_amount = match self.parameters.get(&ProtocolParamKey::MinimumNodeStake) {
-            Some(ProtocolParamValue::MinimumNodeStake(v)) => v,
-            _ => unreachable!(), // set in genesis
-        };
-
         self.node_info
             .get(node_index)
-            .map(|node_info| node_info.stake.staked + node_info.stake.locked >= min_amount.into())
+            .map(|node_info| {
+                node_info.stake.staked + node_info.stake.locked >= self.get_min_stake()
+            })
+            .unwrap_or(false)
+    }
+
+    /// Whether the node has sufficient unlocked stake.
+    ///
+    /// Returns `false` if the node does not exist.
+    fn has_sufficient_unlocked_stake(&self, node_index: &NodeIndex) -> bool {
+        self.node_info
+            .get(node_index)
+            .map(|node_info| node_info.stake.staked >= self.get_min_stake())
             .unwrap_or(false)
     }
 
@@ -1512,6 +1520,16 @@ impl<B: Backend> StateExecutor<B> {
                 Participation::OptedIn | Participation::True
             )
         })
+    }
+
+    /// Returns the minimum amount of stake required for a node to be participating.
+    ///
+    /// Panics if `ProtocolParamKey::MinimumNodeStake` is missing from the parameters or has an
+    fn get_min_stake(&self) -> HpUfixed<18> {
+        match self.parameters.get(&ProtocolParamKey::MinimumNodeStake) {
+            Some(ProtocolParamValue::MinimumNodeStake(v)) => v.into(),
+            _ => unreachable!(), // set in genesis
+        }
     }
 
     fn get_node_info(&self, sender: TransactionSender) -> Option<(NodeIndex, NodeInfo)> {
