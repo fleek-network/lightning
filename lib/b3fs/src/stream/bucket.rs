@@ -27,25 +27,40 @@ use crate::hasher::dir_hasher::B3_DIR_IS_SYM_LINK;
 use crate::on_future;
 use crate::utils::tree_index;
 
+/// A structure representing a stream of a bucket.
 pub struct BucketStream;
 
+/// A structure representing a block of data.
 pub struct Block(pub Vec<u8>);
 
+/// An enum representing different types of directory items.
 pub enum DirItem {
     File(PathBuf),
     Dir(PathBuf),
     Symblink(Vec<u8>),
 }
 
+/// An enum representing different types of bucket items.
 pub enum BucketItem {
     File(Block),
     Dir(DirItem),
 }
 
+/// A type alias for the bucket streamer.
 pub type BucketStreamer =
     Result<Box<dyn Stream<Item = Result<BucketItem, errors::ReadError>>>, errors::ReadError>;
 
 impl BucketStream {
+    /// Creates a new bucket stream.
+    ///
+    /// # Arguments
+    ///
+    /// * `bucket` - The bucket to create the stream for.
+    /// * `root_hash` - The root hash of the bucket.
+    ///
+    /// # Returns
+    ///
+    /// Returns a Result containing the new bucket stream or an IO error.
     pub async fn create(bucket: &Bucket, root_hash: &[u8; 32]) -> BucketStreamer {
         let head = bucket.get_header_path(root_hash);
         let mut file = File::open(head).await?;
@@ -60,6 +75,7 @@ impl BucketStream {
     }
 }
 
+/// An enum representing the different states of a file stream.
 enum FileState {
     SeekPositionHash,
     WaitingPositionHash(Pin<Box<dyn Future<Output = Result<u64, std::io::Error>>>>),
@@ -70,6 +86,7 @@ enum FileState {
     Done,
 }
 
+/// A structure representing a file stream.
 pub struct FileStream {
     bucket: Bucket,
     file: Arc<RwLock<File>>,
@@ -80,6 +97,16 @@ pub struct FileStream {
 }
 
 impl FileStream {
+    /// Creates a new file stream.
+    ///
+    /// # Arguments
+    ///
+    /// * `file` - The file to create the stream for.
+    /// * `bucket` - The bucket to create the stream for.
+    ///
+    /// # Returns
+    ///
+    /// Returns a Result containing the new file stream or an IO error.
     pub async fn new(mut file: File, bucket: Bucket) -> Result<Self, errors::ReadError> {
         file.seek(SeekFrom::Start(POSITION_START_NUM_ENTRIES as u64))
             .await?;
@@ -182,8 +209,10 @@ impl Stream for FileStream {
     }
 }
 
+/// A type alias for a pinned box future.
 type PinBoxFuture<T> = Pin<Box<dyn Future<Output = std::io::Result<T>>>>;
 
+/// An enum representing the different states of a directory stream.
 enum DirState {
     SeekNextPosition,
     ReadFlagEntry,
@@ -201,6 +230,7 @@ enum DirState {
     WaitingReadPathEntry(PinBoxFuture<Vec<u8>>),
 }
 
+/// A structure representing a directory stream.
 pub struct DirStream {
     state: DirState,
     file: Arc<RwLock<BufReader<File>>>,
@@ -217,6 +247,16 @@ pub struct DirStream {
 }
 
 impl DirStream {
+    /// Creates a new directory stream.
+    ///
+    /// # Arguments
+    ///
+    /// * `file` - The file to create the stream for.
+    /// * `bucket` - The bucket to create the stream for.
+    ///
+    /// # Returns
+    ///
+    /// Returns a Result containing the new directory stream or an IO error.
     pub async fn new(file: File, bucket: Bucket) -> Result<Self, errors::ReadError> {
         let mut buf_file = BufReader::new(file);
         buf_file
@@ -412,6 +452,7 @@ impl Stream for DirStream {
     }
 }
 
+/// A module containing tests for the bucket stream.
 #[cfg(test)]
 mod tests {
     use std::env::temp_dir;
@@ -427,6 +468,7 @@ mod tests {
     use crate::entry::{BorrowedLink, InlineVec, OwnedLink};
     use crate::utils::to_hex;
 
+    /// A test for the file stream.
     #[tokio::test]
     async fn test_file_stream_new() {
         let random_file_name: [u8; 32] = random();
