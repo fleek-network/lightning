@@ -12,7 +12,14 @@ use rand::random;
 use tokio::fs::{File, OpenOptions};
 use tokio::io::{self, AsyncWriteExt, BufWriter};
 
-use crate::bucket::{errors, Bucket, HEADER_TYPE_FILE, HEADER_VERSION, POSITION_START_HASHES, POSITION_START_NUM_ENTRIES};
+use crate::bucket::{
+    errors,
+    Bucket,
+    HEADER_TYPE_FILE,
+    HEADER_VERSION,
+    POSITION_START_HASHES,
+    POSITION_START_NUM_ENTRIES,
+};
 use crate::hasher::b3::{BLOCK_SIZE_IN_CHUNKS, MAX_BLOCK_SIZE_IN_BYTES};
 use crate::hasher::collector::BufCollector;
 use crate::hasher::HashTreeCollector;
@@ -320,7 +327,18 @@ impl<T: WithCollector> WriterState for InnerWriterState<T> {
                 self.new_block(block_hash).await?;
             }
         }
+
         let (mut final_collector, root_hash) = self.collector.finalize_tree().await?;
+
+        if self.current_block_file.is_some() && self.count_block == 0 {
+            // If we reached here, it is because we haven't fill up even 1 block, so we
+            // cannot generate a block_hash for that block, because the block is not
+            // completed. So we need to create that last block with the root_hash.
+            // This is tested in
+            // `bucket::file::writer::tests::*`
+            self.new_block(root_hash).await?;
+        }
+
         final_collector
             .write_hash(&mut self.header_file.file)
             .await?;
