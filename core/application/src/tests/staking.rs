@@ -17,6 +17,7 @@ use lightning_interfaces::types::{
     ExecutionError,
     HandshakePorts,
     NodePorts,
+    NodeRegistryChange,
     Participation,
     UpdateMethod,
 };
@@ -67,6 +68,20 @@ async fn test_stake() {
     let (committee, _keystore) = create_genesis_committee(committee_size);
     let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
 
+    // Check that node registry changes were recorded for genesis nodes.
+    let node_registry_changes = query_runner
+        .get_committee_info(&0, |c| c.node_registry_changes)
+        .unwrap();
+    assert_eq!(node_registry_changes.len(), 1);
+    assert_eq!(node_registry_changes.get(&0).unwrap().len(), committee_size);
+    assert!(
+        node_registry_changes
+            .get(&0)
+            .unwrap()
+            .iter()
+            .all(|(_, change)| { matches!(change, NodeRegistryChange::New) })
+    );
+
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let peer_pub_key = NodeSecretKey::generate().to_pk();
 
@@ -108,7 +123,17 @@ async fn test_stake() {
         4,
     );
 
-    expect_tx_success(update, &update_socket, ExecutionData::None).await;
+    let resp = expect_tx_success(update, &update_socket, ExecutionData::None).await;
+
+    // Check that node registry changes were recorded for the new node.
+    let node_registry_changes = query_runner
+        .get_committee_info(&0, |c| c.node_registry_changes)
+        .unwrap();
+    assert_eq!(node_registry_changes.len(), 2);
+    assert_eq!(node_registry_changes.get(&0).unwrap().len(), committee_size);
+    let expected_changes = vec![(peer_pub_key, NodeRegistryChange::New)];
+    assert_eq!(node_registry_changes.get(&3).unwrap(), &expected_changes);
+    assert_eq!(resp.node_registry_changes, expected_changes);
 
     // Query the new node and make sure he has the proper stake
     assert_eq!(get_staked(&query_runner, &peer_pub_key), stake_amount);
@@ -117,7 +142,16 @@ async fn test_stake() {
     // parameters out without a revert
     let update = prepare_regular_stake_update(&stake_amount, &peer_pub_key, &owner_secret_key, 5);
 
-    expect_tx_success(update, &update_socket, ExecutionData::None).await;
+    let resp = expect_tx_success(update, &update_socket, ExecutionData::None).await;
+
+    // Check that no new node registry changes were recorded.
+    let node_registry_changes = query_runner
+        .get_committee_info(&0, |c| c.node_registry_changes)
+        .unwrap();
+    assert_eq!(node_registry_changes.len(), 2);
+    assert_eq!(node_registry_changes.get(&0).unwrap().len(), committee_size);
+    assert_eq!(node_registry_changes.get(&3).unwrap().len(), 1);
+    assert!(resp.node_registry_changes.is_empty());
 
     // Node should now have 2_000 stake
     assert_eq!(

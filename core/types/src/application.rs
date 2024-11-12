@@ -1,11 +1,13 @@
 //! The types used by the Application interface.
 
+use std::collections::BTreeMap;
+
 use ethers::types::{Block as EthersBlock, H256, U64};
 use fleek_crypto::{EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 use serde::{Deserialize, Serialize};
 
-use crate::TransactionReceipt;
+use crate::{BlockNumber, TransactionReceipt};
 
 /// Max number of updates allowed in a content registry update transaction.
 pub const MAX_UPDATES_CONTENT_REGISTRY: usize = 100;
@@ -103,7 +105,7 @@ pub struct BlockExecutionResponse {
     /// has determined that we should move the epoch forward.
     pub change_epoch: bool,
     /// The changes to the node registry.
-    pub node_registry_delta: Vec<(NodePublicKey, NodeRegistryChange)>,
+    pub node_registry_changes: BlockNodeRegistryChanges,
     /// Receipts of all executed transactions
     pub txn_receipts: Vec<TransactionReceipt>,
     /// The previous state root.
@@ -123,7 +125,7 @@ pub struct BlockReceipt {
     /// has determined that we should move the epoch forward.
     pub change_epoch: bool,
     /// The changes to the node registry.
-    pub node_registry_delta: Vec<(NodePublicKey, NodeRegistryChange)>,
+    pub node_registry_changes: BlockNodeRegistryChanges,
     /// The hashes of the transactions included in the block
     pub txn_hashes: Vec<[u8; 32]>,
 }
@@ -136,7 +138,7 @@ impl BlockExecutionResponse {
             block_hash: self.block_hash,
             parent_hash: self.parent_hash,
             change_epoch: self.change_epoch,
-            node_registry_delta: self.node_registry_delta,
+            node_registry_changes: self.node_registry_changes,
             txn_hashes: self
                 .txn_receipts
                 .iter()
@@ -162,7 +164,14 @@ impl From<BlockReceipt> for EthersBlock<H256> {
     }
 }
 
-#[derive(Debug, PartialEq, PartialOrd, Hash, Eq, Serialize, Deserialize, Clone)]
+pub type NodeRegistryChanges = BTreeMap<BlockNumber, BlockNodeRegistryChanges>;
+
+pub type BlockNodeRegistryChanges = Vec<(NodePublicKey, NodeRegistryChange)>;
+
+#[rustfmt::skip]
+#[derive(
+    Debug, PartialEq, PartialOrd, Hash, Eq, Ord, Serialize, Deserialize, Clone, schemars::JsonSchema,
+)]
 pub enum NodeRegistryChange {
     New,
     Removed,

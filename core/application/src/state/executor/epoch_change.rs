@@ -710,6 +710,7 @@ impl<B: Backend> StateExecutor<B> {
             members: committee,
             epoch_end_timestamp,
             active_node_set: active_nodes,
+            node_registry_changes: Default::default(),
         }
     }
 

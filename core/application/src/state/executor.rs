@@ -31,6 +31,7 @@ use lightning_interfaces::types::{
     NodeIndex,
     NodeInfo,
     NodePorts,
+    NodeRegistryChange,
     NodeServed,
     Participation,
     ProofOfConsensus,
@@ -643,6 +644,9 @@ impl<B: Backend> StateExecutor<B> {
                         nonce: 0,
                     };
                     self.create_node(node);
+
+                    // Record the new node in the node registry changes for this block.
+                    self.record_node_registry_change(node_public_key, NodeRegistryChange::New);
                 } else {
                     return TransactionResponse::Revert(ExecutionError::InsufficientNodeDetails);
                 }
@@ -1629,5 +1633,26 @@ impl<B: Backend> StateExecutor<B> {
                 let _ = self.clear_content_registry(&index);
             }
         }
+    }
+    /// Records a node registry change for the current epoch and block number.
+    fn record_node_registry_change(
+        &self,
+        node_public_key: NodePublicKey,
+        change: NodeRegistryChange,
+    ) {
+        let current_epoch = self.get_epoch();
+        let current_block_number = self.get_block_number() + 1;
+        let mut committee = self.committee_info.get(&current_epoch).unwrap();
+        committee
+            .node_registry_changes
+            .entry(current_block_number)
+            .or_insert_with(Vec::new)
+            .push((node_public_key, change));
+        self.committee_info.set(current_epoch, committee);
+    }
+
+    /// Returns the current committee.
+    pub fn get_current_committee(&self) -> Option<Committee> {
+        self.committee_info.get(&self.get_epoch())
     }
 }

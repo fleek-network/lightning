@@ -37,6 +37,7 @@ use merklize::trees::mpt::MptStateTree;
 use merklize::StateTree;
 use tokio::sync::Mutex;
 use tracing::warn;
+use types::{NodeRegistryChange, NodeRegistryChanges};
 
 use crate::config::ApplicationConfig;
 use crate::state::{ApplicationState, QueryRunner};
@@ -89,7 +90,7 @@ impl ApplicationEnv {
                     block_hash: block.digest,
                     parent_hash: last_block_hash,
                     change_epoch: false,
-                    node_registry_delta: Vec::new(),
+                    node_registry_changes: Default::default(),
                     txn_receipts: Vec::with_capacity(block.transactions.len()),
                     block_number,
                     previous_state_root: state_root.into(),
@@ -130,6 +131,13 @@ impl ApplicationEnv {
                         if so acknowledge that in the block response
                     */
                     response.txn_receipts.push(receipt);
+                }
+
+                // Update node registry changes on the response if there were any for this block.
+                if let Some(committee) = app.get_current_committee() {
+                    if let Some(changes) = committee.node_registry_changes.get(&block_number) {
+                        response.node_registry_changes = changes.clone();
+                    }
                 }
 
                 // Set the last executed block hash and sub dag index
@@ -330,12 +338,19 @@ impl ApplicationEnv {
             let epoch_end: u64 = genesis.epoch_time + genesis.epoch_start;
             let mut committee_members = Vec::with_capacity(4);
             let mut active_nodes = Vec::with_capacity(genesis.node_info.len());
+            let mut node_registry_changes = NodeRegistryChanges::from_iter([(0, vec![])]);
             // add node info
             for node in genesis.node_info {
                 let mut node_info = NodeInfo::from(&node);
 
                 node_info.stake.staked = std::cmp::max(
                     node_info.stake.staked, genesis.min_stake.into());
+
+                // Add the node to the node registry changes for the genesis committee.
+                node_registry_changes.get_mut(&0).unwrap().push((
+                    node_info.public_key,
+                    NodeRegistryChange::New,
+                ));
 
                 let node_index = match metadata_table.get(Metadata::NextNodeIndex) {
                     Some(Value::NextNodeIndex(index)) => index,
@@ -377,7 +392,8 @@ impl ApplicationEnv {
                     members: committee_members.clone(),
                     epoch_end_timestamp: epoch_end,
                     // Todo(dont just use the committee members for first set)
-                    active_node_set: active_nodes
+                    active_node_set: active_nodes,
+                    node_registry_changes,
                 },
             );
 
