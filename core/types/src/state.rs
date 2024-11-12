@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use sha3::{Digest, Sha3_256};
 
 use super::ReputationMeasurements;
+use crate::NodeRegistryChanges;
 
 /// The Id of a Service
 pub type ServiceId = u32;
@@ -539,6 +540,7 @@ pub struct Committee {
     pub ready_to_change: Vec<NodeIndex>,
     pub epoch_end_timestamp: u64,
     pub active_node_set: Vec<NodeIndex>,
+    pub node_registry_changes: NodeRegistryChanges,
 }
 
 impl TranscriptBuilderInput for Service {
