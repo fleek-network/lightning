@@ -96,6 +96,7 @@ lightning-interfaces = { path = "core/interfaces" }
 lightning-keystore = { path = "core/keystore" }
 lightning-node = { path = "core/node" }
 lightning-notifier = { path = "core/notifier" }
+lightning-pinger = { path = "core/pinger" }
 lightning-pool = { path = "core/pool" }
 lightning-rep-collector = { path = "core/rep-collector" }
 lightning-resolver = { path = "core/resolver" }

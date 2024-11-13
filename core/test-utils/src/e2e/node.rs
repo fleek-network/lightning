@@ -22,8 +22,9 @@ use lightning_committee_beacon::CommitteeBeaconComponent;
 use lightning_interfaces::prelude::*;
 use lightning_node::ContainedNode;
 use lightning_notifier::Notifier;
+use lightning_pinger::Pinger;
 use lightning_pool::PoolProvider;
-use lightning_rep_collector::MyReputationReporter;
+use lightning_rep_collector::{MyReputationQuery, MyReputationReporter};
 use lightning_rpc::Rpc;
 use lightning_signer::Signer;
 use lightning_utils::transaction::TransactionSigner;
@@ -66,6 +67,7 @@ pub trait TestNetworkNode {
     fn get_consensus_secret_key(&self) -> ConsensusSecretKey;
     fn get_consensus_public_key(&self) -> ConsensusPublicKey;
     fn app_query(&self) -> QueryRunner;
+    fn reputation_query(&self) -> fdi::Ref<MyReputationQuery>;
     fn emit_epoch_changed_notification(
         &self,
         epoch: Epoch,
@@ -87,6 +89,7 @@ pub struct TestFullNode<C: NodeComponents> {
     pub home_dir: PathBuf,
     pub pool_listen_address: Option<SocketAddr>,
     pub rpc_listen_address: Option<SocketAddr>,
+    pub pinger_listen_address: Option<SocketAddr>,
     pub is_genesis_committee: bool,
     pub owner_secret_key: AccountOwnerSecretKey,
 }
@@ -102,11 +105,15 @@ impl<C: NodeComponents> TestNetworkNode for TestFullNode<C> {
             // Wait for pool to be ready.
             let pool_state = self.pool().wait_for_ready().await;
 
+            // Wait for pinger to be ready.
+            let pinger_state = self.pinger().wait_for_ready().await;
+
             // Wait for rpc to be ready.
             let rpc_state = self.rpc().wait_for_ready().await;
 
             // Save the listen addresses.
             self.pool_listen_address = Some(pool_state.listen_address.unwrap());
+            self.pinger_listen_address = Some(pinger_state.listen_address);
             self.rpc_listen_address = Some(rpc_state.listen_address);
         })
         .await
@@ -137,13 +144,17 @@ impl<C: NodeComponents> TestNetworkNode for TestFullNode<C> {
     }
 
     async fn get_node_ports(&self) -> Result<NodePorts> {
-        if self.pool_listen_address.is_none() || self.rpc_listen_address.is_none() {
+        if self.pool_listen_address.is_none()
+            || self.pinger_listen_address.is_none()
+            || self.rpc_listen_address.is_none()
+        {
             return Err(anyhow::anyhow!("node not ready"));
         }
 
         Ok(NodePorts {
             rpc: self.rpc_listen_address.unwrap().port(),
             pool: self.pool_listen_address.unwrap().port(),
+            pinger: self.pinger_listen_address.unwrap().port(),
             primary: get_available_port("127.0.0.1"),
             worker: get_available_port("127.0.0.1"),
             mempool: get_available_port("127.0.0.1"),
@@ -203,6 +214,10 @@ impl<C: NodeComponents> TestNetworkNode for TestFullNode<C> {
 
     fn app_query(&self) -> QueryRunner {
         self.app_query()
+    }
+
+    fn reputation_query(&self) -> fdi::Ref<MyReputationQuery> {
+        self.reputation_query()
     }
 
     fn emit_epoch_changed_notification(
@@ -285,8 +300,16 @@ impl<C: NodeComponents> TestFullNode<C> {
         self.provider().get::<PoolProvider<C>>()
     }
 
+    pub fn pinger(&self) -> fdi::Ref<Pinger<C>> {
+        self.provider().get::<Pinger<C>>()
+    }
+
     pub fn reputation_reporter(&self) -> fdi::Ref<MyReputationReporter> {
         self.provider().get::<MyReputationReporter>()
+    }
+
+    pub fn reputation_query(&self) -> fdi::Ref<MyReputationQuery> {
+        self.provider().get::<MyReputationQuery>()
     }
 
     pub fn get_node_info(&self) -> Option<NodeInfo> {
