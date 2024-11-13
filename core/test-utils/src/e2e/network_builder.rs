@@ -74,7 +74,10 @@ impl TestNetworkBuilder {
             if let Some(committee_beacon_config) = &self.committee_beacon_config {
                 builder = builder.with_committee_beacon_config(committee_beacon_config.clone());
             }
-            let node = builder.build::<C>().await.unwrap();
+            let node = builder
+                .build::<C>(Some(format!("node-{}", self.nodes.len())))
+                .await
+                .unwrap();
             self.nodes.push(node);
         }
         self
@@ -97,7 +100,10 @@ impl TestNetworkBuilder {
             if let Some(committee_beacon_config) = &self.committee_beacon_config {
                 builder = builder.with_committee_beacon_config(committee_beacon_config.clone());
             }
-            let node = builder.build::<C>().await.unwrap();
+            let node = builder
+                .build::<C>(Some(format!("node-{}", self.nodes.len())))
+                .await
+                .unwrap();
             self.nodes.push(node);
         }
         self
