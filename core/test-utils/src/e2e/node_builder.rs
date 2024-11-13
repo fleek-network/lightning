@@ -84,6 +84,11 @@ impl TestNodeBuilder {
         self
     }
 
+    pub fn with_ping_interval(mut self, ping_interval: Duration) -> Self {
+        self.ping_interval = ping_interval;
+        self
+    }
+
     pub async fn build<C: NodeComponents>(self, node_name: Option<String>) -> Result<BoxedTestNode>
     where
         C::ApplicationInterface: ApplicationInterface<C, SyncExecutor = QueryRunner>,
