@@ -35,7 +35,7 @@ use types::{
 #[tokio::test]
 async fn test_start_shutdown() {
     let node = lightning_test_utils::e2e::TestNodeBuilder::new()
-        .build::<TestFullNodeComponentsWithMockConsensus>()
+        .build::<TestFullNodeComponentsWithMockConsensus>(None)
         .await
         .unwrap();
     node.shutdown().await;
@@ -527,7 +527,7 @@ async fn build_network(options: BuildNetworkOptions) -> Result<TestNetwork> {
         builder = builder.with_node(
             TestNodeBuilder::new()
                 .with_mock_consensus(consensus_group.clone())
-                .build::<TestFullNodeComponentsWithoutCommitteeBeacon>()
+                .build::<TestFullNodeComponentsWithoutCommitteeBeacon>(None)
                 .await?,
         );
     }

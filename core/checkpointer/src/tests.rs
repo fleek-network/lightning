@@ -34,7 +34,7 @@ use crate::CheckpointBroadcastMessage;
 #[tokio::test]
 async fn test_start_shutdown() {
     let node = TestNodeBuilder::new()
-        .build::<TestFullNodeComponentsWithMockConsensus>()
+        .build::<TestFullNodeComponentsWithMockConsensus>(None)
         .await
         .unwrap();
     node.shutdown().await;
