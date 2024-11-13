@@ -76,6 +76,9 @@ impl TestNetworkBuilder {
             if let Some(committee_beacon_config) = &self.committee_beacon_config {
                 builder = builder.with_committee_beacon_config(committee_beacon_config.clone());
             }
+            if let Some(ping_interval) = self.ping_interval {
+                builder = builder.with_ping_interval(ping_interval);
+            }
             let node = builder
                 .build::<C>(Some(format!("node-{}", self.nodes.len())))
                 .await
@@ -101,6 +104,9 @@ impl TestNetworkBuilder {
             }
             if let Some(committee_beacon_config) = &self.committee_beacon_config {
                 builder = builder.with_committee_beacon_config(committee_beacon_config.clone());
+            }
+            if let Some(ping_interval) = self.ping_interval {
+                builder = builder.with_ping_interval(ping_interval);
             }
             let node = builder
                 .build::<C>(Some(format!("node-{}", self.nodes.len())))
