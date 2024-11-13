@@ -29,6 +29,7 @@ pub struct TestNetworkBuilder {
     pub mock_consensus_config: Option<MockConsensusConfig>,
     pub mock_consensus_group: Option<MockConsensusGroup>,
     pub committee_beacon_config: Option<CommitteeBeaconConfig>,
+    pub ping_interval: Option<Duration>,
 }
 
 impl TestNetworkBuilder {
@@ -41,6 +42,7 @@ impl TestNetworkBuilder {
             mock_consensus_config: None,
             mock_consensus_group: None,
             committee_beacon_config: None,
+            ping_interval: None,
         }
         .with_mock_consensus(MockConsensusConfig {
             max_ordering_time: 1,
@@ -119,6 +121,11 @@ impl TestNetworkBuilder {
 
     pub fn with_committee_beacon_config(mut self, config: CommitteeBeaconConfig) -> Self {
         self.committee_beacon_config = Some(config);
+        self
+    }
+
+    pub fn with_ping_interval(mut self, ping_interval: Duration) -> Self {
+        self.ping_interval = Some(ping_interval);
         self
     }
 

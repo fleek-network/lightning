@@ -6,6 +6,7 @@ use lightning_consensus::consensus::Consensus;
 use lightning_forwarder::Forwarder;
 use lightning_interfaces::partial_node_components;
 use lightning_notifier::Notifier;
+use lightning_pinger::Pinger;
 use lightning_pool::PoolProvider;
 use lightning_rep_collector::ReputationAggregator;
 use lightning_rpc::Rpc;
@@ -28,6 +29,7 @@ partial_node_components!(TestFullNodeComponentsWithRealConsensus {
     ForwarderInterface = Forwarder<Self>;
     KeystoreInterface = EphemeralKeystore<Self>;
     NotifierInterface = Notifier<Self>;
+    PingerInterface = Pinger<Self>;
     PoolInterface = PoolProvider<Self>;
     ReputationAggregatorInterface = ReputationAggregator<Self>;
     RpcInterface = Rpc<Self>;
@@ -46,6 +48,7 @@ partial_node_components!(TestFullNodeComponentsWithMockConsensus {
     ForwarderInterface = MockForwarder<Self>;
     KeystoreInterface = EphemeralKeystore<Self>;
     NotifierInterface = Notifier<Self>;
+    PingerInterface = Pinger<Self>;
     PoolInterface = PoolProvider<Self>;
     ReputationAggregatorInterface = ReputationAggregator<Self>;
     RpcInterface = Rpc<Self>;
@@ -63,6 +66,7 @@ partial_node_components!(TestFullNodeComponentsWithoutCommitteeBeacon {
     ForwarderInterface = MockForwarder<Self>;
     KeystoreInterface = EphemeralKeystore<Self>;
     NotifierInterface = Notifier<Self>;
+    PingerInterface = Pinger<Self>;
     PoolInterface = PoolProvider<Self>;
     ReputationAggregatorInterface = ReputationAggregator<Self>;
     RpcInterface = Rpc<Self>;

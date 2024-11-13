@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::time::Duration;
 
 use anyhow::Result;
 use fleek_crypto::{AccountOwnerSecretKey, SecretKey};
@@ -15,6 +16,7 @@ use lightning_committee_beacon::{
 use lightning_consensus::{Consensus, ConsensusConfig};
 use lightning_interfaces::prelude::*;
 use lightning_node::ContainedNode;
+use lightning_pinger::{Config as PingerConfig, Pinger};
 use lightning_pool::{Config as PoolConfig, PoolProvider};
 use lightning_rpc::config::Config as RpcConfig;
 use lightning_rpc::Rpc;
@@ -35,6 +37,7 @@ pub struct TestNodeBuilder {
     mock_consensus_group: Option<MockConsensusGroup>,
     is_genesis_committee: Option<bool>,
     committee_beacon_config: Option<CommitteeBeaconConfig>,
+    ping_interval: Duration,
 }
 
 impl Default for TestNodeBuilder {
@@ -55,6 +58,7 @@ impl TestNodeBuilder {
             mock_consensus_group: None,
             is_genesis_committee: None,
             committee_beacon_config: None,
+            ping_interval: Duration::from_secs(5),
         }
     }
 
@@ -127,6 +131,13 @@ impl TestNodeBuilder {
             });
         }
 
+        // Configure pinger component.
+        config.inject::<Pinger<C>>(PingerConfig {
+            // Specify port 0 to get a random available port.
+            address: "0.0.0.0:0".parse().unwrap(),
+            ping_interval: self.ping_interval,
+        });
+
         // Configure pool component.
         config.inject::<PoolProvider<C>>(PoolConfig {
             // Specify port 0 to get a random available port.
@@ -173,6 +184,7 @@ impl TestNodeBuilder {
             home_dir: self.home_dir.clone(),
             owner_secret_key: AccountOwnerSecretKey::generate(),
             is_genesis_committee: self.is_genesis_committee.unwrap_or(true),
+            pinger_listen_address: None,
             pool_listen_address: None,
             rpc_listen_address: None,
         }))

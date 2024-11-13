@@ -1,5 +1,6 @@
 // TODO(qti3e): Someone has to rework this file.
 use std::collections::HashMap;
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -12,14 +13,18 @@ use lightning_utils::application::QueryRunnerExt;
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
+use ready::ReadyWaiter;
 use tokio::net::UdpSocket;
 use tokio::sync::mpsc;
 use tracing::{error, info};
 
 use crate::config::Config;
+use crate::ready::{PingerReadyState, PingerReadyWaiter};
 
 pub struct Pinger<C: NodeComponents> {
-    inner: Option<PingerInner<C>>,
+    inner: PingerInner<C>,
+    started: AtomicBool,
+    ready: PingerReadyWaiter,
 }
 
 impl<C: NodeComponents> Pinger<C> {
@@ -36,28 +41,43 @@ impl<C: NodeComponents> Pinger<C> {
         let rep_reporter = rep_aggregator.get_reporter();
 
         let node_pk = keystore.get_ed25519_pk();
+        let ready = PingerReadyWaiter::new();
         let inner = PingerInner::<C>::new(
             config,
             node_pk,
             query_runner,
             rep_reporter,
             notifier,
+            ready.clone(),
             shutdown_waiter,
         );
 
-        Ok(Self { inner: Some(inner) })
+        Ok(Self {
+            inner,
+            started: AtomicBool::new(false),
+            ready,
+        })
     }
 
-    pub async fn start(mut this: fdi::RefMut<Self>) {
-        this.inner
-            .take()
-            .expect("Pinger already started")
-            .run()
-            .await;
+    pub async fn start(this: fdi::Ref<Self>) {
+        if this.started.load(std::sync::atomic::Ordering::Relaxed) {
+            panic!("pinger already running");
+        }
+        this.started
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+
+        this.inner.run().await;
     }
 }
 
-impl<C: NodeComponents> PingerInterface<C> for Pinger<C> {}
+impl<C: NodeComponents> PingerInterface<C> for Pinger<C> {
+    type ReadyState = PingerReadyState;
+
+    /// Wait for pinger to be ready with the listen address.
+    async fn wait_for_ready(&self) -> Self::ReadyState {
+        self.ready.wait().await
+    }
+}
 
 impl<C: NodeComponents> BuildGraph for Pinger<C> {
     fn build_graph() -> fdi::DependencyGraph {
@@ -73,6 +93,7 @@ struct PingerInner<C: NodeComponents> {
     query_runner: c!(C::ApplicationInterface::SyncExecutor),
     rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
     notifier: C::NotifierInterface,
+    ready: PingerReadyWaiter,
     shutdown_waiter: ShutdownWaiter,
 }
 
@@ -83,6 +104,7 @@ impl<C: NodeComponents> PingerInner<C> {
         query_runner: c!(C::ApplicationInterface::SyncExecutor),
         rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
         notifier: C::NotifierInterface,
+        ready: PingerReadyWaiter,
         shutdown_waiter: ShutdownWaiter,
     ) -> Self {
         Self {
@@ -91,11 +113,30 @@ impl<C: NodeComponents> PingerInner<C> {
             query_runner,
             rep_reporter,
             notifier,
+            ready,
             shutdown_waiter,
         }
     }
 
-    async fn run(self) {
+    async fn run(&self) {
+        // Bind to configured listen address.
+        let socket = Arc::new(
+            UdpSocket::bind(self.config.address)
+                .await
+                .expect("Failed to bind to UDP socket"),
+        );
+
+        // Notify ready with listen address.
+        match socket.local_addr() {
+            Ok(listen_address) => {
+                self.ready.notify(PingerReadyState { listen_address });
+            },
+            Err(e) => {
+                panic!("failed to get listen address: {e:?}");
+            },
+        }
+
+        // Wait for genesis to be applied.
         self.query_runner.wait_for_genesis().await;
 
         // Note(matthias): should a node be able to respond to pings before it knows its node index?
@@ -118,12 +159,6 @@ impl<C: NodeComponents> PingerInner<C> {
 
         let mut buf = [0; 1024];
         let (timeout_tx, mut timeout_rx) = mpsc::channel(1024);
-
-        let socket = Arc::new(
-            UdpSocket::bind(self.config.address)
-                .await
-                .expect("Failed to bind to UDP socket"),
-        );
 
         // Note(matthias): instead of having a fixed interval, we can also determine how many nodes
         // there are, how many pings we want to send to each node per epoch, and the epoch length,
