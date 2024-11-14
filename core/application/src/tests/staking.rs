@@ -786,6 +786,7 @@ async fn test_withdraw_unstaked_works_properly() {
             new_block_interval: Duration::from_millis(0),
             transactions_to_lose: Default::default(),
             block_buffering_interval: Duration::from_millis(0),
+            forwarder_transaction_to_error: Default::default(),
         })
         .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(4)
         .await

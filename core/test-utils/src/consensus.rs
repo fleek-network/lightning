@@ -6,6 +6,7 @@
 
 use std::collections::HashSet;
 use std::marker::PhantomData;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -92,17 +93,45 @@ pub struct MockForwarder<C: NodeComponents> {
 }
 
 impl<C: NodeComponents> MockForwarder<C> {
-    fn new(sender: mpsc::Sender<TransactionRequest>, waiter: ShutdownWaiter) -> Self {
-        struct ProxyWorker(mpsc::Sender<TransactionRequest>);
+    fn new(
+        config: MockConsensusConfig,
+        sender: mpsc::Sender<TransactionRequest>,
+        waiter: ShutdownWaiter,
+    ) -> Self {
+        struct ProxyWorker {
+            config: MockConsensusConfig,
+            sender: mpsc::Sender<TransactionRequest>,
+            counter: AtomicU32,
+        }
         impl AsyncWorkerUnordered for ProxyWorker {
             type Request = TransactionRequest;
             type Response = Result<(), ForwarderError>;
             async fn handle(&self, req: Self::Request) -> Self::Response {
-                self.0.send(req).await.expect("Failed to send transaction.");
+                let counter = self.counter.fetch_add(1, Ordering::Relaxed);
+                if self
+                    .config
+                    .forwarder_transaction_to_error
+                    .contains(&counter)
+                {
+                    tracing::info!(
+                        "returning error for transaction {} in mock forwarder: {:?}",
+                        counter,
+                        req
+                    );
+                    return Err(ForwarderError::FailedToSendToAnyConnection);
+                }
+                self.sender
+                    .send(req)
+                    .await
+                    .expect("Failed to send transaction.");
                 Ok(())
             }
         }
-        let worker = ProxyWorker(sender);
+        let worker = ProxyWorker {
+            config,
+            sender,
+            counter: AtomicU32::new(1),
+        };
         let socket = spawn_worker!(worker, "MOCK-FORWARDER", waiter, crucial);
         Self {
             socket,
@@ -115,8 +144,13 @@ impl<C: NodeComponents> BuildGraph for MockForwarder<C> {
     fn build_graph() -> fdi::DependencyGraph {
         fdi::DependencyGraph::new().with_infallible(
             |mut group: fdi::RefMut<MockConsensusGroup>,
+             config: fdi::Ref<C::ConfigProviderInterface>,
              fdi::Cloned(waiter): fdi::Cloned<ShutdownWaiter>| {
-                Self::new(group.req_tx.take().unwrap(), waiter)
+                Self::new(
+                    config.get::<MockConsensus<C>>(),
+                    group.req_tx.take().unwrap(),
+                    waiter,
+                )
             },
         )
     }
@@ -203,7 +237,7 @@ impl<C: NodeComponents> ConfigConsumer for MockConsensus<C> {
     type Config = MockConsensusConfig;
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MockConsensusConfig {
     /// Lower bound for the random time it takes to order a transaction.
     pub min_ordering_time: u64,
@@ -223,6 +257,10 @@ pub struct MockConsensusConfig {
     /// a single block.
     #[serde(with = "humantime_serde")]
     pub block_buffering_interval: Duration,
+    /// Transactions specified in this set will return an error from the forwarder.
+    /// For example, if the set contains 1 and 3, then the first and third transactions
+    /// arriving at the forwarder will return an error.
+    pub forwarder_transaction_to_error: HashSet<u32>,
 }
 
 impl Default for MockConsensusConfig {
@@ -234,6 +272,7 @@ impl Default for MockConsensusConfig {
             transactions_to_lose: HashSet::new(),
             block_buffering_interval: Duration::from_secs(0),
             new_block_interval: Duration::from_secs(5),
+            forwarder_transaction_to_error: HashSet::new(),
         }
     }
 }

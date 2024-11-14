@@ -10,6 +10,7 @@ use types::{
     ExecuteTransactionResponse,
     ExecutionError,
     ForwarderError,
+    Nonce,
     TransactionReceipt,
     TransactionRequest,
     TransactionResponse,
@@ -59,11 +60,9 @@ impl<C: NodeComponents> TransactionRunner<C> {
         options: ExecuteTransactionOptions,
     ) -> Result<ExecuteTransactionResponse, ExecuteTransactionError> {
         let mut retry = 0;
+        let mut next_nonce = self.nonce_state.get_next_and_increment().await;
 
         loop {
-            // Get the next nonce for this transaction.
-            let next_nonce = self.nonce_state.get_next_and_increment().await;
-
             // Build and sign the transaction.
             let tx: TransactionRequest = TransactionBuilder::from_update(
                 method.clone(),
@@ -82,14 +81,16 @@ impl<C: NodeComponents> TransactionRunner<C> {
                     Ok(()) => {},
                     Err(error) => {
                         retry += 1;
-                        self.handle_forwarder_error(tx, &options, error, retry)
+                        next_nonce = self
+                            .handle_forwarder_error(tx, &options, error, retry)
                             .await?;
                         continue;
                     },
                 },
                 Err(error) => {
                     retry += 1;
-                    self.handle_forwarder_run_error(tx, &options, error, retry)
+                    next_nonce = self
+                        .handle_forwarder_run_error(tx, &options, error, retry)
                         .await?;
                     continue;
                 },
@@ -108,14 +109,16 @@ impl<C: NodeComponents> TransactionRunner<C> {
                     },
                     TransactionResponse::Revert(error) => {
                         retry += 1;
-                        self.handle_receipt_revert(&tx, &options, &receipt, error, retry, timeout)
+                        next_nonce = self
+                            .handle_receipt_revert(&tx, &options, &receipt, error, retry, timeout)
                             .await?;
                         continue;
                     },
                 },
                 Err(ExecuteTransactionError::Timeout((method, Some(tx), _))) => {
                     retry += 1;
-                    self.handle_receipt_timeout(method, &tx, &options, retry, timeout)
+                    next_nonce = self
+                        .handle_receipt_timeout(method, &tx, &options, retry, timeout)
                         .await?;
                     continue;
                 },
@@ -130,7 +133,7 @@ impl<C: NodeComponents> TransactionRunner<C> {
         options: &ExecuteTransactionOptions,
         error: RunError<TransactionRequest>,
         retry: RetryCount,
-    ) -> Result<(), ExecuteTransactionError> {
+    ) -> Result<Nonce, ExecuteTransactionError> {
         // Return error if we shouldn't retry.
         let Some((max_retries, delay)) = options.retry.should_retry_on_forwarder_run_error(&error)
         else {
@@ -159,7 +162,8 @@ impl<C: NodeComponents> TransactionRunner<C> {
         );
         tokio::time::sleep(delay).await;
 
-        Ok(())
+        // Retry with same nonce.
+        Ok(tx.nonce())
     }
 
     async fn handle_forwarder_error(
@@ -168,7 +172,7 @@ impl<C: NodeComponents> TransactionRunner<C> {
         options: &ExecuteTransactionOptions,
         error: ForwarderError,
         retry: RetryCount,
-    ) -> Result<(), ExecuteTransactionError> {
+    ) -> Result<Nonce, ExecuteTransactionError> {
         // Return error if we shouldn't retry.
         let Some((max_retries, delay)) = options.retry.should_retry_on_forwarder_error(&error)
         else {
@@ -197,7 +201,8 @@ impl<C: NodeComponents> TransactionRunner<C> {
         );
         tokio::time::sleep(delay).await;
 
-        Ok(())
+        // Retry with same nonce.
+        Ok(tx.nonce())
     }
 
     async fn handle_receipt_revert(
@@ -208,7 +213,7 @@ impl<C: NodeComponents> TransactionRunner<C> {
         error: &ExecutionError,
         retry: RetryCount,
         timeout: Duration,
-    ) -> Result<(), ExecuteTransactionError> {
+    ) -> Result<Nonce, ExecuteTransactionError> {
         // Return error if we shouldn't retry.
         let Some((max_retries, delay)) = options.retry.should_retry_on_revert(error) else {
             tracing::debug!("transaction reverted (no retries): {:?}", receipt);
@@ -247,7 +252,8 @@ impl<C: NodeComponents> TransactionRunner<C> {
         );
         tokio::time::sleep(delay).await;
 
-        Ok(())
+        // Retry with next available nonce.
+        Ok(self.nonce_state.get_next_and_increment().await)
     }
 
     async fn handle_receipt_timeout(
@@ -257,7 +263,7 @@ impl<C: NodeComponents> TransactionRunner<C> {
         options: &ExecuteTransactionOptions,
         retry: RetryCount,
         timeout: Duration,
-    ) -> Result<(), ExecuteTransactionError> {
+    ) -> Result<Nonce, ExecuteTransactionError> {
         let max_retries = options.retry.get_max_retries(DEFAULT_MAX_RETRIES);
 
         // Return error if we shouldn't retry.
@@ -298,7 +304,8 @@ impl<C: NodeComponents> TransactionRunner<C> {
             tx
         );
 
-        Ok(())
+        // Retry with next available nonce.
+        Ok(self.nonce_state.get_next_and_increment().await)
     }
 
     async fn wait_for_receipt(

@@ -51,6 +51,7 @@ async fn get_node() -> Node<TestBinding> {
                 transactions_to_lose: Default::default(),
                 new_block_interval: Duration::from_secs(0),
                 block_buffering_interval: Duration::from_secs(0),
+                forwarder_transaction_to_error: Default::default(),
             }),
     )
     .unwrap();
