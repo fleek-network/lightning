@@ -204,7 +204,7 @@ async fn wait_for_database_locks(config: &TomlConfigProvider<FullNodeComponents>
     if let Some(path) = app_db_path {
         wait_for_file_to_close(
             &path.join("LOCK"),
-            Duration::from_secs(10),
+            Duration::from_secs(5),
             Duration::from_millis(100),
         )
         .await?;
@@ -212,8 +212,8 @@ async fn wait_for_database_locks(config: &TomlConfigProvider<FullNodeComponents>
 
     // Wait for the narwhal db lock file to be released.
     wait_for_file_to_close(
-        &consensus_db_path.join("0/LOCK"),
-        Duration::from_secs(10),
+        &consensus_db_path.join("0-0/LOCK"),
+        Duration::from_secs(5),
         Duration::from_millis(100),
     )
     .await?;
