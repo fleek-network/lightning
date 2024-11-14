@@ -79,10 +79,11 @@ async fn test_epoch_change_single_node() {
     assert_eq!(new_epoch, epoch);
 
     // Check that the app state beacons are cleared.
+    let beacons = node.app_query().get_committee_selection_beacons();
     assert!(
-        node.app_query()
-            .get_committee_selection_beacons()
-            .is_empty()
+        beacons.is_empty(),
+        "expected beacons to be cleared: {:?}",
+        beacons
     );
 
     // Check that the local database beacons are eventually cleared.
@@ -377,13 +378,6 @@ async fn test_single_revealing_node_fully_slashed() {
     .await
     .unwrap();
 
-    // Get reputation measurements so that we can check that the non-revealing node is no longer
-    // being monitored later.
-    let prev_reputation_measurements_by_node = network
-        .nodes()
-        .map(|n| (n.index(), n.reputation_query().get_measurements()))
-        .collect::<HashMap<_, _>>();
-
     for node in network.nodes() {
         // Check that we are in a new round.
         assert_eq!(
@@ -468,6 +462,13 @@ async fn test_single_revealing_node_fully_slashed() {
         error
     );
 
+    // Get reputation measurements so that we can check that the non-revealing node is no longer
+    // being monitored later.
+    let prev_reputation_measurements_by_node = network
+        .nodes()
+        .map(|n| (n.index(), n.reputation_query().get_measurements()))
+        .collect::<HashMap<_, _>>();
+
     // Sleep for a few seconds so that the pinger has time to send pings.
     tokio::time::sleep(Duration::from_secs(3)).await;
 
@@ -488,23 +489,34 @@ async fn test_single_revealing_node_fully_slashed() {
                 continue;
             }
 
+            let prev_measurements = prev_reputation_measurements[&to_node_index]
+                .interactions
+                .unwrap();
+            let new_measurements = new_reputation_measurements[&to_node_index]
+                .interactions
+                .unwrap();
             if to_node_index == 4 {
                 // The non-revealing node should have no new interactions.
-                assert_eq!(
-                    new_reputation_measurements[&to_node_index].interactions,
-                    prev_reputation_measurements[&to_node_index].interactions,
-                    "expected no interactions for non-revealing node {} from node {}",
+                // We allow 2 new interactions in case it raced the removal of the node from the
+                // pinger components.
+                assert!(
+                    new_measurements - prev_measurements <= 2
+                        && new_measurements - prev_measurements >= 0,
+                    "expected no new interactions for non-revealing node {} from node {} (prev: {:?}, new: {:?})",
                     to_node_index,
                     from_node_index,
+                    prev_measurements,
+                    new_measurements,
                 );
             } else {
                 // The other nodes should have new interactions.
-                assert_ne!(
-                    new_reputation_measurements[&to_node_index].interactions,
-                    prev_reputation_measurements[&to_node_index].interactions,
-                    "expected new interactions for node {} from node {}",
+                assert!(
+                    new_measurements > prev_measurements,
+                    "expected new interactions for node {} from node {} (prev: {:?}, new: {:?})",
                     to_node_index,
                     from_node_index,
+                    prev_measurements,
+                    new_measurements,
                 );
             }
         }
@@ -575,13 +587,6 @@ async fn test_non_revealing_node_partially_slashed_insufficient_stake() {
     })
     .await
     .unwrap();
-
-    // Get reputation measurements so that we can check that the non-revealing node is no longer
-    // being monitored later.
-    let prev_reputation_measurements_by_node = network
-        .nodes()
-        .map(|n| (n.index(), n.reputation_query().get_measurements()))
-        .collect::<HashMap<_, _>>();
 
     // Check that we are in a new round.
     assert_eq!(
@@ -662,6 +667,13 @@ async fn test_non_revealing_node_partially_slashed_insufficient_stake() {
         )))
     ));
 
+    // Get reputation measurements so that we can check that the non-revealing node is no longer
+    // being monitored later.
+    let prev_reputation_measurements_by_node = network
+        .nodes()
+        .map(|n| (n.index(), n.reputation_query().get_measurements()))
+        .collect::<HashMap<_, _>>();
+
     // Sleep for a few seconds so that the pinger has time to send pings.
     tokio::time::sleep(Duration::from_secs(3)).await;
 
@@ -682,23 +694,34 @@ async fn test_non_revealing_node_partially_slashed_insufficient_stake() {
                 continue;
             }
 
+            let prev_measurements = prev_reputation_measurements[&to_node_index]
+                .interactions
+                .unwrap();
+            let new_measurements = new_reputation_measurements[&to_node_index]
+                .interactions
+                .unwrap();
             if to_node_index == 4 {
                 // The non-revealing node should have no new interactions.
-                assert_eq!(
-                    new_reputation_measurements[&to_node_index].interactions,
-                    prev_reputation_measurements[&to_node_index].interactions,
-                    "expected no interactions for non-revealing node {} from node {}",
+                // We allow 2 new interactions in case it raced the removal of the node from the
+                // pinger components.
+                assert!(
+                    new_measurements - prev_measurements <= 2
+                        && new_measurements - prev_measurements >= 0,
+                    "expected no new interactions for non-revealing node {} from node {} (prev: {:?}, new: {:?})",
                     to_node_index,
                     from_node_index,
+                    prev_measurements,
+                    new_measurements,
                 );
             } else {
                 // The other nodes should have new interactions.
-                assert_ne!(
-                    new_reputation_measurements[&to_node_index].interactions,
-                    prev_reputation_measurements[&to_node_index].interactions,
-                    "expected new interactions for node {} from node {}",
+                assert!(
+                    new_measurements > prev_measurements,
+                    "expected new interactions for node {} from node {} (prev: {:?}, new: {:?})",
                     to_node_index,
                     from_node_index,
+                    prev_measurements,
+                    new_measurements,
                 );
             }
         }
