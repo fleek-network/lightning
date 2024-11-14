@@ -510,6 +510,7 @@ async fn build_network(options: BuildNetworkOptions) -> Result<TestNetwork> {
             new_block_interval: Duration::from_millis(0),
             transactions_to_lose: Default::default(),
             block_buffering_interval: options.consensus_buffer_interval,
+            forwarder_transaction_to_error: Default::default(),
         })
         .with_committee_beacon_config(committee_beacon_config.clone())
         .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(options.committee_nodes)

@@ -41,6 +41,8 @@ pub type ChainId = u32;
 
 pub type TxHash = [u8; 32];
 
+pub type Nonce = u64;
+
 // TODO: Change this to capital and non-abrv version.
 const FN_TXN_PAYLOAD_DOMAIN: &str = "fleek_network_txn_payload";
 
@@ -200,6 +202,13 @@ impl TransactionRequest {
             }
         } else {
             None
+        }
+    }
+
+    pub fn nonce(&self) -> Nonce {
+        match self {
+            Self::UpdateRequest(payload) => payload.payload.nonce,
+            Self::EthereumRequest(payload) => payload.nonce.as_u64(),
         }
     }
 }

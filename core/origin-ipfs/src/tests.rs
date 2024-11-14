@@ -132,6 +132,7 @@ async fn create_app_state(temp_dir: &TempDir) -> AppState {
                         transactions_to_lose: HashSet::new(),
                         new_block_interval: Duration::from_secs(5),
                         block_buffering_interval: Duration::from_secs(0),
+                        forwarder_transaction_to_error: HashSet::new(),
                     }),
             )
             .with(keystore),

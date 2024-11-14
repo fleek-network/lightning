@@ -283,6 +283,7 @@ async fn test_execute_transaction_with_node_signer_wait_for_receipt_retry_on_tim
             transactions_to_lose: HashSet::from_iter(vec![1, 2]),
             new_block_interval: Duration::from_secs(0),
             block_buffering_interval: Duration::from_secs(0),
+            forwarder_transaction_to_error: HashSet::new(),
         })
         .build::<TestNodeComponents>()
         .await
@@ -333,6 +334,7 @@ async fn test_execute_transaction_wait_for_receipt_retry_on_timeout_avoids_resub
             transactions_to_lose: HashSet::from_iter(vec![1]),
             new_block_interval: Duration::from_secs(0),
             block_buffering_interval: Duration::from_secs(0),
+            forwarder_transaction_to_error: HashSet::new(),
         })
         .with_genesis_mutator(move |genesis| {
             genesis.chain_id = 1337;
@@ -396,6 +398,7 @@ async fn test_execute_transaction_no_wait_for_receipt_retry_on_timeout_avoids_re
             transactions_to_lose: HashSet::from_iter(vec![1]),
             new_block_interval: Duration::from_secs(0),
             block_buffering_interval: Duration::from_secs(0),
+            forwarder_transaction_to_error: HashSet::new(),
         })
         .with_genesis_mutator(move |genesis| {
             genesis.chain_id = 1337;
@@ -438,6 +441,63 @@ async fn test_execute_transaction_no_wait_for_receipt_retry_on_timeout_avoids_re
     )
     .await
     .unwrap();
+
+    // Shutdown the node.
+    node.shutdown().await;
+}
+
+#[tokio::test]
+async fn test_execute_transaction_retries_with_same_nonce_on_forwarder_error() {
+    let mut node = TestNodeBuilder::new()
+        .with_mock_consensus_config(MockConsensusConfig {
+            min_ordering_time: 0,
+            max_ordering_time: 0,
+            probability_txn_lost: 0.0,
+            transactions_to_lose: HashSet::new(),
+            new_block_interval: Duration::from_secs(0),
+            block_buffering_interval: Duration::from_secs(0),
+            // Lose the first 3 transactions in the forwarder.
+            forwarder_transaction_to_error: HashSet::from_iter(vec![1, 2, 3]),
+        })
+        .build::<TestNodeComponents>()
+        .await
+        .unwrap();
+    node.start().await;
+
+    // Build a transaction client.
+    let signer = TransactionSigner::NodeMain(node.get_node_secret_key());
+    let client = TransactionClient::<TestNodeComponents>::new(
+        node.app.sync_query(),
+        node.notifier.clone(),
+        node.forwarder.mempool_socket(),
+        signer.clone(),
+    )
+    .await;
+
+    // Check that the nonce starts at 0.
+    assert_eq!(signer.get_nonce(&node.app.sync_query()), 0);
+
+    // Execute a transaction and wait for it to complete.
+    let (tx, receipt) = client
+        .execute_transaction(
+            UpdateMethod::IncrementNonce {},
+            Some(ExecuteTransactionOptions {
+                wait: ExecuteTransactionWait::Receipt,
+                ..Default::default()
+            }),
+        )
+        .await
+        .unwrap()
+        .as_receipt();
+    assert_eq!(
+        receipt.response,
+        TransactionResponse::Success(ExecutionData::None)
+    );
+    assert!(!tx.hash().is_empty());
+    assert_eq!(receipt.transaction_hash, tx.hash());
+
+    // Check that the nonce has been incremented only once.
+    assert_eq!(signer.get_nonce(&node.app.sync_query()), 1);
 
     // Shutdown the node.
     node.shutdown().await;
@@ -586,6 +646,7 @@ impl TestNodeBuilder {
                             transactions_to_lose: HashSet::new(),
                             new_block_interval: Duration::from_secs(0),
                             block_buffering_interval: Duration::from_secs(0),
+                            forwarder_transaction_to_error: HashSet::new(),
                         },
                     )),
             ),

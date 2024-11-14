@@ -51,6 +51,7 @@ impl TestNetworkBuilder {
             new_block_interval: Duration::from_secs(0),
             transactions_to_lose: Default::default(),
             block_buffering_interval: Duration::from_millis(0),
+            forwarder_transaction_to_error: Default::default(),
         })
     }
 
