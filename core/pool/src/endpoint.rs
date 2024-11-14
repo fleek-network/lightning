@@ -7,9 +7,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use bytes::Bytes;
-use fleek_crypto::NodePublicKey;
 use futures::stream::FuturesUnordered;
-use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::NodeIndex;
 use lightning_interfaces::ServiceScope;
@@ -388,22 +386,6 @@ where
         Ok(())
     }
 
-    /// Returns true if the peer has staked the required amount
-    /// to be a valid node in the network, and false otherwise.
-    #[inline]
-    fn validate_stake(&self, peer: NodePublicKey) -> bool {
-        match self.query_runner.pubkey_to_index(&peer) {
-            None => false,
-            Some(ref node_idx) => {
-                HpUfixed::from(self.query_runner.get_staking_amount())
-                    <= self
-                        .query_runner
-                        .get_node_info::<HpUfixed<18>>(node_idx, |n| n.stake.staked)
-                        .unwrap_or(HpUfixed::<18>::zero())
-            },
-        }
-    }
-
     #[inline]
     pub fn cancel_dial(&mut self, dst: &NodeIndex) {
         if let Some(cancel) = self.pending_dial.remove(dst) {
@@ -442,7 +424,7 @@ where
             return;
         };
 
-        if !self.validate_stake(pk) {
+        if !self.query_runner.has_sufficient_stake(&pk) {
             tracing::info!("peer with pk {pk} failed stake validation: rejecting connection");
             return;
         }

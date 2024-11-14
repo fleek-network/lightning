@@ -93,11 +93,14 @@ impl<T: BroadcastEventInterface<PubSubMsg>> TransactionStore<T> {
         self.store_attestation_internal(self.next_pointer(), digest, node_index, Some(event));
     }
 
-    // When the epoch changes, the parcels from the current epochs become
-    // the parcels from the previous epoch.
-    // The parcels from the previous epoch are garbage collected, and the parcels from
-    // the next epoch become the parcels from the current epoch (after validating them).
-    pub fn change_epoch(&mut self, committee: &[NodeIndex]) {
+    /// Change the committee.
+    ///
+    /// When the committee is changed for across epoch eras and epochs, the parcels from the current
+    /// become the parcels from the previous.
+    ///
+    /// The parcels from the previous are garbage collected, and the parcels from the next becom
+    /// ethe parcels from the current after validating them.
+    pub fn change_committee(&mut self, committee: &[NodeIndex]) {
         // Verify that the parcels/attestations from the next epoch were send by committee members.
         // Remove invalid parcels/attestations from the hash map.
         let next_pointer = self.next_pointer();

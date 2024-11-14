@@ -609,7 +609,7 @@ impl<B: Backend> StateExecutor<B> {
 
                 // Increase the nodes stake by the amount being staked
                 node.stake.staked += amount.clone();
-                self.node_info.set(index, node);
+                self.node_info.set(index, node.clone());
             },
             None => {
                 // If the node doesn't Exist, create it. But check if they provided all the required
@@ -651,10 +651,10 @@ impl<B: Backend> StateExecutor<B> {
                     return TransactionResponse::Revert(ExecutionError::InsufficientNodeDetails);
                 }
             },
-        }
+        };
 
         // decrement the owners balance
-        owner.flk_balance -= amount;
+        owner.flk_balance -= amount.clone();
 
         // Commit changes to the owner
         self.account_info.set(sender, owner);
@@ -758,7 +758,7 @@ impl<B: Backend> StateExecutor<B> {
         // current epoch + lock time todo(dalton): we should be storing unstaked tokens in a
         // list so we can have multiple locked stakes with dif lock times
         node.stake.staked -= amount.clone();
-        node.stake.locked += amount;
+        node.stake.locked += amount.clone();
         node.stake.locked_until = current_epoch + lock_time;
 
         // Save the changed node state.
@@ -769,7 +769,7 @@ impl<B: Backend> StateExecutor<B> {
         // set as Participation::False on epoch change.
         if !self.has_sufficient_unlocked_stake(&node_index) && self.is_participating(&node_index) {
             node.participation = Participation::OptedOut;
-            self.node_info.set(node_index, node);
+            self.node_info.set(node_index, node.clone());
         }
 
         // Return success.
@@ -864,6 +864,7 @@ impl<B: Backend> StateExecutor<B> {
             Some(mut node_info) => {
                 node_info.participation = Participation::OptedIn;
                 self.node_info.set(index, node_info);
+
                 TransactionResponse::Success(ExecutionData::None)
             },
             None => TransactionResponse::Revert(ExecutionError::NodeDoesNotExist),
@@ -879,6 +880,7 @@ impl<B: Backend> StateExecutor<B> {
             Some(mut node_info) => {
                 node_info.participation = Participation::OptedOut;
                 self.node_info.set(index, node_info);
+
                 TransactionResponse::Success(ExecutionData::None)
             },
             None => TransactionResponse::Revert(ExecutionError::NodeDoesNotExist),
@@ -1591,13 +1593,21 @@ impl<B: Backend> StateExecutor<B> {
         }
     }
 
-    fn get_epoch(&self) -> u64 {
+    pub fn get_epoch(&self) -> u64 {
         if let Some(Value::Epoch(epoch)) = self.metadata.get(&Metadata::Epoch) {
             epoch
         } else {
             // unreachable set at genesis
             0
         }
+    }
+
+    pub fn get_committee(&self, epoch: Epoch) -> Committee {
+        self.committee_info.get(&epoch).unwrap_or_default()
+    }
+
+    pub fn get_node_public_key(&self, node_index: &NodeIndex) -> NodePublicKey {
+        self.node_info.get(node_index).unwrap().public_key
     }
 
     fn clear_content_registry(&self, node_index: &NodeIndex) -> Result<(), ExecutionError> {
@@ -1634,6 +1644,7 @@ impl<B: Backend> StateExecutor<B> {
             }
         }
     }
+
     /// Records a node registry change for the current epoch and block number.
     fn record_node_registry_change(
         &self,
@@ -1654,5 +1665,21 @@ impl<B: Backend> StateExecutor<B> {
     /// Returns the current committee.
     pub fn get_current_committee(&self) -> Option<Committee> {
         self.committee_info.get(&self.get_epoch())
+    }
+
+    pub fn get_node_index(&self, node_public_key: &NodePublicKey) -> Option<NodeIndex> {
+        self.pub_key_to_index.get(node_public_key)
+    }
+
+    pub fn get_epoch_era(&self) -> u64 {
+        if let Some(Value::EpochEra(era)) = self.metadata.get(&Metadata::EpochEra) {
+            era
+        } else {
+            0
+        }
+    }
+
+    pub fn set_epoch_era(&self, era: u64) {
+        self.metadata.set(Metadata::EpochEra, Value::EpochEra(era));
     }
 }
