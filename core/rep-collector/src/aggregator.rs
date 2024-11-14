@@ -21,7 +21,7 @@ use crate::measurement_manager::MeasurementManager;
 pub struct ReputationAggregator<C: NodeComponents> {
     reporter: MyReputationReporter,
     query: MyReputationQuery,
-    measurement_manager: Mutex<MeasurementManager>,
+    measurement_manager: Arc<Mutex<MeasurementManager>>,
     notifier: c![C::NotifierInterface],
     submit_tx: SignerSubmitTxSocket,
     report_rx: buffered_mpsc::BufferedReceiver<ReportMessage>,
@@ -39,13 +39,12 @@ impl<C: NodeComponents> ReputationAggregator<C> {
 
         let (report_tx, report_rx) =
             buffered_mpsc::buffered_channel(config.reporter_buffer_size, 2048);
-        let measurement_manager = MeasurementManager::new();
-        let local_reputation_ref = measurement_manager.get_local_reputation_ref();
+        let measurement_manager = Arc::new(Mutex::new(MeasurementManager::new()));
 
         Ok(Self {
             reporter: MyReputationReporter::new(report_tx),
-            query: MyReputationQuery::new(local_reputation_ref),
-            measurement_manager: Mutex::new(measurement_manager),
+            query: MyReputationQuery::new(measurement_manager.clone()),
+            measurement_manager,
             submit_tx,
             notifier,
             report_rx,
@@ -271,19 +270,31 @@ impl<C: NodeComponents> ConfigConsumer for ReputationAggregator<C> {
 
 #[derive(Clone)]
 pub struct MyReputationQuery {
-    local_reputation: Arc<scc::HashMap<NodeIndex, u8>>,
+    measurement_manager: Arc<Mutex<MeasurementManager>>,
 }
 
 impl MyReputationQuery {
-    fn new(local_reputation: Arc<scc::HashMap<NodeIndex, u8>>) -> Self {
-        Self { local_reputation }
+    fn new(measurement_manager: Arc<Mutex<MeasurementManager>>) -> Self {
+        Self {
+            measurement_manager,
+        }
     }
 }
 
 impl ReputationQueryInteface for MyReputationQuery {
-    /// Returns the reputation of the provided node locally.
+    /// Returns the reputation score of the provided node locally.
     fn get_reputation_of(&self, peer: &NodeIndex) -> Option<u8> {
-        self.local_reputation.get(peer).map(|entry| *entry.get())
+        self.measurement_manager
+            .lock()
+            .unwrap()
+            .get_local_reputation_ref()
+            .get(peer)
+            .map(|entry| *entry.get())
+    }
+
+    /// Returns reputation measurements for all peers.
+    fn get_measurements(&self) -> BTreeMap<NodeIndex, ReputationMeasurements> {
+        self.measurement_manager.lock().unwrap().get_measurements()
     }
 }
 

@@ -21,7 +21,7 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{oneshot, Notify};
 use tokio::{pin, task, time};
 use tracing::{error, info};
-use types::ExecuteTransactionRequest;
+use types::{EpochEra, ExecuteTransactionRequest};
 
 use crate::consensus::{ConsensusReadyWaiter, PubSubMsg};
 use crate::execution::state::FilteredConsensusOutput;
@@ -125,29 +125,30 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
 
     pub async fn start_current_epoch(&mut self) {
         // Get current epoch information
-        let (committee, worker_cache, epoch, epoch_end) = self.get_epoch_info();
+        let (committee, worker_cache, epoch, epoch_era, epoch_end) = self.get_epoch_info();
 
         if committee
             .authority_by_key(self.narwhal_args.primary_keypair.public())
             .is_some()
         {
-            self.run_narwhal(epoch_end, epoch, committee, worker_cache)
+            self.run_narwhal(epoch_end, epoch, epoch_era, committee, worker_cache)
                 .await
         }
     }
 
     pub async fn move_to_next_epoch(&mut self) {
         if let Some(state) = self.consensus.take() {
-            state.shutdown().await
+            state.shutdown().await;
         }
 
         self.start_current_epoch().await
     }
 
-    fn get_epoch_info(&self) -> (Committee, WorkerCache, u64, u64) {
+    fn get_epoch_info(&self) -> (Committee, WorkerCache, Epoch, EpochEra, u64) {
         let EpochInfo {
             committee,
             epoch,
+            epoch_era,
             epoch_end,
         } = self.query_runner.get_epoch_info();
 
@@ -208,7 +209,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
                 .collect(),
         };
 
-        (narwhal_committee, worker_cache, epoch, epoch_end)
+        (narwhal_committee, worker_cache, epoch, epoch_era, epoch_end)
     }
 
     fn wait_to_signal_epoch_change(&self, mut time_until_change: Duration, epoch: Epoch) {
@@ -256,13 +257,14 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
     async fn run_narwhal(
         &mut self,
         epoch_end: u64,
-        epoch: u64,
+        epoch: Epoch,
+        epoch_era: EpochEra,
         committee: Committee,
         worker_cache: WorkerCache,
     ) {
         info!("Node is on current committee, starting narwhal.");
 
-        let store = self.get_narwhal_store_and_garbage_collect(epoch);
+        let store = self.get_narwhal_store_and_garbage_collect(epoch, epoch_era);
 
         // Create the narwhal service
         let service = NarwhalService::new(
@@ -300,13 +302,17 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
 
     /// Creates or reopens a narwhal store specific to current epoch. Also garbage collects stores
     /// that are older than 2 epochs
-    fn get_narwhal_store_and_garbage_collect(&self, current_epoch: u64) -> NodeStorage {
+    fn get_narwhal_store_and_garbage_collect(
+        &self,
+        current_epoch: Epoch,
+        current_epoch_era: EpochEra,
+    ) -> NodeStorage {
         let mut store_path = self.store_path.to_path_buf();
 
         // Delete any directories that are from more than 2 epochs back
         garbage_collect_old_stores(&current_epoch, &store_path, 2);
 
-        store_path.push(format!("{current_epoch}"));
+        store_path.push(format!("{current_epoch}-{current_epoch_era}"));
         // TODO(dalton): This store takes an optional cache metrics struct that can give us metrics
         // on hits/miss
         NodeStorage::reopen(store_path, None)
@@ -321,13 +327,13 @@ fn garbage_collect_old_stores(current_epoch: &u64, store_location: &PathBuf, ret
     }
     if let Ok(files) = fs::read_dir(store_location) {
         for file in files.flatten() {
-            // Every narwhal db is store in this directory with the number of the epoch as its
-            // name
+            // Every narwhal db is store in this directory with the number of the epoch and era as
+            // its name separated by a dash.
             if let Some(epoch_num) = file
                 .file_name()
                 .into_string()
                 .ok()
-                .and_then(|s| s.parse::<u64>().ok())
+                .and_then(|s| s.split('-').next().and_then(|s| s.parse::<u64>().ok()))
             {
                 if epoch_num < current_epoch - retention {
                     if let Err(e) = fs::remove_dir_all(file.path()) {
@@ -351,9 +357,9 @@ mod test_garbage_collect {
 
     use super::*;
 
-    fn create_epoch_directory(path: &Path, epoch: u64) {
+    fn create_epoch_directory(path: &Path, epoch: Epoch, epoch_era: EpochEra) {
         let mut path = path.to_path_buf();
-        path.push(format!("{epoch}"));
+        path.push(format!("{epoch}-{epoch_era}"));
         path.push("directory1");
         fs::create_dir_all(path.clone()).unwrap();
         path.set_file_name("file1.txt");
@@ -378,42 +384,42 @@ mod test_garbage_collect {
     fn with_1_epoch_2_retention() {
         let temp_dir = tempdir().unwrap();
         let store_path = temp_dir.into_path();
-        create_epoch_directory(&store_path, 0);
+        create_epoch_directory(&store_path, 0, 0);
 
         garbage_collect_old_stores(&1, &store_path.to_path_buf(), 2);
 
         assert_eq!(fs::read_dir(&store_path).unwrap().count(), 1);
-        assert!(store_path.join("0").exists());
+        assert!(store_path.join("0-0").exists());
     }
 
     #[test]
     fn with_2_epochs_2_retention() {
         let temp_dir = tempdir().unwrap();
         let store_path = temp_dir.into_path();
-        create_epoch_directory(&store_path, 0);
-        create_epoch_directory(&store_path, 1);
+        create_epoch_directory(&store_path, 0, 0);
+        create_epoch_directory(&store_path, 1, 0);
 
         garbage_collect_old_stores(&2, &store_path.to_path_buf(), 2);
 
         assert_eq!(fs::read_dir(&store_path).unwrap().count(), 2);
-        assert!(store_path.join("0").exists());
-        assert!(store_path.join("1").exists());
+        assert!(store_path.join("0-0").exists());
+        assert!(store_path.join("1-0").exists());
     }
 
     #[test]
     fn with_3_epochs_2_retention() {
         let temp_dir = tempdir().unwrap();
         let store_path = temp_dir.into_path();
-        create_epoch_directory(&store_path, 0);
-        create_epoch_directory(&store_path, 1);
-        create_epoch_directory(&store_path, 2);
+        create_epoch_directory(&store_path, 0, 0);
+        create_epoch_directory(&store_path, 1, 0);
+        create_epoch_directory(&store_path, 2, 0);
 
         garbage_collect_old_stores(&3, &store_path.to_path_buf(), 2);
 
         assert_eq!(fs::read_dir(&store_path).unwrap().count(), 2);
-        assert!(!store_path.join("0").exists());
-        assert!(store_path.join("1").exists());
-        assert!(store_path.join("2").exists());
+        assert!(!store_path.join("0-0").exists());
+        assert!(store_path.join("1-0").exists());
+        assert!(store_path.join("2-0").exists());
     }
 
     #[test]
@@ -423,7 +429,7 @@ mod test_garbage_collect {
         let temp_dir = tempdir().unwrap();
         let store_path = temp_dir.into_path();
         for i in 0..=10 {
-            create_epoch_directory(&store_path, i);
+            create_epoch_directory(&store_path, i, 0);
         }
 
         // Garbage collect the directory
@@ -433,7 +439,7 @@ mod test_garbage_collect {
         // previous 2 epochs
         for i in 0..=10 {
             let mut dir_path = store_path.to_path_buf();
-            dir_path.push(format!("{i}"));
+            dir_path.push(format!("{i}-0"));
             if i < 8 {
                 assert!(!dir_path.exists());
             } else {

@@ -15,6 +15,8 @@ use lightning_interfaces::types::{
     Metadata,
     NodeIndex,
     NodeInfo,
+    NodeRegistryChange,
+    NodeRegistryChangeSlashReason,
     Participation,
     ProtocolParamKey,
     ProtocolParamValue,
@@ -104,6 +106,9 @@ impl<B: Backend> StateExecutor<B> {
 
             // Start the committee selection beacon round at 0.
             self.set_committee_selection_beacon_round(0);
+
+            // Reset the epoch era.
+            self.metadata.set(Metadata::EpochEra, Value::EpochEra(0));
 
             // Return success.
             TransactionResponse::Success(ExecutionData::None)
@@ -318,6 +323,21 @@ impl<B: Backend> StateExecutor<B> {
             return TransactionResponse::Success(ExecutionData::EpochChange);
         }
 
+        let commit_count = beacons.len();
+        let reveal_count = beacons
+            .iter()
+            .filter(|(_, (_, reveal))| reveal.is_some())
+            .count();
+        let (phase_start, phase_end) = reveal_phase.unwrap();
+        tracing::debug!(
+            "waiting for remaining nodes to reveal (epoch: {}, start: {}, end: {}, committed: {}, revealed: {})",
+            epoch,
+            phase_start,
+            phase_end,
+            commit_count,
+            reveal_count,
+        );
+
         // Return success.
         TransactionResponse::Success(ExecutionData::None)
     }
@@ -417,7 +437,12 @@ impl<B: Backend> StateExecutor<B> {
                 epoch,
                 round + 1,
                 commit_start,
-                commit_end
+                commit_end,
+            );
+            tracing::debug!(
+                "commit phase had insufficient participation (committed: {:?}, nodes: {:?})",
+                committee_beacons.keys().collect::<Vec<_>>(),
+                participating_nodes,
             );
             self.set_committee_selection_beacon_commit_phase(commit_start, commit_end);
 
@@ -506,11 +531,18 @@ impl<B: Backend> StateExecutor<B> {
         let non_revealing_nodes = beacons
             .iter()
             .filter(|(_, (_, reveal))| reveal.is_none())
-            .map(|(node_index, _)| node_index)
+            .map(|(node_index, _)| *node_index)
             .collect::<Vec<_>>();
-        for node_index in non_revealing_nodes {
+        for node_index in &non_revealing_nodes {
             self.committee_selection_beacon_non_revealing_node
                 .set(*node_index, ());
+        }
+
+        // Slash non-revealing nodes and remove from the committee and active set of nodes if they
+        // no longer have sufficient stake.
+        let slash_amount = self.get_committee_selection_beacon_non_reveal_slash_amount();
+        for node_index in &non_revealing_nodes {
+            self.slash_node_after_non_reveal_and_maybe_kick(node_index, &slash_amount);
         }
 
         // Clear the beacon state.
@@ -1014,6 +1046,85 @@ impl<B: Backend> StateExecutor<B> {
         match self.parameters.get(&ProtocolParamKey::CommitteeSize) {
             Some(ProtocolParamValue::CommitteeSize(committee_size)) => committee_size,
             _ => unreachable!("invalid committee size in protocol parameters"),
+        }
+    }
+
+    /// Slash a node by removing the given amount from the node's staked balance.
+    ///
+    /// If the node no longer has sufficient stake, it's removed from the committee and active node
+    /// set.
+    pub fn slash_node_after_non_reveal_and_maybe_kick(
+        &self,
+        node_index: &NodeIndex,
+        amount: &HpUfixed<18>,
+    ) {
+        let node_index = *node_index;
+
+        // Remove the given slash amount from the node's staked balance.
+        let mut node_info = self.node_info.get(&node_index).unwrap();
+        let remaining_amount = if node_info.stake.staked >= amount.clone() {
+            node_info.stake.staked -= amount.clone();
+            HpUfixed::<18>::zero()
+        } else {
+            let remaining = amount.clone() - node_info.stake.staked;
+            node_info.stake.staked = HpUfixed::zero();
+            remaining
+        };
+        if node_info.stake.locked >= remaining_amount {
+            node_info.stake.locked -= remaining_amount;
+        } else {
+            node_info.stake.locked = HpUfixed::zero();
+        }
+        self.node_info.set(node_index, node_info.clone());
+        tracing::info!("slashing node {:?} by {:?}", node_index, amount);
+
+        // Record the node registry change.
+        self.record_node_registry_change(
+            node_info.public_key,
+            NodeRegistryChange::Slashed((
+                amount.clone(),
+                node_info.stake,
+                NodeRegistryChangeSlashReason::CommitteeBeaconNonReveal,
+            )),
+        );
+
+        // If the node no longer has sufficient stake, remove it from the committee members and
+        // active nodes.
+        if !self.has_sufficient_stake(&node_index) {
+            let epoch = self.get_epoch();
+            let mut committee = self.get_committee(epoch);
+
+            // Remove node from committee members and active node set.
+            committee.members.retain(|member| *member != node_index);
+            committee
+                .active_node_set
+                .retain(|member| *member != node_index);
+
+            // Save the updated committee info.
+            tracing::info!(
+                "removing node {:?} from committee and active node set after being slashed",
+                node_index
+            );
+            self.committee_info.set(epoch, committee);
+        }
+    }
+
+    /// Get the slash amount for non-revealing nodes in the committee selection beacon process.
+    ///
+    /// Returns 0 if the slash amount is not set in the protocol parameters.
+    /// Panics if the slash amount is not the expected type.
+    fn get_committee_selection_beacon_non_reveal_slash_amount(&self) -> HpUfixed<18> {
+        match self
+            .parameters
+            .get(&ProtocolParamKey::CommitteeSelectionBeaconNonRevealSlashAmount)
+        {
+            Some(ProtocolParamValue::CommitteeSelectionBeaconNonRevealSlashAmount(amount)) => {
+                amount.into()
+            },
+            None => HpUfixed::<18>::zero(),
+            _ => unreachable!(
+                "invalid committee selection beacon non-reveal slash amount in protocol parameters"
+            ),
         }
     }
 }

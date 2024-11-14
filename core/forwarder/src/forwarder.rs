@@ -30,8 +30,9 @@ impl<C: NodeComponents> BuildGraph for Forwarder<C> {
              app: &C::ApplicationInterface,
              fdi::Cloned(waiter): fdi::Cloned<ShutdownWaiter>| {
                 let consensus_key = keystore.get_bls_pk();
+                let node_public_key = keystore.get_ed25519_pk();
                 let query_runner = app.sync_query();
-                let worker = Worker::new(consensus_key, query_runner);
+                let worker = Worker::new(consensus_key, node_public_key, query_runner);
                 let socket = spawn_worker!(worker, "FORWARDER", waiter, crucial);
 
                 Self {

@@ -22,6 +22,9 @@ pub type ServiceId = u32;
 /// Application epoch number
 pub type Epoch = u64;
 
+/// Application epoch era.
+pub type EpochEra = u64;
+
 /// A nodes index
 pub type NodeIndex = u32;
 
@@ -103,6 +106,7 @@ pub enum Metadata {
     SubDagRound,
     CommitteeSelectionBeaconPhase,
     CommitteeSelectionBeaconRound,
+    EpochEra,
 }
 
 /// The Value enum is a data type used to represent values in a key-value pair for a metadata table
@@ -122,6 +126,7 @@ pub enum Value {
     BlockRange(u64, u64),
     CommitteeSelectionBeaconPhase(CommitteeSelectionBeaconPhase),
     CommitteeSelectionBeaconRound(CommitteeSelectionBeaconRound),
+    EpochEra(u64),
 }
 
 impl Value {

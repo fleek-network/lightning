@@ -9,7 +9,7 @@ use std::collections::HashMap;
 
 use affair::AsyncWorker;
 use anyhow::Result;
-use fleek_crypto::ConsensusPublicKey;
+use fleek_crypto::{ConsensusPublicKey, NodePublicKey};
 use lightning_interfaces::types::{Epoch, EpochInfo, ForwarderError, NodeInfo, TransactionRequest};
 use lightning_interfaces::SyncQueryRunnerInterface;
 use lightning_utils::application::QueryRunnerExt;
@@ -24,8 +24,10 @@ const TIMEOUT_DURATION: Duration = Duration::from_secs(4);
 pub struct Worker<Q: SyncQueryRunnerInterface> {
     /// Query runner used to read application state
     query_runner: Q,
-    /// The public key of this node
+    /// The consensus public key of this node.
     primary_name: ConsensusPublicKey,
+    /// The node public key of this node.
+    node_public_key: NodePublicKey,
     /// Current Epoch
     epoch: Epoch,
     /// List of the committee members
@@ -42,10 +44,15 @@ pub struct Worker<Q: SyncQueryRunnerInterface> {
 }
 
 impl<Q: SyncQueryRunnerInterface> Worker<Q> {
-    pub fn new(primary_name: ConsensusPublicKey, query_runner: Q) -> Self {
+    pub fn new(
+        primary_name: ConsensusPublicKey,
+        node_public_key: NodePublicKey,
+        query_runner: Q,
+    ) -> Self {
         Self {
             query_runner,
             primary_name,
+            node_public_key,
             epoch: 0,
             committee: Vec::new(),
             cursor: 0,
@@ -112,23 +119,31 @@ impl<Q: SyncQueryRunnerInterface> Worker<Q> {
 
     fn refresh_epoch(&mut self) {
         let EpochInfo {
-            mut committee,
-            epoch,
-            ..
+            committee, epoch, ..
         } = self.query_runner.get_epoch_info();
 
-        // If our node is on the committee, return a vec with just our node. Or return a vec of all
-        // the committee members
-        if let Some(item) = committee
+        // If our node is on the committee and has sufficient stake to be active, return a vec with
+        // just our node. Or return a vec of all the committee members
+        let is_valid_node = self
+            .query_runner
+            .has_sufficient_stake(&self.node_public_key)
+            && self
+                .query_runner
+                .is_participating_node(&self.node_public_key);
+        let maybe_node = committee
             .iter()
-            .find(|x| x.consensus_key == self.primary_name)
-        {
+            .find(|x| x.consensus_key == self.primary_name);
+        if is_valid_node && maybe_node.is_some() {
             // Reset cursor
             self.cursor = 0;
-            self.committee = vec![item.clone()];
+            self.committee = vec![maybe_node.unwrap().clone()];
         } else {
             // shuffle the order with thread_range so nodes accross the network are not all
             // connecting to the same workers
+            let mut committee = committee
+                .into_iter()
+                .filter(|i| i.consensus_key != self.primary_name)
+                .collect::<Vec<_>>();
             committee.shuffle(&mut rand::thread_rng());
             self.committee = committee;
             self.cursor = 0;

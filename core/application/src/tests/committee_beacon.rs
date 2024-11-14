@@ -11,6 +11,10 @@ use types::{
     CommitteeSelectionBeaconReveal,
     ExecutionData,
     ExecutionError,
+    NodeIndex,
+    NodeRegistryChange,
+    NodeRegistryChangeSlashReason,
+    Staking,
     TransactionResponse,
     UpdateMethod,
 };
@@ -695,11 +699,24 @@ async fn test_committee_beacon_node_attempts_reveal_without_committment() {
 #[tokio::test]
 async fn test_committee_beacon_non_revealing_node_fully_slashed() {
     let network = TestNetwork::builder()
+        // The node's initial stake is 1000, and it will be slashed 500, leaving insufficient stake
+        // for a node.
         .with_committee_nodes(4)
         .build()
         .await
         .unwrap();
     let query = network.query();
+
+    // Check the initial stake of all nodes.
+    for i in 0..network.nodes.len() {
+        let node_index = i as NodeIndex;
+        assert_eq!(
+            query
+                .get_node_info(&node_index, |n| n.stake.staked)
+                .unwrap(),
+            1000u64.into()
+        );
+    }
 
     // Execute epoch change transactions from committee nodes.
     let epoch = query.get_current_epoch();
@@ -795,6 +812,470 @@ async fn test_committee_beacon_non_revealing_node_fully_slashed() {
         Some(CommitteeSelectionBeaconPhase::Commit((10, 12)))
     );
     assert_eq!(query.get_committee_selection_beacon_round(), Some(1));
+
+    // Check that the non-revealing node has been slashed, while no other nodes have been slashed.
+    for i in 0..network.nodes.len() {
+        let node_index = i as NodeIndex;
+        if node_index == 2 {
+            assert_eq!(
+                query
+                    .get_node_info(&node_index, |n| n.stake.staked)
+                    .unwrap(),
+                0u64.into()
+            );
+        } else {
+            assert_eq!(
+                query
+                    .get_node_info(&node_index, |n| n.stake.staked)
+                    .unwrap(),
+                1000u64.into()
+            );
+        }
+    }
+
+    // Check that the node registry changes have been recorded.
+    assert_eq!(query.get_committee_members_by_index(), vec![0, 1, 3]);
+    assert_eq!(query.get_active_node_set(), HashSet::from([0, 1, 3]));
+    let node_registry_changes = query
+        .get_committee_info(&epoch, |c| c.node_registry_changes)
+        .unwrap();
+    assert_eq!(node_registry_changes.len(), 2);
+    assert_eq!(
+        node_registry_changes[&9],
+        vec![(
+            network.node(2).keystore.get_ed25519_pk(),
+            NodeRegistryChange::Slashed((
+                1000u64.into(),
+                Staking {
+                    staked: 0u64.into(),
+                    stake_locked_until: 0,
+                    locked: 0u64.into(),
+                    locked_until: 0,
+                },
+                NodeRegistryChangeSlashReason::CommitteeBeaconNonReveal,
+            )),
+        )]
+    );
+
+    // Check that the node registry changes are included on the block response.
+    assert_eq!(resp.node_registry_changes.len(), 1);
+    assert_eq!(
+        resp.node_registry_changes,
+        vec![(
+            network.node(2).keystore.get_ed25519_pk(),
+            NodeRegistryChange::Slashed((
+                1000u64.into(),
+                Staking {
+                    staked: 0u64.into(),
+                    stake_locked_until: 0,
+                    locked: 0u64.into(),
+                    locked_until: 0,
+                },
+                NodeRegistryChangeSlashReason::CommitteeBeaconNonReveal,
+            )),
+        )]
+    );
+
+    // Execute commit transaction from the previously non-participating node, and check that it's
+    // successful.
+    let resp = network
+        .execute(vec![network.node(3).build_transaction(
+            UpdateMethod::CommitteeSelectionBeaconCommit {
+                commit: CommitteeSelectionBeaconCommit::build(epoch, 1, [14; 32]),
+            },
+        )])
+        .await
+        .unwrap();
+    assert_eq!(resp.block_number, 10);
+
+    // Execute commit transaction from the non-revealing node, and check that it's reverted.
+    let resp = network
+        .maybe_execute(vec![network.node(2).build_transaction(
+            UpdateMethod::CommitteeSelectionBeaconCommit {
+                commit: CommitteeSelectionBeaconCommit::build(epoch, 1, [13; 32]),
+            },
+        )])
+        .await
+        .unwrap();
+    assert_eq!(resp.block_number, 11);
+    assert_eq!(
+        resp.txn_receipts[0].response,
+        TransactionResponse::Revert(ExecutionError::InsufficientStake)
+    );
+}
+
+#[tokio::test]
+async fn test_committee_beacon_non_revealing_node_partially_slashed_insufficient_stake() {
+    let network = TestNetwork::builder()
+        .with_non_reveal_slash_amount(500)
+        .with_min_stake(1000)
+        // The node's initial stake is 1000, and it will be slashed 500, leaving insufficient stake
+        // for a node.
+        .with_committee_nodes(4)
+        .build()
+        .await
+        .unwrap();
+    let query = network.query();
+
+    // Check the initial stake of all nodes.
+    for i in 0..network.nodes.len() {
+        let node_index = i as NodeIndex;
+        assert_eq!(
+            query
+                .get_node_info(&node_index, |n| n.stake.staked)
+                .unwrap(),
+            1000u64.into()
+        );
+    }
+
+    // Execute epoch change transactions from committee nodes.
+    let epoch = query.get_current_epoch();
+    let resp = network.execute_change_epoch(epoch).await.unwrap();
+    assert_eq!(resp.block_number, 1);
+    assert!(!resp.change_epoch);
+
+    // Check that we have transitioned to the commit phase.
+    assert_eq!(
+        query.get_committee_selection_beacon_phase(),
+        Some(CommitteeSelectionBeaconPhase::Commit((1, 3)))
+    );
+    assert_eq!(query.get_committee_selection_beacon_round(), Some(0));
+
+    // Execute commit transactions from 2/3+1 committee nodes (sufficient to start reveal phase).
+    let resp = network
+        .execute(vec![
+            network
+                .node(0)
+                .build_transaction(UpdateMethod::CommitteeSelectionBeaconCommit {
+                    commit: CommitteeSelectionBeaconCommit::build(epoch, 0, [1; 32]),
+                }),
+            network
+                .node(1)
+                .build_transaction(UpdateMethod::CommitteeSelectionBeaconCommit {
+                    commit: CommitteeSelectionBeaconCommit::build(epoch, 0, [2; 32]),
+                }),
+            network
+                .node(2)
+                .build_transaction(UpdateMethod::CommitteeSelectionBeaconCommit {
+                    commit: CommitteeSelectionBeaconCommit::build(epoch, 0, [3; 32]),
+                }),
+        ])
+        .await
+        .unwrap();
+    assert_eq!(resp.block_number, 2);
+
+    // Execute empty blocks to exceed the commit phase timeout.
+    network.execute(vec![]).await.unwrap();
+    network.execute(vec![]).await.unwrap();
+
+    // Execute commit timeout transaction to transition to the reveal phase.
+    let resp = network
+        .execute(vec![network.node(0).build_transaction(
+            UpdateMethod::CommitteeSelectionBeaconCommitPhaseTimeout,
+        )])
+        .await
+        .unwrap();
+    assert_eq!(resp.block_number, 5);
+
+    // Check that we have transitioned to the reveal phase.
+    assert_eq!(
+        query.get_committee_selection_beacon_phase(),
+        Some(CommitteeSelectionBeaconPhase::Reveal((6, 8)))
+    );
+    assert_eq!(query.get_committee_selection_beacon_round(), Some(0));
+
+    // Execute reveal transactions from 2 of the 3 nodes that committed, leaving 1
+    // non-revealing node, and 1 non-participating node.
+    let resp = network
+        .execute(vec![
+            network
+                .node(0)
+                .build_transaction(UpdateMethod::CommitteeSelectionBeaconReveal {
+                    reveal: [1; 32],
+                }),
+            network
+                .node(1)
+                .build_transaction(UpdateMethod::CommitteeSelectionBeaconReveal {
+                    reveal: [2; 32],
+                }),
+        ])
+        .await
+        .unwrap();
+    assert_eq!(resp.block_number, 6);
+
+    // Execute empty blocks to exceed the reveal phase timeout.
+    network.execute(vec![]).await.unwrap();
+    network.execute(vec![]).await.unwrap();
+
+    // Execute reveal timeout transaction to transition to a new commit phase.
+    let resp = network
+        .execute(vec![network.node(0).build_transaction(
+            UpdateMethod::CommitteeSelectionBeaconRevealPhaseTimeout,
+        )])
+        .await
+        .unwrap();
+    assert_eq!(resp.block_number, 9);
+
+    // Check that we have transitioned back to a new commit phase in a new round.
+    assert_eq!(
+        query.get_committee_selection_beacon_phase(),
+        Some(CommitteeSelectionBeaconPhase::Commit((10, 12)))
+    );
+    assert_eq!(query.get_committee_selection_beacon_round(), Some(1));
+
+    // Check that the non-revealing node has been slashed, while no other nodes have been slashed.
+    for i in 0..network.nodes.len() {
+        let node_index = i as NodeIndex;
+        if node_index == 2 {
+            assert_eq!(
+                query
+                    .get_node_info(&node_index, |n| n.stake.staked)
+                    .unwrap(),
+                500u64.into()
+            );
+        } else {
+            assert_eq!(
+                query
+                    .get_node_info(&node_index, |n| n.stake.staked)
+                    .unwrap(),
+                1000u64.into()
+            );
+        }
+    }
+
+    // Check that the node registry changes have been recorded.
+    assert_eq!(query.get_committee_members_by_index(), vec![0, 1, 3]);
+    assert_eq!(query.get_active_node_set(), HashSet::from([0, 1, 3]));
+    let node_registry_changes = query
+        .get_committee_info(&epoch, |c| c.node_registry_changes)
+        .unwrap();
+    assert_eq!(node_registry_changes.len(), 2);
+    assert_eq!(
+        node_registry_changes[&9],
+        vec![(
+            network.node(2).keystore.get_ed25519_pk(),
+            NodeRegistryChange::Slashed((
+                500u64.into(),
+                Staking {
+                    staked: 500u64.into(),
+                    stake_locked_until: 0,
+                    locked: 0u64.into(),
+                    locked_until: 0,
+                },
+                NodeRegistryChangeSlashReason::CommitteeBeaconNonReveal,
+            )),
+        )]
+    );
+
+    // Check that the node registry changes are included on the block response.
+    assert_eq!(resp.node_registry_changes.len(), 1);
+    assert_eq!(
+        resp.node_registry_changes,
+        vec![(
+            network.node(2).keystore.get_ed25519_pk(),
+            NodeRegistryChange::Slashed((
+                500u64.into(),
+                Staking {
+                    staked: 500u64.into(),
+                    stake_locked_until: 0,
+                    locked: 0u64.into(),
+                    locked_until: 0,
+                },
+                NodeRegistryChangeSlashReason::CommitteeBeaconNonReveal,
+            )),
+        )]
+    );
+
+    // Execute commit transaction from the previously non-participating node, and check that it's
+    // successful.
+    let resp = network
+        .execute(vec![network.node(3).build_transaction(
+            UpdateMethod::CommitteeSelectionBeaconCommit {
+                commit: CommitteeSelectionBeaconCommit::build(epoch, 1, [14; 32]),
+            },
+        )])
+        .await
+        .unwrap();
+    assert_eq!(resp.block_number, 10);
+
+    // Execute commit transaction from the non-revealing node, and check that it's reverted.
+    let resp = network
+        .maybe_execute(vec![network.node(2).build_transaction(
+            UpdateMethod::CommitteeSelectionBeaconCommit {
+                commit: CommitteeSelectionBeaconCommit::build(epoch, 1, [13; 32]),
+            },
+        )])
+        .await
+        .unwrap();
+    assert_eq!(resp.block_number, 11);
+    assert_eq!(
+        resp.txn_receipts[0].response,
+        TransactionResponse::Revert(ExecutionError::InsufficientStake)
+    );
+}
+
+#[tokio::test]
+async fn test_committee_beacon_non_revealing_node_partially_slashed_sufficient_stake() {
+    let network = TestNetwork::builder()
+        .with_non_reveal_slash_amount(500)
+        .with_min_stake(500)
+        // The node's initial stake is 1000, and it will be slashed 500, leaving sufficient stake
+        // for a node.
+        .with_committee_nodes(4)
+        .build()
+        .await
+        .unwrap();
+    let query = network.query();
+
+    // Check the initial stake of all nodes.
+    for i in 0..network.nodes.len() {
+        let node_index = i as NodeIndex;
+        assert_eq!(
+            query
+                .get_node_info(&node_index, |n| n.stake.staked)
+                .unwrap(),
+            1000u64.into()
+        );
+    }
+
+    // Execute epoch change transactions from committee nodes.
+    let epoch = query.get_current_epoch();
+    let resp = network.execute_change_epoch(epoch).await.unwrap();
+    assert_eq!(resp.block_number, 1);
+    assert!(!resp.change_epoch);
+
+    // Check that we have transitioned to the commit phase.
+    assert_eq!(
+        query.get_committee_selection_beacon_phase(),
+        Some(CommitteeSelectionBeaconPhase::Commit((1, 3)))
+    );
+    assert_eq!(query.get_committee_selection_beacon_round(), Some(0));
+
+    // Execute commit transactions from 2/3+1 committee nodes (sufficient to start reveal phase).
+    let resp = network
+        .execute(vec![
+            network
+                .node(0)
+                .build_transaction(UpdateMethod::CommitteeSelectionBeaconCommit {
+                    commit: CommitteeSelectionBeaconCommit::build(epoch, 0, [1; 32]),
+                }),
+            network
+                .node(1)
+                .build_transaction(UpdateMethod::CommitteeSelectionBeaconCommit {
+                    commit: CommitteeSelectionBeaconCommit::build(epoch, 0, [2; 32]),
+                }),
+            network
+                .node(2)
+                .build_transaction(UpdateMethod::CommitteeSelectionBeaconCommit {
+                    commit: CommitteeSelectionBeaconCommit::build(epoch, 0, [3; 32]),
+                }),
+        ])
+        .await
+        .unwrap();
+    assert_eq!(resp.block_number, 2);
+
+    // Execute empty blocks to exceed the commit phase timeout.
+    network.execute(vec![]).await.unwrap();
+    network.execute(vec![]).await.unwrap();
+
+    // Execute commit timeout transaction to transition to the reveal phase.
+    let resp = network
+        .execute(vec![network.node(0).build_transaction(
+            UpdateMethod::CommitteeSelectionBeaconCommitPhaseTimeout,
+        )])
+        .await
+        .unwrap();
+    assert_eq!(resp.block_number, 5);
+
+    // Check that we have transitioned to the reveal phase.
+    assert_eq!(
+        query.get_committee_selection_beacon_phase(),
+        Some(CommitteeSelectionBeaconPhase::Reveal((6, 8)))
+    );
+    assert_eq!(query.get_committee_selection_beacon_round(), Some(0));
+
+    // Execute reveal transactions from 2 of the 3 nodes that committed, leaving 1
+    // non-revealing node, and 1 non-participating node.
+    let resp = network
+        .execute(vec![
+            network
+                .node(0)
+                .build_transaction(UpdateMethod::CommitteeSelectionBeaconReveal {
+                    reveal: [1; 32],
+                }),
+            network
+                .node(1)
+                .build_transaction(UpdateMethod::CommitteeSelectionBeaconReveal {
+                    reveal: [2; 32],
+                }),
+        ])
+        .await
+        .unwrap();
+    assert_eq!(resp.block_number, 6);
+
+    // Execute empty blocks to exceed the reveal phase timeout.
+    network.execute(vec![]).await.unwrap();
+    network.execute(vec![]).await.unwrap();
+
+    // Execute reveal timeout transaction to transition to a new commit phase.
+    let resp = network
+        .execute(vec![network.node(0).build_transaction(
+            UpdateMethod::CommitteeSelectionBeaconRevealPhaseTimeout,
+        )])
+        .await
+        .unwrap();
+    assert_eq!(resp.block_number, 9);
+
+    // Check that we have transitioned back to a new commit phase in a new round.
+    assert_eq!(
+        query.get_committee_selection_beacon_phase(),
+        Some(CommitteeSelectionBeaconPhase::Commit((10, 12)))
+    );
+    assert_eq!(query.get_committee_selection_beacon_round(), Some(1));
+
+    // Check that the non-revealing node has been slashed, while no other nodes have been slashed.
+    for i in 0..network.nodes.len() {
+        let node_index = i as NodeIndex;
+        if node_index == 2 {
+            assert_eq!(
+                query
+                    .get_node_info(&node_index, |n| n.stake.staked)
+                    .unwrap(),
+                500u64.into()
+            );
+        } else {
+            assert_eq!(
+                query
+                    .get_node_info(&node_index, |n| n.stake.staked)
+                    .unwrap(),
+                1000u64.into()
+            );
+        }
+    }
+
+    // Check that the non-revealing node has NOT been removed from the committee or active node set.
+    assert_eq!(query.get_committee_members_by_index(), vec![0, 1, 2, 3]);
+    assert_eq!(query.get_active_node_set(), HashSet::from([0, 1, 2, 3]));
+
+    // Check that the node registry changes were recorded.
+    let node_registry_changes = query
+        .get_committee_info(&epoch, |c| c.node_registry_changes)
+        .unwrap();
+    let expected_changes = vec![(
+        network.node(2).keystore.get_ed25519_pk(),
+        NodeRegistryChange::Slashed((
+            500u64.into(),
+            Staking {
+                staked: 500u64.into(),
+                stake_locked_until: 0,
+                locked: 0u64.into(),
+                locked_until: 0,
+            },
+            NodeRegistryChangeSlashReason::CommitteeBeaconNonReveal,
+        )),
+    )];
+    assert_eq!(node_registry_changes[&9], expected_changes);
+    assert_eq!(resp.node_registry_changes, expected_changes);
 
     // Execute commit transaction from the previously non-participating node, and check that it's
     // successful.

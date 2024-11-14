@@ -957,6 +957,8 @@ pub struct TestNetworkBuilder {
     commit_phase_duration: u64,
     reveal_phase_duration: u64,
     stake_lock_time: u64,
+    non_reveal_slash_amount: u64,
+    min_stake: u64,
     genesis_mutator: Option<GenesisMutator>,
 }
 
@@ -976,6 +978,8 @@ impl TestNetworkBuilder {
             commit_phase_duration: 2,
             reveal_phase_duration: 2,
             stake_lock_time: 5,
+            non_reveal_slash_amount: 1000,
+            min_stake: 1000,
             genesis_mutator: None,
         }
     }
@@ -1002,6 +1006,16 @@ impl TestNetworkBuilder {
 
     pub fn with_stake_lock_time(mut self, stake_lock_time: u64) -> Self {
         self.stake_lock_time = stake_lock_time;
+        self
+    }
+
+    pub fn with_non_reveal_slash_amount(mut self, non_reveal_slash_amount: u64) -> Self {
+        self.non_reveal_slash_amount = non_reveal_slash_amount;
+        self
+    }
+
+    pub fn with_min_stake(mut self, min_stake: u64) -> Self {
+        self.min_stake = min_stake;
         self
     }
 
@@ -1033,14 +1047,19 @@ impl TestNetworkBuilder {
 
         let chain_id = 1337;
         let stake_lock_time = self.stake_lock_time;
+        let min_stake = self.min_stake;
         let commit_phase_duration = self.commit_phase_duration;
         let reveal_phase_duration = self.reveal_phase_duration;
+        let non_reveal_slash_amount = self.non_reveal_slash_amount;
         let mut builder = TestGenesisBuilder::new()
             .with_chain_id(chain_id)
             .with_mutator(Arc::new(move |genesis: &mut Genesis| {
                 genesis.lock_time = stake_lock_time;
+                genesis.min_stake = min_stake;
                 genesis.committee_selection_beacon_commit_phase_duration = commit_phase_duration;
                 genesis.committee_selection_beacon_reveal_phase_duration = reveal_phase_duration;
+                genesis.committee_selection_beacon_non_reveal_slash_amount =
+                    non_reveal_slash_amount;
             }));
 
         let mut nodes = vec![];

@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::time::Duration;
 
 use anyhow::Result;
@@ -80,10 +81,8 @@ impl TestNetwork {
     /// This method uses the first node in the network to get the current epoch and committee.
     pub fn committee_nodes(&self) -> Vec<&BoxedTestNode> {
         let node = self.node(0);
-        let epoch = node.app_query().get_current_epoch();
         node.app_query()
-            .get_committee_info(&epoch, |committee| committee.members)
-            .unwrap_or_default()
+            .get_committee_members_by_index()
             .into_iter()
             .map(|index| self.node(index))
             .collect()
@@ -94,11 +93,11 @@ impl TestNetwork {
     /// This method uses the first node in the network to get the current epoch and committee.
     pub fn non_committee_nodes(&self) -> Vec<&BoxedTestNode> {
         let node = self.node(0);
-        let epoch = node.app_query().get_current_epoch();
         let committee_nodes = node
             .app_query()
-            .get_committee_info(&epoch, |committee| committee.members)
-            .unwrap_or_default();
+            .get_committee_members_by_index()
+            .into_iter()
+            .collect::<HashSet<_>>();
         self.nodes()
             .filter(|node| !committee_nodes.contains(&node.index()))
             .collect()
