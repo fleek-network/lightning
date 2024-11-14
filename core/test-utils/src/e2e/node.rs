@@ -140,7 +140,11 @@ impl<C: NodeComponents> TestNetworkNode for TestFullNode<C> {
     }
 
     async fn shutdown(self: Box<Self>) {
-        self.inner.shutdown().await;
+        tokio::time::timeout(Duration::from_secs(30), async move {
+            self.inner.shutdown().await;
+        })
+        .await
+        .unwrap();
     }
 
     async fn get_node_ports(&self) -> Result<NodePorts> {
