@@ -83,7 +83,10 @@ impl ApplicationEnv {
                 let app = ApplicationState::executor(ctx);
                 let last_block_hash = app.get_block_hash();
 
-                let block_number = app.get_block_number() + 1;
+                let last_block_number = app.get_block_number();
+                let block_number = last_block_number + 1;
+
+                let committee_before_execution = app.get_current_committee();
 
                 // Create block response
                 let mut response = BlockExecutionResponse {
@@ -134,19 +137,28 @@ impl ApplicationEnv {
                 }
 
                 // Update node registry changes on the response if there were any for this block.
-                if let Some(committee) = app.get_current_committee() {
+                let committee = app.get_current_committee();
+                if let Some(committee) = &committee {
                     if let Some(changes) = committee.node_registry_changes.get(&block_number) {
                         response.node_registry_changes = changes.clone();
                     }
                 }
 
+                // If the committee changed, advance to the next epoch era.
+                let has_committee_members_changes =
+                    committee_before_execution.map(|c| c.members) != committee.map(|c| c.members);
+                if has_committee_members_changes {
+                    app.set_epoch_era(app.get_epoch_era() + 1);
+                }
+
                 // Set the last executed block hash and sub dag index
                 // if epoch changed a new committee starts and subdag starts back at 0
-                let (new_sub_dag_index, new_sub_dag_round) = if response.change_epoch {
-                    (0, 0)
-                } else {
-                    (block.sub_dag_index, block.sub_dag_round)
-                };
+                let (new_sub_dag_index, new_sub_dag_round) =
+                    if response.change_epoch || has_committee_members_changes {
+                        (0, 0)
+                    } else {
+                        (block.sub_dag_index, block.sub_dag_round)
+                    };
                 app.set_last_block(response.block_hash, new_sub_dag_index, new_sub_dag_round);
 
                 // Set the new state root on the response.
@@ -457,6 +469,7 @@ impl ApplicationEnv {
             }
 
             metadata_table.insert(Metadata::Epoch, Value::Epoch(0));
+            metadata_table.insert(Metadata::EpochEra, Value::EpochEra(0));
 
             tracing::info!("Genesis block loaded into application state.");
             Ok(true)

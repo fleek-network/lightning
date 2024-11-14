@@ -116,7 +116,7 @@ fn test_ring_buffer_epoch_change() {
     // Since the pending parcel was sent from a committee member (2), it be marked as valid after
     // the epoch change.
     let new_committee = vec![0, 1, 2, 3];
-    ring_buffer.change_epoch(&new_committee);
+    ring_buffer.change_committee(&new_committee);
     assert_eq!(
         ring_buffer.get_parcel(&digest).unwrap().inner.to_digest(),
         digest
@@ -124,7 +124,7 @@ fn test_ring_buffer_epoch_change() {
 
     // We keep track of parcels from the previous epoch, so the parcel should still be available.
     let new_committee = vec![0, 5, 4, 3];
-    ring_buffer.change_epoch(&new_committee);
+    ring_buffer.change_committee(&new_committee);
 
     assert_eq!(
         ring_buffer.get_parcel(&digest).unwrap().inner.to_digest(),
@@ -133,7 +133,7 @@ fn test_ring_buffer_epoch_change() {
 
     // But now it should be garbage collected
     let new_committee = vec![0, 2, 1, 3];
-    ring_buffer.change_epoch(&new_committee);
+    ring_buffer.change_committee(&new_committee);
 
     assert!(ring_buffer.get_parcel(&digest).is_none());
 }
@@ -156,7 +156,7 @@ fn test_ring_buffer_invalid_parcel() {
     // The parcel originator (8) is not on the new committee, so the parcel should be marked as
     // invalid and removed.
     let new_committee = vec![0, 1, 2, 3];
-    ring_buffer.change_epoch(&new_committee);
+    ring_buffer.change_committee(&new_committee);
     assert!(ring_buffer.get_parcel(&digest).is_none());
 }
 

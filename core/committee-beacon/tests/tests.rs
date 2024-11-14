@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
 use anyhow::Result;
@@ -14,6 +14,8 @@ use lightning_test_utils::consensus::MockConsensusConfig;
 use lightning_test_utils::e2e::{
     DowncastToTestFullNode,
     TestFullNodeComponentsWithMockConsensus,
+    TestFullNodeComponentsWithRealConsensus,
+    TestFullNodeComponentsWithRealConsensusWithoutCommitteeBeacon,
     TestFullNodeComponentsWithoutCommitteeBeacon,
     TestNetwork,
     TestNodeBuilder,
@@ -28,6 +30,10 @@ use types::{
     ExecuteTransactionOptions,
     ExecuteTransactionRetry,
     ExecutionError,
+    NodeIndex,
+    NodeRegistryChange,
+    NodeRegistryChangeSlashReason,
+    Staking,
     TransactionReceipt,
     TransactionResponse,
 };
@@ -300,8 +306,227 @@ async fn test_insufficient_participation_in_commit_phase() {
 #[tokio::test]
 async fn test_single_revealing_node_fully_slashed() {
     let mut network = build_network(BuildNetworkOptions {
-        committee_nodes: 1,
+        real_consensus: true,
+        committee_nodes: 4,
         committee_nodes_without_beacon: 1,
+        // The node's initial stake is 1000, and it will be slashed 1000, leaving insufficient stake
+        // for a node.
+        commit_phase_duration: 10,
+        reveal_phase_duration: 10,
+        ping_interval: Some(Duration::from_secs(1)),
+        ..Default::default()
+    })
+    .await
+    .unwrap();
+
+    // Check that all the nodes are in the initial committee and active node set.
+    for node in network.nodes() {
+        assert_eq!(
+            node.app_query().get_committee_members_by_index(),
+            vec![0, 1, 2, 3, 4]
+        );
+        assert_eq!(
+            node.app_query().get_active_node_set(),
+            HashSet::from([0, 1, 2, 3, 4])
+        );
+    }
+
+    // Execute epoch change transactions from all nodes.
+    let epoch = network.node(0).app_query().get_current_epoch();
+    network.change_epoch().await.unwrap();
+
+    // Wait for the phase metadata to be set.
+    // This should not be necessary but it seems that the data is not always immediately available
+    // from the app state query runner after the block is executed.
+    wait_for_committee_selection_beacon_phase(&network, |phase| phase.is_some())
+        .await
+        .unwrap();
+
+    // Submit commit transaction from the node that will be non-revealing.
+    // We do this manually because the node does not have a committee beacon component running,
+    // where all other nodes do.
+    let non_revealing_node = network.node(4);
+    non_revealing_node
+        .execute_transaction_from_node(
+            UpdateMethod::CommitteeSelectionBeaconCommit {
+                commit: [0; 32].into(),
+            },
+            None,
+        )
+        .await
+        .unwrap();
+
+    // Get the current round.
+    let round = network
+        .node(0)
+        .app_query()
+        .get_committee_selection_beacon_round()
+        .unwrap();
+
+    // Wait to transition to the reveal phase.
+    wait_for_committee_selection_beacon_phase(&network, |phase| {
+        matches!(phase, Some(CommitteeSelectionBeaconPhase::Reveal(_)))
+    })
+    .await
+    .unwrap();
+
+    // Check that we transition to a new commit phase after reveal phase timeout.
+    wait_for_committee_selection_beacon_phase(&network, |phase| {
+        matches!(phase, Some(CommitteeSelectionBeaconPhase::Commit(_)))
+    })
+    .await
+    .unwrap();
+
+    // Get reputation measurements so that we can check that the non-revealing node is no longer
+    // being monitored later.
+    let prev_reputation_measurements_by_node = network
+        .nodes()
+        .map(|n| (n.index(), n.reputation_query().get_measurements()))
+        .collect::<HashMap<_, _>>();
+
+    for node in network.nodes() {
+        // Check that we are in a new round.
+        assert_eq!(
+            node.app_query().get_committee_selection_beacon_round(),
+            Some(round + 1)
+        );
+
+        // Check that the epoch has not changed.
+        assert_eq!(node.app_query().get_current_epoch(), epoch);
+
+        // Check that the non-revealing node has been slashed, and the other has not.
+        for i in 0..network.nodes().count() {
+            let node_index = i as NodeIndex;
+            if node_index == 4 {
+                assert_eq!(
+                    node.app_query()
+                        .get_node_info(&node_index, |n| n.stake.staked)
+                        .unwrap(),
+                    0u64.into()
+                );
+            } else {
+                assert_eq!(
+                    node.app_query()
+                        .get_node_info(&node_index, |n| n.stake.staked)
+                        .unwrap(),
+                    1000u64.into()
+                );
+            }
+        }
+
+        // Check that the node registry changes have been recorded.
+        assert_eq!(
+            node.app_query().get_committee_members_by_index(),
+            vec![0, 1, 2, 3]
+        );
+        let node_registry_changes = node
+            .app_query()
+            .get_committee_info(&epoch, |c| c.node_registry_changes)
+            .unwrap();
+        assert_eq!(node_registry_changes.len(), 2);
+        assert_eq!(
+            *node_registry_changes.iter().last().unwrap().1,
+            vec![(
+                network.node(4).get_node_public_key(),
+                NodeRegistryChange::Slashed((
+                    1000u64.into(),
+                    Staking {
+                        staked: 0u64.into(),
+                        stake_locked_until: 0,
+                        locked: 0u64.into(),
+                        locked_until: 0,
+                    },
+                    NodeRegistryChangeSlashReason::CommitteeBeaconNonReveal,
+                )),
+            )]
+        );
+    }
+
+    // Submit commit transaction from the non-revealing node and check that it's reverted.
+    let error = non_revealing_node
+        .execute_transaction_from_node(
+            UpdateMethod::CommitteeSelectionBeaconCommit {
+                commit: [0; 32].into(),
+            },
+            None,
+        )
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(
+            error,
+            ExecuteTransactionError::Reverted((
+                _,
+                TransactionReceipt {
+                    response: TransactionResponse::Revert(ExecutionError::InsufficientStake),
+                    ..
+                },
+                _
+            ))
+        ),
+        "{}",
+        error
+    );
+
+    // Sleep for a few seconds so that the pinger has time to send pings.
+    tokio::time::sleep(Duration::from_secs(3)).await;
+
+    // Check that the non-revealing node is no longer being monitored while all others are still
+    // being monitored.
+    for from_node in network.nodes() {
+        let from_node_index = from_node.index();
+
+        let prev_reputation_measurements = &prev_reputation_measurements_by_node[&from_node_index];
+
+        // Get the new reputation measurements.
+        let new_reputation_measurements = from_node.reputation_query().get_measurements();
+
+        for to_node in network.nodes() {
+            let to_node_index = to_node.index();
+
+            if from_node_index == to_node_index {
+                continue;
+            }
+
+            if to_node_index == 4 {
+                // The non-revealing node should have no new interactions.
+                assert_eq!(
+                    new_reputation_measurements[&to_node_index].interactions,
+                    prev_reputation_measurements[&to_node_index].interactions,
+                    "expected no interactions for non-revealing node {} from node {}",
+                    to_node_index,
+                    from_node_index,
+                );
+            } else {
+                // The other nodes should have new interactions.
+                assert_ne!(
+                    new_reputation_measurements[&to_node_index].interactions,
+                    prev_reputation_measurements[&to_node_index].interactions,
+                    "expected new interactions for node {} from node {}",
+                    to_node_index,
+                    from_node_index,
+                );
+            }
+        }
+    }
+
+    // Shutdown the nodes.
+    network.shutdown().await;
+}
+
+#[tokio::test]
+async fn test_non_revealing_node_partially_slashed_insufficient_stake() {
+    let mut network = build_network(BuildNetworkOptions {
+        committee_nodes: 4,
+        committee_nodes_without_beacon: 1,
+        // The node's initial stake is 1000, and it will be slashed 500, leaving insufficient stake
+        // for a node.
+        min_stake: 1000,
+        non_reveal_slash_amount: 500,
+        commit_phase_duration: 10,
+        reveal_phase_duration: 10,
+        real_consensus: true,
+        ping_interval: Some(Duration::from_secs(1)),
         ..Default::default()
     })
     .await
@@ -320,7 +545,201 @@ async fn test_single_revealing_node_fully_slashed() {
 
     // Submit commit transaction from the node that will be non-revealing.
     network
-        .node(1)
+        .node(4)
+        .execute_transaction_from_node(
+            UpdateMethod::CommitteeSelectionBeaconCommit {
+                commit: [0; 32].into(),
+            },
+            None,
+        )
+        .await
+        .unwrap();
+
+    // Get the current round.
+    let round = network
+        .node(0)
+        .app_query()
+        .get_committee_selection_beacon_round()
+        .unwrap();
+
+    // Wait to transition to the reveal phase.
+    wait_for_committee_selection_beacon_phase(&network, |phase| {
+        matches!(phase, Some(CommitteeSelectionBeaconPhase::Reveal(_)))
+    })
+    .await
+    .unwrap();
+
+    // Check that we transition to a new commit phase after the reveal phase timeout.
+    wait_for_committee_selection_beacon_phase(&network, |phase| {
+        matches!(phase, Some(CommitteeSelectionBeaconPhase::Commit(_)))
+    })
+    .await
+    .unwrap();
+
+    // Get reputation measurements so that we can check that the non-revealing node is no longer
+    // being monitored later.
+    let prev_reputation_measurements_by_node = network
+        .nodes()
+        .map(|n| (n.index(), n.reputation_query().get_measurements()))
+        .collect::<HashMap<_, _>>();
+
+    // Check that we are in a new round.
+    assert_eq!(
+        network
+            .node(0)
+            .app_query()
+            .get_committee_selection_beacon_round(),
+        Some(round + 1)
+    );
+
+    // Check that the epoch has not changed.
+    for node in network.nodes() {
+        assert_eq!(node.app_query().get_current_epoch(), epoch);
+    }
+
+    for node in network.nodes() {
+        // Check that the non-revealing node has been slashed, and the other has not.
+        assert_eq!(
+            node.app_query()
+                .get_node_info(&4, |n| n.stake.staked)
+                .unwrap(),
+            500u64.into()
+        );
+        assert_eq!(
+            node.app_query()
+                .get_node_info(&0, |n| n.stake.staked)
+                .unwrap(),
+            1000u64.into()
+        );
+
+        // Check that the node registry changes have been recorded.
+        assert_eq!(
+            node.app_query().get_committee_members_by_index(),
+            vec![0, 1, 2, 3]
+        );
+        let node_registry_changes = node
+            .app_query()
+            .get_committee_info(&epoch, |c| c.node_registry_changes)
+            .unwrap();
+        assert_eq!(node_registry_changes.len(), 2);
+        assert_eq!(
+            *node_registry_changes.iter().last().unwrap().1,
+            vec![(
+                network.node(4).get_node_public_key(),
+                NodeRegistryChange::Slashed((
+                    500u64.into(),
+                    Staking {
+                        staked: 500u64.into(),
+                        stake_locked_until: 0,
+                        locked: 0u64.into(),
+                        locked_until: 0,
+                    },
+                    NodeRegistryChangeSlashReason::CommitteeBeaconNonReveal,
+                )),
+            )]
+        );
+    }
+
+    // Submit commit transaction from the non-revealing node and check that it's reverted.
+    let result = network
+        .node(4)
+        .execute_transaction_from_node(
+            UpdateMethod::CommitteeSelectionBeaconCommit {
+                commit: [0; 32].into(),
+            },
+            None,
+        )
+        .await;
+    assert!(matches!(
+        result,
+        Err(ExecuteTransactionError::Reverted((
+            _,
+            TransactionReceipt {
+                response: TransactionResponse::Revert(ExecutionError::InsufficientStake),
+                ..
+            },
+            _
+        )))
+    ));
+
+    // Sleep for a few seconds so that the pinger has time to send pings.
+    tokio::time::sleep(Duration::from_secs(3)).await;
+
+    // Check that the non-revealing node is no longer being monitored while all others are still
+    // being monitored.
+    for from_node in network.nodes() {
+        let from_node_index = from_node.index();
+
+        let prev_reputation_measurements = &prev_reputation_measurements_by_node[&from_node_index];
+
+        // Get the new reputation measurements.
+        let new_reputation_measurements = from_node.reputation_query().get_measurements();
+
+        for to_node in network.nodes() {
+            let to_node_index = to_node.index();
+
+            if from_node_index == to_node_index {
+                continue;
+            }
+
+            if to_node_index == 4 {
+                // The non-revealing node should have no new interactions.
+                assert_eq!(
+                    new_reputation_measurements[&to_node_index].interactions,
+                    prev_reputation_measurements[&to_node_index].interactions,
+                    "expected no interactions for non-revealing node {} from node {}",
+                    to_node_index,
+                    from_node_index,
+                );
+            } else {
+                // The other nodes should have new interactions.
+                assert_ne!(
+                    new_reputation_measurements[&to_node_index].interactions,
+                    prev_reputation_measurements[&to_node_index].interactions,
+                    "expected new interactions for node {} from node {}",
+                    to_node_index,
+                    from_node_index,
+                );
+            }
+        }
+    }
+
+    // Shutdown the nodes.
+    network.shutdown().await;
+}
+
+#[tokio::test]
+async fn test_non_revealing_node_partially_slashed_sufficient_stake() {
+    let mut network = build_network(BuildNetworkOptions {
+        committee_nodes: 4,
+        committee_nodes_without_beacon: 1,
+        // The node's initial stake is 1000, and it will be slashed 500, leaving sufficient stake
+        // for a node.
+        min_stake: 500,
+        non_reveal_slash_amount: 500,
+        commit_phase_duration: 10,
+        reveal_phase_duration: 10,
+        real_consensus: true,
+        ping_interval: Some(Duration::from_secs(1)),
+        ..Default::default()
+    })
+    .await
+    .unwrap();
+
+    // Execute epoch change transactions from all nodes.
+    let epoch = network.node(0).app_query().get_current_epoch();
+    network.change_epoch().await.unwrap();
+
+    // Wait for the phase metadata to be set.
+    // This should not be necessary but it seems that the data is not always immediately available
+    // from the app state query runner after the block is executed.
+    wait_for_committee_selection_beacon_phase(&network, |phase| phase.is_some())
+        .await
+        .unwrap();
+
+    // Submit commit transaction from the node that will be non-revealing.
+    network
+        .node(4)
         .execute_transaction_from_node(
             UpdateMethod::CommitteeSelectionBeaconCommit {
                 commit: [0; 32].into(),
@@ -351,6 +770,13 @@ async fn test_single_revealing_node_fully_slashed() {
     .await
     .unwrap();
 
+    // Get reputation measurements so that we can check that the non-revealing node is still being
+    // monitored since still has sufficient stake to be active.
+    let prev_reputation_measurements_by_node = network
+        .nodes()
+        .map(|n| (n.index(), n.reputation_query().get_measurements()))
+        .collect::<HashMap<_, _>>();
+
     // Check that we are in a new round.
     assert_eq!(
         network
@@ -363,6 +789,102 @@ async fn test_single_revealing_node_fully_slashed() {
     // Check that the epoch has not changed.
     for node in network.nodes() {
         assert_eq!(node.app_query().get_current_epoch(), epoch);
+    }
+
+    for node in network.nodes() {
+        // Check that the non-revealing node has been slashed, and the other has not.
+        assert_eq!(
+            node.app_query()
+                .get_node_info(&4, |n| n.stake.staked)
+                .unwrap(),
+            500u64.into()
+        );
+        assert_eq!(
+            node.app_query()
+                .get_node_info(&0, |n| n.stake.staked)
+                .unwrap(),
+            1000u64.into()
+        );
+
+        // Check that the active set includes all nodes.
+        assert_eq!(
+            node.app_query().get_committee_members_by_index(),
+            vec![0, 1, 2, 3, 4]
+        );
+        let node_registry_changes = node
+            .app_query()
+            .get_committee_info(&epoch, |c| c.node_registry_changes)
+            .unwrap();
+        assert_eq!(
+            *node_registry_changes.iter().last().unwrap().1,
+            vec![(
+                network.node(4).get_node_public_key(),
+                NodeRegistryChange::Slashed((
+                    500u64.into(),
+                    Staking {
+                        staked: 500u64.into(),
+                        stake_locked_until: 0,
+                        locked: 0u64.into(),
+                        locked_until: 0,
+                    },
+                    NodeRegistryChangeSlashReason::CommitteeBeaconNonReveal,
+                )),
+            )]
+        );
+    }
+
+    // Submit commit transaction from the non-revealing node and check that it's reverted.
+    let result = network
+        .node(4)
+        .execute_transaction_from_node(
+            UpdateMethod::CommitteeSelectionBeaconCommit {
+                commit: [0; 32].into(),
+            },
+            None,
+        )
+        .await;
+    assert!(matches!(
+        result,
+        Err(ExecuteTransactionError::Reverted((
+            _,
+            TransactionReceipt {
+                response: TransactionResponse::Revert(
+                    ExecutionError::CommitteeSelectionBeaconNonRevealingNode
+                ),
+                ..
+            },
+            _
+        )))
+    ));
+
+    // Wait a few seconds so that the pinger has time to send pings.
+    tokio::time::sleep(Duration::from_secs(3)).await;
+
+    // Check that the non-revealing node is still being monitored, along with all other nodes.
+    for from_node in network.nodes() {
+        let from_node_index = from_node.index();
+
+        let prev_reputation_measurements = &prev_reputation_measurements_by_node[&from_node_index];
+
+        // Get the new reputation measurements.
+        let new_reputation_measurements = from_node.reputation_query().get_measurements();
+
+        for to_node in network.nodes() {
+            let to_node_index = to_node.index();
+
+            if from_node_index == to_node_index {
+                continue;
+            }
+
+            // The other nodes should have new interactions.
+            assert_ne!(
+                new_reputation_measurements[&to_node_index].interactions,
+                prev_reputation_measurements[&to_node_index].interactions,
+                "expected new interactions for node {} from node {}",
+                to_node_index,
+                from_node_index,
+            );
+        }
     }
 
     // Shutdown the nodes.
@@ -479,6 +1001,10 @@ pub struct BuildNetworkOptions {
     pub reveal_phase_duration: u64,
     pub committee_beacon_timer_tick_delay: Duration,
     pub consensus_buffer_interval: Duration,
+    pub min_stake: u64,
+    pub non_reveal_slash_amount: u64,
+    pub real_consensus: bool,
+    pub ping_interval: Option<Duration>,
 }
 
 impl Default for BuildNetworkOptions {
@@ -490,6 +1016,10 @@ impl Default for BuildNetworkOptions {
             reveal_phase_duration: 3,
             committee_beacon_timer_tick_delay: Duration::from_millis(200),
             consensus_buffer_interval: Duration::from_millis(200),
+            min_stake: 1000,
+            non_reveal_slash_amount: 1000,
+            real_consensus: false,
+            ping_interval: None,
         }
     }
 }
@@ -502,8 +1032,16 @@ async fn build_network(options: BuildNetworkOptions) -> Result<TestNetwork> {
         ..Default::default()
     };
 
-    let mut builder = TestNetwork::builder()
-        .with_mock_consensus(MockConsensusConfig {
+    let mut builder = TestNetwork::builder();
+
+    if let Some(ping_interval) = options.ping_interval {
+        builder = builder.with_ping_interval(ping_interval);
+    }
+
+    if options.real_consensus {
+        builder = builder.with_real_consensus();
+    } else {
+        builder = builder.with_mock_consensus(MockConsensusConfig {
             max_ordering_time: 0,
             min_ordering_time: 0,
             probability_txn_lost: 0.0,
@@ -512,25 +1050,60 @@ async fn build_network(options: BuildNetworkOptions) -> Result<TestNetwork> {
             block_buffering_interval: options.consensus_buffer_interval,
             forwarder_transaction_to_error: Default::default(),
         })
-        .with_committee_beacon_config(committee_beacon_config.clone())
-        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(options.committee_nodes)
-        .await
-        .with_genesis_mutator(move |genesis| {
-            genesis.committee_selection_beacon_commit_phase_duration =
-                options.commit_phase_duration;
-            genesis.committee_selection_beacon_reveal_phase_duration =
-                options.reveal_phase_duration;
-        });
+    }
 
-    let consensus_group = builder.mock_consensus_group();
+    builder = builder.with_committee_beacon_config(committee_beacon_config.clone());
 
-    for _ in 0..options.committee_nodes_without_beacon {
-        builder = builder.with_node(
-            TestNodeBuilder::new()
-                .with_mock_consensus(consensus_group.clone())
-                .build::<TestFullNodeComponentsWithoutCommitteeBeacon>(None)
-                .await?,
-        );
+    if options.real_consensus {
+        builder = builder
+            .with_committee_nodes::<TestFullNodeComponentsWithRealConsensus>(
+                options.committee_nodes,
+            )
+            .await;
+    } else {
+        builder = builder
+            .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(
+                options.committee_nodes,
+            )
+            .await;
+    }
+
+    builder = builder.with_genesis_mutator(move |genesis| {
+        genesis.committee_selection_beacon_commit_phase_duration = options.commit_phase_duration;
+        genesis.committee_selection_beacon_reveal_phase_duration = options.reveal_phase_duration;
+        genesis.min_stake = options.min_stake;
+        genesis.committee_selection_beacon_non_reveal_slash_amount =
+            options.non_reveal_slash_amount;
+    });
+
+    let mut i = builder.nodes.len();
+    if options.real_consensus {
+        for _ in 0..options.committee_nodes_without_beacon {
+            builder = builder.with_node(
+                TestNodeBuilder::new()
+                    .with_real_consensus()
+                    .build::<TestFullNodeComponentsWithRealConsensusWithoutCommitteeBeacon>(Some(
+                        format!("node-{}", i),
+                    ))
+                    .await?,
+            );
+            i += 1;
+        }
+    } else {
+        let consensus_group = builder.mock_consensus_group();
+
+        for _ in 0..options.committee_nodes_without_beacon {
+            builder = builder.with_node(
+                TestNodeBuilder::new()
+                    .with_mock_consensus(consensus_group.clone())
+                    .build::<TestFullNodeComponentsWithoutCommitteeBeacon>(Some(format!(
+                        "node-{}",
+                        i,
+                    )))
+                    .await?,
+            );
+            i += 1;
+        }
     }
 
     builder.build().await

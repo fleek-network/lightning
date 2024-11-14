@@ -173,6 +173,7 @@ impl<C: NodeComponents> PingerInner<C> {
         let mut cursor = 0;
         let mut pending_req: HashMap<(NodeIndex, u32), Instant> = HashMap::with_capacity(128);
         let mut epoch_changed_notifier = self.notifier.subscribe_epoch_changed();
+        let mut block_notifier = self.notifier.subscribe_block_executed();
 
         loop {
             tokio::select! {
@@ -262,6 +263,12 @@ impl<C: NodeComponents> PingerInner<C> {
                     info!("Configuring for new epoch");
                     node_registry = self.get_node_registry(&mut rng);
                     cursor = 0;
+                }
+                Some(notification) = block_notifier.recv() => {
+                    if !notification.response.node_registry_changes.is_empty() {
+                        node_registry = self.get_node_registry(&mut rng);
+                        cursor = 0;
+                    }
                 }
                 else => {
                     break;
