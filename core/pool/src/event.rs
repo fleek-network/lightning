@@ -418,7 +418,10 @@ where
                     task.abort();
                 }
                 self.ongoing_async_tasks.clear();
-                while !matches!(self.event_queue.try_recv(), Err(TryRecvError::Empty)) {}
+                while !matches!(
+                    self.event_queue.try_recv(),
+                    Err(TryRecvError::Empty | TryRecvError::Disconnected)
+                ) {}
             },
             "POOL: spawn"
         );
