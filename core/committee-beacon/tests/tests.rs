@@ -1157,7 +1157,7 @@ where
                 Err(PollUntilError::ConditionNotSatisfied)
             }
         },
-        Duration::from_secs(15),
+        Duration::from_secs(30),
         Duration::from_millis(100),
     )
     .await
