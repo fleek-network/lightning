@@ -20,7 +20,6 @@ use lightning_signer::Signer;
 use lightning_test_utils::consensus::{MockConsensus, MockConsensusConfig, MockForwarder};
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
-use lightning_utils::application::QueryRunnerExt;
 use tempfile::{tempdir, TempDir};
 
 use crate::{Config, DeliveryAcknowledgmentAggregator};

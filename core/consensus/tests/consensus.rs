@@ -3,7 +3,6 @@ use std::time::Duration;
 use futures::future::join_all;
 use lightning_interfaces::prelude::*;
 use lightning_test_utils::e2e::{TestFullNodeComponentsWithRealConsensus, TestNetwork};
-use lightning_utils::application::QueryRunnerExt;
 use lightning_utils::poll::{poll_until, PollUntilError};
 use types::{
     ExecuteTransactionError,

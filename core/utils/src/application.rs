@@ -5,7 +5,6 @@ use fleek_crypto::{EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
-    Epoch,
     EpochInfo,
     Metadata,
     NodeIndex,
@@ -16,7 +15,7 @@ use lightning_interfaces::types::{
     Value,
 };
 use lightning_interfaces::PagingParams;
-use types::{CommitteeSelectionBeaconPhase, Participation};
+use types::Participation;
 
 pub trait QueryRunnerExt: SyncQueryRunnerInterface {
     /// Returns the chain id
@@ -40,15 +39,6 @@ pub trait QueryRunnerExt: SyncQueryRunnerInterface {
         let epoch = self.get_current_epoch();
         self.get_committee_info(&epoch, |c| c.members)
             .unwrap_or_default()
-    }
-
-    /// Get Current Epoch
-    /// Returns just the current epoch
-    fn get_current_epoch(&self) -> Epoch {
-        match self.get_metadata(&Metadata::Epoch) {
-            Some(Value::Epoch(epoch)) => epoch,
-            _ => 0,
-        }
     }
 
     /// Get Current Epoch Info
@@ -281,15 +271,6 @@ pub trait QueryRunnerExt: SyncQueryRunnerInterface {
             Some(ProtocolParamValue::TopologyMinNodes(min_nodes)) => min_nodes,
             // Default to 16 for backwards compatibility.
             _ => 16,
-        }
-    }
-
-    /// Returns the current phase of the committee selection beacon.
-    fn get_committee_selection_beacon_phase(&self) -> Option<CommitteeSelectionBeaconPhase> {
-        match self.get_metadata(&Metadata::CommitteeSelectionBeaconPhase) {
-            Some(Value::CommitteeSelectionBeaconPhase(phase)) => Some(phase),
-            None => None,
-            _ => unreachable!("invalid committee selection beacon phase in metadata"),
         }
     }
 

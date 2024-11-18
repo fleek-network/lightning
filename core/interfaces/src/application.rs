@@ -14,6 +14,7 @@ use lightning_types::{
     ChainId,
     Committee,
     CommitteeSelectionBeaconCommit,
+    CommitteeSelectionBeaconPhase,
     CommitteeSelectionBeaconReveal,
     Genesis,
     NodeIndex,
@@ -118,6 +119,9 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     /// Query Metadata Table
     fn get_metadata(&self, key: &lightning_types::Metadata) -> Option<Value>;
 
+    /// Returns the current epoch
+    fn get_current_epoch(&self) -> Epoch;
+
     /// Query Account Table
     /// Returns information about an account.
     fn get_account_info<V>(
@@ -167,6 +171,9 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
         CommitteeSelectionBeaconCommit,
         Option<CommitteeSelectionBeaconReveal>,
     )>;
+
+    /// Returns the current committee selection beacon phase.
+    fn get_committee_selection_beacon_phase(&self) -> Option<CommitteeSelectionBeaconPhase>;
 
     /// Query Services Table
     /// Returns the service information for a given [`ServiceId`]

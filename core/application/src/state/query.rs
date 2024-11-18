@@ -20,6 +20,7 @@ use lightning_interfaces::types::{
     Blake3Hash,
     Committee,
     CommitteeSelectionBeaconCommit,
+    CommitteeSelectionBeaconPhase,
     CommitteeSelectionBeaconReveal,
     CommodityTypes,
     Epoch,
@@ -164,6 +165,14 @@ impl SyncQueryRunnerInterface for QueryRunner {
         self.inner.run(|ctx| self.metadata_table.get(ctx).get(key))
     }
 
+    /// Returns the current epoch.
+    fn get_current_epoch(&self) -> Epoch {
+        match self.get_metadata(&Metadata::Epoch) {
+            Some(Value::Epoch(epoch)) => epoch,
+            _ => 0,
+        }
+    }
+
     #[inline]
     fn get_account_info<V>(
         &self,
@@ -235,6 +244,15 @@ impl SyncQueryRunnerInterface for QueryRunner {
     )> {
         self.inner
             .run(|ctx| self.committee_selection_beacon.get(ctx).get(node))
+    }
+
+    /// Returns the current phase of the committee selection beacon.
+    fn get_committee_selection_beacon_phase(&self) -> Option<CommitteeSelectionBeaconPhase> {
+        match self.get_metadata(&Metadata::CommitteeSelectionBeaconPhase) {
+            Some(Value::CommitteeSelectionBeaconPhase(phase)) => Some(phase),
+            None => None,
+            _ => unreachable!("invalid committee selection beacon phase in metadata"),
+        }
     }
 
     fn get_service_info(&self, id: &ServiceId) -> Option<Service> {

@@ -29,7 +29,6 @@ use lightning_test_utils::e2e::{
     TestNetwork,
     TestNetworkNode,
 };
-use lightning_utils::application::QueryRunnerExt;
 use tempfile::tempdir;
 use utils::{
     create_genesis_committee,

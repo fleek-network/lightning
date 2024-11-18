@@ -1591,7 +1591,7 @@ impl<B: Backend> StateExecutor<B> {
         }
     }
 
-    fn get_epoch(&self) -> u64 {
+    pub fn get_epoch(&self) -> u64 {
         if let Some(Value::Epoch(epoch)) = self.metadata.get(&Metadata::Epoch) {
             epoch
         } else {

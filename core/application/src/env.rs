@@ -37,7 +37,7 @@ use merklize::trees::mpt::MptStateTree;
 use merklize::StateTree;
 use tokio::sync::Mutex;
 use tracing::warn;
-use types::{NodeRegistryChange, NodeRegistryChanges};
+use types::{CommitteeSelectionBeaconPhase, NodeRegistryChange, NodeRegistryChanges};
 
 use crate::config::ApplicationConfig;
 use crate::state::{ApplicationState, QueryRunner};
@@ -74,6 +74,10 @@ impl ApplicationEnv {
         F: FnOnce() -> P,
         P: IncrementalPutInterface,
     {
+        let query = self.query_runner();
+        let committee_beacon_phase_before_execution = query.get_committee_selection_beacon_phase();
+        let epoch_before_execution = query.get_current_epoch();
+
         let response = self
             .inner
             .run(move |ctx| {
@@ -160,6 +164,23 @@ impl ApplicationEnv {
             })
             .context("Failed to execute block")?
             .unwrap();
+
+        // Emit metric if the committee selection beacon phase changed.
+        let committee_beacon_phase_after_execution = query.get_committee_selection_beacon_phase();
+        if committee_beacon_phase_before_execution != committee_beacon_phase_after_execution {
+            let from_phase =
+                committee_selection_beacon_phase_tag_value(committee_beacon_phase_before_execution);
+            let to_phase =
+                committee_selection_beacon_phase_tag_value(committee_beacon_phase_after_execution);
+            let epoch = epoch_before_execution.to_string();
+            increment_counter!(
+                "committee_beacon_phase_changed",
+                Some("Counter for committee beacon phase changes"),
+                "from_phase" => from_phase.as_str(),
+                "to_phase" => to_phase.as_str(),
+                "epoch" => epoch.as_str()
+            );
+        }
 
         if response.change_epoch {
             increment_counter!(
@@ -512,4 +533,16 @@ impl<C: NodeComponents> WorkerTrait for UpdateWorker<C> {
             .await
             .expect("Failed to execute block")
     }
+}
+
+/// Returns the metric tag representation of a committee selection beacon phase.
+fn committee_selection_beacon_phase_tag_value(
+    phase: Option<CommitteeSelectionBeaconPhase>,
+) -> String {
+    match phase {
+        Some(CommitteeSelectionBeaconPhase::Commit(_)) => "Commit",
+        Some(CommitteeSelectionBeaconPhase::Reveal(_)) => "Reveal",
+        None => "None",
+    }
+    .to_string()
 }
