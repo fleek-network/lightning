@@ -36,6 +36,8 @@ mod tests {
     use triomphe::Arc;
 
     use super::*;
+    use crate::bucket::POSITION_START_HASHES;
+    use crate::hasher::b3::CHUNK_START;
     use crate::utils;
 
     #[tokio::test]
@@ -52,6 +54,7 @@ mod tests {
             .unwrap();
         let num_blocks = 10;
         let mut data = BytesMut::with_capacity(num_blocks as usize * KEY_LEN);
+        data.extend_from_slice(&[0; POSITION_START_HASHES]);
         for _ in 0..(num_blocks * 2) - 2 {
             data.extend_from_slice(&random::<[u8; KEY_LEN]>());
         }
@@ -60,10 +63,11 @@ mod tests {
         let file = fs::File::open(file_name.clone()).await.unwrap();
         let mut b3file = B3File::new(num_blocks, file);
         let mut hash = b3file.hashtree().await.unwrap();
-        for _ in 0..num_blocks {
-            let _ = hash.next().await.unwrap();
+        for i in 0..num_blocks {
+            let _ = hash.get_hash(i).await.unwrap();
         }
-        assert!(hash.next().await.is_none());
+        let no_more = hash.get_hash(num_blocks).await.unwrap();
+        assert!(no_more.is_none());
         fs::remove_file(file_name).await.unwrap();
     }
 }

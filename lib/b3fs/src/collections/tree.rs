@@ -1,7 +1,9 @@
 //! Forms a post-order binary tree over a flat hash slice.
 
+use std::cmp::min;
 use std::fmt::Debug;
 use std::future::Future;
+use std::mem::{self, MaybeUninit};
 use std::ops::Index;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -13,6 +15,7 @@ use tokio_stream::Stream;
 
 use super::error::CollectionTryFromError;
 use super::flat::FlatHashSlice;
+use crate::bucket::errors::ReadError;
 use crate::bucket::POSITION_START_HASHES;
 use crate::stream::buffer::ProofBuf;
 use crate::stream::walker::Mode;
@@ -190,21 +193,14 @@ impl<'s> Debug for HashTree<'s> {
     }
 }
 
-enum State {
-    SeekPosition,
-    Reading,
-    ValueReady(Pin<Box<dyn Future<Output = std::io::Result<[u8; 32]>>>>),
-    WaitingSeek(Pin<Box<dyn Future<Output = std::io::Result<u64>>>>),
-}
-
 pub struct AsyncHashTree<T: AsyncReadExt + AsyncSeekExt + Unpin> {
     file_reader: Arc<RwLock<T>>,
     number_of_hashes: u32,
     current_block: u32,
-    state: State,
+    pages: Vec<Option<Box<[[u8; 32]]>>>, // Store loaded pages as boxed slices
 }
 
-/// An asynchronous stream that reads hashes from a file.
+/// An asynchronous structure that reads hashes from memory pages.
 impl<T> AsyncHashTree<T>
 where
     T: AsyncReadExt + AsyncSeekExt + Unpin,
@@ -214,191 +210,51 @@ where
             file_reader: Arc::new(RwLock::new(file_reader)),
             number_of_hashes,
             current_block: 0,
-            state: State::SeekPosition,
+            pages: vec![None; (number_of_hashes as usize + 1023) / 1024], // Initialize pages
         }
     }
-}
 
-impl<T> Stream for AsyncHashTree<T>
-where
-    T: AsyncReadExt + AsyncSeekExt + Unpin + 'static,
-{
-    type Item = Result<[u8; 32], std::io::Error>;
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let this = self.as_mut().get_mut();
-
-        if this.current_block >= this.number_of_hashes {
-            return Poll::Ready(None);
+    /// Asynchronously get the hash for the specified block number.
+    pub async fn get_hash(&mut self, block_number: u32) -> Result<Option<[u8; 32]>, ReadError> {
+        if block_number >= self.number_of_hashes {
+            return Ok(None);
         }
 
-        match this.state {
-            State::SeekPosition => {
-                let index = tree_index(this.current_block as usize) as u64 * 32
-                    + POSITION_START_HASHES as u64;
-                let file = this.file_reader.clone();
-                let waker = cx.waker().clone();
-                let future = async move {
-                    let result = file
-                        .write()
-                        .await
-                        .seek(tokio::io::SeekFrom::Start(index))
-                        .await;
-                    waker.wake();
-                    result
-                };
-                let future = Box::pin(future);
-                this.state = State::WaitingSeek(future);
-                cx.waker().wake_by_ref();
-                Poll::Pending
-            },
-            State::WaitingSeek(ref mut future) => match future.as_mut().poll(cx) {
-                Poll::Ready(Ok(_)) => {
-                    this.state = State::Reading;
-                    cx.waker().wake_by_ref();
-                    Poll::Pending
-                },
-                Poll::Ready(Err(e)) => Poll::Ready(Some(Err(e))),
-                Poll::Pending => Poll::Pending,
-            },
-            State::Reading => {
-                let file = this.file_reader.clone();
-                let waker = cx.waker().clone();
-                let future = async move {
+        let tree_index = tree_index(block_number as usize);
+        let page_index = (block_number as usize) / 1024;
+        let offset = tree_index % 1024;
+
+        // Load the page if it is not already loaded
+        if self.pages[page_index].is_none() {
+            let start_index = POSITION_START_HASHES as u64 + (page_index * 4096) as u64; // 4KB page size
+            let file = self.file_reader.clone();
+            let mut file_lock = file.write().await;
+
+            // Determine the remaining bytes in the file
+            let file_size = file_lock.seek(tokio::io::SeekFrom::End(0)).await?; // Get the file size
+            file_lock
+                .seek(tokio::io::SeekFrom::Start(start_index))
+                .await?; // Seek back to the start index
+
+            let bytes_to_read = (file_size - start_index) as usize;
+            let mut page_data = vec![0; bytes_to_read.min(4096)]; // Create a buffer with the minimum of remaining bytes or 4096
+            let bytes_read = file_lock.read_exact(&mut page_data).await?;
+
+            let hashes: Vec<[u8; 32]> = page_data
+                .chunks_exact(32)
+                .map(|slice| {
                     let mut hash = [0; 32];
-                    file.write().await.read_exact(&mut hash).await?;
-                    waker.wake();
-                    Ok(hash)
-                };
-                let future = Box::pin(future);
-                this.state = State::ValueReady(future);
-                cx.waker().wake_by_ref();
-                Poll::Pending
-            },
-            State::ValueReady(ref mut future) => match future.as_mut().poll(cx) {
-                Poll::Ready(Ok(hash)) => {
-                    this.current_block += 1;
-                    this.state = State::SeekPosition;
-                    Poll::Ready(Some(Ok(hash)))
-                },
-                Poll::Ready(Err(e)) => Poll::Ready(Some(Err(e))),
-                Poll::Pending => Poll::Pending,
-            },
-        }
-    }
-}
+                    hash.copy_from_slice(slice);
+                    hash
+                })
+                .collect();
 
-#[cfg(test)]
-mod tests {
-    use std::fmt::write;
-    use std::io::Seek;
-
-    use rand::random;
-    use tokio::io::{AsyncRead, AsyncSeek};
-    use tokio_stream::StreamExt;
-
-    use super::*;
-
-    struct MockReader {
-        data: Vec<u8>,
-        position: usize,
-    }
-
-    impl MockReader {
-        fn new(data: Vec<u8>) -> Self {
-            Self { data, position: 0 }
-        }
-    }
-
-    impl AsyncRead for MockReader {
-        fn poll_read(
-            mut self: Pin<&mut Self>,
-            _: &mut Context<'_>,
-            buf: &mut tokio::io::ReadBuf<'_>,
-        ) -> Poll<std::io::Result<()>> {
-            let remaining = self.data.len() - self.position;
-            let to_read = std::cmp::min(remaining, buf.remaining());
-            buf.put_slice(&self.data[self.position..self.position + to_read]);
-            self.position += to_read;
-            Poll::Ready(Ok(()))
-        }
-    }
-
-    impl AsyncSeek for MockReader {
-        fn start_seek(self: Pin<&mut Self>, position: std::io::SeekFrom) -> std::io::Result<()> {
-            Ok(())
+            // Store the entire page of hashes
+            self.pages[page_index] = Some(hashes.into_boxed_slice()); // Store as boxed slice of hashes
         }
 
-        fn poll_complete(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<std::io::Result<u64>> {
-            Poll::Ready(Ok(self.position as u64))
-        }
-    }
-
-    #[tokio::test]
-    async fn test_single_hash() {
-        let data = random::<[u8; 32]>();
-        let reader = MockReader::new(data.clone().to_vec());
-        let mut tree = AsyncHashTree::new(reader, 1);
-
-        let r = tree.next().await.unwrap();
-        assert!(r.is_ok());
-        assert_eq!(r.unwrap(), data);
-        let r = tree.next().await;
-        assert!(r.is_none());
-    }
-
-    #[tokio::test]
-    async fn test_multiple_hashes() {
-        let data1 = random::<[u8; 32]>();
-        let data2 = random::<[u8; 32]>();
-        let data = data1
-            .iter()
-            .chain(data1.iter())
-            .chain(data2.iter())
-            .cloned()
-            .collect::<Vec<_>>();
-        let reader = MockReader::new(data);
-        let mut tree = AsyncHashTree::new(reader, 3);
-
-        let r = tree.next().await.unwrap();
-        assert!(r.is_ok());
-        assert_eq!(r.unwrap(), data1);
-        let r = tree.next().await.unwrap();
-        assert!(r.is_ok());
-        assert_eq!(r.unwrap(), data1);
-        let r = tree.next().await.unwrap();
-        assert!(r.is_ok());
-        assert_eq!(r.unwrap(), data2);
-        let r = tree.next().await;
-        assert!(r.is_none());
-    }
-
-    #[tokio::test]
-    async fn test_incomplete_hash() {
-        let data = random::<[u8; 31]>(); // Not enough data for a full hash
-        let reader = MockReader::new(data.to_vec());
-        let mut tree = AsyncHashTree::new(reader, 1);
-
-        let r = tree.next().await.unwrap();
-        assert!(r.is_err()); // Should return an error
-    }
-
-    #[tokio::test]
-    async fn test_more_hashes_than_available() {
-        let data1 = random::<[u8; 32]>();
-        let data2 = random::<[u8; 32]>();
-        let binding = [data1, data2];
-        let data = binding.iter().flatten(); // Two complete hashes
-        let reader = MockReader::new(data.cloned().collect());
-        let mut tree = AsyncHashTree::new(reader, 3); // Ask for 3 hashes
-
-        let r = tree.next().await.unwrap();
-        assert!(r.is_ok());
-        assert_eq!(r.unwrap(), data1);
-        let r = tree.next().await.unwrap();
-        assert!(r.is_ok());
-        assert_eq!(r.unwrap(), data2);
-        let r = tree.next().await.unwrap();
-        assert!(r.is_err()); // Should return None after reading available hashes
+        // Retrieve the hash from the loaded page
+        let hashes = self.pages[page_index].as_ref();
+        Ok(hashes.map(|x| x[offset]))
     }
 }
