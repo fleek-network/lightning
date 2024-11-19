@@ -193,7 +193,7 @@ mod tests {
         let mut reader = B3File::new(num_entries, file);
         let mut hashtree = reader.hashtree().await.unwrap();
         let mut counter = 0;
-        while let Some(Ok(block)) = hashtree.next().await {
+        while let Ok(Some(block)) = hashtree.get_hash(counter).await {
             counter += 1;
             assert!(
                 file_blocks.contains(&utils::to_hex(&block).as_str().to_string()),
@@ -202,7 +202,7 @@ mod tests {
                 file_blocks
             );
         }
-        assert_eq!(counter, num_entries as usize);
+        assert_eq!(counter, num_entries);
         fs::remove_dir_all(&temp_dir).await.unwrap();
     }
 }
