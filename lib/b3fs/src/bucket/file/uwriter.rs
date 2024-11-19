@@ -51,8 +51,10 @@ impl UntrustedFileWriter {
 
 #[cfg(test)]
 mod tests {
+    use core::num;
     use std::env::temp_dir;
 
+    use cmp::min;
     use rand::random;
     use tokio::fs;
 
@@ -60,36 +62,79 @@ mod tests {
     use crate::bucket::file::tests::verify_writer;
     use crate::bucket::file::B3FSFile;
     use crate::bucket::tests::get_random_file;
-    use crate::collections::HashTree;
+    use crate::collections::{tree, HashTree};
     use crate::hasher::byte_hasher::Blake3Hasher;
     use crate::stream::walker::Mode;
-    use crate::utils;
+    use crate::utils::{self, tree_index};
 
     #[tokio::test]
     async fn test_untrusted_file_writer_providing_incremental_proof() {
+        for i in 1..10 {
+            untrusted_file_writer_with(
+                "test_untrusted_file_writer_providing_incremental_proof",
+                i,
+                0,
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_untrusted_file_writer_providing_incremental_proof_few_bytes() {
+        for i in 1..10 {
+            untrusted_file_writer_with(
+                "test_untrusted_file_writer_providing_incremental_proof_few_bytes",
+                0,
+                32 * i,
+            );
+        }
+    }
+    #[tokio::test]
+    async fn test_untrusted_file_writer_providing_incremental_proof_three_blocks_plus_some_bytes() {
+        for i in 1..10 {
+            untrusted_file_writer_with(
+                "test_untrusted_file_writer_providing_incremental_proof_three_blocks_plus_some_bytes",
+                i,
+                32 * i,
+            );
+        }
+    }
+
+    async fn untrusted_file_writer_with(
+        test_name: &str,
+        num_blocks: usize,
+        additional_bytes_size: usize,
+    ) {
+        let mut n_blocks = num_blocks;
         let temp_dir_name = random::<[u8; 32]>();
-        let temp_dir = temp_dir().join(format!(
-            "test_uwrite_should_work_{}",
-            utils::to_hex(&temp_dir_name)
-        ));
+        let temp_dir = temp_dir().join(format!("{}_{}", test_name, utils::to_hex(&temp_dir_name)));
         let bucket = Bucket::open(&temp_dir).await.unwrap();
         let mut blake3_hasher: Blake3Hasher<Vec<[u8; 32]>> = Blake3Hasher::default();
-        let block = get_random_file(8192 * 2);
+        let mut block = get_random_file(n_blocks * 8192);
+        for _ in 0..additional_bytes_size {
+            block.push(random());
+        }
         blake3_hasher.update(&block[..]);
+        if additional_bytes_size > 0 {
+            n_blocks += 1;
+        }
 
         let (ref mut hashes, root) = blake3_hasher.finalize_tree();
         hashes.push(root);
         let hashtree = HashTree::try_from(&*hashes).unwrap();
-        let mut writer = UntrustedFileWriter::new(&bucket, *hashtree.root())
-            .await
-            .unwrap();
-        for i in 0..2 {
-            let proof = hashtree.generate_proof(Mode::from_is_initial(i == 0), i);
+        let mut writer = UntrustedFileWriter::new(&bucket, root).await.unwrap();
+        let mut init_idx = 0;
+        let mut final_idx = 0;
+        for i in 0..n_blocks {
+            let index = i;
+            let proof = hashtree.generate_proof(Mode::from_is_initial(index == 0), index);
             writer.feed_proof(proof.as_slice()).await.unwrap();
+            let block_size = 8192 * 32;
+            final_idx = min(init_idx + block_size + 1, block.len());
+            writer.write(&block[init_idx..final_idx]).await.unwrap();
+            init_idx = final_idx;
         }
-        writer.write(&block).await.unwrap();
         let proof = writer.commit().await.unwrap();
 
-        verify_writer(&temp_dir, 2).await;
+        verify_writer(&temp_dir, n_blocks).await;
     }
 }

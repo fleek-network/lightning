@@ -2,6 +2,7 @@ use thiserror::Error;
 use triomphe::UniqueArc;
 
 use crate::hasher::collector::InvalidHashSize;
+use crate::stream::verifier::VerificationError;
 use crate::{hasher, stream};
 
 #[derive(Error, Debug)]
@@ -42,8 +43,8 @@ pub enum WriteError {
     IOError(#[from] std::io::Error),
     #[error("Error while hashing the block. Not found hash for block.")]
     BlockHashNotFound,
-    #[error("Invalid block hash detected against incremental verifier")]
-    InvalidBlockHash,
+    #[error("Invalid block hash detected against incremental verifier {0}")]
+    InvalidBlockHash(#[from] VerificationError),
     #[error("Error while getting current block file. Not found")]
     BlockFileNotFound,
 }
