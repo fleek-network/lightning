@@ -50,8 +50,7 @@ impl WithCollector for UntrustedFileWriterCollector {
         let block_hash = self.current_hasher.clone().finalize(false);
         self.increment_verifier
             .borrow_mut()
-            .verify_hash(block_hash)
-            .map_err(|_| errors::WriteError::InvalidBlockHash)?;
+            .verify_hash(block_hash)?;
         Ok(block_hash)
     }
 
@@ -67,11 +66,10 @@ impl WithCollector for UntrustedFileWriterCollector {
         &mut self,
         count_block: usize,
     ) -> Result<Option<[u8; 32]>, errors::WriteError> {
-        let block_hash = self.current_hasher.clone().finalize(false);
+        let block_hash = self.current_hasher.clone().finalize(count_block == 0);
         self.increment_verifier
             .borrow_mut()
-            .verify_hash(block_hash)
-            .map_err(|_| errors::WriteError::InvalidBlockHash)?;
+            .verify_hash(block_hash)?;
         Ok(Some(block_hash))
     }
 
@@ -100,9 +98,7 @@ impl UntrustedFileWriterCollector {
 
     /// Feeds a proof to the incremental verifier
     pub(crate) fn feed_proof(&mut self, proof: &[u8]) -> Result<(), errors::FeedProofError> {
-        self.increment_verifier
-            .borrow_mut()
-            .feed_proof(proof)
-            .map_err(|_| errors::FeedProofError::InvalidProof)
+        self.increment_verifier.borrow_mut().feed_proof(proof)?;
+        Ok(())
     }
 }
