@@ -67,7 +67,7 @@ impl WithCollector for UntrustedFileWriterCollector {
         &mut self,
         count_block: usize,
     ) -> Result<Option<[u8; 32]>, errors::WriteError> {
-        let block_hash = self.current_hasher.clone().finalize(false);
+        let block_hash = self.current_hasher.clone().finalize(count_block == 0);
         self.increment_verifier
             .borrow_mut()
             .verify_hash(block_hash)

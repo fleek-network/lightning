@@ -92,4 +92,30 @@ mod tests {
 
         verify_writer(&temp_dir, 2).await;
     }
+
+    #[tokio::test]
+    async fn test_untrusted_file_writer_providing_incremental_proof_few_bytes() {
+        let temp_dir_name = random::<[u8; 32]>();
+        let temp_dir = temp_dir().join(format!(
+            "test_uwrite_should_work_few_bytes{}",
+            utils::to_hex(&temp_dir_name)
+        ));
+        let bucket = Bucket::open(&temp_dir).await.unwrap();
+        let mut blake3_hasher: Blake3Hasher<Vec<[u8; 32]>> = Blake3Hasher::default();
+        let block = get_random_file(1);
+        blake3_hasher.update(&block[..]);
+
+        let (ref mut hashes, root) = blake3_hasher.finalize_tree();
+        hashes.push(root);
+        let hashtree = HashTree::try_from(&*hashes).unwrap();
+        let mut writer = UntrustedFileWriter::new(&bucket, *hashtree.root())
+            .await
+            .unwrap();
+        let proof = hashtree.generate_proof(Mode::from_is_initial(true), 0);
+        writer.feed_proof(proof.as_slice()).await.unwrap();
+        writer.write(&block).await.unwrap();
+        let proof = writer.commit().await.unwrap();
+
+        verify_writer(&temp_dir, 1).await;
+    }
 }
