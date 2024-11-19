@@ -455,11 +455,6 @@ mod tests {
         // since reserve_exact is used:
         assert_eq!(total_reallocation, 0);
         assert_eq!(total_over_allocation, 0);
-
-        // dbg!(total_over_allocation);
-        // dbg!(total_over_allocation / 255);
-        // dbg!(total_reallocation);
-        // println!("{}", std::mem::size_of::<IncrementalVerifier<false>>());
     }
 
     #[test]
