@@ -188,7 +188,11 @@ impl<T: WithCollector> InnerWriterState<T> {
     }
 
     /// Processes a block of data, creating new block files as necessary
-    async fn process_block(&mut self, bytes: &mut BytesMut) -> Result<(), errors::WriteError> {
+    async fn process_block(
+        &mut self,
+        bytes: &mut BytesMut,
+        last_bytes: bool,
+    ) -> Result<(), errors::WriteError> {
         if let Some(ref mut block) = self.current_block_file {
             if self.collector.has_reach_block(block.size() + bytes.len()) {
                 // Write `block_before_remaining` bytes to the current block file and create a
@@ -197,19 +201,20 @@ impl<T: WithCollector> InnerWriterState<T> {
                 let block_before_remaining = bytes.split_to(remaining);
                 block.write_all(&block_before_remaining).await?;
 
-                let block_hash = self
+                if let Some(block_hash) = self
                     .collector
-                    .on_reach_full_block(&block_before_remaining, self.count_block)
-                    .await?;
+                    .on_reach_full_block(self.count_block, last_bytes)
+                    .await?
+                {
+                    // Add the block hash and the block file path to the list of block files so far
+                    // committed.
+                    self.new_block(block_hash).await?;
+                    self.collector
+                        .on_new_block(self.count_block, &mut self.header_file.file)
+                        .await?;
 
-                // Add the block hash and the block file path to the list of block files so far
-                // committed.
-                self.new_block(block_hash).await?;
-                self.collector
-                    .on_new_block(self.count_block, &mut self.header_file.file)
-                    .await?;
-
-                self.create_new_block_file(bytes).await?;
+                    self.create_new_block_file(bytes).await?;
+                }
             }
         } else {
             self.create_new_block_file(bytes).await?;
@@ -268,9 +273,9 @@ pub trait WithCollector {
     /// Called when a block reaches its maximum size
     async fn on_reach_full_block(
         &mut self,
-        bytes: &[u8],
         count_block: usize,
-    ) -> Result<[u8; 32], errors::WriteError>;
+        last_bytes: bool,
+    ) -> Result<Option<[u8; 32]>, errors::WriteError>;
 
     /// Called when a new block is created
     async fn on_new_block(
@@ -278,9 +283,6 @@ pub trait WithCollector {
         count_block: usize,
         writer: impl AsyncWriteExt + Unpin,
     ) -> Result<(), io::Error>;
-
-    /// Called after processing the bytes and after check if the block has reached the max size.
-    async fn post_collect(&mut self, bytes: &[u8]) -> Result<(), errors::WriteError>;
 
     /// Called for the final block in the write process
     async fn final_block(
@@ -295,7 +297,7 @@ pub trait WithCollector {
 /// Trait defining the behavior of a writer state
 pub trait WriterState {
     /// Writes bytes to the state
-    async fn write(&mut self, bytes: &[u8]) -> Result<(), errors::WriteError>;
+    async fn write(&mut self, bytes: &[u8], last_bytes: bool) -> Result<(), errors::WriteError>;
     /// Commits the write operation
     async fn commit(self) -> Result<[u8; 32], errors::CommitError>;
     /// Rolls back the write operation
@@ -303,7 +305,7 @@ pub trait WriterState {
 }
 
 impl<T: WithCollector> WriterState for InnerWriterState<T> {
-    async fn write(&mut self, bytes: &[u8]) -> Result<(), errors::WriteError> {
+    async fn write(&mut self, bytes: &[u8], last_bytes: bool) -> Result<(), errors::WriteError> {
         // Wrap the bytes in a BytesMut so we can split it into chunks.
         let mut bytes_mut = BytesMut::from(bytes);
         // Write the bytes to the current random block file incrementally or create a new block file
@@ -314,11 +316,9 @@ impl<T: WithCollector> WriterState for InnerWriterState<T> {
             // Collect the bytes into the collector.
             self.collector.collect(&bytes).await?;
             // Process the block file to see if we reached the max block size.
-            self.process_block(&mut bytes).await?;
+            self.process_block(&mut bytes, last_bytes).await?;
             // Write the bytes to the block file.
             self.write_block_file(&bytes).await?;
-            // Post collect the bytes into the collector.
-            self.collector.post_collect(&bytes).await?;
         }
 
         Ok(())
@@ -326,7 +326,7 @@ impl<T: WithCollector> WriterState for InnerWriterState<T> {
 
     /// Finalize this write and flush the data to the disk.
     async fn commit(mut self) -> Result<[u8; 32], errors::CommitError> {
-        if self.current_block_file.is_some() {
+        if let Some(current_block) = &self.current_block_file {
             if let Some(block_hash) = self.collector.final_block(self.count_block).await? {
                 self.new_block(block_hash).await?;
             }

@@ -21,6 +21,8 @@ pub enum ReadError {
     InvalidEntryAtOffset(Vec<u8>, Vec<u8>, u32),
     #[error("Invalid bloom filter")]
     InvalidBloomFilter,
+    #[error("Hash was not found for block number {0}")]
+    HashNotFound(u32),
 }
 
 #[derive(Error, Debug)]

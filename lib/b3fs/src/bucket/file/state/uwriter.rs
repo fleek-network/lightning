@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::path::PathBuf;
 
-use bytes::BytesMut;
+use bytes::{BufMut, BytesMut};
 use tokio::io;
 
 use super::*;
@@ -19,12 +19,15 @@ pub(crate) struct UntrustedFileWriterCollector {
     increment_verifier: RefCell<IncrementalVerifier<WithHashTreeCollector<BufCollector>>>,
     /// The root hash provided by the caller
     root_hash: [u8; 32],
+    /// Buffer to control filling a block
+    buffer_bytes: BytesMut,
 }
 
 impl WithCollector for UntrustedFileWriterCollector {
     /// In this case, we don't need to collect anything because the untrusted writer
     /// will write the bytes directly to the block file
     async fn collect(&mut self, bytes: &[u8]) -> Result<(), errors::WriteError> {
+        self.buffer_bytes.extend_from_slice(bytes);
         Ok(())
     }
 
@@ -47,22 +50,23 @@ impl WithCollector for UntrustedFileWriterCollector {
     /// Update hasher and validate block hash against verifier when reaching the maximum block size
     async fn on_reach_full_block(
         &mut self,
-        bytes: &[u8],
         _count_block: usize,
-    ) -> Result<[u8; 32], errors::WriteError> {
-        self.current_hasher.update(bytes);
-        let block_hash = self.current_hasher.clone().finalize(false);
-        self.increment_verifier
-            .borrow_mut()
-            .verify_hash(block_hash)?;
-        Ok(block_hash)
-    }
-
-    /// Processes bytes after collection. In this case, we need to update hasher with the remaining
-    /// bytes.
-    async fn post_collect(&mut self, bytes: &[u8]) -> Result<(), errors::WriteError> {
-        self.current_hasher.update(bytes);
-        Ok(())
+        last_bytes: bool,
+    ) -> Result<Option<[u8; 32]>, errors::WriteError> {
+        if self.buffer_bytes.len() == MAX_BLOCK_SIZE_IN_BYTES && last_bytes {
+            return Ok(None);
+        }
+        if self.buffer_bytes.len() >= MAX_BLOCK_SIZE_IN_BYTES {
+            let bytes_block = self.buffer_bytes.split_to(MAX_BLOCK_SIZE_IN_BYTES);
+            self.current_hasher.update(&bytes_block);
+            let block_hash = self.current_hasher.clone().finalize(false);
+            self.increment_verifier
+                .borrow_mut()
+                .verify_hash(block_hash)?;
+            Ok(Some(block_hash))
+        } else {
+            Ok(None)
+        }
     }
 
     /// Get the final block hash and verify it against the verifier
@@ -70,11 +74,16 @@ impl WithCollector for UntrustedFileWriterCollector {
         &mut self,
         count_block: usize,
     ) -> Result<Option<[u8; 32]>, errors::WriteError> {
-        let block_hash = self.current_hasher.clone().finalize(count_block == 0);
-        self.increment_verifier
-            .borrow_mut()
-            .verify_hash(block_hash)?;
-        Ok(Some(block_hash))
+        if !self.buffer_bytes.is_empty() {
+            self.current_hasher.update(&self.buffer_bytes);
+            let block_hash = self.current_hasher.clone().finalize(count_block == 0);
+            self.increment_verifier
+                .borrow_mut()
+                .verify_hash(block_hash)?;
+            Ok(Some(block_hash))
+        } else {
+            Ok(None)
+        }
     }
 
     /// Finalizes the hash tree and return the root hash
@@ -97,6 +106,7 @@ impl UntrustedFileWriterCollector {
             current_hasher,
             increment_verifier: RefCell::new(increment_verifier),
             root_hash,
+            buffer_bytes: BytesMut::new(),
         }
     }
 
