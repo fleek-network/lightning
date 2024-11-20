@@ -40,8 +40,12 @@ impl WithCollector for UntrustedFileWriterCollector {
         Ok(())
     }
 
+    fn has_reach_block(&self, bytes_size: usize) -> bool {
+        bytes_size >= MAX_BLOCK_SIZE_IN_BYTES
+    }
+
     /// Update hasher and validate block hash against verifier when reaching the maximum block size
-    async fn reach_max_block(
+    async fn on_reach_full_block(
         &mut self,
         bytes: &[u8],
         _count_block: usize,
