@@ -190,7 +190,7 @@ impl<T: WithCollector> InnerWriterState<T> {
     /// Processes a block of data, creating new block files as necessary
     async fn process_block(&mut self, bytes: &mut BytesMut) -> Result<(), errors::WriteError> {
         if let Some(ref mut block) = self.current_block_file {
-            if block.size() + bytes.len() > MAX_BLOCK_SIZE_IN_BYTES {
+            if self.collector.has_reach_block(block.size() + bytes.len()) {
                 // Write `block_before_remaining` bytes to the current block file and create a
                 // new block file where we will write the remaining bytes which is in `bytes`.
                 let remaining = MAX_BLOCK_SIZE_IN_BYTES - block.size();
@@ -199,7 +199,7 @@ impl<T: WithCollector> InnerWriterState<T> {
 
                 let block_hash = self
                     .collector
-                    .reach_max_block(&block_before_remaining, self.count_block)
+                    .on_reach_full_block(&block_before_remaining, self.count_block)
                     .await?;
 
                 // Add the block hash and the block file path to the list of block files so far
@@ -261,8 +261,12 @@ pub trait WithCollector {
     /// Collects bytes during the write process
     async fn collect(&mut self, bytes: &[u8]) -> Result<(), errors::WriteError>;
 
+    // Check if the collector needs to perform a block chunk because it reaches the max size of a
+    // block
+    fn has_reach_block(&self, bytes_size: usize) -> bool;
+
     /// Called when a block reaches its maximum size
-    async fn reach_max_block(
+    async fn on_reach_full_block(
         &mut self,
         bytes: &[u8],
         count_block: usize,

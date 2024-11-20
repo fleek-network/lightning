@@ -129,7 +129,7 @@ mod tests {
             let proof = hashtree.generate_proof(Mode::from_is_initial(index == 0), index);
             writer.feed_proof(proof.as_slice()).await.unwrap();
             let block_size = 8192 * 32;
-            final_idx = min(init_idx + block_size + 1, block.len());
+            final_idx = min(init_idx + block_size, block.len());
             writer.write(&block[init_idx..final_idx]).await.unwrap();
             init_idx = final_idx;
         }
