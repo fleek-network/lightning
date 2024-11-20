@@ -20,7 +20,7 @@ impl B3File {
     }
 
     pub async fn hashtree(self) -> Result<AsyncHashTree<fs::File>, errors::ReadError> {
-        let hash = AsyncHashTree::new(self.file, self.num_blocks);
+        let hash = AsyncHashTree::new(self.file, self.num_blocks as usize);
         Ok(hash)
     }
 }
@@ -55,7 +55,7 @@ mod tests {
         let num_blocks = 10;
         let mut data = BytesMut::with_capacity(num_blocks as usize * KEY_LEN);
         data.extend_from_slice(&[0; POSITION_START_HASHES]);
-        for _ in 0..(num_blocks * 2) - 2 {
+        for _ in 0..(num_blocks * 2) - 1 {
             data.extend_from_slice(&random::<[u8; KEY_LEN]>());
         }
         file.write_all(&data).await.unwrap();
@@ -66,7 +66,7 @@ mod tests {
         for i in 0..num_blocks {
             let _ = hash.get_hash(i).await.unwrap();
         }
-        let no_more = hash.get_hash(num_blocks).await.unwrap();
+        let no_more = hash.get_hash(num_blocks + 1).await.unwrap();
         assert!(no_more.is_none());
         fs::remove_file(file_name).await.unwrap();
     }
