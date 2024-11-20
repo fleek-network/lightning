@@ -3,8 +3,10 @@
 use std::cmp::min;
 use std::fmt::Debug;
 use std::future::Future;
+use std::io::Read;
 use std::mem::{self, MaybeUninit};
 use std::ops::Index;
+use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
@@ -18,8 +20,9 @@ use super::flat::FlatHashSlice;
 use crate::bucket::errors::ReadError;
 use crate::bucket::POSITION_START_HASHES;
 use crate::stream::buffer::ProofBuf;
-use crate::stream::walker::Mode;
-use crate::utils::{is_valid_tree_len, tree_index};
+use crate::stream::walker::{self, Mode, TreeWalker};
+use crate::stream::ProofEncoder;
+use crate::utils::{block_counter_from_tree_index, is_valid_tree_len, tree_index};
 
 /// A wrapper around a list of hashes that provides access only to the leaf nodes in the tree.
 #[derive(Clone, Copy)]
@@ -195,8 +198,8 @@ impl<'s> Debug for HashTree<'s> {
 
 pub struct AsyncHashTree<T: AsyncReadExt + AsyncSeekExt + Unpin> {
     file_reader: Arc<RwLock<T>>,
-    number_of_hashes: u32,
-    current_block: u32,
+    number_of_blocks: usize,
+    current_block: usize,
     pages: Vec<Option<Box<[[u8; 32]]>>>, // Store loaded pages as boxed slices
 }
 
@@ -205,24 +208,29 @@ impl<T> AsyncHashTree<T>
 where
     T: AsyncReadExt + AsyncSeekExt + Unpin,
 {
-    pub fn new(file_reader: T, number_of_hashes: u32) -> Self {
+    pub fn new(file_reader: T, number_of_blocks: usize) -> Self {
         Self {
             file_reader: Arc::new(RwLock::new(file_reader)),
-            number_of_hashes,
+            number_of_blocks,
             current_block: 0,
-            pages: vec![None; (number_of_hashes as usize + 1023) / 1024], // Initialize pages
+            pages: vec![None; (number_of_blocks + 1023) / 1024], // Initialize pages
         }
     }
 
-    /// Asynchronously get the hash for the specified block number.
     pub async fn get_hash(&mut self, block_number: u32) -> Result<Option<[u8; 32]>, ReadError> {
-        if block_number >= self.number_of_hashes {
+        self.get_hash_by_index(tree_index(block_number as usize))
+            .await
+    }
+
+    /// Asynchronously get the hash for the specified block number.
+    pub async fn get_hash_by_index(&mut self, index: usize) -> Result<Option<[u8; 32]>, ReadError> {
+        if index >= self.number_of_blocks * 2 - 1 {
             return Ok(None);
         }
 
-        let tree_index = tree_index(block_number as usize);
-        let page_index = (block_number as usize) / 1024;
-        let offset = tree_index % 1024;
+        let block_number = block_counter_from_tree_index(index).unwrap_or(0);
+        let page_index = block_number / 1024;
+        let offset = index % 1024;
 
         // Load the page if it is not already loaded
         if self.pages[page_index].is_none() {
@@ -256,5 +264,25 @@ where
         // Retrieve the hash from the loaded page
         let hashes = self.pages[page_index].as_ref();
         Ok(hashes.map(|x| x[offset]))
+    }
+
+    pub async fn generate_proof(&mut self, block_number: u32) -> Result<ProofBuf, ReadError> {
+        let tree_len = self.number_of_blocks * 2 - 1;
+        let walker = if block_number == 0 {
+            TreeWalker::initial(block_number as usize, tree_len)
+        } else {
+            TreeWalker::proceeding(block_number as usize, tree_len)
+        };
+        let size = walker.size_hint().0;
+        let mut encoder = ProofEncoder::new(size);
+        for (direction, index) in walker {
+            debug_assert!(index < tree_len, "Index overflow.");
+            let hash = self
+                .get_hash_by_index(index)
+                .await?
+                .ok_or(ReadError::HashNotFound(index as u32))?;
+            encoder.insert(direction, &hash);
+        }
+        Ok(encoder.finalize())
     }
 }
