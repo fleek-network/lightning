@@ -41,15 +41,15 @@ impl WithCollector for FileWriterCollector {
     /// Retrieves the block hash when a block reaches its maximum size
     async fn on_reach_full_block(
         &mut self,
-        bytes: &[u8],
         count_block: usize,
-    ) -> Result<[u8; 32], errors::WriteError> {
-        self.hasher
+        _last_bytes: bool,
+    ) -> Result<Option<[u8; 32]>, errors::WriteError> {
+        Ok(self
+            .hasher
             .read()
             .await
             .get_tree()
-            .get_block_hash(count_block)
-            .ok_or(errors::WriteError::BlockHashNotFound)
+            .get_block_hash(count_block))
     }
 
     /// Writes the hash tree to the provided writer when a new block is created
@@ -64,11 +64,6 @@ impl WithCollector for FileWriterCollector {
             .get_tree_mut()
             .write_hash(writer)
             .await
-    }
-
-    /// No additional processing needed after collection for this implementation
-    async fn post_collect(&mut self, bytes: &[u8]) -> Result<(), errors::WriteError> {
-        Ok(())
     }
 
     /// Finalizes the last block and prepares the finalized tree

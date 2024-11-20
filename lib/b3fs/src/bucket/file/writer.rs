@@ -31,7 +31,7 @@ impl FileWriter {
     }
 
     pub async fn write(&mut self, bytes: &[u8]) -> Result<(), errors::WriteError> {
-        self.state.write(bytes).await
+        self.state.write(bytes, false).await
     }
 
     /// Finalize this write and flush the data to the disk.
