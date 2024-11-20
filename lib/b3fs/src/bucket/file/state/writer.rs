@@ -33,8 +33,13 @@ impl WithCollector for FileWriterCollector {
         Ok(())
     }
 
+    /// Tursted Writer needs to wait for at least 1 more byte before cutting a block
+    fn has_reach_block(&self, bytes_size: usize) -> bool {
+        bytes_size > MAX_BLOCK_SIZE_IN_BYTES
+    }
+
     /// Retrieves the block hash when a block reaches its maximum size
-    async fn reach_max_block(
+    async fn on_reach_full_block(
         &mut self,
         bytes: &[u8],
         count_block: usize,
