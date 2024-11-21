@@ -86,7 +86,9 @@ async fn test_epoch_change_single_node() {
         beacons
     );
 
-    // Check that the local database beacons are eventually cleared.
+    // Change epoch and check that the local database beacons are eventually cleared.
+    network.wait_for_epoch_change(new_epoch).await.unwrap();
+    network.change_epoch().await.unwrap();
     poll_until(
         || async {
             node.committee_beacon()
@@ -147,7 +149,9 @@ async fn test_epoch_change_multiple_nodes() {
         );
     }
 
-    // Check that the local database beacons are eventually cleared.
+    // Change epoch and check that the local database beacons are eventually cleared.
+    network.wait_for_epoch_change(epoch).await.unwrap();
+    network.change_epoch().await.unwrap();
     poll_until(
         || async {
             node.committee_beacon()

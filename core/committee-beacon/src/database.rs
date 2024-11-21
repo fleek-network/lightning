@@ -1,5 +1,9 @@
 use fxhash::FxHashMap;
-use lightning_interfaces::types::{CommitteeSelectionBeaconCommit, CommitteeSelectionBeaconReveal};
+use lightning_interfaces::types::{
+    CommitteeSelectionBeaconCommit,
+    CommitteeSelectionBeaconReveal,
+    Epoch,
+};
 
 use crate::config::CommitteeBeaconDatabaseConfig;
 
@@ -21,15 +25,16 @@ pub trait CommitteeBeaconDatabase: Clone + Send + Sync {
     /// Get the query instance for this database.
     fn query(&self) -> Self::Query;
 
-    /// Set the beacon reveal value for a given commit.
+    /// Set the beacon reveal value for a given epoch and commit.
     fn set_beacon(
         &self,
+        epoch: Epoch,
         commit: CommitteeSelectionBeaconCommit,
         reveal: CommitteeSelectionBeaconReveal,
     );
 
-    /// Clear beacons.
-    fn clear_beacons(&self);
+    /// Clear beacons before a given epoch.
+    fn clear_beacons_before_epoch(&self, epoch: Epoch);
 }
 
 /// A trait for a committee beacon database query, encapsulating the database query operations that
@@ -41,11 +46,12 @@ pub trait CommitteeBeaconDatabaseQuery {
     /// Get beacon for a given commit.
     fn get_beacon(
         &self,
+        epoch: Epoch,
         commit: CommitteeSelectionBeaconCommit,
     ) -> Option<CommitteeSelectionBeaconReveal>;
 
     /// Get all the locally stored beacons.
     fn get_beacons(
         &self,
-    ) -> FxHashMap<CommitteeSelectionBeaconCommit, CommitteeSelectionBeaconReveal>;
+    ) -> FxHashMap<(Epoch, CommitteeSelectionBeaconCommit), CommitteeSelectionBeaconReveal>;
 }
