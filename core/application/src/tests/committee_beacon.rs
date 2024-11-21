@@ -1303,6 +1303,39 @@ async fn test_committee_beacon_non_revealing_node_partially_slashed_sufficient_s
         resp.txn_receipts[0].response,
         TransactionResponse::Revert(ExecutionError::CommitteeSelectionBeaconNonRevealingNode)
     );
+
+    // Execute empty blocks to exceed the commit phase timeout.
+    network.execute(vec![]).await.unwrap();
+    let resp = network.execute(vec![]).await.unwrap();
+    assert_eq!(resp.block_number, 13);
+
+    // Execute commit timeout transaction to transition to new commit phase round.
+    let resp = network
+        .execute(vec![network.node(0).build_transaction(
+            UpdateMethod::CommitteeSelectionBeaconCommitPhaseTimeout,
+        )])
+        .await
+        .unwrap();
+    assert_eq!(resp.block_number, 14);
+
+    // Check that we have transitioned to a new commit phase in a new round.
+    assert_eq!(
+        query.get_committee_selection_beacon_phase(),
+        Some(CommitteeSelectionBeaconPhase::Commit((15, 17)))
+    );
+    assert_eq!(query.get_committee_selection_beacon_round(), Some(2));
+
+    // Execute commit transaction from the non-revealing node, and check that it's successful this
+    // time.
+    let resp = network
+        .execute(vec![network.node(2).build_transaction(
+            UpdateMethod::CommitteeSelectionBeaconCommit {
+                commit: CommitteeSelectionBeaconCommit::build(epoch, 1, [13; 32]),
+            },
+        )])
+        .await
+        .unwrap();
+    assert_eq!(resp.block_number, 15);
 }
 
 #[tokio::test]
