@@ -172,8 +172,18 @@ impl<C: NodeComponents> CommitteeBeaconListener<C> {
             current_block
         );
 
-        // TODO(snormore): If we were a non-revealing node in the previous epoch, we should not
-        // commit, it will just be rejected/reverted.
+        // If this node was a recent non-revealing node, skip the commit phase, since it will be
+        // rejected/reverted anyway.
+        let non_revealing_nodes = self
+            .app_query
+            .get_committee_selection_beacon_non_revealing_nodes();
+        if non_revealing_nodes.contains(&self.node_index) {
+            tracing::debug!(
+                "node {} is non-revealing in previous epoch, skipping commit",
+                self.node_index
+            );
+            return Ok(());
+        }
 
         // If this is the first block outside of the commit phase range, execute a commit timeout
         // transaction and return.

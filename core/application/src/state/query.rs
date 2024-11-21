@@ -78,7 +78,7 @@ pub struct QueryRunner {
             Option<CommitteeSelectionBeaconReveal>,
         ),
     >,
-    _committee_selection_beacon_non_revealing_node: ResolvedTableReference<NodeIndex, ()>,
+    committee_selection_beacon_non_revealing_node: ResolvedTableReference<NodeIndex, ()>,
 }
 
 impl QueryRunner {
@@ -120,7 +120,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
                 CommitteeSelectionBeaconCommit,
                 Option<CommitteeSelectionBeaconReveal>,
             )>("committee_selection_beacon"),
-            _committee_selection_beacon_non_revealing_node: atomo
+            committee_selection_beacon_non_revealing_node: atomo
                 .resolve::<NodeIndex, ()>("committee_selection_beacon_non_revealing_node"),
 
             inner: atomo,
@@ -235,6 +235,18 @@ impl SyncQueryRunnerInterface for QueryRunner {
     )> {
         self.inner
             .run(|ctx| self.committee_selection_beacon.get(ctx).get(node))
+    }
+
+    fn get_committee_selection_beacon_non_revealing_nodes(&self) -> Vec<NodeIndex> {
+        self.inner
+            .run(|ctx| {
+                self.committee_selection_beacon_non_revealing_node
+                    .get(ctx)
+                    .as_map()
+            })
+            .keys()
+            .cloned()
+            .collect()
     }
 
     fn get_service_info(&self, id: &ServiceId) -> Option<Service> {
