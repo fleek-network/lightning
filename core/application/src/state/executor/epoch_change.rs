@@ -193,18 +193,23 @@ impl<B: Backend> StateExecutor<B> {
         // If all active nodes have committed, we can transition to the reveal phase early before
         // timeout.
         let beacons = self.committee_selection_beacon.as_map();
-        // TODO(snormore): We should check eligible nodes instead of active nodes, which excludes
-        // previously non-revealing nodes, otherwise we will always timeout the commit phase when
-        // that happens.
-        if beacons.len() == active_nodes.len()
-            && active_nodes
+        let eligible_nodes = active_nodes
+            .iter()
+            .filter(|node_index| {
+                self.committee_selection_beacon_non_revealing_node
+                    .get(*node_index)
+                    .is_none()
+            })
+            .collect::<Vec<_>>();
+        if beacons.len() == eligible_nodes.len()
+            && eligible_nodes
                 .iter()
                 .all(|node_index| beacons.contains_key(node_index))
         {
             let reveal_start = current_block + 1;
             let reveal_end = reveal_start + self.get_reveal_phase_duration();
             tracing::info!(
-                "transitioning to committee selection beacon reveal phase because all active nodes have committed (epoch: {}, start: {}, end: {})",
+                "transitioning to committee selection beacon reveal phase because all eligible nodes have committed (epoch: {}, start: {}, end: {})",
                 self.get_epoch(),
                 reveal_start,
                 reveal_end
@@ -390,12 +395,11 @@ impl<B: Backend> StateExecutor<B> {
             );
         }
 
-        // The commit phase has timed out.
-        // Check if we have sufficient participation or not.
+        // The commit phase has timed out. Check if we have sufficient participation or not.
         // Note that we exclude non-revealing nodes in the previous round from the participating
         // nodes set for this calculation.
         let current_committee = self.committee_info.get(&epoch).unwrap_or_default();
-        let participating_nodes = current_committee
+        let participating_committee_members = current_committee
             .members
             .iter()
             .filter(|node_index| {
@@ -407,13 +411,12 @@ impl<B: Backend> StateExecutor<B> {
         let beacons = self.committee_selection_beacon.as_map();
         let committee_beacons = beacons
             .iter()
-            .filter(|(node_index, _)| participating_nodes.contains(node_index))
+            .filter(|(node_index, _)| participating_committee_members.contains(node_index))
             .collect::<HashMap<_, _>>();
 
         // Check for sufficient participation; that > 2/3 of the existing committee has committed.
-        // Any other non-committee nodes can also optionally participate, but it's not
-        // required.
-        if committee_beacons.len() > (2 * participating_nodes.len() / 3) {
+        // Any other non-committee nodes can also optionally participate, but it's not required.
+        if committee_beacons.len() > (2 * participating_committee_members.len() / 3) {
             // If we have sufficient participation, start the reveal phase.
             let reveal_start = current_block + 1;
             let reveal_end = reveal_start + self.get_reveal_phase_duration();
@@ -423,7 +426,7 @@ impl<B: Backend> StateExecutor<B> {
                 reveal_start,
                 reveal_end,
                 committee_beacons.len(),
-                participating_nodes.len(),
+                participating_committee_members.len(),
             );
             self.set_committee_selection_beacon_reveal_phase(reveal_start, reveal_end);
         } else {
@@ -447,12 +450,12 @@ impl<B: Backend> StateExecutor<B> {
                 commit_start,
                 commit_end,
                 committee_beacons.len(),
-                participating_nodes.len(),
+                participating_committee_members.len(),
             );
             tracing::debug!(
                 "commit phase had insufficient participation (committed: {:?}, nodes: {:?})",
                 committee_beacons.keys().collect::<Vec<_>>(),
-                participating_nodes,
+                participating_committee_members,
             );
             self.set_committee_selection_beacon_commit_phase(commit_start, commit_end);
 
