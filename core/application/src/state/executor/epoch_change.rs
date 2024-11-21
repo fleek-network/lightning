@@ -193,6 +193,9 @@ impl<B: Backend> StateExecutor<B> {
         // If all active nodes have committed, we can transition to the reveal phase early before
         // timeout.
         let beacons = self.committee_selection_beacon.as_map();
+        // TODO(snormore): We should check eligible nodes instead of active nodes, which excludes
+        // previously non-revealing nodes, otherwise we will always timeout the commit phase when
+        // that happens.
         if beacons.len() == active_nodes.len()
             && active_nodes
                 .iter()
@@ -412,10 +415,12 @@ impl<B: Backend> StateExecutor<B> {
             let reveal_start = current_block + 1;
             let reveal_end = reveal_start + self.get_reveal_phase_duration();
             tracing::info!(
-                "transitioning to committee selection beacon reveal phase because commit phase timed out with sufficient participation (epoch: {}, start: {}, end: {})",
+                "transitioning to committee selection beacon reveal phase because commit phase timed out with sufficient participation (epoch: {}, start: {}, end: {}, committed: {}, eligible: {})",
                 epoch,
                 reveal_start,
-                reveal_end
+                reveal_end,
+                committee_beacons.len(),
+                participating_nodes.len(),
             );
             self.set_committee_selection_beacon_reveal_phase(reveal_start, reveal_end);
         } else {
@@ -433,11 +438,13 @@ impl<B: Backend> StateExecutor<B> {
             let commit_start = current_block + 1;
             let commit_end = commit_start + self.get_commit_phase_duration();
             tracing::info!(
-                "transitioning to new committee selection beacon commit phase because commit phase timed out without sufficient participation (epoch: {}, round: {}, start: {}, end: {})",
+                "transitioning to new committee selection beacon commit phase because commit phase timed out without sufficient participation (epoch: {}, round: {}, start: {}, end: {}, committed: {}, eligible: {})",
                 epoch,
                 round + 1,
                 commit_start,
                 commit_end,
+                committee_beacons.len(),
+                participating_nodes.len(),
             );
             tracing::debug!(
                 "commit phase had insufficient participation (committed: {:?}, nodes: {:?})",
@@ -527,6 +534,7 @@ impl<B: Backend> StateExecutor<B> {
         // Save non-revealing nodes to state so we can reject any commits in the next round.
         // Clear existing non-revealing nodes table first.
         self.committee_selection_beacon_non_revealing_node.clear();
+        // TODO(snormore): Do we need to clear this in other places like on epoch change?
         let beacons = self.committee_selection_beacon.as_map();
         let non_revealing_nodes = beacons
             .iter()

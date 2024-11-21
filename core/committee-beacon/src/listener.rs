@@ -8,6 +8,7 @@ use types::{
     CommitteeSelectionBeaconCommit,
     CommitteeSelectionBeaconPhase,
     CommitteeSelectionBeaconReveal,
+    Epoch,
     ExecuteTransactionError,
     ExecuteTransactionOptions,
     ExecuteTransactionRequest,
@@ -81,14 +82,20 @@ impl<C: NodeComponents> CommitteeBeaconListener<C> {
     ) -> Result<(), CommitteeBeaconError> {
         tracing::trace!("handling block execution response: {:?}", response);
 
+        let epoch = self.app_query.get_current_epoch();
+
         // Clear the local database after epoch change is executed.
         if response.change_epoch {
-            tracing::debug!("clearing beacons at epoch change");
             // Clearing the beacons at epoch change is best-effort, since we can't guarantee that
-            // the notification will be received or the listener will be running, in the case of a
-            // deployment for example. This is fine, since the beacons will be cleared on the next
-            // committee selection phase anyway, and we don't rely on it for correctness.
-            self.db.clear_beacons();
+            // the notification will be received on time or at all, or that the listener will be
+            // running. This is fine, since the beacons will be cleared on the next committee
+            // selection phase anyway, and we don't rely on it for correctness. We also keep beacons
+            // from the most recent epoch to avoid clearing beacons for the current epoch in case of
+            // delayed notification.
+            if epoch > 0 {
+                tracing::debug!("clearing beacons at epoch change");
+                self.db.clear_beacons_before_epoch(epoch);
+            }
             return Ok(());
         }
 
@@ -110,7 +117,7 @@ impl<C: NodeComponents> CommitteeBeaconListener<C> {
                 (start_block, end_block),
             ))) => {
                 let result = self
-                    .handle_commit_phase(start_block, end_block, current_block)
+                    .handle_commit_phase(epoch, start_block, end_block, current_block)
                     .await;
 
                 // Handling executed block responses is best-effort, and so if the commit phase
@@ -124,7 +131,7 @@ impl<C: NodeComponents> CommitteeBeaconListener<C> {
                 (start_block, end_block),
             ))) => {
                 let result = self
-                    .handle_reveal_phase(start_block, end_block, current_block)
+                    .handle_reveal_phase(epoch, start_block, end_block, current_block)
                     .await;
 
                 // Handling executed block responses is best-effort, and so if the reveal phase
@@ -153,6 +160,7 @@ impl<C: NodeComponents> CommitteeBeaconListener<C> {
     /// commit phase, depending on participation.
     async fn handle_commit_phase(
         &self,
+        epoch: Epoch,
         start_block: BlockNumber,
         end_block: BlockNumber,
         current_block: BlockNumber,
@@ -163,6 +171,9 @@ impl<C: NodeComponents> CommitteeBeaconListener<C> {
             end_block,
             current_block
         );
+
+        // TODO(snormore): If we were a non-revealing node in the previous epoch, we should not
+        // commit, it will just be rejected/reverted.
 
         // If this is the first block outside of the commit phase range, execute a commit timeout
         // transaction and return.
@@ -201,7 +212,6 @@ impl<C: NodeComponents> CommitteeBeaconListener<C> {
         // If we have not committed, generate a random value for our commit transaction, save to
         // local database, and submit it.
         let reveal = self.generate_random_reveal();
-        let epoch = self.app_query.get_current_epoch();
         let round = self.app_query.get_committee_selection_beacon_round();
         let Some(round) = round else {
             tracing::error!("no committee selection beacon round found for commit");
@@ -210,7 +220,7 @@ impl<C: NodeComponents> CommitteeBeaconListener<C> {
         let commit = CommitteeSelectionBeaconCommit::build(epoch, round, reveal);
 
         // Save random beacon data to local database.
-        self.db.set_beacon(commit, reveal);
+        self.db.set_beacon(epoch, commit, reveal);
 
         // Build commit and submit it.
         tracing::info!("submitting commit transaction: {:?}", commit);
@@ -232,6 +242,7 @@ impl<C: NodeComponents> CommitteeBeaconListener<C> {
     /// application executor that will restart back to a new commit phase.
     async fn handle_reveal_phase(
         &self,
+        epoch: Epoch,
         start_block: BlockNumber,
         end_block: BlockNumber,
         current_block: BlockNumber,
@@ -286,7 +297,7 @@ impl<C: NodeComponents> CommitteeBeaconListener<C> {
         }
 
         // Retrieve our beacon random data from local database.
-        let Some(reveal) = self.db.query().get_beacon(commit) else {
+        let Some(reveal) = self.db.query().get_beacon(epoch, commit) else {
             tracing::warn!("no beacon found for reveal in local database");
             return Ok(());
         };
