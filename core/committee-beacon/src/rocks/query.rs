@@ -1,9 +1,13 @@
 use atomo::{Atomo, DefaultSerdeBackend, QueryPerm};
 use atomo_rocks::RocksBackend;
 use fxhash::FxHashMap;
-use lightning_interfaces::types::{CommitteeSelectionBeaconCommit, CommitteeSelectionBeaconReveal};
+use lightning_interfaces::types::{
+    CommitteeSelectionBeaconCommit,
+    CommitteeSelectionBeaconReveal,
+    Epoch,
+};
 
-use super::database::BEACONS_TABLE;
+use super::database::{BeaconsTableKey, BEACONS_TABLE};
 use crate::database::CommitteeBeaconDatabaseQuery;
 
 /// A committee beacon database query type that uses RocksDB as the underlying datastore.
@@ -21,26 +25,23 @@ impl RocksCommitteeBeaconDatabaseQuery {
 impl CommitteeBeaconDatabaseQuery for RocksCommitteeBeaconDatabaseQuery {
     fn get_beacon(
         &self,
+        epoch: Epoch,
         commit: CommitteeSelectionBeaconCommit,
     ) -> Option<CommitteeSelectionBeaconReveal> {
         self.atomo.query().run(|ctx| {
-            let table = ctx
-                .get_table::<CommitteeSelectionBeaconCommit, CommitteeSelectionBeaconReveal>(
-                    BEACONS_TABLE,
-                );
+            let table =
+                ctx.get_table::<BeaconsTableKey, CommitteeSelectionBeaconReveal>(BEACONS_TABLE);
 
-            table.get(commit)
+            table.get((epoch, commit))
         })
     }
 
     fn get_beacons(
         &self,
-    ) -> FxHashMap<CommitteeSelectionBeaconCommit, CommitteeSelectionBeaconReveal> {
+    ) -> FxHashMap<(Epoch, CommitteeSelectionBeaconCommit), CommitteeSelectionBeaconReveal> {
         self.atomo.query().run(|ctx| {
-            let table = ctx
-                .get_table::<CommitteeSelectionBeaconCommit, CommitteeSelectionBeaconReveal>(
-                    BEACONS_TABLE,
-                );
+            let table =
+                ctx.get_table::<BeaconsTableKey, CommitteeSelectionBeaconReveal>(BEACONS_TABLE);
 
             table.as_map()
         })

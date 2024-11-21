@@ -2,13 +2,19 @@ use std::sync::{Arc, Mutex};
 
 use atomo::{Atomo, AtomoBuilder, DefaultSerdeBackend, UpdatePerm};
 use atomo_rocks::{Options, RocksBackend, RocksBackendBuilder};
-use lightning_interfaces::types::{CommitteeSelectionBeaconCommit, CommitteeSelectionBeaconReveal};
+use lightning_interfaces::types::{
+    CommitteeSelectionBeaconCommit,
+    CommitteeSelectionBeaconReveal,
+    Epoch,
+};
 
 use super::RocksCommitteeBeaconDatabaseQuery;
 use crate::config::CommitteeBeaconDatabaseConfig;
 use crate::database::CommitteeBeaconDatabase;
 
 pub(crate) const BEACONS_TABLE: &str = "beacons";
+
+pub type BeaconsTableKey = (Epoch, CommitteeSelectionBeaconCommit);
 
 /// A committee beacon database writer that uses RocksDB as the underlying datastore.
 ///
@@ -34,7 +40,7 @@ impl CommitteeBeaconDatabase for RocksCommitteeBeaconDatabase {
 
         let builder = RocksBackendBuilder::new(config.path.to_path_buf()).with_options(options);
         let builder = AtomoBuilder::new(builder)
-            .with_table::<CommitteeSelectionBeaconCommit, CommitteeSelectionBeaconReveal>(
+            .with_table::<(Epoch, CommitteeSelectionBeaconCommit), CommitteeSelectionBeaconReveal>(
                 BEACONS_TABLE,
             )
             .enable_iter(BEACONS_TABLE);
@@ -51,28 +57,27 @@ impl CommitteeBeaconDatabase for RocksCommitteeBeaconDatabase {
 
     fn set_beacon(
         &self,
+        epoch: Epoch,
         commit: CommitteeSelectionBeaconCommit,
         reveal: CommitteeSelectionBeaconReveal,
     ) {
         self.atomo.lock().unwrap().run(|ctx| {
-            let mut table = ctx
-                .get_table::<CommitteeSelectionBeaconCommit, CommitteeSelectionBeaconReveal>(
-                    BEACONS_TABLE,
-                );
+            let mut table =
+                ctx.get_table::<BeaconsTableKey, CommitteeSelectionBeaconReveal>(BEACONS_TABLE);
 
-            table.insert(commit, reveal);
+            table.insert((epoch, commit), reveal);
         });
     }
 
-    fn clear_beacons(&self) {
+    fn clear_beacons_before_epoch(&self, before_epoch: Epoch) {
         self.atomo.lock().unwrap().run(|ctx| {
-            let mut table = ctx
-                .get_table::<CommitteeSelectionBeaconCommit, CommitteeSelectionBeaconReveal>(
-                    BEACONS_TABLE,
-                );
+            let mut table =
+                ctx.get_table::<BeaconsTableKey, CommitteeSelectionBeaconReveal>(BEACONS_TABLE);
 
-            for key in table.keys() {
-                table.remove(key);
+            for (epoch, commit) in table.keys() {
+                if epoch < before_epoch {
+                    table.remove((epoch, commit));
+                }
             }
         });
     }
