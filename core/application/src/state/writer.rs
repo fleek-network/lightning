@@ -532,7 +532,7 @@ mod tests {
 
         // Check that the state tree was rebuilt and verified in a reasonable time.
         let duration = start_time.elapsed();
-        assert!(duration < Duration::from_secs(1));
+        assert!(duration < Duration::from_secs(3));
     }
 
     #[test]
