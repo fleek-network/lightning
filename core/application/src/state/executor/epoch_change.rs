@@ -319,6 +319,9 @@ impl<B: Backend> StateExecutor<B> {
             // Reset the committee selection beacon.
             self.clear_committee_selection_beacons();
 
+            // Clear the non-revealing nodes table from the previous round.
+            self.clear_committee_selection_beacon_non_revealing_node();
+
             // Execute the epoch change.
             self.execute_epoch_change(epoch, committee, beacons);
 
@@ -457,7 +460,10 @@ impl<B: Backend> StateExecutor<B> {
             self.set_committee_selection_beacon_round(round + 1);
 
             // Clear the beacon state.
-            self.committee_selection_beacon.clear();
+            self.clear_committee_selection_beacons();
+
+            // Clear the non-revealing nodes table from the previous round.
+            self.clear_committee_selection_beacon_non_revealing_node();
         }
 
         // Return success.
@@ -532,9 +538,6 @@ impl<B: Backend> StateExecutor<B> {
         self.set_committee_selection_beacon_round(round + 1);
 
         // Save non-revealing nodes to state so we can reject any commits in the next round.
-        // Clear existing non-revealing nodes table first.
-        self.committee_selection_beacon_non_revealing_node.clear();
-        // TODO(snormore): Do we need to clear this in other places like on epoch change?
         let beacons = self.committee_selection_beacon.as_map();
         let non_revealing_nodes = beacons
             .iter()
@@ -615,6 +618,10 @@ impl<B: Backend> StateExecutor<B> {
 
     fn clear_committee_selection_beacons(&self) {
         self.committee_selection_beacon.clear();
+    }
+
+    fn clear_committee_selection_beacon_non_revealing_node(&self) {
+        self.committee_selection_beacon_non_revealing_node.clear();
     }
 
     fn get_committee_selection_beacon_round(&self) -> Option<u64> {
