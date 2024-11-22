@@ -299,7 +299,7 @@ async fn handle_consensus_output<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
         ctx.on_committee = ctx.committee.contains(&ctx.our_index);
 
         if !is_epoch_era_changed {
-            ctx.txn_store.change_committee(&ctx.committee);
+            ctx.txn_store.change_epoch(&ctx.committee);
         }
     }
 }
@@ -547,7 +547,7 @@ async fn execute_digest<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: E
                     .unwrap_or(u32::MAX);
                 ctx.on_committee = ctx.committee.contains(&ctx.our_index);
                 ctx.reconfigure_notify.notify_waiters();
-                ctx.txn_store.change_committee(&ctx.committee);
+                ctx.txn_store.change_epoch(&ctx.committee);
             }
         },
         Err(not_executed) => {
