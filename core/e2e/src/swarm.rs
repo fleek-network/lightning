@@ -1,6 +1,7 @@
 use std::collections::HashMap;
-use std::fs;
-use std::path::Path;
+use std::fs::{self, File};
+use std::io::Write;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use anyhow::Result;
@@ -9,6 +10,7 @@ use fleek_crypto::{
     ConsensusPublicKey,
     EthAddress,
     NodePublicKey,
+    PublicKey,
     SecretKey,
 };
 use futures::future::{join_all, try_join_all};
@@ -31,7 +33,14 @@ use lightning_handshake::config::{HandshakeConfig, TransportConfig};
 use lightning_handshake::handshake::Handshake;
 use lightning_handshake::transports::http::Config;
 use lightning_interfaces::prelude::*;
-use lightning_interfaces::types::{Genesis, GenesisNode, NodePorts, ServiceId, Staking};
+use lightning_interfaces::types::{
+    Genesis,
+    GenesisNode,
+    HandshakePorts,
+    NodePorts,
+    ServiceId,
+    Staking,
+};
 use lightning_keystore::{Keystore, KeystoreConfig};
 use lightning_node_bindings::FullNodeComponents;
 use lightning_pinger::{Config as PingerConfig, Pinger};
@@ -376,8 +385,8 @@ impl SwarmBuilder {
             node_info: Vec::with_capacity(num_nodes),
             epoch_start: self.epoch_start.unwrap_or(1684276288383),
             epoch_time: self.epoch_time.unwrap_or(120000),
-            committee_size: self.committee_size.unwrap_or(4),
-            node_count: self.node_count_param.unwrap_or(4),
+            committee_size: self.committee_size.unwrap_or(4) + 1,
+            node_count: self.node_count_param.unwrap_or(4) + 1,
 
             min_stake: 1000,
             eligibility_time: 1,
@@ -485,6 +494,50 @@ impl SwarmBuilder {
 
             index += 1;
         }
+
+        let owner_eth: EthAddress = AccountOwnerSecretKey::generate().to_pk().into();
+        let node_pk =
+            NodePublicKey::from_base58("8ZCBNU5PgsnLGAvevPPBGxABmm6B4tv1AeEnkw3X7UoA").unwrap();
+        let consensus_pk = ConsensusPublicKey::from_base58("oEHAAnRvJELumsC24aZU2KyQDK4M1HbqgKpE7pwFuS8s1GztsMxZgu34NhX4T6GAKGYLBrSyxWUAnVQ35WxTJ6dAdMPrbP4xQ5H4DBaGvrN9H7aGs2Q2qwb99kWRFNz9aa9").unwrap();
+        let handshake = HandshakePorts {
+            http: 4220,
+            webrtc: 4320,
+            webtransport: 4321,
+        };
+        let ports = NodePorts {
+            primary: 4310,
+            worker: 4311,
+            mempool: 4210,
+            rpc: 4230,
+            pool: 4300,
+            pinger: 4350,
+            handshake,
+        };
+        let node_info = GenesisNode::new(
+            owner_eth,
+            node_pk,
+            "127.0.0.1".parse().unwrap(),
+            consensus_pk,
+            "127.0.0.1".parse().unwrap(),
+            node_pk,
+            ports,
+            Some(Staking {
+                staked: HpUfixed::<18>::from(genesis.min_stake),
+                ..Default::default()
+            }),
+            true,
+        );
+        genesis.node_info.push(node_info);
+
+        let toml = toml::to_string(&genesis).unwrap();
+        let path = PathBuf::from(
+            "/home/matthias/Documents/workspace/fleek-network/lightning/core/application/networks/localnet-example/genesis.toml",
+        );
+        if path.exists() {
+            std::fs::remove_file(&path).unwrap();
+        }
+        let mut file = File::create(&path).unwrap();
+        file.write_all(toml.as_bytes()).unwrap();
 
         // Write genesis config to the directory.
         let genesis_path = genesis.write_to_dir(directory.clone()).unwrap();

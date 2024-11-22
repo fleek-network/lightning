@@ -551,6 +551,9 @@ impl<B: Backend> StateExecutor<B> {
             self.committee_selection_beacon_non_revealing_node
                 .set(*node_index, ());
         }
+        println!("#########################################################");
+        println!("non_revealing_nodes: {non_revealing_nodes:?}");
+        println!("#########################################################");
 
         // Slash non-revealing nodes and remove from the committee and active set of nodes if they
         // no longer have sufficient stake.
