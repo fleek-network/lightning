@@ -298,7 +298,9 @@ async fn handle_consensus_output<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
             .unwrap_or(u32::MAX);
         ctx.on_committee = ctx.committee.contains(&ctx.our_index);
 
-        ctx.txn_store.change_committee(&ctx.committee);
+        if !is_epoch_era_changed {
+            ctx.txn_store.change_committee(&ctx.committee);
+        }
     }
 }
 
