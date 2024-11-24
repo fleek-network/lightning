@@ -57,78 +57,54 @@ mod tests {
     use crate::bucket::file::B3FSFile;
     use crate::bucket::tests::get_random_file;
 
-    #[tokio::test]
-    async fn test_writer_should_work() {
+    async fn writer_with(test_name: &str, n_blocks: usize, additional_bytes: usize) {
         let temp_dir_name = random::<[u8; 32]>();
-        let temp_dir = temp_dir().join(format!(
-            "test_writer_should_work_{}",
-            utils::to_hex(&temp_dir_name)
-        ));
+        let temp_dir = temp_dir().join(format!("{}_{}", test_name, utils::to_hex(&temp_dir_name)));
         let bucket = Bucket::open(&temp_dir).await.unwrap();
         let mut writer = FileWriter::new(&bucket).await.unwrap();
-        let data = get_random_file(8192 * 2);
+        let mut data = get_random_file(8192 * n_blocks);
+        let mut number_blocks = n_blocks;
+        for _ in 0..additional_bytes {
+            data.push(random());
+        }
+        if additional_bytes > 0 {
+            number_blocks += 1;
+        }
         writer.write(&data).await.unwrap();
         writer.commit().await.unwrap();
-        verify_writer(&temp_dir, 2).await;
+        verify_writer(&temp_dir, number_blocks).await;
     }
 
     #[tokio::test]
-    async fn test_writer_should_work_more_blocks() {
-        let temp_dir_name = random::<[u8; 32]>();
-        let temp_dir = temp_dir().join(format!(
-            "test_writer_should_work_more_blocks_{}",
-            utils::to_hex(&temp_dir_name)
-        ));
-        let bucket = Bucket::open(&temp_dir).await.unwrap();
-        let mut writer = FileWriter::new(&bucket).await.unwrap();
-        let data = get_random_file(32768);
-        writer.write(&data).await.unwrap();
-        writer.commit().await.unwrap();
-        verify_writer(&temp_dir, 4).await;
-    }
-
-    #[tokio::test]
-    async fn test_writer_should_work_exact_one_block() {
-        let temp_dir_name = random::<[u8; 32]>();
-        let temp_dir = temp_dir().join(format!(
-            "test_writer_should_work_exact_one_block_{}",
-            utils::to_hex(&temp_dir_name)
-        ));
-        let bucket = Bucket::open(&temp_dir).await.unwrap();
-        let mut writer = FileWriter::new(&bucket).await.unwrap();
-        let data = get_random_file(MAX_BLOCK_SIZE_IN_BYTES / 32);
-        writer.write(&data).await.unwrap();
-        writer.commit().await.unwrap();
-        verify_writer(&temp_dir, 1).await;
+    async fn test_writer_should_work_with_full_blocks() {
+        let test_name = "test_writer_should_work_with_full_blocks";
+        for i in 1..10 {
+            let test_name = format!("{}_{}", test_name, i);
+            writer_with(&test_name, i, 0).await;
+        }
     }
 
     #[tokio::test]
     async fn test_writer_should_work_with_few_bytes() {
-        let temp_dir_name = random::<[u8; 32]>();
-        let temp_dir = temp_dir().join(format!(
-            "ttest_writer_should_work_with_few_bytes_{}",
-            utils::to_hex(&temp_dir_name)
-        ));
-        let bucket = Bucket::open(&temp_dir).await.unwrap();
-        let mut writer = FileWriter::new(&bucket).await.unwrap();
-        let data = get_random_file(1);
-        writer.write(&data).await.unwrap();
-        writer.commit().await.unwrap();
-        verify_writer(&temp_dir, 1).await;
+        let test_name = "test_writer_should_work_with_few_bytes";
+        for i in 1..10 {
+            let test_name = &format!("{}_{}", test_name, i);
+            writer_with(test_name, 0, i * 20).await;
+        }
     }
 
     #[tokio::test]
-    async fn test_writer_should_work_with_one_block_and_few_more_bytes() {
-        let temp_dir_name = random::<[u8; 32]>();
-        let temp_dir = temp_dir().join(format!(
-            "ttest_writer_should_work_with_one_block_and_few_more_bytes_{}",
-            utils::to_hex(&temp_dir_name)
-        ));
-        let bucket = Bucket::open(&temp_dir).await.unwrap();
-        let mut writer = FileWriter::new(&bucket).await.unwrap();
-        let data = get_random_file(8193);
-        writer.write(&data).await.unwrap();
-        writer.commit().await.unwrap();
-        verify_writer(&temp_dir, 2).await;
+    async fn test_writer_should_work_with_one_byte() {
+        let test_name = "test_writer_should_work_with_one_byte";
+        writer_with(test_name, 0, 1).await;
+    }
+
+    #[tokio::test]
+    async fn test_writer_should_work_with_full_blocks_and_few_more_bytes() {
+        let test_name = "test_writer_should_work_with_full_blocks_and_few_more_bytes";
+        for i in 1..10 {
+            let test_name = &format!("{}_{}", test_name, i);
+            writer_with(test_name, i, i * 20).await;
+        }
     }
 }
