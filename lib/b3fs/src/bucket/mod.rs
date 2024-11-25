@@ -206,6 +206,10 @@ impl ContentHeader {
         self.is_dir()
             .then(|| dir::reader::B3Dir::new(self.num_entries, self.header_file))
     }
+
+    pub fn blocks(&self) -> u32 {
+        self.num_entries
+    }
 }
 
 #[cfg(test)]

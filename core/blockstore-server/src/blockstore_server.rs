@@ -358,48 +358,54 @@ async fn handle_request<C: Collection>(
     if let Ok(tree) = blockstore.get_bucket().get(&peer_request.hash).await {
         let mut num_bytes = 0;
         let instant = Instant::now();
-        for block in 0..tree.len() {
-            let compr = CompressionAlgoSet::default(); // rustfmt
 
-            // TODO: Check this with @parsa. How to map this get?
-            let Some(chunk) = blockstore.get(block as u32, &tree[block], compr).await else {
-                break;
-            };
+        if let Some(file) = tree.into_file() {
+            let reader = file.hashtree().await?;
+            for block in 0..tree.blocks() {
+                let hash = match reader.get_hash(block).await {
+                    Ok(Some(hash)) => hash,
+                    Ok(_) => break,
+                    Err(e) => return request.reject(RejectReason::Other),       
+                };
 
-            let proof = if block == 0 {
-                ProofBuf::new(tree.as_ref(), 0)
-            } else {
-                ProofBuf::resume(tree.as_ref(), block)
-            };
+                let Ok(proof) = reader.generate_proof(block).await else {
+                    return request.reject(RejectReason::Other);
+                }
 
-            if !proof.is_empty() {
-                num_bytes += proof.len();
+                if !proof.is_empty() {
+                    num_bytes += proof.len();
+                    if let Err(e) = request
+                        .send(Bytes::from(Frame::Proof(Cow::Borrowed(proof.as_slice()))))
+                        .await
+                    {
+                        error!("Failed to send proof: {e:?}");
+                        num_responses.fetch_sub(1, Ordering::Release);
+                        return;
+                    }
+                }
+
+                let block_path = blockstore.get_bucket().get_block_path(block, &hash);
+                let Ok(chunk) = tokio::fs::read(block_path).await else {
+                    return request.reject(RejectReason::ContentNotFound);
+                }
+
+                num_bytes += chunk.len();
                 if let Err(e) = request
-                    .send(Bytes::from(Frame::Proof(Cow::Borrowed(proof.as_slice()))))
+                    .send(Bytes::from(Frame::Chunk(Cow::Borrowed(&chunk))))
                     .await
                 {
-                    error!("Failed to send proof: {e:?}");
+                    error!("Failed to send chunk: {e:?}");
                     num_responses.fetch_sub(1, Ordering::Release);
                     return;
                 }
             }
-
-            num_bytes += chunk.content.len();
-            if let Err(e) = request
-                .send(Bytes::from(Frame::Chunk(Cow::Borrowed(
-                    chunk.content.as_slice(),
-                ))))
-                .await
-            {
-                error!("Failed to send chunk: {e:?}");
-                num_responses.fetch_sub(1, Ordering::Release);
-                return;
+            if let Err(e) = request.send(Bytes::from(Frame::Eos)).await {
+                error!("Failed to send eos: {e:?}");
+            } else {
+                rep_reporter.report_bytes_sent(peer, num_bytes as u64, Some(instant.elapsed()));
             }
-        }
-        if let Err(e) = request.send(Bytes::from(Frame::Eos)).await {
-            error!("Failed to send eos: {e:?}");
         } else {
-            rep_reporter.report_bytes_sent(peer, num_bytes as u64, Some(instant.elapsed()));
+            request.reject(RejectReason::ContentNotFound);
         }
     } else {
         request.reject(RejectReason::ContentNotFound);
