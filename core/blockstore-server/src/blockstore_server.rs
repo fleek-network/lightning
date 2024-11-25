@@ -11,12 +11,10 @@ use std::time::{Duration, Instant};
 
 use affair::{Socket, Task};
 use anyhow::{anyhow, Result};
-use blake3_tree::ProofBuf;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
     Blake3Hash,
-    CompressionAlgoSet,
     CompressionAlgorithm,
     NodeIndex,
     PeerRequestError,
@@ -359,18 +357,21 @@ async fn handle_request<C: Collection>(
         let mut num_bytes = 0;
         let instant = Instant::now();
 
+        let num_blocks = tree.blocks();
         if let Some(file) = tree.into_file() {
-            let reader = file.hashtree().await?;
-            for block in 0..tree.blocks() {
+            let Ok(ref mut reader) = file.hashtree().await else {
+                return request.reject(RejectReason::ContentNotFound);
+            };
+            for block in 0..num_blocks {
                 let hash = match reader.get_hash(block).await {
                     Ok(Some(hash)) => hash,
                     Ok(_) => break,
-                    Err(e) => return request.reject(RejectReason::Other),       
+                    Err(_) => return request.reject(RejectReason::Other),
                 };
 
                 let Ok(proof) = reader.generate_proof(block).await else {
                     return request.reject(RejectReason::Other);
-                }
+                };
 
                 if !proof.is_empty() {
                     num_bytes += proof.len();
@@ -387,7 +388,7 @@ async fn handle_request<C: Collection>(
                 let block_path = blockstore.get_bucket().get_block_path(block, &hash);
                 let Ok(chunk) = tokio::fs::read(block_path).await else {
                     return request.reject(RejectReason::ContentNotFound);
-                }
+                };
 
                 num_bytes += chunk.len();
                 if let Err(e) = request
