@@ -43,6 +43,7 @@
 //! [1]: file::reader::File
 //! [2]: dir::reader::Dir
 
+use core::hash;
 use std::io::{Error, ErrorKind, Result};
 use std::path::{Path, PathBuf};
 
@@ -156,8 +157,7 @@ impl Bucket {
         })
     }
 
-    pub fn get_block_path(&self, counter: u32, hash: &[u8; 32]) -> PathBuf {
-        // TODO(qti3e): use the counter in file name.
+    pub fn get_block_path(&self, hash: &[u8; 32]) -> PathBuf {
         let mut path = self.blocks.clone();
         path.push(to_hex(hash).as_str());
         path
@@ -167,6 +167,16 @@ impl Bucket {
         let mut path = self.headers.clone();
         path.push(to_hex(hash).as_str());
         path
+    }
+
+    pub async fn get_block_content(&self, hash: &[u8; 32]) -> Result<Option<Vec<u8>>> {
+        let path = self.get_block_path(hash);
+        if tokio::fs::try_exists(path.clone()).await? {
+            let read = tokio::fs::read(path).await?;
+            Ok(Some(read))
+        } else {
+            Ok(None)
+        }
     }
 
     pub(crate) fn get_new_wal_path(&self) -> PathBuf {

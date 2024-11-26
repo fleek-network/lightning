@@ -6732,6 +6732,7 @@ version = "0.0.0"
 dependencies = [
  "affair",
  "anyhow",
+ "b3fs",
  "blake3-tree",
  "bytes",
  "fleek-crypto",

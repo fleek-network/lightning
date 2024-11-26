@@ -11,11 +11,11 @@ use std::time::{Duration, Instant};
 
 use affair::{Socket, Task};
 use anyhow::{anyhow, Result};
+use b3fs::bucket::file::uwriter::UntrustedFileWriter;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
     Blake3Hash,
-    CompressionAlgorithm,
     NodeIndex,
     PeerRequestError,
     RejectReason,
@@ -24,7 +24,7 @@ use lightning_interfaces::types::{
 use lightning_interfaces::ServiceScope;
 use lightning_metrics::increment_counter;
 use serde::{Deserialize, Serialize};
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::{broadcast, mpsc, RwLock};
 use tokio::task::JoinSet;
 use tokio::time::timeout;
 use tokio_stream::StreamExt;
@@ -297,6 +297,7 @@ impl TryFrom<Bytes> for PeerRequest {
 pub enum Frame<'a> {
     Proof(Cow<'a, [u8]>),
     Chunk(Cow<'a, [u8]>),
+    LastChunk(Cow<'a, [u8]>),
     Eos,
 }
 
@@ -312,8 +313,12 @@ impl<'a> From<Frame<'a>> for Bytes {
                 b.put_u8(0x01);
                 b.put_slice(&chunk);
             },
-            Frame::Eos => {
+            Frame::LastChunk(chunk) => {
                 b.put_u8(0x02);
+                b.put_slice(&chunk);
+            },
+            Frame::Eos => {
+                b.put_u8(0x03);
             },
         }
         b.freeze()
@@ -396,16 +401,18 @@ async fn handle_request<C: Collection>(
                     }
                 }
 
-                let block_path = blockstore.get_bucket().get_block_path(block, &hash);
-                let Ok(chunk) = tokio::fs::read(block_path).await else {
-                    return request.reject(RejectReason::ContentNotFound);
+                let chunk = match blockstore.get_bucket().get_block_content(&hash).await {
+                    Ok(Some(chunk)) => chunk,
+                    _ => return request.reject(RejectReason::ContentNotFound),
                 };
 
                 num_bytes += chunk.len();
-                if let Err(e) = request
-                    .send(Bytes::from(Frame::Chunk(Cow::Borrowed(&chunk))))
-                    .await
-                {
+                let frame = if block == num_blocks - 1 {
+                    Frame::LastChunk(Cow::Borrowed(&chunk))
+                } else {
+                    Frame::Chunk(Cow::Borrowed(&chunk))
+                };
+                if let Err(e) = request.send(Bytes::from(frame)).await {
                     error!("Failed to send chunk: {e:?}");
                     num_responses.fetch_sub(1, Ordering::Release);
                     return;
@@ -443,7 +450,12 @@ async fn send_request<C: Collection>(
             match response.status_code() {
                 Ok(()) => {
                     let mut body = response.body();
-                    let mut writer = UntrustedFileWriter::new();
+                    let bucket = blockstore.get_bucket();
+                    let writer = Arc::new(RwLock::new(
+                        UntrustedFileWriter::new(&bucket, request.hash)
+                            .await
+                            .unwrap(),
+                    ));
                     let mut bytes_recv = 0;
                     let instant = Instant::now();
 
@@ -462,15 +474,25 @@ async fn send_request<C: Collection>(
                             });
                         };
                         match frame {
-                            Frame::Proof(proof) => putter.feed_proof(&proof).unwrap(),
-                            Frame::Chunk(chunk) => putter
-                                .write(&chunk, CompressionAlgorithm::Uncompressed)
-                                .unwrap(),
+                            Frame::Proof(proof) => {
+                                writer.write().await.feed_proof(&proof).await.unwrap()
+                            },
+                            Frame::Chunk(chunk) => {
+                                writer.write().await.write(&chunk, false).await.unwrap()
+                            },
+                            Frame::LastChunk(chunk) => {
+                                writer.write().await.write(&chunk, true).await.unwrap()
+                            },
                             Frame::Eos => {
                                 // TODO: Handle premature end of stream errors instead of
                                 // unwrapping here, since we there could be an upstream blockstore
                                 // miss where the server would send an EOS frame.
-                                let _hash = putter.finalize().await.unwrap();
+                                let _hash = Arc::try_unwrap(writer)
+                                    .unwrap()
+                                    .into_inner()
+                                    .commit()
+                                    .await
+                                    .unwrap();
                                 // TODO(matthias): do we have to compare this hash to the
                                 // requested hash?
                                 let duration = instant.elapsed();

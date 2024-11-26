@@ -127,8 +127,8 @@ impl HeaderFile {
 
         tokio::fs::rename(header_tmp_file_path, final_path).await?;
 
-        for (i, (hash, path)) in block_files.iter().enumerate() {
-            let final_hash_file = bucket.get_block_path(i as u32, hash);
+        for (hash, path) in block_files.iter() {
+            let final_hash_file = bucket.get_block_path(hash);
             tokio::fs::rename(path, final_hash_file).await?;
         }
 

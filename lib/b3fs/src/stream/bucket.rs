@@ -13,6 +13,7 @@ use tokio_stream::Stream;
 
 use crate::bucket::dir::reader::B3Dir;
 use crate::bucket::dir::HeaderPositions;
+use crate::bucket::errors::ReadError;
 use crate::bucket::file::reader::B3File;
 use crate::bucket::{
     self,
@@ -184,9 +185,14 @@ impl Stream for FileStream {
                 let curr_block = this.current_block;
                 let waker = cx.waker().clone();
                 let curr_hash = this.current_hash;
-                let buck_path = this.bucket.get_block_path(curr_block, &curr_hash).clone();
+                let bucket = this.bucket.clone();
                 let future = async move {
-                    let result = tokio::fs::read(buck_path).await;
+                    let result = bucket.get_block_content(&curr_hash).await.and_then(|o| {
+                        o.ok_or(std::io::Error::new(
+                            std::io::ErrorKind::Other,
+                            "Block not found",
+                        ))
+                    });
                     waker.wake();
                     result
                 };
