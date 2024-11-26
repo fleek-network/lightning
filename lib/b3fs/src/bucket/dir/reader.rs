@@ -235,7 +235,7 @@ impl B3Dir {
         offset: u32,
     ) -> Result<Option<BorrowedEntry<'a>>, errors::ReadError> {
         let start_entry: u64 =
-            self.positions.position_start_entries as u64 + offset as u64 - name.len() as u64 - 4;
+            self.positions.position_start_entries as u64 + offset as u64 - name.len() as u64 - 3;
         let file = self.position_file(start_entry).await?;
         let mut file = BufReader::new(file);
         let flag = file.read_u8().await;
@@ -279,7 +279,7 @@ mod tests {
 
     use super::*;
     use crate::bucket::dir::writer::DirWriter;
-    use crate::bucket::{Bucket, HEADER_TYPE_DIR, HEADER_VERSION};
+    use crate::bucket::{Bucket, HEADER_DIR_VERSION};
     use crate::entry::OwnedEntry;
     use crate::utils::to_hex;
 
@@ -305,10 +305,8 @@ mod tests {
                 .join(to_hex(&root_hash).to_string()),
         )
         .await?;
-        let ty = file.read_u8().await?;
-        assert_eq!(ty, HEADER_TYPE_DIR);
         let version = file.read_u32_le().await?;
-        assert_eq!(version, HEADER_VERSION);
+        assert_eq!(version, HEADER_DIR_VERSION);
         let num_entries = file.read_u32_le().await?;
         let file = Arc::new(file);
 

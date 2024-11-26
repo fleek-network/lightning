@@ -52,8 +52,8 @@ impl B3FSFile {
 
     pub fn deserialize(data: &[u8]) -> Self {
         // Skip type
-        let version: u32 = u32::from_le_bytes(*array_ref!(data, 1, 4));
-        let num_entries: u32 = u32::from_le_bytes(*array_ref!(data, 5, 4));
+        let version: u32 = u32::from_le_bytes(*array_ref!(data, 0, 4));
+        let num_entries: u32 = u32::from_le_bytes(*array_ref!(data, 4, 4));
         let num_hashes = (2 * num_entries) - 1;
         assert!(
             data.len() == POSITION_START_HASHES + num_hashes as usize * 32,
@@ -94,7 +94,12 @@ mod tests {
     use crate::bucket::file::writer::FileWriter;
     use crate::bucket::file::B3FSFile;
     use crate::bucket::tests::get_random_file;
-    use crate::bucket::{Bucket, POSITION_START_HASHES, POSITION_START_NUM_ENTRIES};
+    use crate::bucket::{
+        Bucket,
+        HEADER_FILE_VERSION,
+        POSITION_START_HASHES,
+        POSITION_START_NUM_ENTRIES,
+    };
     use crate::hasher::b3::MAX_BLOCK_SIZE_IN_BYTES;
     use crate::utils;
 
@@ -126,7 +131,7 @@ mod tests {
         let file_header = std::fs::read(file_header).unwrap();
         let b3fs = B3FSFile::deserialize(&file_header);
         let num_hashes = 2 * n - 1;
-        assert_eq!(1, b3fs.version);
+        assert_eq!(HEADER_FILE_VERSION, b3fs.version);
         assert_eq!(n, b3fs.num_entries as usize);
         assert_eq!(num_hashes, b3fs.hashes.len());
 

@@ -15,8 +15,7 @@ use tokio::io::{self, AsyncWriteExt, BufWriter};
 use crate::bucket::{
     errors,
     Bucket,
-    HEADER_TYPE_FILE,
-    HEADER_VERSION,
+    HEADER_FILE_VERSION,
     POSITION_START_HASHES,
     POSITION_START_NUM_ENTRIES,
 };
@@ -108,8 +107,7 @@ impl HeaderFile {
                 .await?,
         );
         let num_entries: u32 = 0;
-        file.write_u8(HEADER_TYPE_FILE).await?;
-        file.write_u32_le(HEADER_VERSION).await?;
+        file.write_u32_le(HEADER_FILE_VERSION).await?;
         file.write_u32_le(num_entries).await?;
         file.flush().await?;
 

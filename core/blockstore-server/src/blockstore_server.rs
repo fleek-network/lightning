@@ -359,18 +359,29 @@ async fn handle_request<C: Collection>(
 
         let num_blocks = tree.blocks();
         if let Some(file) = tree.into_file() {
-            let Ok(ref mut reader) = file.hashtree().await else {
-                return request.reject(RejectReason::ContentNotFound);
+            let mut reader = match file.hashtree().await {
+                Ok(reader) => reader,
+                Err(e) => {
+                    error!("Failed to get Async HashTree {}", e);
+                    return request.reject(RejectReason::ContentNotFound);
+                },
             };
             for block in 0..num_blocks {
                 let hash = match reader.get_hash(block).await {
                     Ok(Some(hash)) => hash,
                     Ok(_) => break,
-                    Err(_) => return request.reject(RejectReason::Other),
+                    Err(e) => {
+                        error!("Failed to read hash from block {} - {}", block, e);
+                        return request.reject(RejectReason::Other);
+                    },
                 };
 
-                let Ok(proof) = reader.generate_proof(block).await else {
-                    return request.reject(RejectReason::Other);
+                let proof = match reader.generate_proof(block).await {
+                    Ok(p) => p,
+                    Err(e) => {
+                        error!("Failed to generate proof {}", e);
+                        return request.reject(RejectReason::Other);
+                    },
                 };
 
                 if !proof.is_empty() {
@@ -432,7 +443,7 @@ async fn send_request<C: Collection>(
             match response.status_code() {
                 Ok(()) => {
                     let mut body = response.body();
-                    let mut putter = blockstore.put(Some(request.hash));
+                    let mut writer = UntrustedFileWriter::new();
                     let mut bytes_recv = 0;
                     let instant = Instant::now();
 
