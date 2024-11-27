@@ -272,6 +272,7 @@ impl B3Dir {
 #[cfg(test)]
 mod tests {
     use std::env::temp_dir;
+    use std::io::Read;
     use std::path::{Path, PathBuf};
 
     use tokio::io::AsyncWriteExt;
@@ -378,19 +379,12 @@ mod tests {
         let mut count = 0;
 
         while let Some(entry) = iter.next().await {
-            let entry = entry.unwrap();
+            let OwnedEntry { name, link } = entry.unwrap();
             count += 1;
-            match entry.name {
-                b"aa_file1" | b"aa_file2" | b"bb_file3" => {
-                    assert!(matches!(entry.link, BorrowedLink::Content(_)))
-                },
-                b"aa_symlink" | b"bb_symlink2" | b"bb_symlink3" => {
-                    assert!(matches!(entry.link, BorrowedLink::Path(_)))
-                },
-                _ => panic!(
-                    "Unexpected entry: {:?}",
-                    String::from_utf8(entry.name.to_vec()).unwrap()
-                ),
+            if name.windows(4).any(|s| s == "file".as_bytes()) {
+                assert!(matches!(link, OwnedLink::Content(_)))
+            } else {
+                assert!(matches!(link, OwnedLink::Link(_)))
             }
         }
 

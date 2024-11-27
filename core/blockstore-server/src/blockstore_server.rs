@@ -354,83 +354,131 @@ async fn handle_request<C: Collection>(
     peer: NodeIndex,
     peer_request: PeerRequest,
     blockstore: C::BlockstoreInterface,
-    mut request: <c!(C::PoolInterface::Responder) as ResponderInterface>::Request,
+    request: <c!(C::PoolInterface::Responder) as ResponderInterface>::Request,
     num_responses: Arc<AtomicUsize>,
     rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
 ) {
     if let Ok(tree) = blockstore.get_bucket().get(&peer_request.hash).await {
-        let mut num_bytes = 0;
-        let instant = Instant::now();
-
         let num_blocks = tree.blocks();
-        if let Some(file) = tree.into_file() {
-            let mut reader = match file.hashtree().await {
-                Ok(reader) => reader,
-                Err(e) => {
-                    error!("Failed to get Async HashTree {}", e);
-                    return request.reject(RejectReason::ContentNotFound);
-                },
-            };
-            for block in 0..num_blocks {
-                let hash = match reader.get_hash(block).await {
-                    Ok(Some(hash)) => hash,
-                    Ok(_) => break,
-                    Err(e) => {
-                        error!("Failed to read hash from block {} - {}", block, e);
-                        return request.reject(RejectReason::Other);
-                    },
-                };
-
-                let proof = match reader.generate_proof(block).await {
-                    Ok(p) => p,
-                    Err(e) => {
-                        error!("Failed to generate proof {}", e);
-                        return request.reject(RejectReason::Other);
-                    },
-                };
-
-                if !proof.is_empty() {
-                    num_bytes += proof.len();
-                    if let Err(e) = request
-                        .send(Bytes::from(Frame::Proof(Cow::Borrowed(proof.as_slice()))))
-                        .await
-                    {
-                        error!("Failed to send proof: {e:?}");
-                        num_responses.fetch_sub(1, Ordering::Release);
-                        return;
-                    }
-                }
-
-                let chunk = match blockstore.get_bucket().get_block_content(&hash).await {
-                    Ok(Some(chunk)) => chunk,
-                    _ => return request.reject(RejectReason::ContentNotFound),
-                };
-
-                num_bytes += chunk.len();
-                let frame = if block == num_blocks - 1 {
-                    Frame::LastChunk(Cow::Borrowed(&chunk))
-                } else {
-                    Frame::Chunk(Cow::Borrowed(&chunk))
-                };
-                if let Err(e) = request.send(Bytes::from(frame)).await {
-                    error!("Failed to send chunk: {e:?}");
-                    num_responses.fetch_sub(1, Ordering::Release);
-                    return;
-                }
-            }
-            if let Err(e) = request.send(Bytes::from(Frame::Eos)).await {
-                error!("Failed to send eos: {e:?}");
+        if tree.is_file() {
+            if let Some(file) = tree.into_file() {
+                send_file::<C>(
+                    file,
+                    request,
+                    num_blocks,
+                    &num_responses,
+                    blockstore,
+                    rep_reporter,
+                    peer,
+                )
+                .await;
             } else {
-                rep_reporter.report_bytes_sent(peer, num_bytes as u64, Some(instant.elapsed()));
+                error!(
+                    "Content Header detected a File type but it could not be converted into File"
+                );
+                request.reject(RejectReason::Other);
+            }
+        } else if let Some(dir) = tree.into_dir() {
+            match dir.entries().await {
+                Ok(dir_reader) => {
+                    let mut dir_reader = dir_reader;
+                    while let Some(e) = dir_reader.next().await {
+                        match e {
+                            Ok(entry) => todo!(),
+                            Err(e) => {
+                                error!("Error getting reading entry from dir {}", e);
+                                return request.reject(RejectReason::Other);
+                            },
+                        }
+                    }
+                },
+                Err(e) => {
+                    error!("Error getting directory reader {}", e);
+                    request.reject(RejectReason::Other);
+                },
             }
         } else {
-            request.reject(RejectReason::ContentNotFound);
+            error!(
+                "Content Header detected a Directory type but it could not be converted into Dir"
+            );
+            request.reject(RejectReason::Other);
         }
     } else {
         request.reject(RejectReason::ContentNotFound);
     }
 
     num_responses.fetch_sub(1, Ordering::Release);
+}
+
+async fn send_file<C: Collection>(
+    file: b3fs::bucket::file::reader::B3File,
+    mut request: <c!(C::PoolInterface::Responder) as ResponderInterface>::Request,
+    num_blocks: u32,
+    num_responses: &Arc<AtomicUsize>,
+    blockstore: <C as Collection>::BlockstoreInterface,
+    rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
+    peer: u32,
+) {
+    let mut num_bytes = 0;
+    let instant = Instant::now();
+    let mut reader = match file.hashtree().await {
+        Ok(reader) => reader,
+        Err(e) => {
+            error!("Failed to get Async HashTree {}", e);
+            return request.reject(RejectReason::ContentNotFound);
+        },
+    };
+    for block in 0..num_blocks {
+        let hash = match reader.get_hash(block).await {
+            Ok(Some(hash)) => hash,
+            Ok(_) => break,
+            Err(e) => {
+                error!("Failed to read hash from block {} - {}", block, e);
+                return request.reject(RejectReason::Other);
+            },
+        };
+
+        let proof = match reader.generate_proof(block).await {
+            Ok(p) => p,
+            Err(e) => {
+                error!("Failed to generate proof {}", e);
+                return request.reject(RejectReason::Other);
+            },
+        };
+
+        if !proof.is_empty() {
+            num_bytes += proof.len();
+            if let Err(e) = request
+                .send(Bytes::from(Frame::Proof(Cow::Borrowed(proof.as_slice()))))
+                .await
+            {
+                error!("Failed to send proof: {e:?}");
+                num_responses.fetch_sub(1, Ordering::Release);
+                return;
+            }
+        }
+
+        let chunk = match blockstore.get_bucket().get_block_content(&hash).await {
+            Ok(Some(chunk)) => chunk,
+            _ => return request.reject(RejectReason::ContentNotFound),
+        };
+
+        num_bytes += chunk.len();
+        let frame = if block == num_blocks - 1 {
+            Frame::LastChunk(Cow::Borrowed(&chunk))
+        } else {
+            Frame::Chunk(Cow::Borrowed(&chunk))
+        };
+        if let Err(e) = request.send(Bytes::from(frame)).await {
+            error!("Failed to send chunk: {e:?}");
+            num_responses.fetch_sub(1, Ordering::Release);
+        }
+    }
+    if let Err(e) = request.send(Bytes::from(Frame::Eos)).await {
+        error!("Failed to send eos: {e:?}");
+    } else {
+        rep_reporter.report_bytes_sent(peer, num_bytes as u64, Some(instant.elapsed()));
+    }
 }
 
 async fn send_request<C: Collection>(
