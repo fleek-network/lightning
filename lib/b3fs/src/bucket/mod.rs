@@ -212,8 +212,14 @@ impl ContentHeader {
 
     /// If this content is a directory returns a [B3Dir][dir::reader::B3Dir].
     pub fn into_dir(self) -> Option<dir::reader::B3Dir> {
-        self.is_dir()
-            .then(|| dir::reader::B3Dir::new(self.num_entries, self.header_file))
+        let f = self.header_file.clone();
+        let file = Arc::try_unwrap(f).map(Some).unwrap_or_default();
+        if let Some(f) = file {
+            self.is_dir()
+                .then(|| dir::reader::B3Dir::new(self.num_entries, f))
+        } else {
+            None
+        }
     }
 
     pub fn blocks(&self) -> u32 {

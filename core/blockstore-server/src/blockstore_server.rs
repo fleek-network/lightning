@@ -3,6 +3,7 @@
 
 use std::borrow::Cow;
 use std::collections::{HashMap, VecDeque};
+use std::error::Error;
 use std::mem;
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -12,6 +13,7 @@ use std::time::{Duration, Instant};
 use affair::{Socket, Task};
 use anyhow::{anyhow, Result};
 use b3fs::bucket::file::uwriter::UntrustedFileWriter;
+use b3fs::entry::{InlineVec, OwnedEntry};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
@@ -295,9 +297,19 @@ impl TryFrom<Bytes> for PeerRequest {
 }
 
 pub enum Frame<'a> {
+    File(FileFrame<'a>),
+    Dir(DirFrame<'a>),
+}
+enum FileFrame<'a> {
     Proof(Cow<'a, [u8]>),
     Chunk(Cow<'a, [u8]>),
     LastChunk(Cow<'a, [u8]>),
+    Eos,
+}
+
+enum DirFrame<'a> {
+    Proof(Cow<'a, [u8]>),
+    Chunk(Cow<'a, OwnedEntry>),
     Eos,
 }
 
@@ -305,20 +317,45 @@ impl<'a> From<Frame<'a>> for Bytes {
     fn from(value: Frame) -> Self {
         let mut b = BytesMut::new();
         match value {
-            Frame::Proof(proof) => {
-                b.put_u8(0x00);
-                b.put_slice(&proof);
+            Frame::File(file) => match file {
+                FileFrame::Proof(proof) => {
+                    b.put_u8(0x00);
+                    b.put_slice(&proof);
+                },
+                FileFrame::Chunk(chunk) => {
+                    b.put_u8(0x01);
+                    b.put_slice(&chunk);
+                },
+                FileFrame::LastChunk(chunk) => {
+                    b.put_u8(0x02);
+                    b.put_slice(&chunk);
+                },
+                FileFrame::Eos => {
+                    b.put_u8(0x03);
+                },
             },
-            Frame::Chunk(chunk) => {
-                b.put_u8(0x01);
-                b.put_slice(&chunk);
-            },
-            Frame::LastChunk(chunk) => {
-                b.put_u8(0x02);
-                b.put_slice(&chunk);
-            },
-            Frame::Eos => {
-                b.put_u8(0x03);
+            Frame::Dir(dir) => match dir {
+                DirFrame::Proof(proof) => {
+                    b.put_u8(0x10);
+                    b.put_slice(&proof);
+                },
+                DirFrame::Chunk(chunk) => {
+                    b.put_u8(0x11);
+                    b.put_slice(&chunk.name);
+                    match &chunk.link {
+                        b3fs::entry::OwnedLink::Content(content) => {
+                            b.put_u8(0x00);
+                            b.put_slice(content);
+                        },
+                        b3fs::entry::OwnedLink::Link(link) => {
+                            b.put_u8(0x01);
+                            b.put_slice(link);
+                        },
+                    }
+                },
+                DirFrame::Eos => {
+                    b.put_u8(0x12);
+                },
             },
         }
         b.freeze()
@@ -330,9 +367,43 @@ impl TryFrom<Bytes> for Frame<'static> {
 
     fn try_from(mut value: Bytes) -> Result<Self> {
         match value.get_u8() {
-            0x00 => Ok(Frame::Proof(Cow::Owned(value.to_vec()))),
-            0x01 => Ok(Frame::Chunk(Cow::Owned(value.to_vec()))),
-            0x02 => Ok(Frame::Eos),
+            0x00 => Ok(Frame::File(FileFrame::Proof(Cow::Owned(value.to_vec())))),
+            0x01 => Ok(Frame::File(FileFrame::Chunk(Cow::Owned(value.to_vec())))),
+            0x02 => Ok(Frame::File(FileFrame::LastChunk(Cow::Owned(
+                value.to_vec(),
+            )))),
+            0x03 => Ok(Frame::File(FileFrame::Eos)),
+            0x10 => Ok(Frame::Dir(DirFrame::Proof(Cow::Owned(value.to_vec())))),
+            0x11 => {
+                let mut slice: [u8; 24] = [0; 24];
+                let bytes = value.copy_to_bytes(24);
+                slice.copy_from_slice(&bytes);
+                let name = InlineVec::from_buf(slice);
+                let ty = value.get_u8();
+                match ty {
+                    0x00 => {
+                        let mut content = [0; 32];
+                        let bytes = value.copy_to_bytes(32);
+                        content.copy_from_slice(&bytes);
+                        Ok(Frame::Dir(DirFrame::Chunk(Cow::Owned(OwnedEntry {
+                            name,
+                            link: b3fs::entry::OwnedLink::Content(content),
+                        }))))
+                    },
+                    0x01 => {
+                        let mut link = [0; 24];
+                        let bytes = value.copy_to_bytes(24);
+                        link.copy_from_slice(&bytes);
+                        let link = InlineVec::from_buf(link);
+                        Ok(Frame::Dir(DirFrame::Chunk(Cow::Owned(OwnedEntry {
+                            name,
+                            link: b3fs::entry::OwnedLink::Link(link),
+                        }))))
+                    },
+                    _ => Err(anyhow!("Unknown magic byte for OwnedEntry type")),
+                }
+            },
+            0x12 => Ok(Frame::Dir(DirFrame::Eos)),
             _ => Err(anyhow!("Unknown magic byte")),
         }
     }
@@ -379,24 +450,16 @@ async fn handle_request<C: Collection>(
                 request.reject(RejectReason::Other);
             }
         } else if let Some(dir) = tree.into_dir() {
-            match dir.entries().await {
-                Ok(dir_reader) => {
-                    let mut dir_reader = dir_reader;
-                    while let Some(e) = dir_reader.next().await {
-                        match e {
-                            Ok(entry) => todo!(),
-                            Err(e) => {
-                                error!("Error getting reading entry from dir {}", e);
-                                return request.reject(RejectReason::Other);
-                            },
-                        }
-                    }
-                },
-                Err(e) => {
-                    error!("Error getting directory reader {}", e);
-                    request.reject(RejectReason::Other);
-                },
-            }
+            send_dir::<C>(
+                dir,
+                request,
+                num_blocks,
+                &num_responses,
+                blockstore,
+                rep_reporter,
+                peer,
+            )
+            .await;
         } else {
             error!(
                 "Content Header detected a Directory type but it could not be converted into Dir"
@@ -449,7 +512,9 @@ async fn send_file<C: Collection>(
         if !proof.is_empty() {
             num_bytes += proof.len();
             if let Err(e) = request
-                .send(Bytes::from(Frame::Proof(Cow::Borrowed(proof.as_slice()))))
+                .send(Bytes::from(Frame::File(FileFrame::Proof(Cow::Borrowed(
+                    proof.as_slice(),
+                )))))
                 .await
             {
                 error!("Failed to send proof: {e:?}");
@@ -465,19 +530,51 @@ async fn send_file<C: Collection>(
 
         num_bytes += chunk.len();
         let frame = if block == num_blocks - 1 {
-            Frame::LastChunk(Cow::Borrowed(&chunk))
+            Frame::File(FileFrame::LastChunk(Cow::Borrowed(&chunk)))
         } else {
-            Frame::Chunk(Cow::Borrowed(&chunk))
+            Frame::File(FileFrame::Chunk(Cow::Borrowed(&chunk)))
         };
         if let Err(e) = request.send(Bytes::from(frame)).await {
             error!("Failed to send chunk: {e:?}");
             num_responses.fetch_sub(1, Ordering::Release);
         }
     }
-    if let Err(e) = request.send(Bytes::from(Frame::Eos)).await {
+    if let Err(e) = request.send(Bytes::from(Frame::File(FileFrame::Eos))).await {
         error!("Failed to send eos: {e:?}");
     } else {
         rep_reporter.report_bytes_sent(peer, num_bytes as u64, Some(instant.elapsed()));
+    }
+}
+
+async fn send_dir<C: Collection>(
+    dir: b3fs::bucket::dir::reader::B3Dir,
+    mut request: <c!(C::PoolInterface::Responder) as ResponderInterface>::Request,
+    num_blocks: u32,
+    num_responses: &Arc<AtomicUsize>,
+    blockstore: <C as Collection>::BlockstoreInterface,
+    rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
+    peer: u32,
+) {
+    match dir.entries().await {
+        Ok(dir_reader) => {
+            let mut dir_reader = dir_reader;
+            while let Some(e) = dir_reader.next().await {
+                match e {
+                    Ok(entry) => {
+                        let frame = Frame::Dir(DirFrame::)
+                        println!("Entry {}", entry);
+                    },
+                    Err(e) => {
+                        error!("Error getting reading entry from dir {}", e);
+                        return request.reject(RejectReason::Other);
+                    },
+                }
+            }
+        },
+        Err(e) => {
+            error!("Error getting directory reader {}", e);
+            request.reject(RejectReason::Other);
+        },
     }
 }
 
@@ -494,75 +591,65 @@ async fn send_request<C: Collection>(
     )
     .await
     {
-        Ok(Ok(response)) => {
-            match response.status_code() {
-                Ok(()) => {
-                    let mut body = response.body();
-                    let bucket = blockstore.get_bucket();
-                    let writer = Arc::new(RwLock::new(
-                        UntrustedFileWriter::new(&bucket, request.hash)
-                            .await
-                            .unwrap(),
-                    ));
-                    let mut bytes_recv = 0;
-                    let instant = Instant::now();
+        Ok(Ok(response)) => match response.status_code() {
+            Ok(()) => {
+                let mut body = response.body();
+                let bucket = blockstore.get_bucket();
+                let writer = Arc::new(RwLock::new(
+                    UntrustedFileWriter::new(&bucket, request.hash)
+                        .await
+                        .unwrap(),
+                ));
+                let mut bytes_recv = 0;
+                let instant = Instant::now();
 
-                    while let Some(bytes) = body.next().await {
-                        let Ok(bytes) = bytes else {
-                            return Err(ErrorResponse {
-                                error: PeerRequestError::Incomplete,
-                                request,
-                            });
-                        };
-                        bytes_recv += bytes.len();
-                        let Ok(frame) = Frame::try_from(bytes) else {
-                            return Err(ErrorResponse {
-                                error: PeerRequestError::Incomplete,
-                                request,
-                            });
-                        };
-                        match frame {
-                            Frame::Proof(proof) => {
-                                writer.write().await.feed_proof(&proof).await.unwrap()
-                            },
-                            Frame::Chunk(chunk) => {
-                                writer.write().await.write(&chunk, false).await.unwrap()
-                            },
-                            Frame::LastChunk(chunk) => {
-                                writer.write().await.write(&chunk, true).await.unwrap()
-                            },
-                            Frame::Eos => {
-                                // TODO: Handle premature end of stream errors instead of
-                                // unwrapping here, since we there could be an upstream blockstore
-                                // miss where the server would send an EOS frame.
-                                let _hash = Arc::try_unwrap(writer)
-                                    .unwrap()
-                                    .into_inner()
-                                    .commit()
-                                    .await
-                                    .unwrap();
-                                // TODO(matthias): do we have to compare this hash to the
-                                // requested hash?
-                                let duration = instant.elapsed();
-                                rep_reporter.report_bytes_received(
-                                    peer,
-                                    bytes_recv as u64,
-                                    Some(duration),
-                                );
-                                return Ok(request);
-                            },
-                        }
+                while let Some(bytes) = body.next().await {
+                    let Ok(bytes) = bytes else {
+                        return Err(ErrorResponse {
+                            error: PeerRequestError::Incomplete,
+                            request,
+                        });
+                    };
+                    bytes_recv += bytes.len();
+                    let Ok(frame) = Frame::try_from(bytes) else {
+                        return Err(ErrorResponse {
+                            error: PeerRequestError::Incomplete,
+                            request,
+                        });
+                    };
+                    match frame {
+                        Frame::File(file) => {
+                            match handle_send_request_file::<C>(writer.clone(), file).await {
+                                Ok(RespFile::Continue) => (),
+                                Ok(RespFile::EoF) => {
+                                    // TODO(matthias): do we have to compare this hash to the
+                                    // requested hash?
+                                    let duration = instant.elapsed();
+                                    rep_reporter.report_bytes_received(
+                                        peer,
+                                        bytes_recv as u64,
+                                        Some(duration),
+                                    );
+                                    return Ok(request);
+                                },
+                                Err(err) => {
+                                    error!("Error handling send request for file {}", err);
+                                    break;
+                                },
+                            }
+                        },
+                        Frame::Dir(_) => {},
                     }
-                    Err(ErrorResponse {
-                        error: PeerRequestError::Incomplete,
-                        request,
-                    })
-                },
-                Err(reason) => Err(ErrorResponse {
-                    error: PeerRequestError::Rejected(reason),
+                }
+                Err(ErrorResponse {
+                    error: PeerRequestError::Incomplete,
                     request,
-                }),
-            }
+                })
+            },
+            Err(reason) => Err(ErrorResponse {
+                error: PeerRequestError::Rejected(reason),
+                request,
+            }),
         },
         Ok(Err(_)) => Err(ErrorResponse {
             error: PeerRequestError::Incomplete,
@@ -572,6 +659,47 @@ async fn send_request<C: Collection>(
             error: PeerRequestError::Timeout,
             request,
         }),
+    }
+}
+
+enum RespFile {
+    Continue,
+    EoF,
+}
+
+async fn handle_send_request_file<'a, C: Collection>(
+    writer: Arc<RwLock<UntrustedFileWriter>>,
+    file: FileFrame<'a>,
+) -> Result<RespFile, Box<dyn Error>> {
+    match file {
+        FileFrame::Proof(proof) => writer
+            .write()
+            .await
+            .feed_proof(&proof)
+            .await
+            .map(|_| RespFile::Continue)
+            .map_err(|e| e.into()),
+        FileFrame::Chunk(chunk) => writer
+            .write()
+            .await
+            .write(&chunk, false)
+            .await
+            .map(|_| RespFile::Continue)
+            .map_err(Into::into),
+        FileFrame::LastChunk(chunk) => writer
+            .write()
+            .await
+            .write(&chunk, true)
+            .await
+            .map(|_| RespFile::Continue)
+            .map_err(Into::into),
+        FileFrame::Eos => Arc::try_unwrap(writer)
+            .unwrap()
+            .into_inner()
+            .commit()
+            .await
+            .map(|_| RespFile::EoF)
+            .map_err(Into::into),
     }
 }
 
