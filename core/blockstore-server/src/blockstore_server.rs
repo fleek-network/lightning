@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 use affair::{Socket, Task};
 use anyhow::{anyhow, Result};
 use b3fs::bucket::file::uwriter::UntrustedFileWriter;
-use b3fs::entry::{InlineVec, OwnedEntry};
+use b3fs::entry::{InlineVec, OwnedEntry, OwnedLink};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
@@ -300,17 +300,40 @@ pub enum Frame<'a> {
     File(FileFrame<'a>),
     Dir(DirFrame<'a>),
 }
-enum FileFrame<'a> {
+pub enum FileFrame<'a> {
     Proof(Cow<'a, [u8]>),
     Chunk(Cow<'a, [u8]>),
     LastChunk(Cow<'a, [u8]>),
     Eos,
 }
 
-enum DirFrame<'a> {
+pub enum DirFrame<'a> {
     Proof(Cow<'a, [u8]>),
     Chunk(Cow<'a, OwnedEntry>),
     Eos,
+}
+
+impl<'a> DirFrame<'a> {
+    pub fn len(&self) -> usize {
+        match &self {
+            Self::Proof(c) => c.len(),
+            Self::Chunk(entry) => {
+                let mut bytes = entry.name.len();
+                match &entry.link {
+                    OwnedLink::Content(c) => bytes += c.len(),
+                    OwnedLink::Link(l) => bytes += l.len(),
+                }
+                bytes
+            },
+            Self::Eos => 0,
+        }
+    }
+}
+
+impl<'a> From<OwnedEntry> for DirFrame<'a> {
+    fn from(value: OwnedEntry) -> Self {
+        Self::Chunk(Cow::Owned(value))
+    }
 }
 
 impl<'a> From<Frame<'a>> for Bytes {
@@ -450,16 +473,7 @@ async fn handle_request<C: Collection>(
                 request.reject(RejectReason::Other);
             }
         } else if let Some(dir) = tree.into_dir() {
-            send_dir::<C>(
-                dir,
-                request,
-                num_blocks,
-                &num_responses,
-                blockstore,
-                rep_reporter,
-                peer,
-            )
-            .await;
+            send_dir::<C>(dir, request, num_blocks, &num_responses, rep_reporter, peer).await;
         } else {
             error!(
                 "Content Header detected a Directory type but it could not be converted into Dir"
@@ -547,34 +561,75 @@ async fn send_file<C: Collection>(
 }
 
 async fn send_dir<C: Collection>(
-    dir: b3fs::bucket::dir::reader::B3Dir,
+    mut dir: b3fs::bucket::dir::reader::B3Dir,
     mut request: <c!(C::PoolInterface::Responder) as ResponderInterface>::Request,
     num_blocks: u32,
     num_responses: &Arc<AtomicUsize>,
-    blockstore: <C as Collection>::BlockstoreInterface,
     rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
     peer: u32,
 ) {
-    match dir.entries().await {
-        Ok(dir_reader) => {
-            let mut dir_reader = dir_reader;
-            while let Some(e) = dir_reader.next().await {
-                match e {
-                    Ok(entry) => {
-                        let frame = Frame::Dir(DirFrame::)
-                        println!("Entry {}", entry);
-                    },
-                    Err(e) => {
-                        error!("Error getting reading entry from dir {}", e);
-                        return request.reject(RejectReason::Other);
-                    },
-                }
-            }
-        },
+    let mut num_bytes = 0;
+    let instant = Instant::now();
+    let mut reader = match dir.hashtree().await {
+        Ok(reader) => reader,
         Err(e) => {
-            error!("Error getting directory reader {}", e);
-            request.reject(RejectReason::Other);
+            error!("Failed to get Async HashTree {}", e);
+            return request.reject(RejectReason::ContentNotFound);
         },
+    };
+    for block in 0..num_blocks {
+        let hash = match reader.get_hash(block).await {
+            Ok(Some(hash)) => hash,
+            Ok(_) => break,
+            Err(e) => {
+                error!("Failed to read hash from block {} - {}", block, e);
+                return request.reject(RejectReason::Other);
+            },
+        };
+
+        let proof = match reader.generate_proof(block).await {
+            Ok(p) => p,
+            Err(e) => {
+                error!("Failed to generate proof {}", e);
+                return request.reject(RejectReason::Other);
+            },
+        };
+
+        if !proof.is_empty() {
+            num_bytes += proof.len();
+            if let Err(e) = request
+                .send(Bytes::from(Frame::Dir(DirFrame::Proof(Cow::Borrowed(
+                    proof.as_slice(),
+                )))))
+                .await
+            {
+                error!("Failed to send proof: {e:?}");
+                num_responses.fetch_sub(1, Ordering::Release);
+                return;
+            }
+        }
+
+        // TODO: COMPLETE HERE
+        let name = b"harcoded";
+
+        let owned_entry: b3fs::entry::OwnedEntry = match dir.get_entry(name).await {
+            Ok(Some(entry)) => entry.into(),
+            _ => return request.reject(RejectReason::ContentNotFound),
+        };
+
+        let dir_frame: DirFrame<'_> = owned_entry.into();
+        num_bytes += dir_frame.len();
+        let frame = Frame::Dir(dir_frame);
+
+        if let Err(e) = request.send(Bytes::from(frame)).await {
+            error!("Failed to send chunk: {e:?}");
+            num_responses.fetch_sub(1, Ordering::Release);
+        }
+    }
+    if let Err(e) = request.send(Bytes::from(Frame::Dir(DirFrame::Eos))).await {
+        error!("Failed to send eos: {e:?}");
+    } else {
+        rep_reporter.report_bytes_sent(peer, num_bytes as u64, Some(instant.elapsed()));
     }
 }
 
