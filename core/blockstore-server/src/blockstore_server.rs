@@ -268,14 +268,12 @@ enum Message {
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub struct PeerRequest {
     hash: Blake3Hash,
-    //block_counter: u32,
 }
 
 impl From<PeerRequest> for Bytes {
     fn from(value: PeerRequest) -> Self {
         let mut buf = BytesMut::with_capacity(value.hash.len());
         buf.put_slice(&value.hash);
-        //buf.put_u32(value.block_counter);
         buf.into()
     }
 }
@@ -289,10 +287,8 @@ impl TryFrom<Bytes> for PeerRequest {
             return Err(anyhow!("Number of bytes must be {}", hash_len));
         }
         let hash = value.split_to(hash_len);
-        //let block_counter = value.get_u32();
         Ok(Self {
             hash: hash.to_vec().try_into().unwrap(),
-            //block_counter,
         })
     }
 }
@@ -309,6 +305,7 @@ pub enum FileFrame<'a> {
 }
 
 pub enum DirFrame<'a> {
+    Prelude(u32),
     Proof(Cow<'a, [u8]>),
     Chunk(Cow<'a, OwnedEntry>),
     Eos,
@@ -317,6 +314,7 @@ pub enum DirFrame<'a> {
 impl<'a> DirFrame<'a> {
     pub fn len(&self) -> usize {
         match &self {
+            Self::Prelude(c) => c.to_le_bytes().len(),
             Self::Proof(c) => c.len(),
             Self::Chunk(entry) => {
                 let mut bytes = entry.name.len();
@@ -359,6 +357,10 @@ impl<'a> From<Frame<'a>> for Bytes {
                 },
             },
             Frame::Dir(dir) => match dir {
+                DirFrame::Prelude(num_entries) => {
+                    b.put_u8(0x09);
+                    b.put_u32_le(num_entries);
+                },
                 DirFrame::Proof(proof) => {
                     b.put_u8(0x10);
                     b.put_slice(&proof);
@@ -578,16 +580,24 @@ async fn send_dir<C: Collection>(
             return request.reject(RejectReason::ContentNotFound);
         },
     };
-    for block in 0..num_blocks {
-        let hash = match reader.get_hash(block).await {
-            Ok(Some(hash)) => hash,
-            Ok(_) => break,
-            Err(e) => {
-                error!("Failed to read hash from block {} - {}", block, e);
-                return request.reject(RejectReason::Other);
-            },
-        };
+    let mut entries_reader = match dir.entries().await {
+        Ok(entries) => entries,
+        Err(e) => {
+            error!("Error trying to obtain Entries Iterator {}", e);
+            return request.reject(RejectReason::ContentNotFound);
+        },
+    };
 
+    if let Err(e) = request
+        .send(Bytes::from(Frame::Dir(DirFrame::Prelude(num_blocks))))
+        .await
+    {
+        error!("Failed to send prelude: {e:?}");
+    } else {
+        rep_reporter.report_bytes_sent(peer, num_bytes as u64, Some(instant.elapsed()));
+    }
+
+    for block in 0..num_blocks {
         let proof = match reader.generate_proof(block).await {
             Ok(p) => p,
             Err(e) => {
@@ -610,21 +620,28 @@ async fn send_dir<C: Collection>(
             }
         }
 
-        // TODO: COMPLETE HERE
-        let name = b"harcoded";
+        if let Some(ent) = entries_reader.next().await {
+            match ent {
+                Ok(entry) => {
+                    let dir_frame: DirFrame<'_> = entry.into();
+                    num_bytes += dir_frame.len();
+                    let frame = Frame::Dir(dir_frame);
 
-        let owned_entry: b3fs::entry::OwnedEntry = match dir.get_entry(name).await {
-            Ok(Some(entry)) => entry.into(),
-            _ => return request.reject(RejectReason::ContentNotFound),
-        };
-
-        let dir_frame: DirFrame<'_> = owned_entry.into();
-        num_bytes += dir_frame.len();
-        let frame = Frame::Dir(dir_frame);
-
-        if let Err(e) = request.send(Bytes::from(frame)).await {
-            error!("Failed to send chunk: {e:?}");
-            num_responses.fetch_sub(1, Ordering::Release);
+                    if let Err(e) = request.send(Bytes::from(frame)).await {
+                        error!("Failed to send chunk: {e:?}");
+                        num_responses.fetch_sub(1, Ordering::Release);
+                    }
+                },
+                Err(e) => {
+                    error!("Error getting entry - {}", e);
+                    return request.reject(RejectReason::ContentNotFound);
+                },
+            }
+        } else {
+            error!(
+                "There should be a next entry but it not found. Inconsistency between stream entries and hashes"
+            );
+            return request.reject(RejectReason::ContentNotFound);
         }
     }
     if let Err(e) = request.send(Bytes::from(Frame::Dir(DirFrame::Eos))).await {
@@ -651,17 +668,9 @@ async fn send_request<C: Collection>(
             Ok(()) => {
                 let mut body = response.body();
                 let bucket = blockstore.get_bucket();
-                let writer = Arc::new(RwLock::new(
-                    UntrustedFileWriter::new(&bucket, request.hash)
-                        .await
-                        .unwrap(),
-                ));
-                // TODO: CHECK HERE NUMBER OF ENTRIES
-                let dir_writer = Arc::new(RwLock::new(
-                    UntrustedDirWriter::new(&bucket, 10, request.hash)
-                        .await
-                        .unwrap(),
-                ));
+                let mut writer = None;
+                let mut dir_writer = None;
+
                 let mut bytes_recv = 0;
                 let instant = Instant::now();
 
@@ -681,43 +690,71 @@ async fn send_request<C: Collection>(
                     };
                     match frame {
                         Frame::File(file) => {
-                            match handle_send_request_file(writer.clone(), file).await {
-                                Ok(RespSendRequest::Continue) => (),
-                                Ok(RespSendRequest::EoF) => {
-                                    // TODO(matthias): do we have to compare this hash to the
-                                    // requested hash?
-                                    let duration = instant.elapsed();
-                                    rep_reporter.report_bytes_received(
-                                        peer,
-                                        bytes_recv as u64,
-                                        Some(duration),
-                                    );
-                                    return Ok(request);
-                                },
-                                Err(err) => {
-                                    error!("Error handling send request for file {}", err);
-                                    break;
-                                },
+                            if writer.is_none() {
+                                writer = Some(Arc::new(RwLock::new(
+                                    UntrustedFileWriter::new(&bucket, request.hash)
+                                        .await
+                                        .unwrap(),
+                                )));
+                            }
+                            if let Some(ref file_writer) = writer {
+                                match handle_send_request_file(file_writer.clone(), file).await {
+                                    Ok(RespSendRequest::Continue) => (),
+                                    Ok(RespSendRequest::EoF) => {
+                                        // TODO(matthias): do we have to compare this hash to the
+                                        // requested hash?
+                                        let duration = instant.elapsed();
+                                        rep_reporter.report_bytes_received(
+                                            peer,
+                                            bytes_recv as u64,
+                                            Some(duration),
+                                        );
+                                        return Ok(request);
+                                    },
+                                    Err(err) => {
+                                        error!("Error handling send request for file {}", err);
+                                        break;
+                                    },
+                                }
+                            } else {
+                                error!("File Writer could not be initialized");
+                                break;
                             }
                         },
                         Frame::Dir(dir) => {
-                            match handle_send_request_dir(dir_writer.clone(), dir).await {
-                                Ok(RespSendRequest::Continue) => (),
-                                Ok(RespSendRequest::EoF) => {
-                                    // TODO(matthias): do we have to compare this hash to the
-                                    // requested hash?
-                                    let duration = instant.elapsed();
-                                    rep_reporter.report_bytes_received(
-                                        peer,
-                                        bytes_recv as u64,
-                                        Some(duration),
-                                    );
-                                    return Ok(request);
-                                },
-                                Err(err) => {
-                                    error!("Error handling send request for dir {}", err);
-                                    break;
-                                },
+                            if let DirFrame::Prelude(num_entries) = dir {
+                                dir_writer = Some(Arc::new(RwLock::new(
+                                    UntrustedDirWriter::new(
+                                        &bucket,
+                                        num_entries as usize,
+                                        request.hash,
+                                    )
+                                    .await
+                                    .unwrap(),
+                                )));
+                            };
+                            if let Some(ref dir_wr) = dir_writer {
+                                match handle_send_request_dir(dir_wr.clone(), dir).await {
+                                    Ok(RespSendRequest::Continue) => (),
+                                    Ok(RespSendRequest::EoF) => {
+                                        // TODO(matthias): do we have to compare this hash to the
+                                        // requested hash?
+                                        let duration = instant.elapsed();
+                                        rep_reporter.report_bytes_received(
+                                            peer,
+                                            bytes_recv as u64,
+                                            Some(duration),
+                                        );
+                                        return Ok(request);
+                                    },
+                                    Err(err) => {
+                                        error!("Error handling send request for dir {}", err);
+                                        break;
+                                    },
+                                }
+                            } else {
+                                error!("Dir Writer was not initilialized properly");
+                                break;
                             }
                         },
                     }
@@ -748,9 +785,9 @@ enum RespSendRequest {
     EoF,
 }
 
-async fn handle_send_request_file<'a>(
+async fn handle_send_request_file(
     writer: Arc<RwLock<UntrustedFileWriter>>,
-    file: FileFrame<'a>,
+    file: FileFrame<'_>,
 ) -> Result<RespSendRequest, Box<dyn Error>> {
     match file {
         FileFrame::Proof(proof) => writer
@@ -784,11 +821,12 @@ async fn handle_send_request_file<'a>(
     }
 }
 
-async fn handle_send_request_dir<'a>(
+async fn handle_send_request_dir(
     writer: Arc<RwLock<UntrustedDirWriter>>,
-    dir: DirFrame<'a>,
+    dir: DirFrame<'_>,
 ) -> Result<RespSendRequest, Box<dyn Error>> {
     match dir {
+        DirFrame::Prelude(_) => Ok(RespSendRequest::Continue),
         DirFrame::Proof(proof) => writer
             .write()
             .await
