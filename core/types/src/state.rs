@@ -22,6 +22,9 @@ pub type ServiceId = u32;
 /// Application epoch number
 pub type Epoch = u64;
 
+/// Application epoch era.
+pub type EpochEra = u64;
+
 /// A nodes index
 pub type NodeIndex = u32;
 
@@ -103,6 +106,7 @@ pub enum Metadata {
     SubDagRound,
     CommitteeSelectionBeaconPhase,
     CommitteeSelectionBeaconRound,
+    EpochEra,
 }
 
 /// The Value enum is a data type used to represent values in a key-value pair for a metadata table
@@ -122,6 +126,7 @@ pub enum Value {
     BlockRange(u64, u64),
     CommitteeSelectionBeaconPhase(CommitteeSelectionBeaconPhase),
     CommitteeSelectionBeaconRound(CommitteeSelectionBeaconRound),
+    EpochEra(u64),
 }
 
 impl Value {
@@ -272,6 +277,8 @@ pub enum ProtocolParamKey {
     CommitteeSelectionBeaconCommitPhaseDuration = 18,
     /// The committee selection beacon reveal phase duration in blocks
     CommitteeSelectionBeaconRevealPhaseDuration = 19,
+    /// The slash amount for non-revealing nodes in the committee selection beacon process.
+    CommitteeSelectionBeaconNonRevealSlashAmount = 20,
 }
 
 /// The Value enum is a data type used to represent values in a key-value pair for a metadata table
@@ -297,6 +304,7 @@ pub enum ProtocolParamValue {
     TopologyMinNodes(usize),
     CommitteeSelectionBeaconCommitPhaseDuration(u64),
     CommitteeSelectionBeaconRevealPhaseDuration(u64),
+    CommitteeSelectionBeaconNonRevealSlashAmount(u64),
 }
 
 impl ProtocolParamValue {
@@ -326,6 +334,9 @@ impl ProtocolParamValue {
                 Cow::Owned(i.to_le_bytes().to_vec())
             },
             ProtocolParamValue::CommitteeSelectionBeaconRevealPhaseDuration(i) => {
+                Cow::Owned(i.to_le_bytes().to_vec())
+            },
+            ProtocolParamValue::CommitteeSelectionBeaconNonRevealSlashAmount(i) => {
                 Cow::Owned(i.to_le_bytes().to_vec())
             },
         }

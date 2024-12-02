@@ -27,11 +27,11 @@ mod tests {
 
     #[test]
     fn test_localnet_example_genesis() {
-        assert!(Network::LocalnetExample.genesis().is_ok());
+        Network::LocalnetExample.genesis().unwrap();
     }
 
     #[test]
     fn test_testnet_stable_genesis() {
-        assert!(Network::TestnetStable.genesis().is_ok());
+        Network::TestnetStable.genesis().unwrap();
     }
 }

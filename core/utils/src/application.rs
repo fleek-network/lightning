@@ -16,7 +16,7 @@ use lightning_interfaces::types::{
     Value,
 };
 use lightning_interfaces::PagingParams;
-use types::{CommitteeSelectionBeaconPhase, Participation};
+use types::{CommitteeSelectionBeaconPhase, EpochEra, Participation};
 
 pub trait QueryRunnerExt: SyncQueryRunnerInterface {
     /// Returns the chain id
@@ -51,10 +51,19 @@ pub trait QueryRunnerExt: SyncQueryRunnerInterface {
         }
     }
 
+    /// Get current epoch era.
+    fn get_epoch_era(&self) -> EpochEra {
+        match self.get_metadata(&Metadata::EpochEra) {
+            Some(Value::EpochEra(era)) => era,
+            _ => 0,
+        }
+    }
+
     /// Get Current Epoch Info
     /// Returns all the information on the current epoch that Narwhal needs to run
     fn get_epoch_info(&self) -> EpochInfo {
         let epoch = self.get_current_epoch();
+        let epoch_era = self.get_epoch_era();
         // look up current committee
         let committee = self.get_committee_info(&epoch, |c| c).unwrap_or_default();
         EpochInfo {
@@ -64,6 +73,7 @@ pub trait QueryRunnerExt: SyncQueryRunnerInterface {
                 .filter_map(|member| self.get_node_info::<NodeInfo>(member, |n| n))
                 .collect(),
             epoch,
+            epoch_era,
             epoch_end: committee.epoch_end_timestamp,
         }
     }

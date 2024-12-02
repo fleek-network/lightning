@@ -1,5 +1,9 @@
 use fxhash::FxHashMap;
-use lightning_interfaces::types::{CommitteeSelectionBeaconCommit, CommitteeSelectionBeaconReveal};
+use lightning_interfaces::types::{
+    CommitteeSelectionBeaconCommit,
+    CommitteeSelectionBeaconReveal,
+    Epoch,
+};
 use lightning_interfaces::CommitteeBeaconQueryInterface;
 
 use crate::database::CommitteeBeaconDatabaseQuery;
@@ -19,7 +23,7 @@ impl CommitteeBeaconQuery {
 impl CommitteeBeaconQueryInterface for CommitteeBeaconQuery {
     fn get_beacons(
         &self,
-    ) -> FxHashMap<CommitteeSelectionBeaconCommit, CommitteeSelectionBeaconReveal> {
+    ) -> FxHashMap<(Epoch, CommitteeSelectionBeaconCommit), CommitteeSelectionBeaconReveal> {
         self.db.get_beacons()
     }
 }

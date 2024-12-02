@@ -168,6 +168,9 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
         Option<CommitteeSelectionBeaconReveal>,
     )>;
 
+    /// Get the non-revealing nodes from the previous round.
+    fn get_committee_selection_beacon_non_revealing_nodes(&self) -> Vec<NodeIndex>;
+
     /// Query Services Table
     /// Returns the service information for a given [`ServiceId`]
     fn get_service_info(&self, id: &ServiceId) -> Option<Service>;

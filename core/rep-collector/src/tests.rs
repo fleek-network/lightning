@@ -313,14 +313,20 @@ async fn test_reputation_calculation_and_query() {
     // Wait until all measurements have been submitted to the application.
     poll_until(
         || async {
-            let alice_rep = app_query
+            let alice_rep_count = app_query
                 .get_reputation_measurements(&alice)
-                .unwrap_or(Vec::new());
-            let bob_rep = app_query
+                .unwrap_or(Vec::new())
+                .iter()
+                .filter(|m| m.measurements.interactions.is_some())
+                .count();
+            let bob_rep_count = app_query
                 .get_reputation_measurements(&bob)
-                .unwrap_or(Vec::new());
+                .unwrap_or(Vec::new())
+                .iter()
+                .filter(|m| m.measurements.interactions.is_some())
+                .count();
 
-            (alice_rep.len() == 2 && bob_rep.len() == 2)
+            (alice_rep_count == 2 && bob_rep_count == 2)
                 .then_some(())
                 .ok_or(PollUntilError::ConditionNotSatisfied)
         },

@@ -3,7 +3,7 @@ use fleek_crypto::{EthAddress, TransactionSender};
 use serde::{Deserialize, Serialize};
 
 use super::{Epoch, NodeInfo};
-use crate::{Event, UpdateMethod};
+use crate::{EpochEra, Event, UpdateMethod};
 
 /// Info on a Narwhal epoch
 #[derive(
@@ -14,6 +14,8 @@ pub struct EpochInfo {
     pub committee: Vec<NodeInfo>,
     /// The current epoch number
     pub epoch: Epoch,
+    /// The current epoch era
+    pub epoch_era: EpochEra,
     /// Timestamp when the epoch ends
     pub epoch_end: u64,
 }

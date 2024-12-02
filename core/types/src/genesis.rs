@@ -62,6 +62,7 @@ pub struct Genesis {
     pub topology_min_nodes: usize,
     pub committee_selection_beacon_commit_phase_duration: u64,
     pub committee_selection_beacon_reveal_phase_duration: u64,
+    pub committee_selection_beacon_non_reveal_slash_amount: u64,
 }
 
 impl Genesis {

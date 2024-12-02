@@ -7,7 +7,7 @@ use fleek_crypto::{EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
 use serde::{Deserialize, Serialize};
 
-use crate::{BlockNumber, TransactionReceipt};
+use crate::{BlockNumber, Staking, TransactionReceipt};
 
 /// Max number of updates allowed in a content registry update transaction.
 pub const MAX_UPDATES_CONTENT_REGISTRY: usize = 100;
@@ -175,6 +175,15 @@ pub type BlockNodeRegistryChanges = Vec<(NodePublicKey, NodeRegistryChange)>;
 pub enum NodeRegistryChange {
     New,
     Removed,
+    Slashed((HpUfixed<18>, Staking, NodeRegistryChangeSlashReason)),
+}
+
+#[rustfmt::skip]
+#[derive(
+    Debug, PartialEq, PartialOrd, Hash, Eq, Ord, Serialize, Deserialize, Clone, schemars::JsonSchema,
+)]
+pub enum NodeRegistryChangeSlashReason {
+    CommitteeBeaconNonReveal,
 }
 
 /// The account info stored per account on the blockchain

@@ -1,7 +1,8 @@
+use std::collections::BTreeMap;
 use std::time::Duration;
 
 use fdi::BuildGraph;
-use lightning_types::NodeIndex;
+use lightning_types::{NodeIndex, ReputationMeasurements};
 
 use crate::components::NodeComponents;
 
@@ -31,6 +32,9 @@ pub trait ReputationAggregatorInterface<C: NodeComponents>: BuildGraph {
 pub trait ReputationQueryInteface: Clone + Send + Sync {
     /// Returns the reputation of the provided node locally.
     fn get_reputation_of(&self, peer: &NodeIndex) -> Option<u8>;
+
+    /// Returns reputation measurements for all peers.
+    fn get_measurements(&self) -> BTreeMap<NodeIndex, ReputationMeasurements>;
 }
 
 /// Reputation reporter is a cheaply cleanable object which can be used to report the interactions

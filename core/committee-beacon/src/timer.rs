@@ -109,7 +109,7 @@ impl<C: NodeComponents> CommitteeBeaconTimer<C> {
                             }
                         },
                         Err(e) => {
-                            tracing::error!("ignoring transaction client error: {:?}", e);
+                            tracing::info!("ignoring transaction client error: {:?}", e);
                         },
                     }
 

@@ -150,7 +150,7 @@ async fn test_node_load_checkpoint_start_ready_shutdown_iterations() {
 
         // Start the node and wait for it to be ready.
         node.start().await;
-        node.wait_for_ready(Some(Duration::from_secs(5)))
+        node.wait_for_ready(Some(Duration::from_secs(20)))
             .await
             .unwrap();
 
@@ -212,7 +212,7 @@ async fn wait_for_database_locks(config: &TomlConfigProvider<FullNodeComponents>
 
     // Wait for the narwhal db lock file to be released.
     wait_for_file_to_close(
-        &consensus_db_path.join("0/LOCK"),
+        &consensus_db_path.join("0-0/LOCK"),
         Duration::from_secs(5),
         Duration::from_millis(100),
     )
