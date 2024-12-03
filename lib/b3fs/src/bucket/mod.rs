@@ -84,7 +84,7 @@ pub struct ContentHeader {
     /// If the content is a directory header this is always smaller or equal to u16::MAX.
     num_entries: u32,
     /// The actual header file that is open.
-    header_file: Arc<File>,
+    header_file: File,
 }
 
 impl Bucket {
@@ -153,7 +153,7 @@ impl Bucket {
         Ok(ContentHeader {
             is_file,
             num_entries,
-            header_file: Arc::new(file),
+            header_file: file,
         })
     }
 
@@ -200,26 +200,14 @@ impl ContentHeader {
 
     /// If this content is a file returns a [B3File][file::reader::B3File].
     pub fn into_file(self) -> Option<file::reader::B3File> {
-        let f = self.header_file.clone();
-        let file = Arc::try_unwrap(f).map(Some).unwrap_or_default();
-        if let Some(f) = file {
-            self.is_file()
-                .then(|| file::reader::B3File::new(self.num_entries, f))
-        } else {
-            None
-        }
+        self.is_file()
+            .then(|| file::reader::B3File::new(self.num_entries, self.header_file))
     }
 
     /// If this content is a directory returns a [B3Dir][dir::reader::B3Dir].
     pub fn into_dir(self) -> Option<dir::reader::B3Dir> {
-        let f = self.header_file.clone();
-        let file = Arc::try_unwrap(f).map(Some).unwrap_or_default();
-        if let Some(f) = file {
-            self.is_dir()
-                .then(|| dir::reader::B3Dir::new(self.num_entries, f))
-        } else {
-            None
-        }
+        self.is_dir()
+            .then(|| dir::reader::B3Dir::new(self.num_entries, self.header_file))
     }
 
     pub fn blocks(&self) -> u32 {
