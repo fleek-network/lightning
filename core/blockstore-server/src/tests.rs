@@ -2,7 +2,8 @@ use std::borrow::Cow;
 use std::collections::VecDeque;
 use std::time::Duration;
 
-use blake3_tree::ProofBuf;
+use b3fs::bucket::file::uwriter::UntrustedFileWriter;
+use b3fs::bucket::file::writer::FileWriter;
 use fleek_crypto::{AccountOwnerSecretKey, NodePublicKey, SecretKey};
 use lightning_application::app::Application;
 use lightning_application::config::ApplicationConfig;
@@ -10,14 +11,7 @@ use lightning_blockstore::blockstore::{Blockstore, BLOCK_SIZE};
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_indexer::Indexer;
 use lightning_interfaces::prelude::*;
-use lightning_interfaces::types::{
-    CompressionAlgoSet,
-    CompressionAlgorithm,
-    Genesis,
-    GenesisNode,
-    NodePorts,
-    ServerRequest,
-};
+use lightning_interfaces::types::{Genesis, GenesisNode, NodePorts, ServerRequest};
 use lightning_notifier::Notifier;
 use lightning_pool::{Config as PoolConfig, PoolProvider};
 use lightning_rep_collector::ReputationAggregator;
@@ -28,7 +22,7 @@ use lightning_topology::Topology;
 use tempfile::{tempdir, TempDir};
 
 use super::BlockstoreServer;
-use crate::blockstore_server::Frame;
+use crate::blockstore_server::{FileFrame, Frame};
 use crate::config::Config;
 
 partial!(TestBinding {
@@ -164,49 +158,61 @@ async fn test_stream_verified_content() {
     let content = create_content();
 
     // Put some content into the sender's blockstore
-    let mut putter = peers[0].blockstore().put(None);
-    putter
-        .write(content.as_slice(), CompressionAlgorithm::Uncompressed)
-        .unwrap();
-    let root_hash = putter.finalize().await.unwrap();
+    let bucket = peers[0].blockstore().get_bucket();
+    let mut writer_sender = FileWriter::new(&bucket).await.unwrap();
+    writer_sender.write(content.as_slice()).await.unwrap();
+    let root_hash = writer_sender.commit().await.unwrap();
 
     let mut network_wire = VecDeque::new();
 
     // The sender sends the content with the proofs to the receiver
-    if let Some(tree) = peers[0].blockstore().get_tree(&root_hash).await {
-        for block in 0..tree.len() {
-            let compr = CompressionAlgoSet::default(); // rustfmt
+    if let Ok(tree) = peers[0].blockstore().get_bucket().get(&root_hash).await {
+        let num_blocks = tree.blocks();
+        let mut reader = tree.into_file().unwrap().hashtree().await.unwrap();
+        for block in 0..num_blocks {
+            let hash = reader.get_hash(block).await.unwrap().unwrap();
+
+            let proof = reader.generate_proof(block).await.unwrap();
+            if !proof.is_empty() {
+                let slice = proof.as_slice().to_owned();
+                network_wire.push_back(Frame::File(FileFrame::Proof(Cow::Owned(slice))));
+            }
+
             let chunk = peers[0]
                 .blockstore()
-                .get(block as u32, &tree[block], compr)
+                .get_bucket()
+                .get_block_content(&hash)
                 .await
-                .expect("failed to get block from store");
-            let proof = if block == 0 {
-                ProofBuf::new(tree.as_ref().as_ref(), 0)
-            } else {
-                ProofBuf::resume(tree.as_ref().as_ref(), block)
-            };
+                .unwrap()
+                .unwrap();
 
-            if !proof.is_empty() {
-                network_wire.push_back(Frame::Proof(Cow::Owned(proof.as_slice().to_vec())));
-            }
-            network_wire.push_back(Frame::Chunk(Cow::Owned(chunk.content.clone())));
+            let frame = if block == num_blocks - 1 {
+                Frame::File(FileFrame::LastChunk(Cow::Owned(chunk.clone())))
+            } else {
+                Frame::File(FileFrame::Chunk(Cow::Owned(chunk.clone())))
+            };
+            network_wire.push_back(frame);
         }
-        network_wire.push_back(Frame::Eos);
+        network_wire.push_back(Frame::File(FileFrame::Eos));
     }
 
     // The receiver reads the frames and puts them into its blockstore
-    let mut putter = peers[1].blockstore().put(Some(root_hash));
+    let bucket = peers[1].blockstore().get_bucket();
+    let mut putter = UntrustedFileWriter::new(&bucket, root_hash).await.unwrap();
     while let Some(frame) = network_wire.pop_front() {
         match frame {
-            Frame::Proof(proof) => putter.feed_proof(&proof).unwrap(),
-            Frame::Chunk(chunk) => putter
-                .write(&chunk, CompressionAlgorithm::Uncompressed)
-                .unwrap(),
-            Frame::Eos => {
-                let hash = putter.finalize().await.unwrap();
+            Frame::File(FileFrame::Proof(proof)) => putter.feed_proof(&proof).await.unwrap(),
+            Frame::File(FileFrame::LastChunk(chunk)) => {
+                putter.write(&chunk, true).await.unwrap();
+            },
+            Frame::File(FileFrame::Chunk(chunk)) => putter.write(&chunk, false).await.unwrap(),
+            Frame::File(FileFrame::Eos) => {
+                let hash = putter.commit().await.unwrap();
                 assert_eq!(hash, root_hash);
                 break;
+            },
+            Frame::Dir(_) => {
+                panic!("imposible");
             },
         }
     }
@@ -233,11 +239,10 @@ async fn test_send_and_receive() {
 
     let content = create_content();
     // Put some data into the blockstore of peer 1
-    let mut putter = peers[0].blockstore().put(None);
-    putter
-        .write(&content, CompressionAlgorithm::Uncompressed)
-        .unwrap();
-    let hash = putter.finalize().await.unwrap();
+    let bucket = peers[0].blockstore().get_bucket();
+    let mut putter = FileWriter::new(&bucket).await.unwrap();
+    putter.write(&content).await.unwrap();
+    let hash = putter.commit().await.unwrap();
 
     // Send a request from peer 2 to peer 1
     let socket = peers[1].blockstore_server().get_socket();
