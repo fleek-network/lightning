@@ -7549,6 +7549,7 @@ dependencies = [
  "alloy-primitives",
  "anyhow",
  "async-trait",
+ "b3fs",
  "clap",
  "ethers",
  "fleek-crypto",
