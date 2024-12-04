@@ -3,7 +3,6 @@
 
 use std::borrow::Cow;
 use std::collections::{HashMap, VecDeque};
-use std::error::Error;
 use std::mem;
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -691,16 +690,18 @@ async fn send_request<C: Collection>(
                     match frame {
                         Frame::File(file) => {
                             if writer.is_none() {
-                                writer = Some(Arc::new(RwLock::new(
+                                writer = Some(RwLock::new(
                                     UntrustedFileWriter::new(&bucket, request.hash)
                                         .await
                                         .unwrap(),
-                                )));
+                                ));
                             }
                             if let Some(ref file_writer) = writer {
-                                match handle_send_request_file(file_writer.clone(), file).await {
+                                match handle_send_request_file(file_writer, file).await {
                                     Ok(RespSendRequest::Continue) => (),
                                     Ok(RespSendRequest::EoF) => {
+                                        let writer = writer.take().unwrap().into_inner();
+                                        writer.commit().await.expect("Error commiting writer");
                                         // TODO(matthias): do we have to compare this hash to the
                                         // requested hash?
                                         let duration = instant.elapsed();
@@ -723,7 +724,7 @@ async fn send_request<C: Collection>(
                         },
                         Frame::Dir(dir) => {
                             if let DirFrame::Prelude(num_entries) = dir {
-                                dir_writer = Some(Arc::new(RwLock::new(
+                                dir_writer = Some(RwLock::new(
                                     UntrustedDirWriter::new(
                                         &bucket,
                                         num_entries as usize,
@@ -731,12 +732,14 @@ async fn send_request<C: Collection>(
                                     )
                                     .await
                                     .unwrap(),
-                                )));
+                                ));
                             };
                             if let Some(ref dir_wr) = dir_writer {
-                                match handle_send_request_dir(dir_wr.clone(), dir).await {
+                                match handle_send_request_dir(dir_wr, dir).await {
                                     Ok(RespSendRequest::Continue) => (),
                                     Ok(RespSendRequest::EoF) => {
+                                        let dir_writer = dir_writer.take().unwrap().into_inner();
+                                        dir_writer.commit().await.expect("Error commiting writer");
                                         // TODO(matthias): do we have to compare this hash to the
                                         // requested hash?
                                         let duration = instant.elapsed();
@@ -786,9 +789,9 @@ enum RespSendRequest {
 }
 
 async fn handle_send_request_file(
-    writer: Arc<RwLock<UntrustedFileWriter>>,
+    writer: &RwLock<UntrustedFileWriter>,
     file: FileFrame<'_>,
-) -> Result<RespSendRequest, Box<dyn Error>> {
+) -> Result<RespSendRequest, String> {
     match file {
         FileFrame::Proof(proof) => writer
             .write()
@@ -796,35 +799,29 @@ async fn handle_send_request_file(
             .feed_proof(&proof)
             .await
             .map(|_| RespSendRequest::Continue)
-            .map_err(|e| e.into()),
+            .map_err(|e| e.to_string()),
         FileFrame::Chunk(chunk) => writer
             .write()
             .await
             .write(&chunk, false)
             .await
             .map(|_| RespSendRequest::Continue)
-            .map_err(Into::into),
+            .map_err(|e| e.to_string()),
         FileFrame::LastChunk(chunk) => writer
             .write()
             .await
             .write(&chunk, true)
             .await
             .map(|_| RespSendRequest::Continue)
-            .map_err(Into::into),
-        FileFrame::Eos => Arc::try_unwrap(writer)
-            .unwrap()
-            .into_inner()
-            .commit()
-            .await
-            .map(|_| RespSendRequest::EoF)
-            .map_err(Into::into),
+            .map_err(|e| e.to_string()),
+        FileFrame::Eos => Ok(RespSendRequest::EoF),
     }
 }
 
 async fn handle_send_request_dir(
-    writer: Arc<RwLock<UntrustedDirWriter>>,
+    writer: &RwLock<UntrustedDirWriter>,
     dir: DirFrame<'_>,
-) -> Result<RespSendRequest, Box<dyn Error>> {
+) -> Result<RespSendRequest, String> {
     match dir {
         DirFrame::Prelude(_) => Ok(RespSendRequest::Continue),
         DirFrame::Proof(proof) => writer
@@ -833,21 +830,15 @@ async fn handle_send_request_dir(
             .feed_proof(&proof)
             .await
             .map(|_| RespSendRequest::Continue)
-            .map_err(|e| e.into()),
+            .map_err(|e| e.to_string()),
         DirFrame::Chunk(chunk) => writer
             .write()
             .await
             .insert(BorrowedEntry::from(&chunk.into_owned()))
             .await
             .map(|_| RespSendRequest::Continue)
-            .map_err(Into::into),
-        DirFrame::Eos => Arc::try_unwrap(writer)
-            .unwrap()
-            .into_inner()
-            .commit()
-            .await
-            .map(|_| RespSendRequest::EoF)
-            .map_err(Into::into),
+            .map_err(|e| e.to_string()),
+        DirFrame::Eos => Ok(RespSendRequest::EoF),
     }
 }
 

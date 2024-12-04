@@ -253,12 +253,15 @@ async fn test_send_and_receive() {
         })
         .await
         .expect("Failed to send request");
-    match res.recv().await.unwrap() {
+    let result = res.recv().await.unwrap();
+    match result {
         Ok(()) => {
             let recv_content = peers[1].blockstore().read_all_to_vec(&hash).await.unwrap();
             assert_eq!(recv_content, content);
         },
-        Err(e) => panic!("Failed to receive content: {e:?}"),
+        Err(e) => {
+            panic!("Failed to receive content: {e:?}");
+        },
     }
 
     for mut peer in peers {
