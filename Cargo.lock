@@ -6937,6 +6937,7 @@ dependencies = [
  "lightning-application",
  "lightning-archive",
  "lightning-blockstore",
+ "lightning-blockstore-server",
  "lightning-broadcast",
  "lightning-consensus",
  "lightning-final-bindings",
