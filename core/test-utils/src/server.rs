@@ -1,4 +1,4 @@
-use axum::extract::Path;
+use axum::extract::{Path, Query};
 use axum::http::{HeaderMap, StatusCode};
 use axum::routing::get;
 use axum::Router;
@@ -18,12 +18,14 @@ pub async fn spawn_server(port: u16) -> anyhow::Result<()> {
         .map_err(|e| e.into())
 }
 
-async fn get_cid(Path(cid): Path<String>) -> Result<(HeaderMap, Vec<u8>), StatusCode> {
-    if let Ok(file) = std::fs::read(format!("../test-utils/files/{cid}.car")) {
-        let mut headers = HeaderMap::new();
-        headers.insert("Content-Type", "application/vnd.ipld.car".parse().unwrap());
-        Ok((headers, file.clone()))
-    } else {
-        Err(StatusCode::NOT_FOUND)
-    }
+async fn get_cid(
+    Path(cid): Path<String>,
+    _format: Option<Query<String>>,
+) -> Result<(HeaderMap, Vec<u8>), StatusCode> {
+    let result = tokio::fs::read(format!("../test-utils/files/{cid}.car"))
+        .await
+        .map_err(|_| StatusCode::NOT_FOUND)?;
+    let mut headers = HeaderMap::new();
+    headers.insert("Content-Type", "application/vnd.ipld.raw".parse().unwrap());
+    Ok((headers, result))
 }
