@@ -2,7 +2,10 @@
 name = "fleek-ipld"
 version = "0.0.0"
 edition = "2021"
-authors = [ "M. Meier <miguel@fleek.xyz>", "Juan Royo Sales <juansales@fleek.xyz" ]
+authors = [
+    "M. Meier <miguel@fleek.xyz>",
+    "Juan Royo Sales <juansales@fleek.xyz",
+]
 homepage = "https://github.com/fleek-network/lightning"
 description = "The Fleek IPLD crate"
 

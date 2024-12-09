@@ -226,7 +226,6 @@ async fn test_origin_bbb_dag_pb() {
 }
 
 #[tokio::test]
-#[should_panic]
 async fn test_origin_raw() {
     let req_cid =
         Cid::try_from("bafkreihiruy5ng7d5v26c6g4gwhtastyencrefjkruqe33vwrnbyhvr74u").unwrap();
@@ -269,7 +268,6 @@ async fn test_origin_raw() {
 }
 
 #[tokio::test]
-#[should_panic]
 async fn test_origin_bbb_dag_pb_and_raw() {
     let req_cid =
         Cid::try_from("bafybeieb3754ppknuruchkb5pxdizi5rzz42kldrps4qvjmouomyt3xkte").unwrap();

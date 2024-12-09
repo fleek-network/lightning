@@ -25,6 +25,12 @@ pub trait DataCodec<F> {
     fn decode_from(doc_id: &DocId, data: F) -> Result<IpldItem, IpldError>;
 }
 
+pub trait IpldCodecStrategy {
+    type Decoded;
+    type ErrDec: std::fmt::Debug;
+    fn decode(&self, doc_id: &DocId, bytes: &[u8]) -> Result<Self::Decoded, Self::ErrDec>;
+}
+
 /// Trait to decode a IPLD abstract format `Ipld` into a specific user format p `DataCodec`.
 /// Note that the use of Associated Types is encouraged to allow the user to define the specific
 /// types for the IPLD abstract format and the specific user format, because the decoding is a
@@ -33,16 +39,12 @@ pub trait DataCodec<F> {
 /// 1. Decode the IPLD abstract format DAG-PB, DAG-CBOR, etc.
 /// 2. Decode the `data` field from the IPLD abstract format into a specific user format, like
 ///    UnixFS.
-pub trait Decoder {
+pub trait Decoder: IpldCodecStrategy<Decoded = Self::Ipld, ErrDec = Self::Err> {
     /// The IPLD abstract format.
     type Ipld;
 
     /// The error type for the IPLD abstract format.
     type Err: std::fmt::Debug;
-
-    /// The codec to decode the IPLD abstract format which is constraint to the `Codec` trait in
-    /// the `ipld_core` library.
-    type IpldCodec: Codec<Self::Ipld, Error = Self::Err>;
 
     /// The codec to decode the `data` field from the IPLD abstract format into a specific user
     type DataCodec: DataCodec<Self::Ipld>;
@@ -52,7 +54,7 @@ pub trait Decoder {
 
     /// Perform the 2 step decoding process.
     fn decode_from_slice(&self, doc_id: &DocId, data: &[u8]) -> Result<IpldItem, IpldError> {
-        let node = Self::IpldCodec::decode_from_slice(data)
+        let node = Self::decode(&self, doc_id, data)
             .map_err(|e| IpldError::IpldCodecError(*doc_id.cid(), format!("{e:?}")))?;
         Self::validate_data(doc_id, data)?;
         Self::DataCodec::decode_from(doc_id, node)
@@ -80,16 +82,18 @@ impl UnixFsProtobufCodec {
     fn from_result(
         id: &mut DocId,
         previous_path: Option<&PathBuf>,
-        node: &PbNode,
+        node: Option<&PbNode>,
         data: &Data,
     ) -> Result<IpldItem, IpldError> {
         match data.Type {
             DataType::Directory => {
+                let node = node.ok_or(IpldError::CannotDecodeDagPbData(*id.cid()))?;
                 id.merge(previous_path, None);
                 let links = Link::get_links(&node.links);
                 Ok(IpldItem::to_dir(id.clone(), links))
             },
             DataType::File => {
+                let node = node.ok_or(IpldError::CannotDecodeDagPbData(*id.cid()))?;
                 if node.links.is_empty() {
                     let data = Bytes::copy_from_slice(&data.Data);
                     Ok(IpldItem::to_file(id.clone(), data))
@@ -100,21 +104,35 @@ impl UnixFsProtobufCodec {
                     ))
                 }
             },
+            DataType::Raw => {
+                let data = Bytes::copy_from_slice(&data.Data);
+                Ok(IpldItem::to_file(id.clone(), data))
+            },
             _ => Err(IpldError::UnsupportedUnixFsDataType(*id.cid())),
         }
     }
 }
 
-impl DataCodec<PbNode> for UnixFsProtobufCodec {
-    fn decode_from(doc_id: &DocId, node: PbNode) -> Result<IpldItem, IpldError> {
-        if node.data.is_none() {
-            return Err(IpldError::UnixFsDecodingError(
-                "No Data. Not UnixFs".to_string(),
-            ));
+impl DataCodec<IpldData> for UnixFsProtobufCodec {
+    fn decode_from(doc_id: &DocId, node: IpldData) -> Result<IpldItem, IpldError> {
+        match node {
+            IpldData::Ipld(d) => {
+                if d.data.is_none() {
+                    return Err(IpldError::UnixFsDecodingError(
+                        "No Data. Not UnixFs".to_string(),
+                    ));
+                }
+                let data_bytes = d.data.clone();
+                let data = Data::try_from(&data_bytes)?;
+                let mut doc_id = doc_id.clone();
+                Self::from_result(&mut doc_id, None, Some(&d), &data)
+            },
+            IpldData::Raw(d) => {
+                let data = Data::to_raw(&d);
+                let mut doc_id = doc_id.clone();
+                Self::from_result(&mut doc_id, None, None, &data)
+            },
         }
-        let data = Data::try_from(&node.data)?;
-        let mut doc_id = doc_id.clone();
-        Self::from_result(&mut doc_id, None, &node, &data)
     }
 }
 
@@ -125,15 +143,48 @@ impl DataCodec<PbNode> for UnixFsProtobufCodec {
 #[derive(Default, Clone)]
 pub struct DagPbWithUnixFsCodec;
 
+impl IpldCodecStrategy for DagPbWithUnixFsCodec {
+    type Decoded = IpldData;
+
+    type ErrDec = IpldError;
+
+    fn decode(&self, doc_id: &DocId, bytes: &[u8]) -> Result<Self::Decoded, Self::ErrDec> {
+        let cid = doc_id.cid();
+        match cid.codec() {
+            0x70 => DagPbCodec::decode_from_slice(bytes)
+                .map(IpldData::Ipld)
+                .map_err(|e| IpldError::IpldCodecError(*cid, format!("{e:?}"))),
+            0x55 => Ok(IpldData::Raw(Bytes::copy_from_slice(bytes))),
+            _ => Err(IpldError::IpldCodecError(
+                *cid,
+                format!("Invalid codec {:?}", cid.codec()),
+            )),
+        }
+    }
+}
+
 pub type DefaultDecoder = DagPbWithUnixFsCodec;
 
+pub enum IpldData {
+    Raw(Bytes),
+    Ipld(PbNode),
+}
+
+impl IpldData {
+    pub fn get_data(&self) -> Option<Bytes> {
+        match self {
+            Self::Ipld(node) => node.data.clone(),
+            Self::Raw(bytes) => Some(Bytes::copy_from_slice(bytes)),
+        }
+    }
+}
+
 impl Decoder for DagPbWithUnixFsCodec {
-    type Err = ipld_dagpb::Error;
-    type Ipld = PbNode;
-    type IpldCodec = DagPbCodec;
+    type Err = IpldError;
+    type Ipld = IpldData;
     type DataCodec = UnixFsProtobufCodec;
 
-    fn get_data(node: &PbNode) -> Result<Option<Bytes>, IpldError> {
-        Ok(node.data.clone())
+    fn get_data(node: &IpldData) -> Result<Option<Bytes>, IpldError> {
+        Ok(node.get_data())
     }
 }
