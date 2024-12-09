@@ -158,7 +158,7 @@ async fn test_origin_dag_pb() {
         config.gateways = vec![Gateway {
             protocol: Protocol::Http,
             authority: "127.0.0.1:30100".to_string(),
-            request_format: RequestFormat::CidLast,
+            request_format: RequestFormat::Raw,
         }];
         let ipfs_origin =
             IPFSOrigin::<TestBinding>::new(config, state.blockstore().clone()).unwrap();
@@ -200,7 +200,7 @@ async fn test_origin_bbb_dag_pb() {
         config.gateways = vec![Gateway {
             protocol: Protocol::Http,
             authority: "127.0.0.1:30200".to_string(),
-            request_format: RequestFormat::CidLast,
+            request_format: RequestFormat::Raw,
         }];
         let ipfs_origin =
             IPFSOrigin::<TestBinding>::new(config, state.blockstore().clone()).unwrap();
@@ -242,7 +242,7 @@ async fn test_origin_raw() {
         config.gateways = vec![Gateway {
             protocol: Protocol::Http,
             authority: "127.0.0.1:30201".to_string(),
-            request_format: RequestFormat::CidLast,
+            request_format: RequestFormat::Raw,
         }];
         let ipfs_origin =
             IPFSOrigin::<TestBinding>::new(config, state.blockstore().clone()).unwrap();
@@ -284,7 +284,7 @@ async fn test_origin_bbb_dag_pb_and_raw() {
         config.gateways = vec![Gateway {
             protocol: Protocol::Http,
             authority: "127.0.0.1:30202".to_string(),
-            request_format: RequestFormat::CidLast,
+            request_format: RequestFormat::Raw,
         }];
         let ipfs_origin =
             IPFSOrigin::<TestBinding>::new(config, state.blockstore().clone()).unwrap();

@@ -31,6 +31,8 @@ pub enum FeedProofError {
     UnexpectedCall,
     #[error("Proof is not matching the current root.")]
     InvalidProof,
+    #[error("Error getting write lock")]
+    LockError,
     #[error("Error while feeding proof. {0}")]
     VerificationError(#[from] stream::verifier::VerificationError),
 }
@@ -49,6 +51,8 @@ pub enum WriteError {
     InvalidBlockHash(#[from] VerificationError),
     #[error("Error while getting current block file. Not found")]
     BlockFileNotFound,
+    #[error("Error getting mutable lock for write collector")]
+    LockError,
 }
 
 #[derive(Error, Debug)]
@@ -89,4 +93,6 @@ pub enum CommitError {
     SpawnError(#[from] tokio::task::JoinError),
     #[error("Error while committing. {0}")]
     CommitError(#[from] WriteError),
+    #[error("Error getting final lock for commit")]
+    LockError,
 }
