@@ -60,10 +60,10 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             hmac_secret_dir: None,
-            addr: "0.0.0.0:4230".parse().expect("RPC Socket Addr to parse"),
+            addr: "0.0.0.0:4240".parse().expect("RPC Socket Addr to parse"),
             rpc_selection: Default::default(),
             disallowed_methods: None,
-            firewall: FirewallConfig::none("rpc-4230".to_string()),
+            firewall: FirewallConfig::none("rpc-4240".to_string()),
         }
     }
 }

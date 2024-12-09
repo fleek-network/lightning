@@ -410,7 +410,7 @@ impl Default for NodePorts {
             worker: 4311,
             mempool: 4210,
             handshake: Default::default(),
-            rpc: 4230,
+            rpc: 4240,
             pinger: 4350,
         }
     }
