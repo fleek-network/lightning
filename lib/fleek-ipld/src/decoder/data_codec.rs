@@ -54,7 +54,7 @@ pub trait Decoder: IpldCodecStrategy<Decoded = Self::Ipld, ErrDec = Self::Err> {
 
     /// Perform the 2 step decoding process.
     fn decode_from_slice(&self, doc_id: &DocId, data: &[u8]) -> Result<IpldItem, IpldError> {
-        let node = Self::decode(&self, doc_id, data)
+        let node = Self::decode(self, doc_id, data)
             .map_err(|e| IpldError::IpldCodecError(*doc_id.cid(), format!("{e:?}")))?;
         Self::validate_data(doc_id, data)?;
         Self::DataCodec::decode_from(doc_id, node)

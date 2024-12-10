@@ -156,7 +156,7 @@ async fn get_fetchers(
                                             "127.0.0.1:{}",
                                             gateway_port_offset + i as u16
                                         ),
-                                        request_format: RequestFormat::CidLast,
+                                        request_format: RequestFormat::Raw,
                                     }],
                                     gateway_timeout: Duration::from_millis(5000),
                                 },
