@@ -7395,6 +7395,7 @@ version = "0.0.0"
 dependencies = [
  "affair",
  "anyhow",
+ "b3fs",
  "blake3-tree",
  "bytes",
  "fleek-crypto",
@@ -7677,6 +7678,7 @@ dependencies = [
  "lightning-application",
  "lightning-archive",
  "lightning-blockstore",
+ "lightning-blockstore-server",
  "lightning-broadcast",
  "lightning-checkpointer",
  "lightning-committee-beacon",
@@ -8315,6 +8317,7 @@ dependencies = [
  "alloy-primitives",
  "anyhow",
  "async-trait",
+ "b3fs",
  "bit-set 0.8.0",
  "clap",
  "ethers",

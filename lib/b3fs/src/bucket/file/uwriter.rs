@@ -21,6 +21,12 @@ pub struct UntrustedFileWriter {
     state: UntrustedFileWriterState,
 }
 
+impl std::fmt::Debug for UntrustedFileWriter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("UntrustedFileWriter").finish()
+    }
+}
+
 impl UntrustedFileWriter {
     pub async fn new(bucket: &Bucket, hash: [u8; 32]) -> Result<Self, errors::WriteError> {
         let state = UntrustedFileWriterCollector::new(hash);
@@ -31,7 +37,7 @@ impl UntrustedFileWriter {
     }
 
     pub async fn feed_proof(&mut self, proof: &[u8]) -> Result<(), errors::FeedProofError> {
-        self.state.collector.feed_proof(proof)
+        self.state.collector.feed_proof(proof).await
     }
 
     pub async fn write(
@@ -145,8 +151,11 @@ mod tests {
             let slice = proof.as_slice();
             writer.feed_proof(slice).await.unwrap();
             let hash_block = hash_tree.get_hash(i as u32).await.unwrap().unwrap();
-            let block_path = previous_bucket.get_block_path(i as u32, &hash_block);
-            let bytes = tokio::fs::read(block_path).await.unwrap();
+            let bytes = previous_bucket
+                .get_block_content(&hash_block)
+                .await
+                .unwrap()
+                .unwrap();
             writer.write(&bytes, num_blocks - 1 == i).await.unwrap();
         }
 
