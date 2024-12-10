@@ -43,6 +43,7 @@
 //! [1]: file::reader::File
 //! [2]: dir::reader::Dir
 
+use core::hash;
 use std::io::{Error, ErrorKind, Result};
 use std::path::{Path, PathBuf};
 
@@ -58,10 +59,9 @@ pub mod dir;
 pub mod errors;
 pub mod file;
 
-pub const HEADER_VERSION: u32 = 1;
-pub const HEADER_TYPE_DIR: u8 = 0;
-pub const HEADER_TYPE_FILE: u8 = 1;
-pub const POSITION_START_HASHES: usize = 9;
+pub const HEADER_DIR_VERSION: u32 = 1;
+pub const HEADER_FILE_VERSION: u32 = 0;
+pub const POSITION_START_HASHES: usize = 8;
 pub const POSITION_START_NUM_ENTRIES: usize = POSITION_START_HASHES - 4;
 
 /// An open b3fs bucket which can be used for both reads and writes.
@@ -84,7 +84,7 @@ pub struct ContentHeader {
     /// If the content is a directory header this is always smaller or equal to u16::MAX.
     num_entries: u32,
     /// The actual header file that is open.
-    header_file: Arc<File>,
+    header_file: File,
 }
 
 impl Bucket {
@@ -153,12 +153,11 @@ impl Bucket {
         Ok(ContentHeader {
             is_file,
             num_entries,
-            header_file: Arc::new(file),
+            header_file: file,
         })
     }
 
-    pub fn get_block_path(&self, counter: u32, hash: &[u8; 32]) -> PathBuf {
-        // TODO(qti3e): use the counter in file name.
+    pub fn get_block_path(&self, hash: &[u8; 32]) -> PathBuf {
         let mut path = self.blocks.clone();
         path.push(to_hex(hash).as_str());
         path
@@ -168,6 +167,16 @@ impl Bucket {
         let mut path = self.headers.clone();
         path.push(to_hex(hash).as_str());
         path
+    }
+
+    pub async fn get_block_content(&self, hash: &[u8; 32]) -> Result<Option<Vec<u8>>> {
+        let path = self.get_block_path(hash);
+        if tokio::fs::try_exists(path.clone()).await? {
+            let read = tokio::fs::read(path).await?;
+            Ok(Some(read))
+        } else {
+            Ok(None)
+        }
     }
 
     pub(crate) fn get_new_wal_path(&self) -> PathBuf {
@@ -191,20 +200,18 @@ impl ContentHeader {
 
     /// If this content is a file returns a [B3File][file::reader::B3File].
     pub fn into_file(self) -> Option<file::reader::B3File> {
-        let f = self.header_file.clone();
-        let file = Arc::try_unwrap(f).map(Some).unwrap_or_default();
-        if let Some(f) = file {
-            self.is_file()
-                .then(|| file::reader::B3File::new(self.num_entries, f))
-        } else {
-            None
-        }
+        self.is_file()
+            .then(|| file::reader::B3File::new(self.num_entries, self.header_file))
     }
 
     /// If this content is a directory returns a [B3Dir][dir::reader::B3Dir].
     pub fn into_dir(self) -> Option<dir::reader::B3Dir> {
         self.is_dir()
             .then(|| dir::reader::B3Dir::new(self.num_entries, self.header_file))
+    }
+
+    pub fn blocks(&self) -> u32 {
+        self.num_entries
     }
 }
 

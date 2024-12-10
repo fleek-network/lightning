@@ -13,12 +13,13 @@ use tokio_stream::Stream;
 
 use crate::bucket::dir::reader::B3Dir;
 use crate::bucket::dir::HeaderPositions;
+use crate::bucket::errors::ReadError;
 use crate::bucket::file::reader::B3File;
 use crate::bucket::{
     self,
     errors,
     Bucket,
-    HEADER_TYPE_DIR,
+    HEADER_DIR_VERSION,
     POSITION_START_HASHES,
     POSITION_START_NUM_ENTRIES,
 };
@@ -64,9 +65,9 @@ impl BucketStream {
     pub async fn create(bucket: &Bucket, root_hash: &[u8; 32]) -> BucketStreamer {
         let head = bucket.get_header_path(root_hash);
         let mut file = File::open(head).await?;
-        let ty = file.read_u8().await?;
+        let ty = file.read_u32_le().await?;
         let stream: Box<dyn Stream<Item = Result<BucketItem, errors::ReadError>>> =
-            if ty == HEADER_TYPE_DIR {
+            if ty == HEADER_DIR_VERSION {
                 Box::new(DirStream::new(file, bucket.to_owned()).await?)
             } else {
                 Box::new(FileStream::new(file, bucket.to_owned()).await?)
@@ -184,9 +185,14 @@ impl Stream for FileStream {
                 let curr_block = this.current_block;
                 let waker = cx.waker().clone();
                 let curr_hash = this.current_hash;
-                let buck_path = this.bucket.get_block_path(curr_block, &curr_hash).clone();
+                let bucket = this.bucket.clone();
                 let future = async move {
-                    let result = tokio::fs::read(buck_path).await;
+                    let result = bucket.get_block_content(&curr_hash).await.and_then(|o| {
+                        o.ok_or(std::io::Error::new(
+                            std::io::ErrorKind::Other,
+                            "Block not found",
+                        ))
+                    });
                     waker.wake();
                     result
                 };
@@ -226,7 +232,7 @@ enum DirState {
     WaitingReadFlagEntry(PinBoxFuture<u8>),
     WaitingReadNameEntry(PinBoxFuture<Vec<u8>>),
     WaitingContentEntry(PinBoxFuture<[u8; 32]>),
-    WaitingOpenContentEntry(PinBoxFuture<(PathBuf, u8)>),
+    WaitingOpenContentEntry(PinBoxFuture<(PathBuf, u32)>),
     WaitingReadPathEntry(PinBoxFuture<Vec<u8>>),
 }
 
@@ -397,7 +403,7 @@ impl Stream for DirStream {
                     .clone();
                 let future = async move {
                     let mut file = File::open(path.clone()).await?;
-                    let ty = file.read_u8().await?;
+                    let ty = file.read_u32_le().await?;
                     waker.wake();
                     Ok((path, ty))
                 };
@@ -408,9 +414,9 @@ impl Stream for DirStream {
             },
             DirState::WaitingOpenContentEntry(ref mut fut) => {
                 let result = fut.as_mut().poll(cx);
-                on_future!(this, result, DirState::Eof, |(path, ty): (PathBuf, u8)| {
+                on_future!(this, result, DirState::Eof, |(path, ty): (PathBuf, u32)| {
                     this.state = DirState::SeekNextPosition;
-                    if ty == HEADER_TYPE_DIR {
+                    if ty == HEADER_DIR_VERSION {
                         Poll::Ready(Some(Ok(BucketItem::Dir(DirItem::Dir(path.clone())))))
                     } else {
                         Poll::Ready(Some(Ok(BucketItem::Dir(DirItem::File(path)))))
