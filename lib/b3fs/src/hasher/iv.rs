@@ -16,6 +16,9 @@ pub struct SmallIV {
     iv: *const IV,
 }
 
+unsafe impl Send for SmallIV {}
+unsafe impl Sync for SmallIV {}
+
 impl SmallIV {
     /// Blake3's default IV.
     pub const DEFAULT: Self = Self::from_static_ref(&IV::DEFAULT);
