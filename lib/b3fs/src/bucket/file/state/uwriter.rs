@@ -1,8 +1,10 @@
 use std::cell::RefCell;
+use std::mem;
 use std::path::PathBuf;
 
 use bytes::{BufMut, BytesMut};
 use tokio::io;
+use tokio::sync::RwLock;
 
 use super::*;
 use crate::bucket::{errors, Bucket};
@@ -16,7 +18,7 @@ pub(crate) struct UntrustedFileWriterCollector {
     /// The current block hasher
     current_hasher: BlockHasher,
     /// An incremental verifier for hash tree collection
-    increment_verifier: RefCell<IncrementalVerifier<WithHashTreeCollector<BufCollector>>>,
+    increment_verifier: RwLock<IncrementalVerifier<WithHashTreeCollector<BufCollector>>>,
     /// The root hash provided by the caller
     root_hash: [u8; 32],
     /// Buffer to control filling a block
@@ -61,7 +63,8 @@ impl WithCollector for UntrustedFileWriterCollector {
             self.current_hasher.update(&bytes_block);
             let block_hash = self.current_hasher.clone().finalize(false);
             self.increment_verifier
-                .borrow_mut()
+                .write()
+                .await
                 .verify_hash(block_hash)?;
             Ok(Some(block_hash))
         } else {
@@ -78,7 +81,8 @@ impl WithCollector for UntrustedFileWriterCollector {
             self.current_hasher.update(&self.buffer_bytes);
             let block_hash = self.current_hasher.clone().finalize(count_block == 0);
             self.increment_verifier
-                .borrow_mut()
+                .write()
+                .await
                 .verify_hash(block_hash)?;
             Ok(Some(block_hash))
         } else {
@@ -88,7 +92,9 @@ impl WithCollector for UntrustedFileWriterCollector {
 
     /// Finalizes the hash tree and return the root hash
     async fn finalize_tree(&mut self) -> Result<(BufCollector, [u8; 32]), errors::WriteError> {
-        let mut collector = self.increment_verifier.take().finalize();
+        let mut collector_ward = self.increment_verifier.write().await;
+        let collector = mem::take(&mut *collector_ward);
+        let collector = collector.finalize();
         Ok((collector, self.root_hash))
     }
 }
@@ -104,15 +110,15 @@ impl UntrustedFileWriterCollector {
         increment_verifier.set_root_hash(root_hash);
         Self {
             current_hasher,
-            increment_verifier: RefCell::new(increment_verifier),
+            increment_verifier: RwLock::new(increment_verifier),
             root_hash,
             buffer_bytes: BytesMut::new(),
         }
     }
 
     /// Feeds a proof to the incremental verifier
-    pub(crate) fn feed_proof(&mut self, proof: &[u8]) -> Result<(), errors::FeedProofError> {
-        self.increment_verifier.borrow_mut().feed_proof(proof)?;
+    pub(crate) async fn feed_proof(&mut self, proof: &[u8]) -> Result<(), errors::FeedProofError> {
+        self.increment_verifier.write().await.feed_proof(proof)?;
         Ok(())
     }
 }

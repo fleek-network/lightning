@@ -3,6 +3,7 @@
 //! This module provides functionality for writing directory entries in an untrusted manner,
 //! requiring proofs to verify the integrity of the data being written.
 
+use std::fmt::Debug;
 use std::io;
 
 use super::state::uwriter::{DirUWriterCollector, DirUWriterState};
@@ -17,6 +18,12 @@ use crate::stream::verifier::{IncrementalVerifier, WithHashTreeCollector};
 pub struct UntrustedDirWriter {
     /// The internal state of the writer
     state: DirUWriterState,
+}
+
+impl Debug for UntrustedDirWriter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("UntrustedDirWriter").finish()
+    }
 }
 
 impl UntrustedDirWriter {
