@@ -10,7 +10,7 @@ use tokio::sync::RwLock;
 use tokio_stream::Stream;
 
 use crate::bucket::errors;
-use crate::entry::{BorrowedEntry, BorrowedLink};
+use crate::entry::{BorrowedEntry, BorrowedLink, OwnedEntry, OwnedLink};
 use crate::hasher::dir_hasher::B3_DIR_IS_SYM_LINK;
 use crate::on_future;
 
@@ -36,7 +36,7 @@ enum State {
 }
 
 /// Iterator over entries in a B3 directory
-pub struct DirEntriesIter<'a> {
+pub struct DirEntriesIter {
     /// Buffered reader for the directory file
     reader: Arc<RwLock<BufReader<File>>>,
     /// Current position in the file
@@ -47,11 +47,12 @@ pub struct DirEntriesIter<'a> {
     entry_name: Vec<u8>,
     /// Entry type flag
     flag: u8,
-    /// Phantom data for lifetime 'a
-    _marker: std::marker::PhantomData<&'a ()>,
 }
 
-impl<'a> DirEntriesIter<'a> {
+unsafe impl Send for DirEntriesIter {}
+unsafe impl Sync for DirEntriesIter {}
+
+impl DirEntriesIter {
     /// Creates a new directory entries iterator starting at the given position
     pub async fn new(reader: File, position_start_entries: u64) -> Result<Self, errors::ReadError> {
         let mut reader = BufReader::new(reader);
@@ -61,13 +62,12 @@ impl<'a> DirEntriesIter<'a> {
             state: State::ReadPosition,
             entry_name: Vec::new(),
             flag: 0,
-            _marker: std::marker::PhantomData,
         })
     }
 }
 
-impl<'a> Stream for DirEntriesIter<'a> {
-    type Item = Result<BorrowedEntry<'a>, errors::ReadError>;
+impl Stream for DirEntriesIter {
+    type Item = Result<OwnedEntry, errors::ReadError>;
 
     /// Polls the iterator for the next directory entry
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -176,11 +176,9 @@ impl<'a> Stream for DirEntriesIter<'a> {
                 on_future!(this, result, State::Eof, |buffer_content: [u8; 32]| {
                     this.state = State::ReadPosition;
                     this.position += this.entry_name.len() as u64 + buffer_content.len() as u64 + 2;
-                    let static_slice: &'static [u8; 32] =
-                        unsafe { mem::transmute_copy(&buffer_content) };
-                    Poll::Ready(Some(Ok(BorrowedEntry {
-                        name: Box::leak(this.entry_name.clone().into_boxed_slice()),
-                        link: BorrowedLink::Content(static_slice),
+                    Poll::Ready(Some(Ok(OwnedEntry {
+                        name: this.entry_name.clone().into(),
+                        link: OwnedLink::Content(buffer_content),
                     })))
                 })
             },
@@ -204,13 +202,10 @@ impl<'a> Stream for DirEntriesIter<'a> {
                 on_future!(this, result, State::Eof, |buffer_link: Vec<u8>| {
                     this.state = State::ReadPosition;
                     this.position += this.entry_name.len() as u64 + buffer_link.len() as u64 + 2;
-                    let content = buffer_link[..buffer_link.len() - 1]
-                        .to_vec()
-                        .into_boxed_slice();
-                    let static_slice: &'static [u8] = Box::leak(content);
-                    Poll::Ready(Some(Ok(BorrowedEntry {
-                        name: Box::leak(this.entry_name.clone().into_boxed_slice()),
-                        link: BorrowedLink::Path(static_slice),
+                    let content = buffer_link[..buffer_link.len() - 1].to_vec();
+                    Poll::Ready(Some(Ok(OwnedEntry {
+                        name: this.entry_name.clone().into(),
+                        link: OwnedLink::Link(smallvec::SmallVec::from_vec(content)),
                     })))
                 })
             },

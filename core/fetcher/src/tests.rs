@@ -156,19 +156,17 @@ async fn get_fetchers(
                                     .try_into()
                                     .unwrap(),
                             })
-                            .with::<OriginDemuxer<TestBinding>>(DemuxerOriginConfig {
+                            .with::<Fetcher<TestBinding>>(Config {
+                                max_conc_origin_req: 3,
                                 ipfs: IPFSOriginConfig {
                                     gateways: vec![Gateway {
                                         protocol: Protocol::Http,
                                         authority: format!("127.0.0.1:{gateway_port}"),
-                                        request_format: RequestFormat::CidLast,
+                                        request_format: RequestFormat::Raw,
                                     }],
                                     gateway_timeout: Duration::from_millis(5000),
                                 },
                                 ..Default::default()
-                            })
-                            .with::<Fetcher<TestBinding>>(Config {
-                                max_conc_origin_req: 3,
                             }),
                     ),
             )

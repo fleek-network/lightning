@@ -24,6 +24,7 @@ use super::phf::PHF_TABLE_RANDOMIZED_KEY_SIZE;
 use crate::bucket::dir::phf::{calculate_buckets_len, displace, hash, HasherState};
 use crate::bucket::dir::HeaderPositions;
 use crate::bucket::{errors, POSITION_START_HASHES};
+use crate::collections::tree::AsyncHashTree;
 use crate::collections::HashTree;
 use crate::entry::{BorrowedEntry, BorrowedLink, OwnedLink};
 use crate::hasher::dir_hasher::B3_DIR_IS_SYM_LINK;
@@ -36,11 +37,9 @@ pub struct B3Dir {
     /// The number of entries in this directory.
     num_entries: u16,
     /// The actual header file.
-    file: Arc<fs::File>,
+    file: fs::File,
     /// Bloom filter for fast negative lookups
     bloom_filter: OnceCell<BloomFilter>,
-    /// Hash tree containing entry hashes
-    hashtree: OnceCell<HashTree<'static>>,
     /// Directory header positions
     positions: HeaderPositions,
     /// Perfect hash function table
@@ -67,14 +66,13 @@ impl B3Dir {
     /// # Arguments
     /// * `num_entries` - Number of entries in the directory
     /// * `file` - The directory header file
-    pub(crate) fn new(num_entries: u32, file: Arc<fs::File>) -> Self {
+    pub(crate) fn new(num_entries: u32, file: fs::File) -> Self {
         debug_assert!(num_entries <= u16::MAX as u32);
         let positions = HeaderPositions::new(num_entries as usize);
         Self {
             num_entries: num_entries as u16,
             file,
             bloom_filter: OnceCell::new(),
-            hashtree: OnceCell::new(),
             phf_table: OnceCell::new(),
             positions,
         }
@@ -84,17 +82,10 @@ impl B3Dir {
     ///
     /// # Returns
     /// The hash tree containing entry hashes, or an error if reading fails.
-    pub async fn hashtree(&mut self) -> Result<&HashTree<'static>, errors::ReadError> {
-        self.hashtree
-            .get_or_try_init(|| async {
-                let mut buffer = vec![0u8; self.positions.length_hashes];
-                let mut file_reader = self.position_file(POSITION_START_HASHES as u64).await?;
-                file_reader.read_exact(&mut buffer).await?;
-                let boxed_slice = buffer.into_boxed_slice();
-                let static_slice: &'static [u8] = Box::leak(boxed_slice);
-                HashTree::try_from(static_slice).map_err(errors::ReadError::InvalidHashtree)
-            })
-            .await
+    pub async fn hashtree(&mut self) -> Result<AsyncHashTree<fs::File>, errors::ReadError> {
+        let file = self.file.try_clone().await?;
+        let hash = AsyncHashTree::new(file, self.num_entries as usize);
+        Ok(hash)
     }
 
     /// Looks up a directory entry by name.
@@ -235,7 +226,7 @@ impl B3Dir {
         offset: u32,
     ) -> Result<Option<BorrowedEntry<'a>>, errors::ReadError> {
         let start_entry: u64 =
-            self.positions.position_start_entries as u64 + offset as u64 - name.len() as u64 - 4;
+            self.positions.position_start_entries as u64 + offset as u64 - name.len() as u64 - 3;
         let file = self.position_file(start_entry).await?;
         let mut file = BufReader::new(file);
         let flag = file.read_u8().await;
@@ -272,6 +263,7 @@ impl B3Dir {
 #[cfg(test)]
 mod tests {
     use std::env::temp_dir;
+    use std::io::Read;
     use std::path::{Path, PathBuf};
 
     use tokio::io::AsyncWriteExt;
@@ -279,7 +271,7 @@ mod tests {
 
     use super::*;
     use crate::bucket::dir::writer::DirWriter;
-    use crate::bucket::{Bucket, HEADER_TYPE_DIR, HEADER_VERSION};
+    use crate::bucket::{Bucket, HEADER_DIR_VERSION};
     use crate::entry::OwnedEntry;
     use crate::utils::to_hex;
 
@@ -305,12 +297,9 @@ mod tests {
                 .join(to_hex(&root_hash).to_string()),
         )
         .await?;
-        let ty = file.read_u8().await?;
-        assert_eq!(ty, HEADER_TYPE_DIR);
         let version = file.read_u32_le().await?;
-        assert_eq!(version, HEADER_VERSION);
+        assert_eq!(version, HEADER_DIR_VERSION);
         let num_entries = file.read_u32_le().await?;
-        let file = Arc::new(file);
 
         Ok(B3Dir::new(num_entries, file))
     }
@@ -380,19 +369,12 @@ mod tests {
         let mut count = 0;
 
         while let Some(entry) = iter.next().await {
-            let entry = entry.unwrap();
+            let OwnedEntry { name, link } = entry.unwrap();
             count += 1;
-            match entry.name {
-                b"aa_file1" | b"aa_file2" | b"bb_file3" => {
-                    assert!(matches!(entry.link, BorrowedLink::Content(_)))
-                },
-                b"aa_symlink" | b"bb_symlink2" | b"bb_symlink3" => {
-                    assert!(matches!(entry.link, BorrowedLink::Path(_)))
-                },
-                _ => panic!(
-                    "Unexpected entry: {:?}",
-                    String::from_utf8(entry.name.to_vec()).unwrap()
-                ),
+            if name.windows(4).any(|s| s == "file".as_bytes()) {
+                assert!(matches!(link, OwnedLink::Content(_)))
+            } else {
+                assert!(matches!(link, OwnedLink::Link(_)))
             }
         }
 
@@ -413,10 +395,13 @@ mod tests {
                 link: OwnedLink::Content([2; 32]),
             },
         ];
+        let num_entries = entries.len();
         let mut dir = create_test_dir(&temp_dir, entries).await.unwrap();
 
-        let hashtree = dir.hashtree().await.unwrap();
-        assert_eq!(hashtree.len(), 2);
+        let mut hashtree = dir.hashtree().await.unwrap();
+        for i in 0..num_entries {
+            hashtree.get_hash(i as u32).await.unwrap().unwrap();
+        }
         tokio::fs::remove_dir_all(temp_dir).await.unwrap();
     }
 }
