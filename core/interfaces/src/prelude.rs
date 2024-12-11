@@ -21,7 +21,6 @@ pub use crate::{c, fdi, partial_node_components, schema, spawn, types, ShutdownW
 #[rustfmt::skip]
 pub use crate::{
     ExecutionEngineSocket,
-    OriginProviderSocket,
     SignerSubmitTxSocket,
     FetcherSocket,
     DeliveryAcknowledgmentSocket,
