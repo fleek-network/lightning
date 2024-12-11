@@ -1,5 +1,5 @@
 use lightning_interfaces::types::{Blake3Hash, ImmutablePointer, OriginProvider};
-use lightning_interfaces::Collection;
+use lightning_interfaces::NodeComponents;
 use lightning_origin_b3fs::B3FSOrigin;
 use lightning_origin_http::HttpOrigin;
 use lightning_origin_ipfs::IPFSOrigin;
@@ -7,13 +7,13 @@ use lightning_origin_ipfs::IPFSOrigin;
 use crate::config::Config;
 
 #[derive(Clone)]
-pub(crate) struct Router<C: Collection> {
+pub(crate) struct Router<C: NodeComponents> {
     http: HttpOrigin<C>,
     ipfs: IPFSOrigin<C>,
     b3fs: B3FSOrigin<C>,
 }
 
-impl<C: Collection> Router<C> {
+impl<C: NodeComponents> Router<C> {
     pub fn new(config: Config, blockstore: C::BlockstoreInterface) -> anyhow::Result<Self> {
         Ok(Self {
             http: HttpOrigin::<C>::new(config.http, blockstore.clone())?,
