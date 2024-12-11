@@ -1,5 +1,6 @@
 #![allow(unused)]
 
+use std::fmt::Write;
 use std::future::Future;
 use std::io;
 use std::marker::PhantomData;
@@ -119,24 +120,35 @@ impl<C: NodeComponents> BlockstoreInterface<C> for Blockstore<C> {
 
     type UDirWriter = DUWriter;
 
-    fn file_writer(&self) -> Self::FileWriter {
-        todo!()
+    async fn file_writer(&self) -> Result<Self::FileWriter, WriteError> {
+        let fw = FileWriter::new(&self.get_bucket()).await?;
+        Ok(FWriter(fw))
     }
 
-    fn file_untrusted_writer(&self) -> Self::UFileWriter {
-        todo!()
+    async fn file_untrusted_writer(
+        &self,
+        root_hash: Blake3Hash,
+    ) -> Result<Self::UFileWriter, WriteError> {
+        let fw = UntrustedFileWriter::new(&self.get_bucket(), root_hash).await?;
+        Ok(FUWriter(fw))
     }
 
-    fn dir_writer(&self) -> Self::DirWriter {
-        todo!()
+    async fn dir_writer(&self, num_entries: usize) -> Result<Self::DirWriter, WriteError> {
+        let dw = DirWriter::new(&self.get_bucket(), num_entries).await?;
+        Ok(DWriter(dw))
     }
 
-    fn dir_untrusted_writer(&self) -> Self::UDirWriter {
-        todo!()
+    async fn dir_untrusted_writer(
+        &self,
+        root_hash: Blake3Hash,
+        num_entries: usize,
+    ) -> Result<Self::UDirWriter, WriteError> {
+        let dw = UntrustedDirWriter::new(&self.get_bucket(), num_entries, root_hash).await?;
+        Ok(DUWriter(dw))
     }
 }
 
-struct FUWriter(UntrustedFileWriter);
+pub struct FUWriter(UntrustedFileWriter);
 
 impl Deref for FUWriter {
     type Target = UntrustedFileWriter;
@@ -172,7 +184,7 @@ impl FileTrustedWriter for FUWriter {
     }
 }
 
-struct FWriter(FileWriter);
+pub struct FWriter(FileWriter);
 
 impl Deref for FWriter {
     type Target = FileWriter;
@@ -202,7 +214,7 @@ impl FileTrustedWriter for FWriter {
     }
 }
 
-struct DUWriter(UntrustedDirWriter);
+pub struct DUWriter(UntrustedDirWriter);
 
 impl Deref for DUWriter {
     type Target = UntrustedDirWriter;
@@ -240,7 +252,7 @@ impl DirTrustedWriter for DUWriter {
         self.0.rollback().await
     }
 }
-struct DWriter(DirWriter);
+pub struct DWriter(DirWriter);
 
 impl Deref for DWriter {
     type Target = DirWriter;
