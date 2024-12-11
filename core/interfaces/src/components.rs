@@ -19,7 +19,6 @@ define_node_components!([
     ConsensusInterface,
     HandshakeInterface,
     NotifierInterface,
-    OriginProviderInterface,
     DeliveryAcknowledgmentAggregatorInterface,
     ReputationAggregatorInterface,
     ResolverInterface,
