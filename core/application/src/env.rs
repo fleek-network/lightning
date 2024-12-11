@@ -36,7 +36,6 @@ use merklize::hashers::keccak::KeccakHasher;
 use merklize::trees::mpt::MptStateTree;
 use merklize::StateTree;
 use tokio::sync::Mutex;
-use tracing::warn;
 use types::{NodeRegistryChange, NodeRegistryChanges};
 
 use crate::config::ApplicationConfig;
@@ -75,7 +74,7 @@ impl ApplicationEnv {
         get_blockstore: F,
     ) -> Result<BlockExecutionResponse>
     where
-        C: Collection,
+        C: NodeComponents,
         F: FnOnce() -> P,
         P: BlockstoreInterface<C>,
     {

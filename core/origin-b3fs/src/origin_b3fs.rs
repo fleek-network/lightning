@@ -4,11 +4,11 @@ use lightning_interfaces::types::Blake3Hash;
 
 use crate::Config;
 
-pub struct B3FSOrigin<C: Collection> {
+pub struct B3FSOrigin<C: NodeComponents> {
     _phantom: std::marker::PhantomData<C>,
 }
 
-impl<C: Collection> Clone for B3FSOrigin<C> {
+impl<C: NodeComponents> Clone for B3FSOrigin<C> {
     fn clone(&self) -> Self {
         Self {
             _phantom: std::marker::PhantomData,
@@ -16,7 +16,7 @@ impl<C: Collection> Clone for B3FSOrigin<C> {
     }
 }
 
-impl<C: Collection> B3FSOrigin<C> {
+impl<C: NodeComponents> B3FSOrigin<C> {
     pub fn new(_config: Config) -> Result<Self> {
         Ok(B3FSOrigin {
             _phantom: std::marker::PhantomData,
