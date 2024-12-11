@@ -1,3 +1,5 @@
+use std::time::SystemTime;
+
 use arrayref::array_ref;
 use bytes::{BufMut, BytesMut};
 use cid::Cid;
@@ -20,6 +22,12 @@ async fn main() -> anyhow::Result<()> {
         .send_handshake(HandshakeRequestFrame::Handshake {
             retry: None,
             service: SERVICE_ID,
+            expiry: SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs()
+                + 30,
+            nonce: 0, // TODO
             pk: [0; 96].into(),
             pop: [0; 48].into(),
         })

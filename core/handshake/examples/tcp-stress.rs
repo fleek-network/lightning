@@ -2,6 +2,7 @@ use std::fs::File;
 use std::io::Write;
 use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
+use std::time::SystemTime;
 
 use anyhow::{anyhow, Result};
 use clap::Parser;
@@ -223,6 +224,12 @@ async fn run_request(
             service: 1001,
             pk: ClientPublicKey([1; 96]),
             pop: ClientSignature([2; 48]),
+            expiry: SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs()
+                + 3600,
+            nonce: 0,
         })
         .await?;
     data!(line, "handshake_sent", timer);

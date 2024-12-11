@@ -1,6 +1,8 @@
 mod config;
 mod handler;
 
+use std::marker::PhantomData;
+
 use async_channel::{Receiver, Sender};
 use async_trait::async_trait;
 use axum::http::StatusCode;
@@ -22,23 +24,29 @@ use tracing::warn;
 
 use crate::transports::{Transport, TransportReceiver, TransportSender};
 
-pub struct HttpTransport {}
+pub struct HttpTransport<P, QR> {
+    _p: PhantomData<(P, QR)>,
+}
 
 #[async_trait]
-impl Transport for HttpTransport {
+impl<P: ExecutorProviderInterface, QR: SyncQueryRunnerInterface> Transport
+    for HttpTransport<P, QR>
+{
     type Config = Config;
     type Sender = HttpSender;
     type Receiver = HttpReceiver;
 
-    async fn bind<P: ExecutorProviderInterface>(
-        _: ShutdownWaiter,
-        _: Self::Config,
-    ) -> anyhow::Result<(Self, Option<Router>)> {
+    async fn bind(_: ShutdownWaiter, _: Self::Config) -> anyhow::Result<(Self, Option<Router>)> {
         let router = Router::new()
-            .route("/services/:service/*path", any(handler::handler::<P>))
-            .route("/services/:service", any(handler::handler::<P>))
+            .route("/services/:service/*path", any(handler::handler::<P, QR>))
+            .route("/services/:service", any(handler::handler::<P, QR>))
             .route("/actions.json", any(handler::blink_support));
-        Ok((Self {}, Some(router)))
+        Ok((
+            Self {
+                _p: Default::default(),
+            },
+            Some(router),
+        ))
     }
 
     async fn accept(&mut self) -> Option<(HandshakeRequestFrame, Self::Sender, Self::Receiver)> {

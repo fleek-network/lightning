@@ -4,6 +4,7 @@ use anyhow::{anyhow, Result};
 use arrayref::array_ref;
 use bytes::{BufMut, Bytes};
 use fleek_crypto::{ClientPublicKey, ClientSignature, NodePublicKey, NodeSignature};
+use sha2::{Digest, Sha256};
 
 pub const NETWORK_PREFIX: &[u8; 5] = b"FLEEK";
 
@@ -57,11 +58,44 @@ pub enum HandshakeRequestFrame {
     Handshake {
         retry: Option<u64>,
         service: u32,
+        expiry: u64,
+        nonce: u128,
         pk: ClientPublicKey,
         pop: ClientSignature,
     },
     /// Secondary connection join request.
     JoinRequest { access_token: [u8; 48] },
+}
+
+/// Compute a digest for signing a handshake request
+pub fn handshake_digest(
+    retry: Option<u64>,
+    service: u32,
+    expiry: u64,
+    nonce: u128,
+    pk: ClientPublicKey,
+) -> [u8; 32] {
+    let mut hasher = Sha256::default();
+
+    hasher.update(b"RETRY");
+    hasher.update([retry.is_some() as u8]);
+    if let Some(id) = retry {
+        hasher.update(id.to_be_bytes());
+    }
+
+    hasher.update(b"SERVICE");
+    hasher.update(service.to_be_bytes());
+
+    hasher.update(b"EXPIRY");
+    hasher.update(expiry.to_be_bytes());
+
+    hasher.update(b"NONCE");
+    hasher.update(nonce.to_be_bytes());
+
+    hasher.update(b"PUBKEY");
+    hasher.update(pk.0);
+
+    hasher.finalize().into()
 }
 
 impl HandshakeRequestFrame {
@@ -71,23 +105,27 @@ impl HandshakeRequestFrame {
             HandshakeRequestFrame::Handshake {
                 retry,
                 service,
+                expiry,
+                nonce,
                 pk,
                 pop,
             } => {
                 let mut buf = match retry {
                     None => {
-                        let mut buf = Vec::with_capacity(149);
+                        let mut buf = Vec::with_capacity(173);
                         buf.put_u8(HANDSHAKE_REQ_TAG);
                         buf
                     },
                     Some(id) => {
-                        let mut buf = Vec::with_capacity(157);
+                        let mut buf = Vec::with_capacity(181);
                         buf.put_u8(HANDSHAKE_RETRY_REQ_TAG);
                         buf.put_u64(*id);
                         buf
                     },
                 };
                 buf.put_u32(*service);
+                buf.put_u64(*expiry);
+                buf.put_u128(*nonce);
                 buf.put_slice(&pk.0);
                 buf.put_slice(&pop.0);
                 buf.into()
@@ -109,30 +147,39 @@ impl HandshakeRequestFrame {
 
         match bytes[0] {
             HANDSHAKE_REQ_TAG => {
-                if bytes.len() != 149 {
+                if bytes.len() != 173 {
                     return Err(anyhow!("wrong number of bytes"));
                 }
                 let service = u32::from_be_bytes(*array_ref!(bytes, 1, 4));
-                let pk = ClientPublicKey(*array_ref!(bytes, 5, 96));
-                let pop = ClientSignature(*array_ref!(bytes, 101, 48));
+                let expiry = u64::from_be_bytes(*array_ref![bytes, 5, 8]);
+                let nonce = u128::from_be_bytes(*array_ref![bytes, 13, 16]);
+                let pk = ClientPublicKey(*array_ref!(bytes, 29, 96));
+                let pop = ClientSignature(*array_ref!(bytes, 125, 48));
                 Ok(Self::Handshake {
+                    retry: None,
+                    service,
+                    expiry,
+                    nonce,
                     pk,
                     pop,
-                    service,
-                    retry: None,
                 })
             },
             HANDSHAKE_RETRY_REQ_TAG => {
-                if bytes.len() != 157 {
+                if bytes.len() != 181 {
                     return Err(anyhow!("wrong number of bytes"));
                 }
                 let retry = Some(u64::from_be_bytes(*array_ref!(bytes, 1, 8)));
+
                 let service = u32::from_be_bytes(*array_ref!(bytes, 9, 4));
-                let pk = ClientPublicKey(*array_ref!(bytes, 13, 96));
-                let pop = ClientSignature(*array_ref!(bytes, 109, 48));
+                let expiry = u64::from_be_bytes(*array_ref![bytes, 13, 8]);
+                let nonce = u128::from_be_bytes(*array_ref![bytes, 21, 16]);
+                let pk = ClientPublicKey(*array_ref!(bytes, 37, 96));
+                let pop = ClientSignature(*array_ref!(bytes, 133, 48));
                 Ok(Self::Handshake {
                     retry,
                     service,
+                    expiry,
+                    nonce,
                     pk,
                     pop,
                 })
@@ -394,12 +441,16 @@ mod tests {
             HandshakeRequestFrame::Handshake {
                 retry: None,
                 service: 1,
+                expiry: 0,
+                nonce: 0,
                 pk: ClientPublicKey([2; 96]),
                 pop: ClientSignature([3; 48]),
             },
             HandshakeRequestFrame::Handshake {
                 retry: Some(4),
                 service: 5,
+                expiry: 0,
+                nonce: 0,
                 pk: ClientPublicKey([6; 96]),
                 pop: ClientSignature([7; 48]),
             },

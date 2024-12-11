@@ -57,10 +57,7 @@ impl Transport for WebRtcTransport {
     type Sender = WebRtcSender;
     type Receiver = WebRtcReceiver;
 
-    async fn bind<P: ExecutorProviderInterface>(
-        waiter: ShutdownWaiter,
-        config: Self::Config,
-    ) -> Result<(Self, Option<Router>)> {
+    async fn bind(waiter: ShutdownWaiter, config: Self::Config) -> Result<(Self, Option<Router>)> {
         info!("Binding WebRTC transport on {}", config.address);
         let conns = Arc::new(DashMap::new());
 

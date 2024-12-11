@@ -5,7 +5,7 @@ use arrayref::array_ref;
 use async_channel::Receiver;
 use bytes::BytesMut;
 use lightning_interfaces::schema::handshake::{ResponseFrame, TerminationReason};
-use lightning_interfaces::{spawn, ExecutorProviderInterface};
+use lightning_interfaces::{spawn, ExecutorProviderInterface, SyncQueryRunnerInterface};
 use lightning_metrics::increment_counter;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::UnixStream;
@@ -14,8 +14,8 @@ use crate::handshake::Context;
 use crate::schema::RequestFrame;
 use crate::transports::{match_transport, TransportPair, TransportReceiver, TransportSender};
 
-pub struct Proxy<P: ExecutorProviderInterface> {
-    context: Context<P>,
+pub struct Proxy<P: ExecutorProviderInterface, QR: SyncQueryRunnerInterface> {
+    context: Context<P, QR>,
     /// The id for this connection.
     connection_id: u64,
     /// The id for the service this connection is connected to.
@@ -61,7 +61,7 @@ enum HandleRequestResult {
     TerminateConnection,
 }
 
-impl<P: ExecutorProviderInterface> Proxy<P> {
+impl<P: ExecutorProviderInterface, QR: SyncQueryRunnerInterface> Proxy<P, QR> {
     #[allow(clippy::too_many_arguments)]
     #[inline(always)]
     pub fn new(
@@ -69,7 +69,7 @@ impl<P: ExecutorProviderInterface> Proxy<P> {
         service_id: u32,
         socket: UnixStream,
         connection_rx: Receiver<(IsPrimary, TransportPair)>,
-        context: Context<P>,
+        context: Context<P, QR>,
         timeout: Duration,
     ) -> Self {
         Self {
@@ -524,7 +524,7 @@ impl<P: ExecutorProviderInterface> Proxy<P> {
     }
 }
 
-impl<P: ExecutorProviderInterface> Drop for Proxy<P> {
+impl<P: ExecutorProviderInterface, QR: SyncQueryRunnerInterface> Drop for Proxy<P, QR> {
     fn drop(&mut self) {
         self.context.cleanup_connection(self.connection_id);
     }
@@ -609,15 +609,17 @@ mod tests {
         }
     }
 
-    async fn start_mock_node<P: ExecutorProviderInterface>(id: u16) -> Result<ShutdownController> {
+    async fn start_mock_node(id: u16) -> Result<ShutdownController> {
         let shutdown = ShutdownController::default();
         let context = Context::new(
             MockServiceProvider,
+            lightning_interfaces::_hacks::Blanket,
             shutdown.waiter(),
             Duration::from_secs(1),
+            false,
         );
         let (transport, _) =
-            MockTransport::bind::<P>(shutdown.waiter(), MockTransportConfig { port: id }).await?;
+            MockTransport::bind(shutdown.waiter(), MockTransportConfig { port: id }).await?;
         transport.spawn_listener_task(context);
 
         Ok(shutdown)
@@ -626,7 +628,7 @@ mod tests {
     #[tokio::test]
     async fn primary_connection() -> Result<()> {
         // start and connect to the mock node
-        let mut shutdown = start_mock_node::<MockServiceProvider>(0).await?;
+        let mut shutdown = start_mock_node(0).await?;
         let (tx, rx) = dial_mock(0).await.expect("failed to dial");
 
         // send handshake req
@@ -634,6 +636,8 @@ mod tests {
             HandshakeRequestFrame::Handshake {
                 retry: None,
                 service: ECHO_SERVICE,
+                expiry: 0,
+                nonce: 0,
                 pk: ClientPublicKey([0; 96]),
                 pop: ClientSignature([0; 48]),
             }
@@ -664,7 +668,7 @@ mod tests {
     #[tokio::test]
     async fn join_secondary_connection() -> Result<()> {
         // start and connect to the mock node
-        let mut shutdown = start_mock_node::<MockServiceProvider>(1).await?;
+        let mut shutdown = start_mock_node(1).await?;
         let (primary_tx, primary_rx) = dial_mock(1)
             .await
             .expect("failed to dial primary connection");
@@ -675,6 +679,8 @@ mod tests {
                 HandshakeRequestFrame::Handshake {
                     retry: None,
                     service: ECHO_SERVICE,
+                    expiry: 0,
+                    nonce: 0,
                     pk: ClientPublicKey([0; 96]),
                     pop: ClientSignature([0; 48]),
                 }
@@ -725,7 +731,7 @@ mod tests {
     #[tokio::test]
     async fn reject_expired_token() -> Result<()> {
         // start and connect to the mock node
-        let mut shutdown = start_mock_node::<MockServiceProvider>(2).await?;
+        let mut shutdown = start_mock_node(2).await?;
         let (primary_tx, primary_rx) = dial_mock(2)
             .await
             .expect("failed to dial primary connection");
@@ -736,6 +742,8 @@ mod tests {
                 HandshakeRequestFrame::Handshake {
                     retry: None,
                     service: ECHO_SERVICE,
+                    expiry: 0,
+                    nonce: 0,
                     pk: ClientPublicKey([0; 96]),
                     pop: ClientSignature([0; 48]),
                 }
@@ -783,7 +791,7 @@ mod tests {
     #[tokio::test]
     async fn extend_token() -> Result<()> {
         // start and connect to the mock node
-        let mut shutdown = start_mock_node::<MockServiceProvider>(3).await?;
+        let mut shutdown = start_mock_node(3).await?;
         let (primary_tx, primary_rx) = dial_mock(3)
             .await
             .expect("failed to dial primary connection");
@@ -794,6 +802,8 @@ mod tests {
                 HandshakeRequestFrame::Handshake {
                     retry: None,
                     service: ECHO_SERVICE,
+                    expiry: 0,
+                    nonce: 0,
                     pk: ClientPublicKey([0; 96]),
                     pop: ClientSignature([0; 48]),
                 }

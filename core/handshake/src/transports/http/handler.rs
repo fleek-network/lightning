@@ -11,7 +11,7 @@ use bytes::Bytes;
 use fleek_crypto::{ClientPublicKey, ClientSignature};
 use fn_sdk::header::{HttpMethod, HttpOverrides, TransportDetail};
 use lightning_interfaces::schema::handshake::{HandshakeRequestFrame, RequestFrame};
-use lightning_interfaces::ExecutorProviderInterface;
+use lightning_interfaces::{ExecutorProviderInterface, SyncQueryRunnerInterface};
 use lightning_metrics::increment_counter;
 use tokio::sync::oneshot;
 use url::Url;
@@ -19,13 +19,13 @@ use url::Url;
 use crate::handshake::Context;
 use crate::transports::http::{HttpReceiver, HttpSender, Service};
 
-pub async fn handler<P: ExecutorProviderInterface>(
+pub async fn handler<P: ExecutorProviderInterface, QR: SyncQueryRunnerInterface>(
     method: Method,
     headers: HeaderMap,
     OriginalUri(uri): OriginalUri,
     Path(map): Path<HashMap<String, String>>,
     Query(params): Query<HashMap<String, String>>,
-    Extension(provider): Extension<Context<P>>,
+    Extension(provider): Extension<Context<P, QR>>,
     payload: Bytes,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     let service_id = map
@@ -48,11 +48,15 @@ pub async fn handler<P: ExecutorProviderInterface>(
 
     let body_frame = RequestFrame::ServicePayload { bytes: payload };
 
+    // TODO(oz): implement a http header spec for sending this information.
+    //           Possibly just use jwt encoding with a js payload
     let handshake_frame = HandshakeRequestFrame::Handshake {
+        retry: None,
         service: service_id as u32,
+        expiry: 0,
+        nonce: 0,
         pk: ClientPublicKey([0; 96]),
         pop: ClientSignature([0; 48]),
-        retry: None,
     };
 
     let (frame_tx, frame_rx) = async_channel::bounded(8);
