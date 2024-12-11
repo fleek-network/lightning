@@ -22,13 +22,20 @@ pub trait BlockstoreInterface<C: NodeComponents>:
 
     type UDirWriter: DirUntrustedWriter;
 
-    fn file_writer(&self) -> Self::FileWriter;
+    async fn file_writer(&self) -> Result<Self::FileWriter, WriteError>;
 
-    fn file_untrusted_writer(&self) -> Self::UFileWriter;
+    async fn file_untrusted_writer(
+        &self,
+        root_hash: Blake3Hash,
+    ) -> Result<Self::UFileWriter, WriteError>;
 
-    fn dir_writer(&self) -> Self::DirWriter;
+    async fn dir_writer(&self, num_entries: usize) -> Result<Self::DirWriter, WriteError>;
 
-    fn dir_untrusted_writer(&self) -> Self::UDirWriter;
+    async fn dir_untrusted_writer(
+        &self,
+        root_hash: Blake3Hash,
+        num_entries: usize,
+    ) -> Result<Self::UDirWriter, WriteError>;
 
     /// Returns an open instance of a b3fs bucket.
     fn get_bucket(&self) -> b3fs::bucket::Bucket;
