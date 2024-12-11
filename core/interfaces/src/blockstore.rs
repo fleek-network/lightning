@@ -1,6 +1,9 @@
 use std::future::Future;
+use std::io;
 use std::path::PathBuf;
 
+use b3fs::bucket::errors::{CommitError, FeedProofError, InsertError, WriteError};
+use b3fs::entry::BorrowedEntry;
 use fdi::BuildGraph;
 
 use crate::components::NodeComponents;
@@ -11,6 +14,22 @@ use crate::types::Blake3Hash;
 pub trait BlockstoreInterface<C: NodeComponents>:
     BuildGraph + Clone + Send + Sync + ConfigConsumer
 {
+    type FileWriter: FileTrustedWriter;
+
+    type UFileWriter: FileUntrustedWriter;
+
+    type DirWriter: DirTrustedWriter;
+
+    type UDirWriter: DirUntrustedWriter;
+
+    fn file_writer(&self) -> Self::FileWriter;
+
+    fn file_untrusted_writer(&self) -> Self::UFileWriter;
+
+    fn dir_writer(&self) -> Self::DirWriter;
+
+    fn dir_untrusted_writer(&self) -> Self::UDirWriter;
+
     /// Returns an open instance of a b3fs bucket.
     fn get_bucket(&self) -> b3fs::bucket::Bucket;
 
@@ -36,4 +55,43 @@ pub trait BlockstoreInterface<C: NodeComponents>:
             Some(result)
         }
     }
+}
+
+/// The interface for the writer to a [`BlockstoreInterface`].
+#[interfaces_proc::blank]
+pub trait FileUntrustedWriter: FileTrustedWriter {
+    /// Write the proof for the buffer.
+    async fn feed_proof(&mut self, proof: &[u8]) -> Result<(), FeedProofError>;
+}
+/// The interface for the writer to a [`BlockstoreInterface`].
+#[interfaces_proc::blank]
+pub trait FileTrustedWriter: Send {
+    /// Write the content. If there has been a call to `feed_proof`, an incremental
+    /// validation will happen.
+    async fn write(&mut self, content: &[u8], last_bytes: bool) -> Result<(), WriteError>;
+
+    /// Finalize the write, try to write all of the content to the file system or any other
+    /// underlying storage medium used to implement the [`BlockstoreInterface`].
+    async fn commit(self) -> Result<Blake3Hash, CommitError>;
+
+    async fn rollback(self) -> Result<(), io::Error>;
+}
+
+/// The interface for the directory writer to a [`BlockstoreInterface`].
+#[interfaces_proc::blank]
+pub trait DirUntrustedWriter: DirTrustedWriter {
+    /// Write the proof for the next entry. Should not be called in the trusted mode.
+    async fn feed_proof(&mut self, proof: &[u8]) -> Result<(), FeedProofError>;
+}
+/// The interface for the directory writer to a [`BlockstoreInterface`].
+#[interfaces_proc::blank]
+pub trait DirTrustedWriter: Send {
+    /// Insert the next directory entry. The calls to this method must be in alphabetic order,
+    /// based on the name of the entry.
+    async fn insert(&mut self, entry: BorrowedEntry<'_>) -> Result<(), InsertError>;
+
+    /// Finalize the write, try to write the directory header to the file system.
+    async fn commit(self) -> Result<Blake3Hash, CommitError>;
+
+    async fn rollback(self) -> Result<(), io::Error>;
 }
