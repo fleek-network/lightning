@@ -2,8 +2,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{anyhow, Context, Result};
-use b3fs::bucket::dir::writer::DirWriter;
-use b3fs::bucket::file::writer::FileWriter;
 use b3fs::entry::{BorrowedEntry, BorrowedLink};
 use cid::Cid;
 use fleek_ipld::decoder::fs::{DocId, IpldItem};
@@ -15,8 +13,9 @@ use futures::TryStreamExt;
 use hyper::client::{self, HttpConnector};
 use hyper::{Body, Client, Request, Uri};
 use hyper_rustls::{ConfigBuilderExt, HttpsConnector};
-use lightning_interfaces::prelude::*;
+use lightning_interfaces::{prelude::*, DirTrustedWriter};
 use lightning_interfaces::types::Blake3Hash;
+use lightning_interfaces::FileTrustedWriter;
 use tokio::time::timeout;
 use tracing::info;
 
@@ -130,26 +129,25 @@ impl<C: NodeComponents> IPFSOrigin<C> {
 
         stream.start(requested_cid).await;
         let mut hash: [u8; 32] = [0; 32];
-        let bucket = self.blockstore.get_bucket();
 
         loop {
             let item = stream.next().await?;
-            let mut last_dir: Option<DirWriter> = None;
+            let mut last_dir: Option<<<C as NodeComponents>::BlockstoreInterface as BlockstoreInterface<C>>::DirWriter> = None;
             match item {
                 Some(IpldItem::ChunkedFile(chunk)) => {
                     let doc_id = chunk.id().clone();
                     let mut stream_file = stream.new_chunk_file_streamer(chunk).await;
-                    let mut file_writer = FileWriter::new(&bucket).await?;
+                    let mut file_writer: <<C as NodeComponents>::BlockstoreInterface as BlockstoreInterface<C>>::FileWriter = self.blockstore.file_writer().await?;
                     while let Some(chunk) = stream_file.next_chunk().await? {
-                        file_writer.write(chunk.data()).await?;
+                        file_writer.write(chunk.data(), false).await?;
                     }
                     self.insert_file_into_dir(&mut last_dir, &mut hash, file_writer, &doc_id)
                         .await?;
                 },
                 Some(IpldItem::File(file)) => {
                     let doc_id = file.id().clone();
-                    let mut file_writer = FileWriter::new(&bucket).await?;
-                    file_writer.write(file.data()).await?;
+                    let mut file_writer: <<C as NodeComponents>::BlockstoreInterface as BlockstoreInterface<C>>::FileWriter = self.blockstore.file_writer().await?;
+                    file_writer.write(file.data(), false).await?;
                     self.insert_file_into_dir(&mut last_dir, &mut hash, file_writer, &doc_id)
                         .await?;
                 },
@@ -157,7 +155,7 @@ impl<C: NodeComponents> IPFSOrigin<C> {
                     if last_dir.is_some() {
                         hash = last_dir.take().unwrap().commit().await?;
                     }
-                    let dir_writer = DirWriter::new(&bucket, dir.links().len()).await?;
+                    let dir_writer = self.blockstore.dir_writer(dir.links().len()).await?;
                     last_dir.replace(dir_writer);
                 },
                 Some(IpldItem::Chunk(_)) => {
@@ -176,9 +174,9 @@ impl<C: NodeComponents> IPFSOrigin<C> {
 
     async fn insert_file_into_dir(
         &self,
-        last_dir: &mut Option<DirWriter>,
+        last_dir: &mut Option<<<C as NodeComponents>::BlockstoreInterface as BlockstoreInterface<C>>::DirWriter>,
         hash: &mut [u8; 32],
-        file_writer: FileWriter,
+        file_writer: <C::BlockstoreInterface as BlockstoreInterface<C>>::FileWriter,
         doc_id: &DocId,
     ) -> Result<()> {
         let file_name = doc_id.file_name().unwrap_or_default();
