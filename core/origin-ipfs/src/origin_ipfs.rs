@@ -13,9 +13,9 @@ use futures::TryStreamExt;
 use hyper::client::{self, HttpConnector};
 use hyper::{Body, Client, Request, Uri};
 use hyper_rustls::{ConfigBuilderExt, HttpsConnector};
-use lightning_interfaces::{prelude::*, DirTrustedWriter};
+use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::Blake3Hash;
-use lightning_interfaces::FileTrustedWriter;
+use lightning_interfaces::{DirTrustedWriter, FileTrustedWriter};
 use tokio::time::timeout;
 use tracing::info;
 
@@ -132,12 +132,14 @@ impl<C: NodeComponents> IPFSOrigin<C> {
 
         loop {
             let item = stream.next().await?;
-            let mut last_dir: Option<<<C as NodeComponents>::BlockstoreInterface as BlockstoreInterface<C>>::DirWriter> = None;
+            let mut last_dir: Option<
+                <C::BlockstoreInterface as BlockstoreInterface<C>>::DirWriter,
+            > = None;
             match item {
                 Some(IpldItem::ChunkedFile(chunk)) => {
                     let doc_id = chunk.id().clone();
                     let mut stream_file = stream.new_chunk_file_streamer(chunk).await;
-                    let mut file_writer: <<C as NodeComponents>::BlockstoreInterface as BlockstoreInterface<C>>::FileWriter = self.blockstore.file_writer().await?;
+                    let mut file_writer = self.blockstore.file_writer().await?;
                     while let Some(chunk) = stream_file.next_chunk().await? {
                         file_writer.write(chunk.data(), false).await?;
                     }
@@ -146,7 +148,7 @@ impl<C: NodeComponents> IPFSOrigin<C> {
                 },
                 Some(IpldItem::File(file)) => {
                     let doc_id = file.id().clone();
-                    let mut file_writer: <<C as NodeComponents>::BlockstoreInterface as BlockstoreInterface<C>>::FileWriter = self.blockstore.file_writer().await?;
+                    let mut file_writer = self.blockstore.file_writer().await?;
                     file_writer.write(file.data(), false).await?;
                     self.insert_file_into_dir(&mut last_dir, &mut hash, file_writer, &doc_id)
                         .await?;
@@ -174,7 +176,7 @@ impl<C: NodeComponents> IPFSOrigin<C> {
 
     async fn insert_file_into_dir(
         &self,
-        last_dir: &mut Option<<<C as NodeComponents>::BlockstoreInterface as BlockstoreInterface<C>>::DirWriter>,
+        last_dir: &mut Option<<C::BlockstoreInterface as BlockstoreInterface<C>>::DirWriter>,
         hash: &mut [u8; 32],
         file_writer: <C::BlockstoreInterface as BlockstoreInterface<C>>::FileWriter,
         doc_id: &DocId,
