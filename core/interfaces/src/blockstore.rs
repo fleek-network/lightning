@@ -72,7 +72,7 @@ pub trait FileUntrustedWriter: FileTrustedWriter {
 }
 /// The interface for the writer to a [`BlockstoreInterface`].
 #[interfaces_proc::blank]
-pub trait FileTrustedWriter: Send {
+pub trait FileTrustedWriter: Send + Sync + 'static {
     /// Write the content. If there has been a call to `feed_proof`, an incremental
     /// validation will happen.
     async fn write(&mut self, content: &[u8], last_bytes: bool) -> Result<(), WriteError>;
@@ -92,7 +92,7 @@ pub trait DirUntrustedWriter: DirTrustedWriter {
 }
 /// The interface for the directory writer to a [`BlockstoreInterface`].
 #[interfaces_proc::blank]
-pub trait DirTrustedWriter: Send {
+pub trait DirTrustedWriter: Send + Sync + 'static {
     /// Insert the next directory entry. The calls to this method must be in alphabetic order,
     /// based on the name of the entry.
     async fn insert(&mut self, entry: BorrowedEntry<'_>) -> Result<(), InsertError>;
