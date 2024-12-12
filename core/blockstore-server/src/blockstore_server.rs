@@ -11,8 +11,6 @@ use std::time::{Duration, Instant};
 
 use affair::{Socket, Task};
 use anyhow::{anyhow, Result};
-use b3fs::bucket::dir::uwriter::UntrustedDirWriter;
-use b3fs::bucket::file::uwriter::UntrustedFileWriter;
 use b3fs::entry::{BorrowedEntry, InlineVec, OwnedEntry, OwnedLink};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use lightning_interfaces::prelude::*;
@@ -23,7 +21,13 @@ use lightning_interfaces::types::{
     RejectReason,
     ServerRequest,
 };
-use lightning_interfaces::ServiceScope;
+use lightning_interfaces::{
+    DirTrustedWriter,
+    DirUntrustedWriter,
+    FileTrustedWriter,
+    FileUntrustedWriter,
+    ServiceScope,
+};
 use lightning_metrics::increment_counter;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, RwLock};
@@ -666,9 +670,12 @@ async fn send_request<C: NodeComponents>(
         Ok(Ok(response)) => match response.status_code() {
             Ok(()) => {
                 let mut body = response.body();
-                let bucket = blockstore.get_bucket();
-                let mut writer = None;
-                let mut dir_writer = None;
+                let mut writer: Option<
+                    RwLock<<C::BlockstoreInterface as BlockstoreInterface<C>>::UFileWriter>,
+                > = None;
+                let mut dir_writer: Option<
+                    RwLock<<C::BlockstoreInterface as BlockstoreInterface<C>>::UDirWriter>,
+                > = None;
 
                 let mut bytes_recv = 0;
                 let instant = Instant::now();
@@ -691,13 +698,14 @@ async fn send_request<C: NodeComponents>(
                         Frame::File(file) => {
                             if writer.is_none() {
                                 writer = Some(RwLock::new(
-                                    UntrustedFileWriter::new(&bucket, request.hash)
+                                    blockstore
+                                        .file_untrusted_writer(request.hash)
                                         .await
                                         .unwrap(),
                                 ));
                             }
                             if let Some(ref file_writer) = writer {
-                                match handle_send_request_file(file_writer, file).await {
+                                match handle_send_request_file::<C>(file_writer, file).await {
                                     Ok(RespSendRequest::Continue) => (),
                                     Ok(RespSendRequest::EoF) => {
                                         let writer = writer.take().unwrap().into_inner();
@@ -725,17 +733,14 @@ async fn send_request<C: NodeComponents>(
                         Frame::Dir(dir) => {
                             if let DirFrame::Prelude(num_entries) = dir {
                                 dir_writer = Some(RwLock::new(
-                                    UntrustedDirWriter::new(
-                                        &bucket,
-                                        num_entries as usize,
-                                        request.hash,
-                                    )
-                                    .await
-                                    .unwrap(),
+                                    blockstore
+                                        .dir_untrusted_writer(request.hash, num_entries as usize)
+                                        .await
+                                        .unwrap(),
                                 ));
                             };
                             if let Some(ref dir_wr) = dir_writer {
-                                match handle_send_request_dir(dir_wr, dir).await {
+                                match handle_send_request_dir::<C>(dir_wr, dir).await {
                                     Ok(RespSendRequest::Continue) => (),
                                     Ok(RespSendRequest::EoF) => {
                                         let dir_writer = dir_writer.take().unwrap().into_inner();
@@ -788,8 +793,8 @@ enum RespSendRequest {
     EoF,
 }
 
-async fn handle_send_request_file(
-    writer: &RwLock<UntrustedFileWriter>,
+async fn handle_send_request_file<C: NodeComponents>(
+    writer: &RwLock<<C::BlockstoreInterface as BlockstoreInterface<C>>::UFileWriter>,
     file: FileFrame<'_>,
 ) -> Result<RespSendRequest, String> {
     match file {
@@ -818,8 +823,8 @@ async fn handle_send_request_file(
     }
 }
 
-async fn handle_send_request_dir(
-    writer: &RwLock<UntrustedDirWriter>,
+async fn handle_send_request_dir<C: NodeComponents>(
+    writer: &RwLock<<C::BlockstoreInterface as BlockstoreInterface<C>>::UDirWriter>,
     dir: DirFrame<'_>,
 ) -> Result<RespSendRequest, String> {
     match dir {

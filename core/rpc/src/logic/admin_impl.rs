@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use b3fs::bucket::file::writer::FileWriter;
 use jsonrpsee::core::RpcResult;
 use lightning_firewall::{CommandCenter, FirewallCommand};
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::Blake3Hash;
+use lightning_interfaces::FileTrustedWriter;
 
 use crate::api::AdminApiServer;
 use crate::error::RPCError;
@@ -27,12 +27,14 @@ impl<C: NodeComponents> AdminApiServer for AdminApi<C> {
             .await
             .map_err(|e| RPCError::custom(e.to_string()))?;
 
-        let bucket = self.data._blockstore.get_bucket();
-        let mut writer = FileWriter::new(&bucket)
+        let mut writer = self
+            .data
+            ._blockstore
+            .file_writer()
             .await
             .map_err(|e| RPCError::custom(e.to_string()))?;
         writer
-            .write(file.as_ref())
+            .write(file.as_ref(), true)
             .await
             .map_err(|e| RPCError::custom(e.to_string()))?;
         let hash = writer

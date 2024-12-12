@@ -26,6 +26,7 @@ use lightning_interfaces::{
     DirUntrustedWriter,
     FileTrustedWriter,
     FileUntrustedWriter,
+    _IndexerInterface,
 };
 use parking_lot::RwLock;
 use resolved_pathbuf::ResolvedPathBuf;
@@ -112,17 +113,20 @@ impl<C: NodeComponents> BlockstoreInterface<C> for Blockstore<C> {
         self.root.to_path_buf()
     }
 
-    type FileWriter = FWriter;
+    type FileWriter = FWriter<C>;
 
-    type UFileWriter = FUWriter;
+    type UFileWriter = FUWriter<C>;
 
-    type DirWriter = DWriter;
+    type DirWriter = DWriter<C>;
 
-    type UDirWriter = DUWriter;
+    type UDirWriter = DUWriter<C>;
 
     async fn file_writer(&self) -> Result<Self::FileWriter, WriteError> {
         let fw = FileWriter::new(&self.get_bucket()).await?;
-        Ok(FWriter(fw))
+        Ok(FWriter {
+            writer: fw,
+            indexer: self.indexer.clone(),
+        })
     }
 
     async fn file_untrusted_writer(
@@ -130,12 +134,18 @@ impl<C: NodeComponents> BlockstoreInterface<C> for Blockstore<C> {
         root_hash: Blake3Hash,
     ) -> Result<Self::UFileWriter, WriteError> {
         let fw = UntrustedFileWriter::new(&self.get_bucket(), root_hash).await?;
-        Ok(FUWriter(fw))
+        Ok(FUWriter {
+            writer: fw,
+            indexer: self.indexer.clone(),
+        })
     }
 
     async fn dir_writer(&self, num_entries: usize) -> Result<Self::DirWriter, WriteError> {
         let dw = DirWriter::new(&self.get_bucket(), num_entries).await?;
-        Ok(DWriter(dw))
+        Ok(DWriter {
+            writer: dw,
+            indexer: self.indexer.clone(),
+        })
     }
 
     async fn dir_untrusted_writer(
@@ -144,143 +154,114 @@ impl<C: NodeComponents> BlockstoreInterface<C> for Blockstore<C> {
         num_entries: usize,
     ) -> Result<Self::UDirWriter, WriteError> {
         let dw = UntrustedDirWriter::new(&self.get_bucket(), num_entries, root_hash).await?;
-        Ok(DUWriter(dw))
+        Ok(DUWriter {
+            writer: dw,
+            indexer: self.indexer.clone(),
+        })
     }
 }
 
-pub struct FUWriter(UntrustedFileWriter);
-
-impl Deref for FUWriter {
-    type Target = UntrustedFileWriter;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
+pub struct FUWriter<C: NodeComponents> {
+    writer: UntrustedFileWriter,
+    indexer: Arc<OnceLock<C::IndexerInterface>>,
 }
 
-impl DerefMut for FUWriter {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl FileUntrustedWriter for FUWriter {
+impl<C: NodeComponents> FileUntrustedWriter for FUWriter<C> {
     async fn feed_proof(&mut self, proof: &[u8]) -> Result<(), FeedProofError> {
-        self.0.feed_proof(proof).await
+        self.writer.feed_proof(proof).await
     }
 }
 
-impl FileTrustedWriter for FUWriter {
+impl<C: NodeComponents> FileTrustedWriter for FUWriter<C> {
     async fn write(&mut self, content: &[u8], last_bytes: bool) -> Result<(), WriteError> {
-        self.0.write(content, last_bytes).await
+        self.writer.write(content, last_bytes).await
     }
 
     async fn commit(self) -> Result<Blake3Hash, CommitError> {
-        self.0.commit().await
+        let hash = self.writer.commit().await?;
+        let indexer = self.indexer.get().ok_or_else(|| CommitError::LockError)?;
+        IndexerInterface::register(indexer, hash).await;
+        Ok(hash)
     }
 
     async fn rollback(self) -> Result<(), io::Error> {
-        self.0.rollback().await
+        self.writer.rollback().await
     }
 }
 
-pub struct FWriter(FileWriter);
-
-impl Deref for FWriter {
-    type Target = FileWriter;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
+pub struct FWriter<C: NodeComponents> {
+    writer: FileWriter,
+    indexer: Arc<OnceLock<C::IndexerInterface>>,
 }
 
-impl DerefMut for FWriter {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl FileTrustedWriter for FWriter {
+impl<C: NodeComponents> FileTrustedWriter for FWriter<C> {
     async fn write(&mut self, content: &[u8], _last_bytes: bool) -> Result<(), WriteError> {
-        self.0.write(content).await
+        self.writer.write(content).await
     }
 
     async fn commit(self) -> Result<Blake3Hash, CommitError> {
-        self.0.commit().await
+        let hash = self.writer.commit().await?;
+        let indexer = self.indexer.get().ok_or_else(|| CommitError::LockError)?;
+        IndexerInterface::register(indexer, hash).await;
+        Ok(hash)
     }
 
     async fn rollback(self) -> Result<(), io::Error> {
-        self.0.rollback().await
+        self.writer.rollback().await
     }
 }
 
-pub struct DUWriter(UntrustedDirWriter);
-
-impl Deref for DUWriter {
-    type Target = UntrustedDirWriter;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
+pub struct DUWriter<C: NodeComponents> {
+    writer: UntrustedDirWriter,
+    indexer: Arc<OnceLock<C::IndexerInterface>>,
 }
 
-impl DerefMut for DUWriter {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl DirUntrustedWriter for DUWriter {
+impl<C: NodeComponents> DirUntrustedWriter for DUWriter<C> {
     async fn feed_proof(&mut self, proof: &[u8]) -> Result<(), FeedProofError> {
-        self.0.feed_proof(proof).await
+        self.writer.feed_proof(proof).await
     }
 }
 
-impl DirTrustedWriter for DUWriter {
+impl<C: NodeComponents> DirTrustedWriter for DUWriter<C> {
     async fn insert(
         &mut self,
         entry: b3fs::entry::BorrowedEntry<'_>,
     ) -> Result<(), b3fs::bucket::errors::InsertError> {
-        self.0.insert(entry).await
+        self.writer.insert(entry).await
     }
 
     async fn commit(self) -> Result<Blake3Hash, CommitError> {
-        self.0.commit().await
+        let hash = self.writer.commit().await?;
+        let indexer = self.indexer.get().ok_or_else(|| CommitError::LockError)?;
+        IndexerInterface::register(indexer, hash).await;
+        Ok(hash)
     }
 
     async fn rollback(self) -> Result<(), io::Error> {
-        self.0.rollback().await
+        self.writer.rollback().await
     }
 }
-pub struct DWriter(DirWriter);
-
-impl Deref for DWriter {
-    type Target = DirWriter;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
+pub struct DWriter<C: NodeComponents> {
+    writer: DirWriter,
+    indexer: Arc<OnceLock<C::IndexerInterface>>,
 }
 
-impl DerefMut for DWriter {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl DirTrustedWriter for DWriter {
+impl<C: NodeComponents> DirTrustedWriter for DWriter<C> {
     async fn insert(
         &mut self,
         entry: b3fs::entry::BorrowedEntry<'_>,
     ) -> Result<(), b3fs::bucket::errors::InsertError> {
-        self.0.insert(entry).await
+        self.writer.insert(entry).await
     }
 
     async fn commit(self) -> Result<Blake3Hash, CommitError> {
-        self.0.commit().await
+        let hash = self.writer.commit().await?;
+        let indexer = self.indexer.get().ok_or_else(|| CommitError::LockError)?;
+        IndexerInterface::register(indexer, hash).await;
+        Ok(hash)
     }
 
     async fn rollback(self) -> Result<(), io::Error> {
-        self.0.rollback().await
+        self.writer.rollback().await
     }
 }
