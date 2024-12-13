@@ -682,6 +682,7 @@ async fn send_request<C: NodeComponents>(
 
                 while let Some(bytes) = body.next().await {
                     let Ok(bytes) = bytes else {
+                        println!("#1");
                         return Err(ErrorResponse {
                             error: PeerRequestError::Incomplete,
                             request,
@@ -689,6 +690,7 @@ async fn send_request<C: NodeComponents>(
                     };
                     bytes_recv += bytes.len();
                     let Ok(frame) = Frame::try_from(bytes) else {
+                        println!("#2");
                         return Err(ErrorResponse {
                             error: PeerRequestError::Incomplete,
                             request,
@@ -767,6 +769,7 @@ async fn send_request<C: NodeComponents>(
                         },
                     }
                 }
+                println!("+3");
                 Err(ErrorResponse {
                     error: PeerRequestError::Incomplete,
                     request,

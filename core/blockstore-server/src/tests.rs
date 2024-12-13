@@ -4,15 +4,16 @@ use std::time::Duration;
 
 use b3fs::bucket::file::uwriter::UntrustedFileWriter;
 use b3fs::bucket::file::writer::FileWriter;
+use b3fs::entry::{BorrowedEntry, BorrowedLink, OwnedEntry, OwnedLink};
 use fleek_crypto::{AccountOwnerSecretKey, NodePublicKey, SecretKey};
 use lightning_application::app::Application;
 use lightning_application::config::ApplicationConfig;
 use lightning_blockstore::blockstore::{Blockstore, BLOCK_SIZE};
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_indexer::Indexer;
-use lightning_interfaces::_FileTrustedWriter;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Genesis, GenesisNode, NodePorts, ServerRequest};
+use lightning_interfaces::{DirTrustedWriter, _FileTrustedWriter};
 use lightning_node::Node;
 use lightning_notifier::Notifier;
 use lightning_pool::{Config as PoolConfig, PoolProvider};
@@ -262,6 +263,96 @@ async fn test_send_and_receive() {
         Ok(()) => {
             let recv_content = peers[1].blockstore().read_all_to_vec(&hash).await.unwrap();
             assert_eq!(recv_content, content);
+        },
+        Err(e) => {
+            panic!("Failed to receive content: {e:?}");
+        },
+    }
+
+    for mut peer in peers {
+        peer.inner.shutdown().await;
+        drop(peer);
+    }
+}
+
+#[tokio::test]
+async fn test_send_and_receive_dir() {
+    let temp_dir = tempdir().unwrap();
+    let peers = get_peers(&temp_dir, 49200, 2).await;
+    let query_runner = peers[0].app().sync_query();
+    for peer in &peers {
+        peer.inner.start().await;
+    }
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    let node_index1 = query_runner
+        .pubkey_to_index(&peers[0].node_public_key)
+        .unwrap();
+
+    let file1 = std::fs::read("/home/matthias/Desktop/testdir/file1").unwrap();
+    let file2 = std::fs::read("/home/matthias/Desktop/testdir/file2").unwrap();
+    let file3 = std::fs::read("/home/matthias/Desktop/testdir/subdir/file3").unwrap();
+
+    // Put some data into the blockstore of peer 1
+    let mut fputter = peers[0].blockstore().file_writer().await.unwrap();
+    fputter.write(&file1, true).await.unwrap();
+    let file1_hash = fputter.commit().await.unwrap();
+
+    let mut fputter = peers[0].blockstore().file_writer().await.unwrap();
+    fputter.write(&file2, true).await.unwrap();
+    let file2_hash = fputter.commit().await.unwrap();
+
+    let mut fputter = peers[0].blockstore().file_writer().await.unwrap();
+    fputter.write(&file3, true).await.unwrap();
+    let file3_hash = fputter.commit().await.unwrap();
+    let entry = BorrowedEntry {
+        name: "file3".as_bytes(),
+        link: BorrowedLink::Content(&file3_hash),
+    };
+    let mut dputter_subdir = peers[0].blockstore().dir_writer(1).await.unwrap();
+    dputter_subdir.insert(entry).await.unwrap();
+    let subdir_hash = dputter_subdir.commit().await.unwrap();
+
+    //let mut dputter = peers[0].blockstore().dir_writer(3).await.unwrap();
+    let mut dputter = peers[0].blockstore().dir_writer(2).await.unwrap();
+
+    let entry1 = BorrowedEntry {
+        name: "file1".as_bytes(),
+        link: BorrowedLink::Content(&file1_hash),
+    };
+    let entry2 = BorrowedEntry {
+        name: "file2".as_bytes(),
+        link: BorrowedLink::Content(&file2_hash),
+    };
+    let entry3 = BorrowedEntry {
+        name: "subdir".as_bytes(),
+        link: BorrowedLink::Content(&subdir_hash),
+    };
+    dputter.insert(entry1).await.unwrap();
+    dputter.insert(entry2).await.unwrap();
+    //dputter.insert(entry3).await.unwrap();
+
+    // Test commit()
+    let root_hash = dputter.commit().await.unwrap();
+
+    // Send a request from peer 2 to peer 1
+    let socket = peers[1].blockstore_server().get_socket();
+    let mut res = socket
+        .run(ServerRequest {
+            hash: root_hash,
+            peer: node_index1,
+        })
+        .await
+        .expect("Failed to send request");
+    let result = res.recv().await.unwrap();
+    match result {
+        Ok(()) => {
+            let recv_content = peers[1]
+                .blockstore()
+                .read_all_to_vec(&root_hash)
+                .await
+                .unwrap();
+            //assert_eq!(recv_content, content);
         },
         Err(e) => {
             panic!("Failed to receive content: {e:?}");
