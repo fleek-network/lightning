@@ -10,6 +10,7 @@ use lightning_application::config::ApplicationConfig;
 use lightning_blockstore::blockstore::{Blockstore, BLOCK_SIZE};
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_indexer::Indexer;
+use lightning_interfaces::_FileTrustedWriter;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Genesis, GenesisNode, NodePorts, ServerRequest};
 use lightning_node::Node;
@@ -243,9 +244,8 @@ async fn test_send_and_receive() {
 
     let content = create_content();
     // Put some data into the blockstore of peer 1
-    let bucket = peers[0].blockstore().get_bucket();
-    let mut putter = FileWriter::new(&bucket).await.unwrap();
-    putter.write(&content).await.unwrap();
+    let mut putter = peers[0].blockstore().file_writer().await.unwrap();
+    putter.write(&content, true).await.unwrap();
     let hash = putter.commit().await.unwrap();
 
     // Send a request from peer 2 to peer 1
