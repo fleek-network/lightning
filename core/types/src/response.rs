@@ -144,6 +144,7 @@ pub enum ExecutionError {
     NotNodeOwner,
     NotCommitteeMember,
     NodeDoesNotExist,
+    AccountDoesNotExist,
     CantSendToYourself,
     AlreadySignaled,
     SubmittedTooManyTransactions,

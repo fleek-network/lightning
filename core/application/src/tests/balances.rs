@@ -3,10 +3,12 @@ use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::types::{
     ExecutionData,
     ExecutionError,
+    GenesisAccount,
     ProofOfConsensus,
     Tokens,
     UpdateMethod,
 };
+use lightning_interfaces::SyncQueryRunnerInterface;
 use tempfile::tempdir;
 
 use super::utils::*;
@@ -220,4 +222,76 @@ async fn test_deposit_usdc_works_properly() {
         get_account_balance(&query_runner, &owner),
         intial_balance + deposit_amount
     );
+}
+
+#[tokio::test]
+async fn test_withdraw_usdc_works_properly() {
+    let temp_dir = tempdir().unwrap();
+
+    let mut genesis = test_genesis();
+
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    let owner: EthAddress = owner_secret_key.to_pk().into();
+
+    let receiver_secret_key = AccountOwnerSecretKey::generate();
+    let receiver: EthAddress = receiver_secret_key.to_pk().into();
+
+    let account = GenesisAccount {
+        public_key: owner,
+        flk_balance: 0_u64.into(),
+        stables_balance: 1000,
+        bandwidth_balance: 0,
+    };
+    genesis.account = vec![account];
+
+    let (update_socket, query_runner) = init_app_with_genesis(&temp_dir, &genesis);
+
+    let withdraw_amount = 500_u64;
+    let withdraw = UpdateMethod::Withdraw {
+        amount: withdraw_amount.into(),
+        token: Tokens::USDC,
+        receiving_address: receiver,
+    };
+    let update = prepare_update_request_account(withdraw, &owner_secret_key, 1);
+    expect_tx_success(update, &update_socket, ExecutionData::None).await;
+
+    let withdraws = query_runner.get_usdc_withdraws();
+    assert_eq!(withdraws[0].1, receiver);
+    assert_eq!(withdraws[0].2, withdraw_amount.into());
+}
+
+#[tokio::test]
+async fn test_withdraw_flk_works_properly() {
+    let temp_dir = tempdir().unwrap();
+
+    let mut genesis = test_genesis();
+
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    let owner: EthAddress = owner_secret_key.to_pk().into();
+
+    let receiver_secret_key = AccountOwnerSecretKey::generate();
+    let receiver: EthAddress = receiver_secret_key.to_pk().into();
+
+    let account = GenesisAccount {
+        public_key: owner,
+        flk_balance: 1000_u64.into(),
+        stables_balance: 0,
+        bandwidth_balance: 0,
+    };
+    genesis.account = vec![account];
+
+    let (update_socket, query_runner) = init_app_with_genesis(&temp_dir, &genesis);
+
+    let withdraw_amount = 500_u64;
+    let withdraw = UpdateMethod::Withdraw {
+        amount: withdraw_amount.into(),
+        token: Tokens::FLK,
+        receiving_address: receiver,
+    };
+    let update = prepare_update_request_account(withdraw, &owner_secret_key, 1);
+    expect_tx_success(update, &update_socket, ExecutionData::None).await;
+
+    let withdraws = query_runner.get_flk_withdraws();
+    assert_eq!(withdraws[0].1, receiver);
+    assert_eq!(withdraws[0].2, withdraw_amount.into());
 }

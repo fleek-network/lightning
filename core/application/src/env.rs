@@ -242,6 +242,8 @@ impl ApplicationEnv {
 
             metadata_table.insert(Metadata::BlockNumber, Value::BlockNumber(0));
 
+            metadata_table.insert(Metadata::WithdrawId, Value::WithdrawId(0));
+
             metadata_table.insert(
                 Metadata::ProtocolFundAddress,
                 Value::AccountPublicKey(genesis.protocol_fund_address),

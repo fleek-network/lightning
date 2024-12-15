@@ -131,6 +131,8 @@ pub struct StateExecutor<B: Backend> {
         ),
     >,
     pub committee_selection_beacon_non_revealing_node: B::Ref<NodeIndex, ()>,
+    pub flk_withdraws: B::Ref<u64, (EthAddress, HpUfixed<18>)>,
+    pub usdc_withdraws: B::Ref<u64, (EthAddress, HpUfixed<6>)>,
     pub backend: B,
 }
 
@@ -162,6 +164,8 @@ impl<B: Backend> StateExecutor<B> {
             committee_selection_beacon: backend.get_table_reference("committee_selection_beacon"),
             committee_selection_beacon_non_revealing_node: backend
                 .get_table_reference("committee_selection_beacon_non_revealing_node"),
+            flk_withdraws: backend.get_table_reference("flk_withdraws"),
+            usdc_withdraws: backend.get_table_reference("usdc_withdraws"),
             backend,
         }
     }
@@ -466,12 +470,53 @@ impl<B: Backend> StateExecutor<B> {
 
     fn withdraw(
         &self,
-        _sender: TransactionSender,
-        _reciever: EthAddress,
-        _amount: HpUfixed<18>,
-        _token: Tokens,
+        sender: TransactionSender,
+        reciever: EthAddress,
+        amount: HpUfixed<18>,
+        token: Tokens,
     ) -> TransactionResponse {
-        TransactionResponse::Revert(ExecutionError::Unimplemented)
+        // This transaction is only callable by AccountOwners and not nodes
+        // So revert if the sender is a node public key
+        let sender = match self.only_account_owner(sender) {
+            Ok(account) => account,
+            Err(e) => return e,
+        };
+        let Some(mut account) = self.account_info.get(&sender) else {
+            return TransactionResponse::Revert(ExecutionError::AccountDoesNotExist);
+        };
+
+        let withdraw_id = match self.metadata.get(&Metadata::WithdrawId) {
+            Some(Value::WithdrawId(epoch)) => epoch,
+            _ => 0,
+        };
+
+        match token {
+            Tokens::FLK => {
+                if amount > account.flk_balance {
+                    return TransactionResponse::Revert(ExecutionError::InsufficientBalance);
+                }
+
+                account.flk_balance -= amount.clone();
+                self.flk_withdraws.set(withdraw_id, (reciever, amount));
+                self.metadata
+                    .set(Metadata::WithdrawId, Value::WithdrawId(withdraw_id + 1));
+            },
+            Tokens::USDC => {
+                // TODO(matthias): make sure that this conversion is safe
+                let amount = amount.convert_precision::<6>();
+                if amount > account.stables_balance {
+                    return TransactionResponse::Revert(ExecutionError::InsufficientBalance);
+                }
+
+                account.stables_balance -= amount.clone();
+                self.usdc_withdraws.set(withdraw_id, (reciever, amount));
+                self.metadata
+                    .set(Metadata::WithdrawId, Value::WithdrawId(withdraw_id + 1));
+            },
+        }
+
+        self.account_info.set(sender, account);
+        TransactionResponse::Success(ExecutionData::None)
     }
 
     fn deposit(
