@@ -8,6 +8,7 @@ use atomo::{Atomo, InMemoryStorage, KeyIterator, QueryPerm, StorageBackend};
 use fdi::BuildGraph;
 use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
 use fxhash::FxHashMap;
+use hp_fixed::unsigned::HpUfixed;
 use lightning_types::{
     AccountInfo,
     Blake3Hash,
@@ -240,6 +241,12 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
 
     // Returns whether the genesis block has been applied.
     fn has_genesis(&self) -> bool;
+
+    /// Returns a list of FLK withdraws
+    fn get_flk_withdraws(&self) -> Vec<(u64, EthAddress, HpUfixed<18>)>;
+
+    /// Returns a list of USDC withdraws
+    fn get_usdc_withdraws(&self) -> Vec<(u64, EthAddress, HpUfixed<6>)>;
 }
 
 #[derive(Clone, Debug)]

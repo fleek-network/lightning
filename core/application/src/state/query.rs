@@ -79,6 +79,8 @@ pub struct QueryRunner {
         ),
     >,
     committee_selection_beacon_non_revealing_node: ResolvedTableReference<NodeIndex, ()>,
+    flk_withdraws: ResolvedTableReference<u64, (EthAddress, HpUfixed<18>)>,
+    usdc_withdraws: ResolvedTableReference<u64, (EthAddress, HpUfixed<6>)>,
 }
 
 impl QueryRunner {
@@ -122,7 +124,8 @@ impl SyncQueryRunnerInterface for QueryRunner {
             )>("committee_selection_beacon"),
             committee_selection_beacon_non_revealing_node: atomo
                 .resolve::<NodeIndex, ()>("committee_selection_beacon_non_revealing_node"),
-
+            flk_withdraws: atomo.resolve::<u64, (EthAddress, HpUfixed<18>)>("flk_withdraws"),
+            usdc_withdraws: atomo.resolve::<u64, (EthAddress, HpUfixed<6>)>("usdc_withdraws"),
             inner: atomo,
         }
     }
@@ -371,5 +374,21 @@ impl SyncQueryRunnerInterface for QueryRunner {
     fn has_genesis(&self) -> bool {
         // This is consistent with the logic in `Env::apply_genesis_block`.
         self.get_metadata(&Metadata::Epoch).is_some()
+    }
+
+    fn get_flk_withdraws(&self) -> Vec<(u64, EthAddress, HpUfixed<18>)> {
+        self.inner
+            .run(|ctx| self.flk_withdraws.get(ctx).as_map())
+            .iter()
+            .map(|(id, (address, amount))| (*id, *address, amount.clone()))
+            .collect()
+    }
+
+    fn get_usdc_withdraws(&self) -> Vec<(u64, EthAddress, HpUfixed<6>)> {
+        self.inner
+            .run(|ctx| self.usdc_withdraws.get(ctx).as_map())
+            .iter()
+            .map(|(id, (address, amount))| (*id, *address, amount.clone()))
+            .collect()
     }
 }
