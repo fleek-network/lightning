@@ -9,7 +9,7 @@ fn-sdk = { git = "https://github.com/fleek-network/lightning", rev = "0.1.0-alph
 dcap-quoteprov = { path = "../../lib/dcap-quoteprov" }
 
 # async
-tokio = { version = "1.39", features = ["full"] }
+tokio = { version = "1.36", features = ["full"] }
 futures = "0.3"
 
 # io
@@ -26,7 +26,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_cbor = "0.11.2"
 serde-big-array = "0.5"
-url = { version = "2.5", features = ["serde"] }
+url = { version = "2.4.1", features = ["serde"] }
 arrayvec = "0.7"
 
 # deps for running sgx enclaves
