@@ -1,5 +1,6 @@
 //! Forms a post-order binary tree over a flat hash slice.
 
+use core::hash;
 use std::cmp::min;
 use std::fmt::Debug;
 use std::future::Future;
@@ -19,6 +20,9 @@ use super::error::CollectionTryFromError;
 use super::flat::FlatHashSlice;
 use crate::bucket::errors::ReadError;
 use crate::bucket::POSITION_START_HASHES;
+use crate::entry::BorrowedEntry;
+use crate::hasher;
+use crate::hasher::dir_hasher::DirectoryHasher;
 use crate::stream::buffer::ProofBuf;
 use crate::stream::walker::{self, Mode, TreeWalker};
 use crate::stream::ProofEncoder;

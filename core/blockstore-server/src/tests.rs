@@ -3,16 +3,16 @@ use std::collections::VecDeque;
 use std::time::Duration;
 
 use b3fs::bucket::file::uwriter::UntrustedFileWriter;
-use b3fs::bucket::file::writer::FileWriter;
+use b3fs::entry::BorrowedEntry;
 use fleek_crypto::{AccountOwnerSecretKey, NodePublicKey, SecretKey};
 use lightning_application::app::Application;
 use lightning_application::config::ApplicationConfig;
 use lightning_blockstore::blockstore::{Blockstore, BLOCK_SIZE};
 use lightning_blockstore::config::Config as BlockstoreConfig;
 use lightning_indexer::Indexer;
-use lightning_interfaces::_FileTrustedWriter;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Genesis, GenesisNode, NodePorts, ServerRequest};
+use lightning_interfaces::{_DirTrustedWriter, _DirUntrustedWriter, _FileTrustedWriter};
 use lightning_node::Node;
 use lightning_notifier::Notifier;
 use lightning_pool::{Config as PoolConfig, PoolProvider};
@@ -22,9 +22,11 @@ use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
 use lightning_topology::Topology;
 use tempfile::{tempdir, TempDir};
+use tokio::sync::RwLock;
+use tokio_stream::StreamExt;
 
 use super::BlockstoreServer;
-use crate::blockstore_server::{FileFrame, Frame};
+use crate::blockstore_server::{DirFrame, FileFrame, Frame};
 use crate::config::Config;
 
 partial_node_components!(TestBinding {
@@ -163,9 +165,9 @@ async fn test_stream_verified_content() {
     let content = create_content();
 
     // Put some content into the sender's blockstore
-    let bucket = peers[0].blockstore().get_bucket();
-    let mut writer_sender = FileWriter::new(&bucket).await.unwrap();
-    writer_sender.write(content.as_slice()).await.unwrap();
+    let blockstore = peers[0].blockstore();
+    let mut writer_sender = blockstore.file_writer().await.unwrap();
+    writer_sender.write(content.as_slice(), true).await.unwrap();
     let root_hash = writer_sender.commit().await.unwrap();
 
     let mut network_wire = VecDeque::new();
@@ -271,5 +273,126 @@ async fn test_send_and_receive() {
     for mut peer in peers {
         peer.inner.shutdown().await;
         drop(peer);
+    }
+}
+
+#[tokio::test]
+async fn test_dir_stream_verified_content() {
+    let temp_dir = tempdir().unwrap();
+    let peers = get_peers(&temp_dir, 49200, 2).await;
+
+    // Put some content into the sender's blockstore
+    let blockstore = peers[0].blockstore();
+
+    let file1 = tokio::fs::read("tests/testdir/file1").await.unwrap();
+    let file2 = tokio::fs::read("tests/testdir/file2").await.unwrap();
+    let file3 = tokio::fs::read("tests/testdir/subdir/file3").await.unwrap();
+
+    let mut writer_sender = blockstore.file_writer().await.unwrap();
+    writer_sender.write(&file1, true).await.unwrap();
+    let root_hash_file1 = writer_sender.commit().await.unwrap();
+
+    let mut writer_sender = blockstore.file_writer().await.unwrap();
+    writer_sender.write(&file2, true).await.unwrap();
+    let root_hash_file2 = writer_sender.commit().await.unwrap();
+
+    let mut writer_sender = blockstore.file_writer().await.unwrap();
+    writer_sender.write(&file3, true).await.unwrap();
+    let root_hash_file3 = writer_sender.commit().await.unwrap();
+
+    let mut writer_sender = blockstore.dir_writer(1).await.unwrap();
+    let entry_file3 = BorrowedEntry {
+        name: "file3".as_bytes(),
+        link: b3fs::entry::BorrowedLink::Content(&root_hash_file3),
+    };
+    writer_sender.insert(entry_file3).await.unwrap();
+    let root_hash_subdir = writer_sender.commit().await.unwrap();
+
+    let mut writer_sender = blockstore.dir_writer(3).await.unwrap();
+    let entry_file1 = BorrowedEntry {
+        name: "file1".as_bytes(),
+        link: b3fs::entry::BorrowedLink::Content(&root_hash_file1),
+    };
+    let entry_file2 = BorrowedEntry {
+        name: "file2".as_bytes(),
+        link: b3fs::entry::BorrowedLink::Content(&root_hash_file2),
+    };
+    let entry_subdir = BorrowedEntry {
+        name: "subdir".as_bytes(),
+        link: b3fs::entry::BorrowedLink::Content(&root_hash_subdir),
+    };
+
+    writer_sender.insert(entry_file1).await.unwrap();
+    writer_sender.insert(entry_file2).await.unwrap();
+    writer_sender.insert(entry_subdir).await.unwrap();
+    let root_hash_testdir = writer_sender.commit().await.unwrap();
+
+    let mut network_wire = VecDeque::new();
+
+    // The sender sends the content with the proofs to the receiver
+    match blockstore.get_bucket().get(&root_hash_testdir).await {
+        Ok(tree) => {
+            let num_blocks = tree.blocks();
+            let mut tree_dir = tree.into_dir().unwrap();
+            let mut reader = tree_dir.hashtree().await.unwrap();
+            let mut entries_reader = tree_dir.entries().await.unwrap();
+            network_wire.push_back(Frame::Dir(DirFrame::Prelude(num_blocks)));
+            let mut block = 0;
+            while let Some(ent) = entries_reader.next().await {
+                let entry = ent.unwrap();
+                let proof = reader.generate_proof(block).await.unwrap();
+                let slice = proof.as_slice().to_owned();
+                network_wire.push_back(Frame::Dir(DirFrame::Proof(Cow::Owned(slice))));
+
+                let dir_frame: DirFrame<'_> = entry.into();
+                let frame = Frame::Dir(dir_frame);
+                network_wire.push_back(frame);
+                block += 1;
+            }
+            network_wire.push_back(Frame::File(FileFrame::Eos));
+        },
+        Err(e) => {
+            panic!("{e}");
+        },
+    }
+
+    // The receiver reads the frames and puts them into its blockstore
+    let blockstore_peer1 = peers[1].blockstore();
+    let mut putter = None;
+    while let Some(ref frame) = network_wire.pop_front() {
+        dbg!(frame);
+        match frame {
+            Frame::Dir(DirFrame::Prelude(num_entries)) => {
+                putter = Some(RwLock::new(
+                    blockstore_peer1
+                        .dir_untrusted_writer(root_hash_testdir, *num_entries as usize)
+                        .await
+                        .unwrap(),
+                ));
+            },
+            Frame::Dir(DirFrame::Proof(proof)) => match putter {
+                Some(ref p) => {
+                    p.write().await.feed_proof(&proof).await.unwrap();
+                },
+                _ => panic!("Impossible"),
+            },
+            Frame::Dir(DirFrame::Chunk(chunk)) => match putter {
+                Some(ref p) => p
+                    .write()
+                    .await
+                    .insert(BorrowedEntry::from(&chunk.clone().into_owned()))
+                    .await
+                    .unwrap(),
+                _ => panic!("Impossible"),
+            },
+            Frame::Dir(DirFrame::Eos) => {
+                let hash = putter.take().unwrap().into_inner().commit().await.unwrap();
+                assert_eq!(hash, root_hash_testdir);
+                break;
+            },
+            Frame::File(_) => {
+                panic!("imposible");
+            },
+        }
     }
 }

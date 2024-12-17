@@ -150,6 +150,7 @@ mod tests {
         let bucket = setup_bucket().await.unwrap();
         let num_entries = 1;
         let (hashes, root, entry) = setup_hasher();
+        dbg!(&hashes);
         let hashtree = HashTree::try_from(&hashes).unwrap();
 
         let mut writer = UntrustedDirWriter::new(&bucket, num_entries, root)
