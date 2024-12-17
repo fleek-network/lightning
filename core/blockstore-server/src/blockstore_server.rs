@@ -296,10 +296,13 @@ impl TryFrom<Bytes> for PeerRequest {
     }
 }
 
+#[derive(Debug)]
 pub enum Frame<'a> {
     File(FileFrame<'a>),
     Dir(DirFrame<'a>),
 }
+
+#[derive(Debug)]
 pub enum FileFrame<'a> {
     Proof(Cow<'a, [u8]>),
     Chunk(Cow<'a, [u8]>),
@@ -307,6 +310,7 @@ pub enum FileFrame<'a> {
     Eos,
 }
 
+#[derive(Debug)]
 pub enum DirFrame<'a> {
     Prelude(u32),
     Proof(Cow<'a, [u8]>),
@@ -529,18 +533,16 @@ async fn send_file<C: NodeComponents>(
             },
         };
 
-        if !proof.is_empty() {
-            num_bytes += proof.len();
-            if let Err(e) = request
-                .send(Bytes::from(Frame::File(FileFrame::Proof(Cow::Borrowed(
-                    proof.as_slice(),
-                )))))
-                .await
-            {
-                error!("Failed to send proof: {e:?}");
-                num_responses.fetch_sub(1, Ordering::Release);
-                return;
-            }
+        num_bytes += proof.len();
+        if let Err(e) = request
+            .send(Bytes::from(Frame::File(FileFrame::Proof(Cow::Borrowed(
+                proof.as_slice(),
+            )))))
+            .await
+        {
+            error!("Failed to send proof: {e:?}");
+            num_responses.fetch_sub(1, Ordering::Release);
+            return;
         }
 
         let chunk = match blockstore.get_bucket().get_block_content(&hash).await {
@@ -609,18 +611,16 @@ async fn send_dir<C: NodeComponents>(
             },
         };
 
-        if !proof.is_empty() {
-            num_bytes += proof.len();
-            if let Err(e) = request
-                .send(Bytes::from(Frame::Dir(DirFrame::Proof(Cow::Borrowed(
-                    proof.as_slice(),
-                )))))
-                .await
-            {
-                error!("Failed to send proof: {e:?}");
-                num_responses.fetch_sub(1, Ordering::Release);
-                return;
-            }
+        num_bytes += proof.len();
+        if let Err(e) = request
+            .send(Bytes::from(Frame::Dir(DirFrame::Proof(Cow::Borrowed(
+                proof.as_slice(),
+            )))))
+            .await
+        {
+            error!("Failed to send proof: {e:?}");
+            num_responses.fetch_sub(1, Ordering::Release);
+            return;
         }
 
         if let Some(ent) = entries_reader.next().await {

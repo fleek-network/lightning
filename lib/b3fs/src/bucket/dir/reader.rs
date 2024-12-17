@@ -404,4 +404,23 @@ mod tests {
         }
         tokio::fs::remove_dir_all(temp_dir).await.unwrap();
     }
+
+    #[tokio::test]
+    async fn test_reader_file_with_three_entries() {
+        let reader = B3Dir::new(
+            3,
+            tokio::fs::File::open(
+                "tests/fixtures/4bc76dc8621d67c905b214f47cfc68924d7994afd2c181f47a449edbc359b514",
+            )
+            .await
+            .unwrap(),
+        );
+        let mut entries = reader.entries().await.unwrap();
+        let mut count = 0;
+        while let Some(en) = entries.next().await {
+            count += 1;
+            assert!(en.is_ok());
+        }
+        assert_eq!(count, 3);
+    }
 }
