@@ -15,7 +15,7 @@ use lightning_interfaces::types::{
     ProtocolParamValue,
     Value,
 };
-use lightning_interfaces::PagingParams;
+use lightning_interfaces::NodePagingParams;
 use types::{CommitteeSelectionBeaconPhase, EpochEra, Participation};
 
 pub trait QueryRunnerExt: SyncQueryRunnerInterface {
@@ -156,7 +156,7 @@ pub trait QueryRunnerExt: SyncQueryRunnerInterface {
     /// Returns a full copy of the entire node-registry,
     /// Paging Params - filtering nodes that are still a valid node and have enough stake; Takes
     /// from starting index and specified amount.
-    fn get_node_registry(&self, paging: Option<PagingParams>) -> Vec<NodeInfoWithIndex> {
+    fn get_node_registry(&self, paging: Option<NodePagingParams>) -> Vec<NodeInfoWithIndex> {
         let staking_amount = self.get_staking_amount().into();
 
         self.get_node_table_iter::<Vec<NodeInfoWithIndex>>(|nodes| -> Vec<NodeInfoWithIndex> {
@@ -168,7 +168,7 @@ pub trait QueryRunnerExt: SyncQueryRunnerInterface {
                 None => nodes
                     .filter(|node| node.info.stake.staked >= staking_amount)
                     .collect(),
-                Some(PagingParams {
+                Some(NodePagingParams {
                     ignore_stake,
                     limit,
                     start,

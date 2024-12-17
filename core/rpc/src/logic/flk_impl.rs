@@ -28,7 +28,7 @@ use lightning_interfaces::types::{
     TransactionRequest,
     Value,
 };
-use lightning_interfaces::PagingParams;
+use lightning_interfaces::{NodePagingParams, WithdrawPagingParams};
 use lightning_types::{AggregateCheckpoint, StateProofKey, StateProofValue};
 use lightning_utils::application::QueryRunnerExt;
 use merklize::{StateRootHash, StateTree};
@@ -302,7 +302,10 @@ impl<C: NodeComponents> FleekApiServer for FleekApi<C> {
         Ok(self.data.query_runner.has_sufficient_stake(&pk))
     }
 
-    async fn get_node_registry(&self, paging: Option<PagingParams>) -> RpcResult<Vec<NodeInfo>> {
+    async fn get_node_registry(
+        &self,
+        paging: Option<NodePagingParams>,
+    ) -> RpcResult<Vec<NodeInfo>> {
         Ok(self
             .data
             .query_runner
@@ -314,7 +317,7 @@ impl<C: NodeComponents> FleekApiServer for FleekApi<C> {
 
     async fn get_node_registry_index(
         &self,
-        paging: Option<PagingParams>,
+        paging: Option<NodePagingParams>,
     ) -> RpcResult<Vec<NodeInfoWithIndex>> {
         Ok(self.data.query_runner.get_node_registry(paging))
     }
@@ -463,6 +466,30 @@ impl<C: NodeComponents> FleekApiServer for FleekApi<C> {
             Ok(metrics) => Ok(metrics),
             Err(err) => Err(RPCError::custom(err.to_string()).into()),
         }
+    }
+
+    async fn get_flk_withdraws(
+        &self,
+        epoch: Option<u64>,
+        paging: WithdrawPagingParams,
+    ) -> RpcResult<Vec<(u64, EthAddress, HpUfixed<18>)>> {
+        Ok(self
+            .data
+            .query_runner(epoch)
+            .await?
+            .get_flk_withdraws(paging))
+    }
+
+    async fn get_usdc_withdraws(
+        &self,
+        epoch: Option<u64>,
+        paging: WithdrawPagingParams,
+    ) -> RpcResult<Vec<(u64, EthAddress, HpUfixed<6>)>> {
+        Ok(self
+            .data
+            .query_runner(epoch)
+            .await?
+            .get_usdc_withdraws(paging))
     }
 
     async fn handle_subscription(

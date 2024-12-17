@@ -31,7 +31,7 @@ use lightning_interfaces::types::{
     ReputationMeasurements,
     Staking,
 };
-use lightning_interfaces::PagingParams;
+use lightning_interfaces::NodePagingParams;
 use lightning_node::Node;
 use lightning_test_utils::e2e::{try_init_tracing, TestGenesisBuilder, TestGenesisNodeBuilder};
 use lightning_test_utils::json_config::JsonConfigProvider;
@@ -857,8 +857,8 @@ pub(crate) fn update_reputation_measurements(
 }
 
 /// Helper function that prepare `PagingParams`
-pub(crate) fn paging_params(ignore_stake: bool, start: u32, limit: usize) -> PagingParams {
-    PagingParams {
+pub(crate) fn paging_params(ignore_stake: bool, start: u32, limit: usize) -> NodePagingParams {
+    NodePagingParams {
         ignore_stake,
         start,
         limit,
