@@ -8,7 +8,7 @@ use lightning_interfaces::types::{
     Tokens,
     UpdateMethod,
 };
-use lightning_interfaces::SyncQueryRunnerInterface;
+use lightning_interfaces::{SyncQueryRunnerInterface, WithdrawPagingParams};
 use tempfile::tempdir;
 
 use super::utils::*;
@@ -255,7 +255,10 @@ async fn test_withdraw_usdc_works_properly() {
     let update = prepare_update_request_account(withdraw, &owner_secret_key, 1);
     expect_tx_success(update, &update_socket, ExecutionData::None).await;
 
-    let withdraws = query_runner.get_usdc_withdraws();
+    let withdraws = query_runner.get_usdc_withdraws(WithdrawPagingParams {
+        start: 0,
+        limit: 100,
+    });
     assert_eq!(withdraws[0].1, receiver);
     assert_eq!(withdraws[0].2, withdraw_amount.into());
 }
@@ -291,7 +294,10 @@ async fn test_withdraw_flk_works_properly() {
     let update = prepare_update_request_account(withdraw, &owner_secret_key, 1);
     expect_tx_success(update, &update_socket, ExecutionData::None).await;
 
-    let withdraws = query_runner.get_flk_withdraws();
+    let withdraws = query_runner.get_flk_withdraws(WithdrawPagingParams {
+        start: 0,
+        limit: 100,
+    });
     assert_eq!(withdraws[0].1, receiver);
     assert_eq!(withdraws[0].2, withdraw_amount.into());
 }

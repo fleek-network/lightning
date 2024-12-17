@@ -41,7 +41,7 @@ use lightning_interfaces::types::{
     TxHash,
     Value,
 };
-use lightning_interfaces::SyncQueryRunnerInterface;
+use lightning_interfaces::{SyncQueryRunnerInterface, WithdrawPagingParams};
 use merklize::{StateRootHash, StateTree};
 
 use crate::env::ApplicationStateTree;
@@ -376,19 +376,29 @@ impl SyncQueryRunnerInterface for QueryRunner {
         self.get_metadata(&Metadata::Epoch).is_some()
     }
 
-    fn get_flk_withdraws(&self) -> Vec<(u64, EthAddress, HpUfixed<18>)> {
+    fn get_flk_withdraws(
+        &self,
+        paging: WithdrawPagingParams,
+    ) -> Vec<(u64, EthAddress, HpUfixed<18>)> {
         self.inner
             .run(|ctx| self.flk_withdraws.get(ctx).as_map())
             .iter()
             .map(|(id, (address, amount))| (*id, *address, amount.clone()))
+            .filter(|(id, _, _)| id >= &paging.start)
+            .take(paging.limit)
             .collect()
     }
 
-    fn get_usdc_withdraws(&self) -> Vec<(u64, EthAddress, HpUfixed<6>)> {
+    fn get_usdc_withdraws(
+        &self,
+        paging: WithdrawPagingParams,
+    ) -> Vec<(u64, EthAddress, HpUfixed<6>)> {
         self.inner
             .run(|ctx| self.usdc_withdraws.get(ctx).as_map())
             .iter()
             .map(|(id, (address, amount))| (*id, *address, amount.clone()))
+            .filter(|(id, _, _)| id >= &paging.start)
+            .take(paging.limit)
             .collect()
     }
 }

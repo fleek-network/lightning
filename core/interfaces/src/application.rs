@@ -243,10 +243,16 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     fn has_genesis(&self) -> bool;
 
     /// Returns a list of FLK withdraws
-    fn get_flk_withdraws(&self) -> Vec<(u64, EthAddress, HpUfixed<18>)>;
+    fn get_flk_withdraws(
+        &self,
+        paging: WithdrawPagingParams,
+    ) -> Vec<(u64, EthAddress, HpUfixed<18>)>;
 
     /// Returns a list of USDC withdraws
-    fn get_usdc_withdraws(&self) -> Vec<(u64, EthAddress, HpUfixed<6>)>;
+    fn get_usdc_withdraws(
+        &self,
+        paging: WithdrawPagingParams,
+    ) -> Vec<(u64, EthAddress, HpUfixed<6>)>;
 }
 
 #[derive(Clone, Debug)]
@@ -262,7 +268,7 @@ pub enum ExecutionError {
 }
 
 #[derive(Deserialize, Serialize, schemars::JsonSchema)]
-pub struct PagingParams {
+pub struct NodePagingParams {
     // Since some nodes may be in state without
     // having staked the minimum and if at any point
     // they stake the minimum amount, this would
@@ -271,5 +277,11 @@ pub struct PagingParams {
     // to keep returned results consistent.
     pub ignore_stake: bool,
     pub start: NodeIndex,
+    pub limit: usize,
+}
+
+#[derive(Deserialize, Serialize, schemars::JsonSchema)]
+pub struct WithdrawPagingParams {
+    pub start: u64,
     pub limit: usize,
 }

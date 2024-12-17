@@ -22,7 +22,7 @@ use lightning_interfaces::types::{
     TotalServed,
     TransactionRequest,
 };
-use lightning_interfaces::PagingParams;
+use lightning_interfaces::{NodePagingParams, WithdrawPagingParams};
 use lightning_openrpc_macros::open_rpc;
 use lightning_types::{ProtocolParamKey, StateProofKey, StateProofValue};
 use merklize::{StateRootHash, StateTree};
@@ -154,12 +154,13 @@ pub trait FleekApi {
     async fn node_has_sufficient_stake(&self, public_key: NodePublicKey) -> RpcResult<bool>;
 
     #[method(name = "get_node_registry")]
-    async fn get_node_registry(&self, paging: Option<PagingParams>) -> RpcResult<Vec<NodeInfo>>;
+    async fn get_node_registry(&self, paging: Option<NodePagingParams>)
+    -> RpcResult<Vec<NodeInfo>>;
 
     #[method(name = "get_node_registry_index")]
     async fn get_node_registry_index(
         &self,
-        paging: Option<PagingParams>,
+        paging: Option<NodePagingParams>,
     ) -> RpcResult<Vec<NodeInfoWithIndex>>;
 
     #[method(name = "get_reputation")]
@@ -218,6 +219,20 @@ pub trait FleekApi {
 
     #[method(name = "metrics")]
     async fn metrics(&self) -> RpcResult<String>;
+
+    #[method(name = "get_flk_withdraws")]
+    async fn get_flk_withdraws(
+        &self,
+        epoch: Option<u64>,
+        paging: WithdrawPagingParams,
+    ) -> RpcResult<Vec<(u64, EthAddress, HpUfixed<18>)>>;
+
+    #[method(name = "get_usdc_withdraws")]
+    async fn get_usdc_withdraws(
+        &self,
+        epoch: Option<u64>,
+        paging: WithdrawPagingParams,
+    ) -> RpcResult<Vec<(u64, EthAddress, HpUfixed<6>)>>;
 
     #[subscription(name = "subscribe", item = Event)]
     async fn handle_subscription(&self, event_type: Option<EventType>) -> SubscriptionResult;
