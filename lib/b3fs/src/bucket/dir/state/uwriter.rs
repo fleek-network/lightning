@@ -18,7 +18,7 @@ use crate::hasher::collector::BufCollector;
 use crate::hasher::dir_hasher::DirectoryHasher;
 use crate::hasher::HashTreeCollector;
 use crate::stream::verifier::{IncrementalVerifier, WithHashTreeCollector};
-use crate::utils;
+use crate::utils::{self, tree_index};
 
 /// Collector for incrementally verifying and building a directory hash tree during updates
 #[derive(Default)]
@@ -54,13 +54,16 @@ impl WithCollector for DirUWriterCollector {
         borrowed_entry: BorrowedEntry<'_>,
     ) -> Result<(), errors::InsertError> {
         let mut dir_hasher: DirectoryHasher<Vec<[u8; 32]>> = DirectoryHasher::default();
-        dir_hasher.insert_unchecked(borrowed_entry);
+        dir_hasher.insert(borrowed_entry);
 
         let (_, tree) = dir_hasher.finalize();
 
+        dbg!(&tree);
         let this_entry_hash = tree
-            .first()
+            .get(tree_index(0))
             .ok_or(errors::InsertError::IncrementalVerification)?;
+
+        dbg!(this_entry_hash);
 
         self.hasher
             .verify_hash(*this_entry_hash)

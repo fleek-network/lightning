@@ -50,7 +50,7 @@ use std::path::{Path, PathBuf};
 use arrayref::array_ref;
 use rand::random;
 use tokio::fs::{self, File, OpenOptions};
-use tokio::io::{AsyncReadExt, BufWriter};
+use tokio::io::{AsyncReadExt, AsyncSeekExt, BufWriter};
 use triomphe::Arc;
 
 use crate::utils::{to_hex, Digest};
@@ -149,6 +149,7 @@ impl Bucket {
                 "too many entries in b3fs directory.",
             ));
         }
+        file.rewind().await?;
 
         Ok(ContentHeader {
             is_file,
