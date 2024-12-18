@@ -65,8 +65,8 @@ pub enum InsertError {
     WritingError(#[from] WriteError),
     #[error("Error writing to disk. {0}")]
     IO(#[from] std::io::Error),
-    #[error("Invalid Hash or internal hashes content doing incremental validation")]
-    IncrementalVerification,
+    #[error("Invalid Hash or internal hashes content doing incremental validation {0}")]
+    IncrementalVerification(String),
     #[error("Error trying to insert entry in phf generator. {0}")]
     InvalidEntry(#[from] hasher::dir_hasher::Error),
 }
