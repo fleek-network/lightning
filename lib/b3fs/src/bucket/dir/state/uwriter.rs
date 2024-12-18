@@ -30,6 +30,8 @@ pub(crate) struct DirUWriterCollector {
     /// The expected root hash of the directory
     root_hash: [u8; 32],
 
+    counter: u16,
+
     last_entry: Option<OwnedEntry>,
 }
 
@@ -42,6 +44,7 @@ impl DirUWriterCollector {
             hasher,
             root_hash: hash,
             last_entry: None,
+            counter: 0,
         }
     }
 
@@ -50,10 +53,17 @@ impl DirUWriterCollector {
         self.hasher.feed_proof(proof).map_err(Into::into)
     }
 
-    fn create_hash(entry: BorrowedEntry<'_>, last_entry: bool) -> [u8; 32] {
+    fn create_hash(&mut self, entry: BorrowedEntry<'_>, last_entry: bool) -> [u8; 32] {
         let mut buffer = Vec::new();
-        write_entry_transcript(&mut buffer, entry, 0, true);
-        IV::DIR.hash_all_at_once(&buffer)
+        write_entry_transcript(
+            &mut buffer,
+            entry,
+            self.counter,
+            last_entry && self.counter == 0,
+        );
+        let hash = IV::DIR.hash_all_at_once(&buffer);
+        self.counter += 1;
+        hash
     }
 }
 
@@ -70,24 +80,23 @@ impl WithCollector for DirUWriterCollector {
             return Ok(());
         }
 
-        let hash = Self::create_hash(borrowed_entry, last_entry);
-
-        dbg!(&hash);
+        let hash = self.create_hash(borrowed_entry, last_entry);
 
         self.hasher
             .verify_hash(hash)
-            .map_err(|_| errors::InsertError::IncrementalVerification)
+            .map_err(|e| errors::InsertError::IncrementalVerification(e.to_string()))
     }
 
     /// Called when committing the directory changes
     /// Returns the root hash and final hash tree
     async fn on_commit(mut self) -> Result<([u8; 32], Vec<[u8; 32]>), errors::CommitError> {
-        if let Some(ref last_entry) = self.last_entry {
-            let hash = Self::create_hash(last_entry.into(), true);
-            let mut this = &mut self;
-            this.hasher
+        if let Some(ref mut last_entry) = self.last_entry {
+            let owned_entry = last_entry.to_owned();
+            let borrowed = BorrowedEntry::from(&owned_entry);
+            let hash = self.create_hash(borrowed, true);
+            self.hasher
                 .verify_hash(hash)
-                .map_err(|_| CommitError::InvalidBlockHash)?;
+                .map_err(|e| errors::InsertError::IncrementalVerification(e.to_string()))?;
         }
         Ok((self.root_hash, self.hasher.finalize()))
     }

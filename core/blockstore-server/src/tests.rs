@@ -343,9 +343,6 @@ async fn test_dir_stream_verified_content() {
                 let proof = reader.generate_proof(block).await.unwrap();
                 let slice = proof.as_slice().to_owned();
 
-                let hash_block = reader.get_hash(block).await.unwrap();
-                dbg!(hash_block);
-
                 network_wire.push_back(Frame::Dir(DirFrame::Proof(Cow::Owned(slice))));
 
                 let dir_frame: DirFrame<'_> = DirFrame::from_entry(entry, block + 1 == num_blocks);
@@ -353,7 +350,7 @@ async fn test_dir_stream_verified_content() {
                 network_wire.push_back(frame);
                 block += 1;
             }
-            network_wire.push_back(Frame::File(FileFrame::Eos));
+            network_wire.push_back(Frame::Dir(DirFrame::Eos));
         },
         Err(e) => {
             panic!("{e}");
@@ -364,7 +361,6 @@ async fn test_dir_stream_verified_content() {
     let blockstore_peer1 = peers[1].blockstore();
     let mut putter = None;
     while let Some(ref frame) = network_wire.pop_front() {
-        dbg!(frame);
         match frame {
             Frame::Dir(DirFrame::Prelude(num_entries)) => {
                 putter = Some(RwLock::new(
@@ -376,7 +372,7 @@ async fn test_dir_stream_verified_content() {
             },
             Frame::Dir(DirFrame::Proof(proof)) => match putter {
                 Some(ref p) => {
-                    p.write().await.feed_proof(&proof).await.unwrap();
+                    p.write().await.feed_proof(proof).await.unwrap();
                 },
                 _ => panic!("Impossible"),
             },
