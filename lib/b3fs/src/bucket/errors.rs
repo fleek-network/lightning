@@ -93,6 +93,8 @@ pub enum CommitError {
     SpawnError(#[from] tokio::task::JoinError),
     #[error("Error while committing. {0}")]
     CommitError(#[from] WriteError),
+    #[error("Error while inserting entry. {0}")]
+    CommitInsertError(#[from] InsertError),
     #[error("Error getting final lock for commit")]
     LockError,
 }

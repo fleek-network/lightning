@@ -305,7 +305,7 @@ async fn test_dir_stream_verified_content() {
         name: "file3".as_bytes(),
         link: b3fs::entry::BorrowedLink::Content(&root_hash_file3),
     };
-    writer_sender.insert(entry_file3).await.unwrap();
+    writer_sender.insert(entry_file3, true).await.unwrap();
     let root_hash_subdir = writer_sender.commit().await.unwrap();
 
     let mut writer_sender = blockstore.dir_writer(3).await.unwrap();
@@ -322,9 +322,9 @@ async fn test_dir_stream_verified_content() {
         link: b3fs::entry::BorrowedLink::Content(&root_hash_subdir),
     };
 
-    writer_sender.insert(entry_file1).await.unwrap();
-    writer_sender.insert(entry_file2).await.unwrap();
-    writer_sender.insert(entry_subdir).await.unwrap();
+    writer_sender.insert(entry_file1, false).await.unwrap();
+    writer_sender.insert(entry_file2, false).await.unwrap();
+    writer_sender.insert(entry_subdir, true).await.unwrap();
     let root_hash_testdir = writer_sender.commit().await.unwrap();
 
     let mut network_wire = VecDeque::new();
@@ -342,9 +342,13 @@ async fn test_dir_stream_verified_content() {
                 let entry = ent.unwrap();
                 let proof = reader.generate_proof(block).await.unwrap();
                 let slice = proof.as_slice().to_owned();
+
+                let hash_block = reader.get_hash(block).await.unwrap();
+                dbg!(hash_block);
+
                 network_wire.push_back(Frame::Dir(DirFrame::Proof(Cow::Owned(slice))));
 
-                let dir_frame: DirFrame<'_> = entry.into();
+                let dir_frame: DirFrame<'_> = DirFrame::from_entry(entry, block + 1 == num_blocks);
                 let frame = Frame::Dir(dir_frame);
                 network_wire.push_back(frame);
                 block += 1;
@@ -380,7 +384,16 @@ async fn test_dir_stream_verified_content() {
                 Some(ref p) => p
                     .write()
                     .await
-                    .insert(BorrowedEntry::from(&chunk.clone().into_owned()))
+                    .insert(BorrowedEntry::from(&chunk.clone().into_owned()), false)
+                    .await
+                    .unwrap(),
+                _ => panic!("Impossible"),
+            },
+            Frame::Dir(DirFrame::LastChunk(chunk)) => match putter {
+                Some(ref p) => p
+                    .write()
+                    .await
+                    .insert(BorrowedEntry::from(&chunk.clone().into_owned()), true)
                     .await
                     .unwrap(),
                 _ => panic!("Impossible"),

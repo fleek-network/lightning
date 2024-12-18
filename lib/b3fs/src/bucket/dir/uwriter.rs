@@ -66,11 +66,12 @@ impl UntrustedDirWriter {
     ///
     /// # Returns
     /// Ok(()) if successful, InsertError otherwise
-    pub async fn insert<'a>(
+    pub async fn insert(
         &mut self,
-        entry: impl Into<BorrowedEntry<'a>>,
+        entry: impl Into<BorrowedEntry<'_>>,
+        last_entry: bool,
     ) -> Result<(), errors::InsertError> {
-        self.state.insert_entry(entry.into()).await
+        self.state.insert_entry(entry.into(), last_entry).await
     }
 
     /// Finalizes this write and flushes the data to disk.
@@ -141,7 +142,7 @@ mod tests {
             )
             .await
             .unwrap();
-        let result = writer.insert(&entry).await;
+        let result = writer.insert(&entry, true).await;
         assert!(result.is_ok());
     }
 
@@ -166,7 +167,7 @@ mod tests {
             .await
             .unwrap();
 
-        writer.insert(&entry).await.unwrap();
+        writer.insert(&entry, true).await.unwrap();
 
         let result = writer.commit().await;
         assert!(result.is_ok());
@@ -193,7 +194,7 @@ mod tests {
             .await
             .unwrap();
 
-        writer.insert(&entry).await.unwrap();
+        writer.insert(&entry, true).await.unwrap();
 
         let result = writer.rollback().await;
         assert!(result.is_ok());
