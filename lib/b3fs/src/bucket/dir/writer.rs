@@ -56,7 +56,7 @@ impl DirWriter {
         &mut self,
         entry: impl Into<BorrowedEntry<'b>>,
     ) -> Result<(), errors::InsertError> {
-        self.state.insert_entry(entry.into()).await
+        self.state.insert_entry(entry.into(), false).await
     }
 
     /// Finalizes this write and flushes the data to disk.

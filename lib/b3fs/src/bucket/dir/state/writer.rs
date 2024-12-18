@@ -32,6 +32,7 @@ impl WithCollector for DirWriterCollector {
     async fn on_insert(
         &mut self,
         borrowed_entry: BorrowedEntry<'_>,
+        _last_entry: bool,
     ) -> Result<(), errors::InsertError> {
         self.hasher.insert(borrowed_entry)?;
         Ok(())

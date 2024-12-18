@@ -220,6 +220,7 @@ pub trait WithCollector {
     async fn on_insert(
         &mut self,
         borrowed_entry: BorrowedEntry<'_>,
+        last_entry: bool,
     ) -> Result<(), errors::InsertError>;
 
     /// Finalizes the collection process and returns the root hash and hash tree.
@@ -232,6 +233,7 @@ pub trait DirState {
     async fn insert_entry<'a>(
         &mut self,
         borrowed_entry: BorrowedEntry<'a>,
+        last_entry: bool,
     ) -> Result<(), errors::InsertError>;
 
     /// Commits the changes made to the directory.
@@ -245,13 +247,14 @@ impl<T: WithCollector> DirState for InnerDirState<T> {
     async fn insert_entry<'b>(
         &mut self,
         borrowed_entry: BorrowedEntry<'b>,
+        last_entry: bool,
     ) -> Result<(), errors::InsertError> {
         let i = self.next_position;
         self.phf_generator.push(borrowed_entry.name, i);
         let len_inserted = self.header_file.insert_entry(borrowed_entry).await?;
         self.next_position += len_inserted as u32;
         self.bloom_filter.add(borrowed_entry.name);
-        self.collector.on_insert(borrowed_entry).await?;
+        self.collector.on_insert(borrowed_entry, last_entry).await?;
         Ok(())
     }
 
