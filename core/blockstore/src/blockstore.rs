@@ -226,8 +226,9 @@ impl<C: NodeComponents> DirTrustedWriter for DUWriter<C> {
     async fn insert(
         &mut self,
         entry: b3fs::entry::BorrowedEntry<'_>,
+        last_entry: bool,
     ) -> Result<(), b3fs::bucket::errors::InsertError> {
-        self.writer.insert(entry).await
+        self.writer.insert(entry, last_entry).await
     }
 
     async fn commit(self) -> Result<Blake3Hash, CommitError> {
@@ -250,6 +251,7 @@ impl<C: NodeComponents> DirTrustedWriter for DWriter<C> {
     async fn insert(
         &mut self,
         entry: b3fs::entry::BorrowedEntry<'_>,
+        _last_entry: bool,
     ) -> Result<(), b3fs::bucket::errors::InsertError> {
         self.writer.insert(entry).await
     }
