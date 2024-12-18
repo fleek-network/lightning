@@ -188,7 +188,7 @@ impl<C: NodeComponents> IPFSOrigin<C> {
                 name: file_name.as_bytes(),
                 link: BorrowedLink::Content(&temp_hash),
             };
-            dir.insert(entry).await?;
+            dir.insert(entry, true).await?;
         }
         *hash = temp_hash;
         Ok(())
