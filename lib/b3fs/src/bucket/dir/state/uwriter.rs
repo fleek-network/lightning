@@ -11,11 +11,13 @@ use tokio::io::{self, AsyncWriteExt, BufWriter};
 
 use super::*;
 use crate::bucket::dir::phf::{HasherState, PhfGenerator};
+use crate::bucket::errors::CommitError;
 use crate::bucket::{errors, Bucket};
-use crate::entry::{BorrowedEntry, BorrowedLink};
+use crate::entry::{BorrowedEntry, BorrowedLink, OwnedEntry};
 use crate::hasher::b3::MAX_BLOCK_SIZE_IN_BYTES;
 use crate::hasher::collector::BufCollector;
-use crate::hasher::dir_hasher::DirectoryHasher;
+use crate::hasher::dir_hasher::{write_entry_transcript, DirectoryHasher};
+use crate::hasher::iv::IV;
 use crate::hasher::HashTreeCollector;
 use crate::stream::verifier::{IncrementalVerifier, WithHashTreeCollector};
 use crate::utils::{self, tree_index};
@@ -27,6 +29,8 @@ pub(crate) struct DirUWriterCollector {
     hasher: Box<IncrementalVerifier<WithHashTreeCollector>>,
     /// The expected root hash of the directory
     root_hash: [u8; 32],
+
+    last_entry: Option<OwnedEntry>,
 }
 
 impl DirUWriterCollector {
@@ -37,12 +41,19 @@ impl DirUWriterCollector {
         Self {
             hasher,
             root_hash: hash,
+            last_entry: None,
         }
     }
 
     /// Feeds a proof to the incremental verifier
     pub(crate) fn feed_proof(&mut self, proof: &[u8]) -> Result<(), errors::FeedProofError> {
         self.hasher.feed_proof(proof).map_err(Into::into)
+    }
+
+    fn create_hash(entry: BorrowedEntry<'_>, last_entry: bool) -> [u8; 32] {
+        let mut buffer = Vec::new();
+        write_entry_transcript(&mut buffer, entry, 0, true);
+        IV::DIR.hash_all_at_once(&buffer)
     }
 }
 
@@ -52,27 +63,32 @@ impl WithCollector for DirUWriterCollector {
     async fn on_insert(
         &mut self,
         borrowed_entry: BorrowedEntry<'_>,
+        last_entry: bool,
     ) -> Result<(), errors::InsertError> {
-        let mut dir_hasher: DirectoryHasher<Vec<[u8; 32]>> = DirectoryHasher::default();
-        dir_hasher.insert(borrowed_entry);
+        if last_entry {
+            self.last_entry = Some(borrowed_entry.into());
+            return Ok(());
+        }
 
-        let (_, tree) = dir_hasher.finalize();
+        let hash = Self::create_hash(borrowed_entry, last_entry);
 
-        dbg!(&tree);
-        let this_entry_hash = tree
-            .get(tree_index(0))
-            .ok_or(errors::InsertError::IncrementalVerification)?;
-
-        dbg!(this_entry_hash);
+        dbg!(&hash);
 
         self.hasher
-            .verify_hash(*this_entry_hash)
+            .verify_hash(hash)
             .map_err(|_| errors::InsertError::IncrementalVerification)
     }
 
     /// Called when committing the directory changes
     /// Returns the root hash and final hash tree
-    async fn on_commit(self) -> Result<([u8; 32], Vec<[u8; 32]>), errors::CommitError> {
+    async fn on_commit(mut self) -> Result<([u8; 32], Vec<[u8; 32]>), errors::CommitError> {
+        if let Some(ref last_entry) = self.last_entry {
+            let hash = Self::create_hash(last_entry.into(), true);
+            let mut this = &mut self;
+            this.hasher
+                .verify_hash(hash)
+                .map_err(|_| CommitError::InvalidBlockHash)?;
+        }
         Ok((self.root_hash, self.hasher.finalize()))
     }
 }
