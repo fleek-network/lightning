@@ -95,7 +95,11 @@ pub trait DirUntrustedWriter: DirTrustedWriter {
 pub trait DirTrustedWriter: Send + Sync + 'static {
     /// Insert the next directory entry. The calls to this method must be in alphabetic order,
     /// based on the name of the entry.
-    async fn insert(&mut self, entry: BorrowedEntry<'_>) -> Result<(), InsertError>;
+    async fn insert(
+        &mut self,
+        entry: BorrowedEntry<'_>,
+        last_entry: bool,
+    ) -> Result<(), InsertError>;
 
     /// Finalize the write, try to write the directory header to the file system.
     async fn commit(self) -> Result<Blake3Hash, CommitError>;

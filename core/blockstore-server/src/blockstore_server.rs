@@ -315,30 +315,36 @@ pub enum DirFrame<'a> {
     Prelude(u32),
     Proof(Cow<'a, [u8]>),
     Chunk(Cow<'a, OwnedEntry>),
+    LastChunk(Cow<'a, OwnedEntry>),
     Eos,
 }
 
 impl<'a> DirFrame<'a> {
+    fn entry_len(entry: &OwnedEntry) -> usize {
+        let mut bytes = entry.name.len();
+        match &entry.link {
+            OwnedLink::Content(c) => bytes += c.len(),
+            OwnedLink::Link(l) => bytes += l.len(),
+        }
+        bytes
+    }
+
     pub fn len(&self) -> usize {
         match &self {
             Self::Prelude(c) => c.to_le_bytes().len(),
             Self::Proof(c) => c.len(),
-            Self::Chunk(entry) => {
-                let mut bytes = entry.name.len();
-                match &entry.link {
-                    OwnedLink::Content(c) => bytes += c.len(),
-                    OwnedLink::Link(l) => bytes += l.len(),
-                }
-                bytes
-            },
+            Self::Chunk(entry) => Self::entry_len(entry),
+            Self::LastChunk(entry) => Self::entry_len(entry),
             Self::Eos => 0,
         }
     }
-}
 
-impl<'a> From<OwnedEntry> for DirFrame<'a> {
-    fn from(value: OwnedEntry) -> Self {
-        Self::Chunk(Cow::Owned(value))
+    pub fn from_entry(value: OwnedEntry, last: bool) -> Self {
+        if last {
+            Self::LastChunk(Cow::Owned(value))
+        } else {
+            Self::Chunk(Cow::Owned(value))
+        }
     }
 }
 
@@ -386,8 +392,22 @@ impl<'a> From<Frame<'a>> for Bytes {
                         },
                     }
                 },
-                DirFrame::Eos => {
+                DirFrame::LastChunk(chunk) => {
                     b.put_u8(0x12);
+                    b.put_slice(&chunk.name);
+                    match &chunk.link {
+                        b3fs::entry::OwnedLink::Content(content) => {
+                            b.put_u8(0x00);
+                            b.put_slice(content);
+                        },
+                        b3fs::entry::OwnedLink::Link(link) => {
+                            b.put_u8(0x01);
+                            b.put_slice(link);
+                        },
+                    }
+                },
+                DirFrame::Eos => {
+                    b.put_u8(0x13);
                 },
             },
         }
@@ -436,7 +456,36 @@ impl TryFrom<Bytes> for Frame<'static> {
                     _ => Err(anyhow!("Unknown magic byte for OwnedEntry type")),
                 }
             },
-            0x12 => Ok(Frame::Dir(DirFrame::Eos)),
+            0x12 => {
+                let mut slice: [u8; 24] = [0; 24];
+                let bytes = value.copy_to_bytes(24);
+                slice.copy_from_slice(&bytes);
+                let name = InlineVec::from_buf(slice);
+                let ty = value.get_u8();
+                match ty {
+                    0x00 => {
+                        let mut content = [0; 32];
+                        let bytes = value.copy_to_bytes(32);
+                        content.copy_from_slice(&bytes);
+                        Ok(Frame::Dir(DirFrame::LastChunk(Cow::Owned(OwnedEntry {
+                            name,
+                            link: b3fs::entry::OwnedLink::Content(content),
+                        }))))
+                    },
+                    0x01 => {
+                        let mut link = [0; 24];
+                        let bytes = value.copy_to_bytes(24);
+                        link.copy_from_slice(&bytes);
+                        let link = InlineVec::from_buf(link);
+                        Ok(Frame::Dir(DirFrame::LastChunk(Cow::Owned(OwnedEntry {
+                            name,
+                            link: b3fs::entry::OwnedLink::Link(link),
+                        }))))
+                    },
+                    _ => Err(anyhow!("Unknown magic byte for OwnedEntry type")),
+                }
+            },
+            0x13 => Ok(Frame::Dir(DirFrame::Eos)),
             _ => Err(anyhow!("Unknown magic byte")),
         }
     }
@@ -626,7 +675,8 @@ async fn send_dir<C: NodeComponents>(
         if let Some(ent) = entries_reader.next().await {
             match ent {
                 Ok(entry) => {
-                    let dir_frame: DirFrame<'_> = entry.into();
+                    let dir_frame: DirFrame<'_> =
+                        DirFrame::from_entry(entry, num_blocks == block + 1);
                     num_bytes += dir_frame.len();
                     let frame = Frame::Dir(dir_frame);
 
@@ -839,7 +889,14 @@ async fn handle_send_request_dir<C: NodeComponents>(
         DirFrame::Chunk(chunk) => writer
             .write()
             .await
-            .insert(BorrowedEntry::from(&chunk.into_owned()))
+            .insert(BorrowedEntry::from(&chunk.into_owned()), false)
+            .await
+            .map(|_| RespSendRequest::Continue)
+            .map_err(|e| e.to_string()),
+        DirFrame::LastChunk(chunk) => writer
+            .write()
+            .await
+            .insert(BorrowedEntry::from(&chunk.into_owned()), true)
             .await
             .map(|_| RespSendRequest::Continue)
             .map_err(|e| e.to_string()),
