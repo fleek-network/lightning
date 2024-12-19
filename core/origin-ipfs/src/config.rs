@@ -3,26 +3,27 @@ use std::time::Duration;
 use cid::Cid;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Config {
     pub gateways: Vec<Gateway>,
     #[serde(with = "humantime_serde")]
     pub gateway_timeout: Duration,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Protocol {
     Http,
     Https,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum RequestFormat {
+    Raw,
     CidFirst,
     CidLast,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Gateway {
     pub protocol: Protocol,
     pub authority: String,
@@ -62,6 +63,13 @@ impl Default for Config {
 impl Gateway {
     pub fn build_request(&self, cid: Cid) -> String {
         match self.request_format {
+            RequestFormat::Raw => {
+                format!(
+                    "{}://{}/ipfs/{cid}?format=raw",
+                    self.protocol.as_str(),
+                    self.authority
+                )
+            },
             RequestFormat::CidFirst => {
                 format!(
                     "{}://{cid}.{}?format=car",
