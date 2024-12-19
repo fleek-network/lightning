@@ -419,13 +419,15 @@ impl TryFrom<Bytes> for Frame<'static> {
     type Error = anyhow::Error;
 
     fn try_from(mut value: Bytes) -> Result<Self> {
-        match value.get_u8() {
+        let val_frame = value.get_u8();
+        match val_frame {
             0x00 => Ok(Frame::File(FileFrame::Proof(Cow::Owned(value.to_vec())))),
             0x01 => Ok(Frame::File(FileFrame::Chunk(Cow::Owned(value.to_vec())))),
             0x02 => Ok(Frame::File(FileFrame::LastChunk(Cow::Owned(
                 value.to_vec(),
             )))),
             0x03 => Ok(Frame::File(FileFrame::Eos)),
+            0x09 => Ok(Frame::Dir(DirFrame::Prelude(value.get_u32_le()))),
             0x10 => Ok(Frame::Dir(DirFrame::Proof(Cow::Owned(value.to_vec())))),
             0x11 => {
                 let mut slice: [u8; 24] = [0; 24];
@@ -486,7 +488,7 @@ impl TryFrom<Bytes> for Frame<'static> {
                 }
             },
             0x13 => Ok(Frame::Dir(DirFrame::Eos)),
-            _ => Err(anyhow!("Unknown magic byte")),
+            i => Err(anyhow!("Unknown magic byte {i}")),
         }
     }
 }
