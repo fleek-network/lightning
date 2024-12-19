@@ -381,13 +381,14 @@ impl<'a> From<Frame<'a>> for Bytes {
                 DirFrame::Chunk(chunk) => {
                     b.put_u8(0x11);
                     b.put_slice(&chunk.name);
+                    b.put_u8(0x00);
                     match &chunk.link {
                         b3fs::entry::OwnedLink::Content(content) => {
-                            b.put_u8(0x00);
+                            b.put_u8(0x01);
                             b.put_slice(content);
                         },
                         b3fs::entry::OwnedLink::Link(link) => {
-                            b.put_u8(0x01);
+                            b.put_u8(0x02);
                             b.put_slice(link);
                         },
                     }
@@ -395,13 +396,14 @@ impl<'a> From<Frame<'a>> for Bytes {
                 DirFrame::LastChunk(chunk) => {
                     b.put_u8(0x12);
                     b.put_slice(&chunk.name);
+                    b.put_u8(0x00);
                     match &chunk.link {
                         b3fs::entry::OwnedLink::Content(content) => {
-                            b.put_u8(0x00);
+                            b.put_u8(0x01);
                             b.put_slice(content);
                         },
                         b3fs::entry::OwnedLink::Link(link) => {
-                            b.put_u8(0x01);
+                            b.put_u8(0x02);
                             b.put_slice(link);
                         },
                     }
@@ -430,13 +432,21 @@ impl TryFrom<Bytes> for Frame<'static> {
             0x09 => Ok(Frame::Dir(DirFrame::Prelude(value.get_u32_le()))),
             0x10 => Ok(Frame::Dir(DirFrame::Proof(Cow::Owned(value.to_vec())))),
             0x11 => {
-                let mut slice: [u8; 24] = [0; 24];
-                let bytes = value.copy_to_bytes(24);
-                slice.copy_from_slice(&bytes);
-                let name = InlineVec::from_buf(slice);
+                let bytes: &[u8] = if let Some(bs) = value.iter().position(|p| *p == 0x00) {
+                    &value.split_to(bs)
+                } else {
+                    return Err(anyhow!("Error detecting null byte for name"));
+                };
+                if bytes.len() > 24 {
+                    return Err(anyhow!(
+                        "We are receiving more bytes than allowed for InlineVec"
+                    ));
+                }
+                let _ = value.get_u8();
+                let name: InlineVec = bytes.into();
                 let ty = value.get_u8();
                 match ty {
-                    0x00 => {
+                    0x01 => {
                         let mut content = [0; 32];
                         let bytes = value.copy_to_bytes(32);
                         content.copy_from_slice(&bytes);
@@ -445,10 +455,14 @@ impl TryFrom<Bytes> for Frame<'static> {
                             link: b3fs::entry::OwnedLink::Content(content),
                         }))))
                     },
-                    0x01 => {
+                    0x02 => {
                         let mut link = [0; 24];
-                        let bytes = value.copy_to_bytes(24);
-                        link.copy_from_slice(&bytes);
+                        if value.len() > 24 {
+                            return Err(anyhow!(
+                                "We are receiving more bytes than allowed for InlineVec"
+                            ));
+                        }
+                        link.copy_from_slice(&value);
                         let link = InlineVec::from_buf(link);
                         Ok(Frame::Dir(DirFrame::Chunk(Cow::Owned(OwnedEntry {
                             name,
@@ -459,13 +473,21 @@ impl TryFrom<Bytes> for Frame<'static> {
                 }
             },
             0x12 => {
-                let mut slice: [u8; 24] = [0; 24];
-                let bytes = value.copy_to_bytes(24);
-                slice.copy_from_slice(&bytes);
-                let name = InlineVec::from_buf(slice);
+                let bytes: &[u8] = if let Some(bs) = value.iter().position(|p| *p == 0x00) {
+                    &value.split_to(bs)
+                } else {
+                    return Err(anyhow!("Error detecting null byte for name"));
+                };
+                if bytes.len() > 24 {
+                    return Err(anyhow!(
+                        "We are receiving more bytes than allowed for InlineVec"
+                    ));
+                }
+                let _ = value.get_u8();
+                let name: InlineVec = bytes.into();
                 let ty = value.get_u8();
                 match ty {
-                    0x00 => {
+                    0x01 => {
                         let mut content = [0; 32];
                         let bytes = value.copy_to_bytes(32);
                         content.copy_from_slice(&bytes);
@@ -474,10 +496,15 @@ impl TryFrom<Bytes> for Frame<'static> {
                             link: b3fs::entry::OwnedLink::Content(content),
                         }))))
                     },
-                    0x01 => {
+                    0x02 => {
                         let mut link = [0; 24];
-                        let bytes = value.copy_to_bytes(24);
-                        link.copy_from_slice(&bytes);
+                        if value.len() > 24 {
+                            return Err(anyhow!(
+                                "We are receiving more bytes than allowed for InlineVec"
+                            ));
+                        }
+
+                        link.copy_from_slice(&value);
                         let link = InlineVec::from_buf(link);
                         Ok(Frame::Dir(DirFrame::LastChunk(Cow::Owned(OwnedEntry {
                             name,
@@ -733,11 +760,15 @@ async fn send_request<C: NodeComponents>(
                 let instant = Instant::now();
 
                 while let Some(bytes) = body.next().await {
-                    let Ok(bytes) = bytes else {
-                        return Err(ErrorResponse {
-                            error: PeerRequestError::Incomplete,
-                            request,
-                        });
+                    let bytes = match bytes {
+                        Ok(b) => b,
+                        Err(e) => {
+                            error!("{}", e);
+                            return Err(ErrorResponse {
+                                error: PeerRequestError::Incomplete,
+                                request,
+                            });
+                        },
                     };
                     bytes_recv += bytes.len();
                     let Ok(frame) = Frame::try_from(bytes) else {
@@ -829,7 +860,7 @@ async fn send_request<C: NodeComponents>(
                 request,
             }),
         },
-        Ok(Err(_)) => Err(ErrorResponse {
+        Ok(Err(e)) => Err(ErrorResponse {
             error: PeerRequestError::Incomplete,
             request,
         }),

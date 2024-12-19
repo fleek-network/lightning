@@ -279,7 +279,7 @@ async fn test_send_and_receive() {
 #[tokio::test]
 async fn test_dir_stream_verified_content() {
     let temp_dir = tempdir().unwrap();
-    let peers = get_peers(&temp_dir, 49200, 2).await;
+    let peers = get_peers(&temp_dir, 58200, 2).await;
 
     // Put some content into the sender's blockstore
     let blockstore = peers[0].blockstore();
@@ -404,12 +404,16 @@ async fn test_dir_stream_verified_content() {
             },
         }
     }
+    for mut peer in peers {
+        peer.inner.shutdown().await;
+        drop(peer);
+    }
 }
 
 #[tokio::test]
 async fn test_dir_send_and_receive() {
     let temp_dir = tempdir().unwrap();
-    let peers = get_peers(&temp_dir, 49200, 2).await;
+    let peers = get_peers(&temp_dir, 59200, 2).await;
     let query_runner = peers[0].app().sync_query();
     for peer in &peers {
         peer.inner.start().await;
