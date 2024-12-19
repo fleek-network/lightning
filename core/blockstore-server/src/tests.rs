@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 use std::time::Duration;
 
 use b3fs::bucket::file::uwriter::UntrustedFileWriter;
-use b3fs::entry::BorrowedEntry;
+use b3fs::entry::{BorrowedEntry, OwnedEntry};
 use fleek_crypto::{AccountOwnerSecretKey, NodePublicKey, SecretKey};
 use lightning_application::app::Application;
 use lightning_application::config::ApplicationConfig;
@@ -403,5 +403,98 @@ async fn test_dir_stream_verified_content() {
                 panic!("imposible");
             },
         }
+    }
+}
+
+#[tokio::test]
+async fn test_dir_send_and_receive() {
+    let temp_dir = tempdir().unwrap();
+    let peers = get_peers(&temp_dir, 49200, 2).await;
+    let query_runner = peers[0].app().sync_query();
+    for peer in &peers {
+        peer.inner.start().await;
+    }
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    let node_index1 = query_runner
+        .pubkey_to_index(&peers[0].node_public_key)
+        .unwrap();
+
+    // Put some content into the sender's blockstore
+    let blockstore = peers[0].blockstore();
+
+    let file1 = tokio::fs::read("tests/testdir/file1").await.unwrap();
+    let file2 = tokio::fs::read("tests/testdir/file2").await.unwrap();
+    let file3 = tokio::fs::read("tests/testdir/subdir/file3").await.unwrap();
+
+    let mut writer_sender = blockstore.file_writer().await.unwrap();
+    writer_sender.write(&file1, true).await.unwrap();
+    let root_hash_file1 = writer_sender.commit().await.unwrap();
+
+    let mut writer_sender = blockstore.file_writer().await.unwrap();
+    writer_sender.write(&file2, true).await.unwrap();
+    let root_hash_file2 = writer_sender.commit().await.unwrap();
+
+    let mut writer_sender = blockstore.file_writer().await.unwrap();
+    writer_sender.write(&file3, true).await.unwrap();
+    let root_hash_file3 = writer_sender.commit().await.unwrap();
+
+    let mut writer_sender = blockstore.dir_writer(1).await.unwrap();
+    let entry_file3 = BorrowedEntry {
+        name: "file3".as_bytes(),
+        link: b3fs::entry::BorrowedLink::Content(&root_hash_file3),
+    };
+    writer_sender.insert(entry_file3, true).await.unwrap();
+    let root_hash_subdir = writer_sender.commit().await.unwrap();
+
+    let mut writer_sender = blockstore.dir_writer(3).await.unwrap();
+    let entry_file1 = BorrowedEntry {
+        name: "file1".as_bytes(),
+        link: b3fs::entry::BorrowedLink::Content(&root_hash_file1),
+    };
+    let entry_file2 = BorrowedEntry {
+        name: "file2".as_bytes(),
+        link: b3fs::entry::BorrowedLink::Content(&root_hash_file2),
+    };
+    let entry_subdir = BorrowedEntry {
+        name: "subdir".as_bytes(),
+        link: b3fs::entry::BorrowedLink::Content(&root_hash_subdir),
+    };
+
+    writer_sender.insert(entry_file1, false).await.unwrap();
+    writer_sender.insert(entry_file2, false).await.unwrap();
+    writer_sender.insert(entry_subdir, true).await.unwrap();
+    let hash = writer_sender.commit().await.unwrap();
+    // Send a request from peer 2 to peer 1
+    let socket = peers[1].blockstore_server().get_socket();
+    let mut res = socket
+        .run(ServerRequest {
+            hash,
+            peer: node_index1,
+        })
+        .await
+        .expect("Failed to send request");
+    let result = res.recv().await.unwrap();
+    match result {
+        Ok(()) => {
+            let recv_content = peers[1]
+                .blockstore()
+                .dir_read_all_to_vec(&hash)
+                .await
+                .unwrap();
+            let expected: Vec<OwnedEntry> =
+                vec![entry_file1.into(), entry_file2.into(), entry_subdir.into()];
+            for (entry1, entry2) in recv_content.iter().zip(expected) {
+                assert_eq!(entry1.name, entry2.name);
+            }
+        },
+        Err(e) => {
+            panic!("Failed to receive content: {e:?}");
+        },
+    }
+
+    for mut peer in peers {
+        peer.inner.shutdown().await;
+        drop(peer);
     }
 }
