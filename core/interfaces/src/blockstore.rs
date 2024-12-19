@@ -3,8 +3,9 @@ use std::io;
 use std::path::PathBuf;
 
 use b3fs::bucket::errors::{CommitError, FeedProofError, InsertError, WriteError};
-use b3fs::entry::BorrowedEntry;
+use b3fs::entry::{BorrowedEntry, OwnedEntry};
 use fdi::BuildGraph;
+use tokio_stream::StreamExt;
 
 use crate::components::NodeComponents;
 use crate::config::ConfigConsumer;
@@ -57,6 +58,25 @@ pub trait BlockstoreInterface<C: NodeComponents>:
                     let hash = reader.get_hash(i).await.unwrap().unwrap();
                     let content = bucket.get_block_content(&hash).await.unwrap().unwrap();
                     result.extend_from_slice(&content);
+                }
+            }
+            Some(result)
+        }
+    }
+    /// Utility function to read an entire dir to a vec.
+    fn dir_read_all_to_vec(
+        &self,
+        hash: &Blake3Hash,
+    ) -> impl Future<Output = Option<Vec<OwnedEntry>>> + Send {
+        async {
+            let bucket = self.get_bucket();
+            let content = bucket.get(hash).await.unwrap();
+            let mut result = vec![];
+            if let Some(ref mut dir) = content.into_dir() {
+                let mut reader = dir.entries().await.unwrap();
+                while let Some(entry) = reader.next().await {
+                    let e = entry.unwrap();
+                    result.push(e);
                 }
             }
             Some(result)
