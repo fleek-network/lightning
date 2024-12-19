@@ -17,6 +17,7 @@ use lightning_types::{
     CommitteeSelectionBeaconReveal,
     Genesis,
     NodeIndex,
+    Nonce,
     ProtocolParamKey,
     ProtocolParamValue,
     StateProofKey,
@@ -127,8 +128,11 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
         selector: impl FnOnce(AccountInfo) -> V,
     ) -> Option<V>;
 
-    /// Query Client Table
+    /// Query Client table for parent account id
     fn client_key_to_account_key(&self, pub_key: &ClientPublicKey) -> Option<EthAddress>;
+
+    /// Query Client table for nonce
+    fn get_client_nonce(&self, pub_key: &ClientPublicKey) -> Nonce;
 
     /// Query Node Table
     /// Returns information about a single node.

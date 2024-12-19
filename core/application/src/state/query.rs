@@ -190,6 +190,18 @@ impl SyncQueryRunnerInterface for QueryRunner {
     }
 
     #[inline]
+    fn get_client_nonce(&self, pub_key: &ClientPublicKey) -> Nonce {
+        self.inner
+            .run(|ctx| {
+                self.client_table
+                    .get(ctx)
+                    .get(pub_key)
+                    .map(|(_, nonce)| nonce)
+            })
+            .unwrap_or_default()
+    }
+
+    #[inline]
     fn get_node_info<V>(
         &self,
         node: &NodeIndex,
