@@ -560,6 +560,7 @@ mod tests {
     };
     use lightning_interfaces::types::ServiceId;
     use lightning_interfaces::ShutdownController;
+    use lightning_test_utils::keys::EphemeralKeystore;
     use tokio::net::UnixStream;
     use tokio::time::timeout;
     use tokio_util::codec::Framed;
@@ -609,9 +610,17 @@ mod tests {
         }
     }
 
+    partial_node_components!(MockNode {
+        KeystoreInterface = EphemeralKeystore<Self>;
+    });
+
     async fn start_mock_node(id: u16) -> Result<ShutdownController> {
         let shutdown = ShutdownController::default();
+        let keystore = EphemeralKeystore::<MockNode>::default();
+
         let context = Context::new(
+            keystore.get_ed25519_pk(),
+            keystore.get_ed25519_sk(),
             MockServiceProvider,
             lightning_interfaces::_hacks::Blanket,
             shutdown.waiter(),

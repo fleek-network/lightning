@@ -5,7 +5,7 @@ use async_channel::{bounded, Sender};
 use axum::{Extension, Router};
 use axum_server::Handle;
 use dashmap::DashMap;
-use fleek_crypto::{NodePublicKey, PublicKey};
+use fleek_crypto::{NodePublicKey, NodeSecretKey, PublicKey, SecretKey};
 use fn_sdk::header::{write_header, ConnectionHeader};
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
@@ -13,7 +13,7 @@ use lightning_interfaces::prelude::*;
 use lightning_interfaces::schema::handshake::{HandshakeRequestFrame, TerminationReason};
 use lightning_metrics::increment_counter;
 use rand::RngCore;
-use schema::handshake::handshake_digest;
+use schema::handshake::{handshake_digest, HandshakeResponse};
 use tracing::warn;
 use triomphe::Arc;
 
@@ -56,7 +56,10 @@ impl<C: NodeComponents> Handshake<C> {
         let config = config.get::<Self>();
         let provider = service_executor.get_provider();
         let pk = keystore.get_ed25519_pk();
+        let sk = keystore.get_ed25519_sk();
         let ctx = Context::new(
+            pk,
+            sk,
             provider,
             query_runner.clone(),
             waiter,
@@ -147,6 +150,8 @@ pub struct TokenState {
 /// Shared context given to the transport listener tasks and the connection proxies.
 #[derive(Clone)]
 pub struct Context<P: ExecutorProviderInterface, QR: SyncQueryRunnerInterface> {
+    pk: NodePublicKey,
+    sk: NodeSecretKey,
     /// Service unix socket provider
     provider: P,
     query_runner: QR,
@@ -154,7 +159,7 @@ pub struct Context<P: ExecutorProviderInterface, QR: SyncQueryRunnerInterface> {
     connection_counter: Arc<AtomicU64>,
     connections: Arc<DashMap<u64, ConnectionEntry>>,
     timeout: Duration,
-    validate: bool,
+    pub(crate) validate: bool,
 }
 
 struct ConnectionEntry {
@@ -169,6 +174,8 @@ struct ConnectionEntry {
 
 impl<P: ExecutorProviderInterface, QR: SyncQueryRunnerInterface> Context<P, QR> {
     pub fn new(
+        pk: NodePublicKey,
+        sk: NodeSecretKey,
         provider: P,
         query_runner: QR,
         waiter: ShutdownWaiter,
@@ -176,6 +183,8 @@ impl<P: ExecutorProviderInterface, QR: SyncQueryRunnerInterface> Context<P, QR> 
         validate: bool,
     ) -> Self {
         Self {
+            pk,
+            sk,
             provider,
             query_runner,
             shutdown: waiter,
@@ -189,7 +198,7 @@ impl<P: ExecutorProviderInterface, QR: SyncQueryRunnerInterface> Context<P, QR> 
     pub async fn handle_new_connection<S: TransportSender, R: TransportReceiver>(
         &self,
         request: HandshakeRequestFrame,
-        sender: S,
+        mut sender: S,
         mut receiver: R,
     ) where
         (S, R): Into<TransportPair>,
@@ -216,7 +225,11 @@ impl<P: ExecutorProviderInterface, QR: SyncQueryRunnerInterface> Context<P, QR> 
                     }
 
                     // 2. TODO: check the nonce against app state or zero if not found
-                    // let nonce = self.query_runner.get_client
+                    let current_nonce = self.query_runner.get_client_nonce(&pk);
+                    if nonce <= current_nonce {
+                        sender.terminate(TerminationReason::InvalidHandshake).await;
+                        return;
+                    }
 
                     // 3. compute the handshake digest
                     let digest = handshake_digest(None, service, expiry, nonce, pk);
@@ -232,6 +245,20 @@ impl<P: ExecutorProviderInterface, QR: SyncQueryRunnerInterface> Context<P, QR> 
                         );
                         return;
                     }
+
+                    // 5. Encode and send the handshake response, signing the handshake digest from
+                    //    the client we just validated.
+                    // TODO: again should we avoid double hashing here
+                    let res = HandshakeResponse {
+                        pk: self.pk,
+                        pop: self.sk.sign(&digest),
+                    }
+                    .encode();
+                    sender.start_write(res.len()).await;
+                    if let Err(e) = sender.write(res).await {
+                        warn!("failed to send handshake response frame: {e}");
+                        return;
+                    };
                 }
 
                 // Attempt to connect to the service, getting the unix socket.
