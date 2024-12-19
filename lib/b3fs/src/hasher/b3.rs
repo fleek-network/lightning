@@ -27,6 +27,9 @@ pub const MAX_DEPTH: usize = 54; // 2^54 * CHUNK_LEN = 2^64
 pub const BLOCK_LEN: usize = 64;
 pub const CHUNK_LEN: usize = 1024;
 
+pub const BLOCK_SIZE_IN_CHUNKS: usize = 256;
+pub const MAX_BLOCK_SIZE_IN_BYTES: usize = CHUNK_LEN * BLOCK_SIZE_IN_CHUNKS;
+
 // While iterating the compression function within a chunk, the CV is
 // represented as words, to avoid doing two extra endianness conversions for
 // each compression in the portable implementation. But the hash_many interface

@@ -1,6 +1,8 @@
 use std::fmt::Debug;
+use std::path::{Path, PathBuf};
 
 use arrayvec::ArrayString;
+use rand::random;
 
 /// Convert a hash digest to a human-readable string.
 #[inline]
@@ -12,6 +14,19 @@ pub fn to_hex(slice: &[u8; 32]) -> ArrayString<64> {
         s.push(table[(b & 0xf) as usize] as char);
     }
     s
+}
+
+pub fn from_hex(hex: &ArrayString<64>) -> [u8; 32] {
+    let mut out = [0; 32];
+    let mut i = 0;
+    let mut j = 0;
+    while i < 64 {
+        let byte = u8::from_str_radix(&hex[i..i + 2], 16).unwrap();
+        out[j] = byte;
+        j += 1;
+        i += 2;
+    }
+    out
 }
 
 /// Returns the previous power of two of a given number, the returned
@@ -208,6 +223,31 @@ impl Debug for OwnedDigest {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", to_hex(&self.0))
     }
+}
+
+#[inline(always)]
+pub fn random_file_from(path: &Path) -> PathBuf {
+    let random_file: [u8; 32] = random();
+    path.to_path_buf().join(to_hex(&random_file).as_str())
+}
+
+#[macro_export]
+#[macro_use]
+macro_rules! on_future {
+    ($self:expr, $flag:expr, $new_state:expr, $on_ok:expr) => {
+        match $flag {
+            Poll::Ready(Ok(r)) => return $on_ok(r),
+            Poll::Ready(Err(e)) => {
+                if e.kind() == std::io::ErrorKind::UnexpectedEof {
+                    $self.state = $new_state;
+                    return Poll::Ready(None);
+                } else {
+                    return Poll::Ready(Some(Err(errors::ReadError::from(e))));
+                }
+            },
+            Poll::Pending => return Poll::Pending,
+        }
+    };
 }
 
 #[cfg(test)]

@@ -21,7 +21,6 @@ pub use crate::{c, fdi, partial_node_components, schema, spawn, types, ShutdownW
 #[rustfmt::skip]
 pub use crate::{
     ExecutionEngineSocket,
-    OriginProviderSocket,
     SignerSubmitTxSocket,
     FetcherSocket,
     DeliveryAcknowledgmentSocket,
@@ -54,15 +53,12 @@ pub use crate::{
     FetcherInterface,
     ForwarderInterface,
     HandshakeInterface,
-    IncrementalDirInterface,
-    IncrementalPutInterface,
     IndexerInterface,
     KeystoreInterface,
     LaneManager,
     NodeComponents,
     NotifierInterface,
     OriginFinderAsyncIter,
-    OriginProviderInterface,
     PingerInterface,
     PoolInterface,
     PubSub,
@@ -82,5 +78,4 @@ pub use crate::{
     SyncQueryRunnerInterface,
     SyncronizerInterface,
     TopologyInterface,
-    UntrustedStream,
 };
