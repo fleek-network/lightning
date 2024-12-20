@@ -205,6 +205,12 @@ impl<B: Backend> StateExecutor<B> {
                 receiving_address,
             } => self.withdraw(txn.payload.sender, receiving_address, amount, token),
 
+            UpdateMethod::Mint {
+                amount,
+                token,
+                receiving_address,
+            } => self.mint(txn.payload.sender, receiving_address, amount, token),
+
             UpdateMethod::Deposit {
                 proof,
                 token,
@@ -516,6 +522,41 @@ impl<B: Backend> StateExecutor<B> {
         }
 
         self.account_info.set(sender, account);
+        TransactionResponse::Success(ExecutionData::None)
+    }
+
+    // TODO(matthias): temporary until proof of consensus is implemented
+    fn mint(
+        &self,
+        sender: TransactionSender,
+        reciever: EthAddress,
+        amount: HpUfixed<18>,
+        token: Tokens,
+    ) -> TransactionResponse {
+        // This transaction is only callable by AccountOwners and not nodes
+        // So revert if the sender is a node public key
+        let sender = match self.only_account_owner(sender) {
+            Ok(account) => account,
+            Err(e) => return e,
+        };
+
+        let governance_address = match self.metadata.get(&Metadata::GovernanceAddress) {
+            Some(Value::AccountPublicKey(address)) => address,
+            _ => unreachable!("Governance address is missing from state."),
+        };
+        if sender != governance_address {
+            return TransactionResponse::Revert(ExecutionError::OnlyGovernance);
+        }
+
+        let mut account = self.account_info.get(&reciever).unwrap_or_default();
+
+        // Check the token bridged and increment that amount
+        match token {
+            Tokens::FLK => account.flk_balance += amount,
+            Tokens::USDC => account.bandwidth_balance += TryInto::<u128>::try_into(amount).unwrap(),
+        }
+
+        self.account_info.set(reciever, account);
         TransactionResponse::Success(ExecutionData::None)
     }
 
@@ -887,11 +928,9 @@ impl<B: Backend> StateExecutor<B> {
             Ok(account) => account,
             Err(e) => return e,
         };
-        // TODO(matthias): should be panic here or revert? Since the governance address will be
-        // seeded though genesis, this should never happen.
         let governance_address = match self.metadata.get(&Metadata::GovernanceAddress) {
             Some(Value::AccountPublicKey(address)) => address,
-            _ => panic!("Governance address is missing from state."),
+            _ => unreachable!("Governance address is missing from state."),
         };
         if sender != governance_address {
             return TransactionResponse::Revert(ExecutionError::OnlyGovernance);
