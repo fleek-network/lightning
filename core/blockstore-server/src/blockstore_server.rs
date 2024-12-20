@@ -860,7 +860,7 @@ async fn send_request<C: NodeComponents>(
                 request,
             }),
         },
-        Ok(Err(e)) => Err(ErrorResponse {
+        Ok(Err(_)) => Err(ErrorResponse {
             error: PeerRequestError::Incomplete,
             request,
         }),
