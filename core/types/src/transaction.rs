@@ -356,6 +356,17 @@ pub enum UpdateMethod {
         /// The address to recieve these tokens on the L2
         receiving_address: EthAddress,
     },
+    /// Mint tokens on the network that were bridged over from the L2
+    // TODO(matthias): this is a temporary transaction type until the proof of consensus is
+    // implemented for the `Deposit` transaction.
+    Mint {
+        /// The amount to mint.
+        amount: HpUfixed<18>,
+        /// Which token to mint.
+        token: Tokens,
+        /// The address to recieve these tokens on the network
+        receiving_address: EthAddress,
+    },
     /// Submit of PoC from the bridge on the L2 to get the tokens in network
     Deposit {
         /// The proof of the bridge recieved from the L2,
@@ -531,6 +542,18 @@ impl ToDigest for UpdatePayload {
             } => {
                 transcript_builder = transcript_builder
                     .with("transaction_name", &"withdraw")
+                    .with_prefix("input".to_owned())
+                    .with("amount", &HpUfixedWrapper(amount.clone()))
+                    .with("token", token)
+                    .with("receiving_address", &receiving_address.0);
+            },
+            UpdateMethod::Mint {
+                amount,
+                token,
+                receiving_address,
+            } => {
+                transcript_builder = transcript_builder
+                    .with("transaction_name", &"mint")
                     .with_prefix("input".to_owned())
                     .with("amount", &HpUfixedWrapper(amount.clone()))
                     .with("token", token)
