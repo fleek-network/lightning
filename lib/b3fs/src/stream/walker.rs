@@ -88,7 +88,7 @@ impl TreeWalker {
         assert_ne!(target, 0, "Block zero has no previous blocks.");
 
         // Compute the index of the target in the tree representation.
-        let target_index = target * 2 - target.count_ones() as usize;
+        let target_index = tree_index(target);
         // If the target is not in this tree (out of bound) or the tree size is not
         // large enough for a resume walk return the empty iterator.
         if target_index >= tree_len || tree_len < 3 {

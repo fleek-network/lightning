@@ -1,10 +1,19 @@
 #![allow(unused)]
 
+use std::fmt::Write;
+use std::future::Future;
 use std::io;
 use std::marker::PhantomData;
+use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 
+use b3fs::bucket::dir::uwriter::UntrustedDirWriter;
+use b3fs::bucket::dir::writer::DirWriter;
+use b3fs::bucket::errors::{CommitError, FeedProofError, WriteError};
+use b3fs::bucket::file::uwriter::UntrustedFileWriter;
+use b3fs::bucket::file::writer::FileWriter;
+use b3fs::bucket::{Bucket, ContentHeader};
 use blake3_tree::blake3::tree::{BlockHasher, HashTreeBuilder};
 use blake3_tree::blake3::Hash;
 use blake3_tree::utils::{HashTree, HashVec};
@@ -12,7 +21,13 @@ use blake3_tree::IncrementalVerifier;
 use bytes::{BufMut, BytesMut};
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Blake3Hash, CompressionAlgoSet, CompressionAlgorithm};
-use lightning_interfaces::ContentChunk;
+use lightning_interfaces::{
+    DirTrustedWriter,
+    DirUntrustedWriter,
+    FileTrustedWriter,
+    FileUntrustedWriter,
+    _IndexerInterface,
+};
 use parking_lot::RwLock;
 use resolved_pathbuf::ResolvedPathBuf;
 use serde::{Deserialize, Serialize};
@@ -22,14 +37,13 @@ use tokio::io::AsyncWriteExt;
 use tokio::task::JoinSet;
 use tracing::{error, trace};
 
-use crate::config::{Config, BLOCK_DIR, INTERNAL_DIR, TMP_DIR};
-use crate::put::Putter;
-use crate::store::{Block, Store};
+use crate::config::Config;
 
 pub const BLOCK_SIZE: usize = 256 << 10;
 
 pub struct Blockstore<C: NodeComponents> {
     root: PathBuf,
+    bucket: Bucket,
     indexer: Arc<OnceLock<C::IndexerInterface>>,
     _components: PhantomData<C>,
 }
@@ -38,6 +52,7 @@ impl<C: NodeComponents> Clone for Blockstore<C> {
     fn clone(&self) -> Self {
         Self {
             root: self.root.clone(),
+            bucket: self.bucket.clone(),
             indexer: self.indexer.clone(),
             _components: PhantomData,
         }
@@ -51,7 +66,7 @@ impl<C: NodeComponents> ConfigConsumer for Blockstore<C> {
 
 impl<C: NodeComponents> BuildGraph for Blockstore<C> {
     fn build_graph() -> fdi::DependencyGraph {
-        fdi::DependencyGraph::new().with(Self::new.with_event_handler(
+        fdi::DependencyGraph::new().with(Self::new.wrap_with_block_on().with_event_handler(
             "_post",
             |mut this: fdi::RefMut<Self>,
              fdi::Cloned(indexer): fdi::Cloned<C::IndexerInterface>| {
@@ -62,22 +77,20 @@ impl<C: NodeComponents> BuildGraph for Blockstore<C> {
 }
 
 impl<C: NodeComponents> Blockstore<C> {
-    fn new(config_provider: &C::ConfigProviderInterface) -> anyhow::Result<Self> {
-        Self::init(config_provider.get::<Self>())
+    fn new(
+        config_provider: &C::ConfigProviderInterface,
+    ) -> impl Future<Output = anyhow::Result<Self>> {
+        let config = config_provider.get::<Self>();
+        Self::init(config)
     }
 
-    pub fn init(config: Config) -> anyhow::Result<Self> {
+    pub async fn init(config: Config) -> anyhow::Result<Self> {
         let root = config.root.to_path_buf();
-        let internal_dir = root.join(INTERNAL_DIR);
-        let block_dir = root.join(BLOCK_DIR);
-        let tmp_dir = root.join(TMP_DIR);
 
-        std::fs::create_dir_all(&root)?;
-        std::fs::create_dir_all(internal_dir)?;
-        std::fs::create_dir_all(block_dir)?;
-        std::fs::create_dir_all(tmp_dir)?;
+        let bucket = Bucket::open(&root).await?;
 
         Ok(Self {
+            bucket,
             root,
             indexer: Arc::new(OnceLock::new()),
             _components: PhantomData,
@@ -92,105 +105,165 @@ impl<C: NodeComponents> Blockstore<C> {
 }
 
 impl<C: NodeComponents> BlockstoreInterface<C> for Blockstore<C> {
-    type SharedPointer<T: ?Sized + Send + Sync> = Arc<T>;
-    type Put = Putter<Self, C>;
-    type DirPut = lightning_interfaces::_hacks::Blanket;
-
-    async fn get_tree(&self, cid: &Blake3Hash) -> Option<Self::SharedPointer<HashTree>> {
-        let data = self.fetch(INTERNAL_DIR, cid, None).await?;
-        if data.len() & 31 != 0 {
-            error!("Tried to read corrupted proof from disk");
-            return None;
-        }
-
-        Some(Arc::new(HashTree::from_inner(HashVec::from_inner(
-            data.into_boxed_slice(),
-        ))))
-    }
-
-    async fn get(
-        &self,
-        block_counter: u32,
-        block_hash: &Blake3Hash,
-        _compression: CompressionAlgoSet,
-    ) -> Option<Self::SharedPointer<ContentChunk>> {
-        let block = self
-            .fetch(BLOCK_DIR, block_hash, Some(block_counter as usize))
-            .await?;
-        Some(Arc::new(ContentChunk {
-            compression: CompressionAlgorithm::Uncompressed,
-            content: block,
-        }))
-    }
-
-    fn put(&self, root: Option<Blake3Hash>) -> Self::Put {
-        match root {
-            Some(root) => Putter::verifier(
-                self.clone(),
-                root,
-                self.indexer
-                    .get()
-                    .cloned()
-                    .expect("Indexer to have been set"),
-            ),
-            None => Putter::trust(
-                self.clone(),
-                self.indexer
-                    .get()
-                    .cloned()
-                    .expect("Indexer to have been set"),
-            ),
-        }
-    }
-
-    fn put_dir(&self, root: Option<Blake3Hash>) -> Self::DirPut {
-        todo!()
+    fn get_bucket(&self) -> Bucket {
+        self.bucket.clone()
     }
 
     fn get_root_dir(&self) -> PathBuf {
         self.root.to_path_buf()
     }
-}
 
-impl<C> Store for Blockstore<C>
-where
-    C: NodeComponents,
-{
-    async fn fetch(&self, location: &str, key: &Blake3Hash, tag: Option<usize>) -> Option<Block> {
-        let filename = match tag {
-            Some(tag) => format!("{tag}-{}", Hash::from(*key).to_hex()),
-            None => format!("{}", Hash::from(*key).to_hex()),
-        };
-        let path = self.root.to_path_buf().join(location).join(filename);
-        trace!("Fetch {path:?}");
-        fs::read(path).await.ok()
+    type FileWriter = FWriter<C>;
+
+    type UFileWriter = FUWriter<C>;
+
+    type DirWriter = DWriter<C>;
+
+    type UDirWriter = DUWriter<C>;
+
+    async fn file_writer(&self) -> Result<Self::FileWriter, WriteError> {
+        let fw = FileWriter::new(&self.get_bucket()).await?;
+        Ok(FWriter {
+            writer: fw,
+            indexer: self.indexer.clone(),
+        })
     }
 
+    async fn file_untrusted_writer(
+        &self,
+        root_hash: Blake3Hash,
+    ) -> Result<Self::UFileWriter, WriteError> {
+        let fw = UntrustedFileWriter::new(&self.get_bucket(), root_hash).await?;
+        Ok(FUWriter {
+            writer: fw,
+            indexer: self.indexer.clone(),
+        })
+    }
+
+    async fn dir_writer(&self, num_entries: usize) -> Result<Self::DirWriter, WriteError> {
+        let dw = DirWriter::new(&self.get_bucket(), num_entries).await?;
+        Ok(DWriter {
+            writer: dw,
+            indexer: self.indexer.clone(),
+        })
+    }
+
+    async fn dir_untrusted_writer(
+        &self,
+        root_hash: Blake3Hash,
+        num_entries: usize,
+    ) -> Result<Self::UDirWriter, WriteError> {
+        let dw = UntrustedDirWriter::new(&self.get_bucket(), num_entries, root_hash).await?;
+        Ok(DUWriter {
+            writer: dw,
+            indexer: self.indexer.clone(),
+        })
+    }
+}
+
+pub struct FUWriter<C: NodeComponents> {
+    writer: UntrustedFileWriter,
+    indexer: Arc<OnceLock<C::IndexerInterface>>,
+}
+
+impl<C: NodeComponents> FileUntrustedWriter for FUWriter<C> {
+    async fn feed_proof(&mut self, proof: &[u8]) -> Result<(), FeedProofError> {
+        self.writer.feed_proof(proof).await
+    }
+}
+
+impl<C: NodeComponents> FileTrustedWriter for FUWriter<C> {
+    async fn write(&mut self, content: &[u8], last_bytes: bool) -> Result<(), WriteError> {
+        self.writer.write(content, last_bytes).await
+    }
+
+    async fn commit(self) -> Result<Blake3Hash, CommitError> {
+        let hash = self.writer.commit().await?;
+        let indexer = self.indexer.get().ok_or_else(|| CommitError::LockError)?;
+        IndexerInterface::register(indexer, hash).await;
+        Ok(hash)
+    }
+
+    async fn rollback(self) -> Result<(), io::Error> {
+        self.writer.rollback().await
+    }
+}
+
+pub struct FWriter<C: NodeComponents> {
+    writer: FileWriter,
+    indexer: Arc<OnceLock<C::IndexerInterface>>,
+}
+
+impl<C: NodeComponents> FileTrustedWriter for FWriter<C> {
+    async fn write(&mut self, content: &[u8], _last_bytes: bool) -> Result<(), WriteError> {
+        self.writer.write(content).await
+    }
+
+    async fn commit(self) -> Result<Blake3Hash, CommitError> {
+        let hash = self.writer.commit().await?;
+        let indexer = self.indexer.get().ok_or_else(|| CommitError::LockError)?;
+        IndexerInterface::register(indexer, hash).await;
+        Ok(hash)
+    }
+
+    async fn rollback(self) -> Result<(), io::Error> {
+        self.writer.rollback().await
+    }
+}
+
+pub struct DUWriter<C: NodeComponents> {
+    writer: UntrustedDirWriter,
+    indexer: Arc<OnceLock<C::IndexerInterface>>,
+}
+
+impl<C: NodeComponents> DirUntrustedWriter for DUWriter<C> {
+    async fn feed_proof(&mut self, proof: &[u8]) -> Result<(), FeedProofError> {
+        self.writer.feed_proof(proof).await
+    }
+}
+
+impl<C: NodeComponents> DirTrustedWriter for DUWriter<C> {
     async fn insert(
         &mut self,
-        location: &str,
-        key: Blake3Hash,
-        block: &[u8],
-        tag: Option<usize>,
-    ) -> io::Result<()> {
-        let filename = match tag {
-            Some(tag) => format!("{tag}-{}", Hash::from(key).to_hex()),
-            None => format!("{}", Hash::from(key).to_hex()),
-        };
-        let tmp_file_name = format!("{}-{}", rand::random::<u64>(), filename);
-        let tmp_file_path = self.root.to_path_buf().join(TMP_DIR).join(&tmp_file_name);
-        if let Ok(mut tmp_file) = File::create(&tmp_file_path).await {
-            tmp_file.write_all(block).await?;
+        entry: b3fs::entry::BorrowedEntry<'_>,
+        last_entry: bool,
+    ) -> Result<(), b3fs::bucket::errors::InsertError> {
+        self.writer.insert(entry, last_entry).await
+    }
 
-            // TODO: Is this needed before calling rename?
-            tmp_file.sync_all().await?;
+    async fn commit(self) -> Result<Blake3Hash, CommitError> {
+        let hash = self.writer.commit().await?;
+        let indexer = self.indexer.get().ok_or_else(|| CommitError::LockError)?;
+        IndexerInterface::register(indexer, hash).await;
+        Ok(hash)
+    }
 
-            let store_path = self.root.to_path_buf().join(location).join(filename);
+    async fn rollback(self) -> Result<(), io::Error> {
+        self.writer.rollback().await
+    }
+}
+pub struct DWriter<C: NodeComponents> {
+    writer: DirWriter,
+    indexer: Arc<OnceLock<C::IndexerInterface>>,
+}
 
-            trace!("Inserting {store_path:?}");
+impl<C: NodeComponents> DirTrustedWriter for DWriter<C> {
+    async fn insert(
+        &mut self,
+        entry: b3fs::entry::BorrowedEntry<'_>,
+        _last_entry: bool,
+    ) -> Result<(), b3fs::bucket::errors::InsertError> {
+        self.writer.insert(entry).await
+    }
 
-            fs::rename(tmp_file_path, store_path).await?;
-        }
-        Ok(())
+    async fn commit(self) -> Result<Blake3Hash, CommitError> {
+        let hash = self.writer.commit().await?;
+        let indexer = self.indexer.get().ok_or_else(|| CommitError::LockError)?;
+        IndexerInterface::register(indexer, hash).await;
+        Ok(hash)
+    }
+
+    async fn rollback(self) -> Result<(), io::Error> {
+        self.writer.rollback().await
     }
 }

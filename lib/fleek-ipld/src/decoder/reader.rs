@@ -11,6 +11,7 @@ use crate::errors::IpldError;
 
 /// The default buffer size for the reader is 16KB.
 const DEFAULT_BUFFER_SIZE: usize = 1024 * 16;
+const SUPPORTED_CODECS: [u64; 2] = [0x70, 0x55];
 
 /// A reader abstraction to read stream data downloaded from IPFS and stored in a buffer.
 ///
@@ -69,6 +70,9 @@ where
     ) -> Result<IpldItem, IpldError> {
         let mut stream = stream;
         let doc_id = id.into();
+        if !SUPPORTED_CODECS.contains(&doc_id.cid().codec()) {
+            return Err(IpldError::UnsupportedCodec(*doc_id.cid()));
+        }
         while let Some(chunk) = stream.next().await {
             let chunk = chunk.map_err(Into::into)?;
             self.buffer.extend_from_slice(&chunk);

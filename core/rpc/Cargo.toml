@@ -33,6 +33,7 @@ clap = { version = "4.4.10", features = ["derive"] }
 prometheus = "0.13"
 
 lightning-application = { path = "../application" }
+b3fs.workspace = true
 lightning-firewall = { path = "../firewall" }
 lightning-types = { path = "../types" }
 lightning-interfaces = { path = "../interfaces" }
@@ -59,7 +60,6 @@ lightning-fetcher = { path = "../fetcher" }
 lightning-blockstore = { path = "../blockstore" }
 lightning-blockstore-server = { path = "../blockstore-server" }
 lightning-indexer = { path = "../indexer" }
-lightning-origin-demuxer = { path = "../origin-demuxer" }
 lightning-signer = { path = "../signer" }
 lightning-notifier = { path = "../notifier" }
 lightning-pool = { path = "../pool" }
