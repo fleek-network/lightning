@@ -212,7 +212,7 @@ pub struct AccountInfo {
     pub nonce: u64,
 }
 
-#[derive(Debug, Hash, Serialize, Deserialize, Clone, schemars::JsonSchema)]
+#[derive(Debug, Hash, PartialEq, Serialize, Deserialize, Clone, schemars::JsonSchema)]
 pub struct WithdrawInfo {
     pub epoch: Epoch,
     pub token: Tokens,
@@ -220,7 +220,7 @@ pub struct WithdrawInfo {
     pub amount: HpUfixed<18>,
 }
 
-#[derive(Debug, Hash, Serialize, Deserialize, Clone, schemars::JsonSchema)]
+#[derive(Debug, Hash, PartialEq, Serialize, Deserialize, Clone, schemars::JsonSchema)]
 pub struct WithdrawInfoWithId {
     pub id: u64,
     pub info: WithdrawInfo,
