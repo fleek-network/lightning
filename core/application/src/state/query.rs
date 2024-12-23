@@ -40,6 +40,8 @@ use lightning_interfaces::types::{
     TransactionResponse,
     TxHash,
     Value,
+    WithdrawInfo,
+    WithdrawInfoWithId,
 };
 use lightning_interfaces::{SyncQueryRunnerInterface, WithdrawPagingParams};
 use merklize::{StateRootHash, StateTree};
@@ -79,8 +81,7 @@ pub struct QueryRunner {
         ),
     >,
     committee_selection_beacon_non_revealing_node: ResolvedTableReference<NodeIndex, ()>,
-    flk_withdraws: ResolvedTableReference<u64, (EthAddress, HpUfixed<18>)>,
-    usdc_withdraws: ResolvedTableReference<u64, (EthAddress, HpUfixed<6>)>,
+    withdraws: ResolvedTableReference<u64, WithdrawInfo>,
 }
 
 impl QueryRunner {
@@ -124,8 +125,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
             )>("committee_selection_beacon"),
             committee_selection_beacon_non_revealing_node: atomo
                 .resolve::<NodeIndex, ()>("committee_selection_beacon_non_revealing_node"),
-            flk_withdraws: atomo.resolve::<u64, (EthAddress, HpUfixed<18>)>("flk_withdraws"),
-            usdc_withdraws: atomo.resolve::<u64, (EthAddress, HpUfixed<6>)>("usdc_withdraws"),
+            withdraws: atomo.resolve::<u64, WithdrawInfo>("withdraws"),
             inner: atomo,
         }
     }
@@ -376,28 +376,12 @@ impl SyncQueryRunnerInterface for QueryRunner {
         self.get_metadata(&Metadata::Epoch).is_some()
     }
 
-    fn get_flk_withdraws(
-        &self,
-        paging: WithdrawPagingParams,
-    ) -> Vec<(u64, EthAddress, HpUfixed<18>)> {
+    fn get_withdraws(&self, paging: WithdrawPagingParams) -> Vec<WithdrawInfoWithId> {
         self.inner
-            .run(|ctx| self.flk_withdraws.get(ctx).as_map())
-            .iter()
-            .map(|(id, (address, amount))| (*id, *address, amount.clone()))
-            .filter(|(id, _, _)| id >= &paging.start)
-            .take(paging.limit)
-            .collect()
-    }
-
-    fn get_usdc_withdraws(
-        &self,
-        paging: WithdrawPagingParams,
-    ) -> Vec<(u64, EthAddress, HpUfixed<6>)> {
-        self.inner
-            .run(|ctx| self.usdc_withdraws.get(ctx).as_map())
-            .iter()
-            .map(|(id, (address, amount))| (*id, *address, amount.clone()))
-            .filter(|(id, _, _)| id >= &paging.start)
+            .run(|ctx| self.withdraws.get(ctx).as_map())
+            .into_iter()
+            .map(|(id, info)| WithdrawInfoWithId { id, info })
+            .filter(|info| info.id >= paging.start)
             .take(paging.limit)
             .collect()
     }

@@ -677,8 +677,7 @@ impl<B: Backend> StateExecutor<B> {
         self.executed_digests.clear();
 
         // Clear withdraws
-        self.flk_withdraws.clear();
-        self.usdc_withdraws.clear();
+        self.withdraws.clear();
         self.metadata
             .set(Metadata::WithdrawId, Value::WithdrawId(0));
 

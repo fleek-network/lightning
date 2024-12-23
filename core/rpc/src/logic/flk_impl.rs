@@ -33,7 +33,7 @@ use lightning_types::{AggregateCheckpoint, StateProofKey, StateProofValue};
 use lightning_utils::application::QueryRunnerExt;
 use merklize::{StateRootHash, StateTree};
 use serde_json::Value as JsonValue;
-use types::ProtocolParamKey;
+use types::{ProtocolParamKey, WithdrawInfoWithId};
 
 use crate::api::FleekApiServer;
 use crate::error::RPCError;
@@ -468,28 +468,12 @@ impl<C: NodeComponents> FleekApiServer for FleekApi<C> {
         }
     }
 
-    async fn get_flk_withdraws(
+    async fn get_withdraws(
         &self,
         epoch: Option<u64>,
         paging: WithdrawPagingParams,
-    ) -> RpcResult<Vec<(u64, EthAddress, HpUfixed<18>)>> {
-        Ok(self
-            .data
-            .query_runner(epoch)
-            .await?
-            .get_flk_withdraws(paging))
-    }
-
-    async fn get_usdc_withdraws(
-        &self,
-        epoch: Option<u64>,
-        paging: WithdrawPagingParams,
-    ) -> RpcResult<Vec<(u64, EthAddress, HpUfixed<6>)>> {
-        Ok(self
-            .data
-            .query_runner(epoch)
-            .await?
-            .get_usdc_withdraws(paging))
+    ) -> RpcResult<Vec<WithdrawInfoWithId>> {
+        Ok(self.data.query_runner(epoch).await?.get_withdraws(paging))
     }
 
     async fn handle_subscription(
