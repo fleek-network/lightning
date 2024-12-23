@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 use std::time::Duration;
 
 use b3fs::bucket::file::uwriter::UntrustedFileWriter;
-use b3fs::entry::{BorrowedEntry, OwnedEntry};
+use b3fs::entry::{BorrowedEntry, OwnedEntry, OwnedLink};
 use fleek_crypto::{AccountOwnerSecretKey, NodePublicKey, SecretKey};
 use lightning_application::app::Application;
 use lightning_application::config::ApplicationConfig;
@@ -490,6 +490,13 @@ async fn test_dir_send_and_receive() {
                 vec![entry_file1.into(), entry_file2.into(), entry_subdir.into()];
             for (entry1, entry2) in recv_content.iter().zip(expected) {
                 assert_eq!(entry1.name, entry2.name);
+                let OwnedLink::Content(content1) = entry1.link else {
+                    panic!("entry1 missing content");
+                };
+                let OwnedLink::Content(content2) = entry2.link else {
+                    panic!("entry2 missing content");
+                };
+                assert_eq!(content1, content2);
             }
         },
         Err(e) => {
