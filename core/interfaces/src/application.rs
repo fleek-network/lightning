@@ -8,7 +8,6 @@ use atomo::{Atomo, InMemoryStorage, KeyIterator, QueryPerm, StorageBackend};
 use fdi::BuildGraph;
 use fleek_crypto::{ClientPublicKey, EthAddress, NodePublicKey};
 use fxhash::FxHashMap;
-use hp_fixed::unsigned::HpUfixed;
 use lightning_types::{
     AccountInfo,
     Blake3Hash,
@@ -25,6 +24,7 @@ use lightning_types::{
     TransactionRequest,
     TxHash,
     Value,
+    WithdrawInfoWithId,
 };
 use merklize::trees::mpt::MptStateProof;
 use merklize::StateRootHash;
@@ -242,17 +242,8 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     // Returns whether the genesis block has been applied.
     fn has_genesis(&self) -> bool;
 
-    /// Returns a list of FLK withdraws
-    fn get_flk_withdraws(
-        &self,
-        paging: WithdrawPagingParams,
-    ) -> Vec<(u64, EthAddress, HpUfixed<18>)>;
-
-    /// Returns a list of USDC withdraws
-    fn get_usdc_withdraws(
-        &self,
-        paging: WithdrawPagingParams,
-    ) -> Vec<(u64, EthAddress, HpUfixed<6>)>;
+    /// Returns a list of withdraws
+    fn get_withdraws(&self, paging: WithdrawPagingParams) -> Vec<WithdrawInfoWithId>;
 }
 
 #[derive(Clone, Debug)]

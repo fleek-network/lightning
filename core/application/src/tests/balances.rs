@@ -255,12 +255,12 @@ async fn test_withdraw_usdc_works_properly() {
     let update = prepare_update_request_account(withdraw, &owner_secret_key, 1);
     expect_tx_success(update, &update_socket, ExecutionData::None).await;
 
-    let withdraws = query_runner.get_usdc_withdraws(WithdrawPagingParams {
+    let withdraws = query_runner.get_withdraws(WithdrawPagingParams {
         start: 0,
         limit: 100,
     });
-    assert_eq!(withdraws[0].1, receiver);
-    assert_eq!(withdraws[0].2, withdraw_amount.into());
+    assert_eq!(withdraws[0].info.receiver, receiver);
+    assert_eq!(withdraws[0].info.amount, withdraw_amount.into());
 }
 
 #[tokio::test]
@@ -294,10 +294,10 @@ async fn test_withdraw_flk_works_properly() {
     let update = prepare_update_request_account(withdraw, &owner_secret_key, 1);
     expect_tx_success(update, &update_socket, ExecutionData::None).await;
 
-    let withdraws = query_runner.get_flk_withdraws(WithdrawPagingParams {
+    let withdraws = query_runner.get_withdraws(WithdrawPagingParams {
         start: 0,
         limit: 100,
     });
-    assert_eq!(withdraws[0].1, receiver);
-    assert_eq!(withdraws[0].2, withdraw_amount.into());
+    assert_eq!(withdraws[0].info.receiver, receiver);
+    assert_eq!(withdraws[0].info.amount, withdraw_amount.into());
 }

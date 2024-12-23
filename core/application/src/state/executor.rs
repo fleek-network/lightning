@@ -52,6 +52,7 @@ use lightning_interfaces::types::{
     UpdateMethod,
     UpdateRequest,
     Value,
+    WithdrawInfo,
     MAX_MEASUREMENTS_PER_TX,
     MAX_MEASUREMENTS_SUBMIT,
     MAX_UPDATES_CONTENT_REGISTRY,
@@ -131,8 +132,7 @@ pub struct StateExecutor<B: Backend> {
         ),
     >,
     pub committee_selection_beacon_non_revealing_node: B::Ref<NodeIndex, ()>,
-    pub flk_withdraws: B::Ref<u64, (EthAddress, HpUfixed<18>)>,
-    pub usdc_withdraws: B::Ref<u64, (EthAddress, HpUfixed<6>)>,
+    pub withdraws: B::Ref<u64, WithdrawInfo>,
     pub backend: B,
 }
 
@@ -164,8 +164,7 @@ impl<B: Backend> StateExecutor<B> {
             committee_selection_beacon: backend.get_table_reference("committee_selection_beacon"),
             committee_selection_beacon_non_revealing_node: backend
                 .get_table_reference("committee_selection_beacon_non_revealing_node"),
-            flk_withdraws: backend.get_table_reference("flk_withdraws"),
-            usdc_withdraws: backend.get_table_reference("usdc_withdraws"),
+            withdraws: backend.get_table_reference("withdraws"),
             backend,
         }
     }
@@ -477,7 +476,7 @@ impl<B: Backend> StateExecutor<B> {
     fn withdraw(
         &self,
         sender: TransactionSender,
-        reciever: EthAddress,
+        receiver: EthAddress,
         amount: HpUfixed<18>,
         token: Tokens,
     ) -> TransactionResponse {
@@ -501,9 +500,16 @@ impl<B: Backend> StateExecutor<B> {
                 if amount > account.flk_balance {
                     return TransactionResponse::Revert(ExecutionError::InsufficientBalance);
                 }
-
                 account.flk_balance -= amount.clone();
-                self.flk_withdraws.set(withdraw_id, (reciever, amount));
+                self.withdraws.set(
+                    withdraw_id,
+                    WithdrawInfo {
+                        epoch: 0,
+                        token: Tokens::FLK,
+                        receiver,
+                        amount,
+                    },
+                );
                 self.metadata
                     .set(Metadata::WithdrawId, Value::WithdrawId(withdraw_id + 1));
             },
@@ -513,9 +519,16 @@ impl<B: Backend> StateExecutor<B> {
                 if amount > account.stables_balance {
                     return TransactionResponse::Revert(ExecutionError::InsufficientBalance);
                 }
-
                 account.stables_balance -= amount.clone();
-                self.usdc_withdraws.set(withdraw_id, (reciever, amount));
+                self.withdraws.set(
+                    withdraw_id,
+                    WithdrawInfo {
+                        epoch: 0,
+                        token: Tokens::USDC,
+                        receiver,
+                        amount: amount.convert_precision::<18>(),
+                    },
+                );
                 self.metadata
                     .set(Metadata::WithdrawId, Value::WithdrawId(withdraw_id + 1));
             },

@@ -24,7 +24,7 @@ use lightning_interfaces::types::{
 };
 use lightning_interfaces::{NodePagingParams, WithdrawPagingParams};
 use lightning_openrpc_macros::open_rpc;
-use lightning_types::{ProtocolParamKey, StateProofKey, StateProofValue};
+use lightning_types::{ProtocolParamKey, StateProofKey, StateProofValue, WithdrawInfoWithId};
 use merklize::{StateRootHash, StateTree};
 
 #[open_rpc(namespace = "flk", tag = "1.0.0")]
@@ -220,19 +220,12 @@ pub trait FleekApi {
     #[method(name = "metrics")]
     async fn metrics(&self) -> RpcResult<String>;
 
-    #[method(name = "get_flk_withdraws")]
-    async fn get_flk_withdraws(
+    #[method(name = "get_withdraws")]
+    async fn get_withdraws(
         &self,
         epoch: Option<u64>,
         paging: WithdrawPagingParams,
-    ) -> RpcResult<Vec<(u64, EthAddress, HpUfixed<18>)>>;
-
-    #[method(name = "get_usdc_withdraws")]
-    async fn get_usdc_withdraws(
-        &self,
-        epoch: Option<u64>,
-        paging: WithdrawPagingParams,
-    ) -> RpcResult<Vec<(u64, EthAddress, HpUfixed<6>)>>;
+    ) -> RpcResult<Vec<WithdrawInfoWithId>>;
 
     #[subscription(name = "subscribe", item = Event)]
     async fn handle_subscription(&self, event_type: Option<EventType>) -> SubscriptionResult;
