@@ -2,7 +2,10 @@
 name = "fleek-ipld"
 version = "0.0.0"
 edition = "2021"
-authors = [ "M. Meier <miguel@fleek.xyz>", "Juan Royo Sales <juansales@fleek.xyz" ]
+authors = [
+    "M. Meier <miguel@fleek.xyz>",
+    "Juan Royo Sales <juansales@fleek.xyz",
+]
 homepage = "https://github.com/fleek-network/lightning"
 description = "The Fleek IPLD crate"
 
@@ -10,10 +13,12 @@ description = "The Fleek IPLD crate"
 anyhow.workspace = true
 async-trait.workspace = true
 bytes.workspace = true
+cid.workspace = true
 futures.workspace = true
 ipld-core = "0.4.1"
 ipld-dagpb = "0.2.1"
 quick-protobuf = "0.8"
+multihash.workspace = true
 reqwest = { workspace = true, features = ["stream"] }
 thiserror.workspace = true
 tokio-stream.workspace = true

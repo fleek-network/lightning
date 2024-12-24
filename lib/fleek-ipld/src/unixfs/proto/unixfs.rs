@@ -25,6 +25,19 @@ pub struct Data<'a> {
     pub fanout: u64,
 }
 
+impl<'a> Data<'a> {
+    pub fn to_raw(bytes: &'a [u8]) -> Data<'a> {
+        Data {
+            Type: mod_Data::DataType::Raw,
+            Data: Cow::Borrowed(bytes),
+            filesize: bytes.len() as u64,
+            blocksizes: vec![],
+            hashType: 0,
+            fanout: 0
+        }
+    }
+}
+
 impl<'a> MessageRead<'a> for Data<'a> {
     fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();

@@ -6,12 +6,13 @@ edition = "2021"
 [dependencies]
 affair.workspace = true
 anyhow.workspace = true
+b3fs.workspace = true
 fast-sri = { path = "../../lib/fast-sri" }
 lightning-interfaces = { path = "../interfaces" }
+lightning-workspace-hack.workspace = true
 reqwest.workspace = true
 serde.workspace = true
 url.workspace = true
-lightning-workspace-hack.workspace = true
 
 [dev-dependencies]
 fleek-crypto.workspace = true

@@ -18,6 +18,7 @@ use types::{NodeIndex, PeerRequestError};
 
 use crate::config::Config;
 use crate::origin::{OriginError, OriginFetcher, OriginRequest};
+use crate::router::Router;
 
 pub(crate) type Uri = Vec<u8>;
 
@@ -31,7 +32,6 @@ impl<C: NodeComponents> Fetcher<C> {
     pub fn new(
         config: &C::ConfigProviderInterface,
         blockstore_server: &C::BlockstoreServerInterface,
-        origin: &C::OriginProviderInterface,
         app: &C::ApplicationInterface,
         fdi::Cloned(blockstore): fdi::Cloned<C::BlockstoreInterface>,
         fdi::Cloned(resolver): fdi::Cloned<C::ResolverInterface>,
@@ -39,13 +39,11 @@ impl<C: NodeComponents> Fetcher<C> {
     ) -> anyhow::Result<Self> {
         let config = config.get::<Self>();
 
+        let router = Router::new(config.clone(), blockstore.clone())?;
+
         let (origin_tx, rx) = mpsc::channel(128);
-        let origin_fetcher = OriginFetcher::<C>::new(
-            config.max_conc_origin_req,
-            origin.get_socket(),
-            rx,
-            resolver.clone(),
-        );
+        let origin_fetcher =
+            OriginFetcher::<C>::new(config.max_conc_origin_req, router, rx, resolver.clone());
 
         let waiter = shutdown.clone();
         let app_query = app.sync_query();
@@ -111,10 +109,16 @@ impl<C: NodeComponents> FetcherWorker<C> {
     /// then falling back to the record's immutable pointer.
     #[inline(always)]
     async fn fetch(&self, hash: Blake3Hash) -> Result<()> {
-        if self.blockstore.get_tree(&hash).await.is_some() {
+        if self
+            .blockstore
+            .get_bucket()
+            .exists(&hash)
+            .await
+            .unwrap_or_default()
+        {
             increment_counter!(
-                "fetcher_from_cache",
-                Some("Counter for content that was already cached locally")
+                "fetcher_from_blockstore",
+                Some("Counter for content that was fetched from the blockstore")
             );
             return Ok(());
         }
@@ -145,10 +149,15 @@ impl<C: NodeComponents> FetcherWorker<C> {
             }
             if let Some(pointer) = pointer {
                 debug_assert_eq!(pointer.hash, hash);
-                if self.blockstore.get_tree(&hash).await.is_some() {
-                    // in case we have the file
+                if self
+                    .blockstore
+                    .get_bucket()
+                    .exists(&hash)
+                    .await
+                    .unwrap_or_default()
+                {
                     increment_counter!(
-                        "fetcher_from_cache",
+                        "fetcher_from_blockstore",
                         Some("Counter for content that was already cached locally")
                     );
                     return Ok(());
@@ -283,6 +292,7 @@ impl<C: NodeComponents> AsyncWorkerUnordered for FetcherWorker<C> {
         match req {
             FetcherRequest::Put { pointer } => {
                 let res = self.put(pointer).await;
+                dbg!(&res);
                 if res.is_err() {
                     increment_counter!(
                         "fetcher_put_request_failed",

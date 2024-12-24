@@ -6,7 +6,8 @@ use std::time::Duration;
 
 use fast_sri::IntegrityMetadata;
 use lightning_interfaces::prelude::*;
-use lightning_interfaces::types::{Blake3Hash, CompressionAlgorithm};
+use lightning_interfaces::types::Blake3Hash;
+use lightning_interfaces::FileTrustedWriter;
 use reqwest::{Client, ClientBuilder, Url};
 
 pub use crate::config::Config;
@@ -53,9 +54,12 @@ impl<C: NodeComponents> HttpOrigin<C> {
             data = verified_data;
         }
 
-        let mut putter = self.blockstore.put(None);
-        putter.write(data.as_ref(), CompressionAlgorithm::Uncompressed)?;
-        putter.finalize().await.map_err(Into::into)
+        let mut writer = self.blockstore.file_writer().await?;
+        writer
+            .write(data.as_ref(), true)
+            .await
+            .map_err(|e| anyhow::anyhow!(e))?;
+        writer.commit().await.map_err(|e| anyhow::anyhow!(e))
     }
 }
 
