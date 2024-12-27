@@ -602,7 +602,7 @@ async fn send_file<C: NodeComponents>(
     file: b3fs::bucket::file::reader::B3File,
     request: &mut <c!(C::PoolInterface::Responder) as ResponderInterface>::Request,
     num_blocks: u32,
-    num_responses: &Arc<AtomicUsize>,
+    num_responses: &AtomicUsize,
     blockstore: <C as NodeComponents>::BlockstoreInterface,
     rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
     peer: u32,
@@ -672,121 +672,133 @@ async fn send_dir<C: NodeComponents>(
     request: &mut <c!(C::PoolInterface::Responder) as ResponderInterface>::Request,
     blockstore: <C as NodeComponents>::BlockstoreInterface,
     num_blocks: u32,
-    num_responses: &Arc<AtomicUsize>,
+    num_responses: &AtomicUsize,
     rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
     peer: u32,
 ) -> anyhow::Result<()> {
     let mut num_bytes = 0;
     let instant = Instant::now();
-    let mut reader = match dir.hashtree().await {
+
+    let reader = match dir.hashtree().await {
         Ok(reader) => reader,
         Err(e) => {
             return Err(anyhow!("Failed to get Async HashTree {}", e));
         },
     };
-    let mut entries_reader = match dir.entries().await {
+    let entries_reader = match dir.entries().await {
         Ok(entries) => entries,
         Err(e) => {
             return Err(anyhow!("Error trying to obtain Entries Iterator {}", e));
         },
     };
+    let mut stack_reader = VecDeque::new();
+    stack_reader.push_back((reader, entries_reader, false));
 
-    if let Err(e) = request
-        .send(Bytes::from(Frame::Dir(DirFrame::Prelude(num_blocks))))
-        .await
-    {
-        return Err(anyhow!("Failed to send prelude: {e:?}"));
-    } else {
-        rep_reporter.report_bytes_sent(peer, num_bytes as u64, Some(instant.elapsed()));
-    }
-
-    for block in 0..num_blocks {
-        let proof = match reader.generate_proof(block).await {
-            Ok(p) => p,
-            Err(e) => {
-                return Err(anyhow!("Failed to generate proof {}", e));
-            },
-        };
-
-        num_bytes += proof.len();
-        if let Err(e) = request
-            .send(Bytes::from(Frame::Dir(DirFrame::Proof(Cow::Borrowed(
-                proof.as_slice(),
-            )))))
-            .await
+    'dir_reader: loop {
+        if let Some((ref mut reader, ref mut entries_reader, ref mut prelude_sent)) =
+            stack_reader.pop_front()
         {
-            num_responses.fetch_sub(1, Ordering::Release);
-            return Err(anyhow!("Failed to send proof: {e:?}"));
-        }
+            if !*prelude_sent {
+                if let Err(e) = request
+                    .send(Bytes::from(Frame::Dir(DirFrame::Prelude(num_blocks))))
+                    .await
+                {
+                    return Err(anyhow!("Failed to send prelude: {e:?}"));
+                } else {
+                    rep_reporter.report_bytes_sent(peer, num_bytes as u64, Some(instant.elapsed()));
+                    *prelude_sent = true;
+                }
+            }
 
-        if let Some(ent) = entries_reader.next().await {
-            match ent {
-                Ok(entry) => {
-                    match entry.link {
-                        OwnedLink::Content(content) => {
-                            let content_header = blockstore.get_bucket().get(&content).await;
-                            match content_header {
-                                Ok(cont_head) => {
-                                    if cont_head.is_dir() {
-                                        let dir_reader = cont_head.into_dir().unwrap();
-                                        let result = Box::pin(
-                                            send_dir::<C>(
-                                                dir_reader,
+            let mut block = 0;
+            'entries: while let Some(ent) = entries_reader.next().await {
+                match ent {
+                    Ok(ref entry) => {
+                        let proof = match reader.generate_proof(block).await {
+                            Ok(p) => p,
+                            Err(e) => {
+                                return Err(anyhow!("Failed to generate proof {}", e));
+                            },
+                        };
+                        num_bytes += proof.len();
+                        if let Err(e) = request
+                            .send(Bytes::from(Frame::Dir(DirFrame::Proof(Cow::Borrowed(
+                                proof.as_slice(),
+                            )))))
+                            .await
+                        {
+                            num_responses.fetch_sub(1, Ordering::Release);
+                            return Err(anyhow!("Failed to send proof: {e:?}"));
+                        }
+                        let dir_frame: DirFrame<'_> =
+                            DirFrame::from_entry(entry.clone(), num_blocks == block + 1);
+                        num_bytes += dir_frame.len();
+                        let frame = Frame::Dir(dir_frame);
+
+                        if let Err(e) = request.send(Bytes::from(frame)).await {
+                            error!("Failed to send chunk: {e:?}");
+                            num_responses.fetch_sub(1, Ordering::Release);
+                        }
+                        block += 1;
+                        match entry.link {
+                            OwnedLink::Content(content) => {
+                                let content_header = blockstore.get_bucket().get(&content).await;
+                                match content_header {
+                                    Ok(cont_head) => {
+                                        if cont_head.is_dir() {
+                                            if let Some(ref mut dir_reader) = cont_head.into_dir() {
+                                                let reader = dir_reader.hashtree().await?;
+                                                let entries_reader = dir_reader.entries().await?;
+                                                stack_reader.push_back((
+                                                    reader,
+                                                    entries_reader,
+                                                    false,
+                                                ));
+                                                continue 'entries;
+                                            } else {
+                                                return Err(anyhow!(
+                                                    "Content was detect as DIR but it cannot be converted into DirReader"
+                                                ));
+                                            }
+                                        } else if let Some(file_data) = cont_head.into_file() {
+                                            send_file::<C>(
+                                                file_data,
                                                 request,
-                                                blockstore.clone(),
                                                 num_blocks,
                                                 num_responses,
+                                                blockstore.clone(),
                                                 rep_reporter.clone(),
                                                 peer,
                                             )
-                                            .await,
-                                        );
-                                        result.unwrap()?;
-                                    } else {
-                                        let file_data = cont_head.into_file().unwrap();
-                                        send_file::<C>(
-                                            file_data,
-                                            request,
-                                            num_blocks,
-                                            num_responses,
-                                            blockstore.clone(),
-                                            rep_reporter.clone(),
-                                            peer,
-                                        )
-                                        .await?;
-                                    }
-                                },
-                                Err(err) => {
-                                    return Err(anyhow!("Error getting entry - {}", err));
-                                },
-                            };
-                        },
-                        OwnedLink::Link(_) => (),
-                    };
-                    let dir_frame: DirFrame<'_> =
-                        DirFrame::from_entry(entry, num_blocks == block + 1);
-                    num_bytes += dir_frame.len();
-                    let frame = Frame::Dir(dir_frame);
-
-                    if let Err(e) = request.send(Bytes::from(frame)).await {
-                        error!("Failed to send chunk: {e:?}");
-                        num_responses.fetch_sub(1, Ordering::Release);
-                    }
-                },
-                Err(e) => {
-                    return Err(anyhow!("Error getting entry - {}", e));
-                },
+                                            .await?;
+                                            continue 'entries;
+                                        } else {
+                                            return Err(anyhow!(
+                                                "File Reader cannot be obtained and it should be present"
+                                            ));
+                                        }
+                                    },
+                                    Err(err) => {
+                                        return Err(anyhow!("Error getting entry - {}", err));
+                                    },
+                                };
+                            },
+                            OwnedLink::Link(_) => (),
+                        };
+                    },
+                    Err(e) => {
+                        return Err(anyhow!("Error getting entry - {}", e));
+                    },
+                }
+            }
+            if let Err(e) = request.send(Bytes::from(Frame::Dir(DirFrame::Eos))).await {
+                return Err(anyhow!("Failed to send eos: {e:?}"));
+            } else {
+                rep_reporter.report_bytes_sent(peer, num_bytes as u64, Some(instant.elapsed()));
             }
         } else {
-            return Err(anyhow!(
-                "There should be a next entry but it not found. Inconsistency between stream entries and hashes"
-            ));
+            break 'dir_reader;
         }
-    }
-    if let Err(e) = request.send(Bytes::from(Frame::Dir(DirFrame::Eos))).await {
-        return Err(anyhow!("Failed to send eos: {e:?}"));
-    } else {
-        rep_reporter.report_bytes_sent(peer, num_bytes as u64, Some(instant.elapsed()));
     }
     Ok(())
 }
