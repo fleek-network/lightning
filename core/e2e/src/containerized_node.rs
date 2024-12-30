@@ -108,6 +108,13 @@ impl ContainerizedNode {
             .clone()
     }
 
+    pub fn take_blockstore_server_socket(&self) -> BlockstoreServerSocket {
+        self.node
+            .provider()
+            .get::<<FullNodeComponents as NodeComponents>::BlockstoreServerInterface>()
+            .get_socket()
+    }
+
     pub fn is_genesis_committee(&self) -> bool {
         self.is_genesis_committee
     }

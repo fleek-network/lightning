@@ -179,8 +179,21 @@ impl Swarm {
         self.nodes.get(node).map(|node| node.take_blockstore())
     }
 
+    pub fn get_blockstore_server_socket(
+        &self,
+        node: &NodePublicKey,
+    ) -> Option<BlockstoreServerSocket> {
+        self.nodes
+            .get(node)
+            .map(|node| node.take_blockstore_server_socket())
+    }
+
     pub fn nodes(&self) -> Vec<&ContainerizedNode> {
         self.nodes.values().collect::<Vec<_>>()
+    }
+
+    pub fn get_node_index(&self, node: &NodePublicKey) -> Option<NodeIndex> {
+        self.nodes.get(node).map(|node| node.get_index())
     }
 
     pub fn started_nodes(&self) -> Vec<&ContainerizedNode> {
