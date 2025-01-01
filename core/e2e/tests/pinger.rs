@@ -9,7 +9,7 @@ use tempfile::tempdir;
 
 #[tokio::test]
 async fn e2e_detect_offline_node() {
-    logging::setup();
+    logging::setup(None);
 
     let temp_dir = tempdir().unwrap();
     let mut swarm = Swarm::builder()

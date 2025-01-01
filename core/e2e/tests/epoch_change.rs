@@ -12,7 +12,7 @@ use tempfile::tempdir;
 
 #[tokio::test]
 async fn e2e_epoch_change_all_nodes_on_committee() {
-    logging::setup();
+    logging::setup(None);
 
     // Initialize the swarm.
     let temp_dir = tempdir().unwrap();
@@ -60,7 +60,7 @@ async fn e2e_epoch_change_all_nodes_on_committee() {
 
 #[tokio::test]
 async fn e2e_epoch_change_with_some_nodes_not_on_committee() {
-    logging::setup();
+    logging::setup(None);
 
     // Initialize the swarm.
     let temp_dir = tempdir().unwrap();
@@ -128,7 +128,7 @@ async fn e2e_epoch_change_with_some_nodes_not_on_committee() {
 
 #[tokio::test]
 async fn e2e_test_staking_auction() {
-    logging::setup();
+    logging::setup(None);
 
     // Set a node with high rep and a slightly lower stake then everyone else
     let high_rep_node = SwarmNode {

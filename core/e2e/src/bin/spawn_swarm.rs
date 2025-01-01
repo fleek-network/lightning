@@ -45,7 +45,7 @@ struct Cli {
 }
 
 fn main() -> Result<()> {
-    logging::setup();
+    logging::setup(None);
 
     let args = Cli::parse();
 

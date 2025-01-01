@@ -309,7 +309,7 @@ where
 
 #[test]
 fn demo() {
-    logging::setup();
+    logging::setup(None);
 
     let (pubsub, backend) = spawn_context(ONE_HOUR);
 

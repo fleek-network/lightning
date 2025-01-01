@@ -221,7 +221,7 @@ async fn run_local_echo_task() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn run_single_echo_task() -> anyhow::Result<()> {
-    lightning_test_utils::logging::setup();
+    lightning_test_utils::logging::setup(None);
     let (_, mut nodes) = build_cluster(4).await?;
 
     let broker = nodes[0].provider.get::<TaskBroker<TestBinding>>();
@@ -268,7 +268,7 @@ async fn run_single_echo_task() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn run_single_echo_task_with_fallback() -> anyhow::Result<()> {
-    lightning_test_utils::logging::setup();
+    lightning_test_utils::logging::setup(None);
     let (_, mut nodes) = build_cluster(4).await?;
 
     // shutdown all nodes except 2; one to perform the request,
@@ -326,7 +326,7 @@ async fn run_single_echo_task_with_fallback() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn run_cluster_echo_task() -> anyhow::Result<()> {
-    lightning_test_utils::logging::setup();
+    lightning_test_utils::logging::setup(None);
     let (_, mut nodes) = build_cluster(8).await?;
 
     let broker = nodes[0].provider.get::<TaskBroker<TestBinding>>();
@@ -368,7 +368,7 @@ async fn run_cluster_echo_task() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn run_cluster_echo_task_1_offline_of_8() -> anyhow::Result<()> {
-    lightning_test_utils::logging::setup();
+    lightning_test_utils::logging::setup(None);
     let (_, mut nodes) = build_cluster(8).await?;
 
     // shutdown a node
@@ -421,7 +421,7 @@ async fn run_cluster_echo_task_1_offline_of_8() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn run_cluster_echo_task_7_offline_of_8_should_fail() -> anyhow::Result<()> {
-    lightning_test_utils::logging::setup();
+    lightning_test_utils::logging::setup(None);
     let (_, mut nodes) = build_cluster(8).await?;
 
     // shutdown all nodes but one

@@ -138,7 +138,7 @@ async fn create_peer(
 
 #[tokio::test]
 async fn test_send() {
-    lightning_test_utils::logging::setup();
+    lightning_test_utils::logging::setup(None);
 
     let temp_dir = tempdir().unwrap();
 

@@ -18,7 +18,7 @@ fn create_content() -> Vec<u8> {
 
 #[tokio::test]
 async fn e2e_blockstore_server_get() {
-    logging::setup();
+    logging::setup(None);
 
     let temp_dir = tempdir().unwrap();
     let mut swarm = Swarm::builder()

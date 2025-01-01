@@ -10,7 +10,7 @@ use tempfile::tempdir;
 
 #[tokio::test]
 async fn e2e_checkpoint() {
-    logging::setup();
+    logging::setup(None);
 
     let temp_dir = tempdir().unwrap();
     let mut swarm = Swarm::builder()
