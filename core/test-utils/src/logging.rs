@@ -1,9 +1,9 @@
 use std::env;
 use std::fs::File;
 use std::os::unix::net::UnixStream;
+use std::path::PathBuf;
 use std::str::FromStr;
 
-use chrono::Local;
 use lightning_utils::config::LIGHTNING_HOME_DIR;
 use resolved_pathbuf::ResolvedPathBuf;
 use simplelog::{
@@ -20,7 +20,7 @@ use socket_logger::SocketLogger;
 use tracing::log;
 use tracing::log::LevelFilter;
 
-pub fn setup() {
+pub fn setup(log_file_path: Option<PathBuf>) {
     let log_filter = match env::var("RUST_LOG") {
         Ok(level) => {
             if level == "tui" {
@@ -64,22 +64,30 @@ pub fn setup() {
                 .set_thread_padding(ThreadPadding::Right(4))
                 .build();
 
-            let date = Local::now();
-            let log_file = env::temp_dir().join(format!(
-                "lightning-test-epoch-change-committee-{}.log",
-                date.format("%Y-%m-%d-%H:%M:%S")
-            ));
             // We swollow the result here because another e2e test might have already initialized
             // the logger.
-            let _ = CombinedLogger::init(vec![
-                TermLogger::new(
+            if let Some(log_file_path) = log_file_path {
+                let _ = CombinedLogger::init(vec![
+                    TermLogger::new(
+                        log_filter,
+                        config.clone(),
+                        TerminalMode::Mixed,
+                        ColorChoice::Auto,
+                    ),
+                    WriteLogger::new(
+                        LevelFilter::Trace,
+                        config,
+                        File::create(log_file_path).unwrap(),
+                    ),
+                ]);
+            } else {
+                let _ = CombinedLogger::init(vec![TermLogger::new(
                     log_filter,
                     config.clone(),
                     TerminalMode::Mixed,
                     ColorChoice::Auto,
-                ),
-                WriteLogger::new(LevelFilter::Trace, config, File::create(log_file).unwrap()),
-            ]);
+                )]);
+            }
         },
     };
 }
