@@ -74,11 +74,7 @@ pub fn setup(log_file_path: Option<PathBuf>) {
                         TerminalMode::Mixed,
                         ColorChoice::Auto,
                     ),
-                    WriteLogger::new(
-                        LevelFilter::Trace,
-                        config,
-                        File::create(log_file_path).unwrap(),
-                    ),
+                    WriteLogger::new(log_filter, config, File::create(log_file_path).unwrap()),
                 ]);
             } else {
                 let _ = CombinedLogger::init(vec![TermLogger::new(
