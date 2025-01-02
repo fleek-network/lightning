@@ -18,6 +18,7 @@ lightning-workspace-hack.workspace = true
 
 [dev-dependencies]
 lightning-schema = { path = "../../core/schema" }
+fleek-crypto = { path = "../../lib/fleek-crypto" }
 
 [[bin]]
 name = "fn-service-0"
