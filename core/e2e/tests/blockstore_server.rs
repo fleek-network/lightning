@@ -90,7 +90,7 @@ async fn e2e_blockstore_server_with_fetcher() {
     logging::setup(None);
 
     let temp_dir = tempdir().unwrap();
-    let port_ipfs = spawn_server(0).unwrap();
+    let port_ipfs = spawn_server(10900).unwrap();
 
     let gateways = vec![Gateway {
         protocol: Protocol::Http,
