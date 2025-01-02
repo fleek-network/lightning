@@ -31,6 +31,8 @@ lightning-resolver = { path = "../resolver" }
 lightning-archive = { path = "../archive" }
 lightning-pinger = { path = "../pinger" }
 lightning-utils = { path = "../utils" }
+lightning-origin-demuxer = { path = "../origin-demuxer/" }
+lightning-origin-ipfs = { path = "../origin-ipfs/" }
 lightning-test-utils = { path = "../test-utils" }
 tokio.workspace = true
 anyhow.workspace = true

@@ -7743,6 +7743,8 @@ dependencies = [
  "lightning-node",
  "lightning-node-bindings",
  "lightning-notifier",
+ "lightning-origin-demuxer",
+ "lightning-origin-ipfs",
  "lightning-pinger",
  "lightning-pool",
  "lightning-rep-collector",
