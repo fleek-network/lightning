@@ -10,19 +10,19 @@ pub struct Config {
     pub gateway_timeout: Duration,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Protocol {
     Http,
     Https,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum RequestFormat {
     CidFirst,
     CidLast,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Gateway {
     pub protocol: Protocol,
     pub authority: String,

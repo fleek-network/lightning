@@ -34,6 +34,8 @@ use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Genesis, GenesisNode, NodePorts, ServiceId, Staking};
 use lightning_keystore::{Keystore, KeystoreConfig};
 use lightning_node_bindings::FullNodeComponents;
+use lightning_origin_demuxer::{Config as OriginMuxerConfig, OriginDemuxer};
+use lightning_origin_ipfs::config::{Config as IPFSOriginConfig, Gateway};
 use lightning_pinger::{Config as PingerConfig, Pinger};
 use lightning_pool::{Config as PoolConfig, PoolProvider};
 use lightning_rep_collector::config::Config as RepAggConfig;
@@ -289,6 +291,7 @@ pub struct SwarmBuilder {
     services: Vec<ServiceId>,
     ping_interval: Option<Duration>,
     ping_timeout: Option<Duration>,
+    ipfs_gateways: Option<Vec<Gateway>>,
 }
 
 impl SwarmBuilder {
@@ -370,6 +373,11 @@ impl SwarmBuilder {
 
     pub fn with_ping_timeout(mut self, ping_timeout: Duration) -> Self {
         self.ping_timeout = Some(ping_timeout);
+        self
+    }
+
+    pub fn with_ipfs_gateways(mut self, gateways: Vec<Gateway>) -> Self {
+        self.ipfs_gateways = Some(gateways);
         self
     }
 
@@ -470,6 +478,7 @@ impl SwarmBuilder {
                 self.syncronizer_delta.unwrap_or(Duration::from_secs(300)),
                 &self.services,
                 self.ping_interval,
+                &self.ipfs_gateways,
             );
 
             // Generate and store the node public key.
@@ -581,6 +590,7 @@ fn build_config(
     syncronizer_delta: Duration,
     services: &[ServiceId],
     ping_interval: Option<Duration>,
+    ipfs_gateways: &Option<Vec<Gateway>>,
 ) -> TomlConfigProvider<FullNodeComponents> {
     let config = TomlConfigProvider::<FullNodeComponents>::default();
 
@@ -678,6 +688,16 @@ fn build_config(
         },
         ..Default::default()
     });
+
+    if let Some(gateways) = ipfs_gateways {
+        config.inject::<OriginDemuxer<FullNodeComponents>>(OriginMuxerConfig {
+            ipfs: IPFSOriginConfig {
+                gateways: gateways.clone(),
+                gateway_timeout: Duration::from_millis(5000),
+            },
+            ..Default::default()
+        });
+    }
 
     config
 }
