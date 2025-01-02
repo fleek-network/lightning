@@ -18,7 +18,6 @@ pub enum Protocol {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum RequestFormat {
-    Raw,
     CidFirst,
     CidLast,
 }
@@ -63,23 +62,16 @@ impl Default for Config {
 impl Gateway {
     pub fn build_request(&self, cid: Cid) -> String {
         match self.request_format {
-            RequestFormat::Raw => {
-                format!(
-                    "{}://{}/ipfs/{cid}?format=raw",
-                    self.protocol.as_str(),
-                    self.authority
-                )
-            },
             RequestFormat::CidFirst => {
                 format!(
-                    "{}://{cid}.{}?format=car",
+                    "{}://{cid}.{}?format=raw",
                     self.protocol.as_str(),
                     self.authority
                 )
             },
             RequestFormat::CidLast => {
                 format!(
-                    "{}://{}/ipfs/{cid}?format=car",
+                    "{}://{}/ipfs/{cid}?format=raw",
                     self.protocol.as_str(),
                     self.authority
                 )

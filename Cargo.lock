@@ -7670,6 +7670,7 @@ name = "lightning-e2e"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "cid",
  "clap",
  "fleek-blake3",
  "fleek-crypto",
