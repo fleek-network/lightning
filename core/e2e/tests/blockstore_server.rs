@@ -7,7 +7,9 @@ use lightning_e2e::swarm::Swarm;
 use lightning_interfaces::_FileTrustedWriter;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::ServerRequest;
+use lightning_origin_ipfs::config::{Gateway, Protocol, RequestFormat};
 use lightning_test_utils::logging;
+use lightning_test_utils::server::spawn_server;
 use tempfile::tempdir;
 
 use self::types::{FetcherRequest, FetcherResponse, ImmutablePointer, OriginProvider};
@@ -88,6 +90,14 @@ async fn e2e_blockstore_server_with_fetcher() {
     logging::setup(None);
 
     let temp_dir = tempdir().unwrap();
+    let port_ipfs = spawn_server(0).unwrap();
+
+    let gateways = vec![Gateway {
+        protocol: Protocol::Http,
+        authority: format!("127.0.0.1:{}", port_ipfs),
+        request_format: RequestFormat::CidLast,
+    }];
+
     let mut swarm = Swarm::builder()
         .with_directory(temp_dir.path().to_path_buf().try_into().unwrap())
         .with_min_port(10800)
@@ -104,6 +114,7 @@ async fn e2e_blockstore_server_with_fetcher() {
                 .as_millis() as u64,
         )
         .with_syncronizer_delta(Duration::from_secs(5))
+        .with_ipfs_gateways(gateways)
         .build();
     swarm.launch().await.unwrap();
 

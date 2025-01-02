@@ -27,6 +27,7 @@ use lightning_committee_beacon::{
     CommitteeBeaconDatabaseConfig,
 };
 use lightning_consensus::{Consensus, ConsensusConfig};
+use lightning_fetcher::fetcher::Fetcher;
 use lightning_handshake::config::{HandshakeConfig, TransportConfig};
 use lightning_handshake::handshake::Handshake;
 use lightning_handshake::transports::http::Config;
@@ -34,7 +35,6 @@ use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Genesis, GenesisNode, NodePorts, ServiceId, Staking};
 use lightning_keystore::{Keystore, KeystoreConfig};
 use lightning_node_bindings::FullNodeComponents;
-use lightning_origin_demuxer::{Config as OriginMuxerConfig, OriginDemuxer};
 use lightning_origin_ipfs::config::{Config as IPFSOriginConfig, Gateway};
 use lightning_pinger::{Config as PingerConfig, Pinger};
 use lightning_pool::{Config as PoolConfig, PoolProvider};
@@ -696,7 +696,7 @@ fn build_config(
     });
 
     if let Some(gateways) = ipfs_gateways {
-        config.inject::<OriginDemuxer<FullNodeComponents>>(OriginMuxerConfig {
+        config.inject::<Fetcher<FullNodeComponents>>(lightning_fetcher::config::Config {
             ipfs: IPFSOriginConfig {
                 gateways: gateways.clone(),
                 gateway_timeout: Duration::from_millis(5000),
