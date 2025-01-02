@@ -4,8 +4,9 @@ use fleek_blake3 as blake3;
 use fleek_crypto::NodePublicKey;
 use lightning_blockstore::blockstore::BLOCK_SIZE;
 use lightning_e2e::swarm::Swarm;
+use lightning_interfaces::_FileTrustedWriter;
 use lightning_interfaces::prelude::*;
-use lightning_interfaces::types::{CompressionAlgorithm, ServerRequest};
+use lightning_interfaces::types::ServerRequest;
 use lightning_test_utils::logging;
 use tempfile::tempdir;
 
@@ -51,11 +52,9 @@ async fn e2e_blockstore_server_get() {
     // Put some data into the blockstore of node1
     let data = create_content();
     let blockstore1 = swarm.get_blockstore(&pubkey1).unwrap();
-    let mut putter = blockstore1.put(None);
-    putter
-        .write(data.as_slice(), CompressionAlgorithm::Uncompressed)
-        .unwrap();
-    let data_hash = putter.finalize().await.unwrap();
+    let mut putter = blockstore1.file_writer().await.unwrap();
+    putter.write(data.as_slice(), true).await.unwrap();
+    let data_hash = putter.commit().await.unwrap();
 
     // Send a request from node2 to node1 to obtain the data
     let blockstore2 = swarm.get_blockstore(&pubkey2).unwrap();
