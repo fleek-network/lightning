@@ -208,6 +208,7 @@ async fn test_stream_verified_content() {
     let mut putter = UntrustedFileWriter::new(&bucket, root_hash).await.unwrap();
     while let Some(frame) = network_wire.pop_front() {
         match frame {
+            Frame::File(FileFrame::Prelude(_root_hash)) => (),
             Frame::File(FileFrame::Proof(proof)) => putter.feed_proof(&proof).await.unwrap(),
             Frame::File(FileFrame::LastChunk(chunk)) => {
                 putter.write(&chunk, true).await.unwrap();
@@ -336,7 +337,10 @@ async fn test_dir_stream_verified_content() {
             let mut tree_dir = tree.into_dir().unwrap();
             let mut reader = tree_dir.hashtree().await.unwrap();
             let mut entries_reader = tree_dir.entries().await.unwrap();
-            network_wire.push_back(Frame::Dir(DirFrame::Prelude(num_blocks)));
+            network_wire.push_back(Frame::Dir(DirFrame::Prelude((
+                num_blocks,
+                root_hash_testdir,
+            ))));
             let mut block = 0;
             while let Some(ent) = entries_reader.next().await {
                 let entry = ent.unwrap();
@@ -362,10 +366,10 @@ async fn test_dir_stream_verified_content() {
     let mut putter = None;
     while let Some(ref frame) = network_wire.pop_front() {
         match frame {
-            Frame::Dir(DirFrame::Prelude(num_entries)) => {
+            Frame::Dir(DirFrame::Prelude((num_entries, hash))) => {
                 putter = Some(RwLock::new(
                     blockstore_peer1
-                        .dir_untrusted_writer(root_hash_testdir, *num_entries as usize)
+                        .dir_untrusted_writer(*hash, *num_entries as usize)
                         .await
                         .unwrap(),
                 ));

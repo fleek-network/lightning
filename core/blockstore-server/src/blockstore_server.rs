@@ -11,6 +11,7 @@ use std::time::{Duration, Instant};
 
 use affair::{Socket, Task};
 use anyhow::{anyhow, Result};
+use b3fs::bucket::dir::reader::B3Dir;
 use b3fs::entry::{BorrowedEntry, InlineVec, OwnedEntry, OwnedLink};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use lightning_interfaces::prelude::*;
@@ -304,6 +305,7 @@ pub enum Frame<'a> {
 
 #[derive(Debug)]
 pub enum FileFrame<'a> {
+    Prelude([u8; 32]),
     Proof(Cow<'a, [u8]>),
     Chunk(Cow<'a, [u8]>),
     LastChunk(Cow<'a, [u8]>),
@@ -312,7 +314,7 @@ pub enum FileFrame<'a> {
 
 #[derive(Debug)]
 pub enum DirFrame<'a> {
-    Prelude(u32),
+    Prelude((u32, [u8; 32])),
     Proof(Cow<'a, [u8]>),
     Chunk(Cow<'a, OwnedEntry>),
     LastChunk(Cow<'a, OwnedEntry>),
@@ -331,7 +333,7 @@ impl<'a> DirFrame<'a> {
 
     pub fn len(&self) -> usize {
         match &self {
-            Self::Prelude(c) => c.to_le_bytes().len(),
+            Self::Prelude((entries, hash)) => hash.len() + entries.to_le_bytes().len(),
             Self::Proof(c) => c.len(),
             Self::Chunk(entry) => Self::entry_len(entry),
             Self::LastChunk(entry) => Self::entry_len(entry),
@@ -353,47 +355,37 @@ impl<'a> From<Frame<'a>> for Bytes {
         let mut b = BytesMut::new();
         match value {
             Frame::File(file) => match file {
-                FileFrame::Proof(proof) => {
+                FileFrame::Prelude(hash) => {
                     b.put_u8(0x00);
+                    b.put_slice(&hash);
+                },
+                FileFrame::Proof(proof) => {
+                    b.put_u8(0x01);
                     b.put_slice(&proof);
                 },
                 FileFrame::Chunk(chunk) => {
-                    b.put_u8(0x01);
-                    b.put_slice(&chunk);
-                },
-                FileFrame::LastChunk(chunk) => {
                     b.put_u8(0x02);
                     b.put_slice(&chunk);
                 },
-                FileFrame::Eos => {
+                FileFrame::LastChunk(chunk) => {
                     b.put_u8(0x03);
+                    b.put_slice(&chunk);
+                },
+                FileFrame::Eos => {
+                    b.put_u8(0x04);
                 },
             },
             Frame::Dir(dir) => match dir {
-                DirFrame::Prelude(num_entries) => {
-                    b.put_u8(0x09);
+                DirFrame::Prelude((num_entries, hash)) => {
+                    b.put_u8(0x10);
                     b.put_u32_le(num_entries);
+                    b.put_slice(&hash);
                 },
                 DirFrame::Proof(proof) => {
-                    b.put_u8(0x10);
+                    b.put_u8(0x11);
                     b.put_slice(&proof);
                 },
                 DirFrame::Chunk(chunk) => {
-                    b.put_u8(0x11);
-                    b.put_slice(&chunk.name);
-                    b.put_u8(0x00);
-                    match &chunk.link {
-                        b3fs::entry::OwnedLink::Content(content) => {
-                            b.put_u8(0x01);
-                            b.put_slice(content);
-                        },
-                        b3fs::entry::OwnedLink::Link(link) => {
-                            b.put_u8(0x02);
-                            b.put_slice(link);
-                        },
-                    }
-                },
-                DirFrame::LastChunk(chunk) => {
                     b.put_u8(0x12);
                     b.put_slice(&chunk.name);
                     b.put_u8(0x00);
@@ -408,8 +400,23 @@ impl<'a> From<Frame<'a>> for Bytes {
                         },
                     }
                 },
-                DirFrame::Eos => {
+                DirFrame::LastChunk(chunk) => {
                     b.put_u8(0x13);
+                    b.put_slice(&chunk.name);
+                    b.put_u8(0x00);
+                    match &chunk.link {
+                        b3fs::entry::OwnedLink::Content(content) => {
+                            b.put_u8(0x01);
+                            b.put_slice(content);
+                        },
+                        b3fs::entry::OwnedLink::Link(link) => {
+                            b.put_u8(0x02);
+                            b.put_slice(link);
+                        },
+                    }
+                },
+                DirFrame::Eos => {
+                    b.put_u8(0x14);
                 },
             },
         }
@@ -423,55 +430,24 @@ impl TryFrom<Bytes> for Frame<'static> {
     fn try_from(mut value: Bytes) -> Result<Self> {
         let val_frame = value.get_u8();
         match val_frame {
-            0x00 => Ok(Frame::File(FileFrame::Proof(Cow::Owned(value.to_vec())))),
-            0x01 => Ok(Frame::File(FileFrame::Chunk(Cow::Owned(value.to_vec())))),
-            0x02 => Ok(Frame::File(FileFrame::LastChunk(Cow::Owned(
+            0x00 => {
+                let mut content: [u8; 32] = [0; 32];
+                content.copy_from_slice(&value);
+                Ok(Frame::File(FileFrame::Prelude(content)))
+            },
+            0x01 => Ok(Frame::File(FileFrame::Proof(Cow::Owned(value.to_vec())))),
+            0x02 => Ok(Frame::File(FileFrame::Chunk(Cow::Owned(value.to_vec())))),
+            0x03 => Ok(Frame::File(FileFrame::LastChunk(Cow::Owned(
                 value.to_vec(),
             )))),
-            0x03 => Ok(Frame::File(FileFrame::Eos)),
-            0x09 => Ok(Frame::Dir(DirFrame::Prelude(value.get_u32_le()))),
-            0x10 => Ok(Frame::Dir(DirFrame::Proof(Cow::Owned(value.to_vec())))),
-            0x11 => {
-                let bytes: &[u8] = if let Some(bs) = value.iter().position(|p| *p == 0x00) {
-                    &value.split_to(bs)
-                } else {
-                    return Err(anyhow!("Error detecting null byte for name"));
-                };
-                if bytes.len() > 24 {
-                    return Err(anyhow!(
-                        "We are receiving more bytes than allowed for InlineVec"
-                    ));
-                }
-                let _ = value.get_u8();
-                let name: InlineVec = bytes.into();
-                let ty = value.get_u8();
-                match ty {
-                    0x01 => {
-                        let mut content = [0; 32];
-                        let bytes = value.copy_to_bytes(32);
-                        content.copy_from_slice(&bytes);
-                        Ok(Frame::Dir(DirFrame::Chunk(Cow::Owned(OwnedEntry {
-                            name,
-                            link: b3fs::entry::OwnedLink::Content(content),
-                        }))))
-                    },
-                    0x02 => {
-                        let mut link = [0; 24];
-                        if value.len() > 24 {
-                            return Err(anyhow!(
-                                "We are receiving more bytes than allowed for InlineVec"
-                            ));
-                        }
-                        link.copy_from_slice(&value);
-                        let link = InlineVec::from_buf(link);
-                        Ok(Frame::Dir(DirFrame::Chunk(Cow::Owned(OwnedEntry {
-                            name,
-                            link: b3fs::entry::OwnedLink::Link(link),
-                        }))))
-                    },
-                    _ => Err(anyhow!("Unknown magic byte for OwnedEntry type")),
-                }
+            0x04 => Ok(Frame::File(FileFrame::Eos)),
+            0x10 => {
+                let num_entries = value.get_u32_le();
+                let mut content: [u8; 32] = [0; 32];
+                content.copy_from_slice(&value);
+                Ok(Frame::Dir(DirFrame::Prelude((num_entries, content))))
             },
+            0x11 => Ok(Frame::Dir(DirFrame::Proof(Cow::Owned(value.to_vec())))),
             0x12 => {
                 let bytes: &[u8] = if let Some(bs) = value.iter().position(|p| *p == 0x00) {
                     &value.split_to(bs)
@@ -491,6 +467,47 @@ impl TryFrom<Bytes> for Frame<'static> {
                         let mut content = [0; 32];
                         let bytes = value.copy_to_bytes(32);
                         content.copy_from_slice(&bytes);
+                        Ok(Frame::Dir(DirFrame::Chunk(Cow::Owned(OwnedEntry {
+                            name,
+                            link: b3fs::entry::OwnedLink::Content(content),
+                        }))))
+                    },
+                    0x02 => {
+                        let mut link = [0; 24];
+                        if value.len() > 24 {
+                            return Err(anyhow!(
+                                "We are receiving more bytes than allowed for InlineVec"
+                            ));
+                        }
+                        link.copy_from_slice(&value);
+                        let link = InlineVec::from_buf(link);
+                        Ok(Frame::Dir(DirFrame::Chunk(Cow::Owned(OwnedEntry {
+                            name,
+                            link: b3fs::entry::OwnedLink::Link(link),
+                        }))))
+                    },
+                    _ => Err(anyhow!("Unknown magic byte for OwnedEntry type")),
+                }
+            },
+            0x13 => {
+                let bytes: &[u8] = if let Some(bs) = value.iter().position(|p| *p == 0x00) {
+                    &value.split_to(bs)
+                } else {
+                    return Err(anyhow!("Error detecting null byte for name"));
+                };
+                if bytes.len() > 24 {
+                    return Err(anyhow!(
+                        "We are receiving more bytes than allowed for InlineVec"
+                    ));
+                }
+                let _ = value.get_u8();
+                let name: InlineVec = bytes.into();
+                let ty = value.get_u8();
+                match ty {
+                    0x01 => {
+                        let mut content = [0; 32];
+                        let bytes = value.copy_to_bytes(32);
+                        content.copy_from_slice(&bytes);
                         Ok(Frame::Dir(DirFrame::LastChunk(Cow::Owned(OwnedEntry {
                             name,
                             link: b3fs::entry::OwnedLink::Content(content),
@@ -514,7 +531,7 @@ impl TryFrom<Bytes> for Frame<'static> {
                     _ => Err(anyhow!("Unknown magic byte for OwnedEntry type")),
                 }
             },
-            0x13 => Ok(Frame::Dir(DirFrame::Eos)),
+            0x14 => Ok(Frame::Dir(DirFrame::Eos)),
             i => Err(anyhow!("Unknown magic byte {i}")),
         }
     }
@@ -546,6 +563,7 @@ async fn handle_request<C: NodeComponents>(
             if let Some(file) = tree.into_file() {
                 match send_file::<C>(
                     file,
+                    peer_request.hash,
                     &mut request,
                     num_blocks,
                     &num_responses,
@@ -570,6 +588,7 @@ async fn handle_request<C: NodeComponents>(
         } else if let Some(dir) = tree.into_dir() {
             match send_dir::<C>(
                 dir,
+                peer_request.hash,
                 &mut request,
                 blockstore,
                 num_blocks,
@@ -600,6 +619,7 @@ async fn handle_request<C: NodeComponents>(
 
 async fn send_file<C: NodeComponents>(
     file: b3fs::bucket::file::reader::B3File,
+    hash: [u8; 32],
     request: &mut <c!(C::PoolInterface::Responder) as ResponderInterface>::Request,
     num_blocks: u32,
     num_responses: &AtomicUsize,
@@ -615,6 +635,13 @@ async fn send_file<C: NodeComponents>(
             return Err(anyhow!("Failed to get Async HashTree {}", e));
         },
     };
+    if let Err(e) = request
+        .send(Bytes::from(Frame::File(FileFrame::Prelude(hash))))
+        .await
+    {
+        num_responses.fetch_sub(1, Ordering::Release);
+        return Err(anyhow!("Failed to send prelude file: {e:?}"));
+    }
     for block in 0..num_blocks {
         let hash = match reader.get_hash(block).await {
             Ok(Some(hash)) => hash,
@@ -667,8 +694,27 @@ async fn send_file<C: NodeComponents>(
     Ok(())
 }
 
+struct QueueDir {
+    dir: B3Dir,
+    num_blocks: u32,
+    hash: [u8; 32],
+    prelude_sent: bool,
+}
+
+impl QueueDir {
+    pub fn new(dir: B3Dir, hash: [u8; 32], num_blocks: u32) -> Self {
+        QueueDir {
+            dir,
+            num_blocks,
+            hash,
+            prelude_sent: false,
+        }
+    }
+}
+
 async fn send_dir<C: NodeComponents>(
-    mut dir: b3fs::bucket::dir::reader::B3Dir,
+    dir: b3fs::bucket::dir::reader::B3Dir,
+    hash: [u8; 32],
     request: &mut <c!(C::PoolInterface::Responder) as ResponderInterface>::Request,
     blockstore: <C as NodeComponents>::BlockstoreInterface,
     num_blocks: u32,
@@ -679,39 +725,42 @@ async fn send_dir<C: NodeComponents>(
     let mut num_bytes = 0;
     let instant = Instant::now();
 
-    let reader = match dir.hashtree().await {
-        Ok(reader) => reader,
-        Err(e) => {
-            return Err(anyhow!("Failed to get Async HashTree {}", e));
-        },
-    };
-    let entries_reader = match dir.entries().await {
-        Ok(entries) => entries,
-        Err(e) => {
-            return Err(anyhow!("Error trying to obtain Entries Iterator {}", e));
-        },
-    };
     let mut stack_reader = VecDeque::new();
-    stack_reader.push_back((reader, entries_reader, false));
+    stack_reader.push_back(QueueDir::new(dir, hash, num_blocks));
 
     'dir_reader: loop {
-        if let Some((ref mut reader, ref mut entries_reader, ref mut prelude_sent)) =
-            stack_reader.pop_front()
-        {
-            if !*prelude_sent {
+        if let Some(ref mut queue_dir) = stack_reader.pop_front() {
+            dbg!("New dir");
+            let mut reader = match queue_dir.dir.hashtree().await {
+                Ok(reader) => reader,
+                Err(e) => {
+                    return Err(anyhow!("Failed to get Async HashTree {}", e));
+                },
+            };
+            let mut entries_reader = match queue_dir.dir.entries().await {
+                Ok(entries) => entries,
+                Err(e) => {
+                    return Err(anyhow!("Error trying to obtain Entries Iterator {}", e));
+                },
+            };
+            if !queue_dir.prelude_sent {
                 if let Err(e) = request
-                    .send(Bytes::from(Frame::Dir(DirFrame::Prelude(num_blocks))))
+                    .send(Bytes::from(Frame::Dir(DirFrame::Prelude((
+                        queue_dir.num_blocks,
+                        queue_dir.hash,
+                    )))))
                     .await
                 {
                     return Err(anyhow!("Failed to send prelude: {e:?}"));
                 } else {
                     rep_reporter.report_bytes_sent(peer, num_bytes as u64, Some(instant.elapsed()));
-                    *prelude_sent = true;
+                    queue_dir.prelude_sent = true;
                 }
             }
 
             let mut block = 0;
             'entries: while let Some(ent) = entries_reader.next().await {
+                dbg!("new entry");
                 match ent {
                     Ok(ref entry) => {
                         let proof = match reader.generate_proof(block).await {
@@ -745,14 +794,13 @@ async fn send_dir<C: NodeComponents>(
                                 let content_header = blockstore.get_bucket().get(&content).await;
                                 match content_header {
                                     Ok(cont_head) => {
+                                        let num_blocks_new_content = cont_head.blocks();
                                         if cont_head.is_dir() {
-                                            if let Some(ref mut dir_reader) = cont_head.into_dir() {
-                                                let reader = dir_reader.hashtree().await?;
-                                                let entries_reader = dir_reader.entries().await?;
-                                                stack_reader.push_back((
-                                                    reader,
-                                                    entries_reader,
-                                                    false,
+                                            if let Some(dir_reader) = cont_head.into_dir() {
+                                                stack_reader.push_back(QueueDir::new(
+                                                    dir_reader,
+                                                    content,
+                                                    num_blocks_new_content,
                                                 ));
                                                 continue 'entries;
                                             } else {
@@ -761,10 +809,12 @@ async fn send_dir<C: NodeComponents>(
                                                 ));
                                             }
                                         } else if let Some(file_data) = cont_head.into_file() {
+                                            dbg!("sending file");
                                             send_file::<C>(
                                                 file_data,
+                                                content,
                                                 request,
-                                                num_blocks,
+                                                num_blocks_new_content,
                                                 num_responses,
                                                 blockstore.clone(),
                                                 rep_reporter.clone(),
@@ -849,14 +899,11 @@ async fn send_request<C: NodeComponents>(
                     };
                     match frame {
                         Frame::File(file) => {
-                            if writer.is_none() {
+                            if let FileFrame::Prelude(hash) = file {
                                 writer = Some(RwLock::new(
-                                    blockstore
-                                        .file_untrusted_writer(request.hash)
-                                        .await
-                                        .unwrap(),
+                                    blockstore.file_untrusted_writer(hash).await.unwrap(),
                                 ));
-                            }
+                            };
                             if let Some(ref file_writer) = writer {
                                 match handle_send_request_file::<C>(file_writer, file).await {
                                     Ok(RespSendRequest::Continue) => (),
@@ -884,10 +931,10 @@ async fn send_request<C: NodeComponents>(
                             }
                         },
                         Frame::Dir(dir) => {
-                            if let DirFrame::Prelude(num_entries) = dir {
+                            if let DirFrame::Prelude((num_entries, hash)) = dir {
                                 dir_writer = Some(RwLock::new(
                                     blockstore
-                                        .dir_untrusted_writer(request.hash, num_entries as usize)
+                                        .dir_untrusted_writer(hash, num_entries as usize)
                                         .await
                                         .unwrap(),
                                 ));
@@ -951,6 +998,7 @@ async fn handle_send_request_file<C: NodeComponents>(
     file: FileFrame<'_>,
 ) -> Result<RespSendRequest, String> {
     match file {
+        FileFrame::Prelude(_) => Ok(RespSendRequest::Continue),
         FileFrame::Proof(proof) => writer
             .write()
             .await
