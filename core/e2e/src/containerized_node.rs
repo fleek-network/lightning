@@ -115,6 +115,13 @@ impl ContainerizedNode {
             .get_socket()
     }
 
+    pub fn take_fetcher_server_socket(&self) -> FetcherSocket {
+        self.node
+            .provider()
+            .get::<<FullNodeComponents as NodeComponents>::FetcherInterface>()
+            .get_socket()
+    }
+
     pub fn is_genesis_committee(&self) -> bool {
         self.is_genesis_committee
     }

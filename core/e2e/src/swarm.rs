@@ -190,6 +190,12 @@ impl Swarm {
             .map(|node| node.take_blockstore_server_socket())
     }
 
+    pub fn get_fetcher_socket(&self, node: &NodePublicKey) -> Option<FetcherSocket> {
+        self.nodes
+            .get(node)
+            .map(|node| node.take_fetcher_server_socket())
+    }
+
     pub fn nodes(&self) -> Vec<&ContainerizedNode> {
         self.nodes.values().collect::<Vec<_>>()
     }

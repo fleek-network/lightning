@@ -292,7 +292,6 @@ impl<C: NodeComponents> AsyncWorkerUnordered for FetcherWorker<C> {
         match req {
             FetcherRequest::Put { pointer } => {
                 let res = self.put(pointer).await;
-                dbg!(&res);
                 if res.is_err() {
                     increment_counter!(
                         "fetcher_put_request_failed",

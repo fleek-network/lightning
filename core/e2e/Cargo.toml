@@ -55,6 +55,7 @@ clap = { version = "4.2", features = ["derive"] }
 lightning-workspace-hack.workspace = true
 
 [dev-dependencies]
+cid.workspace = true
 tempfile.workspace = true
 
 [features]

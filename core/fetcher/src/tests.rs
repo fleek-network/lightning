@@ -162,7 +162,7 @@ async fn get_fetchers(
                                     gateways: vec![Gateway {
                                         protocol: Protocol::Http,
                                         authority: format!("127.0.0.1:{gateway_port}"),
-                                        request_format: RequestFormat::Raw,
+                                        request_format: RequestFormat::CidLast,
                                     }],
                                     gateway_timeout: Duration::from_millis(5000),
                                 },
