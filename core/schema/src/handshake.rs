@@ -183,7 +183,7 @@ impl HandshakeResponse {
 
     pub fn decode(bytes: &[u8]) -> Result<Self> {
         if bytes.len() != 96 {
-            return Err(anyhow!("wrong number of bytes"));
+            return Err(anyhow!("wrong number of bytes, got {}", bytes.len()));
         }
 
         let pk = NodePublicKey(*array_ref!(bytes, 0, 32));

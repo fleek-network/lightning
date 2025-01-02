@@ -246,19 +246,15 @@ impl<P: ExecutorProviderInterface, QR: SyncQueryRunnerInterface> Context<P, QR> 
                         return;
                     }
 
-                    // 5. Encode and send the handshake response, signing the handshake digest from
-                    //    the client we just validated.
+                    // 5. Finally send the handshake response, signing the handshake digest from the
+                    //    client we just validated.
                     // TODO: again should we avoid double hashing here
-                    let res = HandshakeResponse {
-                        pk: self.pk,
-                        pop: self.sk.sign(&digest),
-                    }
-                    .encode();
-                    sender.start_write(res.len()).await;
-                    if let Err(e) = sender.write(res).await {
-                        warn!("failed to send handshake response frame: {e}");
-                        return;
-                    };
+                    sender
+                        .send_handshake_response(HandshakeResponse {
+                            pk: self.pk,
+                            pop: self.sk.sign(&digest),
+                        })
+                        .await;
                 }
 
                 // Attempt to connect to the service, getting the unix socket.
