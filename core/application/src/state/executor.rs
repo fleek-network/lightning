@@ -84,7 +84,7 @@ const DEFAULT_REP_QUANTILE: f64 = 0.15;
 /// epochs and 30% is based on the current epoch.
 const REP_EWMA_WEIGHT: f64 = 0.7;
 
-/// If a node responded to less than 10% of pings from its peers, it will set to inactive until it
+/// If a node responded to less than 40% of pings from its peers, it will set to inactive until it
 /// submits an OptIn transaction.
 const MINIMUM_UPTIME: u8 = 40;
 
