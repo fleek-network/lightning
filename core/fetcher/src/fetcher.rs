@@ -16,6 +16,7 @@ use tokio::sync::{mpsc, oneshot};
 use tracing::info;
 use types::{NodeIndex, PeerRequestError};
 
+use self::types::ServerResponse;
 use crate::config::Config;
 use crate::origin::{OriginError, OriginFetcher, OriginRequest};
 use crate::router::Router;
@@ -234,8 +235,8 @@ impl<C: NodeComponents> FetcherWorker<C> {
 
         #[inline(always)]
         async fn recv(
-            mut res: tokio::sync::broadcast::Receiver<Result<(), PeerRequestError>>,
-        ) -> Result<()> {
+            mut res: tokio::sync::broadcast::Receiver<Result<ServerResponse, PeerRequestError>>,
+        ) -> Result<ServerResponse> {
             res.recv().await?.map_err(|e| e.into())
         }
 

@@ -299,8 +299,9 @@ impl<C: NodeComponents> SyncronizerInner<C> {
                 .await
                 .expect("Failed to send blockstore server request");
 
-            if let Ok(Ok(response)) = res.recv().await {
-                return Ok(response);
+            if let Ok(Ok(_)) = res.recv().await {
+                // TODO: Ask here about checkpoints
+                return Ok(());
             }
         }
         Err(anyhow!(

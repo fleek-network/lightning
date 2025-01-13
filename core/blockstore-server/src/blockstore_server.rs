@@ -36,9 +36,11 @@ use tokio::time::timeout;
 use tokio_stream::StreamExt;
 use tracing::error;
 
+use self::types::ServerResponse;
 use crate::config::Config;
 
-type ServerRequestTask = Task<ServerRequest, broadcast::Receiver<Result<(), PeerRequestError>>>;
+type ServerRequestTask =
+    Task<ServerRequest, broadcast::Receiver<Result<ServerResponse, PeerRequestError>>>;
 
 const REQUEST_TIMEOUT: Duration = Duration::from_millis(1000);
 
@@ -134,7 +136,7 @@ impl<C: NodeComponents> BlockstoreServerInner<C> {
     pub async fn start(mut self) {
         let mut pending_requests: HashMap<
             PeerRequest,
-            broadcast::Sender<Result<(), PeerRequestError>>,
+            broadcast::Sender<Result<ServerResponse, PeerRequestError>>,
         > = HashMap::new();
         let mut tasks = JoinSet::new();
         let mut queue = VecDeque::new();
@@ -227,7 +229,7 @@ impl<C: NodeComponents> BlockstoreServerInner<C> {
                             } else {
                                 queue.push_back(peer_request.clone());
                             }
-                            let (tx, rx) = broadcast::channel(1);
+                            let (tx, rx) = broadcast::channel::<Result<ServerResponse, PeerRequestError>>(1);
                             pending_requests.insert(peer_request, tx);
                             rx
                         };
@@ -238,9 +240,9 @@ impl<C: NodeComponents> BlockstoreServerInner<C> {
                 }
                 Some(res) = tasks.join_next() => {
                     match res {
-                        Ok(Ok(peer_request)) => {
-                            if let Some(tx) = pending_requests.remove(&peer_request) {
-                                tx.send(Ok(())).expect("Failed to send response");
+                        Ok(Ok(SendResult { request, result })) => {
+                            if let Some(tx) = pending_requests.remove(&request) {
+                                tx.send(Ok(result)).expect("Failed to send response");
                             }
                         },
                         Ok(Err(error_res)) => {
@@ -271,6 +273,11 @@ enum Message {
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub struct PeerRequest {
     hash: Blake3Hash,
+}
+
+pub struct SendResult {
+    request: PeerRequest,
+    result: ServerResponse
 }
 
 impl From<PeerRequest> for Bytes {
@@ -739,7 +746,7 @@ async fn send_request<C: NodeComponents>(
     blockstore: C::BlockstoreInterface,
     pool_requester: c!(C::PoolInterface::Requester),
     rep_reporter: c!(C::ReputationAggregatorInterface::ReputationReporter),
-) -> Result<PeerRequest, ErrorResponse> {
+) -> Result<SendResult, ErrorResponse> {
     match timeout(
         REQUEST_TIMEOUT,
         pool_requester.request(peer, Bytes::from(request.clone())),
@@ -755,6 +762,8 @@ async fn send_request<C: NodeComponents>(
                 let mut dir_writer: Option<
                     RwLock<<C::BlockstoreInterface as BlockstoreInterface<C>>::UDirWriter>,
                 > = None;
+
+                let mut hashes_dir: Option<RwLock<Vec<[u8;32]>>> = None;
 
                 let mut bytes_recv = 0;
                 let instant = Instant::now();
@@ -801,7 +810,7 @@ async fn send_request<C: NodeComponents>(
                                             bytes_recv as u64,
                                             Some(duration),
                                         );
-                                        return Ok(request);
+                                        return Ok(SendResult {request, result: ServerResponse::EoR});
                                     },
                                     Err(err) => {
                                         error!("Error handling send request for file {}", err);
@@ -821,27 +830,34 @@ async fn send_request<C: NodeComponents>(
                                         .await
                                         .unwrap(),
                                 ));
+                                hashes_dir = Some(RwLock::new(Vec::new()));
                             };
                             if let Some(ref dir_wr) = dir_writer {
-                                match handle_send_request_dir::<C>(dir_wr, dir).await {
-                                    Ok(RespSendRequest::Continue) => (),
-                                    Ok(RespSendRequest::EoF) => {
-                                        let dir_writer = dir_writer.take().unwrap().into_inner();
-                                        dir_writer.commit().await.expect("Error commiting writer");
-                                        // TODO(matthias): do we have to compare this hash to the
-                                        // requested hash?
-                                        let duration = instant.elapsed();
-                                        rep_reporter.report_bytes_received(
-                                            peer,
-                                            bytes_recv as u64,
-                                            Some(duration),
-                                        );
-                                        return Ok(request);
-                                    },
-                                    Err(err) => {
-                                        error!("Error handling send request for dir {}", err);
-                                        break;
-                                    },
+                                if let Some(ref hashes_dir_vec) = hashes_dir {
+                                    match handle_send_request_dir::<C>(dir_wr, dir, &hashes_dir_vec).await {
+                                        Ok(RespSendRequest::Continue) => (),
+                                        Ok(RespSendRequest::EoF) => {
+                                            let dir_writer = dir_writer.take().unwrap().into_inner();
+                                            dir_writer.commit().await.expect("Error commiting writer");
+                                            // TODO(matthias): do we have to compare this hash to the
+                                            // requested hash?
+                                            let duration = instant.elapsed();
+                                            rep_reporter.report_bytes_received(
+                                                peer,
+                                                bytes_recv as u64,
+                                                Some(duration),
+                                            );
+                                            let hashes = hashes_dir.take().unwrap().into_inner(); 
+                                            return Ok(SendResult { request, result: ServerResponse::Continue(hashes) });
+                                        },
+                                        Err(err) => {
+                                            error!("Error handling send request for dir {}", err);
+                                            break;
+                                        },
+                                    }
+                                }else{
+                                    error!("Dir Hashes was not initilialized properly");
+                                    break;
                                 }
                             } else {
                                 error!("Dir Writer was not initilialized properly");
@@ -909,6 +925,7 @@ async fn handle_send_request_file<C: NodeComponents>(
 async fn handle_send_request_dir<C: NodeComponents>(
     writer: &RwLock<<C::BlockstoreInterface as BlockstoreInterface<C>>::UDirWriter>,
     dir: DirFrame<'_>,
+    hashes_dir: &RwLock<Vec<[u8; 32]>>,
 ) -> Result<RespSendRequest, String> {
     match dir {
         DirFrame::Prelude(_) => Ok(RespSendRequest::Continue),
@@ -919,13 +936,19 @@ async fn handle_send_request_dir<C: NodeComponents>(
             .await
             .map(|_| RespSendRequest::Continue)
             .map_err(|e| e.to_string()),
-        DirFrame::Chunk(chunk) => writer
+        DirFrame::Chunk(chunk) => {
+            match chunk.link { 
+                OwnedLink::Content(hash) => hashes_dir.write().await.push(hash),
+                OwnedLink::Link(_) => ()
+            };
+            writer
             .write()
             .await
             .insert(BorrowedEntry::from(&chunk.into_owned()), false)
             .await
             .map(|_| RespSendRequest::Continue)
-            .map_err(|e| e.to_string()),
+            .map_err(|e| e.to_string())
+        },
         DirFrame::LastChunk(chunk) => writer
             .write()
             .await

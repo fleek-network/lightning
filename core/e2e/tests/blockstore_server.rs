@@ -12,7 +12,13 @@ use lightning_test_utils::logging;
 use lightning_test_utils::server::spawn_server;
 use tempfile::tempdir;
 
-use self::types::{FetcherRequest, FetcherResponse, ImmutablePointer, OriginProvider};
+use self::types::{
+    FetcherRequest,
+    FetcherResponse,
+    ImmutablePointer,
+    OriginProvider,
+    ServerResponse,
+};
 
 fn create_content() -> Vec<u8> {
     (0..4)
@@ -72,12 +78,16 @@ async fn e2e_blockstore_server_get() {
         .await
         .expect("Failed to send request");
     match res.recv().await.unwrap() {
-        Ok(()) => {
+        Ok(response) => {
             // Make sure the data matches
             let recv_data = blockstore2.read_all_to_vec(&data_hash).await.unwrap();
             assert_eq!(data, recv_data);
             let hash = blake3::hash(&recv_data);
             assert_eq!(hash, data_hash);
+            match response {
+                ServerResponse::Continue(_) => panic!("Unexpected. Only file is expected"),
+                ServerResponse::EoR => (),
+            }
         },
         Err(e) => panic!("Failed to receive content: {e:?}"),
     }
