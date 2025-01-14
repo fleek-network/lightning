@@ -13,6 +13,7 @@ use lightning_interfaces::types::{
 use lightning_interfaces::{spawn_worker, BlockstoreServerSocket, FetcherSocket};
 use lightning_metrics::increment_counter;
 use tokio::sync::{mpsc, oneshot};
+use tokio::task::JoinSet;
 use tracing::info;
 use types::{NodeIndex, PeerRequestError};
 
@@ -225,6 +226,24 @@ impl<C: NodeComponents> FetcherWorker<C> {
 
     #[inline(always)]
     async fn fetch_from_peer(&self, peer: NodeIndex, hash: Blake3Hash) -> Result<()> {
+        Self::download_hash(&self.blockstore_server_socket, peer, hash).await
+    }
+
+    #[inline(always)]
+    fn download_hash_recurse(
+        blockstore_server_socket: &BlockstoreServerSocket,
+        peer: NodeIndex,
+        hash: Blake3Hash,
+    ) -> futures::future::BoxFuture<Result<()>> {
+        Box::pin(Self::download_hash(blockstore_server_socket, peer, hash))
+    }
+
+    #[inline(always)]
+    async fn download_hash(
+        blockstore_server_socket: &BlockstoreServerSocket,
+        peer: NodeIndex,
+        hash: Blake3Hash,
+    ) -> Result<()> {
         #[inline(always)]
         fn emit_failed_metric() {
             increment_counter!(
@@ -240,13 +259,50 @@ impl<C: NodeComponents> FetcherWorker<C> {
             res.recv().await?.map_err(|e| e.into())
         }
 
-        let res = self
-            .blockstore_server_socket
+        let res = blockstore_server_socket
             .run(ServerRequest { hash, peer })
             .await;
+
         match res {
             Ok(res) => match recv(res).await {
-                Ok(_) => {
+                Ok(r) => {
+                    match r {
+                        ServerResponse::EoR => (),
+                        ServerResponse::Continue(hashes) => {
+                            let mut download_hashes = JoinSet::new();
+                            for h in hashes {
+                                let socket = blockstore_server_socket.clone();
+                                download_hashes.spawn(async move {
+                                    Self::download_hash_recurse(&socket, peer, h).await
+                                });
+                            }
+                            while let Some(r) = download_hashes.join_next().await {
+                                match r {
+                                    Ok(Ok(_)) => (),
+                                    Ok(Err(e)) => {
+                                        info!(
+                                            "Failed to receive response from blockstore server {:?}. Error: {:?}",
+                                            peer, e
+                                        );
+                                        emit_failed_metric();
+                                        return Err(e).context(
+                                            "Failed to receive response from blockstore server",
+                                        );
+                                    },
+                                    Err(e) => {
+                                        info!(
+                                            "Failed to receive response from blockstore server {:?}. Error: {:?}",
+                                            peer, e
+                                        );
+                                        emit_failed_metric();
+                                        return Err(e).context(
+                                            "Failed to receive response from blockstore server",
+                                        );
+                                    },
+                                }
+                            }
+                        },
+                    }
                     increment_counter!(
                         "fetcher_from_peer",
                         Some("Counter for content that was fetched from a peer")

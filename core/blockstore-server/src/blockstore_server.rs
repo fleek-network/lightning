@@ -229,7 +229,7 @@ impl<C: NodeComponents> BlockstoreServerInner<C> {
                             } else {
                                 queue.push_back(peer_request.clone());
                             }
-                            let (tx, rx) = broadcast::channel::<Result<ServerResponse, PeerRequestError>>(1);
+                            let (tx, rx) = broadcast::channel(1);
                             pending_requests.insert(peer_request, tx);
                             rx
                         };
@@ -277,7 +277,7 @@ pub struct PeerRequest {
 
 pub struct SendResult {
     request: PeerRequest,
-    result: ServerResponse
+    result: ServerResponse,
 }
 
 impl From<PeerRequest> for Bytes {
@@ -763,7 +763,7 @@ async fn send_request<C: NodeComponents>(
                     RwLock<<C::BlockstoreInterface as BlockstoreInterface<C>>::UDirWriter>,
                 > = None;
 
-                let mut hashes_dir: Option<RwLock<Vec<[u8;32]>>> = None;
+                let mut hashes_dir: Option<RwLock<Vec<[u8; 32]>>> = None;
 
                 let mut bytes_recv = 0;
                 let instant = Instant::now();
@@ -810,7 +810,10 @@ async fn send_request<C: NodeComponents>(
                                             bytes_recv as u64,
                                             Some(duration),
                                         );
-                                        return Ok(SendResult {request, result: ServerResponse::EoR});
+                                        return Ok(SendResult {
+                                            request,
+                                            result: ServerResponse::EoR,
+                                        });
                                     },
                                     Err(err) => {
                                         error!("Error handling send request for file {}", err);
@@ -834,28 +837,37 @@ async fn send_request<C: NodeComponents>(
                             };
                             if let Some(ref dir_wr) = dir_writer {
                                 if let Some(ref hashes_dir_vec) = hashes_dir {
-                                    match handle_send_request_dir::<C>(dir_wr, dir, &hashes_dir_vec).await {
+                                    match handle_send_request_dir::<C>(dir_wr, dir, hashes_dir_vec)
+                                        .await
+                                    {
                                         Ok(RespSendRequest::Continue) => (),
                                         Ok(RespSendRequest::EoF) => {
-                                            let dir_writer = dir_writer.take().unwrap().into_inner();
-                                            dir_writer.commit().await.expect("Error commiting writer");
-                                            // TODO(matthias): do we have to compare this hash to the
-                                            // requested hash?
+                                            let dir_writer =
+                                                dir_writer.take().unwrap().into_inner();
+                                            dir_writer
+                                                .commit()
+                                                .await
+                                                .expect("Error commiting writer");
+                                            // TODO(matthias): do we have to compare this hash to
+                                            // the requested hash?
                                             let duration = instant.elapsed();
                                             rep_reporter.report_bytes_received(
                                                 peer,
                                                 bytes_recv as u64,
                                                 Some(duration),
                                             );
-                                            let hashes = hashes_dir.take().unwrap().into_inner(); 
-                                            return Ok(SendResult { request, result: ServerResponse::Continue(hashes) });
+                                            let hashes = hashes_dir.take().unwrap().into_inner();
+                                            return Ok(SendResult {
+                                                request,
+                                                result: ServerResponse::Continue(hashes),
+                                            });
                                         },
                                         Err(err) => {
                                             error!("Error handling send request for dir {}", err);
                                             break;
                                         },
                                     }
-                                }else{
+                                } else {
                                     error!("Dir Hashes was not initilialized properly");
                                     break;
                                 }
@@ -937,17 +949,17 @@ async fn handle_send_request_dir<C: NodeComponents>(
             .map(|_| RespSendRequest::Continue)
             .map_err(|e| e.to_string()),
         DirFrame::Chunk(chunk) => {
-            match chunk.link { 
+            match chunk.link {
                 OwnedLink::Content(hash) => hashes_dir.write().await.push(hash),
-                OwnedLink::Link(_) => ()
+                OwnedLink::Link(_) => (),
             };
             writer
-            .write()
-            .await
-            .insert(BorrowedEntry::from(&chunk.into_owned()), false)
-            .await
-            .map(|_| RespSendRequest::Continue)
-            .map_err(|e| e.to_string())
+                .write()
+                .await
+                .insert(BorrowedEntry::from(&chunk.into_owned()), false)
+                .await
+                .map(|_| RespSendRequest::Continue)
+                .map_err(|e| e.to_string())
         },
         DirFrame::LastChunk(chunk) => writer
             .write()
