@@ -953,6 +953,7 @@ async fn handle_send_request_dir<C: NodeComponents>(
                 OwnedLink::Content(hash) => hashes_dir.write().await.push(hash),
                 OwnedLink::Link(_) => (),
             };
+
             writer
                 .write()
                 .await
@@ -961,13 +962,20 @@ async fn handle_send_request_dir<C: NodeComponents>(
                 .map(|_| RespSendRequest::Continue)
                 .map_err(|e| e.to_string())
         },
-        DirFrame::LastChunk(chunk) => writer
-            .write()
-            .await
-            .insert(BorrowedEntry::from(&chunk.into_owned()), true)
-            .await
-            .map(|_| RespSendRequest::Continue)
-            .map_err(|e| e.to_string()),
+        DirFrame::LastChunk(chunk) => {
+            match chunk.link {
+                OwnedLink::Content(hash) => hashes_dir.write().await.push(hash),
+                OwnedLink::Link(_) => (),
+            };
+
+            writer
+                .write()
+                .await
+                .insert(BorrowedEntry::from(&chunk.into_owned()), true)
+                .await
+                .map(|_| RespSendRequest::Continue)
+                .map_err(|e| e.to_string())
+        },
         DirFrame::Eos => Ok(RespSendRequest::EoF),
     }
 }

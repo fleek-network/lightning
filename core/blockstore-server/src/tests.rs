@@ -504,7 +504,10 @@ async fn test_dir_send_and_receive() {
                 assert_eq!(content1, content2);
             }
             match response {
-                ServerResponse::Continue(_) => (),
+                ServerResponse::Continue(r) => {
+                    assert!(!r.is_empty());
+                    assert_eq!(r.len(), 3);
+                },
                 ServerResponse::EoR => panic!("Expected more hashes"),
             }
         },
