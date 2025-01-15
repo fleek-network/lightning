@@ -7670,6 +7670,7 @@ name = "lightning-e2e"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "b3fs",
  "cid",
  "clap",
  "fleek-blake3",
