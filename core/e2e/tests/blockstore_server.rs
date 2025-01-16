@@ -264,7 +264,7 @@ async fn e2e_blockstore_server_with_fetcher_recursive_dir() {
         .await
         .expect("Failed to send request");
 
-    tokio::time::sleep(Duration::from_secs(5)).await;
+    tokio::time::sleep(Duration::from_secs(3)).await;
     match res {
         FetcherResponse::Put(_) => panic!("impossible"),
         FetcherResponse::Fetch(hash_new) => {
@@ -279,29 +279,18 @@ async fn e2e_blockstore_server_with_fetcher_recursive_dir() {
                 .unwrap()
                 .into_dir()
                 .unwrap();
-            let entry = dir_reader
-                .entries()
-                .await
-                .unwrap()
-                .next()
-                .await
-                .unwrap()
-                .unwrap();
-            if let OwnedLink::Content(link) = entry.link {
-                let mut path_header = blockstore_2.get_root_dir().to_path_buf();
-                path_header.push("headers");
-                let dir = tokio::fs::read_dir(path_header).await.unwrap();
-                assert!(
-                    blockstore_2
-                        .get_bucket()
-                        .get(&link)
-                        .await
-                        .unwrap()
-                        .is_file()
-                );
-            } else {
-                panic!("Error. Expected content");
+            let mut entries = dir_reader.entries().await.unwrap();
+            let mut count = 0;
+            while let Some(Ok(entry)) = entries.next().await {
+                match entry.link {
+                    OwnedLink::Content(h) => {
+                        count += 1;
+                        assert!(blockstore_2.get_bucket().get(&h).await.is_ok());
+                    },
+                    OwnedLink::Link(_) => (),
+                }
             }
+            assert_eq!(count, 3);
         },
     }
 
