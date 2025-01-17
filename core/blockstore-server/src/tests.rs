@@ -25,6 +25,7 @@ use tempfile::{tempdir, TempDir};
 use tokio::sync::RwLock;
 use tokio_stream::StreamExt;
 
+use self::types::ServerResponse;
 use super::BlockstoreServer;
 use crate::blockstore_server::{DirFrame, FileFrame, Frame};
 use crate::config::Config;
@@ -261,9 +262,13 @@ async fn test_send_and_receive() {
         .expect("Failed to send request");
     let result = res.recv().await.unwrap();
     match result {
-        Ok(()) => {
+        Ok(response) => {
             let recv_content = peers[1].blockstore().read_all_to_vec(&hash).await.unwrap();
             assert_eq!(recv_content, content);
+            match response {
+                ServerResponse::Continue(_) => panic!("Expected only 1 file"),
+                ServerResponse::EoR => (),
+            }
         },
         Err(e) => {
             panic!("Failed to receive content: {e:?}");
@@ -480,7 +485,7 @@ async fn test_dir_send_and_receive() {
         .expect("Failed to send request");
     let result = res.recv().await.unwrap();
     match result {
-        Ok(()) => {
+        Ok(response) => {
             let recv_content = peers[1]
                 .blockstore()
                 .dir_read_all_to_vec(&hash)
@@ -497,6 +502,13 @@ async fn test_dir_send_and_receive() {
                     panic!("entry2 missing content");
                 };
                 assert_eq!(content1, content2);
+            }
+            match response {
+                ServerResponse::Continue(r) => {
+                    assert!(!r.is_empty());
+                    assert_eq!(r.len(), 3);
+                },
+                ServerResponse::EoR => panic!("Expected more hashes"),
             }
         },
         Err(e) => {
