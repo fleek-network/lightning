@@ -1163,6 +1163,11 @@ impl<B: Backend> StateExecutor<B> {
         }
         account_info.client_key = Some(ClientPublicKey(client_key));
 
+        // TODO(oz): technically we should track the client key -> accout key here, but I think
+        //           the pod flow will change to where the client declares the eth account id
+        //           it will use on connection or even per dack. Need to finalize this flow, but
+        //           tracking the logic and ensuring a 1-1 is slightly complex and unused for now.
+
         // Commit to state and return success
         self.account_info.set(sender, account_info);
         TransactionResponse::Success(ExecutionData::None)
