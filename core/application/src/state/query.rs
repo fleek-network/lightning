@@ -27,6 +27,7 @@ use lightning_interfaces::types::{
     NodeIndex,
     NodeInfo,
     NodeServed,
+    Nonce,
     ProtocolParamKey,
     ProtocolParamValue,
     ReportedReputationMeasurements,
@@ -55,7 +56,7 @@ pub struct QueryRunner {
     inner: Atomo<QueryPerm, AtomoStorage>,
     metadata_table: ResolvedTableReference<Metadata, Value>,
     account_table: ResolvedTableReference<EthAddress, AccountInfo>,
-    client_table: ResolvedTableReference<ClientPublicKey, EthAddress>,
+    client_table: ResolvedTableReference<ClientPublicKey, (EthAddress, Nonce)>,
     node_table: ResolvedTableReference<NodeIndex, NodeInfo>,
     pub_key_to_index: ResolvedTableReference<NodePublicKey, NodeIndex>,
     committee_table: ResolvedTableReference<Epoch, Committee>,
@@ -100,7 +101,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
         Self {
             metadata_table: atomo.resolve::<Metadata, Value>("metadata"),
             account_table: atomo.resolve::<EthAddress, AccountInfo>("account"),
-            client_table: atomo.resolve::<ClientPublicKey, EthAddress>("client_keys"),
+            client_table: atomo.resolve::<ClientPublicKey, (EthAddress, Nonce)>("client_keys"),
             node_table: atomo.resolve::<NodeIndex, NodeInfo>("node"),
             pub_key_to_index: atomo.resolve::<NodePublicKey, NodeIndex>("pub_key_to_index"),
             committee_table: atomo.resolve::<Epoch, Committee>("committee"),
@@ -178,9 +179,14 @@ impl SyncQueryRunnerInterface for QueryRunner {
             .map(selector)
     }
 
+    #[inline]
     fn client_key_to_account_key(&self, pub_key: &ClientPublicKey) -> Option<EthAddress> {
-        self.inner
-            .run(|ctx| self.client_table.get(ctx).get(pub_key))
+        self.inner.run(|ctx| {
+            self.client_table
+                .get(ctx)
+                .get(pub_key)
+                .map(|(address, _)| address)
+        })
     }
 
     #[inline]

@@ -801,6 +801,7 @@ async fn test_rpc_get_state_proof() {
             stables_balance: HpUfixed::zero(),
             bandwidth_balance: 0,
             nonce: 0,
+            client_key: None,
         })
     );
 
@@ -815,6 +816,7 @@ async fn test_rpc_get_state_proof() {
                 stables_balance: HpUfixed::zero(),
                 bandwidth_balance: 0,
                 nonce: 0,
+                client_key: None,
             },
             root_hash,
         )

@@ -33,6 +33,7 @@ use lightning_interfaces::types::{
     NodePorts,
     NodeRegistryChange,
     NodeServed,
+    Nonce,
     Participation,
     ProofOfConsensus,
     ProofOfMisbehavior,
@@ -60,7 +61,9 @@ use lightning_interfaces::types::{
 use lightning_interfaces::ToDigest;
 use lightning_utils::eth::fleek_contract::FleekContractCalls;
 use lightning_utils::eth::{
+    ApproveClientKeyCall,
     DepositCall,
+    RevokeClientKeyCall,
     StakeCall,
     UnstakeCall,
     WithdrawCall,
@@ -104,7 +107,7 @@ lazy_static! {
 pub struct StateExecutor<B: Backend> {
     pub metadata: B::Ref<Metadata, Value>,
     pub account_info: B::Ref<EthAddress, AccountInfo>,
-    pub client_keys: B::Ref<ClientPublicKey, EthAddress>,
+    pub client_keys: B::Ref<ClientPublicKey, (EthAddress, Nonce)>,
     pub node_info: B::Ref<NodeIndex, NodeInfo>,
     pub consensus_key_to_index: B::Ref<ConsensusPublicKey, NodeIndex>,
     pub pub_key_to_index: B::Ref<NodePublicKey, NodeIndex>,
@@ -383,7 +386,13 @@ impl<B: Backend> StateExecutor<B> {
                         Some(NodePorts::default()),
                     )
                 },
-                _ => TransactionResponse::Revert(ExecutionError::InvalidStateFunction),
+                Ok(FleekContractCalls::ApproveClientKey(ApproveClientKeyCall { client_key })) => {
+                    self.approve_client_key(sender, client_key.to_vec())
+                },
+                Ok(FleekContractCalls::RevokeClientKey(RevokeClientKeyCall {})) => {
+                    self.revoke_client_key(sender)
+                },
+                Err(_) => TransactionResponse::Revert(ExecutionError::InvalidStateFunction),
             }
         } else {
             // They are trying to transfer FLK
@@ -1139,6 +1148,37 @@ impl<B: Backend> StateExecutor<B> {
             self.uri_to_node.set(uri, providers);
         }
 
+        TransactionResponse::Success(ExecutionData::None)
+    }
+
+    fn approve_client_key(&self, sender: EthAddress, client_key: Vec<u8>) -> TransactionResponse {
+        // Validate client key length
+        let Ok(client_key) = client_key.try_into() else {
+            return TransactionResponse::Revert(ExecutionError::InvalidClientKeyLength);
+        };
+
+        let mut account_info = self.account_info.get(&sender).unwrap_or_default();
+        if account_info.client_key.is_some() {
+            return TransactionResponse::Revert(ExecutionError::DuplicateClientKey);
+        }
+        account_info.client_key = Some(ClientPublicKey(client_key));
+
+        // Commit to state and return success
+        self.account_info.set(sender, account_info);
+        TransactionResponse::Success(ExecutionData::None)
+    }
+
+    fn revoke_client_key(&self, sender: EthAddress) -> TransactionResponse {
+        let mut account_info = self.account_info.get(&sender).unwrap_or_default();
+
+        // If no key is stored, revert, otherwise remove it
+        if account_info.client_key.is_none() {
+            return TransactionResponse::Revert(ExecutionError::MissingClientKey);
+        }
+        account_info.client_key = None;
+
+        // Commit to state and return success
+        self.account_info.set(sender, account_info);
         TransactionResponse::Success(ExecutionData::None)
     }
 

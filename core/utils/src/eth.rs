@@ -11,6 +11,8 @@ abigen!(
         function deposit(string token, uint256 amount)
         function unstake(uint256 amount, bytes32 node_public_key)
         function withdrawUnstaked(bytes32 node_public_key, address recipient)
+        function approveClientKey(bytes client_key)
+        function revokeClientKey()
     ]"
 );
 

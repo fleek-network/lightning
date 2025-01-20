@@ -36,7 +36,7 @@ use merklize::hashers::keccak::KeccakHasher;
 use merklize::trees::mpt::MptStateTree;
 use merklize::StateTree;
 use tokio::sync::Mutex;
-use types::{NodeRegistryChange, NodeRegistryChanges};
+use types::{NodeRegistryChange, NodeRegistryChanges, Nonce};
 
 use crate::config::ApplicationConfig;
 use crate::state::{ApplicationState, QueryRunner};
@@ -215,7 +215,7 @@ impl ApplicationEnv {
 
             let mut node_table = ctx.get_table::<NodeIndex, NodeInfo>("node");
             let mut account_table = ctx.get_table::<EthAddress, AccountInfo>("account");
-            let mut client_table = ctx.get_table::<ClientPublicKey, EthAddress>("client_keys");
+            let mut client_table = ctx.get_table::<ClientPublicKey, (EthAddress, Nonce)>("client_keys");
             let mut service_table = ctx.get_table::<ServiceId, Service>("service");
             let mut param_table = ctx.get_table::<ProtocolParamKey, ProtocolParamValue>("parameter");
             let mut committee_table = ctx.get_table::<Epoch, Committee>("committee");
@@ -247,6 +247,7 @@ impl ApplicationEnv {
             metadata_table.insert(Metadata::GovernanceAddress,
                 Value::AccountPublicKey(genesis.governance_address));
             let governance_account = AccountInfo {
+                client_key: None,
                 flk_balance: 0u64.into(),
                 stables_balance: 0u64.into(),
                 bandwidth_balance: 0u64.into(),
@@ -429,12 +430,13 @@ impl ApplicationEnv {
                     stables_balance: account.stables_balance.into(),
                     bandwidth_balance: account.bandwidth_balance.into(),
                     nonce: 0,
+                    client_key: None,
                 };
                 account_table.insert(account.public_key, info);
             }
 
             for (client_key, address) in genesis.client {
-                client_table.insert(client_key, address);
+                client_table.insert(client_key, (address, 0));
             }
 
             // add commodity prices

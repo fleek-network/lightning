@@ -165,4 +165,8 @@ pub enum ExecutionError {
     TooManyMeasurements,
     TooManyUpdates,
     TooManyUpdatesForContent,
+    // approve and revoke client key error types
+    InvalidClientKeyLength,
+    DuplicateClientKey,
+    MissingClientKey,
 }
