@@ -35,6 +35,12 @@ impl From<&AccountOwnerSecretKey> for Secp256k1PrivateKey {
     }
 }
 
+impl AccountOwnerSecretKey {
+    pub fn into_bytes(self) -> [u8; 32] {
+        self.0
+    }
+}
+
 impl SecretKey for AccountOwnerSecretKey {
     type PublicKey = AccountOwnerPublicKey;
 
