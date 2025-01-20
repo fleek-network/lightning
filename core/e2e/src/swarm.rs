@@ -141,6 +141,15 @@ impl Swarm {
             .collect()
     }
 
+    pub fn get_query_runners(
+        &self,
+    ) -> HashMap<NodePublicKey, c!(FullNodeComponents::ApplicationInterface::SyncExecutor)> {
+        self.nodes
+            .iter()
+            .map(|(&pubkey, node)| (pubkey, node.take_cloned_query_runner()))
+            .collect()
+    }
+
     pub fn get_genesis_committee_rpc_addresses(&self) -> HashMap<NodePublicKey, String> {
         self.nodes
             .iter()
@@ -298,6 +307,7 @@ pub struct SwarmBuilder {
     ping_interval: Option<Duration>,
     ping_timeout: Option<Duration>,
     ipfs_gateways: Option<Vec<Gateway>>,
+    chain_id: Option<u32>,
 }
 
 impl SwarmBuilder {
@@ -387,6 +397,11 @@ impl SwarmBuilder {
         self
     }
 
+    pub fn with_chain_id(mut self, chain_id: u32) -> Self {
+        self.chain_id = Some(chain_id);
+        self
+    }
+
     pub fn build(self) -> Swarm {
         let num_nodes = self.num_nodes.expect("Number of nodes must be provided.");
         let directory = self.directory.expect("Directory must be provided.");
@@ -416,7 +431,7 @@ impl SwarmBuilder {
             max_lock_time: 1460,
             supply_at_genesis: 1000000,
             min_num_measurements: 2,
-            chain_id: 59330,
+            chain_id: self.chain_id.unwrap_or(1337),
             reputation_ping_timeout: self.ping_timeout.unwrap_or(Duration::from_millis(1)),
             topology_target_k: 8,
             topology_min_nodes: 16,

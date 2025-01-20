@@ -122,6 +122,15 @@ impl ContainerizedNode {
             .get_socket()
     }
 
+    pub fn take_cloned_query_runner(
+        &self,
+    ) -> c!(FullNodeComponents::ApplicationInterface::SyncExecutor) {
+        self.node
+            .provider()
+            .get::<c!(FullNodeComponents::ApplicationInterface::SyncExecutor)>()
+            .clone()
+    }
+
     pub fn is_genesis_committee(&self) -> bool {
         self.is_genesis_committee
     }

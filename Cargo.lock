@@ -7673,6 +7673,7 @@ dependencies = [
  "b3fs",
  "cid",
  "clap",
+ "ethers",
  "fleek-blake3",
  "fleek-crypto",
  "futures",

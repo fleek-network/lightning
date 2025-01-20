@@ -49,6 +49,7 @@ serial_test = "3.0.0"
 tracing.workspace = true
 fleek-blake3 = "1.5"
 thiserror.workspace = true
+ethers.workspace = true
 
 toml = "0.7"
 resolve-path = "0.1.0"
