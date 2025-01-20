@@ -5107,6 +5107,7 @@ dependencies = [
  "arrayref",
  "bytes",
  "cid",
+ "fleek-crypto",
  "fn-sdk",
  "hex",
  "lightning-schema",
