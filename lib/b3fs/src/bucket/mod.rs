@@ -64,6 +64,10 @@ pub const HEADER_FILE_VERSION: u32 = 0;
 pub const POSITION_START_HASHES: usize = 8;
 pub const POSITION_START_NUM_ENTRIES: usize = POSITION_START_HASHES - 4;
 
+pub const BLOCKS_PATH: &str = "blocks";
+pub const HEADERS_PATH: &str = "headers";
+pub const TEMP_PATH: &str = "wal";
+
 /// An open b3fs bucket which can be used for both reads and writes.
 #[derive(Clone)]
 pub struct Bucket {
@@ -88,6 +92,22 @@ pub struct ContentHeader {
 }
 
 impl Bucket {
+    pub fn header_path<P: AsRef<Path>>(root: P, hash: &[u8; 32]) -> Result<PathBuf> {
+        let mut root_path = std::env::current_dir()?;
+        root_path.push(&root);
+        root_path.push(HEADERS_PATH);
+        root_path.push(to_hex(hash).as_str());
+        Ok(root_path)
+    }
+
+    pub fn block_path<P: AsRef<Path>>(root: P, hash: &[u8; 32]) -> Result<PathBuf> {
+        let mut root_path = std::env::current_dir()?;
+        root_path.push(&root);
+        root_path.push(BLOCKS_PATH);
+        root_path.push(to_hex(hash).as_str());
+        Ok(root_path)
+    }
+
     /// Open a bucket at the given path.
     pub async fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         // turn the root path into an absolute path. this will prevent any bugs from changing the
@@ -97,15 +117,15 @@ impl Bucket {
         fs::create_dir_all(&root_path).await?;
 
         let mut blocks_path = root_path.clone();
-        blocks_path.push("blocks");
+        blocks_path.push(BLOCKS_PATH);
         fs::create_dir(&blocks_path).await;
 
         let mut headers_path = root_path.clone();
-        headers_path.push("headers");
+        headers_path.push(HEADERS_PATH);
         fs::create_dir(&headers_path).await;
 
         let mut wal_path = root_path.clone();
-        wal_path.push("wal");
+        wal_path.push(TEMP_PATH);
         fs::create_dir(&wal_path).await;
 
         Ok(Self {

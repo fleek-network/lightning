@@ -1,11 +1,14 @@
 use std::cell::RefCell;
 use std::ffi::c_void;
+use std::io::{Read, Seek};
+use std::ops::Deref;
 use std::rc::Rc;
 use std::str::FromStr;
 
 use anyhow::{anyhow, bail, Context};
 use arrayref::array_ref;
-use blake3_tree::utils::{tree_index, HashVec};
+use b3fs::bucket::POSITION_START_HASHES;
+use b3fs::collections::HashTree;
 use cid::Cid;
 use deno_core::error::{AnyError, JsError};
 use deno_core::url::Url;
@@ -13,7 +16,7 @@ use deno_core::{op2, v8, ByteString, JsBuffer, OpState, ResourceId};
 use deno_permissions::ChildPermissionsArg;
 use deno_web::JsMessageData;
 use fleek_crypto::{ClientPublicKey, NodeSignature};
-use fn_sdk::blockstore::get_internal_path;
+use fn_sdk::blockstore::{block_file, header_file};
 use lightning_schema::task_broker::TaskScope;
 use serde::{Deserialize, Serialize, Serializer};
 use serde_json::json;
@@ -92,15 +95,15 @@ pub async fn fetch_from_origin(#[string] raw_url: String) -> anyhow::Result<Box<
 #[op2(async)]
 #[buffer]
 pub async fn load_content(#[buffer(copy)] hash: Vec<u8>) -> anyhow::Result<Box<[u8]>> {
-    let path = get_internal_path(array_ref![hash, 0, 32]);
+    let path = header_file(array_ref![hash, 0, 32]);
 
     // TODO: store proof on rust side, and only give javascript an id to reference the handle
-    let proof = std::fs::read(path)?.into_boxed_slice();
-    if proof.len() & 31 != 0 {
-        return Err(anyhow!("corrupted proof in blockstore"));
-    }
+    let mut file = std::fs::File::open(path)?;
+    file.seek(std::io::SeekFrom::Start(POSITION_START_HASHES as u64))?;
+    let mut buffer = vec![];
+    let _ = file.read_to_end(&mut buffer)?;
 
-    Ok(proof)
+    Ok(buffer.to_vec().into_boxed_slice())
 }
 
 #[op2(async)]
@@ -109,9 +112,9 @@ pub async fn read_block(
     #[buffer(copy)] proof: Box<[u8]>,
     #[bigint] index: usize,
 ) -> anyhow::Result<Vec<u8>> {
-    let tree = HashVec::from_inner(proof);
-    let inner_hash = tree[tree_index(index)];
-    let path = fn_sdk::blockstore::get_block_path(index, &inner_hash);
+    let tree = HashTree::try_from(proof.deref())?;
+    let inner_hash = tree.nth(index);
+    let path = block_file(&inner_hash);
     let block = std::fs::read(path)?;
 
     Ok(block)

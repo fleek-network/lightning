@@ -12,6 +12,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
+use fleek_blake3::tree;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use tokio::sync::RwLock;
 use tokio_stream::Stream;
@@ -107,6 +108,11 @@ impl<'s> HashTree<'s> {
     #[inline]
     pub fn root(&self) -> &'s [u8; 32] {
         self.inner.get(self.inner.len() - 1)
+    }
+
+    #[inline]
+    pub fn nth(&self, index: usize) -> &'s [u8; 32] {
+        self.inner.get(tree_index(index))
     }
 
     /// Returns the number of items in this hash tree.
