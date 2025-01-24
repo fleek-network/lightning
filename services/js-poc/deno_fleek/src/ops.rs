@@ -114,7 +114,7 @@ pub async fn read_block(
 ) -> anyhow::Result<Vec<u8>> {
     let tree = HashTree::try_from(proof.deref())?;
     let inner_hash = tree.nth(index);
-    let path = block_file(&inner_hash);
+    let path = block_file(inner_hash);
     let block = std::fs::read(path)?;
 
     Ok(block)
