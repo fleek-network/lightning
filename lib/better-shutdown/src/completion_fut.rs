@@ -24,7 +24,7 @@ impl<'a> CompletionFuture<'a> {
     }
 }
 
-impl<'a> Future for CompletionFuture<'a> {
+impl Future for CompletionFuture<'_> {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
@@ -34,7 +34,7 @@ impl<'a> Future for CompletionFuture<'a> {
     }
 }
 
-impl<'a> Drop for CompletionFuture<'a> {
+impl Drop for CompletionFuture<'_> {
     fn drop(&mut self) {
         if let Some(slot) = self.list_position.take() {
             let mut wait_list = self

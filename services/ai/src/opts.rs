@@ -168,7 +168,7 @@ impl TryFrom<u8> for BorshVectorType {
             _ => {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidInput,
-                    "unknown encoding {value}",
+                    format!("unknown encoding {value}"),
                 ));
             },
         };

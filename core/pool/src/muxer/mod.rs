@@ -92,7 +92,7 @@ where
         // Sends this is a wrapper for a Stream, the error is consumed.
         Pin::new(&mut self.rx)
             .poll_next(cx)
-            .map(|bytes| bytes.map(|b| b.map(Bytes::from).map_err(Into::into)))
+            .map(|bytes| bytes.map(|b| b.map(Bytes::from)))
     }
 }
 

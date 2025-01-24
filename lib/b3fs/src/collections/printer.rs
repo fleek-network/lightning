@@ -54,7 +54,7 @@ enum TreeNode<'t> {
     Leaf(&'t [u8; 32]),
 }
 
-impl<'t> Debug for TreeNode<'t> {
+impl Debug for TreeNode<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             TreeNode::Internal { hash, left, right } => f

@@ -328,7 +328,7 @@ impl TranscriptBuilderInput for Option<String> {
     }
 }
 
-impl<'a> TranscriptBuilderInput for &'a str {
+impl TranscriptBuilderInput for &str {
     const TYPE: &'static str = "str";
 
     fn to_transcript_builder_input(&self) -> Vec<u8> {

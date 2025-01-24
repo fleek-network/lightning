@@ -10,9 +10,9 @@ use lightning_notifier::Notifier;
 use lightning_test_utils::consensus::{MockConsensus, MockConsensusConfig, MockForwarder};
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
-use lightning_utils::poll::{poll_until, PollUntilError};
+use lightning_utils::poll::{PollUntilError, poll_until};
 use lightning_utils::transaction::TransactionSigner;
-use tempfile::{tempdir, TempDir};
+use tempfile::{TempDir, tempdir};
 use types::{
     ExecuteTransactionError,
     ExecuteTransactionOptions,
@@ -278,6 +278,5 @@ impl<C: NodeComponents> TestNode<C> {
                     }),
             ),
         )
-        .map_err(anyhow::Error::from)
     }
 }

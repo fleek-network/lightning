@@ -19,14 +19,14 @@ use tokio_stream::Stream;
 
 use super::error::CollectionTryFromError;
 use super::flat::FlatHashSlice;
-use crate::bucket::errors::ReadError;
 use crate::bucket::POSITION_START_HASHES;
+use crate::bucket::errors::ReadError;
 use crate::entry::BorrowedEntry;
 use crate::hasher;
 use crate::hasher::dir_hasher::DirectoryHasher;
+use crate::stream::ProofEncoder;
 use crate::stream::buffer::ProofBuf;
 use crate::stream::walker::{self, Mode, TreeWalker};
-use crate::stream::ProofEncoder;
 use crate::utils::{block_counter_from_tree_index, is_valid_tree_len, tree_index};
 
 /// A wrapper around a list of hashes that provides access only to the leaf nodes in the tree.
@@ -82,7 +82,7 @@ impl<'s> TryFrom<&'s Vec<[u8; 32]>> for HashTree<'s> {
     }
 }
 
-impl<'s> Index<usize> for HashTree<'s> {
+impl Index<usize> for HashTree<'_> {
     type Output = [u8; 32];
 
     #[inline]
@@ -184,7 +184,7 @@ impl<'s> Iterator for HashTreeIter<'s> {
     }
 }
 
-impl<'s> DoubleEndedIterator for HashTreeIter<'s> {
+impl DoubleEndedIterator for HashTreeIter<'_> {
     fn next_back(&mut self) -> Option<Self::Item> {
         if self.is_done() {
             return None;
@@ -200,7 +200,7 @@ impl<'s> DoubleEndedIterator for HashTreeIter<'s> {
     }
 }
 
-impl<'s> Debug for HashTree<'s> {
+impl Debug for HashTree<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         super::printer::print(self, f)
     }

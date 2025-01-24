@@ -5,12 +5,12 @@ use std::borrow::Cow;
 use std::collections::{HashMap, VecDeque};
 use std::mem;
 use std::net::SocketAddr;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 
 use affair::{Socket, Task};
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use b3fs::entry::{BorrowedEntry, InlineVec, OwnedEntry, OwnedLink};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use lightning_interfaces::prelude::*;
@@ -30,7 +30,7 @@ use lightning_interfaces::{
 };
 use lightning_metrics::increment_counter;
 use serde::{Deserialize, Serialize};
-use tokio::sync::{broadcast, mpsc, RwLock};
+use tokio::sync::{RwLock, broadcast, mpsc};
 use tokio::task::JoinSet;
 use tokio::time::timeout;
 use tokio_stream::StreamExt;
@@ -326,7 +326,7 @@ pub enum DirFrame<'a> {
     Eos,
 }
 
-impl<'a> DirFrame<'a> {
+impl DirFrame<'_> {
     fn entry_len(entry: &OwnedEntry) -> usize {
         let mut bytes = entry.name.len();
         match &entry.link {
@@ -355,7 +355,7 @@ impl<'a> DirFrame<'a> {
     }
 }
 
-impl<'a> From<Frame<'a>> for Bytes {
+impl From<Frame<'_>> for Bytes {
     fn from(value: Frame) -> Self {
         let mut b = BytesMut::new();
         match value {

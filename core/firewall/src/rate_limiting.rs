@@ -103,7 +103,7 @@ impl RateLimiting {
                 *global = rules;
 
                 // remove all old global rules
-                per.retain(|_, v| v.first().map_or(false, |f| !f.is_global));
+                per.retain(|_, v| v.first().is_some_and(|f| !f.is_global));
             },
         }
 
@@ -132,7 +132,7 @@ impl RateLimiting {
                             .into_iter()
                             .filter_map(|(k, v)| {
                                 // take the user rules if theyre are not global
-                                if v.first().map_or(false, |policy| !policy.is_global) {
+                                if v.first().is_some_and(|policy| !policy.is_global) {
                                     return Some((k, v.into_iter().map(IsGlobal::inner).collect()));
                                 }
 

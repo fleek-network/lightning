@@ -131,7 +131,7 @@ async fn fetch<C: NodeComponents<ConfigProviderInterface = TomlConfigProvider<C>
 
 struct ByteBuf<'a>(&'a [u8]);
 
-impl<'a> std::fmt::LowerHex for ByteBuf<'a> {
+impl std::fmt::LowerHex for ByteBuf<'_> {
     fn fmt(&self, fmtr: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         for byte in self.0 {
             fmtr.write_fmt(format_args!("{:02x}", byte))?;

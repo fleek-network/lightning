@@ -4,8 +4,8 @@ use std::hash::Hash;
 
 use atomo::{KeyIterator, SerdeBackend, StorageBackend, TableRef as AtomoTableRef, TableSelector};
 use fxhash::FxHashMap;
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 
 pub trait Backend {
     type Ref<K: Eq + Hash + Send + Serialize + DeserializeOwned
@@ -59,12 +59,11 @@ pub struct AtomoTable<
 >(RefCell<AtomoTableRef<'selector, K, V, B, S>>);
 
 impl<
-    'selector,
     K: Hash + Eq + Serialize + DeserializeOwned + Any,
     V: Serialize + DeserializeOwned + Any + Clone,
     B: StorageBackend,
     S: SerdeBackend,
-> TableRef<K, V> for AtomoTable<'selector, K, V, B, S>
+> TableRef<K, V> for AtomoTable<'_, K, V, B, S>
 {
     fn set(&self, key: K, value: V) {
         self.0.borrow_mut().insert(key, value);

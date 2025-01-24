@@ -13,16 +13,19 @@ use crate::ipc::BLOCKSTORE;
 ///
 /// If called from outside of a service execution.
 pub async fn blockstore_root() -> Bucket {
+    #[allow(static_mut_refs)]
     let path = unsafe { BLOCKSTORE.as_ref().expect("setup not completed") };
     Bucket::open(path).await.expect("Error opening bucket")
 }
 
 pub fn header_file(hash: &[u8; 32]) -> PathBuf {
+    #[allow(static_mut_refs)]
     let path = unsafe { BLOCKSTORE.as_ref().expect("setup not completed") };
     Bucket::header_path(path, hash).expect("Error opening header path")
 }
 
 pub fn block_file(hash: &[u8; 32]) -> PathBuf {
+    #[allow(static_mut_refs)]
     let path = unsafe { BLOCKSTORE.as_ref().expect("setup not completed") };
     Bucket::block_path(path, hash).expect("Error opening header path")
 }

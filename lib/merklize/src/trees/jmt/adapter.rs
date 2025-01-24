@@ -54,7 +54,7 @@ impl<'a, B: StorageBackend, S: SerdeBackend> Adapter<'a, B, S> {
     }
 }
 
-impl<'a, B: StorageBackend, S: SerdeBackend> TreeReader for Adapter<'a, B, S> {
+impl<B: StorageBackend, S: SerdeBackend> TreeReader for Adapter<'_, B, S> {
     /// Get the node for the given node key, if it is present in the tree.
     fn get_node_option(&self, node_key: &NodeKey) -> Result<Option<Node>> {
         let value = self.nodes_table.lock().unwrap().get(node_key);
@@ -99,7 +99,7 @@ impl<'a, B: StorageBackend, S: SerdeBackend> TreeReader for Adapter<'a, B, S> {
     }
 }
 
-impl<'a, B: StorageBackend, S: SerdeBackend> HasPreimage for Adapter<'a, B, S> {
+impl<B: StorageBackend, S: SerdeBackend> HasPreimage for Adapter<'_, B, S> {
     /// Gets the preimage of a key hash, if it is present in the tree.
     fn preimage(&self, key_hash: KeyHash) -> Result<Option<Vec<u8>>> {
         let state_key = self.get_key(key_hash);

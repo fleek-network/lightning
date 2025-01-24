@@ -8,10 +8,10 @@ use fastbloom_rs::{BloomFilter, FilterBuilder, Hashes, Membership};
 use tokio::fs::{File, OpenOptions};
 use tokio::io::{self, AsyncWriteExt, BufWriter};
 
-use super::phf::{calculate_buckets_len, HasherState, PhfGenerator};
 use super::HeaderPositions;
+use super::phf::{HasherState, PhfGenerator, calculate_buckets_len};
 use crate::bucket::dir::POSITION_START_HASHES;
-use crate::bucket::{errors, Bucket, HEADER_DIR_VERSION};
+use crate::bucket::{Bucket, HEADER_DIR_VERSION, errors};
 use crate::entry::{BorrowedEntry, BorrowedLink};
 use crate::hasher::dir_hasher::B3_DIR_IS_SYM_LINK;
 use crate::utils::random_file_from;
@@ -174,9 +174,9 @@ impl HeaderFile {
     /// # Returns
     ///
     /// Returns a Result indicating success or an InsertError.
-    async fn insert_entry<'a>(
+    async fn insert_entry(
         &mut self,
-        borrowed_entry: BorrowedEntry<'a>,
+        borrowed_entry: BorrowedEntry<'_>,
     ) -> Result<usize, errors::InsertError> {
         let (mut flag, content, clen, is_sym) = match borrowed_entry.link {
             crate::entry::BorrowedLink::Content(hash) => (0, hash.as_slice(), 32, false),
@@ -230,9 +230,9 @@ pub trait WithCollector {
 /// Trait defining the operations that can be performed on a directory state.
 pub trait DirState {
     /// Inserts a new entry into the directory.
-    async fn insert_entry<'a>(
+    async fn insert_entry(
         &mut self,
-        borrowed_entry: BorrowedEntry<'a>,
+        borrowed_entry: BorrowedEntry<'_>,
         last_entry: bool,
     ) -> Result<(), errors::InsertError>;
 
@@ -244,9 +244,9 @@ pub trait DirState {
 }
 
 impl<T: WithCollector> DirState for InnerDirState<T> {
-    async fn insert_entry<'b>(
+    async fn insert_entry(
         &mut self,
-        borrowed_entry: BorrowedEntry<'b>,
+        borrowed_entry: BorrowedEntry<'_>,
         last_entry: bool,
     ) -> Result<(), errors::InsertError> {
         let i = self.next_position;

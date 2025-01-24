@@ -6,8 +6,8 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 
 use fxhash::{FxHashMap, FxHashSet};
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 
 use crate::batch::{BatchReference, Operation, VerticalBatch};
 use crate::db::TableId;
@@ -90,7 +90,7 @@ impl TableMeta {
 }
 
 // When a table ref is dropped make it available to be claimed again.
-impl<'selector, K, V, B: StorageBackend, S: SerdeBackend> Drop for TableRef<'selector, K, V, B, S>
+impl<K, V, B: StorageBackend, S: SerdeBackend> Drop for TableRef<'_, K, V, B, S>
 where
     K: Hash + Eq + Serialize + DeserializeOwned + Any,
     V: Serialize + DeserializeOwned + Any,
@@ -212,7 +212,7 @@ impl<K, V> ResolvedTableReference<K, V> {
     }
 }
 
-impl<'selector, K, V, B: StorageBackend, S: SerdeBackend> TableRef<'selector, K, V, B, S>
+impl<K, V, B: StorageBackend, S: SerdeBackend> TableRef<'_, K, V, B, S>
 where
     K: Hash + Eq + Serialize + DeserializeOwned + Any,
     V: Serialize + DeserializeOwned + Any,

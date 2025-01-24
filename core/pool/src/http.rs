@@ -31,7 +31,6 @@ pub async fn spawn_http_server(
         .with_graceful_shutdown(shutdown)
         .await
         .context("failed to run http server")
-        .map(Into::into)
 }
 
 async fn state(

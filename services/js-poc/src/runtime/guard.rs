@@ -22,7 +22,7 @@ impl IsolateGuard {
         Self { rt }
     }
 
-    pub fn guard<'a, F>(&'a mut self, f: F) -> GuardedIsolateFuture
+    pub fn guard<'a, F>(&'a mut self, f: F) -> GuardedIsolateFuture<'a>
     where
         F: FnOnce(&'a mut Runtime) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + 'a>>,
     {
@@ -43,7 +43,7 @@ pub struct GuardedIsolateFuture<'a> {
     fut: Pin<Box<dyn Future<Output = anyhow::Result<()>> + 'a>>,
 }
 
-impl<'a> GuardedIsolateFuture<'a> {
+impl GuardedIsolateFuture<'_> {
     fn enter(&mut self) {
         let runtime = unsafe { self.ptr.as_mut().expect("Pointer to be non-null") };
         unsafe {
@@ -59,7 +59,7 @@ impl<'a> GuardedIsolateFuture<'a> {
     }
 }
 
-impl<'a> Future for GuardedIsolateFuture<'a> {
+impl Future for GuardedIsolateFuture<'_> {
     type Output = anyhow::Result<()>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {

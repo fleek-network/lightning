@@ -1,7 +1,7 @@
 use std::convert::Infallible;
 use std::future::Future;
 use std::pin::Pin;
-use std::task::{ready, Poll};
+use std::task::{Poll, ready};
 
 use tower::Service;
 
@@ -145,7 +145,7 @@ pub trait IntoIpAddr {
     fn ip_addr(&self) -> std::net::IpAddr;
 }
 
-impl<'a> IntoIpAddr for &'a hyper::server::conn::AddrStream {
+impl IntoIpAddr for &hyper::server::conn::AddrStream {
     fn ip_addr(&self) -> std::net::IpAddr {
         self.remote_addr().ip()
     }

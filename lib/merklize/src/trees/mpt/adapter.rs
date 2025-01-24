@@ -37,7 +37,7 @@ where
     }
 }
 
-impl<'a, B, S, H> HashDB<SimpleHasherWrapper<H>, DBValue> for Adapter<'a, B, S, H>
+impl<B, S, H> HashDB<SimpleHasherWrapper<H>, DBValue> for Adapter<'_, B, S, H>
 where
     B: StorageBackend + Send + Sync,
     S: SerdeBackend + Send + Sync,
@@ -124,7 +124,7 @@ where
     }
 }
 
-impl<'a, B, S, H> HashDBRef<SimpleHasherWrapper<H>, DBValue> for Adapter<'a, B, S, H>
+impl<B, S, H> HashDBRef<SimpleHasherWrapper<H>, DBValue> for Adapter<'_, B, S, H>
 where
     B: StorageBackend + Send + Sync,
     S: SerdeBackend + Send + Sync,
@@ -146,7 +146,7 @@ where
     }
 }
 
-impl<'a, B, S, H> AsHashDB<SimpleHasherWrapper<H>, DBValue> for Adapter<'a, B, S, H>
+impl<B, S, H> AsHashDB<SimpleHasherWrapper<H>, DBValue> for Adapter<'_, B, S, H>
 where
     B: StorageBackend + Send + Sync,
     S: SerdeBackend + Send + Sync,

@@ -5,7 +5,7 @@ pub fn name(i: usize) -> &'static str {
     const CHARS: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     const N: usize = CHARS.len();
     let offset = i % N;
-    let len = (i + N - 1) / N;
+    let len = i.div_ceil(N);
     &CHARS[offset..][..len]
 }
 

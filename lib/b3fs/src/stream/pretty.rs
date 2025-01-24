@@ -16,7 +16,7 @@ impl<'b> ProofBufPrettyPrinter<'b> {
     }
 }
 
-impl<'b> Debug for ProofBufPrettyPrinter<'b> {
+impl Debug for ProofBufPrettyPrinter<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let iter = ProofBufIter::new(self.0);
         let mut fmt = f.debug_list();
@@ -28,7 +28,7 @@ impl<'b> Debug for ProofBufPrettyPrinter<'b> {
     }
 }
 
-impl<'b> Display for ProofBufPrettyPrinter<'b> {
+impl Display for ProofBufPrettyPrinter<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Debug::fmt(self, f)
     }
@@ -36,7 +36,7 @@ impl<'b> Display for ProofBufPrettyPrinter<'b> {
 
 struct Item<'h>(bool, &'h [u8; 32]);
 
-impl<'h> Debug for Item<'h> {
+impl Debug for Item<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.0 {
             write!(f, "-{}", to_hex(self.1))
@@ -46,7 +46,7 @@ impl<'h> Debug for Item<'h> {
     }
 }
 
-impl<'b> Deref for ProofBufPrettyPrinter<'b> {
+impl Deref for ProofBufPrettyPrinter<'_> {
     type Target = [u8];
 
     #[inline]

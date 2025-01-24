@@ -8,7 +8,7 @@ use fleek_crypto::{NodePublicKey, NodeSecretKey};
 use futures::stream::FuturesUnordered;
 use futures::{AsyncReadExt, StreamExt, TryStreamExt};
 use lightning_interfaces::prelude::*;
-use lightning_interfaces::{spawn_worker, RequestHeader, RequesterInterface, TaskError};
+use lightning_interfaces::{RequestHeader, RequesterInterface, TaskError, spawn_worker};
 use lightning_metrics::increment_counter;
 use rand::prelude::SliceRandom;
 use rand::thread_rng;
@@ -419,10 +419,9 @@ impl<C: NodeComponents> RequestWorker<C> {
         mut handle: impl lightning_interfaces::RequestInterface,
     ) -> Result<()> {
         // Parse request payload
-        let request = TaskRequest::decode(&header.bytes).map_err(|e| {
+        let request = TaskRequest::decode(&header.bytes).inspect_err(|_| {
             self.rep_reporter
                 .report_unsat(header.peer, lightning_interfaces::Weight::Weak);
-            e
         })?;
 
         let socket = self.socket.clone();

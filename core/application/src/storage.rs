@@ -71,7 +71,7 @@ impl<'a> AtomoStorageBuilder<'a> {
     }
 }
 
-impl<'a> StorageBackendConstructor for AtomoStorageBuilder<'a> {
+impl StorageBackendConstructor for AtomoStorageBuilder<'_> {
     type Storage = AtomoStorage;
 
     type Error = anyhow::Error;

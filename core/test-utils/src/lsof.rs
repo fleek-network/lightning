@@ -2,7 +2,7 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-use lightning_utils::poll::{poll_until, PollUntilError};
+use lightning_utils::poll::{PollUntilError, poll_until};
 use minilsof::LsofData;
 use thiserror::Error;
 use tokio::time::Duration;
@@ -28,7 +28,7 @@ pub async fn wait_for_file_to_close(
 
 /// Check if `/proc` is available on the current system.
 fn is_proc_available() -> bool {
-    fs::metadata("/proc").map_or(false, |meta| meta.is_dir())
+    fs::metadata("/proc").is_ok_and(|meta| meta.is_dir())
 }
 
 /// Wait until the given file is no longer open by any process, using the `/proc` filesystem to get

@@ -64,7 +64,7 @@ pub fn hueristic_sort(dissim_matrix: &Array2<i32>, a: &mut [usize], b: &[usize])
 
     // 2. reassign indeces
     let len = a.len();
-    let n = (len + b.len() - 1) / b.len(); // ceiling 
+    let n = len.div_ceil(b.len()); // ceiling 
     let mut iter = a.iter_mut();
     for c in 0..n {
         let mut j = c;

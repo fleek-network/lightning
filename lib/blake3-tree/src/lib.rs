@@ -416,7 +416,7 @@ impl ProofEncoder {
     pub fn new(n: usize) -> Self {
         // Compute the byte capacity for this encoder, which is 32-byte per hash and 1
         // byte per 8 one of these.
-        let capacity = n * 32 + (n + 8 - 1) / 8;
+        let capacity = n * 32 + n.div_ceil(8);
         // Create a `Vec<u8>` with the given size and set its len to the byte capacity
         // it is not important for us to take care of initializing the items since the
         // type is a u8 and has no drop logic except the deallocatation of the slice
@@ -713,7 +713,7 @@ fn previous_pow_of_two(n: usize) -> usize {
 #[inline(always)]
 fn is_valid_proof_len(n: usize) -> bool {
     const SEG_SIZE: usize = 32 * 8 + 1;
-    let sign_bytes = (n + SEG_SIZE - 1) / SEG_SIZE;
+    let sign_bytes = n.div_ceil(SEG_SIZE);
     let hash_bytes = n - sign_bytes;
     hash_bytes & 31 == 0 && n <= 32 * 47 + 6 && ((hash_bytes / 32) >= 2 || n == 0)
 }

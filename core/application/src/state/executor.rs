@@ -5,7 +5,7 @@ use std::ops::DerefMut;
 use std::time::Duration;
 
 use ethers::abi::AbiDecode;
-use ethers::types::{Transaction as EthersTransaction, H160};
+use ethers::types::{H160, Transaction as EthersTransaction};
 use fleek_crypto::{
     ClientPublicKey,
     ConsensusPublicKey,
@@ -15,6 +15,7 @@ use fleek_crypto::{
 };
 use hp_fixed::unsigned::HpUfixed;
 use lazy_static::lazy_static;
+use lightning_interfaces::ToDigest;
 use lightning_interfaces::types::{
     AccountInfo,
     Blake3Hash,
@@ -27,6 +28,9 @@ use lightning_interfaces::types::{
     Epoch,
     ExecutionData,
     ExecutionError,
+    MAX_MEASUREMENTS_PER_TX,
+    MAX_MEASUREMENTS_SUBMIT,
+    MAX_UPDATES_CONTENT_REGISTRY,
     Metadata,
     MintInfo,
     NodeIndex,
@@ -55,11 +59,7 @@ use lightning_interfaces::types::{
     UpdateRequest,
     Value,
     WithdrawInfo,
-    MAX_MEASUREMENTS_PER_TX,
-    MAX_MEASUREMENTS_SUBMIT,
-    MAX_UPDATES_CONTENT_REGISTRY,
 };
-use lightning_interfaces::ToDigest;
 use lightning_utils::eth::fleek_contract::FleekContractCalls;
 use lightning_utils::eth::{
     ApproveClientKeyCall,
@@ -522,15 +522,12 @@ impl<B: Backend> StateExecutor<B> {
                     return TransactionResponse::Revert(ExecutionError::InsufficientBalance);
                 }
                 account.flk_balance -= amount.clone();
-                self.withdraws.set(
-                    withdraw_id,
-                    WithdrawInfo {
-                        epoch: 0,
-                        token: Tokens::FLK,
-                        receiver,
-                        amount,
-                    },
-                );
+                self.withdraws.set(withdraw_id, WithdrawInfo {
+                    epoch: 0,
+                    token: Tokens::FLK,
+                    receiver,
+                    amount,
+                });
                 self.metadata
                     .set(Metadata::WithdrawId, Value::WithdrawId(withdraw_id + 1));
             },
@@ -541,15 +538,12 @@ impl<B: Backend> StateExecutor<B> {
                     return TransactionResponse::Revert(ExecutionError::InsufficientBalance);
                 }
                 account.stables_balance -= amount.clone();
-                self.withdraws.set(
-                    withdraw_id,
-                    WithdrawInfo {
-                        epoch: 0,
-                        token: Tokens::USDC,
-                        receiver,
-                        amount: amount.convert_precision::<18>(),
-                    },
-                );
+                self.withdraws.set(withdraw_id, WithdrawInfo {
+                    epoch: 0,
+                    token: Tokens::USDC,
+                    receiver,
+                    amount: amount.convert_precision::<18>(),
+                });
                 self.metadata
                     .set(Metadata::WithdrawId, Value::WithdrawId(withdraw_id + 1));
             },
@@ -1392,7 +1386,6 @@ impl<B: Backend> StateExecutor<B> {
     /// also checks the nonce of the sender and makes sure it is equal to the account nonce + 1,
     /// to prevent replay attacks and enforce ordering. Additionally, it verifies ChainID
     /// with the current value from Metadata Table
-
     pub fn verify_transaction(&self, txn: &mut TransactionRequest) -> Result<(), ExecutionError> {
         self.verify_chain_id(txn)?;
 
@@ -1690,7 +1683,7 @@ impl<B: Backend> StateExecutor<B> {
 
     /// Whether the node is participating.
     fn is_participating(&self, node_index: &NodeIndex) -> bool {
-        self.node_info.get(node_index).map_or(false, |info| {
+        self.node_info.get(node_index).is_some_and(|info| {
             matches!(
                 info.participation,
                 Participation::OptedIn | Participation::True

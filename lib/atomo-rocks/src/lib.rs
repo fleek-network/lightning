@@ -11,7 +11,7 @@ use atomo::{AtomoBuilder, DefaultSerdeBackend, StorageBackend, StorageBackendCon
 use fxhash::FxHashMap;
 /// Re-export of [`rocksdb::Options`].
 pub use rocksdb::Options;
-pub use rocksdb::{Cache, Env, DB};
+pub use rocksdb::{Cache, DB, Env};
 use rocksdb::{ColumnFamilyDescriptor, WriteBatch};
 pub use serialization::{build_db_from_checkpoint, serialize_db};
 
@@ -103,7 +103,7 @@ impl<'a> RocksBackendBuilder<'a> {
     }
 }
 
-impl<'a> StorageBackendConstructor for RocksBackendBuilder<'a> {
+impl StorageBackendConstructor for RocksBackendBuilder<'_> {
     type Storage = RocksBackend;
 
     type Error = anyhow::Error;
@@ -365,14 +365,11 @@ mod tests {
                 )
             })
             .collect::<Vec<_>>();
-        assert_eq!(
-            data,
-            vec![
-                (1, "one".to_string()),
-                (2, "two".to_string()),
-                (3, "three".to_string())
-            ]
-        );
+        assert_eq!(data, vec![
+            (1, "one".to_string()),
+            (2, "two".to_string()),
+            (3, "three".to_string())
+        ]);
     }
 
     #[test]

@@ -18,7 +18,7 @@ use std::fmt::Debug;
 use std::ops::Index;
 
 use super::error::CollectionTryFromError;
-use crate::utils::{flatten, Digest};
+use crate::utils::{Digest, flatten};
 
 const BYTES_POW_2: usize = 5; // 2 ** 5 == 32
 
@@ -75,7 +75,7 @@ impl<'s> From<&'s Vec<[u8; 32]>> for FlatHashSlice<'s> {
     }
 }
 
-impl<'s> Index<usize> for FlatHashSlice<'s> {
+impl Index<usize> for FlatHashSlice<'_> {
     type Output = [u8; 32];
 
     #[inline]
@@ -94,7 +94,7 @@ impl<'s> IntoIterator for FlatHashSlice<'s> {
     }
 }
 
-impl<'s> AsRef<[u8]> for FlatHashSlice<'s> {
+impl AsRef<[u8]> for FlatHashSlice<'_> {
     #[inline]
     fn as_ref(&self) -> &[u8] {
         self.as_slice()
@@ -204,7 +204,7 @@ impl<'s> Iterator for FlatHashSliceIter<'s> {
     }
 }
 
-impl<'s> DoubleEndedIterator for FlatHashSliceIter<'s> {
+impl DoubleEndedIterator for FlatHashSliceIter<'_> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         if self.inner.is_empty() {
@@ -222,7 +222,7 @@ impl<'s> DoubleEndedIterator for FlatHashSliceIter<'s> {
     }
 }
 
-impl<'s> Debug for FlatHashSlice<'s> {
+impl Debug for FlatHashSlice<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut fmt = f.debug_list();
         fmt.entries(self.iter().map(Digest));

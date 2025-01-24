@@ -19,7 +19,7 @@ impl ProofEncoder {
     pub fn new(n: usize) -> Self {
         // Compute the byte capacity for this encoder, which is 32-byte per hash and 1
         // byte per 8 one of these.
-        let capacity = n * 32 + (n + 8 - 1) / 8;
+        let capacity = n * 32 + n.div_ceil(8);
         let mut vec = vec![0; capacity];
 
         let buffer = vec.into_boxed_slice();

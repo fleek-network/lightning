@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::time::SystemTime;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use atomo::{AtomoBuilder, DefaultSerdeBackend};
 use atomo_rocks::{Cache as RocksCache, Env as RocksEnv, Options};
 use lightning_interfaces::types::Genesis;
@@ -80,7 +80,7 @@ impl ApplicationConfig {
     pub fn atomo_builder<'a>(
         &'a self,
         checkpoint: Option<([u8; 32], &'a [u8], &'a [String])>,
-    ) -> Result<AtomoBuilder<AtomoStorageBuilder, DefaultSerdeBackend>> {
+    ) -> Result<AtomoBuilder<AtomoStorageBuilder<'a>, DefaultSerdeBackend>> {
         let storage = match self.storage {
             StorageConfig::RocksDb => {
                 let db_path = self

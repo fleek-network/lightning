@@ -70,7 +70,7 @@ mod init_tests {
             "Node configuration file written to {}",
             config_path.to_string_lossy()
         )));
-        assert!(config_path.exists() && fs::metadata(&config_path).map_or(false, |m| m.len() > 0));
+        assert!(config_path.exists() && fs::metadata(&config_path).is_ok_and(|m| m.len() > 0));
         let config = fs::read_to_string(&config_path).unwrap();
         assert!(!config.contains("[application.dev]"));
         assert!(!config.contains("update_epoch_start_to_now = true"));
@@ -124,7 +124,7 @@ mod init_tests {
             "Node configuration file written to {}",
             config_path.to_string_lossy()
         )));
-        assert!(config_path.exists() && fs::metadata(config_path).map_or(false, |m| m.len() > 0));
+        assert!(config_path.exists() && fs::metadata(config_path).is_ok_and(|m| m.len() > 0));
 
         let genesis_path = temp_dir.path().join("genesis.toml");
         assert!(!str::from_utf8(&output.stdout).unwrap().contains(&format!(

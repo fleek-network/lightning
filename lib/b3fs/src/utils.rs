@@ -208,7 +208,7 @@ pub const fn le_bytes_from_words_32(words: &[u32; 8]) -> [u8; 32] {
 /// Used internally as a helper to pretty print hashes as hex strings.
 pub struct Digest<'d>(pub &'d [u8; 32]);
 
-impl<'d> Debug for Digest<'d> {
+impl Debug for Digest<'_> {
     #[inline(always)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", to_hex(self.0))

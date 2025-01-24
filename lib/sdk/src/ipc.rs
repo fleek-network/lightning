@@ -18,7 +18,7 @@ use tokio::sync::mpsc;
 
 use crate::connection::ConnectionListener;
 use crate::futures::future_callback;
-use crate::ipc_types::{IpcMessage, IpcRequest, Request, Response, DELIMITER_SIZE};
+use crate::ipc_types::{DELIMITER_SIZE, IpcMessage, IpcRequest, Request, Response};
 
 static mut SENDER: Option<tokio::sync::mpsc::Sender<IpcRequest>> = None;
 pub(crate) static mut IPC_PATH: Option<PathBuf> = None;
@@ -26,6 +26,7 @@ pub(crate) static mut BLOCKSTORE: Option<PathBuf> = None;
 
 /// Bind to the connection stream.
 pub async fn conn_bind() -> ConnectionListener {
+    #[allow(static_mut_refs)]
     let path = unsafe { IPC_PATH.as_ref() }
         .expect("Service setupt not complete.")
         .join("conn");
@@ -218,6 +219,7 @@ fn handle_message(message: IpcMessage) {
 /// You should only call this method from within a service handlers.
 pub async fn send_no_response(request: Request) {
     unsafe {
+        #[allow(static_mut_refs)]
         let sender = SENDER.as_ref().expect("setup not completed");
         sender
             .send(IpcRequest {
@@ -238,6 +240,7 @@ pub async fn send_no_response(request: Request) {
 pub async fn send_and_await_response(request: Request) -> Response {
     let (request_ctx, future) = crate::futures::create_future();
     unsafe {
+        #[allow(static_mut_refs)]
         let sender = SENDER.as_ref().expect("setup not completed");
         sender
             .send(IpcRequest {
@@ -315,10 +318,9 @@ mod tests {
             }
             let req = IpcRequest::decode(&buffer).unwrap();
 
-            assert_eq!(
-                req.request,
-                Request::QueryClientBandwidth { pk: [i; 96].into() }
-            );
+            assert_eq!(req.request, Request::QueryClientBandwidth {
+                pk: [i; 96].into()
+            });
 
             let result = IpcMessage::Response {
                 request_ctx: req.request_ctx.unwrap(),
@@ -346,12 +348,9 @@ mod tests {
             }
 
             let result = send_task.await.unwrap();
-            assert_eq!(
-                result,
-                Response::QueryClientBandwidth {
-                    balance: i as u128 + 100
-                }
-            );
+            assert_eq!(result, Response::QueryClientBandwidth {
+                balance: i as u128 + 100
+            });
         }
         let took = started.elapsed();
         println!("took {took:?}");
