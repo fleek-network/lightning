@@ -8,6 +8,7 @@ use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{NodePorts, Staking};
 use lightning_node::ContainedNode;
 use lightning_node_bindings::FullNodeComponents;
+use lightning_resolver::Resolver;
 use lightning_rpc::api::FleekApiClient;
 use lightning_rpc::{Rpc, RpcClient};
 use lightning_utils::config::TomlConfigProvider;
@@ -99,6 +100,13 @@ impl ContainerizedNode {
         self.node
             .provider()
             .get::<<FullNodeComponents as NodeComponents>::SyncronizerInterface>()
+    }
+
+    pub fn take_resolver(&self) -> Resolver<FullNodeComponents> {
+        self.node
+            .provider()
+            .get::<<FullNodeComponents as NodeComponents>::ResolverInterface>()
+            .clone()
     }
 
     pub fn take_blockstore(&self) -> Blockstore<FullNodeComponents> {
