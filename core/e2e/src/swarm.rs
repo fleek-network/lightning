@@ -150,6 +150,15 @@ impl Swarm {
             .collect()
     }
 
+    pub fn get_query_runner(
+        &self,
+        node: &NodePublicKey,
+    ) -> Option<c!(FullNodeComponents::ApplicationInterface::SyncExecutor)> {
+        self.nodes
+            .get(node)
+            .map(|node| node.take_cloned_query_runner())
+    }
+
     pub fn get_genesis_committee_rpc_addresses(&self) -> HashMap<NodePublicKey, String> {
         self.nodes
             .iter()
@@ -188,6 +197,10 @@ impl Swarm {
 
     pub fn get_blockstore(&self, node: &NodePublicKey) -> Option<Blockstore<FullNodeComponents>> {
         self.nodes.get(node).map(|node| node.take_blockstore())
+    }
+
+    pub fn get_resolver(&self, node: &NodePublicKey) -> Option<Resolver<FullNodeComponents>> {
+        self.nodes.get(node).map(|node| node.take_resolver())
     }
 
     pub fn get_blockstore_server_socket(

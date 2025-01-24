@@ -29,6 +29,22 @@ fn create_content() -> Vec<u8> {
         .collect()
 }
 
+async fn wait_for_origin_propagation(swarm: &Swarm, node: &NodePublicKey, hash: &[u8; 32]) {
+    let query_runner = swarm.get_query_runner(node).unwrap();
+    lightning_utils::poll::poll_until(
+        || async {
+            query_runner
+                .get_uri_providers(hash)
+                .ok_or(lightning_utils::poll::PollUntilError::ConditionNotSatisfied)
+        },
+        Duration::from_secs(15),
+        Duration::from_millis(200),
+    )
+    .await
+    .map(|_| ())
+    .expect("Error getting uri provider")
+}
+
 #[tokio::test]
 async fn e2e_blockstore_server_get() {
     logging::setup(None);
@@ -71,7 +87,8 @@ async fn e2e_blockstore_server_get() {
     // Send a request from node2 to node1 to obtain the data
     let blockstore2 = swarm.get_blockstore(&pubkey2).unwrap();
     let blockstore_server_socket2 = swarm.get_blockstore_server_socket(&pubkey2).unwrap();
-    tokio::time::sleep(Duration::from_secs(5)).await;
+
+    wait_for_origin_propagation(&swarm, &pubkey2, &data_hash).await;
 
     let mut res = blockstore_server_socket2
         .run(ServerRequest {
@@ -161,7 +178,8 @@ async fn e2e_blockstore_server_with_fetcher() {
         FetcherResponse::Fetch(_) => panic!("impossible"),
     };
 
-    tokio::time::sleep(Duration::from_secs(5)).await;
+    wait_for_origin_propagation(&swarm, &pubkey2, &hash).await;
+
     // Fetch data from Node 1 to force getting from the other node 0
     let fetcher = swarm.get_fetcher_socket(&pubkey2).unwrap();
     let res = fetcher
@@ -256,8 +274,8 @@ async fn e2e_blockstore_server_with_fetcher_recursive_dir() {
     writer_sender.insert(entry_file2, false).await.unwrap();
     writer_sender.insert(entry_subdir, true).await.unwrap();
     let hash = writer_sender.commit().await.unwrap();
+    wait_for_origin_propagation(&swarm, &pubkey2, &hash).await;
 
-    tokio::time::sleep(Duration::from_secs(5)).await;
     // Fetch data from Node 1 to force getting from the other node 0
     let fetcher = swarm.get_fetcher_socket(&pubkey2).unwrap();
     let res = fetcher
