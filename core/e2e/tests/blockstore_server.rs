@@ -31,17 +31,18 @@ fn create_content() -> Vec<u8> {
 
 async fn wait_for_origin_propagation(swarm: &Swarm, node: &NodePublicKey, hash: &[u8; 32]) {
     let query_runner = swarm.get_query_runner(node).unwrap();
-    let mut tries = 0;
-    loop {
-        if query_runner.get_uri_providers(hash).is_some() {
-            break;
-        }
-        if tries >= 9 {
-            break;
-        }
-        tries += 1;
-        tokio::time::sleep(Duration::from_secs(1)).await;
-    }
+    lightning_utils::poll::poll_until(
+        || async {
+            query_runner
+                .get_uri_providers(hash)
+                .ok_or(lightning_utils::poll::PollUntilError::ConditionNotSatisfied)
+        },
+        Duration::from_secs(15),
+        Duration::from_millis(200),
+    )
+    .await
+    .map(|_| ())
+    .expect("Error getting uri provider")
 }
 
 #[tokio::test]
