@@ -19,14 +19,14 @@ use tokio_stream::Stream;
 
 use super::error::CollectionTryFromError;
 use super::flat::FlatHashSlice;
-use crate::bucket::POSITION_START_HASHES;
 use crate::bucket::errors::ReadError;
+use crate::bucket::POSITION_START_HASHES;
 use crate::entry::BorrowedEntry;
 use crate::hasher;
 use crate::hasher::dir_hasher::DirectoryHasher;
-use crate::stream::ProofEncoder;
 use crate::stream::buffer::ProofBuf;
 use crate::stream::walker::{self, Mode, TreeWalker};
+use crate::stream::ProofEncoder;
 use crate::utils::{block_counter_from_tree_index, is_valid_tree_len, tree_index};
 
 /// A wrapper around a list of hashes that provides access only to the leaf nodes in the tree.
@@ -268,7 +268,8 @@ where
                 .collect();
 
             // Store the entire page of hashes
-            self.pages[page_index] = Some(hashes.into_boxed_slice()); // Store as boxed slice of hashes
+            self.pages[page_index] = Some(hashes.into_boxed_slice()); // Store as boxed slice of
+                                                                      // hashes
         }
 
         // Retrieve the hash from the loaded page

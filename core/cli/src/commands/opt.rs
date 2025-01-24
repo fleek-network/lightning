@@ -247,7 +247,7 @@ pub async fn query_node_info(
         return Err(anyhow!("Failed to get node info from bootstrap nodes"));
     }
     node_info.sort_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap());
-    Ok(node_info.pop().unwrap().0.0)
+    Ok(node_info.pop().unwrap().0 .0)
 }
 
 pub async fn query_epoch_info(nodes: &[NodeInfo]) -> Result<EpochInfo> {

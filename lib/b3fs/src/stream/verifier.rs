@@ -381,11 +381,9 @@ mod tests {
                 assert!(!verifier.is_finished());
 
                 // test against a wrong proof string.
-                assert!(
-                    verifier
-                        .feed_proof(hashtree.generate_proof(Mode::Initial, i).as_slice())
-                        .is_err()
-                );
+                assert!(verifier
+                    .feed_proof(hashtree.generate_proof(Mode::Initial, i).as_slice())
+                    .is_err());
 
                 verifier
                     .feed_proof(hashtree.generate_proof(Mode::Proceeding, i).as_slice())

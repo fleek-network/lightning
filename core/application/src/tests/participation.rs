@@ -64,20 +64,16 @@ async fn test_uptime_participation() {
     )
     .await
     .unwrap();
-    assert!(
-        !node
-            .app_query()
-            .get_content_registry(&peer1.index())
-            .unwrap_or_default()
-            .is_empty()
-    );
-    assert!(
-        !node
-            .app_query()
-            .get_content_registry(&peer2.index())
-            .unwrap_or_default()
-            .is_empty()
-    );
+    assert!(!node
+        .app_query()
+        .get_content_registry(&peer1.index())
+        .unwrap_or_default()
+        .is_empty());
+    assert!(!node
+        .app_query()
+        .get_content_registry(&peer2.index())
+        .unwrap_or_default()
+        .is_empty());
 
     // Submit reputation measurements from node 0, for peer 1 and 2.
     let measurements: BTreeMap<u32, lightning_interfaces::types::ReputationMeasurements> =

@@ -93,15 +93,13 @@ async fn test_supermajority_over_epoch_changes() {
         .unwrap();
         for (node_id, agg_header) in agg_header_by_node.iter() {
             // Verify the aggregate header signature.
-            assert!(
-                verify_aggregate_checkpointer_header(
-                    &network,
-                    agg_header.clone(),
-                    *node_id,
-                    headers_by_node.clone(),
-                )
-                .unwrap()
-            );
+            assert!(verify_aggregate_checkpointer_header(
+                &network,
+                agg_header.clone(),
+                *node_id,
+                headers_by_node.clone(),
+            )
+            .unwrap());
 
             // Check that the aggregate header is correct.
             assert_eq!(
@@ -308,15 +306,13 @@ async fn test_missing_epoch_change_notification_still_supermajority() {
     .unwrap();
     for (node_id, agg_header) in agg_header_by_node.iter() {
         // Verify the aggregate header signature.
-        assert!(
-            verify_aggregate_checkpointer_header(
-                &network,
-                agg_header.clone(),
-                *node_id,
-                headers_by_node.clone(),
-            )
-            .unwrap()
-        );
+        assert!(verify_aggregate_checkpointer_header(
+            &network,
+            agg_header.clone(),
+            *node_id,
+            headers_by_node.clone(),
+        )
+        .unwrap());
 
         // Check that the aggregate header is correct.
         assert_eq!(
@@ -450,15 +446,13 @@ async fn test_delayed_epoch_change_notification() {
     .unwrap();
     assert_eq!(agg_header_by_node.len(), 3);
     for (node_id, agg_header) in agg_header_by_node.iter() {
-        assert!(
-            verify_aggregate_checkpointer_header(
-                &network,
-                agg_header.clone(),
-                *node_id,
-                headers_by_node.clone(),
-            )
-            .unwrap()
-        );
+        assert!(verify_aggregate_checkpointer_header(
+            &network,
+            agg_header.clone(),
+            *node_id,
+            headers_by_node.clone(),
+        )
+        .unwrap());
         assert_eq!(
             agg_header,
             &AggregateCheckpoint {
@@ -583,15 +577,13 @@ async fn test_multiple_different_epoch_change_notifications_simultaneously() {
     .unwrap();
     for (node_id, agg_header) in agg_header_by_node.iter() {
         // Verify the aggregate header signature.
-        assert!(
-            verify_aggregate_checkpointer_header(
-                &network,
-                agg_header.clone(),
-                *node_id,
-                epoch1_headers_by_node.clone(),
-            )
-            .unwrap()
-        );
+        assert!(verify_aggregate_checkpointer_header(
+            &network,
+            agg_header.clone(),
+            *node_id,
+            epoch1_headers_by_node.clone(),
+        )
+        .unwrap());
 
         // Check that the aggregate header is correct.
         assert_eq!(
@@ -612,15 +604,13 @@ async fn test_multiple_different_epoch_change_notifications_simultaneously() {
     .unwrap();
     for (node_id, agg_header) in agg_header_by_node.iter() {
         // Verify the aggregate header signature.
-        assert!(
-            verify_aggregate_checkpointer_header(
-                &network,
-                agg_header.clone(),
-                *node_id,
-                epoch2_headers_by_node.clone(),
-            )
-            .unwrap()
-        );
+        assert!(verify_aggregate_checkpointer_header(
+            &network,
+            agg_header.clone(),
+            *node_id,
+            epoch2_headers_by_node.clone(),
+        )
+        .unwrap());
 
         // Check that the aggregate header is correct.
         assert_eq!(
@@ -831,15 +821,13 @@ async fn test_attestations_with_inconsistent_state_roots_still_supermajority() {
 
     for (node_id, agg_header) in agg_header_by_node.iter() {
         // Verify the aggregate header signature.
-        assert!(
-            verify_aggregate_checkpointer_header(
-                &network,
-                agg_header.clone(),
-                *node_id,
-                headers_by_node.clone(),
-            )
-            .unwrap()
-        );
+        assert!(verify_aggregate_checkpointer_header(
+            &network,
+            agg_header.clone(),
+            *node_id,
+            headers_by_node.clone(),
+        )
+        .unwrap());
 
         // Check that the aggregate header is correct.
         assert_eq!(

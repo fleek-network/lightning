@@ -11,7 +11,7 @@ use lightning_test_utils::consensus::{MockConsensus, MockConsensusConfig, MockFo
 use lightning_test_utils::e2e::try_init_tracing;
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
-use tempfile::{TempDir, tempdir};
+use tempfile::{tempdir, TempDir};
 use types::{
     ExecuteTransactionError,
     ExecuteTransactionOptions,
@@ -30,7 +30,7 @@ use types::{
 };
 
 use super::*;
-use crate::poll::{PollUntilError, poll_until};
+use crate::poll::{poll_until, PollUntilError};
 
 #[tokio::test]
 async fn test_execute_transaction_with_account_signer_wait_for_receipt() {

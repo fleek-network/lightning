@@ -19,9 +19,7 @@ macro_rules! impl_pk_sig {
         $pk_name:ident, $pk_size:expr, $pk_fc:ident,
         $sig_name:ident, $sig_size:expr, $sig_fc:ident
     ) => {
-        impl_pk_sig!(
-            $pk_name, $pk_size, $pk_fc, $sig_name, $sig_size, $sig_fc, verify
-        );
+        impl_pk_sig!($pk_name, $pk_size, $pk_fc, $sig_name, $sig_size, $sig_fc, verify);
     };
 
     (

@@ -2,7 +2,7 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-use lightning_utils::poll::{PollUntilError, poll_until};
+use lightning_utils::poll::{poll_until, PollUntilError};
 use minilsof::LsofData;
 use thiserror::Error;
 use tokio::time::Duration;

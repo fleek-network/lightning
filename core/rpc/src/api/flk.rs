@@ -155,7 +155,7 @@ pub trait FleekApi {
 
     #[method(name = "get_node_registry")]
     async fn get_node_registry(&self, paging: Option<NodePagingParams>)
-    -> RpcResult<Vec<NodeInfo>>;
+        -> RpcResult<Vec<NodeInfo>>;
 
     #[method(name = "get_node_registry_index")]
     async fn get_node_registry_index(

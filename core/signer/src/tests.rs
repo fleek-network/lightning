@@ -10,9 +10,9 @@ use lightning_notifier::Notifier;
 use lightning_test_utils::consensus::{MockConsensus, MockConsensusConfig, MockForwarder};
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
-use lightning_utils::poll::{PollUntilError, poll_until};
+use lightning_utils::poll::{poll_until, PollUntilError};
 use lightning_utils::transaction::TransactionSigner;
-use tempfile::{TempDir, tempdir};
+use tempfile::{tempdir, TempDir};
 use types::{
     ExecuteTransactionError,
     ExecuteTransactionOptions,

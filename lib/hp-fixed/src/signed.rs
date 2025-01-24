@@ -102,11 +102,19 @@ impl<const P: usize> HpFixed<P> {
     }
 
     pub fn min<'a>(&'a self, rhs: &'a Self) -> &'a Self {
-        if self.0 <= rhs.0 { self } else { rhs }
+        if self.0 <= rhs.0 {
+            self
+        } else {
+            rhs
+        }
     }
 
     pub fn max<'a>(&'a self, rhs: &'a Self) -> &'a Self {
-        if self.0 >= rhs.0 { self } else { rhs }
+        if self.0 >= rhs.0 {
+            self
+        } else {
+            rhs
+        }
     }
 
     pub fn try_abs(&self) -> Option<HpFixed<P>> {

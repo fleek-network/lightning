@@ -137,12 +137,10 @@ fn parse_headers(headers: &serde_json::Value) -> Result<Vec<(String, Vec<String>
 
                 headers.push((
                     key.to_owned(),
-                    vec![
-                        value
-                            .as_str()
-                            .context("Failed to convert value to string")?
-                            .to_string(),
-                    ],
+                    vec![value
+                        .as_str()
+                        .context("Failed to convert value to string")?
+                        .to_string()],
                 ));
             } else if let Some(array) = value.as_array() {
                 // At this point the array either consists of header values corresponding to
@@ -213,10 +211,9 @@ fn parse_header(value: &serde_json::Value) -> Result<(String, Vec<String>)> {
         match arr.as_slice() {
             // TODO: verify correctness of allowing empty headers
             [serde_json::Value::String(key)] => Ok((key.clone(), vec![])),
-            [
-                serde_json::Value::String(key),
-                serde_json::Value::Array(arr),
-            ] => Ok((key.clone(), arr.iter().map(value_to_string).collect())),
+            [serde_json::Value::String(key), serde_json::Value::Array(arr)] => {
+                Ok((key.clone(), arr.iter().map(value_to_string).collect()))
+            },
             [serde_json::Value::String(key), _, ..] => {
                 Ok((key.clone(), arr[1..].iter().map(value_to_string).collect()))
             },

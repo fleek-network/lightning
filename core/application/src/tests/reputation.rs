@@ -152,16 +152,14 @@ async fn test_rep_scores() {
     network.change_epoch_and_wait_for_complete().await.unwrap();
 
     // Check the reputation scores.
-    assert!(
-        node.app_query()
-            .get_reputation_score(&peer1.index())
-            .is_some()
-    );
-    assert!(
-        node.app_query()
-            .get_reputation_score(&peer2.index())
-            .is_some()
-    );
+    assert!(node
+        .app_query()
+        .get_reputation_score(&peer1.index())
+        .is_some());
+    assert!(node
+        .app_query()
+        .get_reputation_score(&peer2.index())
+        .is_some());
 
     // Shutdown the network.
     network.shutdown().await;

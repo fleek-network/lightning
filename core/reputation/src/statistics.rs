@@ -48,7 +48,11 @@ fn abs_difference<T>(a: T, b: T) -> T
 where
     T: Sub<T, Output = T> + PartialOrd<T>,
 {
-    if a > b { a - b } else { b - a }
+    if a > b {
+        a - b
+    } else {
+        b - a
+    }
 }
 
 fn calculate_mean<T>(values: &[T]) -> Option<T>

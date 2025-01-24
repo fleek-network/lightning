@@ -142,11 +142,10 @@ async fn test_epoch_change_multiple_nodes() {
 
     // Check that the app state beacons are cleared.
     for node in network.nodes() {
-        assert!(
-            node.app_query()
-                .get_committee_selection_beacons()
-                .is_empty()
-        );
+        assert!(node
+            .app_query()
+            .get_committee_selection_beacons()
+            .is_empty());
     }
 
     // Change epoch and check that the local database beacons are eventually cleared.
@@ -1009,11 +1008,10 @@ async fn test_node_attempts_reveal_without_committment() {
 
     // Check that the app state beacons are cleared.
     for node in network.nodes() {
-        assert!(
-            node.app_query()
-                .get_committee_selection_beacons()
-                .is_empty()
-        );
+        assert!(node
+            .app_query()
+            .get_committee_selection_beacons()
+            .is_empty());
     }
 
     // Shutdown the nodes.

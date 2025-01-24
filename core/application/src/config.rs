@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::time::SystemTime;
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{anyhow, Context, Result};
 use atomo::{AtomoBuilder, DefaultSerdeBackend};
 use atomo_rocks::{Cache as RocksCache, Env as RocksEnv, Options};
 use lightning_interfaces::types::Genesis;

@@ -8,7 +8,7 @@ use fleek_crypto::{NodePublicKey, NodeSecretKey};
 use futures::stream::FuturesUnordered;
 use futures::{AsyncReadExt, StreamExt, TryStreamExt};
 use lightning_interfaces::prelude::*;
-use lightning_interfaces::{RequestHeader, RequesterInterface, TaskError, spawn_worker};
+use lightning_interfaces::{spawn_worker, RequestHeader, RequesterInterface, TaskError};
 use lightning_metrics::increment_counter;
 use rand::prelude::SliceRandom;
 use rand::thread_rng;

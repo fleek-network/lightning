@@ -10,7 +10,7 @@ use triomphe::Arc;
 use crate::latency::{DefaultLatencyProvider, LatencyProvider};
 use crate::message::Message;
 use crate::report::{Metrics, Report};
-use crate::state::{NodeState, hook_node, with_node};
+use crate::state::{hook_node, with_node, NodeState};
 use crate::storage::TypedStorage;
 use crate::{FRAME_DURATION, FRAME_TO_MS};
 

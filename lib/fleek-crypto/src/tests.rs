@@ -61,14 +61,12 @@ fn test_consensus_aggregate_signature_verify() {
     let sig3 = sk3.sign(&[3; 32]);
 
     let agg_sig = ConsensusAggregateSignature::aggregate(&[&sig1, &sig2, &sig3]).unwrap();
-    assert!(
-        agg_sig
-            .verify(
-                &[sk1.to_pk(), sk2.to_pk(), sk3.to_pk()],
-                &[&[1; 32], &[2; 32], &[3; 32]],
-            )
-            .unwrap()
-    );
+    assert!(agg_sig
+        .verify(
+            &[sk1.to_pk(), sk2.to_pk(), sk3.to_pk()],
+            &[&[1; 32], &[2; 32], &[3; 32]],
+        )
+        .unwrap());
 
     // Should return error if signature has invalid bytes.
     assert_eq!(

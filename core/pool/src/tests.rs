@@ -362,14 +362,12 @@ async fn test_send_to_all() {
     }
 
     // Then: the unknown node does not receive the message.
-    assert!(
-        tokio::time::timeout(
-            Duration::from_secs(5),
-            event_handlers_unknown_peer.receive(),
-        )
-        .await
-        .is_err()
-    );
+    assert!(tokio::time::timeout(
+        Duration::from_secs(5),
+        event_handlers_unknown_peer.receive(),
+    )
+    .await
+    .is_err());
 
     // Clean up.
     for mut peer in peers {

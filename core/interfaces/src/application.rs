@@ -137,7 +137,7 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     /// Query Node Table
     /// Returns information about a single node.
     fn get_node_info<V>(&self, node: &NodeIndex, selector: impl FnOnce(NodeInfo) -> V)
-    -> Option<V>;
+        -> Option<V>;
 
     /// Returns an Iterator to Node Table
     fn get_node_table_iter<V>(&self, closure: impl FnOnce(KeyIterator<NodeIndex>) -> V) -> V;

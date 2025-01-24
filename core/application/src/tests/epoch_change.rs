@@ -148,12 +148,11 @@ async fn test_epoch_change_with_all_committee_nodes() {
 
     // Check that the ready-to-change set for the next epoch is empty.
     for node in network.nodes() {
-        assert!(
-            node.app_query()
-                .get_committee_info(&(epoch + 1), |c| c.ready_to_change)
-                .unwrap_or_default()
-                .is_empty()
-        );
+        assert!(node
+            .app_query()
+            .get_committee_info(&(epoch + 1), |c| c.ready_to_change)
+            .unwrap_or_default()
+            .is_empty());
     }
 
     // Shutdown the network.
@@ -318,12 +317,11 @@ async fn test_epoch_change_with_some_non_committee_nodes() {
 
     // Check that the ready-to-change set for the next epoch is empty.
     for node in network.nodes() {
-        assert!(
-            node.app_query()
-                .get_committee_info(&(epoch + 1), |c| c.ready_to_change)
-                .unwrap_or_default()
-                .is_empty()
-        );
+        assert!(node
+            .app_query()
+            .get_committee_info(&(epoch + 1), |c| c.ready_to_change)
+            .unwrap_or_default()
+            .is_empty());
     }
 
     // Shutdown the network.
@@ -353,11 +351,9 @@ async fn test_change_epoch_with_only_locked_stake() {
 
     // Execute epoch change transaction from the node with only locked stake.
     let resp = network
-        .execute(vec![
-            network
-                .node(0)
-                .build_transaction(UpdateMethod::ChangeEpoch { epoch }),
-        ])
+        .execute(vec![network
+            .node(0)
+            .build_transaction(UpdateMethod::ChangeEpoch { epoch })])
         .await
         .unwrap();
     assert_eq!(resp.block_number, 1);
@@ -365,11 +361,9 @@ async fn test_change_epoch_with_only_locked_stake() {
 
     // Execute epoch change transaction from the node with unlocked stake.
     let resp = network
-        .execute(vec![
-            network
-                .node(1)
-                .build_transaction(UpdateMethod::ChangeEpoch { epoch }),
-        ])
+        .execute(vec![network
+            .node(1)
+            .build_transaction(UpdateMethod::ChangeEpoch { epoch })])
         .await
         .unwrap();
     assert_eq!(resp.block_number, 2);
@@ -395,20 +389,18 @@ async fn test_change_epoch_reverts_if_node_opted_out() {
 
     // Execute opt-out transaction from the first node.
     let resp = network
-        .execute(vec![
-            network.node(0).build_transaction(UpdateMethod::OptOut {}),
-        ])
+        .execute(vec![network
+            .node(0)
+            .build_transaction(UpdateMethod::OptOut {})])
         .await
         .unwrap();
     assert_eq!(resp.block_number, 1);
 
     // Execute epoch change transaction from the node and check that it reverts.
     let resp = network
-        .maybe_execute(vec![
-            network
-                .node(0)
-                .build_transaction(UpdateMethod::ChangeEpoch { epoch }),
-        ])
+        .maybe_execute(vec![network
+            .node(0)
+            .build_transaction(UpdateMethod::ChangeEpoch { epoch })])
         .await
         .unwrap();
     assert_eq!(resp.block_number, 2);

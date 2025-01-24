@@ -1,7 +1,7 @@
 use std::convert::Infallible;
 use std::future::Future;
 use std::pin::Pin;
-use std::task::{Poll, ready};
+use std::task::{ready, Poll};
 
 use tower::Service;
 

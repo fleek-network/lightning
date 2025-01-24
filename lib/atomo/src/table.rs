@@ -6,8 +6,8 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 
 use fxhash::{FxHashMap, FxHashSet};
-use serde::Serialize;
 use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 use crate::batch::{BatchReference, Operation, VerticalBatch};
 use crate::db::TableId;

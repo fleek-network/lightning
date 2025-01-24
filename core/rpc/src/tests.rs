@@ -676,11 +676,9 @@ async fn test_admin_ping() {
         .downcast::<TestFullNodeComponentsWithMockConsensus>();
 
     // Should fail because we are not authenticated.
-    assert!(
-        AdminApiClient::ping(&node.rpc_client().unwrap())
-            .await
-            .is_err()
-    );
+    assert!(AdminApiClient::ping(&node.rpc_client().unwrap())
+        .await
+        .is_err());
 
     // Should work because we are authenticated.
     let client = node.rpc_admin_client().await.unwrap();

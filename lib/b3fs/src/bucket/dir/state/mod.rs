@@ -8,10 +8,10 @@ use fastbloom_rs::{BloomFilter, FilterBuilder, Hashes, Membership};
 use tokio::fs::{File, OpenOptions};
 use tokio::io::{self, AsyncWriteExt, BufWriter};
 
+use super::phf::{calculate_buckets_len, HasherState, PhfGenerator};
 use super::HeaderPositions;
-use super::phf::{HasherState, PhfGenerator, calculate_buckets_len};
 use crate::bucket::dir::POSITION_START_HASHES;
-use crate::bucket::{Bucket, HEADER_DIR_VERSION, errors};
+use crate::bucket::{errors, Bucket, HEADER_DIR_VERSION};
 use crate::entry::{BorrowedEntry, BorrowedLink};
 use crate::hasher::dir_hasher::B3_DIR_IS_SYM_LINK;
 use crate::utils::random_file_from;

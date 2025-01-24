@@ -82,16 +82,12 @@ mod init_tests {
         )));
         assert!(!genesis_path.exists());
 
-        assert!(
-            str::from_utf8(&output.stdout)
-                .unwrap()
-                .contains("Generated node key:")
-        );
-        assert!(
-            str::from_utf8(&output.stdout)
-                .unwrap()
-                .contains("Generated consensus key:")
-        );
+        assert!(str::from_utf8(&output.stdout)
+            .unwrap()
+            .contains("Generated node key:"));
+        assert!(str::from_utf8(&output.stdout)
+            .unwrap()
+            .contains("Generated consensus key:"));
     }
 
     #[test]
@@ -133,16 +129,12 @@ mod init_tests {
         )));
         assert!(!genesis_path.exists());
 
-        assert!(
-            !str::from_utf8(&output.stdout)
-                .unwrap()
-                .contains("Generated node key:")
-        );
-        assert!(
-            !str::from_utf8(&output.stdout)
-                .unwrap()
-                .contains("Generated consensus key:")
-        );
+        assert!(!str::from_utf8(&output.stdout)
+            .unwrap()
+            .contains("Generated node key:"));
+        assert!(!str::from_utf8(&output.stdout)
+            .unwrap()
+            .contains("Generated consensus key:"));
     }
 
     #[test]
@@ -177,19 +169,14 @@ mod init_tests {
         assert!(config_path.exists());
 
         let genesis_path = temp_dir.path().join("genesis.toml");
-        assert!(
-            str::from_utf8(&output.stdout)
-                .unwrap()
-                .contains(&format!(" written to {}", genesis_path.to_string_lossy()))
-        );
+        assert!(str::from_utf8(&output.stdout)
+            .unwrap()
+            .contains(&format!(" written to {}", genesis_path.to_string_lossy())));
         assert!(genesis_path.exists());
 
         let config = fs::read_to_string(&config_path).unwrap();
-        assert!(
-            config.contains(
-                format!("genesis_path = \"{}\"", genesis_path.to_string_lossy()).as_str()
-            )
-        );
+        assert!(config
+            .contains(format!("genesis_path = \"{}\"", genesis_path.to_string_lossy()).as_str()));
         assert!(config.contains("[application.dev]"));
         assert!(config.contains("update_epoch_start_to_now = true"));
     }
@@ -208,11 +195,9 @@ mod init_tests {
 
         assert!(!output.status.success());
 
-        assert!(
-            str::from_utf8(&output.stderr)
-                .unwrap()
-                .contains("Cannot specify both --dev and --network")
-        );
+        assert!(str::from_utf8(&output.stderr)
+            .unwrap()
+            .contains("Cannot specify both --dev and --network"));
 
         let config_path = temp_dir.path().join("config.toml");
         assert!(!str::from_utf8(&output.stdout).unwrap().contains(&format!(

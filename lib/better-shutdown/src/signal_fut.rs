@@ -4,7 +4,7 @@ use std::task::Poll;
 
 use futures::Future;
 
-use crate::shared::{NUM_SHARED_SHARDS, SharedState};
+use crate::shared::{SharedState, NUM_SHARED_SHARDS};
 use crate::wait_list::{WaitList, WaitListSlotPos};
 
 /// A future that is resolved once the shutdown is triggered. It has the life time of the

@@ -18,7 +18,7 @@ use tokio::sync::mpsc;
 
 use crate::connection::ConnectionListener;
 use crate::futures::future_callback;
-use crate::ipc_types::{DELIMITER_SIZE, IpcMessage, IpcRequest, Request, Response};
+use crate::ipc_types::{IpcMessage, IpcRequest, Request, Response, DELIMITER_SIZE};
 
 static mut SENDER: Option<tokio::sync::mpsc::Sender<IpcRequest>> = None;
 pub(crate) static mut IPC_PATH: Option<PathBuf> = None;
@@ -318,9 +318,10 @@ mod tests {
             }
             let req = IpcRequest::decode(&buffer).unwrap();
 
-            assert_eq!(req.request, Request::QueryClientBandwidth {
-                pk: [i; 96].into()
-            });
+            assert_eq!(
+                req.request,
+                Request::QueryClientBandwidth { pk: [i; 96].into() }
+            );
 
             let result = IpcMessage::Response {
                 request_ctx: req.request_ctx.unwrap(),
@@ -348,9 +349,12 @@ mod tests {
             }
 
             let result = send_task.await.unwrap();
-            assert_eq!(result, Response::QueryClientBandwidth {
-                balance: i as u128 + 100
-            });
+            assert_eq!(
+                result,
+                Response::QueryClientBandwidth {
+                    balance: i as u128 + 100
+                }
+            );
         }
         let took = started.elapsed();
         println!("took {took:?}");

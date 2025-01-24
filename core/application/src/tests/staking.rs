@@ -74,13 +74,11 @@ async fn test_stake() {
         .unwrap();
     assert_eq!(node_registry_changes.len(), 1);
     assert_eq!(node_registry_changes.get(&0).unwrap().len(), committee_size);
-    assert!(
-        node_registry_changes
-            .get(&0)
-            .unwrap()
-            .iter()
-            .all(|(_, change)| { matches!(change, NodeRegistryChange::New) })
-    );
+    assert!(node_registry_changes
+        .get(&0)
+        .unwrap()
+        .iter()
+        .all(|(_, change)| { matches!(change, NodeRegistryChange::New) }));
 
     let owner_secret_key = AccountOwnerSecretKey::generate();
     let peer_pub_key = NodeSecretKey::generate().to_pk();

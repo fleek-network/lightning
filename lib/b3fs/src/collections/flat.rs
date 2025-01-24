@@ -18,7 +18,7 @@ use std::fmt::Debug;
 use std::ops::Index;
 
 use super::error::CollectionTryFromError;
-use crate::utils::{Digest, flatten};
+use crate::utils::{flatten, Digest};
 
 const BYTES_POW_2: usize = 5; // 2 ** 5 == 32
 

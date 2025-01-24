@@ -1991,9 +1991,9 @@ async fn test_committee_beacon_node_can_reveal_after_committing_and_becoming_ina
 
     // Execute opt-out transaction from 1 of the nodes.
     let resp = network
-        .execute(vec![
-            network.node(0).build_transaction(UpdateMethod::OptOut {}),
-        ])
+        .execute(vec![network
+            .node(0)
+            .build_transaction(UpdateMethod::OptOut {})])
         .await
         .unwrap();
     assert_eq!(resp.block_number, 3);
@@ -2475,9 +2475,9 @@ async fn test_committee_beacon_non_committee_node_participation() {
     // Note that we remove the non-participating committee node, otherwise the reveal transaction
     // from the removed node would be rejected.
     let resp = network
-        .execute(vec![
-            network.node(3).build_transaction(UpdateMethod::OptOut {}),
-        ])
+        .execute(vec![network
+            .node(3)
+            .build_transaction(UpdateMethod::OptOut {})])
         .await
         .unwrap();
     assert_eq!(resp.block_number, 5);

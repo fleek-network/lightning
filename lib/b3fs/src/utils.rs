@@ -71,8 +71,8 @@ pub const fn block_counter_from_tree_index(index: usize) -> Option<usize> {
         // =floor(log2(x + 1))
         let exp = usize::BITS - (x + 1).leading_zeros() - 1;
         let m = 1usize << (exp - 1); // 2^(exp - 1)
-        // find our position in the right subtree and perform
-        // the next step recursivly.
+                                     // find our position in the right subtree and perform
+                                     // the next step recursivly.
         x -= 2 * m - 1;
         // our index is at least as largest as all of the items in our left
         // subtree. All of the `m`s we are adding are unique power of twos

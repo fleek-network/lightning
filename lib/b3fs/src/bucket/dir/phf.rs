@@ -3,7 +3,7 @@ use std::num::{NonZeroU32, Wrapping};
 
 use rand::distributions::Standard;
 use rand::rngs::SmallRng;
-use rand::{Rng, SeedableRng, thread_rng};
+use rand::{thread_rng, Rng, SeedableRng};
 use siphasher::sip128::{Hash128, Hasher128};
 
 use crate::entry::InlineVec;

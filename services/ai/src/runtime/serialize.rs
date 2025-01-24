@@ -81,10 +81,13 @@ pub fn borsh_serialize_outputs(
                         bail!("cannot serialize array with dim {dim:?} using borsh");
                     } else {
                         let array = array.into_iter().collect::<Vec<i8>>();
-                        borsh_out.insert(name, BorshVector {
-                            dtype: BorshVectorType::Int8,
-                            data: borsh::to_vec::<Vec<i8>>(&array)?,
-                        });
+                        borsh_out.insert(
+                            name,
+                            BorshVector {
+                                dtype: BorshVectorType::Int8,
+                                data: borsh::to_vec::<Vec<i8>>(&array)?,
+                            },
+                        );
                     }
                 },
                 TensorElementType::Int16 => {
@@ -93,10 +96,13 @@ pub fn borsh_serialize_outputs(
                         bail!("cannot serialize array with dim {dim:?} using borsh");
                     } else {
                         let array = array.into_iter().collect::<Vec<i16>>();
-                        borsh_out.insert(name, BorshVector {
-                            dtype: BorshVectorType::Int8,
-                            data: borsh::to_vec::<Vec<i16>>(&array)?,
-                        });
+                        borsh_out.insert(
+                            name,
+                            BorshVector {
+                                dtype: BorshVectorType::Int8,
+                                data: borsh::to_vec::<Vec<i16>>(&array)?,
+                            },
+                        );
                     }
                 },
                 TensorElementType::Int32 => {
@@ -105,10 +111,13 @@ pub fn borsh_serialize_outputs(
                         bail!("cannot serialize array with dim {dim:?} using borsh");
                     } else {
                         let array = array.into_iter().collect::<Vec<i32>>();
-                        borsh_out.insert(name, BorshVector {
-                            dtype: BorshVectorType::Int8,
-                            data: borsh::to_vec::<Vec<i32>>(&array)?,
-                        });
+                        borsh_out.insert(
+                            name,
+                            BorshVector {
+                                dtype: BorshVectorType::Int8,
+                                data: borsh::to_vec::<Vec<i32>>(&array)?,
+                            },
+                        );
                     }
                 },
                 TensorElementType::Int64 => {
@@ -117,10 +126,13 @@ pub fn borsh_serialize_outputs(
                         bail!("cannot serialize array with dim {dim:?} using borsh");
                     } else {
                         let array = array.into_iter().collect::<Vec<i64>>();
-                        borsh_out.insert(name, BorshVector {
-                            dtype: BorshVectorType::Int8,
-                            data: borsh::to_vec::<Vec<i64>>(&array)?,
-                        });
+                        borsh_out.insert(
+                            name,
+                            BorshVector {
+                                dtype: BorshVectorType::Int8,
+                                data: borsh::to_vec::<Vec<i64>>(&array)?,
+                            },
+                        );
                     }
                 },
                 TensorElementType::Uint8 => {
@@ -129,10 +141,13 @@ pub fn borsh_serialize_outputs(
                         bail!("cannot serialize array with dim {dim:?} using borsh");
                     } else {
                         let array = array.into_iter().collect::<Vec<u8>>();
-                        borsh_out.insert(name, BorshVector {
-                            dtype: BorshVectorType::Int8,
-                            data: borsh::to_vec::<Vec<u8>>(&array)?,
-                        });
+                        borsh_out.insert(
+                            name,
+                            BorshVector {
+                                dtype: BorshVectorType::Int8,
+                                data: borsh::to_vec::<Vec<u8>>(&array)?,
+                            },
+                        );
                     }
                 },
                 TensorElementType::Uint16 => {
@@ -141,10 +156,13 @@ pub fn borsh_serialize_outputs(
                         bail!("cannot serialize array with dim {dim:?} using borsh");
                     } else {
                         let array = array.into_iter().collect::<Vec<u16>>();
-                        borsh_out.insert(name, BorshVector {
-                            dtype: BorshVectorType::Int8,
-                            data: borsh::to_vec::<Vec<u16>>(&array)?,
-                        });
+                        borsh_out.insert(
+                            name,
+                            BorshVector {
+                                dtype: BorshVectorType::Int8,
+                                data: borsh::to_vec::<Vec<u16>>(&array)?,
+                            },
+                        );
                     }
                 },
                 TensorElementType::Uint32 => {
@@ -153,10 +171,13 @@ pub fn borsh_serialize_outputs(
                         bail!("cannot serialize array with dim {dim:?} using borsh");
                     } else {
                         let array = array.into_iter().collect::<Vec<u32>>();
-                        borsh_out.insert(name, BorshVector {
-                            dtype: BorshVectorType::Int8,
-                            data: borsh::to_vec::<Vec<u32>>(&array)?,
-                        });
+                        borsh_out.insert(
+                            name,
+                            BorshVector {
+                                dtype: BorshVectorType::Int8,
+                                data: borsh::to_vec::<Vec<u32>>(&array)?,
+                            },
+                        );
                     }
                 },
                 TensorElementType::Uint64 => {
@@ -165,10 +186,13 @@ pub fn borsh_serialize_outputs(
                         bail!("cannot serialize array with dim {dim:?} using borsh");
                     } else {
                         let array = array.into_iter().collect::<Vec<u64>>();
-                        borsh_out.insert(name, BorshVector {
-                            dtype: BorshVectorType::Uint64,
-                            data: borsh::to_vec::<Vec<u64>>(&array)?,
-                        });
+                        borsh_out.insert(
+                            name,
+                            BorshVector {
+                                dtype: BorshVectorType::Uint64,
+                                data: borsh::to_vec::<Vec<u64>>(&array)?,
+                            },
+                        );
                     }
                 },
                 TensorElementType::Float32 => {
@@ -177,10 +201,13 @@ pub fn borsh_serialize_outputs(
                         bail!("cannot serialize array with dim {dim:?} using borsh");
                     } else {
                         let array = array.into_iter().collect::<Vec<f32>>();
-                        borsh_out.insert(name, BorshVector {
-                            dtype: BorshVectorType::Int8,
-                            data: borsh::to_vec::<Vec<f32>>(&array)?,
-                        });
+                        borsh_out.insert(
+                            name,
+                            BorshVector {
+                                dtype: BorshVectorType::Int8,
+                                data: borsh::to_vec::<Vec<f32>>(&array)?,
+                            },
+                        );
                     }
                 },
                 TensorElementType::Float64 => {
@@ -189,10 +216,13 @@ pub fn borsh_serialize_outputs(
                         bail!("cannot serialize array with dim {dim:?} using borsh");
                     } else {
                         let array = array.into_iter().collect::<Vec<f64>>();
-                        borsh_out.insert(name, BorshVector {
-                            dtype: BorshVectorType::Int8,
-                            data: borsh::to_vec::<Vec<f64>>(&array)?,
-                        });
+                        borsh_out.insert(
+                            name,
+                            BorshVector {
+                                dtype: BorshVectorType::Int8,
+                                data: borsh::to_vec::<Vec<f64>>(&array)?,
+                            },
+                        );
                     }
                 },
                 _ => bail!("unsupported value type"),
