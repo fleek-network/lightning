@@ -85,7 +85,7 @@ impl ModuleLoader for FleekModuleLoader {
                         bail!("Failed to fetch {module_specifier}")
                     }
 
-                    let handle = ContentHandle::load(&hash).await?;
+                    let mut handle = ContentHandle::load(&hash).await?;
                     let source = handle.read_to_end().await?.into_boxed_slice();
 
                     Ok(ModuleSource::new(
@@ -111,7 +111,7 @@ impl ModuleLoader for FleekModuleLoader {
                             format!("Failed to fetch {module_specifier} from origin")
                         })?;
 
-                    let handle = ContentHandle::load(&hash).await?;
+                    let mut handle = ContentHandle::load(&hash).await?;
                     let bytes = handle.read_to_end().await?;
 
                     let module = ModuleSource::new(
@@ -142,7 +142,7 @@ impl ModuleLoader for FleekModuleLoader {
                     .await
                     .with_context(|| format!("Failed to fetch {module_specifier} from origin"))?;
 
-                    let handle = ContentHandle::load(&hash).await?;
+                    let mut handle = ContentHandle::load(&hash).await?;
                     let bytes = handle.read_to_end().await?;
 
                     let module = ModuleSource::new(

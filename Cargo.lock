@@ -3218,7 +3218,7 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "arrayref",
- "blake3-tree",
+ "b3fs",
  "cid",
  "deno_ast",
  "deno_core",
@@ -5209,7 +5209,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "arrayvec",
- "blake3-tree",
+ "b3fs",
  "bytes",
  "derive_more",
  "fleek-crypto",

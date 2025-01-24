@@ -71,6 +71,7 @@ async fn e2e_blockstore_server_get() {
     // Send a request from node2 to node1 to obtain the data
     let blockstore2 = swarm.get_blockstore(&pubkey2).unwrap();
     let blockstore_server_socket2 = swarm.get_blockstore_server_socket(&pubkey2).unwrap();
+    tokio::time::sleep(Duration::from_secs(5)).await;
 
     let mut res = blockstore_server_socket2
         .run(ServerRequest {

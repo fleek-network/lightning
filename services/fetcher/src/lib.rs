@@ -147,7 +147,7 @@ async fn handle_request(conn: &mut Connection, origin: Origin, uri: Bytes) -> an
     debug!("downloaded content");
 
     // Get the content from the blockstore
-    let Ok(content_handle) = fn_sdk::blockstore::ContentHandle::load(&hash).await else {
+    let Ok(mut content_handle) = fn_sdk::blockstore::ContentHandle::load(&hash).await else {
         respond_with_error(conn, b"Internal error", 500).await?;
         bail!("failed to load content handle from the blockstore");
     };

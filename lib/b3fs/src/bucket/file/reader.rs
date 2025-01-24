@@ -1,10 +1,11 @@
+use std::error;
 use std::sync::Arc;
 
 use bytes::BytesMut;
 use tokio::fs::{self};
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncReadExt, AsyncSeekExt};
 
-use crate::bucket::errors;
+use crate::bucket::{errors, POSITION_START_HASHES};
 use crate::collections::tree::AsyncHashTree;
 use crate::collections::HashTree;
 use crate::hasher::b3::KEY_LEN;
@@ -17,6 +18,10 @@ pub struct B3File {
 impl B3File {
     pub(crate) fn new(num_blocks: u32, file: fs::File) -> Self {
         Self { num_blocks, file }
+    }
+
+    pub fn num_blocks(&self) -> u32 {
+        self.num_blocks
     }
 
     pub async fn hashtree(self) -> Result<AsyncHashTree<fs::File>, errors::ReadError> {
