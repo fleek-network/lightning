@@ -366,6 +366,10 @@ pub enum UpdateMethod {
         token: Tokens,
         /// The address to recieve these tokens on the network
         receiving_address: EthAddress,
+        /// The transaction hash from the deposit transaction send to the bridge contract.
+        eth_tx_hash: [u8; 32],
+        /// The block number from the deposit transaction send to the bridge contract.
+        block_number: u64,
     },
     /// Submit of PoC from the bridge on the L2 to get the tokens in network
     Deposit {
@@ -551,13 +555,17 @@ impl ToDigest for UpdatePayload {
                 amount,
                 token,
                 receiving_address,
+                eth_tx_hash,
+                block_number,
             } => {
                 transcript_builder = transcript_builder
                     .with("transaction_name", &"mint")
                     .with_prefix("input".to_owned())
                     .with("amount", &HpUfixedWrapper(amount.clone()))
                     .with("token", token)
-                    .with("receiving_address", &receiving_address.0);
+                    .with("receiving_address", &receiving_address.0)
+                    .with("eth_tx_hash", eth_tx_hash)
+                    .with("block_number", block_number);
             },
             UpdateMethod::Transfer { amount, token, to } => {
                 transcript_builder = transcript_builder

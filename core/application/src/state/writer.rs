@@ -24,6 +24,7 @@ use lightning_interfaces::types::{
     CommodityTypes,
     Epoch,
     Metadata,
+    MintInfo,
     NodeIndex,
     NodeInfo,
     NodeServed,
@@ -190,6 +191,7 @@ impl ApplicationState<AtomoStorage, DefaultSerdeBackend, ApplicationStateTree> {
             )>("committee_selection_beacon")
             .with_table::<NodeIndex, ()>("committee_selection_beacon_non_revealing_node")
             .with_table::<u64, WithdrawInfo>("withdraws")
+            .with_table::<[u8; 32], MintInfo>("mints")
             .enable_iter("current_epoch_served")
             .enable_iter("rep_measurements")
             .enable_iter("submitted_rep_measurements")
@@ -203,6 +205,7 @@ impl ApplicationState<AtomoStorage, DefaultSerdeBackend, ApplicationStateTree> {
             .enable_iter("node_to_uri")
             .enable_iter("committee_selection_beacon")
             .enable_iter("committee_selection_beacon_non_revealing_node")
+            .enable_iter("mints")
             .enable_iter("withdraws");
 
         #[cfg(debug_assertions)]

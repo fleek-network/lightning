@@ -227,3 +227,12 @@ pub struct WithdrawInfoWithId {
     pub id: u64,
     pub info: WithdrawInfo,
 }
+
+#[derive(Debug, Hash, PartialEq, Serialize, Deserialize, Clone, schemars::JsonSchema)]
+pub struct MintInfo {
+    pub amount: HpUfixed<18>,
+    pub token: Tokens,
+    pub receiving_address: EthAddress,
+    pub eth_tx_hash: [u8; 32],
+    pub block_number: u64,
+}
