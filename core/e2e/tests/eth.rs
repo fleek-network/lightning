@@ -20,7 +20,7 @@ async fn e2e_eth_client_approve_revoke() {
     let chain_id = 1337;
     let mut swarm = Swarm::builder()
         .with_directory(temp_dir.path().to_path_buf().try_into().unwrap())
-        .with_min_port(10000)
+        .with_min_port(20000)
         .with_num_nodes(4)
         .with_chain_id(chain_id)
         .persistence(true)
