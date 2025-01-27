@@ -24,6 +24,7 @@ use lightning_interfaces::types::{
     CommodityTypes,
     Epoch,
     Metadata,
+    MintInfo,
     NodeIndex,
     NodeInfo,
     NodeServed,
@@ -83,6 +84,7 @@ pub struct QueryRunner {
     >,
     committee_selection_beacon_non_revealing_node: ResolvedTableReference<NodeIndex, ()>,
     withdraws: ResolvedTableReference<u64, WithdrawInfo>,
+    mints: ResolvedTableReference<[u8; 32], MintInfo>,
 }
 
 impl QueryRunner {
@@ -127,6 +129,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
             committee_selection_beacon_non_revealing_node: atomo
                 .resolve::<NodeIndex, ()>("committee_selection_beacon_non_revealing_node"),
             withdraws: atomo.resolve::<u64, WithdrawInfo>("withdraws"),
+            mints: atomo.resolve::<[u8; 32], MintInfo>("mints"),
             inner: atomo,
         }
     }
@@ -402,5 +405,10 @@ impl SyncQueryRunnerInterface for QueryRunner {
             .filter(|info| info.id >= paging.start)
             .take(paging.limit)
             .collect()
+    }
+
+    fn has_minted(&self, tx_hash: [u8; 32]) -> bool {
+        self.inner
+            .run(|ctx| self.mints.get(ctx).get(tx_hash).is_some())
     }
 }

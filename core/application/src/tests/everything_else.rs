@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use fleek_crypto::{AccountOwnerSecretKey, NodeSecretKey, SecretKey};
+use fleek_crypto::{AccountOwnerSecretKey, EthAddress, NodeSecretKey, SecretKey};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
@@ -9,6 +9,7 @@ use lightning_interfaces::types::{
     NodeInfo,
     Participation,
     Staking,
+    Tokens,
     UpdateMethod,
     UpdatePayload,
     UpdateRequest,
@@ -248,6 +249,111 @@ fn test_quick_sort() {
         // Node indexes 9000-10000 should be the winners of the auction in this test
         assert!(node.0 > 8999);
     }
+}
+
+#[tokio::test]
+async fn test_valid_mint_tx() {
+    let temp_dir = tempdir().unwrap();
+
+    let mut genesis = test_genesis();
+    let gov_secret_key = AccountOwnerSecretKey::generate();
+    let gov_public_key = gov_secret_key.to_pk();
+    let gov_address: EthAddress = gov_public_key.into();
+
+    genesis.governance_address = gov_address;
+
+    let (update_socket, query_runner) = init_app_with_genesis(&temp_dir, &genesis);
+
+    let secret_key = AccountOwnerSecretKey::generate();
+    let public_key = secret_key.to_pk();
+    let recv_address: EthAddress = public_key.into();
+
+    let eth_tx_hash = [1; 32];
+
+    let method = UpdateMethod::Mint {
+        amount: HpUfixed::<18>::from(100_u64),
+        token: Tokens::FLK,
+        receiving_address: recv_address,
+        eth_tx_hash,
+        block_number: 1,
+    };
+    let request = prepare_update_request_account(method, &gov_secret_key, 1);
+
+    // verify that the mint has not been ordered
+    assert!(!query_runner.has_minted(eth_tx_hash));
+
+    expect_tx_success(request, &update_socket, types::ExecutionData::None).await;
+
+    // verify that the mint has been ordered
+    assert!(query_runner.has_minted(eth_tx_hash));
+}
+
+#[tokio::test]
+async fn test_double_mint_tx() {
+    let temp_dir = tempdir().unwrap();
+
+    let mut genesis = test_genesis();
+    let gov_secret_key = AccountOwnerSecretKey::generate();
+    let gov_public_key = gov_secret_key.to_pk();
+    let gov_address: EthAddress = gov_public_key.into();
+
+    genesis.governance_address = gov_address;
+
+    let (update_socket, query_runner) = init_app_with_genesis(&temp_dir, &genesis);
+
+    let secret_key = AccountOwnerSecretKey::generate();
+    let public_key = secret_key.to_pk();
+    let recv_address: EthAddress = public_key.into();
+
+    let eth_tx_hash = [1; 32];
+
+    let method = UpdateMethod::Mint {
+        amount: HpUfixed::<18>::from(100_u64),
+        token: Tokens::FLK,
+        receiving_address: recv_address,
+        eth_tx_hash,
+        block_number: 1,
+    };
+    let request = prepare_update_request_account(method.clone(), &gov_secret_key, 1);
+
+    // verify that the mint has not been ordered
+    assert!(!query_runner.has_minted(eth_tx_hash));
+
+    expect_tx_success(request, &update_socket, types::ExecutionData::None).await;
+
+    // verify that the mint has been ordered
+    assert!(query_runner.has_minted(eth_tx_hash));
+
+    // try to mint again
+    let request = prepare_update_request_account(method, &gov_secret_key, 2);
+    expect_tx_revert(request, &update_socket, ExecutionError::AlreadyMinted).await;
+}
+
+#[tokio::test]
+async fn test_mint_tx_non_governance_key() {
+    let temp_dir = tempdir().unwrap();
+
+    let (update_socket, query_runner) = init_app(&temp_dir, None);
+
+    let secret_key = AccountOwnerSecretKey::generate();
+    let public_key = secret_key.to_pk();
+    let recv_address: EthAddress = public_key.into();
+
+    let eth_tx_hash = [1; 32];
+
+    let method = UpdateMethod::Mint {
+        amount: HpUfixed::<18>::from(100_u64),
+        token: Tokens::FLK,
+        receiving_address: recv_address,
+        eth_tx_hash,
+        block_number: 1,
+    };
+    let request = prepare_update_request_account(method, &secret_key, 1);
+
+    expect_tx_revert(request, &update_socket, ExecutionError::OnlyGovernance).await;
+
+    // verify that the mint has not been ordered
+    assert!(!query_runner.has_minted(eth_tx_hash));
 }
 
 fn quick_sort_repeated(

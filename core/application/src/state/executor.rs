@@ -28,6 +28,7 @@ use lightning_interfaces::types::{
     ExecutionData,
     ExecutionError,
     Metadata,
+    MintInfo,
     NodeIndex,
     NodeInfo,
     NodePorts,
@@ -136,6 +137,7 @@ pub struct StateExecutor<B: Backend> {
     >,
     pub committee_selection_beacon_non_revealing_node: B::Ref<NodeIndex, ()>,
     pub withdraws: B::Ref<u64, WithdrawInfo>,
+    pub mints: B::Ref<[u8; 32], MintInfo>,
     pub backend: B,
 }
 
@@ -168,6 +170,7 @@ impl<B: Backend> StateExecutor<B> {
             committee_selection_beacon_non_revealing_node: backend
                 .get_table_reference("committee_selection_beacon_non_revealing_node"),
             withdraws: backend.get_table_reference("withdraws"),
+            mints: backend.get_table_reference("mints"),
             backend,
         }
     }
@@ -211,7 +214,16 @@ impl<B: Backend> StateExecutor<B> {
                 amount,
                 token,
                 receiving_address,
-            } => self.mint(txn.payload.sender, receiving_address, amount, token),
+                eth_tx_hash,
+                block_number,
+            } => self.mint(
+                txn.payload.sender,
+                receiving_address,
+                amount,
+                token,
+                eth_tx_hash,
+                block_number,
+            ),
 
             UpdateMethod::Deposit {
                 proof,
@@ -554,6 +566,8 @@ impl<B: Backend> StateExecutor<B> {
         reciever: EthAddress,
         amount: HpUfixed<18>,
         token: Tokens,
+        eth_tx_hash: [u8; 32],
+        block_number: u64,
     ) -> TransactionResponse {
         // This transaction is only callable by AccountOwners and not nodes
         // So revert if the sender is a node public key
@@ -572,10 +586,24 @@ impl<B: Backend> StateExecutor<B> {
 
         let mut account = self.account_info.get(&reciever).unwrap_or_default();
 
+        if self.mints.get(&eth_tx_hash).is_some() {
+            return TransactionResponse::Revert(ExecutionError::AlreadyMinted);
+        }
+
+        let mint_info = MintInfo {
+            amount: amount.clone(),
+            token: token.clone(),
+            receiving_address: reciever,
+            eth_tx_hash,
+            block_number,
+        };
+
+        self.mints.set(eth_tx_hash, mint_info);
+
         // Check the token bridged and increment that amount
         match token {
             Tokens::FLK => account.flk_balance += amount,
-            Tokens::USDC => account.bandwidth_balance += TryInto::<u128>::try_into(amount).unwrap(),
+            Tokens::USDC => account.stables_balance += amount.convert_precision::<6>(),
         }
 
         self.account_info.set(reciever, account);

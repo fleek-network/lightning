@@ -476,6 +476,10 @@ impl<C: NodeComponents> FleekApiServer for FleekApi<C> {
         Ok(self.data.query_runner(epoch).await?.get_withdraws(paging))
     }
 
+    async fn has_minted(&self, tx_hash: [u8; 32]) -> RpcResult<bool> {
+        Ok(self.data.query_runner(None).await?.has_minted(tx_hash))
+    }
+
     async fn handle_subscription(
         &self,
         pending: PendingSubscriptionSink,

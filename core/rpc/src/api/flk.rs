@@ -227,6 +227,9 @@ pub trait FleekApi {
         paging: WithdrawPagingParams,
     ) -> RpcResult<Vec<WithdrawInfoWithId>>;
 
+    #[method(name = "has_minted")]
+    async fn has_minted(&self, tx_hash: [u8; 32]) -> RpcResult<bool>;
+
     #[subscription(name = "subscribe", item = Event)]
     async fn handle_subscription(&self, event_type: Option<EventType>) -> SubscriptionResult;
 }
