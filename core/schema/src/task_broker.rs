@@ -1,7 +1,6 @@
 use std::fmt::Display;
 use std::str::FromStr;
 
-use anyhow::anyhow;
 use bytes::Bytes;
 use fleek_crypto::NodeSignature;
 use ink_quill::{ToDigest, TranscriptBuilder};
@@ -30,13 +29,13 @@ impl Display for TaskScope {
     }
 }
 impl FromStr for TaskScope {
-    type Err = anyhow::Error;
+    type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "local" => Ok(TaskScope::Local),
             "single" => Ok(TaskScope::Single),
             "cluster" => Ok(TaskScope::Cluster),
-            s => Err(anyhow!(
+            s => Err(format!(
                 "scope '{s}' unknown, should be one of 'local', 'single', or 'cluster'"
             )),
         }

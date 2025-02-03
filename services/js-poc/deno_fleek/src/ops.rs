@@ -5,7 +5,7 @@ use std::ops::Deref;
 use std::rc::Rc;
 use std::str::FromStr;
 
-use anyhow::{anyhow, bail, Context};
+use anyhow::{anyhow, Context};
 use arrayref::array_ref;
 use b3fs::bucket::POSITION_START_HASHES;
 use b3fs::collections::HashTree;
@@ -13,14 +13,36 @@ use cid::Cid;
 use deno_core::error::{AnyError, JsError};
 use deno_core::url::Url;
 use deno_core::{op2, v8, ByteString, JsBuffer, OpState, ResourceId};
+use deno_error::JsErrorBox;
+use deno_http::HttpNextError;
 use deno_permissions::ChildPermissionsArg;
-use deno_web::JsMessageData;
+use deno_web::{JsMessageData, MessagePortError};
 use fleek_crypto::{ClientPublicKey, NodeSignature};
 use fn_sdk::blockstore::{block_file, header_file};
 use lightning_schema::task_broker::TaskScope;
 use serde::{Deserialize, Serialize, Serializer};
 use serde_json::json;
 use tracing::info;
+
+#[derive(Debug, thiserror::Error, deno_error::JsError)]
+#[class(generic)]
+enum FleekError {
+    #[error("Provided public key is invalid")]
+    InvalidPublicKey,
+
+    #[error("Provided hash is invalid")]
+    InvalidHash,
+
+    #[error("Task Error: {_0}")]
+    TaskError(String),
+
+    #[class(inherit)]
+    #[error(transparent)]
+    FsError(#[from] std::io::Error),
+
+    #[error("{_0:?}")]
+    Any(#[from] AnyError),
+}
 
 #[op2(async)]
 #[serde]
@@ -29,8 +51,8 @@ pub async fn run_task(
     service: u32,
     #[buffer(copy)] body: Vec<u8>,
     #[string] scope: String,
-) -> anyhow::Result<Task> {
-    let scope = TaskScope::from_str(&scope)?;
+) -> anyhow::Result<Task, FleekError> {
+    let scope = TaskScope::from_str(&scope).map_err(FleekError::TaskError)?;
 
     let depth = {
         let state = state.borrow();
@@ -51,9 +73,9 @@ pub fn log(#[string] message: String) {
 }
 
 #[op2(async)]
-pub async fn fetch_blake3(#[buffer(copy)] hash: Vec<u8>) -> anyhow::Result<bool> {
+pub async fn fetch_blake3(#[buffer(copy)] hash: Vec<u8>) -> Result<bool, FleekError> {
     if hash.len() != 32 {
-        return Err(anyhow!("blake3 hash must be 32 bytes"));
+        return Err(FleekError::InvalidHash);
     }
 
     Ok(fn_sdk::api::fetch_blake3(*array_ref![hash, 0, 32]).await)
@@ -61,13 +83,13 @@ pub async fn fetch_blake3(#[buffer(copy)] hash: Vec<u8>) -> anyhow::Result<bool>
 
 #[op2(async)]
 #[buffer]
-pub async fn fetch_from_origin(#[string] raw_url: String) -> anyhow::Result<Box<[u8]>> {
+pub async fn fetch_from_origin(#[string] raw_url: String) -> Result<Box<[u8]>, FleekError> {
     let url = Url::parse(&raw_url).context("failed to parse origin url")?;
     let (origin, uri) = match url.scheme() {
         // ipfs://bafy...
         "ipfs" => {
-            let cid = url.host_str().context("invalid ipfs hostname")?;
-            let cid = cid.parse::<Cid>().context("invalid ipfs cid")?;
+            let cid = url.host_str().context("missing host string")?;
+            let cid = cid.parse::<Cid>().map_err(|_| FleekError::InvalidHash)?;
             (fn_sdk::api::Origin::IPFS, cid.to_bytes())
         },
         // https://example.com/...#integrity=sha256-...
@@ -77,16 +99,16 @@ pub async fn fetch_from_origin(#[string] raw_url: String) -> anyhow::Result<Box<
                 .context("missing integrity fragment")?
                 .starts_with("integrity=")
             {
-                bail!("invalid integrity fragment")
+                return Err(anyhow!("missing integrity hash",).into());
             }
 
             (fn_sdk::api::Origin::HTTP, raw_url.as_bytes().to_vec())
         },
-        _ => bail!("invalid origin scheme"),
+        _ => return Err(anyhow!("invalid origin scheme",).into()),
     };
 
     let Some(hash) = fn_sdk::api::fetch_from_origin(origin, uri).await else {
-        bail!("failed to fetch {raw_url} from origin");
+        return Err(anyhow!("failed to fetch {raw_url} from origin").into());
     };
 
     Ok(hash.to_vec().into_boxed_slice())
@@ -94,7 +116,11 @@ pub async fn fetch_from_origin(#[string] raw_url: String) -> anyhow::Result<Box<
 
 #[op2(async)]
 #[buffer]
-pub async fn load_content(#[buffer(copy)] hash: Vec<u8>) -> anyhow::Result<Box<[u8]>> {
+pub async fn load_content(#[buffer(copy)] hash: Vec<u8>) -> Result<Box<[u8]>, FleekError> {
+    if hash.len() != 32 {
+        return Err(FleekError::InvalidHash);
+    }
+
     let path = header_file(array_ref![hash, 0, 32]);
 
     // TODO: store proof on rust side, and only give javascript an id to reference the handle
@@ -111,8 +137,8 @@ pub async fn load_content(#[buffer(copy)] hash: Vec<u8>) -> anyhow::Result<Box<[
 pub async fn read_block(
     #[buffer(copy)] proof: Box<[u8]>,
     #[bigint] index: usize,
-) -> anyhow::Result<Vec<u8>> {
-    let tree = HashTree::try_from(proof.deref())?;
+) -> Result<Vec<u8>, FleekError> {
+    let tree = HashTree::try_from(proof.deref()).context("failed to parse hash tree")?;
     let inner_hash = tree.nth(index);
     let path = block_file(inner_hash);
     let block = std::fs::read(path)?;
@@ -122,9 +148,11 @@ pub async fn read_block(
 
 #[op2(async)]
 #[string]
-pub async fn query_client_flk_balance(#[buffer(copy)] address: Vec<u8>) -> anyhow::Result<String> {
+pub async fn query_client_flk_balance(
+    #[buffer(copy)] address: Vec<u8>,
+) -> Result<String, FleekError> {
     if address.len() != 96 {
-        return Err(anyhow!("address must be 32 bytes"));
+        return Err(FleekError::InvalidPublicKey);
     }
     let bytes = *array_ref![address, 0, 96];
     Ok(
@@ -138,9 +166,9 @@ pub async fn query_client_flk_balance(#[buffer(copy)] address: Vec<u8>) -> anyho
 #[string]
 pub async fn query_client_bandwidth_balance(
     #[buffer(copy)] address: Vec<u8>,
-) -> anyhow::Result<String> {
+) -> Result<String, FleekError> {
     if address.len() != 96 {
-        return Err(anyhow!("address must be 32 bytes"));
+        return Err(FleekError::InvalidPublicKey);
     }
     let bytes = *array_ref![address, 0, 96];
     Ok(
@@ -159,19 +187,26 @@ pub struct Task {
 /// Marker type for current task depth
 pub struct TaskDepth(pub(crate) u8);
 
+#[derive(Debug, thiserror::Error, deno_error::JsError)]
+pub enum TtyError {
+    #[class(inherit)]
+    #[error(transparent)]
+    Other(#[inherit] JsErrorBox),
+}
+
 #[op2(fast)]
 pub fn op_set_raw(
     _state: &mut OpState,
     _rid: u32,
     _is_raw: bool,
     _cbreak: bool,
-) -> anyhow::Result<(), AnyError> {
-    unimplemented!()
+) -> anyhow::Result<(), TtyError> {
+    Err(TtyError::Other(JsErrorBox::not_supported()))
 }
 
 #[op2(fast)]
 pub fn op_can_write_vectored(_state: &mut OpState, #[smi] _rid: ResourceId) -> bool {
-    unimplemented!()
+    false
 }
 
 #[op2(async)]
@@ -181,8 +216,8 @@ pub async fn op_raw_write_vectored(
     #[smi] _rid: ResourceId,
     #[buffer] _buf1: JsBuffer,
     #[buffer] _buf2: JsBuffer,
-) -> anyhow::Result<usize, AnyError> {
-    unimplemented!()
+) -> Result<usize, HttpNextError> {
+    Err(HttpNextError::Other(JsErrorBox::not_supported()))
 }
 
 #[op2]
@@ -226,14 +261,21 @@ pub enum WebWorkerType {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct WorkerId(u32);
 
+#[derive(Debug, thiserror::Error, deno_error::JsError)]
+pub enum CreateWorkerError {
+    #[class("DOMExceptionNotSupportedError")]
+    #[error("Classic workers are not supported.")]
+    ClassicWorkers,
+}
+
 #[op2]
 #[serde]
 pub fn op_create_worker(
     _state: &mut OpState,
     #[serde] _args: CreateWorkerArgs,
     #[serde] _maybe_worker_metadata: Option<JsMessageData>,
-) -> anyhow::Result<WorkerId, AnyError> {
-    unimplemented!()
+) -> Result<WorkerId, CreateWorkerError> {
+    Err(CreateWorkerError::ClassicWorkers)
 }
 
 #[op2]
@@ -241,7 +283,7 @@ pub fn op_host_post_message(
     _state: &mut OpState,
     #[serde] _id: WorkerId,
     #[serde] _data: JsMessageData,
-) -> anyhow::Result<(), AnyError> {
+) -> Result<(), MessagePortError> {
     unimplemented!()
 }
 
@@ -250,7 +292,7 @@ pub fn op_host_post_message(
 pub async fn op_host_recv_ctrl(
     _state: Rc<RefCell<OpState>>,
     #[serde] _id: WorkerId,
-) -> anyhow::Result<WorkerControlEvent, AnyError> {
+) -> WorkerControlEvent {
     unimplemented!()
 }
 
@@ -259,7 +301,7 @@ pub async fn op_host_recv_ctrl(
 pub async fn op_host_recv_message(
     _state: Rc<RefCell<OpState>>,
     #[serde] _id: WorkerId,
-) -> anyhow::Result<Option<JsMessageData>, AnyError> {
+) -> Result<Option<JsMessageData>, MessagePortError> {
     unimplemented!()
 }
 
@@ -277,7 +319,7 @@ pub fn op_napi_open<'scope>(
     _global: v8::Local<'scope, v8::Object>,
     _buffer_constructor: v8::Local<'scope, v8::Function>,
     _report_error: v8::Local<'scope, v8::Function>,
-) -> std::result::Result<v8::Local<'scope, v8::Value>, AnyError> {
+) -> std::result::Result<v8::Local<'scope, v8::Value>, deno_napi::NApiError> {
     unimplemented!()
 }
 
@@ -291,7 +333,7 @@ pub enum WorkerControlEvent {
 }
 
 impl Serialize for WorkerControlEvent {
-    fn serialize<S>(&self, serializer: S) -> anyhow::Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {

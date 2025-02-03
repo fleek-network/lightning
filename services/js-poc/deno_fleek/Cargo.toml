@@ -15,16 +15,23 @@ lightning-workspace-hack.workspace = true
 tracing = "0.1"
 serde.workspace = true
 serde_json.workspace = true
+thiserror.workspace = true
+async-trait.workspace = true
 
 # Deno core + webapi extensions
-deno_ast = { version = "0.42", features = ["transpiling"] }
-deno_core = "0.314.2"
-deno_fs = "0.83.0"
-deno_io = "0.83.0"
-deno_media_type = "0.1"
-deno_net = "0.165.0"
-deno_node = "0.110.0"
-deno_permissions = "0.33.0"
-deno_web = "0.204.0"
-deno_fetch = "0.197.0"
-deno_websocket = "0.178.0"
+deno_ast = { version = "0.44", features = ["transpiling"] }
+deno_core = "0.331.0"
+deno_error = "0.5.5"
+deno_napi = "0.118.0"
+deno_http = "0.185.0"
+deno_fs = "0.97.0"
+deno_io = "0.97.0"
+deno_media_type = "0.2.5"
+deno_net = "0.179.0"
+deno_node = "0.125.0"
+deno_permissions = "0.46.0"
+deno_web = "0.218.0"
+deno_fetch = "0.211.0"
+deno_websocket = "0.192.0"
+node_resolver = "0.25.0"
+sys_traits = { version = "0.1.7", features = ["memory"] }

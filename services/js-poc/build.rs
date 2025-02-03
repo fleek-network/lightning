@@ -7,9 +7,10 @@ use ::deno_websocket::deno_websocket;
 use deno_canvas::deno_canvas;
 use deno_console::deno_console;
 use deno_crypto::deno_crypto;
+use deno_fleek::in_memory_fs::InMemoryFs;
+use deno_fleek::node_traits::{DisabledNpmChecker, InMemorySysWrapper};
 use deno_fleek::{fleek, maybe_transpile_source, Permissions};
 use deno_fs::sync::MaybeArc;
-use deno_fs::InMemoryFs;
 use deno_url::deno_url;
 use deno_webgpu::deno_webgpu;
 use deno_webidl::deno_webidl;
@@ -29,7 +30,12 @@ fn main() {
         deno_canvas::init_ops_and_esm(),
         deno_io::deno_io::init_ops_and_esm(Some(Default::default())),
         deno_fs::deno_fs::init_ops::<Permissions>(memory_fs.clone()),
-        deno_node::deno_node::init_ops_and_esm::<Permissions>(None, memory_fs),
+        deno_node::deno_node::init_ops_and_esm::<
+            Permissions,
+            DisabledNpmChecker,
+            DisabledNpmChecker,
+            InMemorySysWrapper,
+        >(None, memory_fs),
         fleek::init_ops_and_esm(0),
     ];
 

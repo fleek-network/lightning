@@ -1,14 +1,18 @@
+// Copyright 2018-2025 the Deno authors. MIT license.
+
 use std::path::Path;
 
-use deno_ast::{ParseParams, SourceMapOption};
-use deno_core::error::AnyError;
+use deno_ast::{MediaType, ParseParams, SourceMapOption};
 use deno_core::{ModuleCodeString, ModuleName, SourceMapData};
-use deno_media_type::MediaType;
+use deno_error::JsErrorBox;
+
+deno_error::js_error_wrapper!(deno_ast::ParseDiagnostic, JsParseDiagnostic, "Error");
+deno_error::js_error_wrapper!(deno_ast::TranspileError, JsTranspileError, "Error");
 
 pub fn maybe_transpile_source(
     name: ModuleName,
     source: ModuleCodeString,
-) -> Result<(ModuleCodeString, Option<SourceMapData>), AnyError> {
+) -> Result<(ModuleCodeString, Option<SourceMapData>), JsErrorBox> {
     // Always transpile `node:` built-in modules, since they might be TypeScript.
     let media_type = if name.starts_with("node:") {
         MediaType::TypeScript
@@ -33,13 +37,15 @@ pub fn maybe_transpile_source(
         capture_tokens: false,
         scope_analysis: false,
         maybe_syntax: None,
-    })?;
+    })
+    .map_err(|e| JsErrorBox::from_err(JsParseDiagnostic(e)))?;
     let transpiled_source = parsed
         .transpile(
             &deno_ast::TranspileOptions {
                 imports_not_used_as_values: deno_ast::ImportsNotUsedAsValues::Remove,
                 ..Default::default()
             },
+            &deno_ast::TranspileModuleOptions::default(),
             &deno_ast::EmitOptions {
                 source_map: if cfg!(debug_assertions) {
                     SourceMapOption::Separate
@@ -48,11 +54,14 @@ pub fn maybe_transpile_source(
                 },
                 ..Default::default()
             },
-        )?
+        )
+        .map_err(|e| JsErrorBox::from_err(JsTranspileError(e)))?
         .into_source();
 
-    let maybe_source_map: Option<SourceMapData> = transpiled_source.source_map.map(|sm| sm.into());
-    let source_text = String::from_utf8(transpiled_source.source)?;
-
+    let maybe_source_map: Option<SourceMapData> = transpiled_source
+        .source_map
+        .map(|sm| sm.into_bytes().into());
+    let source_text = transpiled_source.text;
     Ok((source_text.into(), maybe_source_map))
 }
+
