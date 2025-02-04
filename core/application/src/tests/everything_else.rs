@@ -356,6 +356,94 @@ async fn test_mint_tx_non_governance_key() {
     assert!(!query_runner.has_minted(eth_tx_hash));
 }
 
+#[tokio::test]
+async fn test_clear_mints_tx_non_governance_key() {
+    let temp_dir = tempdir().unwrap();
+
+    let (update_socket, query_runner) = init_app(&temp_dir, None);
+
+    let secret_key = AccountOwnerSecretKey::generate();
+
+    let eth_tx_hash = [1; 32];
+
+    let method = UpdateMethod::ClearMints { block_number: 1 };
+    let request = prepare_update_request_account(method, &secret_key, 1);
+
+    expect_tx_revert(request, &update_socket, ExecutionError::OnlyGovernance).await;
+
+    // verify that the mint has not been ordered
+    assert!(!query_runner.has_minted(eth_tx_hash));
+}
+
+#[tokio::test]
+async fn test_valid_clear_mints_tx() {
+    let temp_dir = tempdir().unwrap();
+
+    let mut genesis = test_genesis();
+    let gov_secret_key = AccountOwnerSecretKey::generate();
+    let gov_public_key = gov_secret_key.to_pk();
+    let gov_address: EthAddress = gov_public_key.into();
+
+    genesis.governance_address = gov_address;
+
+    let (update_socket, query_runner) = init_app_with_genesis(&temp_dir, &genesis);
+
+    let secret_key = AccountOwnerSecretKey::generate();
+    let public_key = secret_key.to_pk();
+    let recv_address: EthAddress = public_key.into();
+    let eth_tx_hash1 = [1; 32];
+    let method = UpdateMethod::Mint {
+        amount: HpUfixed::<18>::from(100_u64),
+        token: Tokens::FLK,
+        receiving_address: recv_address,
+        eth_tx_hash: eth_tx_hash1,
+        block_number: 1,
+    };
+    let request = prepare_update_request_account(method, &gov_secret_key, 1);
+    expect_tx_success(request, &update_socket, types::ExecutionData::None).await;
+    assert!(query_runner.has_minted(eth_tx_hash1));
+
+    let secret_key = AccountOwnerSecretKey::generate();
+    let public_key = secret_key.to_pk();
+    let recv_address: EthAddress = public_key.into();
+    let eth_tx_hash2 = [2; 32];
+    let method = UpdateMethod::Mint {
+        amount: HpUfixed::<18>::from(100_u64),
+        token: Tokens::FLK,
+        receiving_address: recv_address,
+        eth_tx_hash: eth_tx_hash2,
+        block_number: 2,
+    };
+    let request = prepare_update_request_account(method, &gov_secret_key, 2);
+    expect_tx_success(request, &update_socket, types::ExecutionData::None).await;
+    assert!(query_runner.has_minted(eth_tx_hash2));
+
+    let secret_key = AccountOwnerSecretKey::generate();
+    let public_key = secret_key.to_pk();
+    let recv_address: EthAddress = public_key.into();
+    let eth_tx_hash3 = [3; 32];
+    let method = UpdateMethod::Mint {
+        amount: HpUfixed::<18>::from(100_u64),
+        token: Tokens::FLK,
+        receiving_address: recv_address,
+        eth_tx_hash: eth_tx_hash3,
+        block_number: 3,
+    };
+    let request = prepare_update_request_account(method, &gov_secret_key, 3);
+    expect_tx_success(request, &update_socket, types::ExecutionData::None).await;
+    assert!(query_runner.has_minted(eth_tx_hash3));
+
+    let method = UpdateMethod::ClearMints { block_number: 2 };
+    let request = prepare_update_request_account(method, &gov_secret_key, 4);
+    expect_tx_success(request, &update_socket, types::ExecutionData::None).await;
+
+    // verify that tx1 and tx2 were removed from the table, because their block number is less than
+    // or equal to 2.
+    assert!(!query_runner.has_minted(eth_tx_hash1));
+    assert!(!query_runner.has_minted(eth_tx_hash2));
+    assert!(query_runner.has_minted(eth_tx_hash3));
+}
+
 fn quick_sort_repeated(
     mut nodes: Vec<(NodeIndex, NodeInfo)>,
     l: usize,
