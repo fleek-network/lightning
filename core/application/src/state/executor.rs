@@ -224,7 +224,9 @@ impl<B: Backend> StateExecutor<B> {
                 eth_tx_hash,
                 block_number,
             ),
-
+            UpdateMethod::ClearMints { block_number } => {
+                self.clear_mints(txn.payload.sender, block_number)
+            },
             UpdateMethod::Deposit {
                 proof,
                 token,
@@ -607,6 +609,33 @@ impl<B: Backend> StateExecutor<B> {
         }
 
         self.account_info.set(reciever, account);
+        TransactionResponse::Success(ExecutionData::None)
+    }
+
+    // TODO(matthias): temporary until proof of consensus is implemented
+    fn clear_mints(&self, sender: TransactionSender, block_number: u64) -> TransactionResponse {
+        // This transaction is only callable by AccountOwners and not nodes
+        // So revert if the sender is a node public key
+        let sender = match self.only_account_owner(sender) {
+            Ok(account) => account,
+            Err(e) => return e,
+        };
+
+        let governance_address = match self.metadata.get(&Metadata::GovernanceAddress) {
+            Some(Value::AccountPublicKey(address)) => address,
+            _ => unreachable!("Governance address is missing from state."),
+        };
+        if sender != governance_address {
+            return TransactionResponse::Revert(ExecutionError::OnlyGovernance);
+        }
+
+        self.mints
+            .as_map()
+            .into_iter()
+            .filter(|(_, val)| val.block_number <= block_number)
+            .map(|(key, _)| key)
+            .for_each(|key| self.mints.remove(&key));
+
         TransactionResponse::Success(ExecutionData::None)
     }
 

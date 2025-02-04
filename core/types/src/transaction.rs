@@ -371,6 +371,13 @@ pub enum UpdateMethod {
         /// The block number from the deposit transaction send to the bridge contract.
         block_number: u64,
     },
+    /// Remove the processed mints from the mint table.
+    // TODO(matthias): this is a temporary transaction type until the proof of consensus is
+    // implemented for the `Deposit` transaction.
+    ClearMints {
+        /// We can remove all mints whose block number is equal or less than `block_number`.
+        block_number: u64,
+    },
     /// Submit of PoC from the bridge on the L2 to get the tokens in network
     Deposit {
         /// The proof of the bridge recieved from the L2,
@@ -565,6 +572,12 @@ impl ToDigest for UpdatePayload {
                     .with("token", token)
                     .with("receiving_address", &receiving_address.0)
                     .with("eth_tx_hash", eth_tx_hash)
+                    .with("block_number", block_number);
+            },
+            UpdateMethod::ClearMints { block_number } => {
+                transcript_builder = transcript_builder
+                    .with("transaction_name", &"clear_mints")
+                    .with_prefix("input".to_owned())
                     .with("block_number", block_number);
             },
             UpdateMethod::Transfer { amount, token, to } => {
