@@ -632,7 +632,7 @@ impl<B: Backend> StateExecutor<B> {
         self.mints
             .as_map()
             .into_iter()
-            .filter(|(_, val)| val.block_number <= block_number)
+            .filter(|(_, val)| val.block_number < block_number)
             .map(|(key, _)| key)
             .for_each(|key| self.mints.remove(&key));
 
