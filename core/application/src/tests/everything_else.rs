@@ -5,6 +5,7 @@ use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
     ExecutionError,
+    GenesisAccount,
     NodeIndex,
     NodeInfo,
     Participation,
@@ -14,6 +15,7 @@ use lightning_interfaces::types::{
     UpdatePayload,
     UpdateRequest,
 };
+use lightning_interfaces::WithdrawPagingParams;
 use lightning_utils::application::QueryRunnerExt;
 use rand::seq::SliceRandom;
 use tempfile::tempdir;
@@ -230,27 +232,6 @@ async fn test_invalid_chain_id() {
     expect_tx_revert(update, &update_socket, ExecutionError::InvalidChainId).await;
 }
 
-// (dalton) Since the quick sort used to select the winners of the auctions takes &self of the whole
-// state, since it has to do reputation lookups on the compare nodes side of things I am going to
-// repeate the modified quick sort algorithm here so we can have unit tests on just the actual
-// algoritm
-#[test]
-fn test_quick_sort() {
-    let nodes = quick_sort_mock_node_list();
-    // We want the top 1000 nodes so the algorithm will find us and return the pivot from the bottom
-    // 9000
-    let k = 9000;
-    let r = nodes.len() - 1;
-    let winners = quick_sort_repeated(nodes, 0, r, k);
-
-    assert_eq!(winners.len(), 1000);
-
-    for node in winners {
-        // Node indexes 9000-10000 should be the winners of the auction in this test
-        assert!(node.0 > 8999);
-    }
-}
-
 #[tokio::test]
 async fn test_valid_mint_tx() {
     let temp_dir = tempdir().unwrap();
@@ -442,6 +423,113 @@ async fn test_valid_clear_mints_tx() {
     assert!(!query_runner.has_minted(eth_tx_hash1));
     assert!(!query_runner.has_minted(eth_tx_hash2));
     assert!(query_runner.has_minted(eth_tx_hash3));
+}
+
+#[tokio::test]
+async fn test_clear_withdraws_tx_non_governance_key() {
+    let temp_dir = tempdir().unwrap();
+
+    let (update_socket, _query_runner) = init_app(&temp_dir, None);
+
+    let secret_key = AccountOwnerSecretKey::generate();
+
+    let method = UpdateMethod::ClearWithdraws { withdraw_id: 1 };
+    let request = prepare_update_request_account(method, &secret_key, 1);
+
+    expect_tx_revert(request, &update_socket, ExecutionError::OnlyGovernance).await;
+}
+
+#[tokio::test]
+async fn test_valid_clear_withdraws_tx() {
+    let temp_dir = tempdir().unwrap();
+
+    let mut genesis = test_genesis();
+    let gov_secret_key = AccountOwnerSecretKey::generate();
+    let gov_public_key = gov_secret_key.to_pk();
+    let gov_address: EthAddress = gov_public_key.into();
+
+    genesis.governance_address = gov_address;
+
+    let secret_key = AccountOwnerSecretKey::generate();
+    let public_key = secret_key.to_pk();
+    let recv_address: EthAddress = public_key.into();
+    genesis.account = vec![GenesisAccount {
+        bandwidth_balance: 0,
+        flk_balance: 1000_u64.into(),
+        stables_balance: 0,
+        public_key: recv_address,
+    }];
+
+    let (update_socket, query_runner) = init_app_with_genesis(&temp_dir, &genesis);
+
+    let method = UpdateMethod::Withdraw {
+        amount: 100_u64.into(),
+        token: Tokens::FLK,
+        receiving_address: recv_address,
+    };
+    let request = prepare_update_request_account(method, &secret_key, 1);
+    expect_tx_success(request, &update_socket, types::ExecutionData::None).await;
+
+    let method = UpdateMethod::Withdraw {
+        amount: 100_u64.into(),
+        token: Tokens::FLK,
+        receiving_address: recv_address,
+    };
+    let request = prepare_update_request_account(method, &secret_key, 2);
+    expect_tx_success(request, &update_socket, types::ExecutionData::None).await;
+
+    let method = UpdateMethod::Withdraw {
+        amount: 100_u64.into(),
+        token: Tokens::FLK,
+        receiving_address: recv_address,
+    };
+    let request = prepare_update_request_account(method, &secret_key, 3);
+    expect_tx_success(request, &update_socket, types::ExecutionData::None).await;
+
+    let withdraws = query_runner.get_withdraws(WithdrawPagingParams {
+        start: 0,
+        limit: 10,
+    });
+    // Make sure all three withdraws are in the table
+    assert_eq!(withdraws.len(), 3);
+    // The withdraw ids start at 0, so at the beginning, the min id should be 0
+    let min_id = withdraws.iter().map(|w| w.id).min().unwrap();
+    assert_eq!(min_id, 0);
+
+    let method = UpdateMethod::ClearWithdraws { withdraw_id: 2 };
+    let request = prepare_update_request_account(method, &gov_secret_key, 1);
+    expect_tx_success(request, &update_socket, types::ExecutionData::None).await;
+
+    let withdraws = query_runner.get_withdraws(WithdrawPagingParams {
+        start: 0,
+        limit: 10,
+    });
+    // We removed all withdraws with id less than 2, which only leaves one withdraw
+    assert_eq!(withdraws.len(), 1);
+    // The min id should now be 2
+    let min_id = withdraws.iter().map(|w| w.id).min().unwrap();
+    assert_eq!(min_id, 2);
+}
+
+// (dalton) Since the quick sort used to select the winners of the auctions takes &self of the whole
+// state, since it has to do reputation lookups on the compare nodes side of things I am going to
+// repeate the modified quick sort algorithm here so we can have unit tests on just the actual
+// algoritm
+#[test]
+fn test_quick_sort() {
+    let nodes = quick_sort_mock_node_list();
+    // We want the top 1000 nodes so the algorithm will find us and return the pivot from the bottom
+    // 9000
+    let k = 9000;
+    let r = nodes.len() - 1;
+    let winners = quick_sort_repeated(nodes, 0, r, k);
+
+    assert_eq!(winners.len(), 1000);
+
+    for node in winners {
+        // Node indexes 9000-10000 should be the winners of the auction in this test
+        assert!(node.0 > 8999);
+    }
 }
 
 fn quick_sort_repeated(
