@@ -51,6 +51,7 @@ console = { version = "0.15", default-features = false, features = ["ansi-parsin
 criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
 crossbeam-channel = { version = "0.5" }
 crossbeam-deque = { version = "0.8" }
+crossbeam-epoch = { version = "0.9" }
 crossbeam-utils = { version = "0.8" }
 crunchy = { version = "0.2", features = ["limit_256", "std"] }
 crypto-common = { version = "0.1", default-features = false, features = ["getrandom", "std"] }
@@ -88,6 +89,7 @@ hyper-582f2526e08bb6a0 = { package = "hyper", version = "0.14", features = ["ful
 hyper-dff4ba8e3ae991db = { package = "hyper", version = "1", features = ["full"] }
 hyper-rustls = { version = "0.24", features = ["http2"] }
 hyper-util = { version = "0.1", features = ["client-legacy", "server-auto", "service"] }
+idna = { version = "1" }
 image = { version = "0.24" }
 indexmap-dff4ba8e3ae991db = { package = "indexmap", version = "1", default-features = false, features = ["serde", "std"] }
 indexmap-f595c2ba2a3f28df = { package = "indexmap", version = "2", features = ["serde"] }
@@ -116,6 +118,7 @@ once_cell = { version = "1", features = ["critical-section"] }
 p256 = { version = "0.13", features = ["ecdh", "jwk"] }
 parity-scale-codec = { version = "3", features = ["derive", "max-encoded-len"] }
 pbkdf2 = { version = "0.12" }
+percent-encoding = { version = "2" }
 phf_shared = { version = "0.11", default-features = false, features = ["std"] }
 pkcs8 = { version = "0.10", default-features = false, features = ["encryption", "pem", "std"] }
 plotters = { version = "0.3" }
@@ -183,8 +186,6 @@ tracing = { version = "0.1", features = ["log"] }
 tracing-core = { version = "0.1" }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "time"] }
 uint = { version = "0.9" }
-unicode-bidi = { version = "0.3" }
-unicode-normalization = { version = "0.1" }
 url = { version = "2", features = ["expose_internals", "serde"] }
 uuid = { version = "1", features = ["fast-rng", "serde", "v4"] }
 web-sys = { version = "0.3", default-features = false, features = ["AbortController", "AbortSignal", "AddEventListenerOptions", "BinaryType", "Cache", "CacheQueryOptions", "CacheStorage", "CloseEvent", "CloseEventInit", "Document", "ErrorEvent", "File", "FileReader", "FormData", "Headers", "History", "HtmlHeadElement", "Location", "MessageEvent", "ProgressEvent", "QueuingStrategy", "ReadableByteStreamController", "ReadableStream", "ReadableStreamByobReader", "ReadableStreamByobRequest", "ReadableStreamDefaultController", "ReadableStreamDefaultReader", "ReadableStreamGetReaderOptions", "ReadableStreamReadResult", "ReadableStreamReaderMode", "ReadableStreamType", "ReadableWritablePair", "Request", "RequestInit", "RequestRedirect", "Response", "ResponseInit", "StreamPipeOptions", "TransformStream", "TransformStreamDefaultController", "Transformer", "UnderlyingSink", "UnderlyingSource", "WebSocket", "Window", "WorkerGlobalScope", "WritableStream", "WritableStreamDefaultController", "WritableStreamDefaultWriter", "console"] }
@@ -227,6 +228,7 @@ console = { version = "0.15", default-features = false, features = ["ansi-parsin
 criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
 crossbeam-channel = { version = "0.5" }
 crossbeam-deque = { version = "0.8" }
+crossbeam-epoch = { version = "0.9" }
 crossbeam-utils = { version = "0.8" }
 crunchy = { version = "0.2", features = ["limit_256", "std"] }
 crypto-common = { version = "0.1", default-features = false, features = ["getrandom", "std"] }
@@ -236,6 +238,7 @@ data-encoding = { version = "2" }
 der = { version = "0.7", default-features = false, features = ["derive", "oid", "pem", "std"] }
 digest-274715c4dabd11b0 = { package = "digest", version = "0.9", default-features = false, features = ["std"] }
 digest-93f6ce9d446188ac = { package = "digest", version = "0.10", features = ["mac", "oid", "std"] }
+displaydoc = { version = "0.2" }
 ecdsa = { version = "0.16", features = ["pem", "signing", "std", "verifying"] }
 either = { version = "1" }
 elliptic-curve = { version = "0.13", features = ["ecdh", "hash2curve", "hazmat", "jwk", "pem", "std"] }
@@ -264,6 +267,7 @@ hyper-582f2526e08bb6a0 = { package = "hyper", version = "0.14", features = ["ful
 hyper-dff4ba8e3ae991db = { package = "hyper", version = "1", features = ["full"] }
 hyper-rustls = { version = "0.24", features = ["http2"] }
 hyper-util = { version = "0.1", features = ["client-legacy", "server-auto", "service"] }
+idna = { version = "1" }
 image = { version = "0.24" }
 indexmap-dff4ba8e3ae991db = { package = "indexmap", version = "1", default-features = false, features = ["serde", "std"] }
 indexmap-f595c2ba2a3f28df = { package = "indexmap", version = "2", features = ["serde"] }
@@ -294,6 +298,7 @@ p256 = { version = "0.13", features = ["ecdh", "jwk"] }
 parity-scale-codec = { version = "3", features = ["derive", "max-encoded-len"] }
 parity-scale-codec-derive = { version = "3", default-features = false, features = ["max-encoded-len"] }
 pbkdf2 = { version = "0.12" }
+percent-encoding = { version = "2" }
 phf_shared = { version = "0.11", default-features = false, features = ["std"] }
 pkcs8 = { version = "0.10", default-features = false, features = ["encryption", "pem", "std"] }
 plotters = { version = "0.3" }
@@ -363,8 +368,6 @@ tracing = { version = "0.1", features = ["log"] }
 tracing-core = { version = "0.1" }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "time"] }
 uint = { version = "0.9" }
-unicode-bidi = { version = "0.3" }
-unicode-normalization = { version = "0.1" }
 url = { version = "2", features = ["expose_internals", "serde"] }
 uuid = { version = "1", features = ["fast-rng", "serde", "v4"] }
 web-sys = { version = "0.3", default-features = false, features = ["AbortController", "AbortSignal", "AddEventListenerOptions", "BinaryType", "Cache", "CacheQueryOptions", "CacheStorage", "CloseEvent", "CloseEventInit", "Document", "ErrorEvent", "File", "FileReader", "FormData", "Headers", "History", "HtmlHeadElement", "Location", "MessageEvent", "ProgressEvent", "QueuingStrategy", "ReadableByteStreamController", "ReadableStream", "ReadableStreamByobReader", "ReadableStreamByobRequest", "ReadableStreamDefaultController", "ReadableStreamDefaultReader", "ReadableStreamGetReaderOptions", "ReadableStreamReadResult", "ReadableStreamReaderMode", "ReadableStreamType", "ReadableWritablePair", "Request", "RequestInit", "RequestRedirect", "Response", "ResponseInit", "StreamPipeOptions", "TransformStream", "TransformStreamDefaultController", "Transformer", "UnderlyingSink", "UnderlyingSource", "WebSocket", "Window", "WorkerGlobalScope", "WritableStream", "WritableStreamDefaultController", "WritableStreamDefaultWriter", "console"] }
@@ -379,6 +382,7 @@ mio = { version = "0.8", features = ["net", "os-ext"] }
 openssl = { version = "0.10", features = ["vendored"] }
 openssl-sys = { version = "0.9", default-features = false, features = ["vendored"] }
 rustix = { version = "0.38", features = ["event", "fs", "net", "pipe", "process", "system", "termios", "time"] }
+serde_bytes = { version = "0.11", features = ["alloc"] }
 tokio-tungstenite = { version = "0.20", features = ["rustls-tls-webpki-roots"] }
 web-sys = { version = "0.3", default-features = false, features = ["Worker"] }
 
@@ -391,6 +395,7 @@ mio = { version = "0.8", features = ["net", "os-ext"] }
 openssl = { version = "0.10", features = ["vendored"] }
 openssl-sys = { version = "0.9", default-features = false, features = ["vendored"] }
 rustix = { version = "0.38", features = ["event", "fs", "net", "pipe", "process", "system", "termios", "time"] }
+serde_bytes = { version = "0.11", features = ["alloc"] }
 tokio-tungstenite = { version = "0.20", features = ["rustls-tls-webpki-roots"] }
 web-sys = { version = "0.3", default-features = false, features = ["Worker"] }
 
@@ -400,11 +405,13 @@ bitflags = { version = "2", default-features = false, features = ["serde"] }
 core-foundation = { version = "0.9" }
 core-foundation-sys = { version = "0.8" }
 core-graphics-types = { version = "0.1" }
+errno = { version = "0.3" }
 event-listener = { version = "5" }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
 mio = { version = "0.8", features = ["net", "os-ext"] }
 rustix = { version = "0.38", features = ["event", "fs", "net", "pipe", "process", "system", "termios", "time"] }
 security-framework-sys = { version = "2" }
+serde_bytes = { version = "0.11", features = ["alloc"] }
 tokio-tungstenite = { version = "0.20", features = ["rustls-tls-webpki-roots"] }
 web-sys = { version = "0.3", default-features = false, features = ["Worker"] }
 
@@ -414,11 +421,13 @@ bitflags = { version = "2", default-features = false, features = ["serde"] }
 core-foundation = { version = "0.9" }
 core-foundation-sys = { version = "0.8" }
 core-graphics-types = { version = "0.1" }
+errno = { version = "0.3" }
 event-listener = { version = "5" }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
 mio = { version = "0.8", features = ["net", "os-ext"] }
 rustix = { version = "0.38", features = ["event", "fs", "net", "pipe", "process", "system", "termios", "time"] }
 security-framework-sys = { version = "2" }
+serde_bytes = { version = "0.11", features = ["alloc"] }
 tokio-tungstenite = { version = "0.20", features = ["rustls-tls-webpki-roots"] }
 web-sys = { version = "0.3", default-features = false, features = ["Worker"] }
 

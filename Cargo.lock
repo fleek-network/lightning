@@ -9173,6 +9173,7 @@ dependencies = [
  "criterion",
  "crossbeam-channel",
  "crossbeam-deque",
+ "crossbeam-epoch",
  "crossbeam-utils",
  "crunchy",
  "crypto-common",
@@ -9182,9 +9183,11 @@ dependencies = [
  "der 0.7.9",
  "digest 0.10.7",
  "digest 0.9.0",
+ "displaydoc",
  "ecdsa",
  "either",
  "elliptic-curve",
+ "errno",
  "ethers-contract-abigen",
  "event-listener 5.3.1",
  "fastcrypto 0.1.5",
@@ -9211,6 +9214,7 @@ dependencies = [
  "hyper 1.4.1",
  "hyper-rustls 0.24.2",
  "hyper-util",
+ "idna",
  "image",
  "indexmap 1.9.3",
  "indexmap 2.3.0",
@@ -9245,6 +9249,7 @@ dependencies = [
  "parity-scale-codec 3.6.11",
  "parity-scale-codec-derive 3.6.9",
  "pbkdf2 0.12.2",
+ "percent-encoding",
  "phf_shared 0.11.2",
  "pkcs8 0.10.2",
  "plotters",
@@ -9285,6 +9290,7 @@ dependencies = [
  "security-framework-sys",
  "semver 1.0.23",
  "serde",
+ "serde_bytes",
  "serde_json",
  "serde_with 2.3.3",
  "sha1",
@@ -9317,8 +9323,6 @@ dependencies = [
  "tracing-core",
  "tracing-subscriber",
  "uint",
- "unicode-bidi",
- "unicode-normalization",
  "url",
  "uuid 1.10.0",
  "web-sys",
@@ -17072,12 +17076,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "unicode-bidi"
-version = "0.3.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08f95100a766bf4f8f28f90d77e0a5461bbdb219042e7679bebe79004fed8d75"
-
-[[package]]
 name = "unicode-id"
 version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -17094,15 +17092,6 @@ name = "unicode-ident"
 version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3354b9ac3fae1ff6755cb6db53683adb661634f67557942dea4facebec0fee4b"
-
-[[package]]
-name = "unicode-normalization"
-version = "0.1.23"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a56d1686db2308d901306f92a263857ef59ea39678a5458e7cb17f01415101f5"
-dependencies = [
- "tinyvec",
-]
 
 [[package]]
 name = "unicode-segmentation"
