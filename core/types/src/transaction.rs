@@ -375,7 +375,7 @@ pub enum UpdateMethod {
     // TODO(matthias): this is a temporary transaction type until the proof of consensus is
     // implemented for the `Deposit` transaction.
     ClearMints {
-        /// We can remove all mints whose block number is equal or less than `block_number`.
+        /// We can remove all mints whose block number is less than `block_number`.
         block_number: u64,
     },
     /// Submit of PoC from the bridge on the L2 to get the tokens in network

@@ -433,12 +433,12 @@ async fn test_valid_clear_mints_tx() {
     expect_tx_success(request, &update_socket, types::ExecutionData::None).await;
     assert!(query_runner.has_minted(eth_tx_hash3));
 
-    let method = UpdateMethod::ClearMints { block_number: 2 };
+    let method = UpdateMethod::ClearMints { block_number: 3 };
     let request = prepare_update_request_account(method, &gov_secret_key, 4);
     expect_tx_success(request, &update_socket, types::ExecutionData::None).await;
 
     // verify that tx1 and tx2 were removed from the table, because their block number is less than
-    // or equal to 2.
+    // 2.
     assert!(!query_runner.has_minted(eth_tx_hash1));
     assert!(!query_runner.has_minted(eth_tx_hash2));
     assert!(query_runner.has_minted(eth_tx_hash3));
