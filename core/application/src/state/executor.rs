@@ -209,7 +209,9 @@ impl<B: Backend> StateExecutor<B> {
                 token,
                 receiving_address,
             } => self.withdraw(txn.payload.sender, receiving_address, amount, token),
-
+            UpdateMethod::ClearWithdraws { withdraw_id } => {
+                self.clear_withdraws(txn.payload.sender, withdraw_id)
+            },
             UpdateMethod::Mint {
                 amount,
                 token,
@@ -514,7 +516,7 @@ impl<B: Backend> StateExecutor<B> {
         };
 
         let withdraw_id = match self.metadata.get(&Metadata::WithdrawId) {
-            Some(Value::WithdrawId(epoch)) => epoch,
+            Some(Value::WithdrawId(withdraw_id)) => withdraw_id,
             _ => 0,
         };
 
@@ -558,6 +560,31 @@ impl<B: Backend> StateExecutor<B> {
         }
 
         self.account_info.set(sender, account);
+        TransactionResponse::Success(ExecutionData::None)
+    }
+
+    // TODO(matthias): temporary until proof of consensus is implemented
+    fn clear_withdraws(&self, sender: TransactionSender, withdraw_id: u64) -> TransactionResponse {
+        // This transaction is only callable by AccountOwners and not nodes
+        // So revert if the sender is a node public key
+        let sender = match self.only_account_owner(sender) {
+            Ok(account) => account,
+            Err(e) => return e,
+        };
+
+        let governance_address = match self.metadata.get(&Metadata::GovernanceAddress) {
+            Some(Value::AccountPublicKey(address)) => address,
+            _ => unreachable!("Governance address is missing from state."),
+        };
+        if sender != governance_address {
+            return TransactionResponse::Revert(ExecutionError::OnlyGovernance);
+        }
+
+        self.withdraws
+            .keys()
+            .filter(|id| id < &withdraw_id)
+            .for_each(|id| self.withdraws.remove(&id));
+
         TransactionResponse::Success(ExecutionData::None)
     }
 

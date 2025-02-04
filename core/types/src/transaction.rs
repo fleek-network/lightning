@@ -356,6 +356,11 @@ pub enum UpdateMethod {
         /// The address to recieve these tokens on the L2
         receiving_address: EthAddress,
     },
+    /// Remove the withdraws from the withdraws table.
+    ClearWithdraws {
+        /// Remove all withdraws with id less than `withdraw_id`
+        withdraw_id: u64,
+    },
     /// Mint tokens on the network that were bridged over from the L2
     // TODO(matthias): this is a temporary transaction type until the proof of consensus is
     // implemented for the `Deposit` transaction.
@@ -557,6 +562,12 @@ impl ToDigest for UpdatePayload {
                     .with("amount", &HpUfixedWrapper(amount.clone()))
                     .with("token", token)
                     .with("receiving_address", &receiving_address.0);
+            },
+            UpdateMethod::ClearWithdraws { withdraw_id } => {
+                transcript_builder = transcript_builder
+                    .with("transaction_name", &"clear_withdraws")
+                    .with_prefix("input".to_owned())
+                    .with("withdraw_id", withdraw_id);
             },
             UpdateMethod::Mint {
                 amount,
