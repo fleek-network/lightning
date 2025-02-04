@@ -1,6 +1,6 @@
-use anyhow::{anyhow, bail, Context};
 use arrayref::array_ref;
 use cid::Cid;
+use deno_core::error::ModuleLoaderError;
 use deno_core::url::Host;
 use deno_core::{
     ModuleLoadResponse,
@@ -11,6 +11,7 @@ use deno_core::{
     ModuleType,
     RequestedModuleType,
 };
+use deno_error::JsErrorBox;
 use fn_sdk::api::fetch_from_origin;
 use fn_sdk::blockstore::ContentHandle;
 use tracing::trace;
@@ -29,7 +30,7 @@ impl ModuleLoader for FleekModuleLoader {
         specifier: &str,
         referrer: &str,
         _kind: deno_core::ResolutionKind,
-    ) -> Result<ModuleSpecifier, anyhow::Error> {
+    ) -> Result<ModuleSpecifier, ModuleLoaderError> {
         // Resolve import according to spec, reusing referrer base urls, etc
         let import = deno_core::resolve_import(specifier, referrer)?;
 
@@ -55,7 +56,10 @@ impl ModuleLoader for FleekModuleLoader {
                 if t.to_lowercase() == "wasm" {
                     ModuleType::Wasm
                 } else {
-                    return ModuleLoadResponse::Sync(Err(anyhow!("Unknown requested module type")));
+                    return ModuleLoadResponse::Sync(Err(ModuleLoaderError::Unsupported {
+                        specifier: Box::new(module_specifier.clone()),
+                        maybe_referrer: maybe_referrer.map(|v| Box::new(v.clone())),
+                    }));
                 }
             },
         };
@@ -64,25 +68,37 @@ impl ModuleLoader for FleekModuleLoader {
         match module_specifier.scheme() {
             "blake3" => {
                 let Some(Host::Domain(host)) = module_specifier.host() else {
-                    return ModuleLoadResponse::Sync(Err(anyhow!("Invalid blake3 hash")));
+                    return ModuleLoadResponse::Sync(Err(ModuleLoaderError::Core(
+                        deno_core::error::CoreError::JsBox(JsErrorBox::generic(
+                            "missing blake3 hash",
+                        )),
+                    )));
                 };
 
                 let bytes = match hex::decode(host) {
                     Ok(bytes) => bytes,
                     Err(e) => {
-                        return ModuleLoadResponse::Sync(Err(anyhow!("Invalid blake3 hash: {e}")));
+                        return ModuleLoadResponse::Sync(Err(ModuleLoaderError::Core(
+                            deno_core::error::CoreError::JsBox(JsErrorBox::generic(format!(
+                                "Invalid blake3 hash: {e}"
+                            ))),
+                        )));
                     },
                 };
                 if bytes.len() != 32 {
-                    return ModuleLoadResponse::Sync(Err(anyhow!(
-                        "Invalid blake3 hash: length must be 32 bytes"
+                    return ModuleLoadResponse::Sync(Err(ModuleLoaderError::Core(
+                        deno_core::error::CoreError::JsBox(JsErrorBox::generic(
+                            "blake3 hash must be 32 bytes of hex",
+                        )),
                     )));
                 }
 
                 let hash = *array_ref![bytes, 0, 32];
                 ModuleLoadResponse::Async(Box::pin(async move {
                     if !fn_sdk::api::fetch_blake3(hash).await {
-                        bail!("Failed to fetch {module_specifier}")
+                        return Err(ModuleLoaderError::Core(deno_core::error::CoreError::JsBox(
+                            JsErrorBox::generic("blake3 hash must be 32 bytes of hex"),
+                        )));
                     }
 
                     let mut handle = ContentHandle::load(&hash).await?;
@@ -98,18 +114,26 @@ impl ModuleLoader for FleekModuleLoader {
             },
             "ipfs" => {
                 let Some(Host::Domain(host)) = module_specifier.host() else {
-                    return ModuleLoadResponse::Sync(Err(anyhow!("Invalid ipfs cid")));
+                    return ModuleLoadResponse::Sync(Err(ModuleLoaderError::Core(
+                        deno_core::error::CoreError::JsBox(JsErrorBox::generic("missing ipfs cid")),
+                    )));
                 };
                 let Ok(cid) = host.parse::<Cid>() else {
-                    return ModuleLoadResponse::Sync(Err(anyhow!("Invalid ipfs cid")));
+                    return ModuleLoadResponse::Sync(Err(ModuleLoaderError::Core(
+                        deno_core::error::CoreError::JsBox(JsErrorBox::generic("invalid ipfs cid")),
+                    )));
                 };
 
                 ModuleLoadResponse::Async(Box::pin(async move {
-                    let hash = fetch_from_origin(fn_sdk::api::Origin::IPFS, cid.to_bytes())
-                        .await
-                        .with_context(|| {
-                            format!("Failed to fetch {module_specifier} from origin")
-                        })?;
+                    let Some(hash) =
+                        fetch_from_origin(fn_sdk::api::Origin::IPFS, cid.to_bytes()).await
+                    else {
+                        return Err(ModuleLoaderError::Core(deno_core::error::CoreError::JsBox(
+                            JsErrorBox::generic(format!(
+                                "failed to fetch {module_specifier} from origin"
+                            )),
+                        )));
+                    };
 
                     let mut handle = ContentHandle::load(&hash).await?;
                     let bytes = handle.read_to_end().await?;
@@ -129,18 +153,26 @@ impl ModuleLoader for FleekModuleLoader {
                     .map(|s| s.starts_with("integrity="))
                     .unwrap_or(false)
                 {
-                    return ModuleLoadResponse::Sync(Err(anyhow!(
-                        "Missing `#integrity=` subresource identifier fragment"
+                    return ModuleLoadResponse::Sync(Err(ModuleLoaderError::Core(
+                        deno_core::error::CoreError::JsBox(JsErrorBox::generic(
+                            "Missing `#integrity=` subresource identifier fragment",
+                        )),
                     )));
                 }
 
                 ModuleLoadResponse::Async(Box::pin(async move {
-                    let hash = fn_sdk::api::fetch_from_origin(
+                    let Some(hash) = fn_sdk::api::fetch_from_origin(
                         fn_sdk::api::Origin::HTTP,
                         module_specifier.as_str(),
                     )
                     .await
-                    .with_context(|| format!("Failed to fetch {module_specifier} from origin"))?;
+                    else {
+                        return Err(ModuleLoaderError::Core(deno_core::error::CoreError::JsBox(
+                            JsErrorBox::generic(format!(
+                                "failed to fetch {module_specifier} from origin"
+                            )),
+                        )));
+                    };
 
                     let mut handle = ContentHandle::load(&hash).await?;
                     let bytes = handle.read_to_end().await?;
@@ -154,7 +186,7 @@ impl ModuleLoader for FleekModuleLoader {
                     Ok(module)
                 }))
             },
-            _ => ModuleLoadResponse::Sync(Err(anyhow!("Unknown import url scheme"))),
+            _ => ModuleLoadResponse::Sync(Err(ModuleLoaderError::NotFound)),
         }
     }
 }

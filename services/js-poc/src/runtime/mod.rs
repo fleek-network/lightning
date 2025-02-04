@@ -14,9 +14,11 @@ use deno_core::url::Url;
 use deno_core::v8::{self, CreateParams, Global, Value};
 use deno_core::{JsRuntime, ModuleSpecifier, PollEventLoopOptions, RuntimeOptions};
 use deno_crypto::deno_crypto;
+use deno_fleek::in_memory_fs::InMemoryFs;
+use deno_fleek::node_traits::{DisabledNpmChecker, InMemorySysWrapper};
 use deno_fleek::{fleek, maybe_transpile_source, Permissions};
 use deno_fs::sync::MaybeArc;
-use deno_fs::InMemoryFs;
+use deno_telemetry::deno_telemetry;
 use deno_url::deno_url;
 use deno_webgpu::deno_webgpu;
 use deno_webidl::deno_webidl;
@@ -57,7 +59,13 @@ impl Runtime {
                 deno_canvas::init_ops(),
                 deno_io::deno_io::init_ops(Some(Default::default())),
                 deno_fs::deno_fs::init_ops::<Permissions>(memory_fs.clone()),
-                deno_node::deno_node::init_ops::<Permissions>(Default::default(), memory_fs),
+                deno_telemetry::init_ops(),
+                deno_node::deno_node::init_ops::<
+                    Permissions,
+                    DisabledNpmChecker,
+                    DisabledNpmChecker,
+                    InMemorySysWrapper,
+                >(Default::default(), memory_fs),
                 // Fleek runtime
                 fleek::init_ops(depth),
             ],
