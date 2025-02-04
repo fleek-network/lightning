@@ -11,6 +11,7 @@ use deno_fleek::in_memory_fs::InMemoryFs;
 use deno_fleek::node_traits::{DisabledNpmChecker, InMemorySysWrapper};
 use deno_fleek::{fleek, maybe_transpile_source, Permissions};
 use deno_fs::sync::MaybeArc;
+use deno_telemetry::deno_telemetry;
 use deno_url::deno_url;
 use deno_webgpu::deno_webgpu;
 use deno_webidl::deno_webidl;
@@ -29,7 +30,8 @@ fn main() {
         deno_webgpu::init_ops_and_esm(),
         deno_canvas::init_ops_and_esm(),
         deno_io::deno_io::init_ops_and_esm(Some(Default::default())),
-        deno_fs::deno_fs::init_ops::<Permissions>(memory_fs.clone()),
+        deno_fs::deno_fs::init_ops_and_esm::<Permissions>(memory_fs.clone()),
+        deno_telemetry::init_ops_and_esm(),
         deno_node::deno_node::init_ops_and_esm::<
             Permissions,
             DisabledNpmChecker,

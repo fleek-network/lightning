@@ -72,10 +72,10 @@ extension!(
         "bootstrap.js",
         "ext:runtime/98_global_scope_shared.js" = "98_global_scope_shared.js",
         "ext:deno_http/00_serve.ts" = "00_serve.ts",
-        "ext:runtime/30_os.js" = "30_os.js",
+        "ext:deno_os/30_os.js" = "30_os.js",
         "ext:deno_broadcast_channel/01_broadcast_channel.js" = "01_broadcast_channel.js",
         "ext:deno_fs/30_fs.js" = "30_fs.js",
-        "ext:runtime/40_process.js" = "40_process.js",
+        "ext:deno_process/40_process.js" = "40_process.js",
     ],
     options = { depth: u8 },
     state = |state, config| {
