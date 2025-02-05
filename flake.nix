@@ -133,7 +133,7 @@
               sha256 =
                 {
                   x86_64-linux = "sha256-e4LOkoISZaECzHMsWxwJ5dVM7i865DCmWrJux1XYuaQ=";
-                  aarch64-darwin = "";
+                  aarch64-darwin = "sha256-roXmQvE8uaPei0jTSycTd/FIcQ9KGZ6MRMVL45I3Qb8=";
                 }
                 ."${system}";
               postFetch = ''
