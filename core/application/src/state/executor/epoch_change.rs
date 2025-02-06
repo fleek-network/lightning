@@ -676,11 +676,6 @@ impl<B: Backend> StateExecutor<B> {
         // Clear executed digests.
         self.executed_digests.clear();
 
-        // Clear withdraws
-        self.withdraws.clear();
-        self.metadata
-            .set(Metadata::WithdrawId, Value::WithdrawId(0));
-
         self.committee_info.set(epoch, current_committee);
         // Get new committee
         let new_committee = self.choose_new_committee(beacons);
