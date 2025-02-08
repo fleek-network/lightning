@@ -4,7 +4,9 @@ use lightning_interfaces::NodeComponents;
 use lightning_node_bindings::{FullNodeComponents, UseMockConsensus};
 use lightning_utils::config::TomlConfigProvider;
 use resolved_pathbuf::ResolvedPathBuf;
+use tempfile::env::temp_dir;
 use tracing::{info, warn};
+use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::EnvFilter;
 
@@ -28,7 +30,7 @@ impl Cli {
     }
 
     pub async fn exec(self) -> Result<()> {
-        self.setup_logging(false);
+        let _log_guard = self.setup_logging(false);
         let config_path = self.resolve_config_path()?;
         match self.args.with_mock_consensus {
             true => {
@@ -79,10 +81,65 @@ impl Cli {
         }
     }
 
-    pub fn setup_logging(&self, is_subprocess: bool) {
+    pub fn setup_logging(&self, is_subprocess: bool) -> WorkerGuard {
         // Build the filter from cli args, or override if environment variable is set.
+        let (env_filter, _) = self.get_logging_filter();
+
+        let log_dir = temp_dir().join("lightning_logs");
+        let file_appender = tracing_appender::rolling::never(log_dir, "app.log");
+        let (non_blocking_file, guard) = tracing_appender::non_blocking(file_appender);
+        let file_layer = tracing_subscriber::fmt::layer()
+            .with_writer(non_blocking_file)
+            .with_ansi(false)
+            .with_target(false)
+            .with_file(self.args.with_log_locations)
+            .with_line_number(true)
+            .with_filter(env_filter);
+
+        let (env_filter, did_override) = self.get_logging_filter();
+        // Initialize the base logging registry
+        let registry = tracing_subscriber::registry().with(file_layer).with(
+            tracing_subscriber::fmt::layer()
+                .with_ansi(true)
+                .with_target(false)
+                .with_file(self.args.with_log_locations)
+                .with_line_number(true)
+                .with_filter(env_filter),
+        );
+
+        if self.args.with_console && !is_subprocess {
+            // Spawn tokio_console server
+            let console_layer = console_subscriber::Builder::default()
+                .with_default_env()
+                .server_addr(([0, 0, 0, 0], 6669))
+                .spawn();
+            registry.with(console_layer).init();
+        } else {
+            registry.init();
+        }
+
+        if !is_subprocess {
+            if did_override && self.args.verbose != 0 {
+                warn!("-v is useless when RUST_LOG override is present");
+            }
+            if self.args.verbose > 3 {
+                warn!("The maximum verbosity level is 3, Parsa.")
+            }
+        }
+        guard
+    }
+
+    fn resolve_config_path(&self) -> Result<ResolvedPathBuf> {
+        let input_path = self.args.config.as_str();
+        let config_path = ResolvedPathBuf::try_from(input_path)
+            .context(format!("Failed to resolve config path: {input_path}"))?;
+        ensure_parent_exist(&config_path)?;
+        Ok(config_path)
+    }
+
+    fn get_logging_filter(&self) -> (EnvFilter, bool) {
         let mut did_override = false;
-        let env_filter = EnvFilter::builder()
+        let filter = EnvFilter::builder()
             .parse_lossy(match std::env::var("RUST_LOG") {
                 // Environment override
                 Ok(filter) => {
@@ -117,41 +174,6 @@ impl Cli {
             // contexts, which are available from tokio console in a human readable way.
             .add_directive("tokio=warn".parse().unwrap())
             .add_directive("runtime=warn".parse().unwrap());
-
-        // Initialize the base logging registry
-        let registry = tracing_subscriber::registry().with(
-            tracing_subscriber::fmt::layer()
-                .with_file(self.args.with_log_locations)
-                .with_line_number(true)
-                .with_filter(env_filter),
-        );
-
-        if self.args.with_console && !is_subprocess {
-            // Spawn tokio_console server
-            let console_layer = console_subscriber::Builder::default()
-                .with_default_env()
-                .server_addr(([0, 0, 0, 0], 6669))
-                .spawn();
-            registry.with(console_layer).init();
-        } else {
-            registry.init();
-        }
-
-        if !is_subprocess {
-            if did_override && self.args.verbose != 0 {
-                warn!("-v is useless when RUST_LOG override is present");
-            }
-            if self.args.verbose > 3 {
-                warn!("The maximum verbosity level is 3, Parsa.")
-            }
-        }
-    }
-
-    fn resolve_config_path(&self) -> Result<ResolvedPathBuf> {
-        let input_path = self.args.config.as_str();
-        let config_path = ResolvedPathBuf::try_from(input_path)
-            .context(format!("Failed to resolve config path: {input_path}"))?;
-        ensure_parent_exist(&config_path)?;
-        Ok(config_path)
+        (filter, did_override)
     }
 }

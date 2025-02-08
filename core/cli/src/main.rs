@@ -15,7 +15,7 @@ fn main() -> Result<()> {
         // In case of spawning the binary with the `SERVICE_ID` env abort the default flow and
         // instead run the code for that service. We avoid using a runtime so that a service can use
         // its own.
-        cli.setup_logging(true);
+        let _log_guard = cli.setup_logging(true);
         <c!(FullNodeComponents::ServiceExecutorInterface)>::run_service(
             service_id.parse().expect("SERVICE_ID to be a number"),
         );

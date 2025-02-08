@@ -40,6 +40,8 @@ os_info = "3.7.0"
 tui-logger = { version = "0.11", optional = true }
 lightning-workspace-hack.workspace = true
 merklize.workspace = true
+tracing-appender = "0.2"
+tempfile = "3.16"
 
 [dev-dependencies]
 serial_test = "3.0.0"
