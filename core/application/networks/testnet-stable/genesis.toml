@@ -1,5 +1,5 @@
 chain_id = 59330
-epoch_start = 1739218446450
+epoch_start = 1739220590102
 epoch_time = 600000
 epochs_per_year = 365
 committee_size = 7
@@ -128,27 +128,27 @@ stake.locked = "0"
 stake.locked_until = 0
 genesis_committee = true
 
-[[node_info]]
-owner = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
-primary_public_key = "FoMVEHRSWhfEkPXgfxaRcxEVQFSchkJgM4wwxEo89251"
-consensus_public_key = "215CXYBiz6qDvsgxiaQNqaTjbLM1Kuv85aniV1hgCwQJsiW5rFDjbDMUi7dS8Ere7gvvzbGL3ztybcPp2Kzi8h3wAiBBtGZE2HG6295fj8xyWGkeXeU7sNxFCesQrRwQf19a"
-worker_public_key = "FoMVEHRSWhfEkPXgfxaRcxEVQFSchkJgM4wwxEo89251"
-primary_domain = "15.235.55.115"
-worker_domain = "15.235.55.115"
-ports.primary = 4310
-ports.worker = 4311
-ports.mempool = 4210
-ports.rpc = 4240
-ports.pool = 4300
-ports.pinger = 4350
-ports.handshake.http = 80
-ports.handshake.webrtc = 4320
-ports.handshake.webtransport = 4321
-stake.staked = "1000"
-stake.stake_locked_until = 0
-stake.locked = "0"
-stake.locked_until = 0
-genesis_committee = true
+#[[node_info]]
+#owner = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
+#primary_public_key = "FoMVEHRSWhfEkPXgfxaRcxEVQFSchkJgM4wwxEo89251"
+#consensus_public_key = "215CXYBiz6qDvsgxiaQNqaTjbLM1Kuv85aniV1hgCwQJsiW5rFDjbDMUi7dS8Ere7gvvzbGL3ztybcPp2Kzi8h3wAiBBtGZE2HG6295fj8xyWGkeXeU7sNxFCesQrRwQf19a"
+#worker_public_key = "FoMVEHRSWhfEkPXgfxaRcxEVQFSchkJgM4wwxEo89251"
+#primary_domain = "15.235.55.115"
+#worker_domain = "15.235.55.115"
+#ports.primary = 4310
+#ports.worker = 4311
+#ports.mempool = 4210
+#ports.rpc = 4240
+#ports.pool = 4300
+#ports.pinger = 4350
+#ports.handshake.http = 80
+#ports.handshake.webrtc = 4320
+#ports.handshake.webtransport = 4321
+#stake.staked = "1000"
+#stake.stake_locked_until = 0
+#stake.locked = "0"
+#stake.locked_until = 0
+#genesis_committee = true
 
 [[node_info]]
 owner = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
