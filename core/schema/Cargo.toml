@@ -3,8 +3,6 @@ name = "lightning-schema"
 version = "0.0.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 serde.workspace = true
 anyhow.workspace = true
@@ -15,3 +13,4 @@ bytes = "1.5"
 arrayref = "0.3"
 flexbuffers = "2.0"
 lightning-workspace-hack.workspace = true
+sha2 = "0.10.8"

@@ -72,6 +72,8 @@ async fn perform_handshake(tx: &Sender<Bytes>, rx: &mut Receiver<Bytes>) {
         schema::HandshakeRequestFrame::Handshake {
             retry: None,
             service: 1001,
+            expiry: u64::MAX,
+            nonce: 789,
             pk: ClientPublicKey([1; 96]),
             pop: ClientSignature([2; 48]),
         }
@@ -121,6 +123,8 @@ fn run_clients(n: usize) -> Vec<JoinHandle<()>> {
                         schema::HandshakeRequestFrame::Handshake {
                             retry: None,
                             service: 1001,
+                            expiry: u64::MAX,
+                            nonce: 789,
                             pk: ClientPublicKey([1; 96]),
                             pop: ClientSignature([2; 48]),
                         }
