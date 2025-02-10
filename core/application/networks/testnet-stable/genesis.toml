@@ -1,8 +1,8 @@
 chain_id = 59330
-epoch_start = 1739220590102
+epoch_start = 1739222879324
 epoch_time = 600000
 epochs_per_year = 365
-committee_size = 7
+committee_size = 6
 node_count = 100
 min_stake = 1000
 eligibility_time = 1
