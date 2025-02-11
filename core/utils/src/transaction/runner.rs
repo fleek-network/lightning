@@ -62,6 +62,7 @@ impl<C: NodeComponents> TransactionRunner<C> {
         let mut retry = 0;
         let mut next_nonce = self.nonce_state.get_next_and_increment().await;
 
+        tracing::info!("executing transaction in forwarder: {method:?}");
         loop {
             // Build and sign the transaction.
             let tx: TransactionRequest = TransactionBuilder::from_update(
@@ -104,10 +105,11 @@ impl<C: NodeComponents> TransactionRunner<C> {
             match result {
                 Ok(receipt) => match &receipt.response {
                     TransactionResponse::Success(_) => {
-                        tracing::debug!("transaction executed: {:?}", receipt);
+                        tracing::info!("transaction executed: {:?}", receipt);
                         return Ok(ExecuteTransactionResponse::Receipt((tx, receipt)));
                     },
                     TransactionResponse::Revert(error) => {
+                        tracing::info!("revert: {error:?}");
                         retry += 1;
                         next_nonce = self
                             .handle_receipt_revert(&tx, &options, &receipt, error, retry, timeout)
@@ -116,6 +118,7 @@ impl<C: NodeComponents> TransactionRunner<C> {
                     },
                 },
                 Err(ExecuteTransactionError::Timeout((method, Some(tx), _))) => {
+                    tracing::info!("timeout: {method:?}");
                     retry += 1;
                     next_nonce = self
                         .handle_receipt_timeout(method, &tx, &options, retry, timeout)

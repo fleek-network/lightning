@@ -68,10 +68,11 @@ impl<C: NodeComponents> AsyncWorker for SignerWorker<C> {
                 };
 
                 // Execute the transaction via the client.
-                tracing::debug!("executing transaction: {:?}", request);
+                tracing::info!("executing transaction: {:?}", request);
                 let resp = client
                     .execute_transaction(request.method, request.options)
                     .await?;
+                tracing::info!("successfully executed transaction");
 
                 Ok(resp)
             })
