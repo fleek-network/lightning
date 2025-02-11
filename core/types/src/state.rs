@@ -605,3 +605,17 @@ impl TryFrom<String> for Tokens {
         }
     }
 }
+
+#[derive(Clone, Deserialize, Serialize)]
+pub struct JobInfo {
+    /// The frequency in which this job should be performed.
+    frequency: u32,
+    /// Amount prepaid.
+    amount: u32,
+    /// CID if the function to call.
+    function: [u8; 32],
+    /// The service that will execute the function.
+    service: ServiceId,
+    /// The arguments for the job.
+    arguments: Box<[u8]>,
+}
