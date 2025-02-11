@@ -17,6 +17,7 @@ use narwhal_types::{TransactionProto, TransactionsClient};
 use rand::seq::SliceRandom;
 use tokio::time::{timeout, Duration};
 use tonic::transport::channel::Channel;
+use tracing::info;
 
 const TARGETED_CONNECTION_NUM: usize = 10;
 const TIMEOUT_DURATION: Duration = Duration::from_secs(4);
@@ -74,13 +75,17 @@ impl<Q: SyncQueryRunnerInterface> Worker<Q> {
         // If there is no open connections try and make a connection with the targeted number of
         // peers or the rest of committee we have not tried yet
         if self.active_connections.len() < self.min_connections {
+            info!("## before make connections");
             self.make_connections().await?;
+            info!("## after make connections");
         }
 
         // serialize transaction
+        info!("## before serialization");
         let txn_bytes: Vec<u8> = req.try_into().map_err(|e: anyhow::Error| {
             ForwarderError::FailedToSerializeTransaction(e.to_string())
         })?;
+        info!("## after serialization");
 
         let request = TransactionProto {
             transaction: txn_bytes.into(),
@@ -111,6 +116,7 @@ impl<Q: SyncQueryRunnerInterface> Worker<Q> {
         );
 
         if self.active_connections.is_empty() {
+            info!("## FailedToSendToAnyConnection");
             return Err(ForwarderError::FailedToSendToAnyConnection);
         }
 
