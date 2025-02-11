@@ -23,6 +23,7 @@ use lightning_interfaces::types::{
     CommitteeSelectionBeaconReveal,
     CommodityTypes,
     Epoch,
+    JobInfo,
     Metadata,
     MintInfo,
     NodeIndex,
@@ -192,6 +193,7 @@ impl ApplicationState<AtomoStorage, DefaultSerdeBackend, ApplicationStateTree> {
             .with_table::<NodeIndex, ()>("committee_selection_beacon_non_revealing_node")
             .with_table::<u64, WithdrawInfo>("withdraws")
             .with_table::<[u8; 32], MintInfo>("mints")
+            .with_table::<NodeIndex, Vec<JobInfo>>("jobs")
             .enable_iter("current_epoch_served")
             .enable_iter("rep_measurements")
             .enable_iter("submitted_rep_measurements")
@@ -206,6 +208,7 @@ impl ApplicationState<AtomoStorage, DefaultSerdeBackend, ApplicationStateTree> {
             .enable_iter("committee_selection_beacon")
             .enable_iter("committee_selection_beacon_non_revealing_node")
             .enable_iter("mints")
+            .enable_iter("jobs")
             .enable_iter("withdraws");
 
         #[cfg(debug_assertions)]
