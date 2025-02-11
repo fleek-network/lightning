@@ -79,6 +79,11 @@ impl<B: Backend> StateExecutor<B> {
         self.committee_info
             .set(current_epoch, current_committee.clone());
 
+        tracing::info!(
+            "executed epoch change transaction for epoch {epoch} from node {index} - {}/{}",
+            current_committee.ready_to_change.len(),
+            (2 * current_committee.members.len() / 3) + 1
+        );
         // If more than 2/3rds of the committee have signaled, start the committee selection
         // process.
         // Note that we do NOT want to execute this code after 2/3+1 nodes have signaled, since

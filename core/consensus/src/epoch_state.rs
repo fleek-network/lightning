@@ -235,7 +235,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
                             break;
                         }
 
-                        info!("Narwhal: Signalling ready to change epoch");
+                        info!("Narwhal: Signalling ready to change epoch {}", epoch);
 
                         if let Err(e) = txn_socket
                             .enqueue(ExecuteTransactionRequest {
