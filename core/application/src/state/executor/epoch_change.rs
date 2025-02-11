@@ -680,6 +680,9 @@ impl<B: Backend> StateExecutor<B> {
         // Set the new committee, epoch, and reset sub dag index
         self.committee_info.set(epoch, new_committee);
 
+        // Schedule jobs.
+        self.schedule_jobs();
+
         // Save new epoch to metadata.
         self.metadata.set(Metadata::Epoch, Value::Epoch(epoch));
 
@@ -1150,6 +1153,55 @@ impl<B: Backend> StateExecutor<B> {
             _ => unreachable!(
                 "invalid committee selection beacon non-reveal slash amount in protocol parameters"
             ),
+        }
+    }
+
+    fn schedule_jobs(&self) {
+        let jobs = self.jobs.as_map();
+
+        self.jobs.clear();
+
+        let mut jobs = jobs
+            .into_iter()
+            .map(|(_, jobs)| jobs)
+            .flatten()
+            .collect::<Vec<_>>();
+
+        jobs.shuffle(&mut rand::thread_rng());
+
+        let node_registry: Vec<(NodeIndex, NodeInfo)> = self
+            .get_node_registry()
+            .into_iter()
+            .filter(|index| index.1.participation == Participation::True)
+            .collect();
+
+        if node_registry.is_empty() {
+            tracing::warn!("no nodes in the registry to schedule jobs to")
+        }
+
+        let chunk = if node_registry.is_empty() || jobs.len() < node_registry.len() {
+            1
+        } else {
+            jobs.len().div_ceil(node_registry.len())
+        };
+
+        let mut scheduled_jobs = HashMap::new();
+        for (i, sched_jobs) in jobs.into_iter().enumerate() {
+            let node_i = i
+                .checked_div(chunk)
+                .expect("chunk is zero only if there are no jobs to iterate on");
+            let (node, _) = node_registry
+                .get(node_i)
+                .expect("we divided the work between all existing nodes");
+
+            scheduled_jobs
+                .entry(*node)
+                .or_insert_with(Vec::new)
+                .push(sched_jobs);
+        }
+
+        for (node, jobs) in scheduled_jobs {
+            self.jobs.set(node, jobs);
         }
     }
 }
