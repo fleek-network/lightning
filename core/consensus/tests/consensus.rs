@@ -72,8 +72,7 @@ async fn test_execute_transaction_as_committee_node() {
             }),
         )
         .await
-        .unwrap()
-        .as_receipt();
+        .unwrap();
     assert_eq!(
         receipt.response,
         TransactionResponse::Success(ExecutionData::None)
@@ -131,8 +130,7 @@ async fn test_execute_transaction_as_non_committee_node() {
             }),
         )
         .await
-        .unwrap()
-        .as_receipt();
+        .unwrap();
     assert_eq!(
         receipt.response,
         TransactionResponse::Success(ExecutionData::None)

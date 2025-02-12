@@ -68,14 +68,14 @@ ethers-contract-abigen = { version = "2", default-features = false, features = [
 fastcrypto-b0db73ecc1bbc313 = { package = "fastcrypto", git = "https://github.com/MystenLabs/fastcrypto", rev = "c961a01596a87e76f590c7e43aca9d57106dbbb1", features = ["copy_key"] }
 fastcrypto-e49888412d456f9d = { package = "fastcrypto", git = "https://github.com/MystenLabs/fastcrypto", rev = "55e7e568842939e01c8545a71d72e2402ad74538", features = ["aes", "copy_key"] }
 ff = { version = "0.13", default-features = false, features = ["alloc"] }
-futures = { version = "0.3", features = ["bilock", "unstable"] }
+futures = { version = "0.3", features = ["bilock", "io-compat", "unstable"] }
 futures-channel = { version = "0.3", features = ["sink", "unstable"] }
 futures-core = { version = "0.3", features = ["unstable"] }
 futures-executor = { version = "0.3" }
 futures-io = { version = "0.3", features = ["unstable"] }
 futures-sink = { version = "0.3" }
 futures-task = { version = "0.3", features = ["unstable"] }
-futures-util = { version = "0.3", features = ["bilock", "channel", "io", "sink", "unstable"] }
+futures-util = { version = "0.3", features = ["bilock", "channel", "io-compat", "sink", "unstable"] }
 generic-array = { version = "0.14", default-features = false, features = ["more_lengths", "serde", "zeroize"] }
 getrandom = { version = "0.2", default-features = false, features = ["std"] }
 group = { version = "0.13", default-features = false, features = ["alloc"] }
@@ -115,6 +115,8 @@ num-integer = { version = "0.1", features = ["i128"] }
 num-iter = { version = "0.1", features = ["i128"] }
 num-traits = { version = "0.2", features = ["i128", "libm"] }
 once_cell = { version = "1", features = ["critical-section"] }
+openssl = { version = "0.10", features = ["vendored"] }
+openssl-sys = { version = "0.9", default-features = false, features = ["vendored"] }
 p256 = { version = "0.13", features = ["ecdh", "jwk"] }
 parity-scale-codec = { version = "3", features = ["derive", "max-encoded-len"] }
 pbkdf2 = { version = "0.12" }
@@ -124,7 +126,7 @@ plotters = { version = "0.3" }
 portable-atomic = { version = "1", features = ["require-cas"] }
 prettyplease = { version = "0.2", default-features = false, features = ["verbatim"] }
 primitive-types = { version = "0.12", features = ["byteorder", "rlp", "rustc-hex", "scale-info", "serde_no_std"] }
-proc-macro2 = { version = "1", features = ["span-locations"] }
+proc-macro2-dff4ba8e3ae991db = { package = "proc-macro2", version = "1", features = ["span-locations"] }
 prost-594e8ee84c453af0 = { package = "prost", version = "0.13", features = ["prost-derive"] }
 prost-5ef9efb8ec2df382 = { package = "prost", version = "0.12", features = ["prost-derive"] }
 prost-a6292c17cd707f01 = { package = "prost", version = "0.11" }
@@ -133,7 +135,7 @@ ptr_meta = { version = "0.1" }
 quinn = { version = "0.10", features = ["futures-io"] }
 quinn-proto = { version = "0.10", features = ["native-certs"] }
 quinn-udp = { version = "0.4", default-features = false, features = ["log"] }
-quote = { version = "1" }
+quote-dff4ba8e3ae991db = { package = "quote", version = "1" }
 rand = { version = "0.8", features = ["small_rng"] }
 rand_chacha = { version = "0.3" }
 regex = { version = "1" }
@@ -157,6 +159,8 @@ semver = { version = "1", features = ["serde"] }
 serde = { version = "1", features = ["alloc", "derive", "rc"] }
 serde_json = { version = "1", features = ["alloc", "arbitrary_precision", "float_roundtrip", "preserve_order", "raw_value", "unbounded_depth"] }
 serde_with = { version = "2", features = ["hex"] }
+sgx-isa = { version = "0.4", default-features = false, features = ["serde"] }
+sgxs = { version = "0.8", default-features = false, features = ["crypto-openssl"] }
 sha1 = { version = "0.10", features = ["oid"] }
 sha2-274715c4dabd11b0 = { package = "sha2", version = "0.9", default-features = false, features = ["std"] }
 sha2-93f6ce9d446188ac = { package = "sha2", version = "0.10", features = ["oid"] }
@@ -247,14 +251,14 @@ ethers-contract-abigen = { version = "2", default-features = false, features = [
 fastcrypto-b0db73ecc1bbc313 = { package = "fastcrypto", git = "https://github.com/MystenLabs/fastcrypto", rev = "c961a01596a87e76f590c7e43aca9d57106dbbb1", features = ["copy_key"] }
 fastcrypto-e49888412d456f9d = { package = "fastcrypto", git = "https://github.com/MystenLabs/fastcrypto", rev = "55e7e568842939e01c8545a71d72e2402ad74538", features = ["aes", "copy_key"] }
 ff = { version = "0.13", default-features = false, features = ["alloc"] }
-futures = { version = "0.3", features = ["bilock", "unstable"] }
+futures = { version = "0.3", features = ["bilock", "io-compat", "unstable"] }
 futures-channel = { version = "0.3", features = ["sink", "unstable"] }
 futures-core = { version = "0.3", features = ["unstable"] }
 futures-executor = { version = "0.3" }
 futures-io = { version = "0.3", features = ["unstable"] }
 futures-sink = { version = "0.3" }
 futures-task = { version = "0.3", features = ["unstable"] }
-futures-util = { version = "0.3", features = ["bilock", "channel", "io", "sink", "unstable"] }
+futures-util = { version = "0.3", features = ["bilock", "channel", "io-compat", "sink", "unstable"] }
 generic-array = { version = "0.14", default-features = false, features = ["more_lengths", "serde", "zeroize"] }
 getrandom = { version = "0.2", default-features = false, features = ["std"] }
 group = { version = "0.13", default-features = false, features = ["alloc"] }
@@ -295,6 +299,8 @@ num-integer = { version = "0.1", features = ["i128"] }
 num-iter = { version = "0.1", features = ["i128"] }
 num-traits = { version = "0.2", features = ["i128", "libm"] }
 once_cell = { version = "1", features = ["critical-section"] }
+openssl = { version = "0.10", features = ["vendored"] }
+openssl-sys = { version = "0.9", default-features = false, features = ["vendored"] }
 p256 = { version = "0.13", features = ["ecdh", "jwk"] }
 parity-scale-codec = { version = "3", features = ["derive", "max-encoded-len"] }
 parity-scale-codec-derive = { version = "3", default-features = false, features = ["max-encoded-len"] }
@@ -306,7 +312,8 @@ portable-atomic = { version = "1", features = ["require-cas"] }
 prettyplease = { version = "0.2", default-features = false, features = ["verbatim"] }
 primitive-types = { version = "0.12", features = ["byteorder", "rlp", "rustc-hex", "scale-info", "serde_no_std"] }
 proc-macro-error = { version = "1" }
-proc-macro2 = { version = "1", features = ["span-locations"] }
+proc-macro2-9fbad63c4bcf4a8f = { package = "proc-macro2", version = "0.4" }
+proc-macro2-dff4ba8e3ae991db = { package = "proc-macro2", version = "1", features = ["span-locations"] }
 prost-594e8ee84c453af0 = { package = "prost", version = "0.13", features = ["prost-derive"] }
 prost-5ef9efb8ec2df382 = { package = "prost", version = "0.12", features = ["prost-derive"] }
 prost-a6292c17cd707f01 = { package = "prost", version = "0.11" }
@@ -315,7 +322,8 @@ ptr_meta = { version = "0.1" }
 quinn = { version = "0.10", features = ["futures-io"] }
 quinn-proto = { version = "0.10", features = ["native-certs"] }
 quinn-udp = { version = "0.4", default-features = false, features = ["log"] }
-quote = { version = "1" }
+quote-3b31131e45eafb45 = { package = "quote", version = "0.6" }
+quote-dff4ba8e3ae991db = { package = "quote", version = "1" }
 rand = { version = "0.8", features = ["small_rng"] }
 rand_chacha = { version = "0.3" }
 regex = { version = "1" }
@@ -339,6 +347,8 @@ semver = { version = "1", features = ["serde"] }
 serde = { version = "1", features = ["alloc", "derive", "rc"] }
 serde_json = { version = "1", features = ["alloc", "arbitrary_precision", "float_roundtrip", "preserve_order", "raw_value", "unbounded_depth"] }
 serde_with = { version = "2", features = ["hex"] }
+sgx-isa = { version = "0.4", default-features = false, features = ["serde"] }
+sgxs = { version = "0.8", default-features = false, features = ["crypto-openssl"] }
 sha1 = { version = "0.10", features = ["oid"] }
 sha2-274715c4dabd11b0 = { package = "sha2", version = "0.9", default-features = false, features = ["std"] }
 sha2-93f6ce9d446188ac = { package = "sha2", version = "0.10", features = ["oid"] }
@@ -352,6 +362,7 @@ spin = { version = "0.9" }
 spki = { version = "0.7", default-features = false, features = ["pem", "std"] }
 stable_deref_trait = { version = "1" }
 subtle = { version = "2" }
+syn-3575ec1268b04181 = { package = "syn", version = "0.15", features = ["extra-traits", "full", "visit"] }
 syn-dff4ba8e3ae991db = { package = "syn", version = "1", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
 syn-f595c2ba2a3f28df = { package = "syn", version = "2", features = ["extra-traits", "fold", "full", "visit", "visit-mut"] }
 time = { version = "0.3", features = ["formatting", "local-offset", "macros", "parsing"] }
@@ -382,8 +393,6 @@ bitflags = { version = "2", default-features = false, features = ["serde"] }
 event-listener = { version = "5" }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
 mio = { version = "0.8", features = ["net", "os-ext"] }
-openssl = { version = "0.10", features = ["vendored"] }
-openssl-sys = { version = "0.9", default-features = false, features = ["vendored"] }
 rustix = { version = "0.38", features = ["event", "fs", "net", "pipe", "process", "system", "termios", "time"] }
 tokio-tungstenite = { version = "0.20", features = ["rustls-tls-webpki-roots"] }
 web-sys = { version = "0.3", default-features = false, features = ["Worker"] }
@@ -394,8 +403,6 @@ bitflags = { version = "2", default-features = false, features = ["serde"] }
 event-listener = { version = "5" }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
 mio = { version = "0.8", features = ["net", "os-ext"] }
-openssl = { version = "0.10", features = ["vendored"] }
-openssl-sys = { version = "0.9", default-features = false, features = ["vendored"] }
 rustix = { version = "0.38", features = ["event", "fs", "net", "pipe", "process", "system", "termios", "time"] }
 tokio-tungstenite = { version = "0.20", features = ["rustls-tls-webpki-roots"] }
 web-sys = { version = "0.3", default-features = false, features = ["Worker"] }

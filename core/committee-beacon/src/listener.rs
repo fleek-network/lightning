@@ -11,7 +11,6 @@ use types::{
     Epoch,
     ExecuteTransactionError,
     ExecuteTransactionOptions,
-    ExecuteTransactionRequest,
     ExecuteTransactionRetry,
     ExecuteTransactionWait,
     Metadata,
@@ -326,14 +325,12 @@ impl<C: NodeComponents> CommitteeBeaconListener<C> {
     async fn execute_transaction(
         &self,
         method: UpdateMethod,
-        options: ExecuteTransactionOptions,
+        _options: ExecuteTransactionOptions,
     ) -> Result<(), ExecuteTransactionError> {
         self.signer
-            .run(ExecuteTransactionRequest {
-                method,
-                options: Some(options),
-            })
-            .await??;
+            .run(method)
+            .await
+            .map_err(|e| anyhow::anyhow!("{e:?}"))?;
         Ok(())
     }
 

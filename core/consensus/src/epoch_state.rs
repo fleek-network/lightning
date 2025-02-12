@@ -21,7 +21,7 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{oneshot, Notify};
 use tokio::{pin, task, time};
 use tracing::{error, info};
-use types::{EpochEra, ExecuteTransactionRequest};
+use types::EpochEra;
 
 use crate::consensus::{ConsensusReadyWaiter, PubSubMsg};
 use crate::execution::state::FilteredConsensusOutput;
@@ -237,10 +237,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
 
                         info!("Narwhal: Signalling ready to change epoch {}", epoch);
                         if let Err(e) = txn_socket
-                            .enqueue(ExecuteTransactionRequest {
-                                method: UpdateMethod::ChangeEpoch { epoch },
-                                options: None,
-                            })
+                            .enqueue(UpdateMethod::ChangeEpoch { epoch })
                             .await
                         {
                             error!("Error sending change epoch signal to socket {}", e);

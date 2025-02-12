@@ -33,9 +33,6 @@ use types::{
     Epoch,
     ExecuteTransactionError,
     ExecuteTransactionOptions,
-    ExecuteTransactionRequest,
-    ExecuteTransactionResponse,
-    ExecuteTransactionWait,
     Genesis,
     NodeIndex,
     NodeInfo,
@@ -79,7 +76,7 @@ pub trait TestNetworkNode {
         &self,
         method: UpdateMethod,
         options: Option<ExecuteTransactionOptions>,
-    ) -> Result<ExecuteTransactionResponse, ExecuteTransactionError>;
+    ) -> Result<u64, ExecuteTransactionError>;
 }
 
 pub type BoxedTestNode = Box<dyn TestNetworkNode>;
@@ -240,20 +237,14 @@ impl<C: NodeComponents> TestNetworkNode for TestFullNode<C> {
     async fn execute_transaction_from_node(
         &self,
         method: UpdateMethod,
-        options: Option<ExecuteTransactionOptions>,
-    ) -> Result<ExecuteTransactionResponse, ExecuteTransactionError> {
+        _options: Option<ExecuteTransactionOptions>,
+    ) -> Result<u64, ExecuteTransactionError> {
         let resp = self
             .signer()
             .get_socket()
-            .run(ExecuteTransactionRequest {
-                method,
-                options: Some(options.unwrap_or(ExecuteTransactionOptions {
-                    wait: ExecuteTransactionWait::Receipt,
-                    timeout: Some(Duration::from_secs(10)),
-                    ..Default::default()
-                })),
-            })
-            .await??;
+            .run(method)
+            .await
+            .map_err(|e| anyhow::anyhow!("{e:?}"))?;
 
         Ok(resp)
     }

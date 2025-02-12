@@ -13,9 +13,9 @@ serde.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
+fleek-crypto.workspace = true
 
 [dev-dependencies]
-fleek-crypto.workspace = true
 futures.workspace = true
 hp-fixed.workspace = true
 lightning-application.workspace = true

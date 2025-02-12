@@ -6,10 +6,6 @@ use lightning_utils::application::QueryRunnerExt;
 use types::{
     CommitteeSelectionBeaconPhase,
     ExecuteTransactionError,
-    ExecuteTransactionOptions,
-    ExecuteTransactionRequest,
-    ExecuteTransactionRetry,
-    ExecuteTransactionWait,
     Metadata,
     TransactionResponse,
     UpdateMethod,
@@ -153,17 +149,9 @@ impl<C: NodeComponents> CommitteeBeaconTimer<C> {
         method: UpdateMethod,
     ) -> Result<(), ExecuteTransactionError> {
         self.signer
-            .run(ExecuteTransactionRequest {
-                method,
-                options: Some(ExecuteTransactionOptions {
-                    // No need to retry the tick transaction, since it is best-effort, and all we
-                    // need is any single node to do this to advance the phase.
-                    retry: ExecuteTransactionRetry::Never,
-                    wait: ExecuteTransactionWait::Receipt,
-                    timeout: None,
-                }),
-            })
-            .await??;
+            .run(method)
+            .await
+            .map_err(|e| anyhow::anyhow!("{e:?}"))?;
         Ok(())
     }
 

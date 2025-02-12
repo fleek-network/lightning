@@ -13,7 +13,6 @@ use lightning_metrics::increment_counter_by;
 use queue_file::QueueFile;
 use tokio::sync::mpsc;
 use tracing::error;
-use types::ExecuteTransactionRequest;
 
 use crate::config::Config;
 
@@ -156,10 +155,7 @@ impl AggregatorInner {
                         let submit_tx = self.submit_tx.clone();
                         spawn!(async move {
                             if let Err(e) = submit_tx
-                                .run(ExecuteTransactionRequest {
-                                    method: update,
-                                    options: None,
-                                })
+                                .run(update)
                                 .await
                             {
                                 error!("Failed to submit DACK to signer: {e:?}");

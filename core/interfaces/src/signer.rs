@@ -1,10 +1,6 @@
 use affair::Socket;
 use fdi::BuildGraph;
-use lightning_types::{
-    ExecuteTransactionError,
-    ExecuteTransactionRequest,
-    ExecuteTransactionResponse,
-};
+use lightning_types::{ExecuteTransactionError, UpdateMethod};
 use thiserror::Error;
 
 use crate::components::NodeComponents;
@@ -12,8 +8,7 @@ use crate::components::NodeComponents;
 /// A socket that is responsible to submit a transaction to the consensus from our node,
 /// implementation of this socket needs to assure the consistency and increment of the
 /// nonce (which we also refer to as the counter).
-pub type SignerSubmitTxSocket =
-    Socket<ExecuteTransactionRequest, Result<ExecuteTransactionResponse, SignerError>>;
+pub type SignerSubmitTxSocket = Socket<UpdateMethod, u64>;
 
 /// The signature provider is responsible for signing messages using the private key of
 /// the node.
