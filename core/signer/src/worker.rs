@@ -38,7 +38,7 @@ impl<C: NodeComponents> AsyncWorker for SignerWorker<C> {
     type Response = Result<ExecuteTransactionResponse, SignerError>;
 
     async fn handle(&mut self, request: Self::Request) -> Self::Response {
-        tracing::debug!("handling signer request: {:?}", request);
+        tracing::info!("handling signer request: {:?}", request);
 
         self.shutdown
             .run_until_shutdown(async {
@@ -63,7 +63,7 @@ impl<C: NodeComponents> AsyncWorker for SignerWorker<C> {
                 // Check that the client is ready, and return an error if not.
                 let client = self.client.lock().await;
                 let Some(client) = client.as_ref() else {
-                    tracing::warn!("signer not ready");
+                    tracing::info!("signer not ready");
                     return Err(SignerError::NotReady);
                 };
 
