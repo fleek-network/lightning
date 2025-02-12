@@ -236,7 +236,6 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
                         }
 
                         info!("Narwhal: Signalling ready to change epoch {}", epoch);
-
                         if let Err(e) = txn_socket
                             .enqueue(ExecuteTransactionRequest {
                                 method: UpdateMethod::ChangeEpoch { epoch },
@@ -246,6 +245,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
                         {
                             error!("Error sending change epoch signal to socket {}", e);
                         }
+                        info!("Narwhal: after signalling ready to change epoch {}", epoch);
 
                         time_until_change = Duration::from_secs(120);
                     },
