@@ -290,7 +290,9 @@ async fn run_non_blocking<Req, Res, H: Worker<Request = Req, Response = Res>>(
     mut handler: H,
 ) {
     while let Some(event) = rx.recv().await {
+        tracing::info!("run_non_blocking before handle");
         event.handle(|req| handler.handle(req));
+        tracing::info!("run_non_blocking after handle");
     }
 }
 
@@ -299,7 +301,9 @@ async fn run_non_blocking_async<Req, Res, H: AsyncWorker<Request = Req, Response
     mut handler: H,
 ) {
     while let Some(event) = rx.recv().await {
+        tracing::info!("run_non_blocking_async before handle");
         event.handle_async(|req| handler.handle(req)).await;
+        tracing::info!("run_non_blocking_async after handle");
     }
 }
 
@@ -326,6 +330,7 @@ async fn run_unordered_async<'a, H: AsyncWorkerUnordered + 'a>(
                     futures.push(Box::pin(fut));
                 },
                 _ = futures.next() => {
+                    tracing::info!("run_unordered_async next");
                     if futures.is_empty() {
                         continue 'outer;
                     }
@@ -368,6 +373,7 @@ impl<Req, Res> Socket<Req, Res> {
             respond: None,
         };
 
+        tracing::info!("### enqueue");
         self.sender
             .send(event)
             .await

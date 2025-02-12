@@ -113,6 +113,7 @@ dependencies = [
  "crossbeam",
  "futures 0.3.30",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
