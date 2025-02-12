@@ -139,12 +139,18 @@ impl<B: Backend> StateExecutor<B> {
 
         // Check that the node is in the active set.
         let epoch = self.get_epoch();
+
+        tracing::info!(
+            "executed beacon_commit transaction for epoch {epoch} from node {node_index}",
+        );
+
         let active_nodes = self
             .committee_info
             .get(&epoch)
             .unwrap_or_default()
             .active_node_set;
         if !active_nodes.contains(&node_index) {
+            tracing::info!("revert CommitteeSelectionBeaconNodeNotActive");
             return TransactionResponse::Revert(
                 ExecutionError::CommitteeSelectionBeaconNodeNotActive,
             );
@@ -156,6 +162,7 @@ impl<B: Backend> StateExecutor<B> {
             .get(&node_index)
             .is_some()
         {
+            tracing::info!("revert CommitteeSelectionBeaconNonRevealingNode");
             return TransactionResponse::Revert(
                 ExecutionError::CommitteeSelectionBeaconNonRevealingNode,
             );
@@ -172,6 +179,7 @@ impl<B: Backend> StateExecutor<B> {
             _ => None,
         };
         if commit_phase.is_none() {
+            tracing::info!("revert CommitteeSelectionBeaconCommitPhaseNotStarted");
             return TransactionResponse::Revert(
                 ExecutionError::CommitteeSelectionBeaconCommitPhaseNotStarted,
             );
@@ -179,6 +187,7 @@ impl<B: Backend> StateExecutor<B> {
 
         // Check that the current block number is within the commit phase range.
         if current_block < commit_phase.unwrap().0 || current_block > commit_phase.unwrap().1 {
+            tracing::info!("revert CommitteeSelectionBeaconNotInCommitPhase");
             return TransactionResponse::Revert(
                 ExecutionError::CommitteeSelectionBeaconNotInCommitPhase,
             );
@@ -186,6 +195,7 @@ impl<B: Backend> StateExecutor<B> {
 
         // Check that the node has not already committed.
         if self.committee_selection_beacon.get(&node_index).is_some() {
+            tracing::info!("revert CommitteeSelectionBeaconAlreadyCommitted");
             return TransactionResponse::Revert(
                 ExecutionError::CommitteeSelectionBeaconAlreadyCommitted,
             );
@@ -248,6 +258,8 @@ impl<B: Backend> StateExecutor<B> {
         // but still has sufficient stake to be a valid node, we give it the opportunity to reveal
         // after committing to avoid becoming a non-revealing node and getting slashed.
 
+        tracing::info!("executed beacon_reveal transaction from node {node_index}",);
+
         // Get the current block number.
         let current_block = self.get_block_number() + 1;
 
@@ -259,6 +271,7 @@ impl<B: Backend> StateExecutor<B> {
             _ => None,
         };
         if reveal_phase.is_none() {
+            tracing::info!("revert CommitteeSelectionBeaconRevealPhaseNotStarted");
             return TransactionResponse::Revert(
                 ExecutionError::CommitteeSelectionBeaconRevealPhaseNotStarted,
             );
@@ -266,6 +279,7 @@ impl<B: Backend> StateExecutor<B> {
 
         // Check that the current block number is within the reveal phase range.
         if current_block < reveal_phase.unwrap().0 || current_block > reveal_phase.unwrap().1 {
+            tracing::info!("revert CommitteeSelectionBeaconNotInRevealPhase");
             return TransactionResponse::Revert(
                 ExecutionError::CommitteeSelectionBeaconNotInRevealPhase,
             );
@@ -274,6 +288,7 @@ impl<B: Backend> StateExecutor<B> {
         // Check that the node has already committed.
         let existing_beacon = self.committee_selection_beacon.get(&node_index);
         if existing_beacon.is_none() {
+            tracing::info!("revert CommitteeSelectionBeaconNotCommitted");
             return TransactionResponse::Revert(
                 ExecutionError::CommitteeSelectionBeaconNotCommitted,
             );
@@ -282,6 +297,7 @@ impl<B: Backend> StateExecutor<B> {
 
         // Check that the node has not already revealed.
         if existing_reveal.is_some() {
+            tracing::info!("revert CommitteeSelectionBeaconAlreadyRevealed");
             return TransactionResponse::Revert(
                 ExecutionError::CommitteeSelectionBeaconAlreadyRevealed,
             );
@@ -293,12 +309,14 @@ impl<B: Backend> StateExecutor<B> {
         // Check that the reveal is valid.
         let round = self.get_committee_selection_beacon_round();
         if round.is_none() {
+            tracing::info!("revert CommitteeSelectionBeaconRoundNotFound");
             return TransactionResponse::Revert(
                 ExecutionError::CommitteeSelectionBeaconRoundNotFound,
             );
         }
         let commit = CommitteeSelectionBeaconCommit::build(epoch, round.unwrap(), reveal);
         if existing_commit != commit {
+            tracing::info!("revert CommitteeSelectionBeaconInvalidReveal");
             return TransactionResponse::Revert(
                 ExecutionError::CommitteeSelectionBeaconInvalidReveal,
             );
@@ -311,6 +329,14 @@ impl<B: Backend> StateExecutor<B> {
         // If all nodes that committed have revealed, execute the epoch change.
         let committee = self.committee_info.get(&epoch).unwrap_or_default();
         let beacons = self.committee_selection_beacon.as_map();
+
+        let count = beacons
+            .iter()
+            .map(|(_, (_, reveal))| if reveal.is_some() { 1 } else { 0 })
+            .sum::<u32>();
+        let total = beacons.len();
+        tracing::info!("committee_selection_beacon_reveal {count}/{total}");
+
         if beacons.iter().all(|(_, (_, reveal))| reveal.is_some()) {
             tracing::info!(
                 "transitioning to committee selection beacon to epoch change execution phase because all committed nodes have revealed (epoch: {}, start: {})",
