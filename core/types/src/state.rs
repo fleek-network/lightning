@@ -277,6 +277,7 @@ pub enum ProtocolParamKey {
     CommitteeSelectionBeaconRevealPhaseDuration = 19,
     /// The slash amount for non-revealing nodes in the committee selection beacon process.
     CommitteeSelectionBeaconNonRevealSlashAmount = 20,
+    TotalTimeIntervals = 21,
 }
 
 /// The Value enum is a data type used to represent values in a key-value pair for a metadata table
@@ -303,6 +304,7 @@ pub enum ProtocolParamValue {
     CommitteeSelectionBeaconCommitPhaseDuration(u64),
     CommitteeSelectionBeaconRevealPhaseDuration(u64),
     CommitteeSelectionBeaconNonRevealSlashAmount(u64),
+    TotalTimeIntervals(u64),
 }
 
 impl ProtocolParamValue {
@@ -337,6 +339,7 @@ impl ProtocolParamValue {
             ProtocolParamValue::CommitteeSelectionBeaconNonRevealSlashAmount(i) => {
                 Cow::Owned(i.to_le_bytes().to_vec())
             },
+            ProtocolParamValue::TotalTimeIntervals(i) => Cow::Owned(i.to_le_bytes().to_vec()),
         }
     }
 }

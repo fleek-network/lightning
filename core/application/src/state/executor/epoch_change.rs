@@ -762,6 +762,13 @@ impl<B: Backend> StateExecutor<B> {
         let epoch_transition_timestamp =
             epoch_end_timestamp - commit_phase_duration - reveal_phase_duration;
 
+        // Calculate the time interval.
+        let time_interval = epoch_time
+            .checked_div(self.get_total_intervals())
+            .expect("total_intervals should be validated on initialization");
+        self.time_interval.clear();
+        self.time_interval.set(time_interval, ());
+
         Committee {
             ready_to_change: Vec::with_capacity(committee.len()),
             signalled_commit_phase_timeout: Vec::with_capacity(committee.len()),
@@ -1067,6 +1074,13 @@ impl<B: Backend> StateExecutor<B> {
         match self.parameters.get(&ProtocolParamKey::EpochTime) {
             Some(ProtocolParamValue::EpochTime(epoch_time)) => epoch_time,
             _ => unreachable!("invalid epoch time in protocol parameters"),
+        }
+    }
+
+    fn get_total_intervals(&self) -> u64 {
+        match self.parameters.get(&ProtocolParamKey::TotalTimeIntervals) {
+            Some(ProtocolParamValue::TotalTimeIntervals(total)) => total,
+            _ => unreachable!("invalid total time interval in protocol parameters"),
         }
     }
 
