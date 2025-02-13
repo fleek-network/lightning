@@ -10,6 +10,7 @@ use hp_fixed::unsigned::HpUfixed;
 use ink_quill::TranscriptBuilderInput;
 use multiaddr::Multiaddr;
 use num_derive::FromPrimitive;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sha3::{Digest, Sha3_256};
 
@@ -606,16 +607,22 @@ impl TryFrom<String> for Tokens {
     }
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Deserialize, Serialize, JsonSchema)]
+pub struct Job {
+    pub hash: [u8; 32],
+    pub info: JobInfo,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Deserialize, Serialize, JsonSchema)]
 pub struct JobInfo {
     /// The frequency in which this job should be performed.
-    frequency: u32,
+    pub frequency: u32,
     /// Amount prepaid.
-    amount: u32,
+    pub amount: u32,
     /// CID if the function to call.
-    function: [u8; 32],
+    pub function: [u8; 32],
     /// The service that will execute the function.
-    service: ServiceId,
+    pub service: ServiceId,
     /// The arguments for the job.
-    arguments: Box<[u8]>,
+    pub arguments: Box<[u8]>,
 }

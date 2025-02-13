@@ -668,8 +668,8 @@ impl<B: Backend> StateExecutor<B> {
         // Set the new committee, epoch, and reset sub dag index
         self.committee_info.set(epoch, new_committee);
 
-        // Schedule jobs.
-        self.schedule_jobs();
+        // Re-schedule jobs.
+        self.reschedule_jobs();
 
         // Save new epoch to metadata.
         self.metadata.set(Metadata::Epoch, Value::Epoch(epoch));
@@ -1141,43 +1141,11 @@ impl<B: Backend> StateExecutor<B> {
         }
     }
 
-    fn schedule_jobs(&self) {
+    fn reschedule_jobs(&self) {
         self.scheduled_jobs.clear();
 
-        let mut jobs = self.jobs.keys().collect::<Vec<_>>();
-
-        jobs.shuffle(&mut rand::thread_rng());
-
-        let node_registry: Vec<(NodeIndex, NodeInfo)> = self
-            .get_node_registry()
-            .into_iter()
-            .filter(|index| index.1.participation == Participation::True)
-            .collect();
-
-        if node_registry.is_empty() {
-            tracing::warn!("no nodes in the registry to schedule jobs to")
-        }
-
-        let chunk = if node_registry.is_empty() || jobs.len() < node_registry.len() {
-            1
-        } else {
-            jobs.len().div_ceil(node_registry.len())
-        };
-
-        let mut scheduled_jobs = HashMap::new();
-        for (i, sched_jobs) in jobs.into_iter().enumerate() {
-            let node_i = i
-                .checked_div(chunk)
-                .expect("chunk is zero only if there are no jobs to iterate on");
-            let (node, _) = node_registry
-                .get(node_i)
-                .expect("we divided the work between all existing nodes");
-
-            scheduled_jobs
-                .entry(*node)
-                .or_insert_with(Vec::new)
-                .push(sched_jobs);
-        }
+        let jobs = self.jobs.keys().collect::<Vec<_>>();
+        let scheduled_jobs = self.schedule_jobs(jobs);
 
         for (node, jobs) in scheduled_jobs {
             self.scheduled_jobs.set(node, jobs);
