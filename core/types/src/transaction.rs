@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::net::IpAddr;
 
 use anyhow::Context;
+use ethers::abi::AbiEncode;
 use ethers::types::Transaction as EthersTransaction;
 use ethers::utils::rlp;
 use fleek_crypto::{
@@ -18,6 +19,7 @@ use serde::{Deserialize, Serialize};
 use super::{
     Epoch,
     Event,
+    Job,
     ProofOfConsensus,
     ProofOfMisbehavior,
     ReputationMeasurements,
@@ -498,6 +500,10 @@ pub enum UpdateMethod {
     UpdateContentRegistry { updates: Vec<ContentUpdate> },
     /// Increment the node nonce.
     IncrementNonce {},
+    /// Add new jobs to the jobs table and assign them to nodes.
+    AddJobs { jobs: Vec<Job> },
+    /// Remove these jobs from the jobs table and unassigned them.
+    RemoveJobs { jobs: Vec<[u8; 32]> },
 }
 
 impl ToDigest for UpdatePayload {
@@ -777,6 +783,26 @@ impl ToDigest for UpdatePayload {
             },
             UpdateMethod::IncrementNonce {} => {
                 transcript_builder = transcript_builder.with("transaction_name", &"inc_nonce");
+            },
+            UpdateMethod::AddJobs { jobs } => {
+                transcript_builder = transcript_builder.with("transaction_name", &"add_jobs");
+                for job in jobs.iter() {
+                    transcript_builder = transcript_builder
+                        .with_prefix(job.hash.encode_hex())
+                        .with("function", &job.info.function)
+                        .with("service", &job.info.service)
+                        .with("frequency", &job.info.frequency)
+                        .with("arguments", &job.info.arguments.as_ref())
+                        .with("amount", &job.info.amount)
+                }
+            },
+            UpdateMethod::RemoveJobs { jobs } => {
+                transcript_builder = transcript_builder.with("transaction_name", &"remove_jobs");
+                for job in jobs.iter() {
+                    transcript_builder = transcript_builder
+                        .with_prefix("input".to_owned())
+                        .with("job", job)
+                }
             },
         }
 

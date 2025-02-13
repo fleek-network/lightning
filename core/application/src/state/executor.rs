@@ -27,7 +27,7 @@ use lightning_interfaces::types::{
     Epoch,
     ExecutionData,
     ExecutionError,
-    JobInfo,
+    Job,
     Metadata,
     MintInfo,
     NodeIndex,
@@ -71,6 +71,7 @@ use lightning_utils::eth::{
     WithdrawCall,
     WithdrawUnstakedCall,
 };
+use rand::prelude::SliceRandom;
 
 use super::context::{Backend, TableRef};
 
@@ -140,7 +141,7 @@ pub struct StateExecutor<B: Backend> {
     pub withdraws: B::Ref<u64, WithdrawInfo>,
     pub mints: B::Ref<[u8; 32], MintInfo>,
     pub scheduled_jobs: B::Ref<NodeIndex, Vec<[u8; 32]>>,
-    pub jobs: B::Ref<[u8; 32], JobInfo>,
+    pub jobs: B::Ref<[u8; 32], Job>,
     pub backend: B,
 }
 
@@ -317,6 +318,8 @@ impl<B: Backend> StateExecutor<B> {
                 self.update_content_registry(txn.payload.sender, updates)
             },
             UpdateMethod::IncrementNonce {} => TransactionResponse::Success(ExecutionData::None),
+            UpdateMethod::AddJobs { jobs } => self.add_jobs(jobs),
+            UpdateMethod::RemoveJobs { jobs } => self.remove_jobs(jobs),
         };
 
         #[cfg(debug_assertions)]
@@ -1274,6 +1277,30 @@ impl<B: Backend> StateExecutor<B> {
         TransactionResponse::Success(ExecutionData::None)
     }
 
+    fn add_jobs(&self, jobs: Vec<Job>) -> TransactionResponse {
+        let job_ids = jobs.iter().map(|job| job.hash).collect();
+        let scheduled_jobs = self.schedule_jobs(job_ids);
+
+        for (node, jobs) in scheduled_jobs {
+            if let Some(mut current_jobs) = self.scheduled_jobs.get(&node) {
+                current_jobs.extend_from_slice(&jobs);
+                self.scheduled_jobs.set(node, current_jobs);
+            }
+        }
+
+        TransactionResponse::Success(ExecutionData::None)
+    }
+
+    fn remove_jobs(&self, jobs: Vec<[u8; 32]>) -> TransactionResponse {
+        for job in jobs {
+            self.jobs.remove(&job);
+        }
+
+        // Jobs will be removed from assigned nodes by the nodes themselves.
+
+        TransactionResponse::Success(ExecutionData::None)
+    }
+
     /********Internal Application Functions******** */
     // These functions should only ever be called in the context of an external transaction function
     // They should never panic and any check that could result in that should be done in the
@@ -1919,5 +1946,42 @@ impl<B: Backend> StateExecutor<B> {
 
     pub fn set_epoch_era(&self, era: u64) {
         self.metadata.set(Metadata::EpochEra, Value::EpochEra(era));
+    }
+
+    fn schedule_jobs(&self, mut jobs: Vec<[u8; 32]>) -> HashMap<NodeIndex, Vec<[u8; 32]>> {
+        jobs.shuffle(&mut rand::thread_rng());
+
+        let node_registry: Vec<(NodeIndex, NodeInfo)> = self
+            .get_node_registry()
+            .into_iter()
+            .filter(|index| index.1.participation == Participation::True)
+            .collect();
+
+        if node_registry.is_empty() {
+            tracing::warn!("no nodes in the registry to schedule jobs to")
+        }
+
+        let chunk = if node_registry.is_empty() || jobs.len() < node_registry.len() {
+            1
+        } else {
+            jobs.len().div_ceil(node_registry.len())
+        };
+
+        let mut scheduled_jobs = HashMap::new();
+        for (i, sched_jobs) in jobs.into_iter().enumerate() {
+            let node_i = i
+                .checked_div(chunk)
+                .expect("chunk is zero only if there are no jobs to iterate on");
+            let (node, _) = node_registry
+                .get(node_i)
+                .expect("we divided the work between all existing nodes");
+
+            scheduled_jobs
+                .entry(*node)
+                .or_insert_with(Vec::new)
+                .push(sched_jobs);
+        }
+
+        scheduled_jobs
     }
 }
