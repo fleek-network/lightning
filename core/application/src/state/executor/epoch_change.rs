@@ -1157,15 +1157,9 @@ impl<B: Backend> StateExecutor<B> {
     }
 
     fn schedule_jobs(&self) {
-        let jobs = self.jobs.as_map();
+        self.scheduled_jobs.clear();
 
-        self.jobs.clear();
-
-        let mut jobs = jobs
-            .into_iter()
-            .map(|(_, jobs)| jobs)
-            .flatten()
-            .collect::<Vec<_>>();
+        let mut jobs = self.jobs.keys().collect::<Vec<_>>();
 
         jobs.shuffle(&mut rand::thread_rng());
 
@@ -1201,7 +1195,7 @@ impl<B: Backend> StateExecutor<B> {
         }
 
         for (node, jobs) in scheduled_jobs {
-            self.jobs.set(node, jobs);
+            self.scheduled_jobs.set(node, jobs);
         }
     }
 }

@@ -139,7 +139,8 @@ pub struct StateExecutor<B: Backend> {
     pub committee_selection_beacon_non_revealing_node: B::Ref<NodeIndex, ()>,
     pub withdraws: B::Ref<u64, WithdrawInfo>,
     pub mints: B::Ref<[u8; 32], MintInfo>,
-    pub jobs: B::Ref<NodeIndex, Vec<JobInfo>>,
+    pub scheduled_jobs: B::Ref<NodeIndex, Vec<[u8; 32]>>,
+    pub jobs: B::Ref<[u8; 32], JobInfo>,
     pub backend: B,
 }
 
@@ -173,6 +174,7 @@ impl<B: Backend> StateExecutor<B> {
                 .get_table_reference("committee_selection_beacon_non_revealing_node"),
             withdraws: backend.get_table_reference("withdraws"),
             mints: backend.get_table_reference("mints"),
+            scheduled_jobs: backend.get_table_reference("scheduled_jobs"),
             jobs: backend.get_table_reference("jobs"),
             backend,
         }
