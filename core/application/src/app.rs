@@ -37,7 +37,6 @@ impl<C: NodeComponents> Application<C> {
         // 2. add counter.
         // 3. add worker and send transactions that it was executed and response. ( worker will
         //    execute the job)
-        // 4. add table for executed jobs.
         let mut env = Env::new(&config, None).expect("Failed to initialize environment.");
 
         // Apply genesis if provided, if it hasn't been applied yet.

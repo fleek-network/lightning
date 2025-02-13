@@ -5,6 +5,7 @@ use std::ops::DerefMut;
 use std::time::Duration;
 
 use ethers::abi::AbiDecode;
+use ethers::core::k256::elliptic_curve::rand_core::SeedableRng;
 use ethers::types::{Transaction as EthersTransaction, H160};
 use fleek_crypto::{
     ClientPublicKey,
@@ -71,7 +72,8 @@ use lightning_utils::eth::{
     WithdrawCall,
     WithdrawUnstakedCall,
 };
-use rand::prelude::SliceRandom;
+use rand::prelude::{SliceRandom, StdRng};
+use sha3::{Digest, Sha3_256};
 
 use super::context::{Backend, TableRef};
 
@@ -142,6 +144,7 @@ pub struct StateExecutor<B: Backend> {
     pub mints: B::Ref<[u8; 32], MintInfo>,
     pub scheduled_jobs: B::Ref<NodeIndex, Vec<[u8; 32]>>,
     pub jobs: B::Ref<[u8; 32], Job>,
+    pub time_interval: B::Ref<u64, ()>,
     pub backend: B,
 }
 
@@ -177,6 +180,7 @@ impl<B: Backend> StateExecutor<B> {
             mints: backend.get_table_reference("mints"),
             scheduled_jobs: backend.get_table_reference("scheduled_jobs"),
             jobs: backend.get_table_reference("jobs"),
+            time_interval: backend.get_table_reference("time_interval"),
             backend,
         }
     }
@@ -1939,22 +1943,28 @@ impl<B: Backend> StateExecutor<B> {
     }
 
     fn schedule_jobs(&self, mut jobs: Vec<[u8; 32]>) -> HashMap<NodeIndex, Vec<[u8; 32]>> {
-        jobs.shuffle(&mut rand::thread_rng());
+        jobs.sort();
 
-        let node_registry: Vec<(NodeIndex, NodeInfo)> = self
+        let jobs_hash: [u8; 32] = Sha3_256::digest(&jobs.concat()).into();
+        let mut rng: StdRng = SeedableRng::from_seed(jobs_hash);
+
+        let mut nodes: Vec<NodeIndex> = self
             .get_node_registry()
             .into_iter()
             .filter(|index| index.1.participation == Participation::True)
+            .map(|(index, _)| index)
             .collect();
+        nodes.sort();
+        nodes.shuffle(&mut rng);
 
-        if node_registry.is_empty() {
+        if nodes.is_empty() {
             tracing::warn!("no nodes in the registry to schedule jobs to")
         }
 
-        let chunk = if node_registry.is_empty() || jobs.len() < node_registry.len() {
+        let chunk = if nodes.is_empty() || jobs.len() < nodes.len() {
             1
         } else {
-            jobs.len().div_ceil(node_registry.len())
+            jobs.len().div_ceil(nodes.len())
         };
 
         let mut scheduled_jobs = HashMap::new();
@@ -1962,7 +1972,7 @@ impl<B: Backend> StateExecutor<B> {
             let node_i = i
                 .checked_div(chunk)
                 .expect("chunk is zero only if there are no jobs to iterate on");
-            let (node, _) = node_registry
+            let node = nodes
                 .get(node_i)
                 .expect("we divided the work between all existing nodes");
 

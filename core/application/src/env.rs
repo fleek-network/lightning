@@ -351,6 +351,15 @@ impl ApplicationEnv {
                 ),
             );
 
+            assert!(genesis.total_intervals > 0, "total intervals cannot be 0");
+
+            param_table.insert(
+                ProtocolParamKey::TotalTimeIntervals,
+                ProtocolParamValue::TotalTimeIntervals(
+                    genesis.total_intervals,
+                ),
+            );
+
             let epoch_end: u64 = genesis.epoch_time + genesis.epoch_start;
 
             let epoch_transition_timestamp = epoch_end
