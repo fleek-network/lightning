@@ -352,18 +352,22 @@ impl ApplicationEnv {
                 ),
             );
 
-            assert!(genesis.total_intervals > 0, "total intervals cannot be 0");
+            let total_intervals = if genesis.total_intervals == 0 {
+                1
+            } else {
+                genesis.total_intervals
+            };
 
             time_interval_table.insert(
                 0,
                 (genesis.epoch_time + genesis.epoch_start)
-                    .checked_div(genesis.total_intervals).unwrap()
+                    .checked_div(total_intervals).unwrap()
             );
 
             param_table.insert(
                 ProtocolParamKey::TotalTimeIntervals,
                 ProtocolParamValue::TotalTimeIntervals(
-                    genesis.total_intervals,
+                    total_intervals,
                 ),
             );
 

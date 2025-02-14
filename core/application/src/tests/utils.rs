@@ -425,6 +425,7 @@ pub(crate) fn test_genesis() -> Genesis {
         committee_selection_beacon_commit_phase_duration: 10,
         committee_selection_beacon_reveal_phase_duration: 10,
         committee_selection_beacon_non_reveal_slash_amount: 1000,
+        total_intervals: 2,
     }
 }
 
