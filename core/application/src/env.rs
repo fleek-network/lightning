@@ -229,6 +229,7 @@ impl ApplicationEnv {
                 ctx.get_table::<(NodeIndex, NodeIndex), Duration>("latencies");
             let mut consensus_key_to_index_table = ctx.get_table::<ConsensusPublicKey, NodeIndex>("consensus_key_to_index");
             let mut pub_key_to_index_table = ctx.get_table::<NodePublicKey, NodeIndex>("pub_key_to_index");
+            let mut time_interval_table = ctx.get_table::<u8, u64>("time_interval");
 
             // TODO(matthias): should we hash the genesis state instead?
             metadata_table.insert(Metadata::LastEpochHash, Value::Hash([0; 32]));
@@ -352,6 +353,12 @@ impl ApplicationEnv {
             );
 
             assert!(genesis.total_intervals > 0, "total intervals cannot be 0");
+
+            time_interval_table.insert(
+                0,
+                (genesis.epoch_time + genesis.epoch_start)
+                    .checked_div(genesis.total_intervals).unwrap()
+            );
 
             param_table.insert(
                 ProtocolParamKey::TotalTimeIntervals,

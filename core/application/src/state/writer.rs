@@ -195,7 +195,7 @@ impl ApplicationState<AtomoStorage, DefaultSerdeBackend, ApplicationStateTree> {
             .with_table::<[u8; 32], MintInfo>("mints")
             .with_table::<NodeIndex, Vec<[u8; 32]>>("scheduled_jobs")
             .with_table::<[u8; 32], JobInfo>("jobs")
-            .with_table::<u64, ()>("time_interval")
+            .with_table::<u8, u64>("time_interval")
             .enable_iter("current_epoch_served")
             .enable_iter("rep_measurements")
             .enable_iter("submitted_rep_measurements")

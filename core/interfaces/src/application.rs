@@ -16,6 +16,7 @@ use lightning_types::{
     CommitteeSelectionBeaconCommit,
     CommitteeSelectionBeaconReveal,
     Genesis,
+    Job,
     NodeIndex,
     Nonce,
     ProtocolParamKey,
@@ -251,6 +252,12 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
 
     /// Returns true if the mint transaction for the provided tx hash was ordered.
     fn has_minted(&self, tx_hash: [u8; 32]) -> bool;
+
+    // Todo: add docs.
+    fn get_job_assignments(&self) -> Vec<(NodeIndex, Vec<[u8; 32]>)>;
+    fn get_jobs_for_node(&self, node_index: &NodeIndex) -> Option<Vec<Job>>;
+    fn get_all_jobs(&self) -> Vec<([u8; 32], Job)>;
+    fn get_time_interval(&self) -> u64;
 }
 
 #[derive(Clone, Debug)]

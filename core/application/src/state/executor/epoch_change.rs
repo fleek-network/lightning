@@ -751,8 +751,7 @@ impl<B: Backend> StateExecutor<B> {
         let time_interval = epoch_time
             .checked_div(self.get_total_intervals())
             .expect("total_intervals should be validated on initialization");
-        self.time_interval.clear();
-        self.time_interval.set(time_interval, ());
+        self.time_interval.set(0, time_interval);
 
         Committee {
             ready_to_change: Vec::with_capacity(committee.len()),
