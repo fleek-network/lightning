@@ -15,31 +15,7 @@ use atomo::{
 };
 use fleek_crypto::{ClientPublicKey, ConsensusPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
-use lightning_interfaces::types::{
-    AccountInfo,
-    Blake3Hash,
-    Committee,
-    CommitteeSelectionBeaconCommit,
-    CommitteeSelectionBeaconReveal,
-    CommodityTypes,
-    Epoch,
-    JobInfo,
-    Metadata,
-    MintInfo,
-    NodeIndex,
-    NodeInfo,
-    NodeServed,
-    ProtocolParamKey,
-    ProtocolParamValue,
-    ReportedReputationMeasurements,
-    Service,
-    ServiceId,
-    ServiceRevenue,
-    TotalServed,
-    TxHash,
-    Value,
-    WithdrawInfo,
-};
+use lightning_interfaces::types::{AccountInfo, Blake3Hash, Committee, CommitteeSelectionBeaconCommit, CommitteeSelectionBeaconReveal, CommodityTypes, Epoch, Job, Metadata, MintInfo, NodeIndex, NodeInfo, NodeServed, ProtocolParamKey, ProtocolParamValue, ReportedReputationMeasurements, Service, ServiceId, ServiceRevenue, TotalServed, TxHash, Value, WithdrawInfo};
 use lightning_interfaces::SyncQueryRunnerInterface;
 use merklize::StateTree;
 use tracing::info;
@@ -194,7 +170,7 @@ impl ApplicationState<AtomoStorage, DefaultSerdeBackend, ApplicationStateTree> {
             .with_table::<u64, WithdrawInfo>("withdraws")
             .with_table::<[u8; 32], MintInfo>("mints")
             .with_table::<NodeIndex, Vec<[u8; 32]>>("scheduled_jobs")
-            .with_table::<[u8; 32], JobInfo>("jobs")
+            .with_table::<[u8; 32], Job>("jobs")
             .with_table::<u8, u64>("time_interval")
             .enable_iter("current_epoch_served")
             .enable_iter("rep_measurements")
@@ -210,6 +186,7 @@ impl ApplicationState<AtomoStorage, DefaultSerdeBackend, ApplicationStateTree> {
             .enable_iter("committee_selection_beacon")
             .enable_iter("committee_selection_beacon_non_revealing_node")
             .enable_iter("mints")
+            .enable_iter("scheduled_jobs")
             .enable_iter("jobs")
             .enable_iter("withdraws");
 
