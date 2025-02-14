@@ -1,23 +1,57 @@
 use std::cmp::Ordering;
+use std::collections::BTreeSet;
+use std::time::Duration;
 
-use fleek_crypto::{AccountOwnerSecretKey, NodeSecretKey, SecretKey};
+use atomo::{AtomoBuilder, DefaultSerdeBackend};
+use atomo_rocks::Options;
+use fleek_crypto::{
+    AccountOwnerSecretKey,
+    ClientPublicKey,
+    ConsensusPublicKey,
+    EthAddress,
+    NodePublicKey,
+    NodeSecretKey,
+    SecretKey,
+};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
+    AccountInfo,
+    Blake3Hash,
+    Committee,
+    CommitteeSelectionBeaconCommit,
+    CommitteeSelectionBeaconReveal,
+    CommodityTypes,
+    Epoch,
     ExecutionError,
+    Metadata,
     NodeIndex,
     NodeInfo,
+    NodeServed,
     Participation,
+    ProtocolParamKey,
+    ProtocolParamValue,
+    ReportedReputationMeasurements,
+    Service,
+    ServiceId,
+    ServiceRevenue,
     Staking,
+    TotalServed,
+    TxHash,
     UpdateMethod,
     UpdatePayload,
     UpdateRequest,
+    Value,
 };
 use lightning_utils::application::QueryRunnerExt;
 use rand::seq::SliceRandom;
+use resolved_pathbuf::ResolvedPathBuf;
 use tempfile::tempdir;
 
 use super::utils::*;
+use crate::env::Env;
+use crate::storage::AtomoStorageBuilder;
+use crate::ApplicationConfig;
 
 #[tokio::test]
 async fn test_has_sufficient_stake() {
@@ -248,6 +282,229 @@ fn test_quick_sort() {
         // Node indexes 9000-10000 should be the winners of the auction in this test
         assert!(node.0 > 8999);
     }
+}
+
+#[tokio::test]
+async fn db_test() {
+    let mut config_1 = ApplicationConfig::default();
+
+    let mut config_2 = ApplicationConfig::default();
+
+    config_1.db_path = Some(
+        "~/Desktop/lgtn_test/app_db1"
+            .try_into()
+            .expect("Failed to resolve path"),
+    );
+
+    config_2.db_path = Some(
+        "~/Desktop/lgtn_test/app_db2"
+            .try_into()
+            .expect("Failed to resolve path"),
+    );
+
+    let mut db_options = Options::default();
+    db_options.create_if_missing(true);
+    db_options.create_missing_column_families(true);
+
+    let serialized_db1 = std::fs::read(
+        ResolvedPathBuf::try_from(
+            "/home/matthias/Desktop/checkpoints/stable-vinthill/epoch_state_serialized",
+        )
+        .unwrap(),
+    )
+    .unwrap();
+
+    let hash_db1 = std::fs::read(
+        ResolvedPathBuf::try_from(
+            "/home/matthias/Desktop/checkpoints/stable-vinthill/epoch_state_hash",
+        )
+        .unwrap(),
+    )
+    .unwrap();
+
+    let serialized_db2 = std::fs::read(
+        ResolvedPathBuf::try_from(
+            "/home/matthias/Desktop/checkpoints/stable-singapore/epoch_state_serialized",
+        )
+        .unwrap(),
+    )
+    .unwrap();
+
+    let hash_db2 = std::fs::read(
+        ResolvedPathBuf::try_from(
+            "/home/matthias/Desktop/checkpoints/stable-singapore/epoch_state_hash",
+        )
+        .unwrap(),
+    )
+    .unwrap();
+
+    let extra_tables = vec![];
+    let db_builder1 =
+        AtomoStorageBuilder::new(Some(config_1.db_path.as_ref().clone().unwrap().as_path()))
+            .with_options(db_options.clone())
+            .from_checkpoint(hash_db1.try_into().unwrap(), &serialized_db1, &extra_tables);
+
+    let db_builder2 =
+        AtomoStorageBuilder::new(Some(config_2.db_path.as_ref().clone().unwrap().as_path()))
+            .with_options(db_options)
+            .from_checkpoint(hash_db2.try_into().unwrap(), &serialized_db2, &extra_tables);
+
+    let mut atomo1 = AtomoBuilder::<AtomoStorageBuilder, DefaultSerdeBackend>::new(db_builder1);
+    atomo1 = atomo1
+        .with_table::<Metadata, Value>("metadata")
+        .with_table::<EthAddress, AccountInfo>("account")
+        .with_table::<ClientPublicKey, EthAddress>("client_keys")
+        .with_table::<NodeIndex, NodeInfo>("node")
+        .with_table::<ConsensusPublicKey, NodeIndex>("consensus_key_to_index")
+        .with_table::<NodePublicKey, NodeIndex>("pub_key_to_index")
+        .with_table::<(NodeIndex, NodeIndex), Duration>("latencies")
+        .with_table::<Epoch, Committee>("committee")
+        .with_table::<ServiceId, Service>("service")
+        .with_table::<ProtocolParamKey, ProtocolParamValue>("parameter")
+        .with_table::<NodeIndex, Vec<ReportedReputationMeasurements>>("rep_measurements")
+        .with_table::<NodeIndex, u8>("rep_scores")
+        .with_table::<NodeIndex, u8>("submitted_rep_measurements")
+        .with_table::<NodeIndex, NodeServed>("current_epoch_served")
+        .with_table::<NodeIndex, NodeServed>("last_epoch_served")
+        .with_table::<Epoch, TotalServed>("total_served")
+        .with_table::<CommodityTypes, HpUfixed<6>>("commodity_prices")
+        .with_table::<ServiceId, ServiceRevenue>("service_revenue")
+        .with_table::<TxHash, ()>("executed_digests")
+        .with_table::<NodeIndex, u8>("uptime")
+        .with_table::<Blake3Hash, BTreeSet<NodeIndex>>("uri_to_node")
+        .with_table::<NodeIndex, BTreeSet<Blake3Hash>>("node_to_uri")
+        .with_table::<NodeIndex, (
+            CommitteeSelectionBeaconCommit,
+            Option<CommitteeSelectionBeaconReveal>,
+        )>("committee_selection_beacon")
+        .with_table::<NodeIndex, ()>("committee_selection_beacon_non_revealing_node")
+        .with_table::<u64, (EthAddress, HpUfixed<18>)>("flk_withdraws")
+        .with_table::<u64, (EthAddress, HpUfixed<6>)>("usdc_withdraws")
+        .enable_iter("current_epoch_served")
+        .enable_iter("rep_measurements")
+        .enable_iter("submitted_rep_measurements")
+        .enable_iter("rep_scores")
+        .enable_iter("latencies")
+        .enable_iter("node")
+        .enable_iter("executed_digests")
+        .enable_iter("uptime")
+        .enable_iter("service_revenue")
+        .enable_iter("uri_to_node")
+        .enable_iter("node_to_uri")
+        .enable_iter("committee_selection_beacon")
+        .enable_iter("committee_selection_beacon_non_revealing_node")
+        .enable_iter("flk_withdraws")
+        .enable_iter("usdc_withdraws");
+
+    let mut atomo2 = AtomoBuilder::<AtomoStorageBuilder, DefaultSerdeBackend>::new(db_builder2);
+    atomo2 = atomo2
+        .with_table::<Metadata, Value>("metadata")
+        .with_table::<EthAddress, AccountInfo>("account")
+        .with_table::<ClientPublicKey, EthAddress>("client_keys")
+        .with_table::<NodeIndex, NodeInfo>("node")
+        .with_table::<ConsensusPublicKey, NodeIndex>("consensus_key_to_index")
+        .with_table::<NodePublicKey, NodeIndex>("pub_key_to_index")
+        .with_table::<(NodeIndex, NodeIndex), Duration>("latencies")
+        .with_table::<Epoch, Committee>("committee")
+        .with_table::<ServiceId, Service>("service")
+        .with_table::<ProtocolParamKey, ProtocolParamValue>("parameter")
+        .with_table::<NodeIndex, Vec<ReportedReputationMeasurements>>("rep_measurements")
+        .with_table::<NodeIndex, u8>("rep_scores")
+        .with_table::<NodeIndex, u8>("submitted_rep_measurements")
+        .with_table::<NodeIndex, NodeServed>("current_epoch_served")
+        .with_table::<NodeIndex, NodeServed>("last_epoch_served")
+        .with_table::<Epoch, TotalServed>("total_served")
+        .with_table::<CommodityTypes, HpUfixed<6>>("commodity_prices")
+        .with_table::<ServiceId, ServiceRevenue>("service_revenue")
+        .with_table::<TxHash, ()>("executed_digests")
+        .with_table::<NodeIndex, u8>("uptime")
+        .with_table::<Blake3Hash, BTreeSet<NodeIndex>>("uri_to_node")
+        .with_table::<NodeIndex, BTreeSet<Blake3Hash>>("node_to_uri")
+        .with_table::<NodeIndex, (
+            CommitteeSelectionBeaconCommit,
+            Option<CommitteeSelectionBeaconReveal>,
+        )>("committee_selection_beacon")
+        .with_table::<NodeIndex, ()>("committee_selection_beacon_non_revealing_node")
+        .with_table::<u64, (EthAddress, HpUfixed<18>)>("flk_withdraws")
+        .with_table::<u64, (EthAddress, HpUfixed<6>)>("usdc_withdraws")
+        .enable_iter("current_epoch_served")
+        .enable_iter("rep_measurements")
+        .enable_iter("submitted_rep_measurements")
+        .enable_iter("rep_scores")
+        .enable_iter("latencies")
+        .enable_iter("node")
+        .enable_iter("executed_digests")
+        .enable_iter("uptime")
+        .enable_iter("service_revenue")
+        .enable_iter("uri_to_node")
+        .enable_iter("node_to_uri")
+        .enable_iter("committee_selection_beacon")
+        .enable_iter("committee_selection_beacon_non_revealing_node")
+        .enable_iter("flk_withdraws")
+        .enable_iter("usdc_withdraws");
+
+    atomo1.build().unwrap();
+    atomo2.build().unwrap();
+
+    let env_1 = Env::new(&config_1, None).unwrap();
+    let env_2 = Env::new(&config_2, None).unwrap();
+
+    let qr_1 = env_1.query_runner();
+    let qr_2 = env_2.query_runner();
+
+    let epoch1 = qr_1.get_epoch_info().epoch;
+    let epoch2 = qr_2.get_epoch_info().epoch;
+    println!("epoch1: {epoch1:?}");
+    println!("epoch2: {epoch2:?}");
+
+    let block_num1 = qr_1.get_block_number().unwrap();
+    let block_num2 = qr_2.get_block_number().unwrap();
+    println!("block_num1: {block_num1:?}");
+    println!("block_num2: {block_num2:?}");
+
+    println!();
+    println!("node1:");
+    let node1 = qr_1.get_node_info(&1, |x| x).unwrap();
+    println!("node1: {node1:?}");
+    let node2 = qr_2.get_node_info(&1, |x| x).unwrap();
+    println!("node2: {node2:?}");
+
+    println!();
+    println!("committee at epoch 34:");
+    let comm1 = qr_1.get_committee_info(&34, |x| x);
+    println!("comm1: {comm1:?}");
+    let comm2 = qr_2.get_committee_info(&34, |x| x);
+    println!("comm2: {comm2:?}");
+
+    println!();
+    println!("committee at epoch 35:");
+    let comm1 = qr_1.get_committee_info(&35, |x| x);
+    println!("comm1: {comm1:?}");
+    let comm2 = qr_2.get_committee_info(&35, |x| x);
+    println!("comm2: {comm2:?}");
+
+    //let nodes = qr_2.get_node_registry(None);
+    //for node in nodes {
+    //    let eth_address =
+    //        EthAddress::from_str("0x5b84350a65C7e353B5207fdE889C91e249413d85").unwrap();
+    //    if node.owner == eth_address {
+    //        println!("{node:?}");
+    //    }
+    //}
+
+    //let path = "/home/matthias/Desktop/lat.csv";
+
+    //let output = File::create(path).unwrap();
+    //let lat = qr_1.get_latencies();
+
+    //let mut writer = BufWriter::new(output);
+
+    //for ((key1, key2), val) in lat {
+    //    writer
+    //        .write_all(format!("{},{},{}\n", key1, key2, val.as_millis()).as_bytes())
+    //        .unwrap();
+    //}
+    //writer.flush().unwrap();
 }
 
 fn quick_sort_repeated(

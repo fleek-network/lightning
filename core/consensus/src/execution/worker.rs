@@ -329,6 +329,7 @@ async fn submit_batch<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: Emi
         })
         .collect::<Vec<_>>();
 
+    tracing::info!("submit_batch - parcel digest: {digest:?}");
     let block = Block {
         digest,
         sub_dag_index,

@@ -74,6 +74,7 @@ impl ApplicationEnv {
         F: FnOnce() -> P,
         P: IncrementalPutInterface,
     {
+        tracing::info!("env run - parcel digest: {:?}", block.digest);
         let response = self
             .inner
             .run(move |ctx| {

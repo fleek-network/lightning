@@ -7,6 +7,8 @@ pub use blockstore::Blockstore;
 
 #[cfg(test)]
 mod tests {
+    use std::fs::File;
+    use std::io::Write;
     use std::path::PathBuf;
 
     use blake3_tree::blake3::tree::{HashTree, HashTreeBuilder};
@@ -278,5 +280,39 @@ mod tests {
             .expect("failed to write to putter");
         let hash = putter.finalize().await.unwrap();
         assert_eq!(&hash, output.hash.as_bytes());
+    }
+
+    #[tokio::test]
+    async fn hash_debug() {
+        let path = PathBuf::from("/home/matthias/Desktop/blockstore_stable_singapore");
+        let hash = [
+            67, 39, 239, 190, 109, 37, 206, 71, 98, 214, 10, 108, 52, 155, 118, 241, 190, 115, 109,
+            172, 43, 123, 254, 18, 209, 239, 102, 157, 159, 142, 70, 61,
+        ];
+
+        let blockstore = Blockstore::<TestBinding>::init(Config {
+            root: path.clone().try_into().unwrap(),
+        })
+        .unwrap();
+
+        let ckpt = blockstore.read_all_to_vec(&hash).await.unwrap();
+
+        let mut file =
+            File::create("/home/matthias/Desktop/checkpoints/stable-singapore/ckpt_node").unwrap();
+        file.write_all(&ckpt).unwrap();
+        println!("{ckpt:?}");
+    }
+
+    #[tokio::test]
+    async fn hash_debugxx() {
+        let hash = [
+            67, 39, 239, 190, 109, 37, 206, 71, 98, 214, 10, 108, 52, 155, 118, 241, 190, 115, 109,
+            172, 43, 123, 254, 18, 209, 239, 102, 157, 159, 142, 70, 61,
+        ];
+
+        let mut file =
+            File::create("/home/matthias/Desktop/checkpoints/stable-singapore/epoch_state_hash")
+                .unwrap();
+        file.write_all(&hash).unwrap();
     }
 }
