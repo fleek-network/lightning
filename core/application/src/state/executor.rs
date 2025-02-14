@@ -144,7 +144,7 @@ pub struct StateExecutor<B: Backend> {
     pub mints: B::Ref<[u8; 32], MintInfo>,
     pub scheduled_jobs: B::Ref<NodeIndex, Vec<[u8; 32]>>,
     pub jobs: B::Ref<[u8; 32], Job>,
-    pub time_interval: B::Ref<u64, ()>,
+    pub time_interval: B::Ref<u8, u64>,
     pub backend: B,
 }
 
