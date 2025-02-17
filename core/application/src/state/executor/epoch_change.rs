@@ -1,8 +1,8 @@
 use std::cmp::Ordering;
 use std::collections::HashMap;
 
-use fleek_crypto::TransactionSender;
-use fxhash::FxHashMap;
+use fleek_blake3::Hasher;
+use fleek_crypto::{NodePublicKey, TransactionSender};
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::types::{
     Committee,
@@ -28,7 +28,6 @@ use lightning_reputation::types::WeightedReputationMeasurements;
 use rand::prelude::SliceRandom;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
-use sha3::{Digest, Sha3_256};
 
 use super::{StateExecutor, BIG_HUNDRED, DEFAULT_REP_QUANTILE, MINIMUM_UPTIME, REP_EWMA_WEIGHT};
 use crate::state::context::{Backend, TableRef};
@@ -109,14 +108,33 @@ impl<B: Backend> StateExecutor<B> {
                 ))),
             );
 
+            let committee = self.committee_info.get(&epoch).unwrap_or_default();
+
             // Start the committee selection beacon round at 0.
             self.set_committee_selection_beacon_round(0);
 
             // Reset the epoch era.
             self.metadata.set(Metadata::EpochEra, Value::EpochEra(0));
 
+            // Reset the committee selection beacon phase metadata to indicate we are no longer in
+            // commit or reveal phases, we are transitioning to epoch change execution and pre-epoch
+            // change waiting phase.
+            self.clear_committee_selection_beacon_phase();
+
+            // Remove the committee selection beacon round.
+            self.clear_committee_selection_beacon_round();
+
+            // Reset the committee selection beacon.
+            self.clear_committee_selection_beacons();
+
+            // Clear the non-revealing nodes table from the previous round.
+            self.clear_committee_selection_beacon_non_revealing_node();
+
+            // Execute the epoch change.
+            self.execute_epoch_change(epoch, committee);
+
             // Return success.
-            TransactionResponse::Success(ExecutionData::None)
+            TransactionResponse::Success(ExecutionData::EpochChange)
         } else {
             TransactionResponse::Success(ExecutionData::None)
         }
@@ -360,7 +378,7 @@ impl<B: Backend> StateExecutor<B> {
             self.clear_committee_selection_beacon_non_revealing_node();
 
             // Execute the epoch change.
-            self.execute_epoch_change(epoch, committee, beacons);
+            self.execute_epoch_change(epoch, committee);
 
             // Return success.
             return TransactionResponse::Success(ExecutionData::EpochChange);
@@ -679,18 +697,7 @@ impl<B: Backend> StateExecutor<B> {
             .remove(&Metadata::CommitteeSelectionBeaconRound);
     }
 
-    fn execute_epoch_change(
-        &self,
-        epoch: Epoch,
-        current_committee: Committee,
-        beacons: FxHashMap<
-            NodeIndex,
-            (
-                CommitteeSelectionBeaconCommit,
-                Option<CommitteeSelectionBeaconReveal>,
-            ),
-        >,
-    ) {
+    fn execute_epoch_change(&self, epoch: Epoch, current_committee: Committee) {
         // Todo: Reward nodes, choose new committee, increment epoch.
         self.calculate_reputation_scores();
         self.distribute_rewards();
@@ -716,7 +723,7 @@ impl<B: Backend> StateExecutor<B> {
 
         self.committee_info.set(epoch, current_committee);
         // Get new committee
-        let new_committee = self.choose_new_committee(beacons);
+        let new_committee = self.choose_new_committee_old();
 
         // increment epoch
         let epoch = epoch + 1;
@@ -728,74 +735,71 @@ impl<B: Backend> StateExecutor<B> {
         self.metadata.set(Metadata::Epoch, Value::Epoch(epoch));
     }
 
-    fn choose_new_committee(
-        &self,
-        beacons: FxHashMap<
-            NodeIndex,
-            (
-                CommitteeSelectionBeaconCommit,
-                Option<CommitteeSelectionBeaconReveal>,
-            ),
-        >,
-    ) -> Committee {
-        let epoch = self.get_epoch();
+    fn choose_new_committee_old(&self) -> Committee {
+        let epoch = match self.metadata.get(&Metadata::Epoch) {
+            Some(Value::Epoch(epoch)) => epoch,
+            _ => 0,
+        };
+
         let committee_size = self.get_committee_size();
 
-        // Get the active nodes from the node registry.
-        let node_registry: Vec<(NodeIndex, NodeInfo)> = self
+        let epoch_time = self.get_epoch_time();
+        let epoch_end_timestamp =
+            self.committee_info.get(&epoch).unwrap().epoch_end_timestamp + epoch_time;
+        let mut node_registry: Vec<(NodeIndex, NodeInfo)> = self
             .get_node_registry()
             .into_iter()
             .filter(|index| index.1.participation == Participation::True)
             .collect();
-        let mut active_nodes: Vec<NodeIndex> = self
-            .settle_auction(node_registry)
+        let num_of_nodes = node_registry.len() as u64;
+        let active_nodes: Vec<NodeIndex> = self
+            .settle_auction(node_registry.clone())
             .iter()
             .map(|node| node.0)
             .collect();
 
-        // If total number of nodes are less than committee size, all nodes are part of
-        // committee. Otherwise, we need to select the committee from the active nodes.
-        let committee = if committee_size >= active_nodes.len() as u64 {
-            active_nodes.clone()
-        } else {
-            // Collect the committee selection beacons from the active nodes.
-            let mut beacons = beacons
-                .into_iter()
-                .filter(|(_, (_, reveal))| reveal.is_some())
-                .map(|(node_index, (commit, reveal))| (node_index, (commit, reveal.unwrap())))
-                .collect::<Vec<_>>();
+        // if total number of nodes are less than committee size, all nodes are part of committee
+        if committee_size >= num_of_nodes {
+            return Committee {
+                ready_to_change: Vec::with_capacity(node_registry.len()),
+                members: node_registry.iter().map(|(index, _)| *index).collect(),
+                epoch_end_timestamp,
+                active_node_set: active_nodes,
+                node_registry_changes: Default::default(),
+            };
+        }
 
-            // Sort the committee selection beacons by node index.
-            beacons.sort_by_key(|k| k.0);
-
-            // Concatenate the reveals in ascending order of node index.
-            let combined_reveals = beacons
-                .into_iter()
-                .map(|(_, (_, reveal))| reveal)
-                .collect::<Vec<_>>()
-                .concat();
-            let combined_reveals_hash: [u8; 32] = Sha3_256::digest(&combined_reveals).into();
-
-            // Shuffle the active nodes using the combined reveals hash as the seed.
-            let mut rng: StdRng = SeedableRng::from_seed(combined_reveals_hash);
-            active_nodes.shuffle(&mut rng);
-
-            // Take the first `committee_size` nodes from the shuffled list as the new committee.
-            active_nodes
-                .iter()
-                .take(committee_size.try_into().unwrap())
-                .copied()
-                .collect()
+        let committee = self.committee_info.get(&epoch).unwrap();
+        let epoch_end = committee.epoch_end_timestamp;
+        let public_key = {
+            if !committee.members.is_empty() {
+                let mid_index = committee.members.len() / 2;
+                self.node_info
+                    .get(&committee.members[mid_index])
+                    .unwrap()
+                    .public_key
+            } else {
+                NodePublicKey([1u8; 32])
+            }
         };
 
-        // Calculate the epoch end timestamp.
-        let epoch_time = self.get_epoch_time();
-        let epoch_end_timestamp =
-            self.committee_info.get(&epoch).unwrap().epoch_end_timestamp + epoch_time;
+        let mut hasher = Hasher::new();
+        hasher.update(&public_key.0);
+        hasher.update(&epoch_end.to_be_bytes());
+        let result = hasher.finalize();
+        let mut seed = [0u8; 32];
+        seed.copy_from_slice(&result.as_bytes()[0..32]);
+        let mut rng: StdRng = SeedableRng::from_seed(seed);
+        node_registry.shuffle(&mut rng);
+        let members: Vec<NodeIndex> = node_registry
+            .into_iter()
+            .take(committee_size.try_into().unwrap())
+            .map(|(index, _)| index)
+            .collect();
 
         Committee {
-            ready_to_change: Vec::with_capacity(committee.len()),
-            members: committee,
+            ready_to_change: Vec::with_capacity(members.len()),
+            members,
             epoch_end_timestamp,
             active_node_set: active_nodes,
             node_registry_changes: Default::default(),

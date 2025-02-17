@@ -10,7 +10,6 @@ define_node_components!([
     BlockstoreInterface,
     BlockstoreServerInterface,
     CheckpointerInterface,
-    CommitteeBeaconInterface,
     SyncronizerInterface,
     BroadcastInterface,
     TopologyInterface,
