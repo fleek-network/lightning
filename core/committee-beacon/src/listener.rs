@@ -232,7 +232,10 @@ impl<C: NodeComponents> CommitteeBeaconListener<C> {
         self.db.set_beacon(epoch, commit, reveal);
 
         // Build commit and submit it.
-        tracing::info!("submitting commit transaction: {:?}", commit);
+        tracing::info!(
+            "submitting commit transaction at epoch {epoch}: {:?}",
+            commit
+        );
         self.execute_transaction_with_retry_on_invalid_nonce(
             UpdateMethod::CommitteeSelectionBeaconCommit { commit },
         )

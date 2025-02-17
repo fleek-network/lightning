@@ -141,7 +141,8 @@ impl<B: Backend> StateExecutor<B> {
         let epoch = self.get_epoch();
 
         tracing::info!(
-            "executed beacon_commit transaction for epoch {epoch} from node {node_index}",
+            "executed beacon_commit transaction for epoch {epoch} from node {node_index}: {:?}",
+            commit.hash
         );
 
         let active_nodes = self
