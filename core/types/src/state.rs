@@ -614,6 +614,7 @@ impl TryFrom<String> for Tokens {
 pub struct Job {
     pub hash: [u8; 32],
     pub info: JobInfo,
+    pub status: Option<JobStatus>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Deserialize, Serialize, JsonSchema)]
@@ -622,10 +623,15 @@ pub struct JobInfo {
     pub frequency: u32,
     /// Amount prepaid.
     pub amount: u32,
-    /// CID if the function to call.
-    pub function: [u8; 32],
     /// The service that will execute the function.
     pub service: ServiceId,
     /// The arguments for the job.
     pub arguments: Box<[u8]>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Deserialize, Serialize, JsonSchema)]
+pub struct JobStatus {
+    pub last_run: u64,
+    pub success: bool,
+    pub message: Option<String>,
 }

@@ -6,15 +6,17 @@ use anyhow::{anyhow, Result};
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::spawn_worker;
 use lightning_interfaces::types::{ChainId, NodeInfo};
+use tokio::sync::mpsc::Sender;
 use tracing::{error, info};
 use types::Genesis;
 
 use crate::config::{ApplicationConfig, StorageConfig};
-use crate::env::{ApplicationEnv, Env, UpdateWorker};
+use crate::env::{ApplicationEnv, Env, TimerWorker, UpdateWorker};
 use crate::state::QueryRunner;
 pub struct Application<C: NodeComponents> {
     env: Arc<tokio::sync::Mutex<ApplicationEnv>>,
     update_socket: Mutex<Option<ExecutionEngineSocket>>,
+    _shutdown_timer_worker: Sender<()>,
     query_runner: QueryRunner,
     _components: PhantomData<C>,
 }
@@ -24,6 +26,8 @@ impl<C: NodeComponents> Application<C> {
     fn init(
         config: &C::ConfigProviderInterface,
         blockstore: &C::BlockstoreInterface,
+        keystore: &C::KeystoreInterface,
+        task_broker: &C::TaskBrokerInterface,
         fdi::Cloned(waiter): fdi::Cloned<ShutdownWaiter>,
     ) -> Result<Self> {
         let config = config.get::<Self>();
@@ -33,10 +37,7 @@ impl<C: NodeComponents> Application<C> {
                 "db_path must be specified for RocksDb backend"
             );
         }
-        // 1. add time consesus
-        // 2. add counter.
-        // 3. add worker and send transactions that it was executed and response. ( worker will
-        //    execute the job)
+
         let mut env = Env::new(&config, None).expect("Failed to initialize environment.");
 
         // Apply genesis if provided, if it hasn't been applied yet.
@@ -49,10 +50,20 @@ impl<C: NodeComponents> Application<C> {
         let worker = UpdateWorker::<C>::new(env.clone(), blockstore.clone());
         let update_socket = spawn_worker!(worker, "APPLICATION", waiter, crucial);
 
+        let pk = keystore.get_ed25519_pk();
+        let _shutdown_timer_worker = TimerWorker::<C>::new(
+            query_runner.clone(),
+            task_broker.clone(),
+            update_socket.clone(),
+            pk,
+        )
+        .spawn();
+
         Ok(Self {
             env,
             query_runner,
             update_socket: Mutex::new(Some(update_socket)),
+            _shutdown_timer_worker,
             _components: PhantomData,
         })
     }

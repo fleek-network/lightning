@@ -1,12 +1,15 @@
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use affair::AsyncWorker as WorkerTrait;
 use anyhow::{Context, Result};
 use atomo::{DefaultSerdeBackend, SerdeBackend, StorageBackend};
 use fleek_crypto::{ClientPublicKey, ConsensusPublicKey, EthAddress, NodePublicKey};
+use futures::stream::FuturesUnordered;
+use futures::StreamExt;
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::prelude::*;
+use lightning_interfaces::schema::task_broker::{TaskRequest, TaskResponse, TaskScope};
 use lightning_interfaces::types::{
     AccountInfo,
     Block,
@@ -17,6 +20,7 @@ use lightning_interfaces::types::{
     ExecutionData,
     Genesis,
     GenesisPrices,
+    JobInfo,
     Metadata,
     NodeIndex,
     NodeInfo,
@@ -30,12 +34,14 @@ use lightning_interfaces::types::{
     TransactionResponse,
     Value,
 };
-use lightning_interfaces::FileTrustedWriter;
+use lightning_interfaces::{FileTrustedWriter, TaskError};
 use lightning_metrics::increment_counter;
 use merklize::hashers::keccak::KeccakHasher;
 use merklize::trees::mpt::MptStateTree;
 use merklize::StateTree;
-use tokio::sync::Mutex;
+use tokio::sync::mpsc::Sender;
+use tokio::sync::{mpsc, Mutex};
+use tokio::task::JoinHandle;
 use types::{NodeRegistryChange, NodeRegistryChanges, Nonce};
 
 use crate::config::ApplicationConfig;
@@ -557,5 +563,102 @@ impl<C: NodeComponents> WorkerTrait for UpdateWorker<C> {
             .run(req, || self.blockstore.clone())
             .await
             .expect("Failed to execute block")
+    }
+}
+
+pub struct TimerWorker<C: NodeComponents> {
+    app_query: QueryRunner,
+    task_broker: c!(C::TaskBrokerInterface),
+    update_socket: ExecutionEngineSocket,
+    pk: NodePublicKey,
+    tasks: FuturesUnordered<JoinHandle<Vec<std::result::Result<TaskResponse, TaskError>>>>,
+}
+
+impl<C: NodeComponents> TimerWorker<C> {
+    pub fn new(
+        app_query: QueryRunner,
+        task_broker: c!(C::TaskBrokerInterface),
+        update_socket: ExecutionEngineSocket,
+        pk: NodePublicKey,
+    ) -> Self {
+        Self {
+            app_query,
+            update_socket,
+            pk,
+            task_broker,
+            tasks: FuturesUnordered::new(),
+        }
+    }
+
+    fn perform_scheduled_work(&self) {
+        if let Some(index) = self.app_query.pubkey_to_index(&self.pk) {
+            if let Some(jobs) = self.app_query.get_jobs_for_node(&index) {
+                for job in jobs {
+                    let JobInfo {
+                        service, arguments, ..
+                    } = job.info;
+
+                    // Arguments should have this information.
+                    /*
+                    pub struct Request {
+                        /// Origin to use
+                        pub origin: Origin,
+                        /// URI For the origin
+                        /// - for blake3 should be hex encoded bytes
+                        /// - for ipfs should be cid string
+                        pub uri: String,
+                        /// Optional path to provide as the window location,
+                        /// including query parameters and the fragment.
+                        pub path: Option<String>,
+                        /// Parameter to pass to the script's main function.
+                        /// For http oriented functions, an object can be passed
+                        /// here to simulate the http object with the fields for
+                        /// method, headers, query params, and the url fragment
+                        pub param: Option<serde_json::Value>,
+                    }
+                     */
+                    let request = TaskRequest {
+                        service,
+                        timestamp: SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap()
+                            .as_secs(),
+                        payload: arguments.into(),
+                    };
+                    let task_broker = self.task_broker.clone();
+                    self.tasks.push(tokio::spawn(async move {
+                        task_broker.run(1, TaskScope::Local, request).await
+                    }));
+                }
+            }
+        }
+    }
+
+    pub fn spawn(mut self) -> Sender<()> {
+        let (tx, mut rx) = mpsc::channel(1);
+
+        tokio::spawn(async move {
+            // We assume that the duration unit is milliseconds.
+            let duration = self.app_query.get_time_interval();
+            let mut interval = tokio::time::interval(Duration::from_millis(duration));
+            loop {
+                tokio::select! {
+                    biased;
+                    shutdown = rx.recv() => {
+                        if shutdown.is_none() {
+                            break;
+                        }
+                    }
+                    _ = interval.tick() => {
+                        self.perform_scheduled_work();
+                    }
+                    _ = self.tasks.next() => {
+                        // Todo: record job execution result.
+                    }
+                }
+            }
+        });
+
+        tx
     }
 }

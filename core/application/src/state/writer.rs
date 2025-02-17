@@ -15,7 +15,31 @@ use atomo::{
 };
 use fleek_crypto::{ClientPublicKey, ConsensusPublicKey, EthAddress, NodePublicKey};
 use hp_fixed::unsigned::HpUfixed;
-use lightning_interfaces::types::{AccountInfo, Blake3Hash, Committee, CommitteeSelectionBeaconCommit, CommitteeSelectionBeaconReveal, CommodityTypes, Epoch, Job, Metadata, MintInfo, NodeIndex, NodeInfo, NodeServed, ProtocolParamKey, ProtocolParamValue, ReportedReputationMeasurements, Service, ServiceId, ServiceRevenue, TotalServed, TxHash, Value, WithdrawInfo};
+use lightning_interfaces::types::{
+    AccountInfo,
+    Blake3Hash,
+    Committee,
+    CommitteeSelectionBeaconCommit,
+    CommitteeSelectionBeaconReveal,
+    CommodityTypes,
+    Epoch,
+    Job,
+    Metadata,
+    MintInfo,
+    NodeIndex,
+    NodeInfo,
+    NodeServed,
+    ProtocolParamKey,
+    ProtocolParamValue,
+    ReportedReputationMeasurements,
+    Service,
+    ServiceId,
+    ServiceRevenue,
+    TotalServed,
+    TxHash,
+    Value,
+    WithdrawInfo,
+};
 use lightning_interfaces::SyncQueryRunnerInterface;
 use merklize::StateTree;
 use tracing::info;
