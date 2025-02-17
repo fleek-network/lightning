@@ -16,17 +16,7 @@ use hp_fixed::unsigned::HpUfixed;
 use ink_quill::{ToDigest, TranscriptBuilder, TranscriptBuilderInput};
 use serde::{Deserialize, Serialize};
 
-use super::{
-    Epoch,
-    Event,
-    Job,
-    ProofOfConsensus,
-    ProofOfMisbehavior,
-    ReputationMeasurements,
-    Service,
-    ServiceId,
-    Tokens,
-};
+use super::{Epoch, Event, Job, JobStatus, ProofOfConsensus, ProofOfMisbehavior, ReputationMeasurements, Service, ServiceId, Tokens};
 use crate::content_registry::ContentUpdate;
 use crate::{
     CommitteeSelectionBeaconCommit,
@@ -441,7 +431,9 @@ pub enum UpdateMethod {
         recipient: Option<EthAddress>,
     },
     /// Sent by committee member to signal he is ready to change epoch
-    ChangeEpoch { epoch: Epoch },
+    ChangeEpoch {
+        epoch: Epoch,
+    },
     /// Sent by nodes to commit their committee selection random beacon.
     CommitteeSelectionBeaconCommit {
         commit: CommitteeSelectionBeaconCommit,
@@ -497,13 +489,19 @@ pub enum UpdateMethod {
     /// The content registry records the contents that are being
     /// provided by the network and the corresponding nodes that
     /// are providing that content.
-    UpdateContentRegistry { updates: Vec<ContentUpdate> },
+    UpdateContentRegistry {
+        updates: Vec<ContentUpdate>,
+    },
     /// Increment the node nonce.
     IncrementNonce {},
     /// Add new jobs to the jobs table and assign them to nodes.
-    AddJobs { jobs: Vec<Job> },
+    AddJobs {
+        jobs: Vec<Job>,
+    },
     /// Remove these jobs from the jobs table and unassigned them.
-    RemoveJobs { jobs: Vec<[u8; 32]> },
+    RemoveJobs {
+        jobs: Vec<[u8; 32]>,
+    },
 }
 
 impl ToDigest for UpdatePayload {
@@ -789,7 +787,6 @@ impl ToDigest for UpdatePayload {
                 for job in jobs.iter() {
                     transcript_builder = transcript_builder
                         .with_prefix(job.hash.encode_hex())
-                        .with("function", &job.info.function)
                         .with("service", &job.info.service)
                         .with("frequency", &job.info.frequency)
                         .with("arguments", &job.info.arguments.as_ref())
