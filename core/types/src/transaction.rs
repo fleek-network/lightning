@@ -16,7 +16,18 @@ use hp_fixed::unsigned::HpUfixed;
 use ink_quill::{ToDigest, TranscriptBuilder, TranscriptBuilderInput};
 use serde::{Deserialize, Serialize};
 
-use super::{Epoch, Event, Job, JobStatus, ProofOfConsensus, ProofOfMisbehavior, ReputationMeasurements, Service, ServiceId, Tokens};
+use super::{
+    Epoch,
+    Event,
+    Job,
+    JobStatus,
+    ProofOfConsensus,
+    ProofOfMisbehavior,
+    ReputationMeasurements,
+    Service,
+    ServiceId,
+    Tokens,
+};
 use crate::content_registry::ContentUpdate;
 use crate::{
     CommitteeSelectionBeaconCommit,
@@ -431,9 +442,7 @@ pub enum UpdateMethod {
         recipient: Option<EthAddress>,
     },
     /// Sent by committee member to signal he is ready to change epoch
-    ChangeEpoch {
-        epoch: Epoch,
-    },
+    ChangeEpoch { epoch: Epoch },
     /// Sent by nodes to commit their committee selection random beacon.
     CommitteeSelectionBeaconCommit {
         commit: CommitteeSelectionBeaconCommit,
@@ -489,18 +498,15 @@ pub enum UpdateMethod {
     /// The content registry records the contents that are being
     /// provided by the network and the corresponding nodes that
     /// are providing that content.
-    UpdateContentRegistry {
-        updates: Vec<ContentUpdate>,
-    },
+    UpdateContentRegistry { updates: Vec<ContentUpdate> },
     /// Increment the node nonce.
     IncrementNonce {},
     /// Add new jobs to the jobs table and assign them to nodes.
-    AddJobs {
-        jobs: Vec<Job>,
-    },
+    AddJobs { jobs: Vec<Job> },
     /// Remove these jobs from the jobs table and unassigned them.
-    RemoveJobs {
-        jobs: Vec<[u8; 32]>,
+    RemoveJobs { jobs: Vec<[u8; 32]> },
+    JobUpdates {
+        updates: BTreeMap<[u8; 32], JobStatus>,
     },
 }
 
@@ -799,6 +805,18 @@ impl ToDigest for UpdatePayload {
                     transcript_builder = transcript_builder
                         .with_prefix("input".to_owned())
                         .with("job", job)
+                }
+            },
+            UpdateMethod::JobUpdates { updates } => {
+                transcript_builder = transcript_builder.with("transaction_name", &"job_updates");
+                for (key, value) in updates {
+                    transcript_builder = transcript_builder
+                        .with_prefix(key.encode_hex())
+                        .with("last_run", &value.last_run)
+                        .with("success", &(value.success as u8));
+                    if let Some(message) = &value.message {
+                        transcript_builder = transcript_builder.with("message", message)
+                    }
                 }
             },
         }

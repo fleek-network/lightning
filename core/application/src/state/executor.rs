@@ -29,6 +29,7 @@ use lightning_interfaces::types::{
     ExecutionData,
     ExecutionError,
     Job,
+    JobStatus,
     Metadata,
     MintInfo,
     NodeIndex,
@@ -324,6 +325,7 @@ impl<B: Backend> StateExecutor<B> {
             UpdateMethod::IncrementNonce {} => TransactionResponse::Success(ExecutionData::None),
             UpdateMethod::AddJobs { jobs } => self.add_jobs(jobs),
             UpdateMethod::RemoveJobs { jobs } => self.remove_jobs(jobs),
+            UpdateMethod::JobUpdates { updates } => self.update_jobs(updates),
         };
 
         #[cfg(debug_assertions)]
@@ -1301,6 +1303,17 @@ impl<B: Backend> StateExecutor<B> {
         }
 
         // Jobs will be removed from assigned nodes by the nodes themselves.
+
+        TransactionResponse::Success(ExecutionData::None)
+    }
+
+    fn update_jobs(&self, updates: BTreeMap<[u8; 32], JobStatus>) -> TransactionResponse {
+        for (key, status) in updates {
+            if let Some(mut job) = self.jobs.get(&key) {
+                job.status = Some(status);
+                self.jobs.set(key, job);
+            }
+        }
 
         TransactionResponse::Success(ExecutionData::None)
     }

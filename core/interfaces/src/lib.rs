@@ -27,6 +27,7 @@ mod signer;
 mod syncronizer;
 mod task_broker;
 mod topology;
+mod watcher;
 
 pub use application::*;
 pub use archive::*;
@@ -56,6 +57,7 @@ pub use signer::*;
 pub use syncronizer::*;
 pub use task_broker::*;
 pub use topology::*;
+pub use watcher::*;
 
 // The common types.
 #[rustfmt::skip]
