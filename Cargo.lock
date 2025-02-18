@@ -9161,6 +9161,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "lightning-watcher"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "fleek-crypto",
+ "futures",
+ "humantime-serde",
+ "lightning-interfaces",
+ "lightning-metrics",
+ "lightning-types",
+ "lightning-utils",
+ "lightning-workspace-hack",
+ "rand 0.8.5",
+ "ready",
+ "serde",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "lightning-workspace-hack"
 version = "0.1.0"
 dependencies = [
