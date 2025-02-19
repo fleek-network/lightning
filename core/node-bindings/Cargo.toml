@@ -31,6 +31,7 @@ lightning-topology = { path = "../topology" }
 lightning-pinger = { path = "../pinger" }
 lightning-test-utils = { path = "../test-utils" }
 lightning-utils = { path = "../utils" }
+lightning-watcher = { path = "../watcher" }
 toml = "0.7"
 anyhow.workspace = true
 resolved-pathbuf.workspace = true
