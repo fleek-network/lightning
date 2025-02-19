@@ -143,7 +143,7 @@ pub struct StateExecutor<B: Backend> {
     pub committee_selection_beacon_non_revealing_node: B::Ref<NodeIndex, ()>,
     pub withdraws: B::Ref<u64, WithdrawInfo>,
     pub mints: B::Ref<[u8; 32], MintInfo>,
-    pub scheduled_jobs: B::Ref<NodeIndex, Vec<[u8; 32]>>,
+    pub assigned_jobs: B::Ref<NodeIndex, Vec<[u8; 32]>>,
     pub jobs: B::Ref<[u8; 32], Job>,
     pub time_interval: B::Ref<u8, u64>,
     pub backend: B,
@@ -179,7 +179,7 @@ impl<B: Backend> StateExecutor<B> {
                 .get_table_reference("committee_selection_beacon_non_revealing_node"),
             withdraws: backend.get_table_reference("withdraws"),
             mints: backend.get_table_reference("mints"),
-            scheduled_jobs: backend.get_table_reference("scheduled_jobs"),
+            assigned_jobs: backend.get_table_reference("assigned_jobs"),
             jobs: backend.get_table_reference("jobs"),
             time_interval: backend.get_table_reference("time_interval"),
             backend,
@@ -1284,25 +1284,60 @@ impl<B: Backend> StateExecutor<B> {
     }
 
     fn add_jobs(&self, jobs: Vec<Job>) -> TransactionResponse {
-        let job_ids = jobs.iter().map(|job| job.hash).collect();
-        let scheduled_jobs = self.schedule_jobs(job_ids);
+        let mut jobs = jobs
+            .into_iter()
+            .map(|job| (job.hash, job))
+            .collect::<HashMap<_, _>>();
+        let job_hashes = jobs.keys().map(|hash| *hash).collect();
+        let assigned_jobs = self.assign_jobs(job_hashes);
 
-        for (node, jobs) in scheduled_jobs {
-            if let Some(mut current_jobs) = self.scheduled_jobs.get(&node) {
-                current_jobs.extend_from_slice(&jobs);
-                self.scheduled_jobs.set(node, current_jobs);
+        // Record the assignee in the job entry.
+        for (index, node_jobs) in assigned_jobs.iter() {
+            for job_hash in node_jobs {
+                if let Some(job) = jobs.get_mut(job_hash) {
+                    job.assignee = Some(*index);
+                }
             }
+        }
+
+        // Update each node's assigned job list.
+        for (node, node_jobs) in assigned_jobs {
+            match self.assigned_jobs.get(&node) {
+                Some(mut cur_assigned_jobs) => {
+                    cur_assigned_jobs.extend_from_slice(&node_jobs);
+                    self.assigned_jobs.set(node, cur_assigned_jobs);
+                },
+                None => {
+                    self.assigned_jobs.set(node, node_jobs);
+                },
+            }
+        }
+
+        // Save jobs.
+        for (job_hash, job) in jobs {
+            self.jobs.set(job_hash, job);
         }
 
         TransactionResponse::Success(ExecutionData::None)
     }
 
     fn remove_jobs(&self, jobs: Vec<[u8; 32]>) -> TransactionResponse {
-        for job in jobs {
-            self.jobs.remove(&job);
-        }
+        // Remove these jobs from nodes' assigned job lists.
+        for job_hash in jobs {
+            if let Some(job) = self.jobs.get(&job_hash) {
+                if let Some(assignee) = job.assignee {
+                    if let Some(mut assigned_jobs) = self.assigned_jobs.get(&assignee) {
+                        if let Some(pos) = assigned_jobs.iter().position(|h| &job_hash == h) {
+                            assigned_jobs.remove(pos);
+                        }
 
-        // Jobs will be removed from assigned nodes by the nodes themselves.
+                        self.assigned_jobs.set(assignee, assigned_jobs);
+                    }
+                }
+            }
+
+            self.jobs.remove(&job_hash);
+        }
 
         TransactionResponse::Success(ExecutionData::None)
     }
@@ -1955,7 +1990,7 @@ impl<B: Backend> StateExecutor<B> {
         self.metadata.set(Metadata::EpochEra, Value::EpochEra(era));
     }
 
-    fn schedule_jobs(&self, mut jobs: Vec<[u8; 32]>) -> HashMap<NodeIndex, Vec<[u8; 32]>> {
+    fn assign_jobs(&self, mut jobs: Vec<[u8; 32]>) -> HashMap<NodeIndex, Vec<[u8; 32]>> {
         jobs.sort();
 
         let jobs_hash: [u8; 32] = Sha3_256::digest(&jobs.concat()).into();
@@ -1980,7 +2015,7 @@ impl<B: Backend> StateExecutor<B> {
             jobs.len().div_ceil(nodes.len())
         };
 
-        let mut scheduled_jobs = HashMap::new();
+        let mut assigned_jobs = HashMap::new();
         for (i, sched_jobs) in jobs.into_iter().enumerate() {
             let node_i = i
                 .checked_div(chunk)
@@ -1989,12 +2024,12 @@ impl<B: Backend> StateExecutor<B> {
                 .get(node_i)
                 .expect("we divided the work between all existing nodes");
 
-            scheduled_jobs
+            assigned_jobs
                 .entry(*node)
                 .or_insert_with(Vec::new)
                 .push(sched_jobs);
         }
 
-        scheduled_jobs
+        assigned_jobs
     }
 }

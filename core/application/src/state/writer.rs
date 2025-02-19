@@ -193,7 +193,7 @@ impl ApplicationState<AtomoStorage, DefaultSerdeBackend, ApplicationStateTree> {
             .with_table::<NodeIndex, ()>("committee_selection_beacon_non_revealing_node")
             .with_table::<u64, WithdrawInfo>("withdraws")
             .with_table::<[u8; 32], MintInfo>("mints")
-            .with_table::<NodeIndex, Vec<[u8; 32]>>("scheduled_jobs")
+            .with_table::<NodeIndex, Vec<[u8; 32]>>("assigned_jobs")
             .with_table::<[u8; 32], Job>("jobs")
             .with_table::<u8, u64>("time_interval")
             .enable_iter("current_epoch_served")
@@ -210,7 +210,7 @@ impl ApplicationState<AtomoStorage, DefaultSerdeBackend, ApplicationStateTree> {
             .enable_iter("committee_selection_beacon")
             .enable_iter("committee_selection_beacon_non_revealing_node")
             .enable_iter("mints")
-            .enable_iter("scheduled_jobs")
+            .enable_iter("assigned_jobs")
             .enable_iter("jobs")
             .enable_iter("withdraws");
 

@@ -669,7 +669,7 @@ impl<B: Backend> StateExecutor<B> {
         self.committee_info.set(epoch, new_committee);
 
         // Re-schedule jobs.
-        self.reschedule_jobs();
+        self.reassign_jobs();
 
         // Save new epoch to metadata.
         self.metadata.set(Metadata::Epoch, Value::Epoch(epoch));
@@ -1154,14 +1154,15 @@ impl<B: Backend> StateExecutor<B> {
         }
     }
 
-    fn reschedule_jobs(&self) {
-        self.scheduled_jobs.clear();
+    fn reassign_jobs(&self) {
+        // Get all current jobs.
+        let jobs = self.jobs.as_map().values().cloned().collect();
 
-        let jobs = self.jobs.keys().collect::<Vec<_>>();
-        let scheduled_jobs = self.schedule_jobs(jobs);
+        // Clear the tables.
+        self.jobs.clear();
+        self.assigned_jobs.clear();
 
-        for (node, jobs) in scheduled_jobs {
-            self.scheduled_jobs.set(node, jobs);
-        }
+        // Add these jobs as new jobs.
+        self.add_jobs(jobs);
     }
 }

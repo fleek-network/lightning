@@ -85,7 +85,7 @@ pub struct QueryRunner {
     >,
     committee_selection_beacon_non_revealing_node: ResolvedTableReference<NodeIndex, ()>,
     withdraws: ResolvedTableReference<u64, WithdrawInfo>,
-    scheduled_jobs: ResolvedTableReference<NodeIndex, Vec<[u8; 32]>>,
+    assigned_jobs: ResolvedTableReference<NodeIndex, Vec<[u8; 32]>>,
     jobs: ResolvedTableReference<[u8; 32], Job>,
     time_interval: ResolvedTableReference<u8, u64>,
     mints: ResolvedTableReference<[u8; 32], MintInfo>,
@@ -133,7 +133,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
             committee_selection_beacon_non_revealing_node: atomo
                 .resolve::<NodeIndex, ()>("committee_selection_beacon_non_revealing_node"),
             withdraws: atomo.resolve::<u64, WithdrawInfo>("withdraws"),
-            scheduled_jobs: atomo.resolve::<NodeIndex, Vec<[u8; 32]>>("scheduled_jobs"),
+            assigned_jobs: atomo.resolve::<NodeIndex, Vec<[u8; 32]>>("assigned_jobs"),
             jobs: atomo.resolve::<[u8; 32], Job>("jobs"),
             time_interval: atomo.resolve::<u8, u64>("time_interval"),
             mints: atomo.resolve::<[u8; 32], MintInfo>("mints"),
@@ -421,7 +421,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
 
     fn get_job_assignments(&self) -> Vec<(NodeIndex, Vec<[u8; 32]>)> {
         self.inner
-            .run(|ctx| self.scheduled_jobs.get(ctx).as_map())
+            .run(|ctx| self.assigned_jobs.get(ctx).as_map())
             .into_iter()
             .collect()
     }
@@ -429,7 +429,7 @@ impl SyncQueryRunnerInterface for QueryRunner {
     fn get_jobs_for_node(&self, node_index: &NodeIndex) -> Option<Vec<Job>> {
         self.inner.run(|ctx| {
             let mut jobs = Vec::new();
-            for id in self.scheduled_jobs.get(ctx).get(node_index)? {
+            for id in self.assigned_jobs.get(ctx).get(node_index)? {
                 match self.jobs.get(ctx).get(id) {
                     Some(job) => jobs.push(job),
                     None => tracing::warn!("there was no job found for job id `{id:?}`"),
