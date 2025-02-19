@@ -1,15 +1,12 @@
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 use affair::AsyncWorker as WorkerTrait;
 use anyhow::{Context, Result};
 use atomo::{DefaultSerdeBackend, SerdeBackend, StorageBackend};
 use fleek_crypto::{ClientPublicKey, ConsensusPublicKey, EthAddress, NodePublicKey};
-use futures::stream::FuturesUnordered;
-use futures::StreamExt;
 use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::prelude::*;
-use lightning_interfaces::schema::task_broker::{TaskRequest, TaskResponse, TaskScope};
 use lightning_interfaces::types::{
     AccountInfo,
     Block,
@@ -20,7 +17,6 @@ use lightning_interfaces::types::{
     ExecutionData,
     Genesis,
     GenesisPrices,
-    JobInfo,
     Metadata,
     NodeIndex,
     NodeInfo,
@@ -34,14 +30,12 @@ use lightning_interfaces::types::{
     TransactionResponse,
     Value,
 };
-use lightning_interfaces::{FileTrustedWriter, TaskError};
+use lightning_interfaces::FileTrustedWriter;
 use lightning_metrics::increment_counter;
 use merklize::hashers::keccak::KeccakHasher;
 use merklize::trees::mpt::MptStateTree;
 use merklize::StateTree;
-use tokio::sync::mpsc::Sender;
-use tokio::sync::{mpsc, Mutex};
-use tokio::task::JoinHandle;
+use tokio::sync::Mutex;
 use types::{NodeRegistryChange, NodeRegistryChanges, Nonce};
 
 use crate::config::ApplicationConfig;

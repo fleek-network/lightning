@@ -615,6 +615,7 @@ pub struct Job {
     pub hash: [u8; 32],
     pub info: JobInfo,
     pub status: Option<JobStatus>,
+    pub assignee: Option<NodeIndex>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Deserialize, Serialize, JsonSchema)]

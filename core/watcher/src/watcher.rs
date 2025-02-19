@@ -4,35 +4,33 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use anyhow::Result;
 use fleek_crypto::NodePublicKey;
+use futures::stream::FuturesUnordered;
 use futures::StreamExt;
-use lightning_interfaces::prelude::BuildGraph;
+use lightning_interfaces::prelude::{BuildGraph, *};
 use lightning_interfaces::schema::task_broker::{TaskRequest, TaskResponse, TaskScope};
 use lightning_interfaces::types::{ExecuteTransactionRequest, JobInfo, JobStatus};
 use lightning_interfaces::{
     c,
     fdi,
+    ApplicationInterface,
     NodeComponents,
     NotifierInterface,
     ShutdownWaiter,
     SignerSubmitTxSocket,
+    Subscriber,
+    SyncQueryRunnerInterface,
+    TaskBrokerInterface,
     TaskError,
     WatcherInterface,
 };
 use lightning_types::UpdateMethod;
-use tokio::sync::{mpsc, Mutex};
-use tokio::sync::mpsc::Sender;
-use tokio::task::{JoinError, JoinHandle};
-use tokio::time::{Instant, Interval};
-use lightning_interfaces::ApplicationInterface;
-use futures::stream::FuturesUnordered;
-use lightning_interfaces::Subscriber;
-use lightning_interfaces::SyncQueryRunnerInterface;
-use lightning_interfaces::TaskBrokerInterface;
-use lightning_interfaces::prelude::*;
+use tokio::sync::Mutex;
+use tokio::task::JoinHandle;
+use tokio::time::Interval;
 
 #[derive(Clone)]
 pub struct Watcher<C: NodeComponents> {
-    inner: Arc<Mutex<Option<InnerWatcher<C>>>>
+    inner: Arc<Mutex<Option<InnerWatcher<C>>>>,
 }
 
 impl<C: NodeComponents> Watcher<C> {
@@ -57,19 +55,27 @@ impl<C: NodeComponents> Watcher<C> {
                 tasks: FuturesUnordered::new(),
                 interval,
                 interval_counter: 0,
-            })))
+            }))),
         })
     }
 
-    pub async fn start(this: fdi::Ref<Self>, fdi::Cloned(shutdown): fdi::Cloned<ShutdownWaiter>) -> Result<()> {
+    pub async fn start(
+        this: fdi::Ref<Self>,
+        fdi::Cloned(shutdown): fdi::Cloned<ShutdownWaiter>,
+    ) -> Result<()> {
         let shutdown = shutdown.clone();
-        let mut inner = this.inner.lock().await.take().expect("Watcher state to exist");
+        let mut inner = this
+            .inner
+            .lock()
+            .await
+            .take()
+            .expect("Watcher state to exist");
         spawn!(
-                async move {
-                    inner.start(shutdown.clone()).await;
-                },
-                "WATCHER: spawn event loop"
-            );
+            async move {
+                inner.start(shutdown.clone()).await;
+            },
+            "WATCHER: spawn event loop"
+        );
 
         Ok(())
     }
@@ -150,17 +156,20 @@ impl<C: NodeComponents> InnerWatcher<C> {
             .signer
             .run(ExecuteTransactionRequest {
                 method: UpdateMethod::JobUpdates {
-                    updates: BTreeMap::from( [(job_hash, JobStatus {
-                        success: succeeded,
-                        message,
-                        last_run,
-                    })]),
+                    updates: BTreeMap::from([(
+                        job_hash,
+                        JobStatus {
+                            success: succeeded,
+                            message,
+                            last_run,
+                        },
+                    )]),
                 },
                 options: None,
             })
             .await
         {
-            tracing::error!("failed to send a job update")
+            tracing::error!("failed to send a job update: {e:?}")
         }
     }
 
@@ -195,7 +204,7 @@ impl<C: NodeComponents> InnerWatcher<C> {
                 Some(next) = self.tasks.next() => {
                     match next {
                         Ok((hash, result)) => {
-                            self.process_finished_jobs(hash, result);
+                            self.process_finished_jobs(hash, result).await;
                         }
                         Err(e) => {
                             tracing::warn!("scheduled job panicked!: {e:?}")
