@@ -1,1 +1,4 @@
-pub mod watcher;
+mod watcher;
+
+
+pub use watcher::Watcher;

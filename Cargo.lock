@@ -8461,6 +8461,7 @@ dependencies = [
  "lightning-test-utils",
  "lightning-topology",
  "lightning-utils",
+ "lightning-watcher",
  "lightning-workspace-hack",
  "resolved-pathbuf",
  "toml 0.7.8",

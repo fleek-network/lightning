@@ -1,25 +1,81 @@
+use std::collections::BTreeMap;
+use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use anyhow::Result;
 use fleek_crypto::NodePublicKey;
 use futures::StreamExt;
+use lightning_interfaces::prelude::BuildGraph;
 use lightning_interfaces::schema::task_broker::{TaskRequest, TaskResponse, TaskScope};
 use lightning_interfaces::types::{ExecuteTransactionRequest, JobInfo, JobStatus};
 use lightning_interfaces::{
     c,
+    fdi,
     NodeComponents,
     NotifierInterface,
+    ShutdownWaiter,
     SignerSubmitTxSocket,
     TaskError,
     WatcherInterface,
 };
 use lightning_types::UpdateMethod;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Mutex};
 use tokio::sync::mpsc::Sender;
 use tokio::task::{JoinError, JoinHandle};
 use tokio::time::{Instant, Interval};
+use lightning_interfaces::ApplicationInterface;
+use futures::stream::FuturesUnordered;
+use lightning_interfaces::Subscriber;
+use lightning_interfaces::SyncQueryRunnerInterface;
+use lightning_interfaces::TaskBrokerInterface;
+use lightning_interfaces::prelude::*;
 
+#[derive(Clone)]
 pub struct Watcher<C: NodeComponents> {
+    inner: Arc<Mutex<Option<InnerWatcher<C>>>>
+}
+
+impl<C: NodeComponents> Watcher<C> {
+    pub fn new(
+        task_broker: &C::TaskBrokerInterface,
+        signer: &C::SignerInterface,
+        notifier: &C::NotifierInterface,
+        keystore: &C::KeystoreInterface,
+        fdi::Cloned(app_query): fdi::Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
+    ) -> Result<Self> {
+        let duration = app_query.get_time_interval();
+        let interval = tokio::time::interval(Duration::from_millis(duration));
+        let pk = keystore.get_ed25519_pk();
+
+        Ok(Self {
+            inner: Arc::new(Mutex::new(Some(InnerWatcher {
+                app_query: app_query.clone(),
+                signer: signer.get_socket(),
+                pk,
+                task_broker: task_broker.clone(),
+                notifier: notifier.clone(),
+                tasks: FuturesUnordered::new(),
+                interval,
+                interval_counter: 0,
+            })))
+        })
+    }
+
+    pub async fn start(this: fdi::Ref<Self>, fdi::Cloned(shutdown): fdi::Cloned<ShutdownWaiter>) -> Result<()> {
+        let shutdown = shutdown.clone();
+        let mut inner = this.inner.lock().await.take().expect("Watcher state to exist");
+        spawn!(
+                async move {
+                    inner.start(shutdown.clone()).await;
+                },
+                "WATCHER: spawn event loop"
+            );
+
+        Ok(())
+    }
+}
+
+struct InnerWatcher<C: NodeComponents> {
     app_query: c!(C::ApplicationInterface::SyncExecutor),
     task_broker: c!(C::TaskBrokerInterface),
     signer: SignerSubmitTxSocket,
@@ -31,28 +87,7 @@ pub struct Watcher<C: NodeComponents> {
     interval: Interval,
 }
 
-impl<C: NodeComponents> Watcher<C> {
-    pub fn new(
-        app_query: c!(C::ApplicationInterface::SyncExecutor),
-        task_broker: c!(C::TaskBrokerInterface),
-        signer: SignerSubmitTxSocket,
-        notifier: C::NotifierInterface,
-        pk: NodePublicKey,
-    ) -> Self {
-        let duration = app_query.get_time_interval();
-        let interval = tokio::time::interval(Duration::from_millis(duration));
-
-        Self {
-            app_query,
-            signer,
-            pk,
-            task_broker,
-            notifier,
-            tasks: FuturesUnordered::new(),
-            interval,
-        }
-    }
-
+impl<C: NodeComponents> InnerWatcher<C> {
     fn perform_scheduled_work(&self) {
         if let Some(index) = self.app_query.pubkey_to_index(&self.pk) {
             if let Some(jobs) = self.app_query.get_jobs_for_node(&index) {
@@ -115,11 +150,11 @@ impl<C: NodeComponents> Watcher<C> {
             .signer
             .run(ExecuteTransactionRequest {
                 method: UpdateMethod::JobUpdates {
-                    updates: vec![JobStatus {
+                    updates: BTreeMap::from( [(job_hash, JobStatus {
                         success: succeeded,
                         message,
                         last_run,
-                    }],
+                    })]),
                 },
                 options: None,
             })
@@ -141,18 +176,15 @@ impl<C: NodeComponents> Watcher<C> {
         self.interval = tokio::time::interval(Duration::from_millis(duration));
     }
 
-    fn tick(&mut self) -> Instant {
-        self.interval.as_mut().unwrap().tick()
-    }
-
-    pub async fn start(mut self) {
-        self.reset();
-
+    pub async fn start(&mut self, shutdown: ShutdownWaiter) {
         let mut epoch_changed_sub = self.notifier.subscribe_epoch_changed();
 
         loop {
             tokio::select! {
                 biased;
+                _ = shutdown.wait_for_shutdown() => {
+                    break;
+                }
                 _ = epoch_changed_sub.recv() => {
                     self.reset();
                 }
@@ -166,15 +198,21 @@ impl<C: NodeComponents> Watcher<C> {
                             self.process_finished_jobs(hash, result);
                         }
                         Err(e) => {
-                            tracing::warn!("scheduled job panicked!")
+                            tracing::warn!("scheduled job panicked!: {e:?}")
                         }
                     }
                 }
             }
         }
-
-        tx
     }
 }
 
 impl<C: NodeComponents> WatcherInterface<C> for Watcher<C> {}
+
+impl<C: NodeComponents> BuildGraph for Watcher<C> {
+    fn build_graph() -> fdi::DependencyGraph {
+        fdi::DependencyGraph::default().with(
+            Self::new.with_event_handler("start", Self::start.wrap_with_spawn_named("WATCHER")),
+        )
+    }
+}
