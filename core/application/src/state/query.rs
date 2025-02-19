@@ -429,10 +429,10 @@ impl SyncQueryRunnerInterface for QueryRunner {
     fn get_jobs_for_node(&self, node_index: &NodeIndex) -> Option<Vec<Job>> {
         self.inner.run(|ctx| {
             let mut jobs = Vec::new();
-            for id in self.assigned_jobs.get(ctx).get(node_index)? {
-                match self.jobs.get(ctx).get(id) {
+            for job_hash in self.assigned_jobs.get(ctx).get(node_index)? {
+                match self.jobs.get(ctx).get(job_hash) {
                     Some(job) => jobs.push(job),
-                    None => tracing::warn!("there was no job found for job id `{id:?}`"),
+                    None => tracing::warn!("there was no job found for job id `{job_hash:?}`"),
                 }
             }
             Some(jobs)

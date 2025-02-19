@@ -668,7 +668,7 @@ impl<B: Backend> StateExecutor<B> {
         // Set the new committee, epoch, and reset sub dag index
         self.committee_info.set(epoch, new_committee);
 
-        // Re-schedule jobs.
+        // Reassign jobs.
         self.reassign_jobs();
 
         // Save new epoch to metadata.
