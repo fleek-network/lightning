@@ -1288,7 +1288,7 @@ impl<B: Backend> StateExecutor<B> {
             .into_iter()
             .map(|job| (job.hash, job))
             .collect::<HashMap<_, _>>();
-        let job_hashes = jobs.keys().map(|hash| *hash).collect();
+        let job_hashes = jobs.keys().copied().collect();
         let assigned_jobs = self.assign_jobs(job_hashes);
 
         // Record the assignee in the job entry.
@@ -1343,10 +1343,10 @@ impl<B: Backend> StateExecutor<B> {
     }
 
     fn update_jobs(&self, updates: BTreeMap<[u8; 32], JobStatus>) -> TransactionResponse {
-        for (key, status) in updates {
-            if let Some(mut job) = self.jobs.get(&key) {
+        for (job_hash, status) in updates {
+            if let Some(mut job) = self.jobs.get(&job_hash) {
                 job.status = Some(status);
-                self.jobs.set(key, job);
+                self.jobs.set(job_hash, job);
             }
         }
 

@@ -505,6 +505,7 @@ pub enum UpdateMethod {
     AddJobs { jobs: Vec<Job> },
     /// Remove these jobs from the jobs table and unassigned them.
     RemoveJobs { jobs: Vec<[u8; 32]> },
+    /// Updates about the jobs' most recent executions.
     JobUpdates {
         updates: BTreeMap<[u8; 32], JobStatus>,
     },
@@ -797,6 +798,7 @@ impl ToDigest for UpdatePayload {
                         .with("frequency", &job.info.frequency)
                         .with("arguments", &job.info.arguments.as_ref())
                         .with("amount", &job.info.amount)
+                        .with("assignee", &job.assignee)
                 }
             },
             UpdateMethod::RemoveJobs { jobs } => {

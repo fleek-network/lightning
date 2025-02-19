@@ -33,10 +33,7 @@ impl<C: NodeComponents> Application<C> {
                 "db_path must be specified for RocksDb backend"
             );
         }
-        // 1. add time consesus
-        // 2. add counter.
-        // 3. add worker and send transactions that it was executed and response. ( worker will
-        //    execute the job)
+
         let mut env = Env::new(&config, None).expect("Failed to initialize environment.");
 
         // Apply genesis if provided, if it hasn't been applied yet.

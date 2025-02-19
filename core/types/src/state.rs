@@ -612,9 +612,13 @@ impl TryFrom<String> for Tokens {
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Deserialize, Serialize, JsonSchema)]
 pub struct Job {
+    /// The hash of the job.
     pub hash: [u8; 32],
+    /// Information about the job for execution purposes.
     pub info: JobInfo,
+    /// The status of the most recent execution of a job.
     pub status: Option<JobStatus>,
+    /// The node to which this job was assigned.
     pub assignee: Option<NodeIndex>,
 }
 
@@ -632,7 +636,10 @@ pub struct JobInfo {
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Deserialize, Serialize, JsonSchema)]
 pub struct JobStatus {
+    /// Timestamp of the most recent execution.
     pub last_run: u64,
+    /// Indicates whether the last execution was successful.
     pub success: bool,
+    /// Records any error message.
     pub message: Option<String>,
 }
