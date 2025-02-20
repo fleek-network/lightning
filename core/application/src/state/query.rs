@@ -87,7 +87,6 @@ pub struct QueryRunner {
     withdraws: ResolvedTableReference<u64, WithdrawInfo>,
     assigned_jobs: ResolvedTableReference<NodeIndex, Vec<[u8; 32]>>,
     jobs: ResolvedTableReference<[u8; 32], Job>,
-    time_interval: ResolvedTableReference<u8, u64>,
     mints: ResolvedTableReference<[u8; 32], MintInfo>,
 }
 
@@ -135,7 +134,6 @@ impl SyncQueryRunnerInterface for QueryRunner {
             withdraws: atomo.resolve::<u64, WithdrawInfo>("withdraws"),
             assigned_jobs: atomo.resolve::<NodeIndex, Vec<[u8; 32]>>("assigned_jobs"),
             jobs: atomo.resolve::<[u8; 32], Job>("jobs"),
-            time_interval: atomo.resolve::<u8, u64>("time_interval"),
             mints: atomo.resolve::<[u8; 32], MintInfo>("mints"),
             inner: atomo,
         }
@@ -444,11 +442,5 @@ impl SyncQueryRunnerInterface for QueryRunner {
             .run(|ctx| self.jobs.get(ctx).as_map())
             .into_iter()
             .collect()
-    }
-
-    fn get_time_interval(&self) -> u64 {
-        self.inner
-            .run(|ctx| self.time_interval.get(ctx).get(0))
-            .expect("Time interval is always set")
     }
 }

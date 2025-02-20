@@ -145,7 +145,6 @@ pub struct StateExecutor<B: Backend> {
     pub mints: B::Ref<[u8; 32], MintInfo>,
     pub assigned_jobs: B::Ref<NodeIndex, Vec<[u8; 32]>>,
     pub jobs: B::Ref<[u8; 32], Job>,
-    pub time_interval: B::Ref<u8, u64>,
     pub backend: B,
 }
 
@@ -181,7 +180,6 @@ impl<B: Backend> StateExecutor<B> {
             mints: backend.get_table_reference("mints"),
             assigned_jobs: backend.get_table_reference("assigned_jobs"),
             jobs: backend.get_table_reference("jobs"),
-            time_interval: backend.get_table_reference("time_interval"),
             backend,
         }
     }

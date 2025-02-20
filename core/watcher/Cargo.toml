@@ -13,4 +13,5 @@ tokio.workspace = true
 tracing.workspace = true
 lightning-interfaces = { path = "../interfaces" }
 lightning-types = { path = "../types" }
+lightning-utils = { path = "../../core/utils" }
 lightning-workspace-hack.workspace = true

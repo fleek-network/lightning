@@ -229,7 +229,6 @@ impl ApplicationEnv {
                 ctx.get_table::<(NodeIndex, NodeIndex), Duration>("latencies");
             let mut consensus_key_to_index_table = ctx.get_table::<ConsensusPublicKey, NodeIndex>("consensus_key_to_index");
             let mut pub_key_to_index_table = ctx.get_table::<NodePublicKey, NodeIndex>("pub_key_to_index");
-            let mut time_interval_table = ctx.get_table::<u8, u64>("time_interval");
 
             // TODO(matthias): should we hash the genesis state instead?
             metadata_table.insert(Metadata::LastEpochHash, Value::Hash([0; 32]));
@@ -243,6 +242,19 @@ impl ApplicationEnv {
             metadata_table.insert(
                 Metadata::ProtocolFundAddress,
                 Value::AccountPublicKey(genesis.protocol_fund_address),
+            );
+
+            let total_intervals = if genesis.total_intervals == 0 {
+                1
+            } else {
+                genesis.total_intervals
+            };
+
+            metadata_table.insert(
+                Metadata::TimeInterval,
+                Value::TimeInterval(
+                    genesis.epoch_time / total_intervals
+                )
             );
 
             metadata_table.insert(Metadata::GovernanceAddress,
@@ -350,18 +362,6 @@ impl ApplicationEnv {
                 ProtocolParamValue::CommitteeSelectionBeaconNonRevealSlashAmount(
                     genesis.committee_selection_beacon_non_reveal_slash_amount,
                 ),
-            );
-
-            let total_intervals = if genesis.total_intervals == 0 {
-                1
-            } else {
-                genesis.total_intervals
-            };
-
-            time_interval_table.insert(
-                0,
-                (genesis.epoch_time + genesis.epoch_start)
-                    .checked_div(total_intervals).unwrap()
             );
 
             param_table.insert(

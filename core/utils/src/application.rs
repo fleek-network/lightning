@@ -329,6 +329,14 @@ pub trait QueryRunnerExt: SyncQueryRunnerInterface {
             _ => unreachable!("invalid reveal phase duration"),
         }
     }
+
+    /// Returns the current time interval.
+    fn get_time_interval(&self) -> u64 {
+        match self.get_metadata(&Metadata::TimeInterval) {
+            Some(Value::TimeInterval(interval)) => interval,
+            _ => unreachable!("invalid committee selection beacon round in metadata"),
+        }
+    }
 }
 
 impl<T: SyncQueryRunnerInterface> QueryRunnerExt for T {}

@@ -108,6 +108,7 @@ pub enum Metadata {
     CommitteeSelectionBeaconPhase,
     EpochEra,
     WithdrawId,
+    TimeInterval,
 }
 
 /// The Value enum is a data type used to represent values in a key-value pair for a metadata table
@@ -128,6 +129,7 @@ pub enum Value {
     CommitteeSelectionBeaconPhase(CommitteeSelectionBeaconPhase),
     EpochEra(u64),
     WithdrawId(u64),
+    TimeInterval(u64),
 }
 
 impl Value {
