@@ -88,6 +88,7 @@ struct InnerWatcher<C: NodeComponents> {
     signer: SignerSubmitTxSocket,
     pk: NodePublicKey,
     notifier: C::NotifierInterface,
+    #[allow(clippy::type_complexity)]
     tasks:
         FuturesUnordered<JoinHandle<([u8; 32], Vec<std::result::Result<TaskResponse, TaskError>>)>>,
     interval_counter: u32,
