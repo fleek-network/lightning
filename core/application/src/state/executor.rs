@@ -2001,7 +2001,7 @@ impl<B: Backend> StateExecutor<B> {
     fn assign_jobs(&self, mut jobs: Vec<[u8; 32]>) -> HashMap<NodeIndex, Vec<[u8; 32]>> {
         jobs.sort();
 
-        let jobs_hash: [u8; 32] = Sha3_256::digest(&jobs.concat()).into();
+        let jobs_hash: [u8; 32] = Sha3_256::digest(jobs.concat()).into();
         let mut rng: StdRng = SeedableRng::from_seed(jobs_hash);
 
         let mut nodes: Vec<NodeIndex> = self
