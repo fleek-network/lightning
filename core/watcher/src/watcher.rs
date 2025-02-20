@@ -24,6 +24,7 @@ use lightning_interfaces::{
     WatcherInterface,
 };
 use lightning_types::UpdateMethod;
+use lightning_utils::application::QueryRunnerExt;
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 use tokio::time::Interval;

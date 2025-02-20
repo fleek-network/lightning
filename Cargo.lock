@@ -9170,6 +9170,7 @@ dependencies = [
  "futures",
  "lightning-interfaces",
  "lightning-types",
+ "lightning-utils",
  "lightning-workspace-hack",
  "tokio",
  "tracing",
