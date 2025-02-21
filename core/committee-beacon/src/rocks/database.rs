@@ -46,7 +46,7 @@ impl CommitteeBeaconDatabase for RocksCommitteeBeaconDatabase {
             .with_table::<(Epoch, CommitteeSelectionBeaconCommit), CommitteeSelectionBeaconReveal>(
                 BEACONS_TABLE,
             )
-            .with_table::<(Epoch, CommitteeSelectionBeaconRound), CommitteeSelectionBeaconReveal>(
+            .with_table::<(Epoch, CommitteeSelectionBeaconRound), CommitteeSelectionBeaconCommit>(
                 COMMITS_TABLE,
             )
             .enable_iter(BEACONS_TABLE)
