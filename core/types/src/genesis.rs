@@ -68,7 +68,15 @@ pub struct Genesis {
 impl Genesis {
     pub fn load_from_file(path: ResolvedPathBuf) -> Result<Self> {
         let raw = fs::read_to_string(path)?;
-        let genesis = toml::from_str(&raw).context("Failed to parse genesis file")?;
+        let genesis: Self = toml::from_str(&raw).context("Failed to parse genesis file")?;
+
+        if genesis.committee_selection_beacon_commit_phase_duration
+            + genesis.committee_selection_beacon_reveal_phase_duration
+            > 2 * genesis.epoch_time / 3
+        {
+            anyhow::bail!("the beacon commit and reveal phases should not be longer than 2/3 of the epoch duration");
+        }
+
         Ok(genesis)
     }
 

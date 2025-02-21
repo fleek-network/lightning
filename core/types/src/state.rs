@@ -143,9 +143,6 @@ impl Value {
 /// Block number.
 pub type BlockNumber = u64;
 
-/// Range of block numbers.
-pub type BlockRange = (BlockNumber, BlockNumber);
-
 /// Committee selection beacon round number.
 pub type CommitteeSelectionBeaconRound = u64;
 
@@ -198,8 +195,8 @@ pub type CommitteeSelectionBeaconReveal = [u8; 32];
 /// Phase of the committee selection beacon.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, schemars::JsonSchema)]
 pub enum CommitteeSelectionBeaconPhase {
-    Commit(BlockRange),
-    Reveal(BlockRange),
+    Commit((Epoch, CommitteeSelectionBeaconRound)),
+    Reveal((Epoch, CommitteeSelectionBeaconRound)),
 }
 
 /// Indicates the participation status of a node.
@@ -549,10 +546,21 @@ pub struct Service {
     schemars::JsonSchema,
 )]
 pub struct Committee {
+    /// The members of the committee
     pub members: Vec<NodeIndex>,
+    /// The members of the committee that already submitted the epoch change txn
     pub ready_to_change: Vec<NodeIndex>,
+    /// The members of the committee that already submitted the commit phase timeout txn
+    pub signalled_commit_phase_timeout: Vec<NodeIndex>,
+    /// The members of the committee that already submitted the reveal phase timeout txn
+    pub signalled_reveal_phase_timeout: Vec<NodeIndex>,
+    /// The timestamp when the epoch will end (approximetaly)
     pub epoch_end_timestamp: u64,
+    /// The timestamp when nodes will send the epoch change transaction
+    pub epoch_transition_timestamp: u64,
+    /// The nodes with sufficient stake
     pub active_node_set: Vec<NodeIndex>,
+    /// Changes to the node registry (I think this is only used for testing)
     pub node_registry_changes: NodeRegistryChanges,
 }
 

@@ -1,13 +1,20 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
+use std::pin::Pin;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use fleek_crypto::{ConsensusPublicKey, NodePublicKey};
 use gethostname::gethostname;
 use lightning_interfaces::prelude::*;
-use lightning_interfaces::types::{Epoch, EpochInfo, UpdateMethod};
+use lightning_interfaces::types::{
+    CommitteeSelectionBeaconPhase,
+    CommitteeSelectionBeaconRound,
+    Epoch,
+    EpochInfo,
+    UpdateMethod,
+};
 use lightning_interfaces::Events;
 use lightning_utils::application::QueryRunnerExt;
 use mysten_network::Multiaddr;
@@ -17,6 +24,7 @@ use narwhal_crypto::{NetworkPublicKey, PublicKey};
 use narwhal_node::NodeStorage;
 use ready::ReadyWaiter;
 use resolved_pathbuf::ResolvedPathBuf;
+use tokio::sync::futures::Notified;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{oneshot, Notify};
 use tokio::{pin, task, time};
@@ -125,14 +133,28 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
 
     pub async fn start_current_epoch(&mut self) {
         // Get current epoch information
-        let (committee, worker_cache, epoch, epoch_era, epoch_end) = self.get_epoch_info();
+        let (committee, worker_cache, epoch, epoch_era, epoch_transition) = self.get_epoch_info();
+        let commit_phase_duration = self
+            .query_runner
+            .get_committee_beacon_commit_phase_duration();
+        let reveal_phase_duration = self
+            .query_runner
+            .get_committee_beacon_reveal_phase_duration();
 
         if committee
             .authority_by_key(self.narwhal_args.primary_keypair.public())
             .is_some()
         {
-            self.run_narwhal(epoch_end, epoch, epoch_era, committee, worker_cache)
-                .await
+            self.run_narwhal(
+                epoch_transition,
+                commit_phase_duration,
+                reveal_phase_duration,
+                epoch,
+                epoch_era,
+                committee,
+                worker_cache,
+            )
+            .await
         }
     }
 
@@ -149,7 +171,8 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
             committee,
             epoch,
             epoch_era,
-            epoch_end,
+            epoch_end: _,
+            epoch_transition,
         } = self.query_runner.get_epoch_info();
 
         let mut committee_builder = CommitteeBuilder::new(epoch);
@@ -209,46 +232,106 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
                 .collect(),
         };
 
-        (narwhal_committee, worker_cache, epoch, epoch_era, epoch_end)
+        (
+            narwhal_committee,
+            worker_cache,
+            epoch,
+            epoch_era,
+            epoch_transition,
+        )
     }
 
-    fn wait_to_signal_epoch_change(&self, mut time_until_change: Duration, epoch: Epoch) {
+    fn handle_epoch_transition_phase(
+        &self,
+        epoch_transition_timestamp: u64,
+        commit_phase_duration: u64,
+        reveal_phase_duration: u64,
+        epoch: Epoch,
+    ) {
         let txn_socket = self.txn_socket.clone();
         let query_runner = self.query_runner.clone();
 
         let shutdown = self.shutdown_notify.clone();
+
+        // Calculate the timestamp for sending the epoch change transaction.
+        // This will kickoff the epoch transaction phase.
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+        let until_epoch_transitions: u64 = (epoch_transition_timestamp as u128)
+            .saturating_sub(now)
+            .try_into()
+            .unwrap();
+        let time_until_epoch_transition = Duration::from_millis(until_epoch_transitions);
+
+        let commit_phase_duration = Duration::from_millis(commit_phase_duration);
+        let reveal_phase_duration = Duration::from_millis(reveal_phase_duration);
+
         task::spawn(async move {
+            let check_phase_duration = Duration::from_millis(1000);
             let shutdown_fut = shutdown.notified();
             pin!(shutdown_fut);
-            loop {
-                let time_to_sleep = time::sleep(time_until_change);
 
-                tokio::select! {
-                    biased;
-                    _ = &mut shutdown_fut => {
-                        tracing::debug!("shutdown signal received, stopping");
+            let res = wait_and_signal_epoch_change(
+                &query_runner,
+                &txn_socket,
+                &mut shutdown_fut,
+                epoch,
+                time_until_epoch_transition,
+                check_phase_duration,
+            )
+            .await;
+
+            if let Some((_commit_phase_epoch, round)) = res {
+                // We are in the commit phase now
+                info!("Waiting to signal commit phase timeout (epoch: {epoch}, round: {round})");
+                // TODO(matthias): what should we do if the commit_phase_epoch doesn't match the
+                // current epoch?
+                // This can only happen if the node is out of sync and on the wrong
+                // epoch.
+
+                let mut commit_phase_round = round;
+                loop {
+                    let res = wait_and_signal_commit_phase_timeout(
+                        &query_runner,
+                        &txn_socket,
+                        &mut shutdown_fut,
+                        epoch,
+                        commit_phase_round,
+                        commit_phase_duration,
+                        check_phase_duration,
+                    )
+                    .await;
+
+                    let Some((_commit_epoch, round)) = res else {
+                        // We detected an epoch change and don't have to await the reveal phase
+                        // anymore.
+                        // This can only happen if a node is out of sync and does not commit during
+                        // the commit phase.
+                        // If > 2/3 of the committee commits and reveals, we will still change
+                        // epochs.
                         break;
-                    }
-                    _ = time_to_sleep => {
-                        let new_epoch = query_runner.get_current_epoch();
-                        if new_epoch != epoch {
-                            break;
-                        }
+                    };
 
-                        info!("Narwhal: Signalling ready to change epoch");
+                    let res = wait_and_signal_reveal_phase_timeout(
+                        &query_runner,
+                        &txn_socket,
+                        &mut shutdown_fut,
+                        epoch,
+                        round,
+                        reveal_phase_duration,
+                        check_phase_duration,
+                    )
+                    .await;
 
-                        if let Err(e) = txn_socket
-                            .enqueue(ExecuteTransactionRequest {
-                                method: UpdateMethod::ChangeEpoch { epoch },
-                                options: None,
-                            })
-                            .await
-                        {
-                            error!("Error sending change epoch signal to socket {}", e);
-                        }
+                    let Some((_commit_epoch, round)) = res else {
+                        // We changed epochs successfully.
+                        break;
+                    };
 
-                        time_until_change = Duration::from_secs(120);
-                    },
+                    // The reveal phase failed and we started a new commit phase.
+                    commit_phase_round = round;
                 }
             }
         });
@@ -256,7 +339,9 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
 
     async fn run_narwhal(
         &mut self,
-        epoch_end: u64,
+        epoch_transition: u64,
+        commit_phase_duration: u64,
+        reveal_phase_duration: u64,
         epoch: Epoch,
         epoch_era: EpochEra,
         committee: Committee,
@@ -283,15 +368,12 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
         // Notify that the component has started and is ready.
         self.ready.notify(());
 
-        // start the timer to signal when your node thinks its ready to change epochs
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_millis();
-        let until_epoch_ends: u64 = (epoch_end as u128).saturating_sub(now).try_into().unwrap();
-        let time_until_epoch_change = Duration::from_millis(until_epoch_ends);
-
-        self.wait_to_signal_epoch_change(time_until_epoch_change, epoch);
+        self.handle_epoch_transition_phase(
+            epoch_transition,
+            commit_phase_duration,
+            reveal_phase_duration,
+            epoch,
+        );
 
         self.consensus = Some(service)
     }
@@ -316,6 +398,206 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
         // TODO(dalton): This store takes an optional cache metrics struct that can give us metrics
         // on hits/miss
         NodeStorage::reopen(store_path, None)
+    }
+}
+
+async fn wait_and_signal_epoch_change<Q: SyncQueryRunnerInterface>(
+    query_runner: &Q,
+    txn_socket: &SignerSubmitTxSocket,
+    shutdown_fut: &mut Pin<&mut Notified<'_>>,
+    epoch: Epoch,
+    mut time_until_epoch_transition: Duration,
+    check_phase_duration: Duration,
+) -> Option<(Epoch, CommitteeSelectionBeaconRound)> {
+    loop {
+        let time_to_sleep = time::sleep(time_until_epoch_transition);
+        let mut check_phase_interval = time::interval(check_phase_duration);
+
+        info!("Waiting to signal epoch change (epoch: {epoch})");
+        tokio::select! {
+            biased;
+            _ = &mut *shutdown_fut => {
+                tracing::debug!("shutdown signal received, stopping");
+                return None;
+            }
+            _ = check_phase_interval.tick() => {
+                // TODO(matthias): what should we do if the phase is wrong?
+                // This should never happen.
+                let phase = query_runner.get_committee_selection_beacon_phase();
+                if let Some(CommitteeSelectionBeaconPhase::Commit((phase_epoch, round))) = phase {
+                    // We successfully transitioned into the commit phase after submitting
+                    // the epoch change transaction
+
+                    return Some((phase_epoch, round))
+                }
+
+                let new_epoch = query_runner.get_current_epoch();
+                if new_epoch != epoch {
+                    // We already changed epochs, so there is no need to send the
+                    // transactions for the commit and reveal phases.
+                    // Realistically, this will never happen.
+                    return None;
+                }
+            }
+            _ = time_to_sleep => {
+                info!("Signalling ready to change epoch (epoch: {epoch})");
+
+                if let Err(e) = txn_socket
+                    .enqueue(ExecuteTransactionRequest {
+                        method: UpdateMethod::ChangeEpoch { epoch },
+                        options: None,
+                    })
+                    .await
+                {
+                    error!("Error sending change epoch signal to socket {}", e);
+                }
+
+                time_until_epoch_transition = Duration::from_secs(60);
+            },
+        }
+    }
+}
+
+async fn wait_and_signal_commit_phase_timeout<Q: SyncQueryRunnerInterface>(
+    query_runner: &Q,
+    txn_socket: &SignerSubmitTxSocket,
+    shutdown_fut: &mut Pin<&mut Notified<'_>>,
+    epoch: Epoch,
+    round: CommitteeSelectionBeaconRound,
+    commit_phase_duration: Duration,
+    check_phase_duration: Duration,
+) -> Option<(Epoch, CommitteeSelectionBeaconRound)> {
+    let mut time_until_signal = commit_phase_duration;
+    loop {
+        let time_to_sleep = time::sleep(time_until_signal);
+        let mut check_phase_interval = time::interval(check_phase_duration);
+
+        info!("Waiting to signal commit phase timeout (epoch: {epoch})");
+        tokio::select! {
+            biased;
+            _ = &mut *shutdown_fut => {
+                tracing::debug!("shutdown signal received, stopping");
+                return None;
+            }
+            _ = check_phase_interval.tick() => {
+                match query_runner.get_committee_selection_beacon_phase() {
+                    Some(CommitteeSelectionBeaconPhase::Commit((_phase_epoch, phase_round))) => {
+                        // If round == phase_round, then we are still in the same commit phase.
+                        // We don't have to do anything.
+                        if phase_round > round {
+                            // We are still in the commit phase, but with an increased round.
+                            // This means that the commit phase had insufficient participation and
+                            // was restarted.
+                            // We will wait for the duration of the commit phase again, and then
+                            // send another commit phase timeout transaction.
+                            time_until_signal = commit_phase_duration;
+                            continue;
+                        }
+                    }
+                    Some(CommitteeSelectionBeaconPhase::Reveal((phase_epoch, phase_round))) => {
+                        // We successfully moved on to the reveal phase.
+                        return Some((phase_epoch, phase_round));
+                    }
+                    _ => {
+                        // This should never happen.
+                        return None;
+                    }
+                }
+
+                let new_epoch = query_runner.get_current_epoch();
+                if new_epoch != epoch {
+                    // We already changed epochs, so there is no need to send the
+                    // transactions for the commit and reveal phases.
+                    // Realistically, this will never happen.
+                    return None;
+                }
+            }
+            _ = time_to_sleep => {
+                info!("Signalling commit phase timeout (epoch: {epoch})");
+
+                let method = UpdateMethod::CommitteeSelectionBeaconCommitPhaseTimeout {
+                    epoch,
+                    round,
+                };
+                if let Err(e) = txn_socket
+                    .enqueue(ExecuteTransactionRequest {
+                        method,
+                        options: None,
+                    })
+                    .await
+                {
+                    error!("Error sending commit phase timeout to socket {}", e);
+                }
+
+                time_until_signal = Duration::from_secs(60);
+            },
+        }
+    }
+}
+
+async fn wait_and_signal_reveal_phase_timeout<Q: SyncQueryRunnerInterface>(
+    query_runner: &Q,
+    txn_socket: &SignerSubmitTxSocket,
+    shutdown_fut: &mut Pin<&mut Notified<'_>>,
+    epoch: Epoch,
+    round: CommitteeSelectionBeaconRound,
+    reveal_phase_duration: Duration,
+    check_phase_duration: Duration,
+) -> Option<(Epoch, CommitteeSelectionBeaconRound)> {
+    let mut time_until_signal = reveal_phase_duration;
+    loop {
+        let time_to_sleep = time::sleep(time_until_signal);
+        let mut check_phase_interval = time::interval(check_phase_duration);
+
+        info!("Waiting to signal reveal phase timeout (epoch: {epoch})");
+        tokio::select! {
+            biased;
+            _ = &mut *shutdown_fut => {
+                tracing::debug!("shutdown signal received, stopping");
+                return None;
+            }
+            _ = check_phase_interval.tick() => {
+                match query_runner.get_committee_selection_beacon_phase() {
+                    Some(CommitteeSelectionBeaconPhase::Commit((phase_epoch, phase_round))) => {
+                        // The reveal phase was not successful. The non-revealing nodes will be
+                        // slashed, and the commit phase will be restarted.
+                        return Some((phase_epoch, phase_round));
+                    }
+                    Some(CommitteeSelectionBeaconPhase::Reveal((_phase_epoch, _phase_round))) => {
+                        // We are still in the reveal phase, nothing to do.
+                    }
+                    _ => {
+                        // The reveal phase concluded successfully and we changed epochs.
+                        // Below we check if the epoch changed, and then we can return.
+                    }
+                }
+
+                let new_epoch = query_runner.get_current_epoch();
+                if new_epoch != epoch {
+                    // The reveal phase concluded successfully and we changed epochs.
+                    return None;
+                }
+            }
+            _ = time_to_sleep => {
+                info!("Signalling reveal phase timeout (epoch: {epoch})");
+
+                let method = UpdateMethod::CommitteeSelectionBeaconRevealPhaseTimeout {
+                    epoch,
+                    round,
+                };
+                if let Err(e) = txn_socket
+                    .enqueue(ExecuteTransactionRequest {
+                        method,
+                        options: None,
+                    })
+                    .await
+                {
+                    error!("Error sending reveal phase timeout to socket {}", e);
+                }
+
+                time_until_signal = Duration::from_secs(60);
+            },
+        }
     }
 }
 

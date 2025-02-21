@@ -2,6 +2,7 @@ use fxhash::FxHashMap;
 use lightning_interfaces::types::{
     CommitteeSelectionBeaconCommit,
     CommitteeSelectionBeaconReveal,
+    CommitteeSelectionBeaconRound,
     Epoch,
 };
 
@@ -29,6 +30,7 @@ pub trait CommitteeBeaconDatabase: Clone + Send + Sync {
     fn set_beacon(
         &self,
         epoch: Epoch,
+        round: CommitteeSelectionBeaconRound,
         commit: CommitteeSelectionBeaconCommit,
         reveal: CommitteeSelectionBeaconReveal,
     );
@@ -49,6 +51,13 @@ pub trait CommitteeBeaconDatabaseQuery {
         epoch: Epoch,
         commit: CommitteeSelectionBeaconCommit,
     ) -> Option<CommitteeSelectionBeaconReveal>;
+
+    /// Get commit for the given epoch and round.
+    fn get_commit(
+        &self,
+        epoch: Epoch,
+        round: CommitteeSelectionBeaconRound,
+    ) -> Option<CommitteeSelectionBeaconCommit>;
 
     /// Get all the locally stored beacons.
     fn get_beacons(

@@ -352,6 +352,11 @@ impl ApplicationEnv {
             );
 
             let epoch_end: u64 = genesis.epoch_time + genesis.epoch_start;
+
+            let epoch_transition_timestamp = epoch_end
+                - genesis.committee_selection_beacon_commit_phase_duration
+                - genesis.committee_selection_beacon_reveal_phase_duration;
+
             let mut committee_members = Vec::with_capacity(4);
             let mut active_nodes = Vec::with_capacity(genesis.node_info.len());
             let mut node_registry_changes = NodeRegistryChanges::from_iter([(0, vec![])]);
@@ -405,8 +410,11 @@ impl ApplicationEnv {
                 0,
                 Committee {
                     ready_to_change: Vec::with_capacity(committee_members.len()),
+                    signalled_commit_phase_timeout: Vec::with_capacity(committee_members.len()),
+                    signalled_reveal_phase_timeout: Vec::with_capacity(committee_members.len()),
                     members: committee_members.clone(),
                     epoch_end_timestamp: epoch_end,
+                    epoch_transition_timestamp,
                     // Todo(dont just use the committee members for first set)
                     active_node_set: active_nodes,
                     node_registry_changes,

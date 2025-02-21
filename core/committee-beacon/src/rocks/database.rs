@@ -5,6 +5,7 @@ use atomo_rocks::{Options, RocksBackend, RocksBackendBuilder};
 use lightning_interfaces::types::{
     CommitteeSelectionBeaconCommit,
     CommitteeSelectionBeaconReveal,
+    CommitteeSelectionBeaconRound,
     Epoch,
 };
 
@@ -13,8 +14,10 @@ use crate::config::CommitteeBeaconDatabaseConfig;
 use crate::database::CommitteeBeaconDatabase;
 
 pub(crate) const BEACONS_TABLE: &str = "beacons";
+pub(crate) const COMMITS_TABLE: &str = "commits";
 
 pub type BeaconsTableKey = (Epoch, CommitteeSelectionBeaconCommit);
+pub type CommitsTableKey = (Epoch, CommitteeSelectionBeaconRound);
 
 /// A committee beacon database writer that uses RocksDB as the underlying datastore.
 ///
@@ -43,7 +46,11 @@ impl CommitteeBeaconDatabase for RocksCommitteeBeaconDatabase {
             .with_table::<(Epoch, CommitteeSelectionBeaconCommit), CommitteeSelectionBeaconReveal>(
                 BEACONS_TABLE,
             )
-            .enable_iter(BEACONS_TABLE);
+            .with_table::<(Epoch, CommitteeSelectionBeaconRound), CommitteeSelectionBeaconReveal>(
+                COMMITS_TABLE,
+            )
+            .enable_iter(BEACONS_TABLE)
+            .enable_iter(COMMITS_TABLE);
 
         let db = builder.build().unwrap();
         let db = Arc::new(Mutex::new(db));
@@ -58,14 +65,18 @@ impl CommitteeBeaconDatabase for RocksCommitteeBeaconDatabase {
     fn set_beacon(
         &self,
         epoch: Epoch,
+        round: CommitteeSelectionBeaconRound,
         commit: CommitteeSelectionBeaconCommit,
         reveal: CommitteeSelectionBeaconReveal,
     ) {
         self.atomo.lock().unwrap().run(|ctx| {
             let mut table =
                 ctx.get_table::<BeaconsTableKey, CommitteeSelectionBeaconReveal>(BEACONS_TABLE);
-
             table.insert((epoch, commit), reveal);
+
+            let mut table =
+                ctx.get_table::<CommitsTableKey, CommitteeSelectionBeaconCommit>(COMMITS_TABLE);
+            table.insert((epoch, round), commit);
         });
     }
 
@@ -77,6 +88,14 @@ impl CommitteeBeaconDatabase for RocksCommitteeBeaconDatabase {
             for (epoch, commit) in table.keys() {
                 if epoch < before_epoch {
                     table.remove((epoch, commit));
+                }
+            }
+
+            let mut table =
+                ctx.get_table::<CommitsTableKey, CommitteeSelectionBeaconCommit>(COMMITS_TABLE);
+            for (epoch, round) in table.keys() {
+                if epoch < before_epoch {
+                    table.remove((epoch, round));
                 }
             }
         });

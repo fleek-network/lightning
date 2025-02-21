@@ -18,6 +18,8 @@ pub struct EpochInfo {
     pub epoch_era: EpochEra,
     /// Timestamp when the epoch ends
     pub epoch_end: u64,
+    /// Timestamp when the epoch transaction starts
+    pub epoch_transition: u64,
 }
 
 #[derive(Clone, Debug, PartialEq, PartialOrd, Hash, Eq, Serialize, Deserialize)]
@@ -116,14 +118,14 @@ pub enum ExecutionError {
     CommitteeSelectionBeaconNodeNotActive,
     CommitteeSelectionBeaconNotCommitted,
     CommitteeSelectionBeaconNotInCommitPhase,
-    CommitteeSelectionBeaconCommitPhaseNotStarted,
+    CommitteeSelectionBeaconCommitPhaseNotActive,
     CommitteeSelectionBeaconAlreadyCommitted,
-    CommitteeSelectionBeaconRevealPhaseNotStarted,
+    CommitteeSelectionBeaconRevealPhaseNotActive,
     CommitteeSelectionBeaconAlreadyRevealed,
     CommitteeSelectionBeaconNotInRevealPhase,
     CommitteeSelectionBeaconInvalidReveal,
-    CommitteeSelectionBeaconCommitPhaseNotTimedOut,
-    CommitteeSelectionBeaconRevealPhaseNotTimedOut,
+    CommitteeSelectionBeaconInvalidCommitPhaseTimeout,
+    CommitteeSelectionBeaconInvalidRevealPhaseTimeout,
     CommitteeSelectionBeaconNonRevealingNode,
     CommitteeSelectionBeaconRoundNotFound,
     MissingCommittee,
