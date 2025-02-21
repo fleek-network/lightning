@@ -29,6 +29,7 @@ use crate::content_registry::ContentUpdate;
 use crate::{
     CommitteeSelectionBeaconCommit,
     CommitteeSelectionBeaconReveal,
+    CommitteeSelectionBeaconRound,
     DeliveryAcknowledgmentProof,
     NodeIndex,
     NodePorts,
@@ -448,9 +449,15 @@ pub enum UpdateMethod {
         reveal: CommitteeSelectionBeaconReveal,
     },
     /// Sent by nodes when they see that the committee selection beacon commit phase has timed out.
-    CommitteeSelectionBeaconCommitPhaseTimeout,
+    CommitteeSelectionBeaconCommitPhaseTimeout {
+        epoch: Epoch,
+        round: CommitteeSelectionBeaconRound,
+    },
     /// Sent by nodes when they see that the committee selection beacon reveal phase has timed out.
-    CommitteeSelectionBeaconRevealPhaseTimeout,
+    CommitteeSelectionBeaconRevealPhaseTimeout {
+        epoch: Epoch,
+        round: CommitteeSelectionBeaconRound,
+    },
     /// Adding a new service to the protocol
     AddService {
         service: Service,
@@ -678,20 +685,28 @@ impl ToDigest for UpdatePayload {
             UpdateMethod::CommitteeSelectionBeaconReveal { reveal } => {
                 transcript_builder = transcript_builder
                     .with("transaction_name", &"committee_selection_beacon_reveal")
-                    .with("reveal", reveal)
-                    .with_prefix("input".to_owned());
+                    .with_prefix("input".to_owned())
+                    .with("reveal", reveal);
             },
-            UpdateMethod::CommitteeSelectionBeaconCommitPhaseTimeout => {
-                transcript_builder = transcript_builder.with(
-                    "transaction_name",
-                    &"committee_selection_beacon_commit_phase_timeout",
-                );
+            UpdateMethod::CommitteeSelectionBeaconCommitPhaseTimeout { epoch, round } => {
+                transcript_builder = transcript_builder
+                    .with(
+                        "transaction_name",
+                        &"committee_selection_beacon_commit_phase_timeout",
+                    )
+                    .with_prefix("input".to_owned())
+                    .with("epoch", epoch)
+                    .with("round", round);
             },
-            UpdateMethod::CommitteeSelectionBeaconRevealPhaseTimeout => {
-                transcript_builder = transcript_builder.with(
-                    "transaction_name",
-                    &"committee_selection_beacon_reveal_phase_timeout",
-                );
+            UpdateMethod::CommitteeSelectionBeaconRevealPhaseTimeout { epoch, round } => {
+                transcript_builder = transcript_builder
+                    .with(
+                        "transaction_name",
+                        &"committee_selection_beacon_reveal_phase_timeout",
+                    )
+                    .with_prefix("input".to_owned())
+                    .with("epoch", epoch)
+                    .with("round", round);
             },
             UpdateMethod::AddService {
                 service,

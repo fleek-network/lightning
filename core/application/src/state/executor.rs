@@ -279,13 +279,11 @@ impl<B: Backend> StateExecutor<B> {
                 self.committee_selection_beacon_reveal(txn.payload.sender, reveal)
             },
 
-            UpdateMethod::CommitteeSelectionBeaconCommitPhaseTimeout => {
-                self.committee_selection_beacon_commit_phase_timeout(txn.payload.sender)
-            },
+            UpdateMethod::CommitteeSelectionBeaconCommitPhaseTimeout { epoch, round } => self
+                .committee_selection_beacon_commit_phase_timeout(txn.payload.sender, epoch, round),
 
-            UpdateMethod::CommitteeSelectionBeaconRevealPhaseTimeout => {
-                self.committee_selection_beacon_reveal_phase_timeout(txn.payload.sender)
-            },
+            UpdateMethod::CommitteeSelectionBeaconRevealPhaseTimeout { epoch, round } => self
+                .committee_selection_beacon_reveal_phase_timeout(txn.payload.sender, epoch, round),
 
             UpdateMethod::AddService {
                 service,
