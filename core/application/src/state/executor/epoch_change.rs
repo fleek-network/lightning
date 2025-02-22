@@ -155,7 +155,7 @@ impl<B: Backend> StateExecutor<B> {
             ))) => Some((epoch, round)),
             _ => None,
         };
-        let Some((commit_phase_epoch, round)) = commit_phase else {
+        let Some((commit_phase_epoch, _round)) = commit_phase else {
             return TransactionResponse::Revert(
                 ExecutionError::CommitteeSelectionBeaconCommitPhaseNotActive,
             );
@@ -185,27 +185,27 @@ impl<B: Backend> StateExecutor<B> {
 
         // If all active nodes have committed, we can transition to the reveal phase early before
         // timeout.
-        let beacons = self.committee_selection_beacon.as_map();
-        let eligible_nodes = active_nodes
-            .iter()
-            .filter(|node_index| {
-                self.committee_selection_beacon_non_revealing_node
-                    .get(*node_index)
-                    .is_none()
-            })
-            .collect::<Vec<_>>();
-        if beacons.len() == eligible_nodes.len()
-            && eligible_nodes
-                .iter()
-                .all(|node_index| beacons.contains_key(node_index))
-        {
-            tracing::info!(
-                "transitioning to committee selection beacon reveal phase because all eligible nodes have committed (epoch: {}, commit_phase_epoch: {})",
-                self.get_epoch(),
-                commit_phase_epoch,
-            );
-            self.set_committee_selection_beacon_reveal_phase(epoch, round);
-        }
+        //let beacons = self.committee_selection_beacon.as_map();
+        //let eligible_nodes = active_nodes
+        //    .iter()
+        //    .filter(|node_index| {
+        //        self.committee_selection_beacon_non_revealing_node
+        //            .get(*node_index)
+        //            .is_none()
+        //    })
+        //    .collect::<Vec<_>>();
+        //if beacons.len() == eligible_nodes.len()
+        //    && eligible_nodes
+        //        .iter()
+        //        .all(|node_index| beacons.contains_key(node_index))
+        //{
+        //    tracing::info!(
+        //        "transitioning to committee selection beacon reveal phase because all eligible
+        // nodes have committed (epoch: {}, commit_phase_epoch: {})",        self.
+        // get_epoch(),        commit_phase_epoch,
+        //    );
+        //    self.set_committee_selection_beacon_reveal_phase(epoch, round);
+        //}
 
         // Return success.
         TransactionResponse::Success(ExecutionData::None)

@@ -4,6 +4,7 @@ use std::time::Duration;
 use anyhow::Result;
 use futures::future::join_all;
 use lightning_interfaces::prelude::*;
+use lightning_interfaces::types::CommitteeSelectionBeaconRound;
 use lightning_utils::application::QueryRunnerExt;
 use lightning_utils::poll::{poll_until, PollUntilError};
 use types::{
@@ -57,6 +58,50 @@ impl TestNetwork {
         .collect::<Result<Vec<_>, _>>()
         .unwrap();
         Ok(epoch + 1)
+    }
+
+    pub async fn commit_phase_timeout(
+        &self,
+        round: CommitteeSelectionBeaconRound,
+    ) -> Result<Epoch> {
+        let epoch = self.node(0).app_query().get_current_epoch();
+        join_all(self.nodes().map(|node| {
+            node.execute_transaction_from_node(
+                UpdateMethod::CommitteeSelectionBeaconCommitPhaseTimeout { epoch, round },
+                Some(ExecuteTransactionOptions {
+                    wait: ExecuteTransactionWait::None,
+                    retry: ExecuteTransactionRetry::Default,
+                    timeout: Some(Duration::from_secs(10)),
+                }),
+            )
+        }))
+        .await
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+        Ok(epoch)
+    }
+
+    pub async fn reveal_phase_timeout(
+        &self,
+        round: CommitteeSelectionBeaconRound,
+    ) -> Result<Epoch> {
+        let epoch = self.node(0).app_query().get_current_epoch();
+        join_all(self.nodes().map(|node| {
+            node.execute_transaction_from_node(
+                UpdateMethod::CommitteeSelectionBeaconRevealPhaseTimeout { epoch, round },
+                Some(ExecuteTransactionOptions {
+                    wait: ExecuteTransactionWait::None,
+                    retry: ExecuteTransactionRetry::Default,
+                    timeout: Some(Duration::from_secs(10)),
+                }),
+            )
+        }))
+        .await
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+        Ok(epoch)
     }
 
     /// Wait for the epoch to match the given epoch across all nodes.
