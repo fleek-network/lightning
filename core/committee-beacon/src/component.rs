@@ -8,11 +8,10 @@ use crate::config::CommitteeBeaconConfig;
 use crate::database::CommitteeBeaconDatabase;
 use crate::listener::CommitteeBeaconListener;
 use crate::rocks::RocksCommitteeBeaconDatabase;
-use crate::timer::CommitteeBeaconTimer;
 use crate::CommitteeBeaconQuery;
 
 pub struct CommitteeBeaconComponent<C: NodeComponents> {
-    config: CommitteeBeaconConfig,
+    _config: CommitteeBeaconConfig,
     db: RocksCommitteeBeaconDatabase,
     _components: PhantomData<C>,
 }
@@ -43,7 +42,7 @@ impl<C: NodeComponents> CommitteeBeaconComponent<C> {
         let config = config.get::<Self>();
         let db = RocksCommitteeBeaconDatabase::build(config.database.clone());
         Ok(Self {
-            config,
+            _config: config,
             db,
             _components: PhantomData,
         })
@@ -62,8 +61,6 @@ impl<C: NodeComponents> CommitteeBeaconComponent<C> {
 
         let db = self.db.clone();
         let listener_shutdown = shutdown.clone();
-        let timer_shutdown = shutdown.clone();
-        let timer_config = self.config.timer.clone();
         spawn!(
             async move {
                 app_query.wait_for_genesis().await;
@@ -96,23 +93,6 @@ impl<C: NodeComponents> CommitteeBeaconComponent<C> {
                     },
                     "COMMITTEE-BEACON listener",
                     crucial(listener_waiter)
-                );
-
-                // Start the timer.
-                let timer =
-                    CommitteeBeaconTimer::<C>::new(timer_config, signer.get_socket(), app_query)
-                        .await
-                        .expect("failed to create committee beacon timer");
-                let timer_waiter = timer_shutdown.clone();
-                spawn!(
-                    async move {
-                        if let Some(result) = timer_shutdown.run_until_shutdown(timer.start()).await
-                        {
-                            result.expect("committee beacon timer failed")
-                        }
-                    },
-                    "COMMITTEE-BEACON timer",
-                    crucial(timer_waiter)
                 );
             },
             "COMMITTEE-BEACON",

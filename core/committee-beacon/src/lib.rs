@@ -5,7 +5,6 @@ mod error;
 mod listener;
 mod query;
 mod rocks;
-mod timer;
 
 pub use component::*;
 pub use config::*;
