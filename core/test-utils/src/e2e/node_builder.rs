@@ -119,7 +119,6 @@ impl TestNodeBuilder {
             database: CommitteeBeaconDatabaseConfig {
                 path: self.home_dir.join("committee-beacon").try_into().unwrap(),
             },
-            ..self.committee_beacon_config.unwrap_or_default()
         });
 
         // Configure consensus component.

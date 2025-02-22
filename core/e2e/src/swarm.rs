@@ -720,7 +720,6 @@ fn build_config(
                 .try_into()
                 .expect("Failed to resolve path"),
         },
-        ..Default::default()
     });
 
     if let Some(gateways) = ipfs_gateways {

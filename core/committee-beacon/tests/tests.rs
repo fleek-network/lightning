@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
 use anyhow::Result;
-use lightning_committee_beacon::{CommitteeBeaconConfig, CommitteeBeaconTimerConfig};
+use lightning_committee_beacon::CommitteeBeaconConfig;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::UpdateMethod;
 use lightning_interfaces::{
@@ -215,7 +215,6 @@ async fn test_insufficient_participation_in_commit_phase() {
         committee_nodes: 1,
         committee_nodes_without_beacon: 2,
         consensus_buffer_interval: Duration::from_millis(100),
-        committee_beacon_timer_tick_delay: Duration::from_millis(100),
         commit_phase_duration,
         reveal_phase_duration,
         ..Default::default()
@@ -970,7 +969,6 @@ pub struct BuildNetworkOptions {
     pub committee_nodes_without_beacon: usize,
     pub commit_phase_duration: u64,
     pub reveal_phase_duration: u64,
-    pub committee_beacon_timer_tick_delay: Duration,
     pub consensus_buffer_interval: Duration,
     pub min_stake: u64,
     pub non_reveal_slash_amount: u64,
@@ -985,7 +983,6 @@ impl Default for BuildNetworkOptions {
             committee_nodes_without_beacon: 0,
             commit_phase_duration: 3,
             reveal_phase_duration: 3,
-            committee_beacon_timer_tick_delay: Duration::from_millis(200),
             consensus_buffer_interval: Duration::from_millis(200),
             min_stake: 1000,
             non_reveal_slash_amount: 1000,
@@ -996,12 +993,7 @@ impl Default for BuildNetworkOptions {
 }
 
 async fn build_network(options: BuildNetworkOptions) -> Result<TestNetwork> {
-    let committee_beacon_config = CommitteeBeaconConfig {
-        timer: CommitteeBeaconTimerConfig {
-            tick_delay: options.committee_beacon_timer_tick_delay,
-        },
-        ..Default::default()
-    };
+    let committee_beacon_config = CommitteeBeaconConfig::default();
 
     let mut builder = TestNetwork::builder();
 
