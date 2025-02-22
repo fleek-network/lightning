@@ -96,9 +96,6 @@ impl<B: Backend> StateExecutor<B> {
             // Start the committee beacon commit phase.
             self.set_committee_selection_beacon_commit_phase(epoch, 0);
 
-            // Start the committee selection beacon round at 0.
-            //self.set_committee_selection_beacon_round(0);
-
             // Reset the epoch era.
             self.metadata.set(Metadata::EpochEra, Value::EpochEra(0));
 
@@ -163,14 +160,6 @@ impl<B: Backend> StateExecutor<B> {
 
         // TODO(matthias): do we have to handle this?
         debug_assert!(commit_phase_epoch == epoch);
-
-        // TODO(matthias): I don't think we need this check anymore
-        // Check that the current block number is within the commit phase range.
-        //if current_block < commit_phase_block_number {
-        //    return TransactionResponse::Revert(
-        //        ExecutionError::CommitteeSelectionBeaconNotInCommitPhase,
-        //    );
-        //}
 
         // Check that the node has not already committed.
         if self.committee_selection_beacon.get(&node_index).is_some() {
@@ -416,9 +405,6 @@ impl<B: Backend> StateExecutor<B> {
                     commit_phase_round + 1,
                 );
 
-                // Increment the committee selection beacon round.
-                //self.set_committee_selection_beacon_round(round + 1);
-
                 // Clear the beacon state.
                 self.clear_committee_selection_beacons();
 
@@ -509,9 +495,6 @@ impl<B: Backend> StateExecutor<B> {
                 // in commit or reveal phases, we are transitioning to epoch change
                 // execution and pre-epoch change waiting phase.
                 self.clear_committee_selection_beacon_phase();
-
-                // Remove the committee selection beacon round.
-                self.clear_committee_selection_beacon_round();
 
                 // Reset the committee selection beacon.
                 self.clear_committee_selection_beacons();
@@ -624,11 +607,6 @@ impl<B: Backend> StateExecutor<B> {
                 epoch, round,
             ))),
         );
-    }
-
-    fn clear_committee_selection_beacon_round(&self) {
-        self.metadata
-            .remove(&Metadata::CommitteeSelectionBeaconRound);
     }
 
     fn clear_committee_selection_beacon_phase(&self) {
