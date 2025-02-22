@@ -406,13 +406,13 @@ async fn wait_and_signal_epoch_change<Q: SyncQueryRunnerInterface>(
     txn_socket: &SignerSubmitTxSocket,
     shutdown_fut: &mut Pin<&mut Notified<'_>>,
     epoch: Epoch,
-    mut time_until_epoch_transition: Duration,
+    time_until_epoch_transition: Duration,
     check_phase_duration: Duration,
 ) -> Option<(Epoch, CommitteeSelectionBeaconRound)> {
+    let mut time_until_signal = time_until_epoch_transition;
+    let mut check_phase_interval = time::interval(check_phase_duration);
+    let mut now = std::time::Instant::now();
     loop {
-        let time_to_sleep = time::sleep(time_until_epoch_transition);
-        let mut check_phase_interval = time::interval(check_phase_duration);
-
         info!("Waiting to signal epoch change (epoch: {epoch})");
         tokio::select! {
             biased;
@@ -438,22 +438,24 @@ async fn wait_and_signal_epoch_change<Q: SyncQueryRunnerInterface>(
                     // Realistically, this will never happen.
                     return None;
                 }
-            }
-            _ = time_to_sleep => {
-                info!("Signalling ready to change epoch (epoch: {epoch})");
 
-                if let Err(e) = txn_socket
-                    .enqueue(ExecuteTransactionRequest {
-                        method: UpdateMethod::ChangeEpoch { epoch },
-                        options: None,
-                    })
-                    .await
-                {
-                    error!("Error sending change epoch signal to socket {}", e);
+                if now.elapsed() >= time_until_signal {
+                    info!("Signalling ready to change epoch (epoch: {epoch})");
+
+                    if let Err(e) = txn_socket
+                        .enqueue(ExecuteTransactionRequest {
+                            method: UpdateMethod::ChangeEpoch { epoch },
+                            options: None,
+                        })
+                        .await
+                    {
+                        error!("Error sending change epoch signal to socket {}", e);
+                    }
+
+                    now = std::time::Instant::now();
+                    time_until_signal = Duration::from_secs(60);
                 }
-
-                time_until_epoch_transition = Duration::from_secs(60);
-            },
+            }
         }
     }
 }
@@ -468,10 +470,9 @@ async fn wait_and_signal_commit_phase_timeout<Q: SyncQueryRunnerInterface>(
     check_phase_duration: Duration,
 ) -> Option<(Epoch, CommitteeSelectionBeaconRound)> {
     let mut time_until_signal = commit_phase_duration;
+    let mut check_phase_interval = time::interval(check_phase_duration);
+    let mut now = std::time::Instant::now();
     loop {
-        let time_to_sleep = time::sleep(time_until_signal);
-        let mut check_phase_interval = time::interval(check_phase_duration);
-
         info!("Waiting to signal commit phase timeout (epoch: {epoch})");
         tokio::select! {
             biased;
@@ -511,26 +512,28 @@ async fn wait_and_signal_commit_phase_timeout<Q: SyncQueryRunnerInterface>(
                     // Realistically, this will never happen.
                     return None;
                 }
-            }
-            _ = time_to_sleep => {
-                info!("Signalling commit phase timeout (epoch: {epoch})");
 
-                let method = UpdateMethod::CommitteeSelectionBeaconCommitPhaseTimeout {
-                    epoch,
-                    round,
-                };
-                if let Err(e) = txn_socket
-                    .enqueue(ExecuteTransactionRequest {
-                        method,
-                        options: None,
-                    })
-                    .await
-                {
-                    error!("Error sending commit phase timeout to socket {}", e);
+                if now.elapsed() >= time_until_signal {
+                    info!("Signalling commit phase timeout (epoch: {epoch})");
+
+                    let method = UpdateMethod::CommitteeSelectionBeaconCommitPhaseTimeout {
+                        epoch,
+                        round,
+                    };
+                    if let Err(e) = txn_socket
+                        .enqueue(ExecuteTransactionRequest {
+                            method,
+                            options: None,
+                        })
+                        .await
+                    {
+                        error!("Error sending commit phase timeout to socket {}", e);
+                    }
+
+                    now = std::time::Instant::now();
+                    time_until_signal = Duration::from_secs(60);
                 }
-
-                time_until_signal = Duration::from_secs(60);
-            },
+            }
         }
     }
 }
@@ -544,11 +547,10 @@ async fn wait_and_signal_reveal_phase_timeout<Q: SyncQueryRunnerInterface>(
     reveal_phase_duration: Duration,
     check_phase_duration: Duration,
 ) -> Option<(Epoch, CommitteeSelectionBeaconRound)> {
+    let mut check_phase_interval = time::interval(check_phase_duration);
     let mut time_until_signal = reveal_phase_duration;
+    let mut now = std::time::Instant::now();
     loop {
-        let time_to_sleep = time::sleep(time_until_signal);
-        let mut check_phase_interval = time::interval(check_phase_duration);
-
         info!("Waiting to signal reveal phase timeout (epoch: {epoch})");
         tokio::select! {
             biased;
@@ -577,26 +579,28 @@ async fn wait_and_signal_reveal_phase_timeout<Q: SyncQueryRunnerInterface>(
                     // The reveal phase concluded successfully and we changed epochs.
                     return None;
                 }
-            }
-            _ = time_to_sleep => {
-                info!("Signalling reveal phase timeout (epoch: {epoch})");
 
-                let method = UpdateMethod::CommitteeSelectionBeaconRevealPhaseTimeout {
-                    epoch,
-                    round,
-                };
-                if let Err(e) = txn_socket
-                    .enqueue(ExecuteTransactionRequest {
-                        method,
-                        options: None,
-                    })
-                    .await
-                {
-                    error!("Error sending reveal phase timeout to socket {}", e);
+                if now.elapsed() >= time_until_signal {
+                    info!("Signalling reveal phase timeout (epoch: {epoch})");
+
+                    let method = UpdateMethod::CommitteeSelectionBeaconRevealPhaseTimeout {
+                        epoch,
+                        round,
+                    };
+                    if let Err(e) = txn_socket
+                        .enqueue(ExecuteTransactionRequest {
+                            method,
+                            options: None,
+                        })
+                        .await
+                    {
+                        error!("Error sending reveal phase timeout to socket {}", e);
+                    }
+
+                    now = std::time::Instant::now();
+                    time_until_signal = Duration::from_secs(60);
                 }
-
-                time_until_signal = Duration::from_secs(60);
-            },
+            }
         }
     }
 }

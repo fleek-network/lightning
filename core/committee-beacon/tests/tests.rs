@@ -22,9 +22,7 @@ use lightning_test_utils::e2e::{
 };
 use lightning_utils::application::QueryRunnerExt;
 use lightning_utils::poll::{poll_until, PollUntilError};
-use tokio::time::Instant;
 use types::{
-    CommitteeSelectionBeaconCommit,
     CommitteeSelectionBeaconPhase,
     ExecuteTransactionError,
     ExecuteTransactionOptions,
@@ -49,8 +47,13 @@ async fn test_start_shutdown() {
 
 #[tokio::test]
 async fn test_epoch_change_single_node() {
+    let commit_phase_duration = 2000;
+    let reveal_phase_duration = 2000;
+
     let mut network = build_network(BuildNetworkOptions {
         committee_nodes: 1,
+        commit_phase_duration,
+        reveal_phase_duration,
         ..Default::default()
     })
     .await
@@ -62,19 +65,31 @@ async fn test_epoch_change_single_node() {
     // Send epoch change transaction from all nodes.
     let epoch = network.change_epoch().await.unwrap();
 
-    // Check that beacon phase is set.
-    // We don't check for commit phase specifically because we can't be sure it hasn't transitioned
-    // to the reveal phase before checking.
-    wait_for_committee_selection_beacon_phase(&network, |phase| phase.is_some())
-        .await
-        .unwrap();
+    // Check that we are in the commit phase.
+    wait_for_committee_selection_beacon_phase(&network, |phase| {
+        matches!(phase, Some(CommitteeSelectionBeaconPhase::Commit((0, 0))))
+    })
+    .await
+    .unwrap();
 
-    // Wait for reveal phase to complete and beacon phase to be unset.
-    wait_for_committee_selection_beacon_phase(&network, |phase| phase.is_none())
-        .await
-        .unwrap();
+    // Wait for the commit phase to end, then submit the commit timeout txn.
+    tokio::time::sleep(Duration::from_millis(commit_phase_duration)).await;
+    // Send commit phase timeout transaction from all nodes.
+    network.commit_phase_timeout(0).await.unwrap();
+
+    // Check that we are in the reveal phase.
+    wait_for_committee_selection_beacon_phase(&network, |phase| {
+        matches!(phase, Some(CommitteeSelectionBeaconPhase::Reveal((0, 0))))
+    })
+    .await
+    .unwrap();
+
+    // Wait for the reveal phase to end, then submit the reveal timeout txn.
+    tokio::time::sleep(Duration::from_millis(reveal_phase_duration)).await;
+    network.reveal_phase_timeout(0).await.unwrap();
 
     // Check that the epoch has been incremented.
+    network.wait_for_epoch_change(epoch).await.unwrap();
     let new_epoch = node.get_epoch();
     assert_eq!(new_epoch, epoch);
 
@@ -86,9 +101,33 @@ async fn test_epoch_change_single_node() {
         beacons
     );
 
-    // Change epoch and check that the local database beacons are eventually cleared.
-    network.wait_for_epoch_change(new_epoch).await.unwrap();
-    network.change_epoch().await.unwrap();
+    // Change epoch again and check that the local database beacons are eventually cleared.
+    network.wait_for_epoch_change(epoch).await.unwrap();
+    let epoch = network.change_epoch().await.unwrap();
+
+    // Check that we are in the commit phase.
+    wait_for_committee_selection_beacon_phase(&network, |phase| {
+        matches!(phase, Some(CommitteeSelectionBeaconPhase::Commit((1, 0))))
+    })
+    .await
+    .unwrap();
+
+    // Wait for the commit phase to end, then submit the commit timeout txn.
+    tokio::time::sleep(Duration::from_millis(commit_phase_duration)).await;
+    // Send commit phase timeout transaction from all nodes.
+    network.commit_phase_timeout(0).await.unwrap();
+    // Check that we are in the reveal phase.
+    wait_for_committee_selection_beacon_phase(&network, |phase| {
+        matches!(phase, Some(CommitteeSelectionBeaconPhase::Reveal((1, 0))))
+    })
+    .await
+    .unwrap();
+
+    // Wait for the reveal phase to end, then submit the reveal timeout txn.
+    tokio::time::sleep(Duration::from_millis(reveal_phase_duration)).await;
+    network.reveal_phase_timeout(0).await.unwrap();
+    network.wait_for_epoch_change(epoch).await.unwrap();
+
     poll_until(
         || async {
             node.committee_beacon()
@@ -110,30 +149,46 @@ async fn test_epoch_change_single_node() {
 
 #[tokio::test]
 async fn test_epoch_change_multiple_nodes() {
+    let commit_phase_duration = 2000;
+    let reveal_phase_duration = 2000;
+
     let mut network = build_network(BuildNetworkOptions {
         committee_nodes: 3,
+        commit_phase_duration,
+        reveal_phase_duration,
         ..Default::default()
     })
     .await
     .unwrap();
-    let node = network
-        .node(0)
-        .downcast::<TestFullNodeComponentsWithMockConsensus>();
 
     // Send epoch change transaction from all nodes.
     let epoch = network.change_epoch().await.unwrap();
 
-    // Check that beacon phase is set.
-    // We don't check for commit phase specifically because we can't be sure it hasn't transitioned
-    // to the reveal phase before checking.
-    wait_for_committee_selection_beacon_phase(&network, |phase| phase.is_some())
-        .await
-        .unwrap();
+    // Check that we are in the commit phase.
+    wait_for_committee_selection_beacon_phase(&network, |phase| {
+        matches!(phase, Some(CommitteeSelectionBeaconPhase::Commit((0, 0))))
+    })
+    .await
+    .unwrap();
 
-    // Wait for reveal phase to complete and beacon phase to be unset.
-    wait_for_committee_selection_beacon_phase(&network, |phase| phase.is_none())
-        .await
-        .unwrap();
+    // Wait for the commit phase to end, then submit the commit timeout txn.
+    tokio::time::sleep(Duration::from_millis(commit_phase_duration)).await;
+    // Send commit phase timeout transaction from all nodes.
+    network.commit_phase_timeout(0).await.unwrap();
+
+    // Check that we are in the reveal phase.
+    wait_for_committee_selection_beacon_phase(&network, |phase| {
+        matches!(phase, Some(CommitteeSelectionBeaconPhase::Reveal((0, 0))))
+    })
+    .await
+    .unwrap();
+
+    // Wait for the reveal phase to end, then submit the reveal timeout txn.
+    tokio::time::sleep(Duration::from_millis(reveal_phase_duration)).await;
+    network.reveal_phase_timeout(0).await.unwrap();
+
+    // Check that the epoch has been incremented.
+    network.wait_for_epoch_change(epoch).await.unwrap();
 
     // Check that the epoch has been incremented.
     for node in network.nodes() {
@@ -148,75 +203,21 @@ async fn test_epoch_change_multiple_nodes() {
             .is_empty());
     }
 
-    // Change epoch and check that the local database beacons are eventually cleared.
-    network.wait_for_epoch_change(epoch).await.unwrap();
-    network.change_epoch().await.unwrap();
-    poll_until(
-        || async {
-            node.committee_beacon()
-                .query()
-                .get_beacons()
-                .is_empty()
-                .then_some(())
-                .ok_or(PollUntilError::ConditionNotSatisfied)
-        },
-        Duration::from_secs(3),
-        Duration::from_millis(100),
-    )
-    .await
-    .unwrap();
-
-    // Shutdown the network.
-    network.shutdown().await;
-}
-
-#[tokio::test]
-async fn test_block_executed_in_waiting_phase_should_do_nothing() {
-    let mut network = TestNetwork::builder()
-        .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(2)
-        .await
-        .build()
-        .await
-        .unwrap();
-    let node = network
-        .node(0)
-        .downcast::<TestFullNodeComponentsWithMockConsensus>();
-    let query = node.app_query();
-
-    // Check beacon phase before submitting transaction.
-    let phase = query.get_committee_selection_beacon_phase();
-    assert!(phase.is_none());
-
-    // Submit a transaction that does nothing except increment the node's nonce.
-    network
-        .node(0)
-        .execute_transaction_from_node(UpdateMethod::IncrementNonce {}, None)
-        .await
-        .unwrap();
-
-    // Check that beacon phase has not changed.
-    let phase = query.get_committee_selection_beacon_phase();
-    assert!(phase.is_none());
-
-    // Check that there are no node beacons (commits and reveals) in app state.
-    let beacons = query.get_committee_selection_beacons();
-    assert!(beacons.is_empty());
-
-    // Check that there are no beacons in our local database.
-    let beacons = node.committee_beacon().query().get_beacons();
-    assert!(beacons.is_empty());
-
     // Shutdown the network.
     network.shutdown().await;
 }
 
 #[tokio::test]
 async fn test_insufficient_participation_in_commit_phase() {
+    let commit_phase_duration = 2000;
+    let reveal_phase_duration = 2000;
     let mut network = build_network(BuildNetworkOptions {
         committee_nodes: 1,
         committee_nodes_without_beacon: 2,
         consensus_buffer_interval: Duration::from_millis(100),
         committee_beacon_timer_tick_delay: Duration::from_millis(100),
+        commit_phase_duration,
+        reveal_phase_duration,
         ..Default::default()
     })
     .await
@@ -229,74 +230,24 @@ async fn test_insufficient_participation_in_commit_phase() {
     // Wait for the phase metadata to be set.
     // This should not be necessary but it seems that the data is not always immediately available
     // from the app state query runner after the block is executed.
-    wait_for_committee_selection_beacon_phase(&network, |phase| phase.is_some())
-        .await
-        .unwrap();
+    wait_for_committee_selection_beacon_phase(&network, |phase| {
+        matches!(phase, Some(CommitteeSelectionBeaconPhase::Commit((0, 0))))
+    })
+    .await
+    .unwrap();
 
-    // Check that we stay in the commit phase, and that the block range and round advances.
-    let start = Instant::now();
-    let mut round_per_node = HashMap::new();
-    let mut block_range_per_node = HashMap::new();
-    while start.elapsed() < Duration::from_secs(3) {
-        for node in network.nodes() {
-            let round = *round_per_node.entry(node.index()).or_insert(0);
-            let block_range = *block_range_per_node.entry(node.index()).or_insert((0, 0));
+    // Wait for the commit phase to end, then submit the commit timeout txn.
+    tokio::time::sleep(Duration::from_millis(commit_phase_duration)).await;
+    // Send commit phase timeout transaction from all nodes.
+    network.commit_phase_timeout(0).await.unwrap();
 
-            let current_phase = node
-                .app_query()
-                .get_committee_selection_beacon_phase()
-                .unwrap();
-            let current_round = node
-                .app_query()
-                .get_committee_selection_beacon_round()
-                .unwrap();
-
-            // Check that we're in a commit phase.
-            assert!(matches!(
-                current_phase,
-                CommitteeSelectionBeaconPhase::Commit(_)
-            ));
-
-            // Check that the block range advances.
-            match current_phase {
-                CommitteeSelectionBeaconPhase::Commit((start_block, end_block)) => {
-                    assert!(
-                        end_block - start_block
-                            == network
-                                .genesis
-                                .committee_selection_beacon_commit_phase_duration
-                    );
-                    if block_range != (start_block, end_block) {
-                        assert!(start_block > block_range.0 && end_block > block_range.1);
-                        block_range_per_node.insert(node.index(), (start_block, end_block));
-                    }
-                },
-                _ => unreachable!(),
-            }
-
-            // Check that the round advances.
-            if round == 0 {
-                round_per_node.insert(node.index(), current_round);
-            } else if current_round != round {
-                assert_eq!(current_round, round + 1);
-                round_per_node.insert(node.index(), current_round);
-            }
-        }
-        tokio::time::sleep(Duration::from_millis(100)).await;
-    }
-    for node in network.nodes() {
-        let round = *round_per_node.get(&node.index()).unwrap();
-        assert!(round > 1);
-
-        let block_range = *block_range_per_node.get(&node.index()).unwrap();
-        assert!(
-            block_range.1 > 0
-                && block_range.1
-                    > network
-                        .genesis
-                        .committee_selection_beacon_reveal_phase_duration
-        );
-    }
+    // Since only one out of 3 nodes submitted a commit, the commit phase should be restarted, with
+    // an incremented round.
+    wait_for_committee_selection_beacon_phase(&network, |phase| {
+        matches!(phase, Some(CommitteeSelectionBeaconPhase::Commit((0, 1))))
+    })
+    .await
+    .unwrap();
 
     // Check that the epoch has not changed.
     for node in network.nodes() {
@@ -309,14 +260,16 @@ async fn test_insufficient_participation_in_commit_phase() {
 
 #[tokio::test]
 async fn test_single_revealing_node_fully_slashed() {
+    let commit_phase_duration = 2000;
+    let reveal_phase_duration = 2000;
     let mut network = build_network(BuildNetworkOptions {
         real_consensus: true,
         committee_nodes: 4,
         committee_nodes_without_beacon: 1,
         // The node's initial stake is 1000, and it will be slashed 1000, leaving insufficient stake
         // for a node.
-        commit_phase_duration: 10,
-        reveal_phase_duration: 10,
+        commit_phase_duration,
+        reveal_phase_duration,
         ping_interval: Some(Duration::from_secs(1)),
         ..Default::default()
     })
@@ -342,9 +295,11 @@ async fn test_single_revealing_node_fully_slashed() {
     // Wait for the phase metadata to be set.
     // This should not be necessary but it seems that the data is not always immediately available
     // from the app state query runner after the block is executed.
-    wait_for_committee_selection_beacon_phase(&network, |phase| phase.is_some())
-        .await
-        .unwrap();
+    wait_for_committee_selection_beacon_phase(&network, |phase| {
+        matches!(phase, Some(CommitteeSelectionBeaconPhase::Commit((0, 0))))
+    })
+    .await
+    .unwrap();
 
     // Submit commit transaction from the node that will be non-revealing.
     // We do this manually because the node does not have a committee beacon component running,
@@ -360,23 +315,26 @@ async fn test_single_revealing_node_fully_slashed() {
         .await
         .unwrap();
 
-    // Get the current round.
-    let round = network
-        .node(0)
-        .app_query()
-        .get_committee_selection_beacon_round()
-        .unwrap();
+    // Wait for the commit phase to end, then submit the commit timeout txn.
+    tokio::time::sleep(Duration::from_millis(commit_phase_duration)).await;
+    // Since we use the real consensus, the commit phase timeout transaction will be send from the
+    // consensus.
 
     // Wait to transition to the reveal phase.
     wait_for_committee_selection_beacon_phase(&network, |phase| {
-        matches!(phase, Some(CommitteeSelectionBeaconPhase::Reveal(_)))
+        matches!(phase, Some(CommitteeSelectionBeaconPhase::Reveal((0, 0))))
     })
     .await
     .unwrap();
 
+    // Wait for the reveal phase to end, then submit the reveal timeout txn.
+    tokio::time::sleep(Duration::from_millis(reveal_phase_duration)).await;
+    // Since we use the real consensus, the reveal phase timeout transaction will be send from the
+    // consensus.
+
     // Check that we transition to a new commit phase after reveal phase timeout.
     wait_for_committee_selection_beacon_phase(&network, |phase| {
-        matches!(phase, Some(CommitteeSelectionBeaconPhase::Commit(_)))
+        matches!(phase, Some(CommitteeSelectionBeaconPhase::Commit((0, 1))))
     })
     .await
     .unwrap();
@@ -384,8 +342,8 @@ async fn test_single_revealing_node_fully_slashed() {
     for node in network.nodes() {
         // Check that we are in a new round.
         assert_eq!(
-            node.app_query().get_committee_selection_beacon_round(),
-            Some(round + 1)
+            node.app_query().get_committee_selection_beacon_phase(),
+            Some(CommitteeSelectionBeaconPhase::Commit((0, 1)))
         );
 
         // Check that the epoch has not changed.
@@ -531,6 +489,8 @@ async fn test_single_revealing_node_fully_slashed() {
 
 #[tokio::test]
 async fn test_non_revealing_node_partially_slashed_insufficient_stake() {
+    let commit_phase_duration = 2000;
+    let reveal_phase_duration = 2000;
     let mut network = build_network(BuildNetworkOptions {
         committee_nodes: 4,
         committee_nodes_without_beacon: 1,
@@ -538,8 +498,8 @@ async fn test_non_revealing_node_partially_slashed_insufficient_stake() {
         // for a node.
         min_stake: 1000,
         non_reveal_slash_amount: 500,
-        commit_phase_duration: 10,
-        reveal_phase_duration: 10,
+        commit_phase_duration,
+        reveal_phase_duration,
         real_consensus: true,
         ping_interval: Some(Duration::from_secs(1)),
         ..Default::default()
@@ -554,9 +514,11 @@ async fn test_non_revealing_node_partially_slashed_insufficient_stake() {
     // Wait for the phase metadata to be set.
     // This should not be necessary but it seems that the data is not always immediately available
     // from the app state query runner after the block is executed.
-    wait_for_committee_selection_beacon_phase(&network, |phase| phase.is_some())
-        .await
-        .unwrap();
+    wait_for_committee_selection_beacon_phase(&network, |phase| {
+        matches!(phase, Some(CommitteeSelectionBeaconPhase::Commit((0, 0))))
+    })
+    .await
+    .unwrap();
 
     // Submit commit transaction from the node that will be non-revealing.
     network
@@ -570,35 +532,29 @@ async fn test_non_revealing_node_partially_slashed_insufficient_stake() {
         .await
         .unwrap();
 
-    // Get the current round.
-    let round = network
-        .node(0)
-        .app_query()
-        .get_committee_selection_beacon_round()
-        .unwrap();
+    // Wait for the commit phase to end, then submit the commit timeout txn.
+    tokio::time::sleep(Duration::from_millis(commit_phase_duration)).await;
+    // Since we use the real consensus, the commit phase timeout transaction will be send from the
+    // consensus.
 
     // Wait to transition to the reveal phase.
     wait_for_committee_selection_beacon_phase(&network, |phase| {
-        matches!(phase, Some(CommitteeSelectionBeaconPhase::Reveal(_)))
+        matches!(phase, Some(CommitteeSelectionBeaconPhase::Reveal((0, 0))))
     })
     .await
     .unwrap();
 
-    // Check that we transition to a new commit phase after the reveal phase timeout.
+    // Wait for the reveal phase to end, then submit the reveal timeout txn.
+    tokio::time::sleep(Duration::from_millis(reveal_phase_duration)).await;
+    // Since we use the real consensus, the reveal phase timeout transaction will be send from the
+    // consensus.
+
+    // Check that we transition to a new commit phase after reveal phase timeout.
     wait_for_committee_selection_beacon_phase(&network, |phase| {
-        matches!(phase, Some(CommitteeSelectionBeaconPhase::Commit(_)))
+        matches!(phase, Some(CommitteeSelectionBeaconPhase::Commit((0, 1))))
     })
     .await
     .unwrap();
-
-    // Check that we are in a new round.
-    assert_eq!(
-        network
-            .node(0)
-            .app_query()
-            .get_committee_selection_beacon_round(),
-        Some(round + 1)
-    );
 
     // Check that the epoch has not changed.
     for node in network.nodes() {
@@ -736,6 +692,8 @@ async fn test_non_revealing_node_partially_slashed_insufficient_stake() {
 
 #[tokio::test]
 async fn test_non_revealing_node_partially_slashed_sufficient_stake() {
+    let commit_phase_duration = 2000;
+    let reveal_phase_duration = 2000;
     let mut network = build_network(BuildNetworkOptions {
         committee_nodes: 4,
         committee_nodes_without_beacon: 1,
@@ -743,8 +701,8 @@ async fn test_non_revealing_node_partially_slashed_sufficient_stake() {
         // for a node.
         min_stake: 500,
         non_reveal_slash_amount: 500,
-        commit_phase_duration: 10,
-        reveal_phase_duration: 10,
+        commit_phase_duration,
+        reveal_phase_duration,
         real_consensus: true,
         ping_interval: Some(Duration::from_secs(1)),
         ..Default::default()
@@ -759,9 +717,11 @@ async fn test_non_revealing_node_partially_slashed_sufficient_stake() {
     // Wait for the phase metadata to be set.
     // This should not be necessary but it seems that the data is not always immediately available
     // from the app state query runner after the block is executed.
-    wait_for_committee_selection_beacon_phase(&network, |phase| phase.is_some())
-        .await
-        .unwrap();
+    wait_for_committee_selection_beacon_phase(&network, |phase| {
+        matches!(phase, Some(CommitteeSelectionBeaconPhase::Commit((0, 0))))
+    })
+    .await
+    .unwrap();
 
     // Submit commit transaction from the node that will be non-revealing.
     network
@@ -775,23 +735,26 @@ async fn test_non_revealing_node_partially_slashed_sufficient_stake() {
         .await
         .unwrap();
 
-    // Get the current round.
-    let round = network
-        .node(0)
-        .app_query()
-        .get_committee_selection_beacon_round()
-        .unwrap();
+    // Wait for the commit phase to end, then submit the commit timeout txn.
+    tokio::time::sleep(Duration::from_millis(commit_phase_duration)).await;
+    // Since we use the real consensus, the commit phase timeout transaction will be send from the
+    // consensus.
 
     // Wait to transition to the reveal phase.
     wait_for_committee_selection_beacon_phase(&network, |phase| {
-        matches!(phase, Some(CommitteeSelectionBeaconPhase::Reveal(_)))
+        matches!(phase, Some(CommitteeSelectionBeaconPhase::Reveal((0, 0))))
     })
     .await
     .unwrap();
 
-    // Check that we transition to a new commit phase.
+    // Wait for the reveal phase to end, then submit the reveal timeout txn.
+    tokio::time::sleep(Duration::from_millis(reveal_phase_duration)).await;
+    // Since we use the real consensus, the reveal phase timeout transaction will be send from the
+    // consensus.
+
+    // Check that we transition to a new commit phase after reveal phase timeout.
     wait_for_committee_selection_beacon_phase(&network, |phase| {
-        matches!(phase, Some(CommitteeSelectionBeaconPhase::Commit(_)))
+        matches!(phase, Some(CommitteeSelectionBeaconPhase::Commit((0, 1))))
     })
     .await
     .unwrap();
@@ -802,15 +765,6 @@ async fn test_non_revealing_node_partially_slashed_sufficient_stake() {
         .nodes()
         .map(|n| (n.index(), n.reputation_query().get_measurements()))
         .collect::<HashMap<_, _>>();
-
-    // Check that we are in a new round.
-    assert_eq!(
-        network
-            .node(0)
-            .app_query()
-            .get_committee_selection_beacon_round(),
-        Some(round + 1)
-    );
 
     // Check that the epoch has not changed.
     for node in network.nodes() {
@@ -919,9 +873,13 @@ async fn test_non_revealing_node_partially_slashed_sufficient_stake() {
 
 #[tokio::test]
 async fn test_node_attempts_reveal_without_committment() {
+    let commit_phase_duration = 2000;
+    let reveal_phase_duration = 2000;
     let mut network = build_network(BuildNetworkOptions {
-        committee_nodes: 2,
-        committee_nodes_without_beacon: 2,
+        committee_nodes: 3,
+        committee_nodes_without_beacon: 1,
+        commit_phase_duration,
+        reveal_phase_duration,
         ..Default::default()
     })
     .await
@@ -931,25 +889,23 @@ async fn test_node_attempts_reveal_without_committment() {
     let epoch = network.node(0).app_query().get_current_epoch();
     network.change_epoch().await.unwrap();
 
-    // Execute commit transaction from one of the nodes without a beacon component running.
-    network
-        .node(2)
-        .execute_transaction_from_node(
-            UpdateMethod::CommitteeSelectionBeaconCommit {
-                commit: CommitteeSelectionBeaconCommit::build(epoch, 0, [2; 32]),
-            },
-            Some(ExecuteTransactionOptions {
-                retry: ExecuteTransactionRetry::Never,
-                wait: types::ExecuteTransactionWait::Receipt,
-                ..Default::default()
-            }),
-        )
-        .await
-        .unwrap();
+    wait_for_committee_selection_beacon_phase(&network, |phase| {
+        matches!(phase, Some(CommitteeSelectionBeaconPhase::Commit((0, 0))))
+    })
+    .await
+    .unwrap();
+
+    // Node 2 does not have the committee-beacon component running, so it won't
+    // send a commit during the commit phase.
+
+    // Wait for the commit phase to end, then submit the commit timeout txn.
+    tokio::time::sleep(Duration::from_millis(commit_phase_duration)).await;
+    // Send commit phase timeout transaction from all nodes.
+    network.commit_phase_timeout(0).await.unwrap();
 
     // Wait to transition to the reveal phase.
     wait_for_committee_selection_beacon_phase(&network, |phase| {
-        matches!(phase, Some(CommitteeSelectionBeaconPhase::Reveal(_)))
+        matches!(phase, Some(CommitteeSelectionBeaconPhase::Reveal((0, 0))))
     })
     .await
     .unwrap();
@@ -982,19 +938,9 @@ async fn test_node_attempts_reveal_without_committment() {
         )))
     ));
 
-    // Execute reveal transaction from the node that did commit so that the epoch change advances.
-    network
-        .node(2)
-        .execute_transaction_from_node(
-            UpdateMethod::CommitteeSelectionBeaconReveal { reveal: [2; 32] },
-            Some(ExecuteTransactionOptions {
-                retry: ExecuteTransactionRetry::Never,
-                wait: types::ExecuteTransactionWait::Receipt,
-                ..Default::default()
-            }),
-        )
-        .await
-        .unwrap();
+    // Wait for the reveal phase to end, then submit the reveal timeout txn.
+    tokio::time::sleep(Duration::from_millis(reveal_phase_duration)).await;
+    network.reveal_phase_timeout(0).await.unwrap();
 
     // Wait for reveal phase to complete and beacon phase to be unset.
     wait_for_committee_selection_beacon_phase(&network, |phase| phase.is_none())
