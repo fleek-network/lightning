@@ -105,7 +105,6 @@ pub enum Metadata {
     SubDagIndex,
     SubDagRound,
     CommitteeSelectionBeaconPhase,
-    CommitteeSelectionBeaconRound,
     EpochEra,
     WithdrawId,
 }
@@ -126,7 +125,6 @@ pub enum Value {
     SubDagRound(u64),
     BlockRange(u64, u64),
     CommitteeSelectionBeaconPhase(CommitteeSelectionBeaconPhase),
-    CommitteeSelectionBeaconRound(CommitteeSelectionBeaconRound),
     EpochEra(u64),
     WithdrawId(u64),
 }
