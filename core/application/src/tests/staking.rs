@@ -10,7 +10,7 @@ use fleek_crypto::{
     SecretKey,
 };
 use hp_fixed::unsigned::HpUfixed;
-use lightning_committee_beacon::{CommitteeBeaconConfig, CommitteeBeaconTimerConfig};
+use lightning_committee_beacon::CommitteeBeaconConfig;
 use lightning_interfaces::types::{
     CommitteeSelectionBeaconCommit,
     ExecutionData,
@@ -771,12 +771,7 @@ async fn test_withdraw_unstaked_reverts_no_locked_tokens() {
 #[tokio::test]
 async fn test_withdraw_unstaked_works_properly() {
     let mut network = TestNetwork::builder()
-        .with_committee_beacon_config(CommitteeBeaconConfig {
-            timer: CommitteeBeaconTimerConfig {
-                tick_delay: Duration::from_millis(100),
-            },
-            ..Default::default()
-        })
+        .with_committee_beacon_config(CommitteeBeaconConfig::default())
         .with_mock_consensus(MockConsensusConfig {
             max_ordering_time: 0,
             min_ordering_time: 0,
