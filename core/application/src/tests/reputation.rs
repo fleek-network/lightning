@@ -262,7 +262,7 @@ async fn test_submit_reputation_measurements_too_many_measurements() {
     let temp_dir = tempdir().unwrap();
 
     let committee_size = 4;
-    let (committee, _keystore) = create_genesis_committee(committee_size);
+    let (committee, keystore) = create_genesis_committee(committee_size);
     let (update_socket, query_runner) = test_init_app(&temp_dir, committee);
     let mut rng = random::get_seedable_rng();
 
@@ -280,14 +280,6 @@ async fn test_submit_reputation_measurements_too_many_measurements() {
     )
     .await;
 
-    // Execute opt-in transaction.
-    expect_tx_success(
-        prepare_update_request_node(UpdateMethod::OptIn {}, &node_secret_key, 1),
-        &update_socket,
-        ExecutionData::None,
-    )
-    .await;
-
     let mut measurements = BTreeMap::new();
 
     // create many dummy measurements that len >
@@ -296,8 +288,8 @@ async fn test_submit_reputation_measurements_too_many_measurements() {
     }
     let update = prepare_update_request_node(
         UpdateMethod::SubmitReputationMeasurements { measurements },
-        &node_secret_key,
-        2,
+        &keystore[0].node_secret_key,
+        1,
     );
 
     expect_tx_revert(update, &update_socket, ExecutionError::TooManyMeasurements).await;
