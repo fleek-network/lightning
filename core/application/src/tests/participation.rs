@@ -14,6 +14,8 @@ use super::utils::*;
 
 #[tokio::test]
 async fn test_uptime_participation() {
+    let commit_phase_duration = 2000;
+    let reveal_phase_duration = 2000;
     let mut network = TestNetwork::builder()
         .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(4)
         .await
@@ -105,7 +107,10 @@ async fn test_uptime_participation() {
         .unwrap();
 
     // Change epoch and wait for it to be complete.
-    network.change_epoch_and_wait_for_complete().await.unwrap();
+    network
+        .change_epoch_and_wait_for_complete(0, commit_phase_duration, reveal_phase_duration)
+        .await
+        .unwrap();
 
     // Check participation.
     assert_eq!(

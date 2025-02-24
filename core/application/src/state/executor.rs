@@ -1746,7 +1746,7 @@ impl<B: Backend> StateExecutor<B> {
         self.node_info.get(node_index).is_some_and(|info| {
             matches!(
                 info.participation,
-                Participation::OptedIn | Participation::True
+                Participation::OptedOut | Participation::True
             )
         })
     }

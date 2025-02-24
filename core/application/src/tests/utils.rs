@@ -21,7 +21,6 @@ use hp_fixed::unsigned::HpUfixed;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
     ChainId,
-    CommitteeSelectionBeaconRound,
     CommodityTypes,
     Genesis,
     GenesisNode,

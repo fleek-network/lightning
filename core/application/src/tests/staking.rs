@@ -770,6 +770,8 @@ async fn test_withdraw_unstaked_reverts_no_locked_tokens() {
 
 #[tokio::test]
 async fn test_withdraw_unstaked_works_properly() {
+    let commit_phase_duration = 2000;
+    let reveal_phase_duration = 2000;
     let mut network = TestNetwork::builder()
         .with_committee_beacon_config(CommitteeBeaconConfig::default())
         .with_mock_consensus(MockConsensusConfig {
@@ -808,7 +810,10 @@ async fn test_withdraw_unstaked_works_properly() {
     // Iterate through 5 epochs to to unlock `lock_time`.
     for _ in 0..5 {
         // Trigger epoch change and wait for it to be complete.
-        network.change_epoch_and_wait_for_complete().await.unwrap();
+        network
+            .change_epoch_and_wait_for_complete(0, commit_phase_duration, reveal_phase_duration)
+            .await
+            .unwrap();
     }
 
     // Get node owner flk balance.
