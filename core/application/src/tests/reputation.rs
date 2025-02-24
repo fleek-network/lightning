@@ -96,6 +96,8 @@ async fn test_submit_rep_measurements_too_many_times() {
 
 #[tokio::test]
 async fn test_rep_scores() {
+    let commit_phase_duration = 2000;
+    let reveal_phase_duration = 2000;
     let mut network = TestNetwork::builder()
         .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(4)
         .await
@@ -149,7 +151,10 @@ async fn test_rep_scores() {
     .unwrap();
 
     // Change epoch and wait for it to be complete.
-    network.change_epoch_and_wait_for_complete().await.unwrap();
+    network
+        .change_epoch_and_wait_for_complete(0, commit_phase_duration, reveal_phase_duration)
+        .await
+        .unwrap();
 
     // Check the reputation scores.
     assert!(node
