@@ -911,6 +911,26 @@ async fn test_unstake_as_non_committee_node_opts_out_node_and_removes_after_epoc
         .await
         .unwrap();
     assert_eq!(resp.block_number, 3);
+
+    // Execute commit phase timeout transaction.
+    let resp = network
+        .execute(
+            network
+                .nodes
+                .iter()
+                .take(3)
+                .map(|n| {
+                    n.build_transaction(UpdateMethod::CommitteeSelectionBeaconCommitPhaseTimeout {
+                        epoch,
+                        round: 0,
+                    })
+                })
+                .collect(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.block_number, 4);
+
     let resp = network
         .execute(
             network
@@ -926,7 +946,26 @@ async fn test_unstake_as_non_committee_node_opts_out_node_and_removes_after_epoc
         )
         .await
         .unwrap();
-    assert_eq!(resp.block_number, 4);
+    assert_eq!(resp.block_number, 5);
+
+    // Execute commit phase timeout transaction.
+    let resp = network
+        .execute(
+            network
+                .nodes
+                .iter()
+                .take(3)
+                .map(|n| {
+                    n.build_transaction(UpdateMethod::CommitteeSelectionBeaconRevealPhaseTimeout {
+                        epoch,
+                        round: 0,
+                    })
+                })
+                .collect(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.block_number, 6);
 
     // Check that the epoch has changed.
     assert_eq!(query.get_current_epoch(), epoch + 1);
@@ -1000,6 +1039,26 @@ async fn test_unstake_as_committee_node_opts_out_node_and_removes_after_epoch_ch
         .await
         .unwrap();
     assert_eq!(resp.block_number, 3);
+
+    // Execute commit phase timeout transaction.
+    let resp = network
+        .execute(
+            network
+                .nodes
+                .iter()
+                .take(4)
+                .map(|n| {
+                    n.build_transaction(UpdateMethod::CommitteeSelectionBeaconCommitPhaseTimeout {
+                        epoch,
+                        round: 0,
+                    })
+                })
+                .collect(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.block_number, 4);
+
     let resp = network
         .execute(
             network
@@ -1015,7 +1074,26 @@ async fn test_unstake_as_committee_node_opts_out_node_and_removes_after_epoch_ch
         )
         .await
         .unwrap();
-    assert_eq!(resp.block_number, 4);
+    assert_eq!(resp.block_number, 5);
+
+    // Execute commit phase timeout transaction.
+    let resp = network
+        .execute(
+            network
+                .nodes
+                .iter()
+                .take(4)
+                .map(|n| {
+                    n.build_transaction(UpdateMethod::CommitteeSelectionBeaconRevealPhaseTimeout {
+                        epoch,
+                        round: 0,
+                    })
+                })
+                .collect(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.block_number, 6);
 
     // Check that the epoch has changed.
     assert_eq!(query.get_current_epoch(), epoch + 1);
