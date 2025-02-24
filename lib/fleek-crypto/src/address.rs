@@ -42,8 +42,10 @@ impl Serialize for EthAddress {
 
 impl EthAddress {
     pub fn verify(&self, signature: &AccountOwnerSignature, digest: &[u8]) -> bool {
-        let signature: Secp256k1RecoverableSignature =
-            signature.try_into().expect("invalid signature");
+        let signature: Result<Secp256k1RecoverableSignature, _> = signature.try_into();
+        let Ok(signature) = signature else {
+            return false;
+        };
         match signature.recover_with_hash::<Keccak256>(digest) {
             Ok(public_key) => {
                 if public_key
