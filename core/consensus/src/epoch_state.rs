@@ -285,7 +285,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
 
             if let Some((_commit_phase_epoch, round)) = res {
                 // We are in the commit phase now
-                info!("Waiting to signal commit phase timeout (epoch: {epoch}, round: {round})");
+
                 // TODO(matthias): what should we do if the commit_phase_epoch doesn't match the
                 // current epoch?
                 // This can only happen if the node is out of sync and on the wrong
@@ -412,8 +412,8 @@ async fn wait_and_signal_epoch_change<Q: SyncQueryRunnerInterface>(
     let mut time_until_signal = time_until_epoch_transition;
     let mut check_phase_interval = time::interval(check_phase_duration);
     let mut now = std::time::Instant::now();
+    info!("Waiting to signal epoch change (epoch: {epoch})");
     loop {
-        info!("Waiting to signal epoch change (epoch: {epoch})");
         tokio::select! {
             biased;
             _ = &mut *shutdown_fut => {
@@ -472,8 +472,8 @@ async fn wait_and_signal_commit_phase_timeout<Q: SyncQueryRunnerInterface>(
     let mut time_until_signal = commit_phase_duration;
     let mut check_phase_interval = time::interval(check_phase_duration);
     let mut now = std::time::Instant::now();
+    info!("Waiting to signal commit phase timeout (epoch: {epoch})");
     loop {
-        info!("Waiting to signal commit phase timeout (epoch: {epoch})");
         tokio::select! {
             biased;
             _ = &mut *shutdown_fut => {
@@ -550,8 +550,8 @@ async fn wait_and_signal_reveal_phase_timeout<Q: SyncQueryRunnerInterface>(
     let mut check_phase_interval = time::interval(check_phase_duration);
     let mut time_until_signal = reveal_phase_duration;
     let mut now = std::time::Instant::now();
+    info!("Waiting to signal reveal phase timeout (epoch: {epoch})");
     loop {
-        info!("Waiting to signal reveal phase timeout (epoch: {epoch})");
         tokio::select! {
             biased;
             _ = &mut *shutdown_fut => {
