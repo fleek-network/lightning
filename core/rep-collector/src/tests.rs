@@ -262,6 +262,8 @@ async fn test_submit_measurements() {
 
 #[tokio::test]
 async fn test_reputation_calculation_and_query() {
+    let commit_phase_duration = 2000;
+    let reveal_phase_duration = 2000;
     let mut network = TestNetwork::builder()
         .with_committee_nodes::<TestFullNodeComponentsWithMockConsensus>(4)
         .await
@@ -337,7 +339,10 @@ async fn test_reputation_calculation_and_query() {
     .unwrap();
 
     // Change epoch and wait for it to be complete.
-    network.change_epoch_and_wait_for_complete().await.unwrap();
+    network
+        .change_epoch_and_wait_for_complete(0, commit_phase_duration, reveal_phase_duration)
+        .await
+        .unwrap();
 
     // Check that the reputation scores have been calculated correctly, and that node1 has a higher
     // reputation score than node2, because reported measurements were better.
