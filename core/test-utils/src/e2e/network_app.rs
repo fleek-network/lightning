@@ -21,9 +21,23 @@ impl TestNetwork {
     /// Execute epoch change transaction from all nodes and wait for epoch to be incremented.
     ///
     /// Returns an error if the epoch does not change within a timeout.
-    pub async fn change_epoch_and_wait_for_complete(&self) -> Result<Epoch> {
-        // Execute epoch change transaction from all nodes.
-        let new_epoch = self.change_epoch().await?;
+    pub async fn change_epoch_and_wait_for_complete(
+        &self,
+        round: CommitteeSelectionBeaconRound,
+        commit_phase_duration: u64,
+        reveal_phase_duration: u64,
+    ) -> Result<Epoch> {
+        let new_epoch = self.change_epoch().await.unwrap();
+
+        // Wait for the commit phase to end.
+        tokio::time::sleep(Duration::from_millis(commit_phase_duration)).await;
+        // Send the commit phase timeout transaction from 2/3+1 committee nodes.
+        self.commit_phase_timeout(round).await.unwrap();
+
+        // Wait for the reveal phase to end.
+        tokio::time::sleep(Duration::from_millis(reveal_phase_duration)).await;
+        // Send the reveal phase timeout transaction from 2/3+1 committee nodes.
+        self.reveal_phase_timeout(round).await.unwrap();
 
         // Wait for epoch to be incremented across all nodes.
         self.wait_for_epoch_change(new_epoch).await?;

@@ -389,7 +389,6 @@ async fn test_change_epoch_with_only_locked_stake() {
         query.get_committee_selection_beacon_phase(),
         Some(CommitteeSelectionBeaconPhase::Commit((0, 0)))
     );
-    //assert_eq!(query.get_committee_selection_beacon_round(), Some(0));
 }
 
 #[tokio::test]
