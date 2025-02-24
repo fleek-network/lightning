@@ -30,7 +30,7 @@ impl Default for HandshakeConfig {
                 TransportConfig::Tcp(Default::default()),
                 TransportConfig::Http(Default::default()),
             ],
-            http_address: ([0, 0, 0, 0], 4220).into(),
+            http_address: ([0, 0, 0, 0], 80).into(),
             https: None,
             timeout: Duration::from_secs(1),
         }
