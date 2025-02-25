@@ -310,6 +310,8 @@ pub struct SwarmBuilder {
     node_count_param: Option<u64>,
     epoch_start: Option<u64>,
     epoch_time: Option<u64>,
+    commit_phase_time: Option<u64>,
+    reveal_phase_time: Option<u64>,
     port_assigner: Option<PortAssigner>,
     syncronizer_delta: Option<Duration>,
     archiver: bool,
@@ -347,6 +349,16 @@ impl SwarmBuilder {
 
     pub fn with_epoch_time(mut self, epoch_time: u64) -> Self {
         self.epoch_time = Some(epoch_time);
+        self
+    }
+
+    pub fn with_commit_phase_time(mut self, commit_phase_time: u64) -> Self {
+        self.commit_phase_time = Some(commit_phase_time);
+        self
+    }
+
+    pub fn with_reveal_phase_time(mut self, reveal_phase_time: u64) -> Self {
+        self.reveal_phase_time = Some(reveal_phase_time);
         self
     }
 
@@ -449,8 +461,12 @@ impl SwarmBuilder {
             topology_target_k: 8,
             topology_min_nodes: 16,
 
-            committee_selection_beacon_commit_phase_duration: 10,
-            committee_selection_beacon_reveal_phase_duration: 10,
+            committee_selection_beacon_commit_phase_duration: self
+                .commit_phase_time
+                .unwrap_or(15000),
+            committee_selection_beacon_reveal_phase_duration: self
+                .reveal_phase_time
+                .unwrap_or(15000),
 
             committee_selection_beacon_non_reveal_slash_amount: 1000,
 

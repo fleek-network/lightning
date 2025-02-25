@@ -35,6 +35,14 @@ struct Cli {
     #[arg(short, long, default_value_t = 60000)]
     epoch_time: u64,
 
+    /// Committee beacon commit phase duration in millis
+    #[arg(short, long, default_value_t = 15000)]
+    commit_phase_time: u64,
+
+    /// Committee beacon reveal phase duration in millis
+    #[arg(short, long, default_value_t = 15000)]
+    reveal_phase_time: u64,
+
     /// Use persistence for the application state
     #[arg(short, long, default_value_t = false)]
     persistence: bool,
@@ -80,6 +88,8 @@ fn main() -> Result<()> {
             .with_num_nodes(args.num_nodes)
             .with_committee_size(args.committee_size as u64)
             .with_epoch_time(args.epoch_time)
+            .with_commit_phase_time(args.commit_phase_time)
+            .with_reveal_phase_time(args.reveal_phase_time)
             .with_epoch_start(epoch_start)
             .with_archiver()
             .persistence(args.persistence)

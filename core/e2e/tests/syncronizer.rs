@@ -21,6 +21,8 @@ async fn e2e_syncronize_state() {
         // another epoch change starts quickly after that, causing our expectation of epoch = 1
         // below to fail.
         .with_epoch_time(10000)
+        .with_commit_phase_time(3000)
+        .with_reveal_phase_time(3000)
         .with_epoch_start(
             SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
