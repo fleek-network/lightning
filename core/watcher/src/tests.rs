@@ -274,7 +274,10 @@ async fn test_watcher() -> anyhow::Result<()> {
     tokio::time::sleep(Duration::from_millis(epoch_time)).await;
 
     // When: We switch to the new epoch.
-    network.change_epoch_and_wait_for_complete().await.unwrap();
+    network
+        .change_epoch_and_wait_for_complete(0, 2000, 2000)
+        .await
+        .unwrap();
 
     // Then: each job should have raised the count by 1.
     // We try a few time in case the thread of execution is too fast.

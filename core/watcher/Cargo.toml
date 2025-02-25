@@ -24,20 +24,20 @@ tokio-util.workspace = true
 tempdir = "0.3.7"
 fn-sdk = { path = "../../lib/sdk" }
 lightning-application= { path = "../application" }
+lightning-blockstore.workspace = true
+lightning-checkpointer.workspace = true
+lightning-committee-beacon.workspace = true
 lightning-keystore.workspace = true
-lightning-test-utils = { path = "../test-utils" }
+lightning-test-utils.workspace = true
 lightning-node.workspace = true
 lightning-notifier.workspace = true
-lightning-pool = { path = "../pool" }
+lightning-pinger.workspace = true
+lightning-pool.workspace = true
+lightning-rep-collector.workspace = true
+lightning-rpc.workspace = true
 lightning-signer.workspace = true
-lightning-topology = { path = "../topology" }
+lightning-topology.workspace = true
 lightning-task-broker = { path = "../task-broker" }
 
-lightning-committee-beacon.workspace = true
-lightning-pinger.workspace = true
-lightning-rpc.workspace = true
-lightning-checkpointer.workspace = true
-lightning-blockstore.workspace = true
-lightning-rep-collector.workspace = true
 
 
