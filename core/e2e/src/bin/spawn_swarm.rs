@@ -36,11 +36,11 @@ struct Cli {
     epoch_time: u64,
 
     /// Committee beacon commit phase duration in millis
-    #[arg(short, long, default_value_t = 15000)]
+    #[arg(long, default_value_t = 15000)]
     commit_phase_time: u64,
 
     /// Committee beacon reveal phase duration in millis
-    #[arg(short, long, default_value_t = 15000)]
+    #[arg(long, default_value_t = 15000)]
     reveal_phase_time: u64,
 
     /// Use persistence for the application state
