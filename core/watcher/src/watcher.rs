@@ -43,8 +43,7 @@ impl<C: NodeComponents> Watcher<C> {
         keystore: &C::KeystoreInterface,
         fdi::Cloned(app_query): fdi::Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
     ) -> Result<Self> {
-        let duration = app_query.get_time_interval().unwrap_or(1);
-        let interval = tokio::time::interval(Duration::from_millis(duration));
+        let interval = tokio::time::interval(Duration::from_millis(100));
         let pk = keystore.get_ed25519_pk();
 
         Ok(Self {
