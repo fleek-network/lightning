@@ -22,6 +22,8 @@ async fn e2e_detect_offline_node() {
         // submitted, before the epoch change. Otherwise, the offline will still be marked as
         // participating = true and our expectation below will fail.
         .with_epoch_time(20000)
+        .with_commit_phase_time(5000)
+        .with_reveal_phase_time(5000)
         .with_ping_interval(Duration::from_secs(1))
         .with_ping_timeout(Duration::from_secs(1))
         .with_epoch_start(

@@ -25,6 +25,8 @@ async fn e2e_epoch_change_all_nodes_on_committee() {
         // another epoch change starts quickly after that, causing our expectation of epoch = 1
         // below to fail.
         .with_epoch_time(15000)
+        .with_commit_phase_time(3000)
+        .with_reveal_phase_time(3000)
         .with_epoch_start(
             SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
@@ -74,6 +76,8 @@ async fn e2e_epoch_change_with_some_nodes_not_on_committee() {
         // another epoch change starts quickly after that, causing our expectation of epoch = 1
         // below to fail.
         .with_epoch_time(15000)
+        .with_commit_phase_time(3000)
+        .with_reveal_phase_time(3000)
         .with_epoch_start(
             SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
@@ -163,6 +167,8 @@ async fn e2e_test_staking_auction() {
         // enough pings to be successful on each, or else that node may be the one that is not on
         // the next committee and cause our expectation below to fail.
         .with_epoch_time(15000)
+        .with_commit_phase_time(3000)
+        .with_reveal_phase_time(3000)
         .with_epoch_start(
             SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
