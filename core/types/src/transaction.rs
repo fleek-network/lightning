@@ -501,6 +501,9 @@ pub enum UpdateMethod {
     UpdateContentRegistry { updates: Vec<ContentUpdate> },
     /// Increment the node nonce.
     IncrementNonce {},
+    // Todo: In the future we should use a different type
+    // instead of `Job` that doesn't expose fields
+    // used for internal purposes, such as `assignee`.
     /// Add new jobs to the jobs table and assign them to nodes.
     AddJobs { jobs: Vec<Job> },
     /// Remove these jobs from the jobs table and unassigned them.

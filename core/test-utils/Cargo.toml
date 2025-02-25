@@ -42,6 +42,7 @@ lightning-signer.workspace = truee
 lightning-syncronizer.workspace = true
 lightning-topology.workspace = true
 lightning-utils.workspace = true
+lightning-watcher.workspace = true
 lightning-workspace-hack.workspace = true
 merklize.workspace = true
 minilsof = "0.1.0"

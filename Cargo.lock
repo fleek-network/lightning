@@ -8978,6 +8978,7 @@ dependencies = [
  "lightning-syncronizer",
  "lightning-topology",
  "lightning-utils",
+ "lightning-watcher",
  "lightning-workspace-hack",
  "merklize",
  "minilsof",
@@ -9135,16 +9136,37 @@ dependencies = [
 
 [[package]]
 name = "lightning-watcher"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "anyhow",
+ "axum 0.7.4",
+ "bytes",
  "fleek-crypto",
+ "fn-sdk",
  "futures",
+ "lightning-application",
+ "lightning-blockstore",
+ "lightning-checkpointer",
+ "lightning-committee-beacon",
  "lightning-interfaces",
+ "lightning-keystore",
+ "lightning-node",
+ "lightning-notifier",
+ "lightning-pinger",
+ "lightning-pool",
+ "lightning-rep-collector",
+ "lightning-rpc",
+ "lightning-signer",
+ "lightning-task-broker",
+ "lightning-test-utils",
+ "lightning-topology",
  "lightning-types",
  "lightning-utils",
  "lightning-workspace-hack",
+ "reqwest",
+ "tempdir",
  "tokio",
+ "tokio-util 0.7.11",
  "tracing",
 ]
 

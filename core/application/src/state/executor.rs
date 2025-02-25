@@ -2018,12 +2018,12 @@ impl<B: Backend> StateExecutor<B> {
             let node_i = i
                 .checked_div(chunk)
                 .expect("chunk is zero only if there are no jobs to iterate on");
-            let node = nodes
+            let index = nodes
                 .get(node_i)
                 .expect("we divided the work between all existing nodes");
 
             assigned_jobs
-                .entry(*node)
+                .entry(*index)
                 .or_insert_with(Vec::new)
                 .push(sched_jobs);
         }
