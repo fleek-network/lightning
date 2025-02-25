@@ -30,4 +30,5 @@ define_node_components!([
     PoolInterface,
     PingerInterface,
     IndexerInterface,
+    WatcherInterface,
 ]);

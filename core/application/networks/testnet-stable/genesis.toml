@@ -21,6 +21,7 @@ governance_address = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
 reputation_ping_timeout = "15s"
 topology_target_k = 8
 topology_min_nodes = 16
+total_intervals = 1
 
 # The time in millis that nodes have to commit their committee selection beacon.
 # There is no penalty for not participating in the commit phase. The phase will be retried until
