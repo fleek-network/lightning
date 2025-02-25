@@ -444,7 +444,7 @@ impl SwarmBuilder {
             epoch_start: self.epoch_start.unwrap_or(1684276288383),
             epoch_time: self.epoch_time.unwrap_or(120000),
             committee_size: self.committee_size.unwrap_or(4),
-            node_count: self.node_count_param.unwrap_or(4),
+            node_count: self.node_count_param.unwrap_or(num_nodes as u64),
 
             min_stake: 1000,
             eligibility_time: 1,
