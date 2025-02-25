@@ -274,14 +274,22 @@ impl StorageBackend for RocksBackend {
 
 #[cfg(test)]
 mod tests {
+    use std::fs::File;
+    use std::io::Read;
+    use std::path::{Path, PathBuf};
     use std::sync::Arc;
 
     use atomo::{DefaultSerdeBackend, SerdeBackend};
-    use rocksdb::Options;
+    use rocksdb::{IteratorMode, Options};
     use tempfile::tempdir;
 
     use crate::serialization::deserialize_db;
-    use crate::{AtomoBuilderWithRocks, RocksBackend, RocksBackendBuilder};
+    use crate::{
+        build_db_from_checkpoint,
+        AtomoBuilderWithRocks,
+        RocksBackend,
+        RocksBackendBuilder,
+    };
 
     #[test]
     fn test_serialize() {
@@ -438,5 +446,118 @@ mod tests {
         barrier_2.wait();
         // Wait for the query thread to finish executing.
         let _ = handle.join();
+    }
+
+    #[test]
+    fn test_build_db_from_checkpoint_debug() {
+        let path0 = std::env::temp_dir().join("lightning_test_rocksdb_0");
+        if path0.exists() {
+            std::fs::remove_dir_all(&path0).expect("failed to remove old rocksdb for test");
+        }
+        let path3 = std::env::temp_dir().join("lightning_test_rocksdb_3");
+        if path3.exists() {
+            std::fs::remove_dir_all(&path3).expect("failed to remove old rocksdb for test");
+        }
+
+        let (hash0, checkpoint0) = read_ckpt("/home/matthias/Desktop/checkpoints/stable_limburg/");
+        let (hash3, checkpoint3) = read_ckpt("/home/matthias/Desktop/checkpoints/stable_vinthill/");
+        let tables = vec![
+            "metadata",
+            "account",
+            "client_keys",
+            "node",
+            "consensus_key_to_index",
+            "pub_key_to_index",
+            "latencies",
+            "committee",
+            "service",
+            "parameter",
+            "rep_measurements",
+            "rep_scores",
+            "submitted_rep_measurements",
+            "current_epoch_served",
+            "last_epoch_served",
+            "total_served",
+            "commodity_prices",
+            "service_revenue",
+            "executed_digests",
+            "uptime",
+            "uri_to_node",
+            "node_to_uri",
+            "committee_selection_beacon",
+            "committee_selection_beacon_non_revealing_node",
+            "withdraws",
+            "mints",
+        ];
+
+        // Build a new database from the checkpoint
+        let mut options = Options::default();
+        options.create_if_missing(true);
+        options.create_missing_column_families(true);
+        let extra_tables = vec![];
+        let (db0, _) =
+            build_db_from_checkpoint(&path0, hash0, &checkpoint0, &extra_tables, options.clone())
+                .expect("Failed to build db from checkpoint");
+        let (db3, _) =
+            build_db_from_checkpoint(&path3, hash3, &checkpoint3, &extra_tables, options)
+                .expect("Failed to build db from checkpoint");
+
+        let mut num_diff = 0;
+        for table in tables {
+            let cf = db0.cf_handle(table).unwrap();
+            let table_iter0 = db0.iterator_cf(&cf, IteratorMode::Start);
+            let cf = db3.cf_handle(table).unwrap();
+            let table_iter3 = db3.iterator_cf(&cf, IteratorMode::Start);
+
+            let mut pairs0 = Vec::new();
+            let mut pairs3 = Vec::new();
+            for (key, val) in table_iter0.flatten() {
+                pairs0.push((key, val));
+            }
+            for (key, val) in table_iter3.flatten() {
+                pairs3.push((key, val));
+            }
+            //assert_eq!(pairs0.len(), pairs3.len());
+
+            for (pair0, pair3) in pairs0.into_iter().zip(pairs3) {
+                let (key0, val0) = pair0;
+                let (key3, val3) = pair3;
+                //assert_eq!(key0, key3);
+                //assert_eq!(val0, val3);
+                if (key0 != key3) || (val0 != val3) {
+                    println!("table: {table}");
+                    println!("key0: {key0:?}");
+                    println!("key3: {key3:?}");
+                    println!("val0: {val0:?}");
+                    println!("val3: {val3:?}");
+                    println!();
+                    num_diff += 1;
+                }
+            }
+        }
+
+        println!("num_diff: {num_diff}");
+
+        std::fs::remove_dir_all(path0).expect("failed to remove old rocksdb");
+        std::fs::remove_dir_all(path3).expect("failed to remove old rocksdb");
+    }
+
+    fn read_ckpt(path: &str) -> ([u8; 32], Vec<u8>) {
+        let path = PathBuf::from(path);
+        let path_hash = path.join("epoch_state_hash");
+        let path_ckpt = path.join("epoch_state_serialized");
+        //let path_block_number = path.join("block_number");
+
+        let hash = read_file(&path_hash);
+        let hash: [u8; 32] = hash.try_into().unwrap();
+        let ckpt = read_file(&path_ckpt);
+        (hash, ckpt)
+    }
+
+    fn read_file(path: &Path) -> Vec<u8> {
+        let mut f = File::open(path).expect("no file found");
+        let mut buffer = Vec::new();
+        f.read_to_end(&mut buffer).expect("buffer overflow");
+        buffer
     }
 }

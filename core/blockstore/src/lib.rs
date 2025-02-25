@@ -3,6 +3,59 @@ pub mod config;
 
 pub use blockstore::Blockstore;
 
+#[cfg(test)]
+mod tests {
+    use std::fs::File;
+    use std::io::Write;
+    use std::path::PathBuf;
+
+    use lightning_interfaces::partial_node_components;
+    use lightning_interfaces::prelude::*;
+
+    use crate::config::Config;
+    use crate::Blockstore;
+
+    partial_node_components!(TestBinding {
+        BlockstoreInterface = Blockstore<Self>;
+    });
+
+    #[tokio::test]
+    async fn hash_debug() {
+        let path = PathBuf::from("/home/matthias/Desktop/blockstore_stable_vinthill");
+        let hash = [
+            170, 242, 107, 205, 231, 209, 117, 170, 33, 82, 43, 32, 162, 6, 191, 38, 203, 178, 168,
+            236, 240, 105, 227, 239, 113, 205, 10, 208, 71, 68, 122, 168,
+        ];
+
+        let blockstore = Blockstore::<TestBinding>::init(Config {
+            root: path.clone().try_into().unwrap(),
+        })
+        .await
+        .unwrap();
+
+        let ckpt = blockstore.read_all_to_vec(&hash).await.unwrap();
+
+        let mut file = File::create(
+            "/home/matthias/Desktop/checkpoints/stable_vinthill/epoch_state_serialized",
+        )
+        .unwrap();
+        file.write_all(&ckpt).unwrap();
+        println!("{ckpt:?}");
+    }
+
+    #[tokio::test]
+    async fn hash_debugxx() {
+        let hash = [
+            170, 242, 107, 205, 231, 209, 117, 170, 33, 82, 43, 32, 162, 6, 191, 38, 203, 178, 168,
+            236, 240, 105, 227, 239, 113, 205, 10, 208, 71, 68, 122, 168,
+        ];
+
+        let mut file =
+            File::create("/home/matthias/Desktop/checkpoints/stable_vinthill/epoch_state_hash")
+                .unwrap();
+        file.write_all(&hash).unwrap();
+    }
+}
 //#[cfg(test)]
 //mod tests {
 //    use std::path::PathBuf;
