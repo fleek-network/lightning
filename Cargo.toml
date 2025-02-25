@@ -110,6 +110,7 @@ lightning-test-utils = { path = "core/test-utils" }
 lightning-topology = { path = "core/topology" }
 lightning-types = { path = "core/types" }
 lightning-utils = { path = "core/utils" }
+lightning-watcher = { path = "core/watcher" }
 affair = { path = "lib/affair" }
 atomo = { path = "lib/atomo" }
 atomo-rocks = { path = "lib/atomo-rocks" }

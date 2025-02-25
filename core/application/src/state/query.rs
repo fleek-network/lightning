@@ -437,10 +437,10 @@ impl SyncQueryRunnerInterface for QueryRunner {
         })
     }
 
-    fn get_all_jobs(&self) -> Vec<([u8; 32], Job)> {
+    fn get_all_jobs(&self) -> Vec<Job> {
         self.inner
             .run(|ctx| self.jobs.get(ctx).as_map())
-            .into_iter()
+            .into_values()
             .collect()
     }
 }

@@ -1,7 +1,7 @@
 [package]
 name = "lightning-watcher"
-version = "0.0.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -15,3 +15,29 @@ lightning-interfaces = { path = "../interfaces" }
 lightning-types = { path = "../types" }
 lightning-utils = { path = "../../core/utils" }
 lightning-workspace-hack.workspace = true
+
+[dev-dependencies]
+axum = "0.7"
+bytes.workspace = true
+reqwest.workspace = true
+tokio-util.workspace = true
+tempdir = "0.3.7"
+fn-sdk = { path = "../../lib/sdk" }
+lightning-application= { path = "../application" }
+lightning-keystore.workspace = true
+lightning-test-utils = { path = "../test-utils" }
+lightning-node.workspace = true
+lightning-notifier.workspace = true
+lightning-pool = { path = "../pool" }
+lightning-signer.workspace = true
+lightning-topology = { path = "../topology" }
+lightning-task-broker = { path = "../task-broker" }
+
+lightning-committee-beacon.workspace = true
+lightning-pinger.workspace = true
+lightning-rpc.workspace = true
+lightning-checkpointer.workspace = true
+lightning-blockstore.workspace = true
+lightning-rep-collector.workspace = true
+
+

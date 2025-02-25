@@ -1172,7 +1172,17 @@ impl<B: Backend> StateExecutor<B> {
 
     fn reassign_jobs(&self) {
         // Get all current jobs.
-        let jobs = self.jobs.as_map().values().cloned().collect();
+        let jobs = self
+            .jobs
+            .as_map()
+            .values()
+            .cloned()
+            .map(|mut job| {
+                // Clear assignee.
+                job.assignee.take();
+                job
+            })
+            .collect();
 
         // Clear the tables.
         self.jobs.clear();

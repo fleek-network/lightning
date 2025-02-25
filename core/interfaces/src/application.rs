@@ -260,7 +260,7 @@ pub trait SyncQueryRunnerInterface: Clone + Send + Sync + 'static {
     fn get_jobs_for_node(&self, node_index: &NodeIndex) -> Option<Vec<Job>>;
 
     /// Returns all the jobs.
-    fn get_all_jobs(&self) -> Vec<([u8; 32], Job)>;
+    fn get_all_jobs(&self) -> Vec<Job>;
 }
 
 #[derive(Clone, Debug)]

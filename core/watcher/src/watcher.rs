@@ -25,6 +25,7 @@ use lightning_interfaces::{
 };
 use lightning_types::UpdateMethod;
 use lightning_utils::application::QueryRunnerExt;
+use lightning_utils::poll::poll_until;
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 use tokio::time::Interval;
@@ -42,7 +43,7 @@ impl<C: NodeComponents> Watcher<C> {
         keystore: &C::KeystoreInterface,
         fdi::Cloned(app_query): fdi::Cloned<c!(C::ApplicationInterface::SyncExecutor)>,
     ) -> Result<Self> {
-        let duration = app_query.get_time_interval();
+        let duration = app_query.get_time_interval().unwrap_or(1);
         let interval = tokio::time::interval(Duration::from_millis(duration));
         let pk = keystore.get_ed25519_pk();
 
@@ -183,12 +184,34 @@ impl<C: NodeComponents> InnerWatcher<C> {
     /// Resets the counter and recomputes the interval.
     fn reset(&mut self) {
         self.interval_counter = 0;
-        let duration = self.app_query.get_time_interval();
+        let duration = self
+            .app_query
+            .get_time_interval()
+            .expect("Time interval metadata to have been set in the Application");
         self.interval = tokio::time::interval(Duration::from_millis(duration));
     }
 
     pub async fn start(&mut self, shutdown: ShutdownWaiter) {
         let mut epoch_changed_sub = self.notifier.subscribe_epoch_changed();
+
+        // It's possible that app hasn't been seeded at this point yet.
+        // Also, we want this to be configurable by tests using appropriate configuration APIs.
+        // Thus, we poll it until we have it.
+        let app_query = self.app_query.clone();
+        poll_until(
+            || async {
+                while app_query.get_time_interval().is_none() {
+                    tokio::time::sleep(Duration::from_millis(500)).await;
+                }
+                Ok(())
+            },
+            Duration::from_secs(12),
+            Duration::from_millis(500),
+        )
+        .await
+        .expect("App to have been seeded");
+
+        self.reset();
 
         loop {
             tokio::select! {
