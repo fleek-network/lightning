@@ -1,282 +1,141 @@
-use std::collections::HashSet;
+use std::collections::BTreeMap;
 use std::time::Duration;
 
-use anyhow::Result;
-use fleek_crypto::{AccountOwnerSecretKey, NodeSecretKey, SecretKey};
-use lightning_application::{Application, ApplicationConfig};
+use fleek_crypto::{AccountOwnerSecretKey, SecretKey};
+use lightning_application::app::Application;
+use lightning_application::config::ApplicationConfig;
 use lightning_interfaces::prelude::*;
+use lightning_interfaces::types::{Genesis, GenesisNode, NodePorts, UpdateMethod};
 use lightning_node::Node;
 use lightning_notifier::Notifier;
 use lightning_test_utils::consensus::{MockConsensus, MockConsensusConfig, MockForwarder};
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
-use lightning_utils::poll::{poll_until, PollUntilError};
-use lightning_utils::transaction::TransactionSigner;
 use tempfile::{tempdir, TempDir};
-use types::{
-    ExecuteTransactionError,
-    ExecuteTransactionOptions,
-    ExecuteTransactionRequest,
-    ExecuteTransactionResponse,
-    ExecuteTransactionWait,
-    ExecutionData,
-    Genesis,
-    GenesisNode,
-    HandshakePorts,
-    NodePorts,
-    TransactionResponse,
-    UpdateMethod,
-};
 
-use super::*;
+use crate::Signer;
 
-#[tokio::test]
-async fn test_execute_transaction_and_wait_for_receipt_success() {
-    // Build and start the node.
-    let mut node = TestNode::<TestNodeComponents>::new().await;
-    node.start().await;
-
-    // Check that the nonce starts at 0.
-    assert_eq!(node.get_nonce(), 0);
-
-    // Execute a transaction and wait for it to complete.
-    let (tx, receipt) = node
-        .execute_transaction(
-            UpdateMethod::IncrementNonce {},
-            Some(ExecuteTransactionOptions {
-                wait: ExecuteTransactionWait::Receipt,
-                ..Default::default()
-            }),
-        )
-        .await
-        .unwrap()
-        .as_receipt();
-    assert_eq!(
-        receipt.response,
-        TransactionResponse::Success(ExecutionData::None)
-    );
-    assert!(!tx.hash().is_empty());
-    assert_eq!(receipt.transaction_hash, tx.hash());
-
-    // Check that the nonce has been incremented.
-    assert_eq!(node.get_nonce(), 1);
-
-    // Execute a few more transactions.
-    for _ in 0..10 {
-        let (tx, receipt) = node
-            .execute_transaction(
-                UpdateMethod::IncrementNonce {},
-                Some(ExecuteTransactionOptions {
-                    wait: ExecuteTransactionWait::Receipt,
-                    ..Default::default()
-                }),
-            )
-            .await
-            .unwrap()
-            .as_receipt();
-        assert_eq!(
-            receipt.response,
-            TransactionResponse::Success(ExecutionData::None)
-        );
-        assert_eq!(receipt.transaction_hash, tx.hash());
-    }
-
-    // Check that the nonce has been incremented.
-    assert_eq!(node.get_nonce(), 11);
-
-    // Shutdown the node.
-    node.shutdown().await;
-}
-
-#[tokio::test]
-async fn test_execute_transaction_and_no_wait_for_receipt_success() {
-    // Build and start the node.
-    let mut node = TestNode::<TestNodeComponents>::new().await;
-    node.start().await;
-
-    // Check that the nonce starts at 0.
-    assert_eq!(node.get_nonce(), 0);
-
-    // Execute a transaction and wait for it to complete.
-    node.execute_transaction(
-        UpdateMethod::IncrementNonce {},
-        Some(ExecuteTransactionOptions {
-            wait: ExecuteTransactionWait::None,
-            ..Default::default()
-        }),
-    )
-    .await
-    .unwrap()
-    .as_none();
-
-    // Wait for the nonce to be incremented.
-    poll_until(
-        || async {
-            (node.get_nonce() == 1)
-                .then_some(())
-                .ok_or(PollUntilError::ConditionNotSatisfied)
-        },
-        Duration::from_secs(5),
-        Duration::from_millis(100),
-    )
-    .await
-    .unwrap();
-
-    // Execute a few more transactions.
-    for _ in 0..10 {
-        node.execute_transaction(
-            UpdateMethod::IncrementNonce {},
-            Some(ExecuteTransactionOptions {
-                wait: ExecuteTransactionWait::None,
-                ..Default::default()
-            }),
-        )
-        .await
-        .unwrap()
-        .as_none();
-    }
-
-    // Wait for the nonce to be incremented for every transaction.
-    poll_until(
-        || async {
-            (node.get_nonce() == 11)
-                .then_some(())
-                .ok_or(PollUntilError::ConditionNotSatisfied)
-        },
-        Duration::from_secs(5),
-        Duration::from_millis(100),
-    )
-    .await
-    .unwrap();
-
-    // Shutdown the node.
-    node.shutdown().await;
-}
-
-partial_node_components!(TestNodeComponents {
+partial_node_components!(TestBinding {
     ConfigProviderInterface = JsonConfigProvider;
-    ApplicationInterface = Application<Self>;
-    NotifierInterface = Notifier<Self>;
     KeystoreInterface = EphemeralKeystore<Self>;
+    SignerInterface = Signer<Self>;
+    ApplicationInterface = Application<Self>;
     ConsensusInterface = MockConsensus<Self>;
     ForwarderInterface = MockForwarder<Self>;
-    SignerInterface = Signer<Self>;
+    NotifierInterface = Notifier<Self>;
 });
 
-struct TestNode<C: NodeComponents> {
-    inner: Node<C>,
-    _temp_dir: TempDir,
+fn build_node(temp_dir: &TempDir, transactions_to_lose: &[u32]) -> Node<TestBinding> {
+    let keystore = EphemeralKeystore::<TestBinding>::default();
+    let (consensus_secret_key, node_secret_key) =
+        (keystore.get_bls_sk(), keystore.get_ed25519_sk());
 
-    app: fdi::Ref<C::ApplicationInterface>,
-    signer: fdi::Ref<C::SignerInterface>,
+    let mut genesis = Genesis::default();
+    let node_public_key = node_secret_key.to_pk();
+    let consensus_public_key = consensus_secret_key.to_pk();
+    let owner_secret_key = AccountOwnerSecretKey::generate();
+    let owner_public_key = owner_secret_key.to_pk();
+
+    genesis.node_info.push(GenesisNode::new(
+        owner_public_key.into(),
+        node_public_key,
+        "127.0.0.1".parse().unwrap(),
+        consensus_public_key,
+        "127.0.0.1".parse().unwrap(),
+        node_public_key,
+        NodePorts {
+            primary: 48000,
+            worker: 48101,
+            mempool: 48102,
+            rpc: 48103,
+            pool: 48104,
+            pinger: 48106,
+            handshake: Default::default(),
+        },
+        None,
+        true,
+    ));
+
+    let genesis_path = genesis
+        .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
+        .unwrap();
+
+    Node::<TestBinding>::init_with_provider(
+        fdi::Provider::default().with(keystore).with(
+            JsonConfigProvider::default()
+                .with::<Application<TestBinding>>(ApplicationConfig::test(genesis_path))
+                .with::<MockConsensus<TestBinding>>(MockConsensusConfig {
+                    min_ordering_time: 0,
+                    max_ordering_time: 1,
+                    probability_txn_lost: 0.0,
+                    transactions_to_lose: transactions_to_lose.iter().copied().collect(),
+                    new_block_interval: Duration::from_secs(5),
+                    ..Default::default()
+                }),
+        ),
+    )
+    .expect("Failed to init node.")
 }
 
-impl<C: NodeComponents> TestNode<C> {
-    pub async fn new() -> Self {
-        Self::with_genesis_mutator(|_| {}).await
-    }
+fn get_our_nonce<C: NodeComponents>(node: &Node<C>) -> u64 {
+    let query_runner = node.provider.get::<C::ApplicationInterface>().sync_query();
+    let node_public_key = node.provider.get::<C::KeystoreInterface>().get_ed25519_pk();
+    let node_idx = query_runner.pubkey_to_index(&node_public_key).unwrap();
+    query_runner
+        .get_node_info::<u64>(&node_idx, |n| n.nonce)
+        .unwrap()
+}
 
-    pub async fn with_genesis_mutator(mutator: impl FnOnce(&mut Genesis)) -> Self {
-        let temp_dir = tempdir().unwrap();
-        let inner = Self::build_inner(&temp_dir, mutator).await.unwrap();
+#[tokio::test]
+async fn test_send_two_txs_in_a_row() {
+    let temp_dir = tempdir().unwrap();
+    let node = build_node(&temp_dir, &[]);
+    node.start().await;
 
-        let app = inner.provider.get::<C::ApplicationInterface>();
-        let signer = inner.provider.get::<C::SignerInterface>();
+    let signer_socket = node.provider.get::<Signer<TestBinding>>().get_socket();
 
-        Self {
-            inner,
-            _temp_dir: temp_dir,
+    // Send two transactions to the signer.
+    let update_method = UpdateMethod::SubmitReputationMeasurements {
+        measurements: BTreeMap::new(),
+    };
+    signer_socket.run(update_method).await.unwrap();
+    let update_method = UpdateMethod::SubmitReputationMeasurements {
+        measurements: BTreeMap::new(),
+    };
+    signer_socket.run(update_method).await.unwrap();
 
-            app,
-            signer,
-        }
-    }
+    // Each transaction will take at most 2 seconds to get ordered.
+    // Therefore, after 5 seconds, the nonce should be 2.
+    tokio::time::sleep(Duration::from_secs(5)).await;
+    let new_nonce = get_our_nonce(&node);
+    assert_eq!(new_nonce, 2);
+}
 
-    pub async fn start(&mut self) {
-        self.inner.start().await;
-    }
+#[tokio::test]
+async fn test_retry_send() {
+    let temp_dir = tempdir().unwrap();
+    let node = build_node(&temp_dir, &[2]);
+    node.start().await;
 
-    pub async fn shutdown(&mut self) {
-        self.inner.shutdown().await;
-    }
+    let signer_socket = node.provider.get::<Signer<TestBinding>>().get_socket();
 
-    pub fn get_node_secret_key(&self) -> NodeSecretKey {
-        self.inner
-            .provider
-            .get::<C::KeystoreInterface>()
-            .get_ed25519_sk()
-    }
+    let new_nonce = get_our_nonce(&node);
+    assert_eq!(new_nonce, 0);
+    // Send two transactions to the signer. The OptIn transaction was chosen arbitrarily.
+    let update_method = UpdateMethod::OptIn {};
+    signer_socket.run(update_method).await.unwrap();
+    // This transaction won't be ordered and the nonce won't be incremented on the application.
+    let update_method = UpdateMethod::OptIn {};
+    signer_socket.run(update_method).await.unwrap();
+    // This transaction will have the wrong nonce, since the signer increments nonces
+    // optimistically.
+    let update_method = UpdateMethod::OptIn {};
+    signer_socket.run(update_method).await.unwrap();
 
-    pub fn get_nonce(&self) -> u64 {
-        TransactionSigner::NodeMain(self.get_node_secret_key()).get_nonce(&self.app.sync_query())
-    }
-
-    pub async fn execute_transaction(
-        &self,
-        method: UpdateMethod,
-        options: Option<ExecuteTransactionOptions>,
-    ) -> Result<ExecuteTransactionResponse, ExecuteTransactionError> {
-        let resp = self
-            .signer
-            .get_socket()
-            .run(ExecuteTransactionRequest { method, options })
-            .await??;
-
-        Ok(resp)
-    }
-
-    async fn build_inner(
-        temp_dir: &TempDir,
-        genesis_mutator: impl FnOnce(&mut Genesis),
-    ) -> Result<Node<C>> {
-        let keystore = EphemeralKeystore::<C>::default();
-        let node_secret_key = keystore.get_ed25519_sk();
-        let mut genesis = Genesis {
-            node_info: vec![GenesisNode {
-                owner: AccountOwnerSecretKey::generate().to_pk().into(),
-                primary_public_key: node_secret_key.to_pk(),
-                primary_domain: "127.0.0.1".parse().unwrap(),
-                consensus_public_key: keystore.get_bls_pk(),
-                worker_domain: "127.0.0.1".parse().unwrap(),
-                worker_public_key: node_secret_key.to_pk(),
-                ports: NodePorts {
-                    primary: 0,
-                    worker: 0,
-                    mempool: 0,
-                    rpc: 0,
-                    pool: 0,
-                    pinger: 0,
-                    handshake: HandshakePorts {
-                        http: 0,
-                        webrtc: 0,
-                        webtransport: 0,
-                    },
-                },
-                stake: Default::default(),
-                reputation: None,
-                current_epoch_served: None,
-                genesis_committee: true,
-            }],
-            ..Default::default()
-        };
-        genesis_mutator(&mut genesis);
-        let genesis_path = genesis
-            .write_to_dir(temp_dir.path().to_path_buf().try_into().unwrap())
-            .unwrap();
-        Node::<C>::init_with_provider(
-            fdi::Provider::default().with(keystore).with(
-                JsonConfigProvider::default()
-                    .with::<Application<C>>(ApplicationConfig::test(genesis_path))
-                    .with::<MockConsensus<C>>(MockConsensusConfig {
-                        min_ordering_time: 0,
-                        max_ordering_time: 0,
-                        probability_txn_lost: 0.0,
-                        transactions_to_lose: HashSet::new(),
-                        new_block_interval: Duration::from_secs(0),
-                        block_buffering_interval: Duration::from_secs(0),
-                        forwarder_transaction_to_error: HashSet::new(),
-                    }),
-            ),
-        )
-    }
+    // The signer will notice that the nonce doesn't increment on the application after the second
+    // transaction, and then it will resend all following transactions.
+    // Hence, the application nonce should be 3 after some time.
+    tokio::time::sleep(Duration::from_secs(15)).await;
+    let new_nonce = get_our_nonce(&node);
+    assert_eq!(new_nonce, 3);
 }
