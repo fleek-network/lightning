@@ -10,9 +10,6 @@ use types::{
     CommitteeSelectionBeaconReveal,
     Epoch,
     ExecuteTransactionError,
-    ExecuteTransactionOptions,
-    ExecuteTransactionRequest,
-    ExecuteTransactionWait,
     Metadata,
     NodeIndex,
     UpdateMethod,
@@ -215,10 +212,10 @@ impl<C: NodeComponents> CommitteeBeaconListener<C> {
             "Submitting commit transaction (epoch: {epoch}, round: {round}): {:?}",
             commit
         );
-        self.execute_transaction_with_retry_on_invalid_nonce(
-            UpdateMethod::CommitteeSelectionBeaconCommit { commit },
-        )
-        .await?;
+
+        // TODO(matthias): check if transaction was ordered
+        self.execute_transaction(UpdateMethod::CommitteeSelectionBeaconCommit { commit })
+            .await?;
 
         Ok(())
     }
@@ -275,10 +272,10 @@ impl<C: NodeComponents> CommitteeBeaconListener<C> {
             "Submitting reveal transaction (epoch: {epoch}, round: {round}): {:?}",
             reveal
         );
-        self.execute_transaction_with_retry_on_invalid_nonce(
-            UpdateMethod::CommitteeSelectionBeaconReveal { reveal },
-        )
-        .await?;
+
+        // TODO(matthias): check if transaction was ordered
+        self.execute_transaction(UpdateMethod::CommitteeSelectionBeaconReveal { reveal })
+            .await?;
 
         Ok(())
     }
@@ -287,29 +284,12 @@ impl<C: NodeComponents> CommitteeBeaconListener<C> {
     async fn execute_transaction(
         &self,
         method: UpdateMethod,
-        options: ExecuteTransactionOptions,
     ) -> Result<(), ExecuteTransactionError> {
         self.signer
-            .run(ExecuteTransactionRequest {
-                method,
-                options: Some(options),
-            })
-            .await??;
+            .run(method)
+            .await
+            .map_err(|e| anyhow::anyhow!("{e:?}"))?;
         Ok(())
-    }
-
-    async fn execute_transaction_with_retry_on_invalid_nonce(
-        &self,
-        method: UpdateMethod,
-    ) -> Result<(), ExecuteTransactionError> {
-        self.execute_transaction(
-            method,
-            ExecuteTransactionOptions {
-                wait: ExecuteTransactionWait::Receipt,
-                ..Default::default()
-            },
-        )
-        .await
     }
 
     /// Generate random reveal value.

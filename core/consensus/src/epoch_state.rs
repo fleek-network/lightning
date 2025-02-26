@@ -29,7 +29,7 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::{oneshot, Notify};
 use tokio::{pin, task, time};
 use tracing::{error, info};
-use types::{EpochEra, ExecuteTransactionRequest};
+use types::EpochEra;
 
 use crate::consensus::{ConsensusReadyWaiter, PubSubMsg};
 use crate::execution::state::FilteredConsensusOutput;
@@ -443,10 +443,7 @@ async fn wait_and_signal_epoch_change<Q: SyncQueryRunnerInterface>(
                     info!("Signalling ready to change epoch (epoch: {epoch})");
 
                     if let Err(e) = txn_socket
-                        .enqueue(ExecuteTransactionRequest {
-                            method: UpdateMethod::ChangeEpoch { epoch },
-                            options: None,
-                        })
+                        .enqueue(UpdateMethod::ChangeEpoch { epoch })
                         .await
                     {
                         error!("Error sending change epoch signal to socket {}", e);
@@ -521,10 +518,7 @@ async fn wait_and_signal_commit_phase_timeout<Q: SyncQueryRunnerInterface>(
                         round,
                     };
                     if let Err(e) = txn_socket
-                        .enqueue(ExecuteTransactionRequest {
-                            method,
-                            options: None,
-                        })
+                        .enqueue(method)
                         .await
                     {
                         error!("Error sending commit phase timeout to socket {}", e);
@@ -588,10 +582,7 @@ async fn wait_and_signal_reveal_phase_timeout<Q: SyncQueryRunnerInterface>(
                         round,
                     };
                     if let Err(e) = txn_socket
-                        .enqueue(ExecuteTransactionRequest {
-                            method,
-                            options: None,
-                        })
+                        .enqueue(method)
                         .await
                     {
                         error!("Error sending reveal phase timeout to socket {}", e);

@@ -6,10 +6,6 @@ use lightning_interfaces::types::{
     CommitteeSelectionBeaconPhase,
     Epoch,
     ExecuteTransactionError,
-    ExecuteTransactionOptions,
-    ExecuteTransactionRequest,
-    ExecuteTransactionResponse,
-    ExecuteTransactionWait,
     Metadata,
     ProofOfConsensus,
     Tokens,
@@ -209,22 +205,16 @@ where
     pub async fn execute_transaction_from_node(
         &self,
         method: UpdateMethod,
-        options: Option<ExecuteTransactionOptions>,
-    ) -> Result<ExecuteTransactionResponse, ExecuteTransactionError>
+    ) -> Result<u64, ExecuteTransactionError>
     where
         C::ApplicationInterface: ApplicationInterface<C, SyncExecutor = QueryRunner>,
     {
         let resp = self
             .signer()
             .get_socket()
-            .run(ExecuteTransactionRequest {
-                method,
-                options: Some(options.unwrap_or(ExecuteTransactionOptions {
-                    wait: ExecuteTransactionWait::Receipt,
-                    ..Default::default()
-                })),
-            })
-            .await??;
+            .run(method)
+            .await
+            .map_err(|e| anyhow::anyhow!("{e:?}"))?;
 
         Ok(resp)
     }

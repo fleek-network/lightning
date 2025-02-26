@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 affair.workspace = true
 anyhow.workspace = true
+fleek-crypto.workspace = true
 lightning-interfaces.workspace = true
 lightning-utils.workspace = true
 lightning-workspace-hack.workspace = true

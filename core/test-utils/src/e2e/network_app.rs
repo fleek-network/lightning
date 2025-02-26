@@ -7,13 +7,7 @@ use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::CommitteeSelectionBeaconRound;
 use lightning_utils::application::QueryRunnerExt;
 use lightning_utils::poll::{poll_until, PollUntilError};
-use types::{
-    Epoch,
-    ExecuteTransactionOptions,
-    ExecuteTransactionRetry,
-    ExecuteTransactionWait,
-    UpdateMethod,
-};
+use types::{Epoch, UpdateMethod};
 
 use super::{BoxedTestNode, TestNetwork};
 
@@ -51,22 +45,12 @@ impl TestNetwork {
     /// This method does not wait for the epoch to be incremented across all nodes, but it does wait
     /// for each of the transactions to be executed.
     pub async fn change_epoch(&self) -> Result<Epoch> {
-        self.change_epoch_with_options(Some(ExecuteTransactionOptions {
-            wait: ExecuteTransactionWait::Receipt,
-            retry: ExecuteTransactionRetry::Default,
-            timeout: Some(Duration::from_secs(10)),
-        }))
-        .await
-    }
-
-    pub async fn change_epoch_with_options(
-        &self,
-        options: Option<ExecuteTransactionOptions>,
-    ) -> Result<Epoch> {
         let epoch = self.node(0).app_query().get_current_epoch();
-        join_all(self.nodes().map(|node| {
-            node.execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch }, options.clone())
-        }))
+        join_all(
+            self.nodes().map(|node| {
+                node.execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
+            }),
+        )
         .await
         .into_iter()
         .collect::<Result<Vec<_>, _>>()
@@ -82,11 +66,6 @@ impl TestNetwork {
         join_all(self.nodes().map(|node| {
             node.execute_transaction_from_node(
                 UpdateMethod::CommitteeSelectionBeaconCommitPhaseTimeout { epoch, round },
-                Some(ExecuteTransactionOptions {
-                    wait: ExecuteTransactionWait::None,
-                    retry: ExecuteTransactionRetry::Default,
-                    timeout: Some(Duration::from_secs(10)),
-                }),
             )
         }))
         .await
@@ -104,11 +83,6 @@ impl TestNetwork {
         join_all(self.nodes().map(|node| {
             node.execute_transaction_from_node(
                 UpdateMethod::CommitteeSelectionBeaconRevealPhaseTimeout { epoch, round },
-                Some(ExecuteTransactionOptions {
-                    wait: ExecuteTransactionWait::None,
-                    retry: ExecuteTransactionRetry::Default,
-                    timeout: Some(Duration::from_secs(10)),
-                }),
             )
         }))
         .await
