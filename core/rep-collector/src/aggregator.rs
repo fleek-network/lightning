@@ -12,7 +12,7 @@ use lightning_interfaces::types::{
 use lightning_interfaces::Weight;
 use tokio::pin;
 use tracing::{error, info};
-use types::{ExecuteTransactionRequest, ProtocolParamKey, ProtocolParamValue};
+use types::{ProtocolParamKey, ProtocolParamValue};
 
 use crate::buffered_mpsc;
 use crate::config::Config;
@@ -114,10 +114,7 @@ impl<C: NodeComponents> ReputationAggregator<C> {
                 let submit_tx = self.submit_tx.clone();
                 info!("Submitting reputation measurements");
                 if let Err(e) = submit_tx
-                    .enqueue(ExecuteTransactionRequest {
-                        method: UpdateMethod::SubmitReputationMeasurements { measurements },
-                        options: None,
-                    })
+                    .enqueue(UpdateMethod::SubmitReputationMeasurements { measurements })
                     .await
                 {
                     error!("Submitting reputation measurements failed: {e:?}");
@@ -142,11 +139,8 @@ impl<C: NodeComponents> ReputationAggregator<C> {
                 info!("Submitting reputation measurements (1)");
                 if let Err(e) = self
                     .submit_tx
-                    .enqueue(ExecuteTransactionRequest {
-                        method: UpdateMethod::SubmitReputationMeasurements {
-                            measurements: measurements1,
-                        },
-                        options: None,
+                    .enqueue(UpdateMethod::SubmitReputationMeasurements {
+                        measurements: measurements1,
                     })
                     .await
                 {
@@ -156,11 +150,8 @@ impl<C: NodeComponents> ReputationAggregator<C> {
                 info!("Submitting reputation measurements (2)");
                 if let Err(e) = self
                     .submit_tx
-                    .enqueue(ExecuteTransactionRequest {
-                        method: UpdateMethod::SubmitReputationMeasurements {
-                            measurements: measurements2,
-                        },
-                        options: None,
+                    .enqueue(UpdateMethod::SubmitReputationMeasurements {
+                        measurements: measurements2,
                     })
                     .await
                 {

@@ -7,7 +7,6 @@ use std::sync::{Arc, OnceLock};
 use fleek_crypto::NodePublicKey;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Blake3Hash, ContentUpdate, NodeIndex, UpdateMethod};
-use types::ExecuteTransactionRequest;
 
 pub struct Indexer<C: NodeComponents> {
     pk: NodePublicKey,
@@ -83,10 +82,7 @@ impl<C: NodeComponents> IndexerInterface<C> for Indexer<C> {
                 let updates = vec![ContentUpdate { uri, remove: false }];
                 if let Err(e) = self
                     .submit_tx
-                    .enqueue(ExecuteTransactionRequest {
-                        method: UpdateMethod::UpdateContentRegistry { updates },
-                        options: None,
-                    })
+                    .enqueue(UpdateMethod::UpdateContentRegistry { updates })
                     .await
                 {
                     tracing::error!("Submitting content registry update failed: {e:?}");
@@ -107,10 +103,7 @@ impl<C: NodeComponents> IndexerInterface<C> for Indexer<C> {
 
                 if let Err(e) = self
                     .submit_tx
-                    .enqueue(ExecuteTransactionRequest {
-                        method: UpdateMethod::UpdateContentRegistry { updates },
-                        options: None,
-                    })
+                    .enqueue(UpdateMethod::UpdateContentRegistry { updates })
                     .await
                 {
                     tracing::error!("Submitting content registry update failed: {e:?}");
