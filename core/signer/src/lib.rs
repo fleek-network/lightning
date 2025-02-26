@@ -35,16 +35,17 @@ const MAX_RETRIES: u8 = 3;
 
 pub struct Signer<C: NodeComponents> {
     socket: Socket<UpdateMethod, u64>,
-    worker: SignerWorker,
+    worker: SignerWorker<c![C::ApplicationInterface::SyncExecutor]>,
     _c: PhantomData<C>,
 }
 
 #[derive(Clone)]
-struct SignerWorker {
-    state: Arc<Mutex<SignerState>>,
+struct SignerWorker<Q: SyncQueryRunnerInterface> {
+    state: Arc<Mutex<SignerState<Q>>>,
 }
 
-struct SignerState {
+struct SignerState<Q: SyncQueryRunnerInterface> {
+    query_runner: Q,
     node_secret_key: NodeSecretKey,
     node_public_key: NodePublicKey,
     mempool_socket: MempoolSocket,
@@ -64,9 +65,12 @@ impl<C: NodeComponents> Signer<C> {
     pub fn init(
         keystore: &C::KeystoreInterface,
         forwarder: &C::ForwarderInterface,
+        app: &C::ApplicationInterface,
         fdi::Cloned(waiter): fdi::Cloned<lightning_interfaces::ShutdownWaiter>,
     ) -> Self {
+        let query_runner = app.sync_query();
         let state = SignerState {
+            query_runner,
             node_secret_key: keystore.get_ed25519_sk(),
             node_public_key: keystore.get_ed25519_pk(),
             mempool_socket: forwarder.mempool_socket(),
@@ -101,9 +105,8 @@ impl<C: NodeComponents> Signer<C> {
         // Initialize the worker's state.
         let mut guard = worker.state.lock().await;
         let mut node_index = LazyNodeIndex::new(guard.node_public_key);
-        let chain_id = query_runner.get_chain_id();
         let nonce = node_index.query_nonce(&query_runner);
-        guard.init_state(chain_id, nonce);
+        guard.init_state(nonce);
         drop(guard);
 
         spawn!(
@@ -130,14 +133,17 @@ impl<C: NodeComponents> SignerInterface<C> for Signer<C> {
     }
 }
 
-impl SignerState {
-    fn init_state(&mut self, chain_id: u32, base_nonce: u64) {
+impl<Q: SyncQueryRunnerInterface> SignerState<Q> {
+    fn init_state(&mut self, base_nonce: u64) {
         self.base_nonce = base_nonce;
         self.next_nonce = base_nonce + 1;
-        self.chain_id = Some(chain_id);
     }
 
     async fn sign_new_tx(&mut self, method: UpdateMethod) -> u64 {
+        if self.chain_id.is_none() {
+            self.chain_id = Some(self.query_runner.get_chain_id());
+        }
+
         let assigned_nonce = self.next_nonce;
         let update_payload = UpdatePayload {
             sender: TransactionSender::NodeMain(self.node_public_key),
@@ -180,10 +186,7 @@ impl SignerState {
         assigned_nonce
     }
 
-    async fn sync_with_application<Q>(&mut self, application_nonce: u64, query_runner: &Q)
-    where
-        Q: SyncQueryRunnerInterface,
-    {
+    async fn sync_with_application(&mut self, application_nonce: u64) {
         // All transactions in range [base_nonce, application_nonce] have
         // been ordered, so we can remove them from `pending_transactions`.
         self.base_nonce = application_nonce;
@@ -207,7 +210,8 @@ impl SignerState {
 
                 for tx in self.pending_transactions.iter_mut() {
                     if matches!(
-                        query_runner.simulate_txn(tx.update_request.clone().into()),
+                        self.query_runner
+                            .simulate_txn(tx.update_request.clone().into()),
                         TransactionResponse::Revert(_)
                     ) || tx.tries >= MAX_RETRIES
                     {
@@ -284,7 +288,7 @@ impl LazyNodeIndex {
     }
 }
 
-impl AsyncWorker for SignerWorker {
+impl<Q: SyncQueryRunnerInterface> AsyncWorker for SignerWorker<Q> {
     type Request = UpdateMethod;
     type Response = u64;
 
@@ -311,7 +315,7 @@ struct PendingTransaction {
 
 async fn new_block_task<Q: SyncQueryRunnerInterface>(
     mut node_index: LazyNodeIndex,
-    worker: SignerWorker,
+    worker: SignerWorker<Q>,
     mut subscriber: impl Subscriber<BlockExecutedNotification>,
     query_runner: Q,
 ) {
@@ -320,6 +324,6 @@ async fn new_block_task<Q: SyncQueryRunnerInterface>(
         // TODO(qti3e): Get the lock only if we have to. Timeout should get sep from block.
         // Right now we are relying on the existence of new blocks to handle timeout.
         let mut guard = worker.state.lock().await;
-        guard.sync_with_application(nonce, &query_runner).await;
+        guard.sync_with_application(nonce).await;
     }
 }

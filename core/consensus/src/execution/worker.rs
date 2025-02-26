@@ -237,6 +237,7 @@ async fn handle_consensus_output<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
         error!("We received consensus output from narwhal while not on the committee");
         return;
     }
+
     // This function is only executed by validators.
     let current_epoch = ctx.query_runner.get_current_epoch();
     // We have batches in the payload send them over broadcast along with an attestion

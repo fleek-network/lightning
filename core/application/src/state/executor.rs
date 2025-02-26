@@ -1512,6 +1512,7 @@ impl<B: Backend> StateExecutor<B> {
         if !txn.payload.sender.verify(txn.signature, &digest) {
             return Err(ExecutionError::InvalidSignature);
         }
+
         Ok(())
     }
 
