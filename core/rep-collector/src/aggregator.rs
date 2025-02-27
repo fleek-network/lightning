@@ -114,7 +114,7 @@ impl<C: NodeComponents> ReputationAggregator<C> {
                 let submit_tx = self.submit_tx.clone();
                 info!("Submitting reputation measurements");
                 if let Err(e) = submit_tx
-                    .enqueue(UpdateMethod::SubmitReputationMeasurements { measurements })
+                    .enqueue(UpdateMethod::SubmitReputationMeasurements { measurements }.into())
                     .await
                 {
                     error!("Submitting reputation measurements failed: {e:?}");
@@ -139,9 +139,12 @@ impl<C: NodeComponents> ReputationAggregator<C> {
                 info!("Submitting reputation measurements (1)");
                 if let Err(e) = self
                     .submit_tx
-                    .enqueue(UpdateMethod::SubmitReputationMeasurements {
-                        measurements: measurements1,
-                    })
+                    .enqueue(
+                        UpdateMethod::SubmitReputationMeasurements {
+                            measurements: measurements1,
+                        }
+                        .into(),
+                    )
                     .await
                 {
                     error!("Submitting reputation measurements failed: {e:?}");
@@ -150,9 +153,12 @@ impl<C: NodeComponents> ReputationAggregator<C> {
                 info!("Submitting reputation measurements (2)");
                 if let Err(e) = self
                     .submit_tx
-                    .enqueue(UpdateMethod::SubmitReputationMeasurements {
-                        measurements: measurements2,
-                    })
+                    .enqueue(
+                        UpdateMethod::SubmitReputationMeasurements {
+                            measurements: measurements2,
+                        }
+                        .into(),
+                    )
                     .await
                 {
                     error!("Submitting reputation measurements failed: {e:?}");

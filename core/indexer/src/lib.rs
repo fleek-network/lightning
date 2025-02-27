@@ -82,7 +82,7 @@ impl<C: NodeComponents> IndexerInterface<C> for Indexer<C> {
                 let updates = vec![ContentUpdate { uri, remove: false }];
                 if let Err(e) = self
                     .submit_tx
-                    .enqueue(UpdateMethod::UpdateContentRegistry { updates })
+                    .enqueue(UpdateMethod::UpdateContentRegistry { updates }.into())
                     .await
                 {
                     tracing::error!("Submitting content registry update failed: {e:?}");
@@ -103,7 +103,7 @@ impl<C: NodeComponents> IndexerInterface<C> for Indexer<C> {
 
                 if let Err(e) = self
                     .submit_tx
-                    .enqueue(UpdateMethod::UpdateContentRegistry { updates })
+                    .enqueue(UpdateMethod::UpdateContentRegistry { updates }.into())
                     .await
                 {
                     tracing::error!("Submitting content registry update failed: {e:?}");

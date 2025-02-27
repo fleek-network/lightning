@@ -1,13 +1,13 @@
 use affair::Socket;
 use fdi::BuildGraph;
-use lightning_types::UpdateMethod;
+use lightning_types::ExecuteTransaction;
 
 use crate::components::NodeComponents;
 
 /// A socket that is responsible to submit a transaction to the consensus from our node,
 /// implementation of this socket needs to assure the consistency and increment of the
 /// nonce (which we also refer to as the counter).
-pub type SignerSubmitTxSocket = Socket<UpdateMethod, u64>;
+pub type SignerSubmitTxSocket = Socket<ExecuteTransaction, ()>;
 
 /// The signature provider is responsible for signing messages using the private key of
 /// the node.

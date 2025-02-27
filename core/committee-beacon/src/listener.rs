@@ -286,7 +286,7 @@ impl<C: NodeComponents> CommitteeBeaconListener<C> {
         method: UpdateMethod,
     ) -> Result<(), ExecuteTransactionError> {
         self.signer
-            .run(method)
+            .run(method.into())
             .await
             .map_err(|e| anyhow::anyhow!("{e:?}"))?;
         Ok(())

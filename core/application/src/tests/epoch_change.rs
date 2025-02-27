@@ -64,11 +64,11 @@ async fn test_epoch_change_with_all_committee_nodes() {
 
     // Execute an epoch change transaction from less than 2/3 of the nodes.
     node1
-        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch }, None)
+        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
         .await
         .unwrap();
     node2
-        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch }, None)
+        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
         .await
         .unwrap();
 
@@ -110,7 +110,7 @@ async fn test_epoch_change_with_all_committee_nodes() {
 
     // Execute an epoch change transaction from enough nodes to trigger an epoch change.
     node3
-        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch }, None)
+        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
         .await
         .unwrap();
 
@@ -196,11 +196,11 @@ async fn test_epoch_change_with_some_non_committee_nodes() {
 
     // Execute an epoch change transaction from less than 2/3 of the committee nodes.
     committee_node1
-        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch }, None)
+        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
         .await
         .unwrap();
     committee_node2
-        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch }, None)
+        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
         .await
         .unwrap();
 
@@ -227,7 +227,7 @@ async fn test_epoch_change_with_some_non_committee_nodes() {
 
     // Send epoch change transactions from the non-committee nodes.
     let result = non_committee_node1
-        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch }, None)
+        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
         .await;
     match result.unwrap_err() {
         ExecuteTransactionError::Reverted((_, TransactionReceipt { response, .. }, _)) => {
@@ -239,7 +239,7 @@ async fn test_epoch_change_with_some_non_committee_nodes() {
         e => panic!("unexpected error type: {e:?}"),
     }
     let result = non_committee_node2
-        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch }, None)
+        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
         .await;
     match result.unwrap_err() {
         ExecuteTransactionError::Reverted((_, TransactionReceipt { response, .. }, _)) => {
@@ -283,7 +283,7 @@ async fn test_epoch_change_with_some_non_committee_nodes() {
 
     // Execute an epoch change transaction from enough nodes to trigger an epoch change.
     committee_node3
-        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch }, None)
+        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
         .await
         .unwrap();
 
@@ -511,7 +511,7 @@ async fn test_epoch_change_reverts_epoch_already_changed() {
 
     // Send epoch change transaction from a node for same epoch, and expect it to be reverted.
     let result = node
-        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch }, None)
+        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
         .await;
     match result.unwrap_err() {
         ExecuteTransactionError::Reverted((_, TransactionReceipt { response, .. }, _)) => {
@@ -691,18 +691,9 @@ async fn test_distribute_rewards() {
     ];
 
     // Execute delivery acknowledgment transactions.
-    node1
-        .execute_transaction_from_node(pod_10, None)
-        .await
-        .unwrap();
-    node1
-        .execute_transaction_from_node(pod_11, None)
-        .await
-        .unwrap();
-    node2
-        .execute_transaction_from_node(pod_21, None)
-        .await
-        .unwrap();
+    node1.execute_transaction_from_node(pod_10).await.unwrap();
+    node1.execute_transaction_from_node(pod_11).await.unwrap();
+    node2.execute_transaction_from_node(pod_21).await.unwrap();
 
     // Trigger epoch change and distribute rewards.
     network
@@ -850,15 +841,12 @@ async fn test_supply_across_epoch() {
     // supply are as expected.
     for epoch in 0..genesis.epochs_per_year {
         // Add at least one transaction per epoch, so reward pool is not zero.
-        node.execute_transaction_from_node(
-            UpdateMethod::SubmitDeliveryAcknowledgmentAggregation {
-                commodity: 10000,
-                service_id: 0,
-                proofs: vec![DeliveryAcknowledgmentProof],
-                metadata: None,
-            },
-            None,
-        )
+        node.execute_transaction_from_node(UpdateMethod::SubmitDeliveryAcknowledgmentAggregation {
+            commodity: 10000,
+            service_id: 0,
+            proofs: vec![DeliveryAcknowledgmentProof],
+            metadata: None,
+        })
         .await
         .unwrap();
 
@@ -875,10 +863,9 @@ async fn test_supply_across_epoch() {
 
                 map.insert(peer.index(), measurements.clone());
             }
-            node.execute_transaction_from_node(
-                UpdateMethod::SubmitReputationMeasurements { measurements: map },
-                None,
-            )
+            node.execute_transaction_from_node(UpdateMethod::SubmitReputationMeasurements {
+                measurements: map,
+            })
             .await
             .unwrap();
         }

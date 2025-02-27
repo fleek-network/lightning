@@ -155,7 +155,7 @@ impl AggregatorInner {
                         let submit_tx = self.submit_tx.clone();
                         spawn!(async move {
                             if let Err(e) = submit_tx
-                                .run(update)
+                                .run(update.into())
                                 .await
                             {
                                 error!("Failed to submit DACK to signer: {e:?}");

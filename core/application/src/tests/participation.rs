@@ -38,21 +38,15 @@ async fn test_uptime_participation() {
 
     // Add records in the content registry for the peers.
     peer1
-        .execute_transaction_from_node(
-            UpdateMethod::UpdateContentRegistry {
-                updates: vec![Default::default()],
-            },
-            None,
-        )
+        .execute_transaction_from_node(UpdateMethod::UpdateContentRegistry {
+            updates: vec![Default::default()],
+        })
         .await
         .unwrap();
     peer2
-        .execute_transaction_from_node(
-            UpdateMethod::UpdateContentRegistry {
-                updates: vec![Default::default()],
-            },
-            None,
-        )
+        .execute_transaction_from_node(UpdateMethod::UpdateContentRegistry {
+            updates: vec![Default::default()],
+        })
         .await
         .unwrap();
 
@@ -91,10 +85,7 @@ async fn test_uptime_participation() {
         ]);
     network
         .node(0)
-        .execute_transaction_from_node(
-            UpdateMethod::SubmitReputationMeasurements { measurements },
-            None,
-        )
+        .execute_transaction_from_node(UpdateMethod::SubmitReputationMeasurements { measurements })
         .await
         .unwrap();
 
@@ -105,10 +96,7 @@ async fn test_uptime_participation() {
     ]);
     network
         .node(1)
-        .execute_transaction_from_node(
-            UpdateMethod::SubmitReputationMeasurements { measurements },
-            None,
-        )
+        .execute_transaction_from_node(UpdateMethod::SubmitReputationMeasurements { measurements })
         .await
         .unwrap();
 

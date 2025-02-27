@@ -443,7 +443,7 @@ async fn wait_and_signal_epoch_change<Q: SyncQueryRunnerInterface>(
                     info!("Signalling ready to change epoch (epoch: {epoch})");
 
                     if let Err(e) = txn_socket
-                        .enqueue(UpdateMethod::ChangeEpoch { epoch })
+                        .enqueue(UpdateMethod::ChangeEpoch { epoch }.into())
                         .await
                     {
                         error!("Error sending change epoch signal to socket {}", e);
@@ -518,7 +518,7 @@ async fn wait_and_signal_commit_phase_timeout<Q: SyncQueryRunnerInterface>(
                         round,
                     };
                     if let Err(e) = txn_socket
-                        .enqueue(method)
+                        .enqueue(method.into())
                         .await
                     {
                         error!("Error sending commit phase timeout to socket {}", e);
@@ -582,7 +582,7 @@ async fn wait_and_signal_reveal_phase_timeout<Q: SyncQueryRunnerInterface>(
                         round,
                     };
                     if let Err(e) = txn_socket
-                        .enqueue(method)
+                        .enqueue(method.into())
                         .await
                     {
                         error!("Error sending reveal phase timeout to socket {}", e);
