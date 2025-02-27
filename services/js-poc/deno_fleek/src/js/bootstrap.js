@@ -1,5 +1,6 @@
 import * as loc from "ext:deno_web/12_location.js";
 import { globalContext } from "ext:fleek/global.js";
+import { bootstrap as bootstrapOtel } from "ext:deno_telemetry/telemetry.ts";
 
 /** Bootstrap function called at runtime before execution.
  *  Can only be called once.
@@ -14,6 +15,8 @@ globalThis.bootstrap = (time, url) => {
 
   // Set runtime location
   loc.setLocationHref(url);
+
+  bootstrapOtel([1, 1, 1]);
 
   // Block internal access to deno from the script scope
   delete globalThis.Deno;

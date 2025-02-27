@@ -17,6 +17,8 @@ serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 async-trait.workspace = true
+opentelemetry_sdk = "0.27.1"
+opentelemetry-otlp = "0.27.0"
 
 # Deno core + webapi extensions
 deno_ast = { version = "0.44", features = ["transpiling"] }

@@ -22,7 +22,7 @@ use fn_sdk::blockstore::{block_file, header_file};
 use lightning_schema::task_broker::TaskScope;
 use serde::{Deserialize, Serialize, Serializer};
 use serde_json::json;
-use tracing::info;
+use tracing::debug;
 
 #[derive(Debug, thiserror::Error, deno_error::JsError)]
 #[class(generic)]
@@ -69,7 +69,7 @@ pub async fn run_task(
 
 #[op2(fast)]
 pub fn log(#[string] message: String) {
-    info!("Runtime: {message}");
+    debug!("Runtime: {message}");
 }
 
 #[op2(async)]
