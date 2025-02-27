@@ -74,7 +74,7 @@ pub trait TestNetworkNode {
     async fn execute_transaction_from_node(
         &self,
         method: UpdateMethod,
-    ) -> Result<u64, ExecuteTransactionError>;
+    ) -> Result<(), ExecuteTransactionError>;
 }
 
 pub type BoxedTestNode = Box<dyn TestNetworkNode>;
@@ -235,15 +235,13 @@ impl<C: NodeComponents> TestNetworkNode for TestFullNode<C> {
     async fn execute_transaction_from_node(
         &self,
         method: UpdateMethod,
-    ) -> Result<u64, ExecuteTransactionError> {
-        let resp = self
-            .signer()
+    ) -> Result<(), ExecuteTransactionError> {
+        self.signer()
             .get_socket()
-            .run(method)
+            .run(method.into())
             .await
             .map_err(|e| anyhow::anyhow!("{e:?}"))?;
-
-        Ok(resp)
+        Ok(())
     }
 }
 

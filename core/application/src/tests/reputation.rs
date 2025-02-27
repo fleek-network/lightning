@@ -125,12 +125,9 @@ async fn test_rep_scores() {
             generate_reputation_measurements(&mut rng, 0.1),
         ),
     ]);
-    node.execute_transaction_from_node(
-        UpdateMethod::SubmitReputationMeasurements { measurements },
-        None,
-    )
-    .await
-    .unwrap();
+    node.execute_transaction_from_node(UpdateMethod::SubmitReputationMeasurements { measurements })
+        .await
+        .unwrap();
 
     // Submit reputation measurements from node 1, for peer 1 and 2.
     let measurements = BTreeMap::from_iter(vec![
@@ -143,12 +140,9 @@ async fn test_rep_scores() {
             generate_reputation_measurements(&mut rng, 0.1),
         ),
     ]);
-    node.execute_transaction_from_node(
-        UpdateMethod::SubmitReputationMeasurements { measurements },
-        None,
-    )
-    .await
-    .unwrap();
+    node.execute_transaction_from_node(UpdateMethod::SubmitReputationMeasurements { measurements })
+        .await
+        .unwrap();
 
     // Change epoch and wait for it to be complete.
     network

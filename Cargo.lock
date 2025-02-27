@@ -7893,7 +7893,7 @@ dependencies = [
  "lightning-workspace-hack",
  "mini-moka",
  "plotters",
- "quick_cache",
+ "quick_cache 0.4.3",
  "rand 0.8.5",
  "serde",
  "simulon",
@@ -8070,7 +8070,7 @@ dependencies = [
  "narwhal-types 0.1.0 (git+https://github.com/MystenLabs/sui.git?rev=bbfaafc17652d221651e835c908028c440f039d7)",
  "narwhal-worker",
  "prometheus",
- "quick_cache",
+ "quick_cache 0.4.3",
  "rand 0.8.5",
  "ready",
  "resolved-pathbuf",
@@ -8879,6 +8879,7 @@ dependencies = [
  "lightning-test-utils",
  "lightning-utils",
  "lightning-workspace-hack",
+ "quick_cache 0.6.10",
  "serde",
  "tempfile",
  "thiserror 1.0.64",
@@ -12622,6 +12623,18 @@ name = "quick_cache"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4a4b807ec70346b4fac3c13ae967634237847d49871f623fe0d455403346bad4"
+dependencies = [
+ "ahash 0.8.11",
+ "equivalent",
+ "hashbrown 0.14.5",
+ "parking_lot",
+]
+
+[[package]]
+name = "quick_cache"
+version = "0.6.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3f67cfc9c723c39f3615eb0840b00c4cb9e2b068d2fa761a30d845ec91730a59"
 dependencies = [
  "ahash 0.8.11",
  "equivalent",

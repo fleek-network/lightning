@@ -205,17 +205,15 @@ where
     pub async fn execute_transaction_from_node(
         &self,
         method: UpdateMethod,
-    ) -> Result<u64, ExecuteTransactionError>
+    ) -> Result<(), ExecuteTransactionError>
     where
         C::ApplicationInterface: ApplicationInterface<C, SyncExecutor = QueryRunner>,
     {
-        let resp = self
-            .signer()
+        self.signer()
             .get_socket()
-            .run(method)
+            .run(method.into())
             .await
             .map_err(|e| anyhow::anyhow!("{e:?}"))?;
-
-        Ok(resp)
+        Ok(())
     }
 }

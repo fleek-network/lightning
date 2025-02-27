@@ -5,13 +5,22 @@ use fleek_crypto::{AccountOwnerSecretKey, SecretKey};
 use lightning_application::app::Application;
 use lightning_application::config::ApplicationConfig;
 use lightning_interfaces::prelude::*;
-use lightning_interfaces::types::{Genesis, GenesisNode, NodePorts, UpdateMethod};
+use lightning_interfaces::types::{
+    ExecuteTransaction,
+    ExecutionData,
+    Genesis,
+    GenesisNode,
+    NodePorts,
+    TransactionResponse,
+    UpdateMethod,
+};
 use lightning_node::Node;
 use lightning_notifier::Notifier;
 use lightning_test_utils::consensus::{MockConsensus, MockConsensusConfig, MockForwarder};
 use lightning_test_utils::json_config::JsonConfigProvider;
 use lightning_test_utils::keys::EphemeralKeystore;
 use tempfile::{tempdir, TempDir};
+use tokio::sync::oneshot;
 
 use crate::Signer;
 
@@ -87,6 +96,35 @@ fn get_our_nonce<C: NodeComponents>(node: &Node<C>) -> u64 {
 }
 
 #[tokio::test]
+async fn test_get_txs_receipt() {
+    let temp_dir = tempdir().unwrap();
+    let node = build_node(&temp_dir, &[]);
+    node.start().await;
+
+    let signer_socket = node.provider.get::<Signer<TestBinding>>().get_socket();
+
+    // Send two transactions to the signer.
+    let (receipt_tx, receipt_rx) = oneshot::channel();
+    let update_method = UpdateMethod::IncrementNonce {};
+    let request = ExecuteTransaction {
+        method: update_method,
+        receipt_tx: Some(receipt_tx),
+    };
+
+    signer_socket.run(request).await.unwrap();
+
+    let receipt = receipt_rx.await.unwrap();
+
+    assert!(matches!(
+        receipt.response,
+        TransactionResponse::Success(ExecutionData::None)
+    ));
+
+    let new_nonce = get_our_nonce(&node);
+    assert_eq!(new_nonce, 1);
+}
+
+#[tokio::test]
 async fn test_send_two_txs_in_a_row() {
     let temp_dir = tempdir().unwrap();
     let node = build_node(&temp_dir, &[]);
@@ -98,11 +136,11 @@ async fn test_send_two_txs_in_a_row() {
     let update_method = UpdateMethod::SubmitReputationMeasurements {
         measurements: BTreeMap::new(),
     };
-    signer_socket.run(update_method).await.unwrap();
+    signer_socket.run(update_method.into()).await.unwrap();
     let update_method = UpdateMethod::SubmitReputationMeasurements {
         measurements: BTreeMap::new(),
     };
-    signer_socket.run(update_method).await.unwrap();
+    signer_socket.run(update_method.into()).await.unwrap();
 
     // Each transaction will take at most 2 seconds to get ordered.
     // Therefore, after 5 seconds, the nonce should be 2.
@@ -123,14 +161,14 @@ async fn test_retry_send() {
     assert_eq!(new_nonce, 0);
     // Send two transactions to the signer. The OptIn transaction was chosen arbitrarily.
     let update_method = UpdateMethod::OptIn {};
-    signer_socket.run(update_method).await.unwrap();
+    signer_socket.run(update_method.into()).await.unwrap();
     // This transaction won't be ordered and the nonce won't be incremented on the application.
     let update_method = UpdateMethod::OptIn {};
-    signer_socket.run(update_method).await.unwrap();
+    signer_socket.run(update_method.into()).await.unwrap();
     // This transaction will have the wrong nonce, since the signer increments nonces
     // optimistically.
     let update_method = UpdateMethod::OptIn {};
-    signer_socket.run(update_method).await.unwrap();
+    signer_socket.run(update_method.into()).await.unwrap();
 
     // The signer will notice that the nonce doesn't increment on the application after the second
     // transaction, and then it will resend all following transactions.
