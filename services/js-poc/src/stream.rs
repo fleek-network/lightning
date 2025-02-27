@@ -20,6 +20,10 @@ pub struct Request {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(alias = "params", alias = "parameter", alias = "parameters")]
     pub param: Option<serde_json::Value>,
+    // /// Optional list of opentelemetry rpc endpoints to post logs to
+    // #[serde(skip_serializing_if = "Vec::is_empty")]
+    // #[serde(alias = "opentelemetry")]
+    // pub otel: Vec<deno_corie::Url>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Eq, PartialEq)]

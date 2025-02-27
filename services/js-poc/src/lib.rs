@@ -130,6 +130,7 @@ async fn handle_request(
         uri,
         path,
         param,
+        // otel,
     } = request;
     if uri.is_empty() {
         bail!("Empty origin uri");

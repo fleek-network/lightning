@@ -1,9 +1,12 @@
+use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use ::deno_fetch::{deno_fetch, Options};
 use ::deno_net::deno_net;
+use ::deno_telemetry::config::TelemetryConfig;
+use ::deno_telemetry::{OtelConfig, OtelRuntimeConfig};
 use ::deno_web::deno_web;
 use ::deno_websocket::deno_websocket;
 use anyhow::{bail, Result};
@@ -44,8 +47,33 @@ impl Runtime {
     pub fn new(location: Url, depth: u8) -> Result<Self> {
         let memory_fs = MaybeArc::new(InMemoryFs::default());
         let tape = Tape::new(location.clone());
+
+        let otel_config = OtelConfig {
+            tracing_enabled: true,
+            deterministic: true,
+            metrics_enabled: true,
+            console: ::deno_telemetry::OtelConsoleConfig::Capture,
+        };
+        let rt_config = OtelRuntimeConfig {
+            runtime_name: std::borrow::Cow::Borrowed("fleek"),
+            runtime_version: std::borrow::Cow::Borrowed("xx"),
+        };
+        let mut headers = HashMap::new();
+        headers.insert(
+            "signoz-ingestion-key".into(),
+            "05bf7a56-ad24-4c31-ad70-cfe9b91c0c41".into(),
+        );
+        let config = TelemetryConfig {
+            protocol: ::deno_telemetry::config::Protocol::HttpBinary,
+            endpoint: Some("https://ingest.us.signoz.cloud:443".into()),
+            headers,
+            temporality: ::deno_telemetry::config::Temporality::LowMemory,
+            client_config: ::deno_telemetry::config::HyperClientConfig {},
+        };
+
         let mut deno = JsRuntime::new(RuntimeOptions {
             extensions: vec![
+                deno_telemetry::init_ops(config, otel_config, rt_config),
                 // WebApi subset
                 deno_webidl::init_ops(),
                 deno_console::init_ops(),
@@ -59,7 +87,6 @@ impl Runtime {
                 deno_canvas::init_ops(),
                 deno_io::deno_io::init_ops(Some(Default::default())),
                 deno_fs::deno_fs::init_ops::<Permissions>(memory_fs.clone()),
-                deno_telemetry::init_ops(),
                 deno_node::deno_node::init_ops::<
                     Permissions,
                     DisabledNpmChecker,
@@ -159,7 +186,11 @@ impl Runtime {
     }
 
     /// End and collect the punch tape
-    pub fn end(self) -> Vec<Punch> {
+    pub fn end(mut self) -> Vec<Punch> {
+        // flush opentelemetry logs
+        let state = self.deno.op_state();
+        ::deno_telemetry::flush(&mut state.borrow_mut());
+
         self.tape.end()
     }
 }
