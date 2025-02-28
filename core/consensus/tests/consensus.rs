@@ -21,7 +21,7 @@ async fn test_execute_transaction_as_committee_node() {
     tokio::time::sleep(Duration::from_millis(1000)).await;
 
     // Execute an increment nonce transaction from the first node.
-    let _ = network
+    network
         .node(0)
         .execute_transaction_from_node(UpdateMethod::IncrementNonce {})
         .await
@@ -73,7 +73,7 @@ async fn test_execute_transaction_as_non_committee_node() {
 
     // Execute an increment nonce transaction from the non-committee node.
     let non_committee_node = network.non_committee_nodes()[0];
-    let _ = non_committee_node
+    non_committee_node
         .execute_transaction_from_node(UpdateMethod::IncrementNonce {})
         .await
         .unwrap();
