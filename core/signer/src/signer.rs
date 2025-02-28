@@ -4,6 +4,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 
 use affair::AsyncWorker;
+use anyhow::anyhow;
 use fleek_crypto::{NodePublicKey, NodeSecretKey, SecretKey, TransactionSender};
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
@@ -19,7 +20,7 @@ use lightning_interfaces::{spawn_worker, BlockExecutedNotification};
 use lightning_utils::application::QueryRunnerExt;
 use quick_cache::sync::Cache;
 use tokio::sync::{oneshot, Mutex};
-use tracing::{error, warn};
+use tracing::{debug, error, warn};
 
 use crate::listener::BlockListener;
 
@@ -39,6 +40,12 @@ const TXN_RECEIPT_INTERVAL: Duration = Duration::from_millis(100);
 
 // Maximum number of times we will resend a transaction.
 const MAX_RETRIES: u8 = 3;
+
+// Maximum number of times we will resend to the forwarder.
+const MAX_FORWARDER_RETRIES: u8 = 3;
+
+// Waiting time between forwarder retries.
+const WAIT_FOR_RETRY: Duration = Duration::from_secs(5);
 
 // Receipt cache capacity.
 const CACHE_CAPACITY: usize = 1000;
@@ -184,13 +191,8 @@ impl<C: NodeComponents> SignerState<C> {
             payload: update_payload,
         };
 
-        if let Err(e) = self
-            .mempool_socket
-            .enqueue(update_request.clone().into())
-            .await
-            .map_err(|r| anyhow::anyhow!(format!("{r:?}")))
-        {
-            error!("Failed to send transaction to mempool: {e:?}");
+        if let Err(e) = send_to_forwarder(&self.mempool_socket, &update_request).await {
+            error!("failed to send transaction to mempool: {e:?}");
         }
 
         // Optimistically increment nonce
@@ -293,13 +295,10 @@ impl<C: NodeComponents> SignerState<C> {
                 }
 
                 for pending_tx in self.pending_transactions.iter_mut() {
-                    if let Err(e) = self
-                        .mempool_socket
-                        .run(pending_tx.update_request.clone().into())
-                        .await
-                        .map_err(|r| anyhow::anyhow!(format!("{r:?}")))
+                    if let Err(e) =
+                        send_to_forwarder(&self.mempool_socket, &pending_tx.update_request).await
                     {
-                        error!("Failed to send transaction to mempool: {e:?}");
+                        error!("failed to send transaction to mempool: {e:?}");
                     } else {
                         pending_tx.tries += 1;
                     }
@@ -307,6 +306,27 @@ impl<C: NodeComponents> SignerState<C> {
             }
         }
     }
+}
+
+async fn send_to_forwarder(
+    mempool_socket: &MempoolSocket,
+    update_request: &UpdateRequest,
+) -> anyhow::Result<()> {
+    for _ in 0..MAX_FORWARDER_RETRIES {
+        match mempool_socket.run(update_request.clone().into()).await {
+            Ok(result) => match result {
+                Ok(()) => return Ok(()),
+                Err(e) => {
+                    debug!("failed to send transaction to mempool: {e:?}");
+                },
+            },
+            Err(e) => {
+                debug!("failed to send transaction to mempool: {e:?}");
+            },
+        }
+        tokio::time::sleep(WAIT_FOR_RETRY).await;
+    }
+    Err(anyhow!("stopped after {MAX_FORWARDER_RETRIES} tries"))
 }
 
 impl LazyNodeIndex {
