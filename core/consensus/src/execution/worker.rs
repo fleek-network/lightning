@@ -299,7 +299,7 @@ async fn handle_consensus_output<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterfa
             .unwrap_or(u32::MAX);
         ctx.on_committee = ctx.committee.contains(&ctx.our_index);
 
-        if !is_epoch_era_changed {
+        if response.change_epoch {
             ctx.txn_store.change_epoch(&ctx.committee);
         }
     }
@@ -535,9 +535,11 @@ async fn execute_digest<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: E
     digest: Digest,
     ctx: &mut Context<P, Q, NE>,
 ) {
+    let epoch_era_before_execution = ctx.query_runner.get_epoch_era();
     match try_execute(digest, ctx).await {
         Ok(epoch_changed) => {
-            if epoch_changed {
+            let epoch_era_changed = epoch_era_before_execution != ctx.query_runner.get_epoch_era();
+            if epoch_changed || epoch_era_changed {
                 ctx.committee = ctx.query_runner.get_committee_members_by_index();
                 ctx.quorom_threshold = (ctx.committee.len() * 2) / 3 + 1;
                 // We recheck our index incase it was non existant before and
@@ -548,7 +550,9 @@ async fn execute_digest<P: PubSub<PubSubMsg>, Q: SyncQueryRunnerInterface, NE: E
                     .unwrap_or(u32::MAX);
                 ctx.on_committee = ctx.committee.contains(&ctx.our_index);
                 ctx.reconfigure_notify.notify_waiters();
-                ctx.txn_store.change_epoch(&ctx.committee);
+                if epoch_changed {
+                    ctx.txn_store.change_epoch(&ctx.committee);
+                }
             }
         },
         Err(not_executed) => {
