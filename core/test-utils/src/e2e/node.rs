@@ -20,6 +20,7 @@ use lightning_application::Application;
 use lightning_checkpointer::Checkpointer;
 use lightning_committee_beacon::CommitteeBeaconComponent;
 use lightning_interfaces::prelude::*;
+use lightning_interfaces::types::{ExecuteTransaction, TransactionReceipt};
 use lightning_node::ContainedNode;
 use lightning_notifier::Notifier;
 use lightning_pinger::Pinger;
@@ -29,6 +30,7 @@ use lightning_rpc::Rpc;
 use lightning_signer::Signer;
 use lightning_utils::transaction::TransactionSigner;
 use merklize::StateRootHash;
+use tokio::sync::oneshot;
 use types::{
     Epoch,
     ExecuteTransactionError,
@@ -75,6 +77,11 @@ pub trait TestNetworkNode {
         &self,
         method: UpdateMethod,
     ) -> Result<(), ExecuteTransactionError>;
+    async fn execute_transaction_from_node_with_receipt(
+        &self,
+        method: UpdateMethod,
+        timeout: Duration,
+    ) -> Result<TransactionReceipt, ExecuteTransactionError>;
 }
 
 pub type BoxedTestNode = Box<dyn TestNetworkNode>;
@@ -242,6 +249,27 @@ impl<C: NodeComponents> TestNetworkNode for TestFullNode<C> {
             .await
             .map_err(|e| anyhow::anyhow!("{e:?}"))?;
         Ok(())
+    }
+
+    async fn execute_transaction_from_node_with_receipt(
+        &self,
+        method: UpdateMethod,
+        timeout: Duration,
+    ) -> Result<TransactionReceipt, ExecuteTransactionError> {
+        let (receipt_tx, receipt_rx) = oneshot::channel();
+        self.signer()
+            .get_socket()
+            .run(ExecuteTransaction {
+                method: method.clone(),
+                receipt_tx: Some(receipt_tx),
+            })
+            .await
+            .map_err(|e| anyhow::anyhow!("{e:?}"))?;
+
+        tokio::time::timeout(timeout, receipt_rx)
+            .await
+            .map_err(|_| ExecuteTransactionError::Timeout((method, None, 1)))?
+            .map_err(|e| ExecuteTransactionError::Other(format!("{e:?}")))
     }
 }
 
