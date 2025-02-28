@@ -34,7 +34,15 @@ impl<C: NodeComponents> BlockListener<C> {
 
             for receipt in notification.response.txn_receipts {
                 let hash = receipt.transaction_hash;
-                self.receipt_cache.insert(hash, receipt);
+
+                // We only insert the receipt if it isn't contained already.
+                // This is because the Narwhal mempool sometimes causes the same transaction to get
+                // ordered twice. In this case, the second transaction will be reverted. But we are
+                // interested in the receipt from the first transaction.
+                if !self.receipt_cache.contains_key(&hash) {
+                    self.receipt_cache.insert(hash, receipt);
+                }
+
                 // We get the item from the cache to turn the eviction policy into LRU.
                 // This way the oldest entries will get evicted first.
                 self.receipt_cache.get(&hash);
