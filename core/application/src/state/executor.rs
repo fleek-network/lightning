@@ -1470,6 +1470,15 @@ impl<B: Backend> StateExecutor<B> {
         }
     }
     fn verify_fleek_transaction(&self, txn: &UpdateRequest) -> Result<(), ExecutionError> {
+        // Check if we already executed the transaction
+        if self
+            .executed_digests
+            .get(&txn.payload.to_digest())
+            .is_some()
+        {
+            return Err(ExecutionError::AlreadyExecutedDigest);
+        }
+
         // Check nonce
         match txn.payload.sender {
             // Todo Sunday(dalton): Clean up this match nesting
