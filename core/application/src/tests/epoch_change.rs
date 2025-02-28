@@ -7,7 +7,6 @@ use lightning_committee_beacon::CommitteeBeaconConfig;
 use lightning_interfaces::types::{
     CommitteeSelectionBeaconPhase,
     DeliveryAcknowledgmentProof,
-    ExecuteTransactionError,
     ExecutionData,
     ExecutionError,
     TransactionReceipt,
@@ -226,30 +225,36 @@ async fn test_epoch_change_with_some_non_committee_nodes() {
     .unwrap();
 
     // Send epoch change transactions from the non-committee nodes.
-    let result = non_committee_node1
-        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
-        .await;
-    match result.unwrap_err() {
-        ExecuteTransactionError::Reverted((_, TransactionReceipt { response, .. }, _)) => {
-            assert_eq!(
-                response,
-                TransactionResponse::Revert(ExecutionError::NotCommitteeMember)
-            )
+    let receipt = non_committee_node1
+        .execute_transaction_from_node_with_receipt(
+            UpdateMethod::ChangeEpoch { epoch },
+            Duration::from_secs(10),
+        )
+        .await
+        .unwrap();
+    assert!(matches!(
+        receipt,
+        TransactionReceipt {
+            response: TransactionResponse::Revert(ExecutionError::NotCommitteeMember),
+            ..
         },
-        e => panic!("unexpected error type: {e:?}"),
-    }
-    let result = non_committee_node2
-        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
-        .await;
-    match result.unwrap_err() {
-        ExecuteTransactionError::Reverted((_, TransactionReceipt { response, .. }, _)) => {
-            assert_eq!(
-                response,
-                TransactionResponse::Revert(ExecutionError::NotCommitteeMember)
-            )
+    ));
+
+    let receipt = non_committee_node2
+        .execute_transaction_from_node_with_receipt(
+            UpdateMethod::ChangeEpoch { epoch },
+            Duration::from_secs(10),
+        )
+        .await
+        .unwrap();
+
+    assert!(matches!(
+        receipt,
+        TransactionReceipt {
+            response: TransactionResponse::Revert(ExecutionError::NotCommitteeMember),
+            ..
         },
-        e => panic!("unexpected error type: {e:?}"),
-    }
+    ));
 
     // Check that the commit phase has not started within some time period.
     poll_until(
@@ -510,18 +515,21 @@ async fn test_epoch_change_reverts_epoch_already_changed() {
         .unwrap();
 
     // Send epoch change transaction from a node for same epoch, and expect it to be reverted.
-    let result = node
-        .execute_transaction_from_node(UpdateMethod::ChangeEpoch { epoch })
-        .await;
-    match result.unwrap_err() {
-        ExecuteTransactionError::Reverted((_, TransactionReceipt { response, .. }, _)) => {
-            assert_eq!(
-                response,
-                TransactionResponse::Revert(ExecutionError::EpochAlreadyChanged)
-            )
+    let receipt = node
+        .execute_transaction_from_node_with_receipt(
+            UpdateMethod::ChangeEpoch { epoch },
+            Duration::from_secs(10),
+        )
+        .await
+        .unwrap();
+
+    assert!(matches!(
+        receipt,
+        TransactionReceipt {
+            response: TransactionResponse::Revert(ExecutionError::EpochAlreadyChanged),
+            ..
         },
-        e => panic!("unexpected error type: {e:?}"),
-    }
+    ));
 
     // Shutdown the network.
     network.shutdown().await;
