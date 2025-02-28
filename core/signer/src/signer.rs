@@ -168,6 +168,7 @@ impl<C: NodeComponents> SignerState<C> {
         }
 
         let ExecuteTransaction { method, receipt_tx } = request;
+
         let assigned_nonce = self.next_nonce;
         let update_payload = UpdatePayload {
             sender: TransactionSender::NodeMain(self.node_public_key),
@@ -215,17 +216,14 @@ impl<C: NodeComponents> SignerState<C> {
         // All transactions in range [base_nonce, application_nonce] have
         // been ordered, so we can remove them from `pending_transactions`.
         self.base_nonce = application_nonce;
-
         while !self.pending_transactions.is_empty()
             && self.pending_transactions[0].update_request.payload.nonce <= application_nonce
         {
             if let Some(txn) = self.pending_transactions.pop_front() {
-                println!("sync_with_application 1");
                 // Check if the request contained a receipt sender.
                 // In this case we will await the transaction receipt in a task, and send it.
                 // This is done on a best effort basis. Errors won't be handled.
                 if let Some(receipt_tx) = txn.receipt_tx {
-                    println!("sync_with_application 2");
                     let receipt_cache = self.receipt_cache.clone();
                     spawn!(
                         async move {
@@ -380,14 +378,11 @@ async fn respond_with_receipt(
     txn: &UpdateRequest,
     timeout: Duration,
 ) {
-    println!("respond_with_receipt");
-
     let mut interval = tokio::time::interval(TXN_RECEIPT_INTERVAL);
     let now = Instant::now();
     loop {
         if now.elapsed() >= timeout {
             tracing::debug!("Timeout while waiting for transaction receipt");
-            println!("Timeout while waiting for transaction receipt");
             break;
         }
         interval.tick().await;
