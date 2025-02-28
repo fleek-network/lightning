@@ -197,7 +197,6 @@ impl ApplicationEnv {
             }
         }
 
-        println!("APP RUN");
         Ok(response)
     }
 
