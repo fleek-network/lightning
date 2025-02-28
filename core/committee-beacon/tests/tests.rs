@@ -4,7 +4,12 @@ use std::time::Duration;
 use anyhow::Result;
 use lightning_committee_beacon::CommitteeBeaconConfig;
 use lightning_interfaces::prelude::*;
-use lightning_interfaces::types::UpdateMethod;
+use lightning_interfaces::types::{
+    ExecutionError,
+    TransactionReceipt,
+    TransactionResponse,
+    UpdateMethod,
+};
 use lightning_interfaces::{
     CommitteeBeaconInterface,
     CommitteeBeaconQueryInterface,
@@ -30,6 +35,9 @@ use types::{
     Staking,
 };
 
+const COMMIT_PHASE_DURATION: u64 = 4000; // ms
+const REVEAL_PHASE_DURATION: u64 = 4000; // ms
+
 #[tokio::test]
 async fn test_start_shutdown() {
     let node = lightning_test_utils::e2e::TestNodeBuilder::new()
@@ -41,8 +49,8 @@ async fn test_start_shutdown() {
 
 #[tokio::test]
 async fn test_epoch_change_single_node() {
-    let commit_phase_duration = 2000;
-    let reveal_phase_duration = 2000;
+    let commit_phase_duration = COMMIT_PHASE_DURATION;
+    let reveal_phase_duration = REVEAL_PHASE_DURATION;
 
     let mut network = build_network(BuildNetworkOptions {
         committee_nodes: 1,
@@ -145,8 +153,8 @@ async fn test_epoch_change_single_node() {
 
 #[tokio::test]
 async fn test_epoch_change_multiple_nodes() {
-    let commit_phase_duration = 2000;
-    let reveal_phase_duration = 2000;
+    let commit_phase_duration = COMMIT_PHASE_DURATION;
+    let reveal_phase_duration = REVEAL_PHASE_DURATION;
 
     let mut network = build_network(BuildNetworkOptions {
         committee_nodes: 3,
@@ -207,8 +215,8 @@ async fn test_epoch_change_multiple_nodes() {
 
 #[tokio::test]
 async fn test_insufficient_participation_in_commit_phase() {
-    let commit_phase_duration = 2000;
-    let reveal_phase_duration = 2000;
+    let commit_phase_duration = COMMIT_PHASE_DURATION;
+    let reveal_phase_duration = REVEAL_PHASE_DURATION;
     let mut network = build_network(BuildNetworkOptions {
         committee_nodes: 1,
         committee_nodes_without_beacon: 2,
@@ -259,8 +267,8 @@ async fn test_insufficient_participation_in_commit_phase() {
 
 #[tokio::test]
 async fn test_single_revealing_node_fully_slashed() {
-    let commit_phase_duration = 2000;
-    let reveal_phase_duration = 2000;
+    let commit_phase_duration = COMMIT_PHASE_DURATION;
+    let reveal_phase_duration = REVEAL_PHASE_DURATION;
     let mut network = build_network(BuildNetworkOptions {
         real_consensus: true,
         committee_nodes: 4,
@@ -395,14 +403,28 @@ async fn test_single_revealing_node_fully_slashed() {
         );
     }
 
+    // Wait for narwhal restart after slashing the non-revealing node.
+    wait_for_narwhal_restart().await;
+
     // Submit commit transaction from the non-revealing node and check that it's reverted.
-    let _ = non_revealing_node
-        .execute_transaction_from_node(UpdateMethod::CommitteeSelectionBeaconCommit {
-            commit: [0; 32].into(),
-        })
+    let receipt = non_revealing_node
+        .execute_transaction_from_node_with_receipt(
+            UpdateMethod::CommitteeSelectionBeaconCommit {
+                commit: [0; 32].into(),
+            },
+            Duration::from_secs(10),
+        )
         .await
         //.unwrap_err();
         .unwrap();
+
+    assert!(matches!(
+        receipt,
+        TransactionReceipt {
+            response: TransactionResponse::Revert(ExecutionError::InsufficientStake),
+            ..
+        },
+    ));
 
     //TODO(matthias): figure out a way to get the transaction response
     //assert!(
@@ -487,8 +509,8 @@ async fn test_single_revealing_node_fully_slashed() {
 
 #[tokio::test]
 async fn test_non_revealing_node_partially_slashed_insufficient_stake() {
-    let commit_phase_duration = 2000;
-    let reveal_phase_duration = 2000;
+    let commit_phase_duration = COMMIT_PHASE_DURATION;
+    let reveal_phase_duration = REVEAL_PHASE_DURATION;
     let mut network = build_network(BuildNetworkOptions {
         committee_nodes: 4,
         committee_nodes_without_beacon: 1,
@@ -601,26 +623,32 @@ async fn test_non_revealing_node_partially_slashed_insufficient_stake() {
         );
     }
 
+    // Wait for narwhal restart after slashing the non-revealing node.
+    //wait_for_narwhal_restart().await;
+
     // Submit commit transaction from the non-revealing node and check that it's reverted.
-    let _ = network
+    let receipt = network
         .node(4)
-        .execute_transaction_from_node(UpdateMethod::CommitteeSelectionBeaconCommit {
-            commit: [0; 32].into(),
-        })
+        .execute_transaction_from_node_with_receipt(
+            UpdateMethod::CommitteeSelectionBeaconCommit {
+                commit: [0; 32].into(),
+            },
+            Duration::from_secs(10),
+        )
         .await;
 
-    //TODO(matthias): figure out a way to get the transaction response
-    //assert!(matches!(
-    //    result,
-    //    Err(ExecuteTransactionError::Reverted((
-    //        _,
-    //        TransactionReceipt {
-    //            response: TransactionResponse::Revert(ExecutionError::InsufficientStake),
-    //            ..
-    //        },
-    //        _
-    //    )))
-    //));
+    if let Err(e) = &receipt {
+        panic!("ERROR: {e:?}");
+    }
+    let receipt = receipt.unwrap();
+
+    assert!(matches!(
+        receipt,
+        TransactionReceipt {
+            response: TransactionResponse::Revert(ExecutionError::InsufficientStake),
+            ..
+        },
+    ));
 
     // Wait for nodes to take reputation measurements.
     tokio::time::sleep(Duration::from_millis(2000)).await;
@@ -633,7 +661,7 @@ async fn test_non_revealing_node_partially_slashed_insufficient_stake() {
         .collect::<HashMap<_, _>>();
 
     // Sleep for a few seconds so that the pinger has time to send pings.
-    tokio::time::sleep(Duration::from_secs(3)).await;
+    tokio::time::sleep(Duration::from_secs(6)).await;
 
     // Check that the non-revealing node is no longer being monitored while all others are still
     // being monitored.
@@ -691,8 +719,8 @@ async fn test_non_revealing_node_partially_slashed_insufficient_stake() {
 
 #[tokio::test]
 async fn test_non_revealing_node_partially_slashed_sufficient_stake() {
-    let commit_phase_duration = 2000;
-    let reveal_phase_duration = 2000;
+    let commit_phase_duration = COMMIT_PHASE_DURATION;
+    let reveal_phase_duration = REVEAL_PHASE_DURATION;
     let mut network = build_network(BuildNetworkOptions {
         committee_nodes: 4,
         committee_nodes_without_beacon: 1,
@@ -770,7 +798,7 @@ async fn test_non_revealing_node_partially_slashed_sufficient_stake() {
     }
 
     for node in network.nodes() {
-        // Check that the non-revealing node has been slashed, and the other has not.
+        // Check that the non-revealing node has been slashed, and the other have not.
         assert_eq!(
             node.app_query()
                 .get_node_info(&4, |n| n.stake.staked)
@@ -812,30 +840,29 @@ async fn test_non_revealing_node_partially_slashed_sufficient_stake() {
     }
 
     // Submit commit transaction from the non-revealing node and check that it's reverted.
-    let _ = network
+    let receipt = network
         .node(4)
-        .execute_transaction_from_node(UpdateMethod::CommitteeSelectionBeaconCommit {
-            commit: [0; 32].into(),
-        })
-        .await;
+        .execute_transaction_from_node_with_receipt(
+            UpdateMethod::CommitteeSelectionBeaconCommit {
+                commit: [0; 32].into(),
+            },
+            Duration::from_secs(10),
+        )
+        .await
+        .unwrap();
 
-    //TODO(matthias): figure out a way to get the transaction response
-    //assert!(matches!(
-    //    result,
-    //    Err(ExecuteTransactionError::Reverted((
-    //        _,
-    //        TransactionReceipt {
-    //            response: TransactionResponse::Revert(
-    //                ExecutionError::CommitteeSelectionBeaconNonRevealingNode
-    //            ),
-    //            ..
-    //        },
-    //        _
-    //    )))
-    //));
+    assert!(matches!(
+        receipt,
+        TransactionReceipt {
+            response: TransactionResponse::Revert(
+                ExecutionError::CommitteeSelectionBeaconNonRevealingNode,
+            ),
+            ..
+        },
+    ));
 
     // Wait a few seconds so that the pinger has time to send pings.
-    tokio::time::sleep(Duration::from_secs(3)).await;
+    tokio::time::sleep(Duration::from_secs(6)).await;
 
     // Check that the non-revealing node is still being monitored, along with all other nodes.
     for from_node in network.nodes() {
@@ -870,8 +897,8 @@ async fn test_non_revealing_node_partially_slashed_sufficient_stake() {
 
 #[tokio::test]
 async fn test_node_attempts_reveal_without_committment() {
-    let commit_phase_duration = 2000;
-    let reveal_phase_duration = 2000;
+    let commit_phase_duration = COMMIT_PHASE_DURATION;
+    let reveal_phase_duration = REVEAL_PHASE_DURATION;
     let mut network = build_network(BuildNetworkOptions {
         committee_nodes: 3,
         committee_nodes_without_beacon: 1,
@@ -910,28 +937,24 @@ async fn test_node_attempts_reveal_without_committment() {
     .unwrap();
 
     // Execute reveal transaction from the node that didn't commit.
-    let _ = network
+    let receipt = network
         .node(3)
-        .execute_transaction_from_node(UpdateMethod::CommitteeSelectionBeaconReveal {
-            reveal: [1; 32],
-        })
-        .await;
+        .execute_transaction_from_node_with_receipt(
+            UpdateMethod::CommitteeSelectionBeaconReveal { reveal: [1; 32] },
+            Duration::from_secs(10),
+        )
+        .await
+        .unwrap();
 
-    //TODO(matthias): figure out a way to get the transaction response
-    // Check that the reveal transaction was reverted.
-    //assert!(matches!(
-    //    result,
-    //    Err(ExecuteTransactionError::Reverted((
-    //        _,
-    //        TransactionReceipt {
-    //            response: TransactionResponse::Revert(
-    //                ExecutionError::CommitteeSelectionBeaconNotCommitted,
-    //            ),
-    //            ..
-    //        },
-    //        _
-    //    )))
-    //));
+    assert!(matches!(
+        receipt,
+        TransactionReceipt {
+            response: TransactionResponse::Revert(
+                ExecutionError::CommitteeSelectionBeaconNotCommitted,
+            ),
+            ..
+        },
+    ));
 
     // Wait for the reveal phase to end, then submit the reveal timeout txn.
     tokio::time::sleep(Duration::from_millis(reveal_phase_duration)).await;
@@ -1069,7 +1092,11 @@ async fn build_network(options: BuildNetworkOptions) -> Result<TestNetwork> {
 }
 
 async fn wait_for_forwarder_to_start() {
-    tokio::time::sleep(Duration::from_millis(1000)).await;
+    tokio::time::sleep(Duration::from_millis(2000)).await;
+}
+
+async fn wait_for_narwhal_restart() {
+    tokio::time::sleep(Duration::from_millis(4000)).await;
 }
 
 /// Wait for committee selection beacon phase to satisfy the given predicate across all nodes, with
