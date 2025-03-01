@@ -101,6 +101,7 @@ macro_rules! partial_node_components {
             PoolInterface,
             PingerInterface,
             IndexerInterface,
+            WatcherInterface,
         }, { $($name),*});
     };
     (@gen_body { $($name:ident = $ty:ty;)* }) => {

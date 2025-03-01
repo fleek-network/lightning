@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::net::IpAddr;
 
 use anyhow::Context;
+use ethers::abi::AbiEncode;
 use ethers::types::Transaction as EthersTransaction;
 use ethers::utils::rlp;
 use fleek_crypto::{
@@ -18,6 +19,8 @@ use serde::{Deserialize, Serialize};
 use super::{
     Epoch,
     Event,
+    Job,
+    JobStatus,
     ProofOfConsensus,
     ProofOfMisbehavior,
     ReputationMeasurements,
@@ -498,6 +501,17 @@ pub enum UpdateMethod {
     UpdateContentRegistry { updates: Vec<ContentUpdate> },
     /// Increment the node nonce.
     IncrementNonce {},
+    // Todo: In the future we should use a different type
+    // instead of `Job` that doesn't expose fields
+    // used for internal purposes, such as `assignee`.
+    /// Add new jobs to the jobs table and assign them to nodes.
+    AddJobs { jobs: Vec<Job> },
+    /// Remove these jobs from the jobs table and unassigned them.
+    RemoveJobs { jobs: Vec<[u8; 32]> },
+    /// Updates about the jobs' most recent executions.
+    JobUpdates {
+        updates: BTreeMap<[u8; 32], JobStatus>,
+    },
 }
 
 impl ToDigest for UpdatePayload {
@@ -777,6 +791,38 @@ impl ToDigest for UpdatePayload {
             },
             UpdateMethod::IncrementNonce {} => {
                 transcript_builder = transcript_builder.with("transaction_name", &"inc_nonce");
+            },
+            UpdateMethod::AddJobs { jobs } => {
+                transcript_builder = transcript_builder.with("transaction_name", &"add_jobs");
+                for job in jobs.iter() {
+                    transcript_builder = transcript_builder
+                        .with_prefix(job.hash.encode_hex())
+                        .with("service", &job.info.service)
+                        .with("frequency", &job.info.frequency)
+                        .with("arguments", &job.info.arguments.as_ref())
+                        .with("amount", &job.info.amount)
+                        .with("assignee", &job.assignee)
+                }
+            },
+            UpdateMethod::RemoveJobs { jobs } => {
+                transcript_builder = transcript_builder.with("transaction_name", &"remove_jobs");
+                for job in jobs.iter() {
+                    transcript_builder = transcript_builder
+                        .with_prefix("input".to_owned())
+                        .with("job", job)
+                }
+            },
+            UpdateMethod::JobUpdates { updates } => {
+                transcript_builder = transcript_builder.with("transaction_name", &"job_updates");
+                for (key, value) in updates {
+                    transcript_builder = transcript_builder
+                        .with_prefix(key.encode_hex())
+                        .with("last_run", &value.last_run)
+                        .with("success", &(value.success as u8));
+                    if let Some(message) = &value.message {
+                        transcript_builder = transcript_builder.with("message", message)
+                    }
+                }
             },
         }
 
