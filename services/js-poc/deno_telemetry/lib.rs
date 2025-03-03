@@ -451,14 +451,7 @@ mod hyper_client {
         {self},
     };
 
-    use deno_tls::{
-        create_client_config,
-        load_certs,
-        load_private_keys,
-        SocketUse,
-        TlsKey,
-        TlsKeys,
-    };
+    use deno_tls::{create_client_config, SocketUse};
     use http_body_util::{BodyExt, Full};
     use hyper::body::{Body as HttpBody, Frame};
     use hyper_rustls::HttpsConnector;
@@ -467,6 +460,7 @@ mod hyper_client {
     use opentelemetry_http::{Bytes, HttpError, Request, Response, ResponseExt};
 
     use super::OtelSharedRuntime;
+    use crate::config::HyperClientConfig;
 
     // same as opentelemetry_http::HyperClient except it uses OtelSharedRuntime
     #[derive(Debug, Clone)]
@@ -475,29 +469,9 @@ mod hyper_client {
     }
 
     impl HyperClient {
-        pub fn new() -> deno_core::anyhow::Result<Self> {
-            let ca_certs = match std::env::var("OTEL_EXPORTER_OTLP_CERTIFICATE") {
-                Ok(path) => vec![std::fs::read(path)?],
-                _ => vec![],
-            };
-
-            let keys = match (
-                std::env::var("OTEL_EXPORTER_OTLP_CLIENT_KEY"),
-                std::env::var("OTEL_EXPORTER_OTLP_CLIENT_CERTIFICATE"),
-            ) {
-                (Ok(key_path), Ok(cert_path)) => {
-                    let key = std::fs::read(key_path)?;
-                    let cert = std::fs::read(cert_path)?;
-
-                    let certs = load_certs(&mut std::io::Cursor::new(cert))?;
-                    let key = load_private_keys(&key)?.into_iter().next().unwrap();
-
-                    TlsKeys::Static(TlsKey(certs, key))
-                },
-                _ => TlsKeys::Null,
-            };
-
-            let tls_config = create_client_config(None, ca_certs, None, keys, SocketUse::Http)?;
+        pub fn new(config: HyperClientConfig) -> deno_core::anyhow::Result<Self> {
+            let tls_config =
+                create_client_config(None, config.ca_certs, None, config.keys, SocketUse::Http)?;
             let mut http_connector = HttpConnector::new();
             http_connector.enforce_http(false);
             let connector = HttpsConnector::from((http_connector, tls_config));
@@ -606,15 +580,16 @@ pub fn init(
         ),
     ]));
 
-    let client = hyper_client::HyperClient::new()?;
+    let client = hyper_client::HyperClient::new(config.client_config)?;
     let endpoint = config.endpoint.unwrap();
-    let endpoint = endpoint.trim_end_matches("/");
+    let endpoint = endpoint.trim_end_matches("/").to_string(); // normalize endpoint
 
     let span_exporter = HttpExporterBuilder::default()
         .with_http_client(client.clone())
         .with_protocol(protocol)
         .with_headers(config.headers.clone())
-        .with_endpoint(endpoint.to_string() + "/v1/traces")
+        // TODO: grpc endpoint support
+        .with_endpoint(endpoint.clone() + "/v1/traces")
         .build_span_exporter()?;
     let mut span_processor = BatchSpanProcessor::builder(span_exporter, OtelSharedRuntime).build();
     span_processor.set_resource(&resource);
@@ -623,7 +598,8 @@ pub fn init(
         .with_http_client(client.clone())
         .with_protocol(protocol)
         .with_headers(config.headers.clone())
-        .with_endpoint(endpoint.to_string() + "/v1/metrics")
+        // TODO: grpc endpoint support
+        .with_endpoint(endpoint.clone() + "/v1/metrics")
         .build_metrics_exporter(config.temporality)?;
     let metric_reader = DenoPeriodicReader::new(metric_exporter);
     let meter_provider = SdkMeterProvider::builder()
@@ -635,7 +611,8 @@ pub fn init(
         .with_http_client(client)
         .with_protocol(protocol)
         .with_headers(config.headers)
-        .with_endpoint(endpoint.to_string() + "/v1/logs")
+        // TODO: grpc endpoint support
+        .with_endpoint(endpoint + "/v1/logs")
         .build_log_exporter()?;
     let log_processor = BatchLogProcessor::builder(log_exporter, OtelSharedRuntime).build();
     log_processor.set_resource(&resource);
