@@ -44,7 +44,12 @@ pub struct Runtime {
 
 impl Runtime {
     /// Create a new runtime
-    pub fn new(location: Url, depth: u8) -> Result<Self> {
+    pub fn new(
+        location: Url,
+        depth: u8,
+        otel_endpoint: Option<String>,
+        otel_headers: HashMap<String, String>,
+    ) -> Result<Self> {
         let memory_fs = MaybeArc::new(InMemoryFs::default());
         let tape = Tape::new(location.clone());
 
@@ -58,17 +63,16 @@ impl Runtime {
             runtime_name: std::borrow::Cow::Borrowed("fleek"),
             runtime_version: std::borrow::Cow::Borrowed("xx"),
         };
-        let mut headers = HashMap::new();
-        headers.insert(
-            "signoz-ingestion-key".into(),
-            "05bf7a56-ad24-4c31-ad70-cfe9b91c0c41".into(),
-        );
         let config = TelemetryConfig {
+            // TODO: should we allow all protocols?
             protocol: ::deno_telemetry::config::Protocol::HttpBinary,
-            endpoint: Some("https://ingest.us.signoz.cloud:443".into()),
-            headers,
+            endpoint: otel_endpoint,
+            headers: otel_headers,
             temporality: ::deno_telemetry::config::Temporality::LowMemory,
-            client_config: ::deno_telemetry::config::HyperClientConfig {},
+            client_config: ::deno_telemetry::config::HyperClientConfig {
+                ca_certs: Default::default(),
+                keys: Default::default(),
+            },
         };
 
         let mut deno = JsRuntime::new(RuntimeOptions {

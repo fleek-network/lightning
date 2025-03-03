@@ -34,6 +34,8 @@ async fn main() -> anyhow::Result<()> {
                 uri,
                 path: None,
                 param,
+                otel_headers: Default::default(),
+                otel_endpoint: Default::default(),
             })
             .expect("failed to encode request")
             .into(),

@@ -36,7 +36,10 @@ fn main() {
         endpoint: Some("http://locahost:8080".into()),
         headers: HashMap::new(),
         temporality: Temporality::LowMemory,
-        client_config: ::deno_telemetry::config::HyperClientConfig {},
+        client_config: ::deno_telemetry::config::HyperClientConfig {
+            ca_certs: Default::default(),
+            keys: Default::default(),
+        },
     };
 
     let extensions = vec![
