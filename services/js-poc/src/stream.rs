@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use fn_sdk::api::Origin as ApiOrigin;
 use serde::{Deserialize, Serialize};
 
@@ -20,10 +22,12 @@ pub struct Request {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(alias = "params", alias = "parameter", alias = "parameters")]
     pub param: Option<serde_json::Value>,
-    // /// Optional list of opentelemetry rpc endpoints to post logs to
-    // #[serde(skip_serializing_if = "Vec::is_empty")]
-    // #[serde(alias = "opentelemetry")]
-    // pub otel: Vec<deno_corie::Url>,
+    /// Optional endpoint to send otlp http logs to
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub otel_endpoint: Option<deno_core::url::Url>,
+    /// Optional headers to include when exporting otlp
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    pub otel_headers: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Eq, PartialEq)]
