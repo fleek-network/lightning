@@ -207,8 +207,6 @@ async fn test_committee_beacon_committee_selection_is_random() {
         // Generate random reveal values.
         let node0_reveal = generate_random_reveal();
         let node1_reveal = generate_random_reveal();
-        let node2_reveal = generate_random_reveal();
-        let node3_reveal = generate_random_reveal();
 
         // Execute commit transactions for all nodes.
         let resp = network
@@ -222,16 +220,6 @@ async fn test_committee_beacon_committee_selection_is_random() {
                     .node(1)
                     .build_transaction(UpdateMethod::CommitteeSelectionBeaconCommit {
                         commit: CommitteeSelectionBeaconCommit::build(epoch, 0, node1_reveal),
-                    }),
-                network
-                    .node(2)
-                    .build_transaction(UpdateMethod::CommitteeSelectionBeaconCommit {
-                        commit: CommitteeSelectionBeaconCommit::build(epoch, 0, node2_reveal),
-                    }),
-                network
-                    .node(3)
-                    .build_transaction(UpdateMethod::CommitteeSelectionBeaconCommit {
-                        commit: CommitteeSelectionBeaconCommit::build(epoch, 0, node3_reveal),
                     }),
             ])
             .await
@@ -272,16 +260,6 @@ async fn test_committee_beacon_committee_selection_is_random() {
                     .node(1)
                     .build_transaction(UpdateMethod::CommitteeSelectionBeaconReveal {
                         reveal: node1_reveal,
-                    }),
-                network
-                    .node(2)
-                    .build_transaction(UpdateMethod::CommitteeSelectionBeaconReveal {
-                        reveal: node2_reveal,
-                    }),
-                network
-                    .node(3)
-                    .build_transaction(UpdateMethod::CommitteeSelectionBeaconReveal {
-                        reveal: node3_reveal,
                     }),
             ])
             .await
@@ -1849,7 +1827,7 @@ async fn test_committee_beacon_already_revealed() {
 }
 
 #[tokio::test]
-async fn test_committee_beacon_non_active_node_commit_is_reverted() {
+async fn test_committee_beacon_non_committee_member_commit_is_reverted() {
     let network = TestNetwork::builder()
         .with_committee_nodes(2)
         .with_non_committee_nodes(1)
@@ -1872,18 +1850,45 @@ async fn test_committee_beacon_non_active_node_commit_is_reverted() {
         Some(CommitteeSelectionBeaconPhase::Commit((0, 0)))
     );
 
-    // Execute opt-out transaction from 1 committee node and 1 non-committee node, which will take
-    // affect in the next epoch in terms of committee.active_node_set being updated.
+    // Execute commit transactions from the node that is not on the committee.
     let resp = network
-        .execute(vec![
-            network.node(0).build_transaction(UpdateMethod::OptOut {}),
-            network.node(2).build_transaction(UpdateMethod::OptOut {}),
-        ])
+        .maybe_execute(vec![network.node(2).build_transaction(
+            UpdateMethod::CommitteeSelectionBeaconCommit {
+                commit: CommitteeSelectionBeaconCommit::build(epoch, 0, [3; 32]),
+            },
+        )])
         .await
         .unwrap();
     assert_eq!(resp.block_number, 2);
 
-    // Execute commit transactions from all the nodes to transition to the reveal phase.
+    assert_eq!(
+        resp.txn_receipts[0].response,
+        TransactionResponse::Revert(ExecutionError::NotCommitteeMember)
+    );
+}
+
+#[tokio::test]
+async fn test_committee_beacon_non_committee_member_reveal_is_reverted() {
+    let network = TestNetwork::builder()
+        .with_committee_nodes(2)
+        .with_non_committee_nodes(1)
+        .build()
+        .await
+        .unwrap();
+    let query = network.query();
+
+    // Execute epoch change transactions from 2/3+1 committee nodes.
+    let epoch = query.get_current_epoch();
+    let resp = network.execute_change_epoch(epoch).await.unwrap();
+    assert_eq!(resp.block_number, 1);
+
+    // Check that we have transitioned to the commit phase.
+    assert_eq!(
+        query.get_committee_selection_beacon_phase(),
+        Some(CommitteeSelectionBeaconPhase::Commit((0, 0)))
+    );
+
+    // Execute commit transactions from both committee nodes.
     let resp = network
         .execute(vec![
             network
@@ -1896,15 +1901,10 @@ async fn test_committee_beacon_non_active_node_commit_is_reverted() {
                 .build_transaction(UpdateMethod::CommitteeSelectionBeaconCommit {
                     commit: CommitteeSelectionBeaconCommit::build(epoch, 0, [2; 32]),
                 }),
-            network
-                .node(2)
-                .build_transaction(UpdateMethod::CommitteeSelectionBeaconCommit {
-                    commit: CommitteeSelectionBeaconCommit::build(epoch, 0, [3; 32]),
-                }),
         ])
         .await
         .unwrap();
-    assert_eq!(resp.block_number, 3);
+    assert_eq!(resp.block_number, 2);
 
     // Execute commit timeout transaction from 2/3+1 committee nodes.
     let resp = network
@@ -1918,92 +1918,26 @@ async fn test_committee_beacon_non_active_node_commit_is_reverted() {
         ])
         .await
         .unwrap();
-    assert_eq!(resp.block_number, 4);
+    assert_eq!(resp.block_number, 3);
 
-    // Check that we are in the reveal phase.
+    // Check that we have transitioned to the reveal phase.
     assert_eq!(
         query.get_committee_selection_beacon_phase(),
         Some(CommitteeSelectionBeaconPhase::Reveal((0, 0)))
     );
 
-    // Execute reveal transactions from all the nodes.
+    // Execute commit transactions from the node that is not on the committee.
     let resp = network
-        .execute(vec![
-            network
-                .node(0)
-                .build_transaction(UpdateMethod::CommitteeSelectionBeaconReveal {
-                    reveal: [1; 32],
-                }),
-            network
-                .node(1)
-                .build_transaction(UpdateMethod::CommitteeSelectionBeaconReveal {
-                    reveal: [2; 32],
-                }),
-            network
-                .node(2)
-                .build_transaction(UpdateMethod::CommitteeSelectionBeaconReveal {
-                    reveal: [3; 32],
-                }),
-        ])
+        .maybe_execute(vec![network.node(2).build_transaction(
+            UpdateMethod::CommitteeSelectionBeaconReveal { reveal: [1; 32] },
+        )])
         .await
         .unwrap();
-    assert_eq!(resp.block_number, 5);
+    assert_eq!(resp.block_number, 4);
 
-    // Execute reveal timeout transaction from 2/3+1 committee nodes.
-    let resp = network
-        .maybe_execute(vec![
-            network.node(0).build_transaction(
-                UpdateMethod::CommitteeSelectionBeaconRevealPhaseTimeout { epoch: 0, round: 0 },
-            ),
-            network.node(1).build_transaction(
-                UpdateMethod::CommitteeSelectionBeaconRevealPhaseTimeout { epoch: 0, round: 0 },
-            ),
-        ])
-        .await
-        .unwrap();
-    assert_eq!(resp.block_number, 6);
-    assert!(resp.change_epoch);
-
-    // Check that we have changed to the next epoch.
-    assert_eq!(query.get_current_epoch(), epoch + 1);
-
-    // Check that the committee active node set is updated.
-    assert_eq!(query.get_active_node_set(), HashSet::from([1]));
-
-    // Emit epoch change transactions from the committee nodes.
-    let resp = network.execute_change_epoch(epoch + 1).await.unwrap();
-    assert_eq!(resp.block_number, 7);
-
-    // Check that we have transitioned to the commit phase.
-    assert_eq!(
-        query.get_committee_selection_beacon_phase(),
-        Some(CommitteeSelectionBeaconPhase::Commit((1, 0)))
-    );
-
-    // Execute commit transactions from the 2 non-active nodes, and check that they are reverted.
-    let resp = network
-        .maybe_execute(vec![
-            network
-                .node(0)
-                .build_transaction(UpdateMethod::CommitteeSelectionBeaconCommit {
-                    commit: CommitteeSelectionBeaconCommit::build(epoch, 0, [1; 32]),
-                }),
-            network
-                .node(2)
-                .build_transaction(UpdateMethod::CommitteeSelectionBeaconCommit {
-                    commit: CommitteeSelectionBeaconCommit::build(epoch, 0, [3; 32]),
-                }),
-        ])
-        .await
-        .unwrap();
-    assert_eq!(resp.block_number, 8);
     assert_eq!(
         resp.txn_receipts[0].response,
-        TransactionResponse::Revert(ExecutionError::CommitteeSelectionBeaconNodeNotActive)
-    );
-    assert_eq!(
-        resp.txn_receipts[1].response,
-        TransactionResponse::Revert(ExecutionError::CommitteeSelectionBeaconNodeNotActive)
+        TransactionResponse::Revert(ExecutionError::NotCommitteeMember)
     );
 }
 
@@ -2534,11 +2468,6 @@ async fn test_committee_beacon_non_committee_node_participation() {
                 .build_transaction(UpdateMethod::CommitteeSelectionBeaconCommit {
                     commit: CommitteeSelectionBeaconCommit::build(epoch, 0, [3; 32]),
                 }),
-            network
-                .node(5)
-                .build_transaction(UpdateMethod::CommitteeSelectionBeaconCommit {
-                    commit: CommitteeSelectionBeaconCommit::build(epoch, 0, [6; 32]),
-                }),
         ])
         .await
         .unwrap();
@@ -2602,11 +2531,6 @@ async fn test_committee_beacon_non_committee_node_participation() {
                 .node(2)
                 .build_transaction(UpdateMethod::CommitteeSelectionBeaconReveal {
                     reveal: [3; 32],
-                }),
-            network
-                .node(5)
-                .build_transaction(UpdateMethod::CommitteeSelectionBeaconReveal {
-                    reveal: [6; 32],
                 }),
         ])
         .await

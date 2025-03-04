@@ -901,6 +901,7 @@ async fn test_unstake_as_non_committee_node_opts_out_node_and_removes_after_epoc
                 .nodes
                 .iter()
                 .enumerate()
+                .take(4)
                 .map(|(i, n)| {
                     n.build_transaction(UpdateMethod::CommitteeSelectionBeaconCommit {
                         commit: CommitteeSelectionBeaconCommit::build(epoch, 0, [i as u8; 32]),
@@ -937,6 +938,7 @@ async fn test_unstake_as_non_committee_node_opts_out_node_and_removes_after_epoc
                 .nodes
                 .iter()
                 .enumerate()
+                .take(4)
                 .map(|(i, n)| {
                     n.build_transaction(UpdateMethod::CommitteeSelectionBeaconReveal {
                         reveal: [i as u8; 32],
