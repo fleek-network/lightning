@@ -1,3 +1,5 @@
+use std::time::{Duration, Instant};
+
 use anyhow::Result;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::CommitteeSelectionBeaconRound;
@@ -19,6 +21,9 @@ use types::{
 use crate::database::{CommitteeBeaconDatabase, CommitteeBeaconDatabaseQuery};
 use crate::rocks::RocksCommitteeBeaconDatabase;
 use crate::CommitteeBeaconError;
+
+const QUERY_INTERVAL: Duration = Duration::from_secs(1);
+const RETRY_TIMEOUT: Duration = Duration::from_secs(10);
 
 pub struct CommitteeBeaconListener<C: NodeComponents> {
     db: RocksCommitteeBeaconDatabase,
@@ -220,9 +225,27 @@ impl<C: NodeComponents> CommitteeBeaconListener<C> {
             commit
         );
 
-        // TODO(matthias): check if transaction was ordered
         self.execute_transaction(UpdateMethod::CommitteeSelectionBeaconCommit { commit })
             .await?;
+
+        let mut now = Instant::now();
+        loop {
+            tokio::time::sleep(QUERY_INTERVAL).await;
+
+            if self
+                .app_query
+                .get_committee_selection_beacon(&self.node_index)
+                .is_some()
+            {
+                break;
+            }
+
+            if now.elapsed() > RETRY_TIMEOUT {
+                self.execute_transaction(UpdateMethod::CommitteeSelectionBeaconCommit { commit })
+                    .await?;
+                now = Instant::now();
+            }
+        }
 
         Ok(())
     }
@@ -280,9 +303,31 @@ impl<C: NodeComponents> CommitteeBeaconListener<C> {
             reveal
         );
 
-        // TODO(matthias): check if transaction was ordered
         self.execute_transaction(UpdateMethod::CommitteeSelectionBeaconReveal { reveal })
             .await?;
+
+        let mut now = Instant::now();
+        loop {
+            tokio::time::sleep(QUERY_INTERVAL).await;
+
+            let Some((_commit, maybe_beacon)) = self
+                .app_query
+                .get_committee_selection_beacon(&self.node_index)
+            else {
+                // We check above that the commit already exists, so this will never happen.
+                break;
+            };
+
+            if maybe_beacon.is_some() {
+                break;
+            }
+
+            if now.elapsed() > RETRY_TIMEOUT {
+                self.execute_transaction(UpdateMethod::CommitteeSelectionBeaconReveal { reveal })
+                    .await?;
+                now = Instant::now();
+            }
+        }
 
         Ok(())
     }
