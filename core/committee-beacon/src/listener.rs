@@ -95,6 +95,13 @@ impl<C: NodeComponents> CommitteeBeaconListener<C> {
             return Ok(());
         }
 
+        // The node only submits the commit and reveal transactions if it is on the committee.
+        let committee = self.app_query.get_committee_members_by_index();
+        let on_committee = committee.contains(&self.node_index);
+        if !on_committee {
+            return Ok(());
+        }
+
         // Get the current phase from metadata.
         let phase = self
             .app_query

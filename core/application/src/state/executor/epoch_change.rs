@@ -113,13 +113,21 @@ impl<B: Backend> StateExecutor<B> {
         commit: CommitteeSelectionBeaconCommit,
     ) -> TransactionResponse {
         // Check that a node is sending the transaction, and get the node's index.
-        let node_index = match self.only_node_with_sufficient_stake(sender) {
+        let node_index = match self.only_node_with_sufficient_stake_and_participating(sender) {
             Ok(account) => account,
             Err(e) => return e,
         };
 
         // Check that the node is in the active set.
         let epoch = self.get_epoch();
+
+        // Get the current committee info.
+        let current_committee = self.committee_info.get(&epoch).unwrap_or_default();
+        // If sender is not on the current committee revert early, or if they have already signaled;
+        if !current_committee.members.contains(&node_index) {
+            return TransactionResponse::Revert(ExecutionError::NotCommitteeMember);
+        }
+
         let active_nodes = self
             .committee_info
             .get(&epoch)
@@ -209,7 +217,7 @@ impl<B: Backend> StateExecutor<B> {
         reveal: CommitteeSelectionBeaconReveal,
     ) -> TransactionResponse {
         // Check that a node is sending the transaction, and get the node's index.
-        let node_index = match self.only_node_with_sufficient_stake(sender) {
+        let node_index = match self.only_node_with_sufficient_stake_and_participating(sender) {
             Ok(account) => account,
             Err(e) => return e,
         };
@@ -235,6 +243,13 @@ impl<B: Backend> StateExecutor<B> {
 
         // Get the current epoch.
         let epoch = self.get_epoch();
+
+        // Get the current committee info.
+        let current_committee = self.committee_info.get(&epoch).unwrap_or_default();
+        // If sender is not on the current committee revert early, or if they have already signaled;
+        if !current_committee.members.contains(&node_index) {
+            return TransactionResponse::Revert(ExecutionError::NotCommitteeMember);
+        }
 
         // TODO(matthias): do we have to handle this?
         debug_assert!(reveal_phase_epoch == epoch);
