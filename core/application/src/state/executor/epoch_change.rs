@@ -96,9 +96,6 @@ impl<B: Backend> StateExecutor<B> {
             // Start the committee beacon commit phase.
             self.set_committee_selection_beacon_commit_phase(epoch, 0);
 
-            // Reset the epoch era.
-            self.metadata.set(Metadata::EpochEra, Value::EpochEra(0));
-
             // Return success.
             TransactionResponse::Success(ExecutionData::None)
         } else {
@@ -670,6 +667,9 @@ impl<B: Backend> StateExecutor<B> {
 
         // Save new epoch to metadata.
         self.metadata.set(Metadata::Epoch, Value::Epoch(epoch));
+
+        // Reset the epoch era.
+        self.metadata.set(Metadata::EpochEra, Value::EpochEra(0));
     }
 
     fn choose_new_committee(
