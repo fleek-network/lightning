@@ -1,6 +1,7 @@
 // Copyright 2018-2025 the Deno authors. MIT license.
 
 #![allow(clippy::too_many_arguments)]
+#![allow(clippy::all)]
 
 use std::borrow::Cow;
 use std::cell::RefCell;
@@ -15,6 +16,7 @@ use std::time::{Duration, SystemTime};
 use std::{env, thread};
 
 use config::TelemetryConfig;
+use deno_core::anyhow::{self, bail};
 use deno_core::futures::channel::mpsc;
 use deno_core::futures::channel::mpsc::UnboundedSender;
 use deno_core::futures::future::BoxFuture;
@@ -99,7 +101,7 @@ deno_core::extension!(
   esm = ["telemetry.ts", "util.ts"],
   options = { config: TelemetryConfig, otel_config: OtelConfig, runtime_config: OtelRuntimeConfig },
   state = |state, config| {
-    let globals = init(config.runtime_config, &config.otel_config, config.config).expect("initializing telemetry");
+    let globals = init(config.runtime_config, &config.otel_config, config.config);
     state.put(globals);
   },
 );
@@ -543,6 +545,11 @@ pub fn init(
 ) -> deno_core::anyhow::Result<OtelGlobals> {
     let protocol = config.protocol;
 
+    let Some(endpoint) = config.endpoint else {
+        bail!("missing endpoint");
+    };
+    let endpoint = endpoint.trim_end_matches("/").to_string(); // normalize endpoint
+
     // Define the resource attributes that will be attached to all log records.
     // These attributes are sourced as follows (in order of precedence):
     //   * The `service.name` attribute from the `OTEL_SERVICE_NAME` env var.
@@ -581,8 +588,6 @@ pub fn init(
     ]));
 
     let client = hyper_client::HyperClient::new(config.client_config)?;
-    let endpoint = config.endpoint.unwrap();
-    let endpoint = endpoint.trim_end_matches("/").to_string(); // normalize endpoint
 
     let span_exporter = HttpExporterBuilder::default()
         .with_http_client(client.clone())
@@ -640,12 +645,15 @@ pub fn init(
 /// `process::exit()`, to ensure that all OpenTelemetry logs are properly
 /// flushed before the process terminates.
 pub fn flush(state: &mut OpState) {
-    let OtelGlobals {
+    let Ok(OtelGlobals {
         span_processor: spans,
         log_processor: logs,
         meter_provider,
         ..
-    } = state.borrow();
+    }) = state.borrow::<anyhow::Result<OtelGlobals>>()
+    else {
+        return;
+    };
 
     let _ = spans.force_flush();
     let _ = logs.force_flush();
@@ -655,11 +663,14 @@ pub fn flush(state: &mut OpState) {
 pub fn handle_log(state: &mut OpState, record: &log::Record) {
     use log::Level;
 
-    let OtelGlobals {
+    let Ok(OtelGlobals {
         log_processor: logs,
         builtin_instrumentation_scope,
         ..
-    } = state.borrow();
+    }) = state.borrow::<anyhow::Result<OtelGlobals>>()
+    else {
+        return;
+    };
 
     let mut log_record = LogRecord::default();
 
@@ -878,11 +889,14 @@ fn op_otel_log<'s>(
     #[smi] level: i32,
     span: v8::Local<'s, v8::Value>,
 ) {
-    let OtelGlobals {
+    let Ok(OtelGlobals {
         log_processor,
         builtin_instrumentation_scope,
         ..
-    } = state.borrow();
+    }) = state.borrow::<anyhow::Result<OtelGlobals>>()
+    else {
+        return;
+    };
 
     // Convert the integer log level that ext/console uses to the corresponding
     // OpenTelemetry log severity.
@@ -934,11 +948,14 @@ fn op_otel_log_foreign(
     span_id: v8::Local<'_, v8::Value>,
     #[smi] trace_flags: u8,
 ) {
-    let OtelGlobals {
+    let Ok(OtelGlobals {
         log_processor,
         builtin_instrumentation_scope,
         ..
-    } = state.borrow();
+    }) = state.borrow::<anyhow::Result<OtelGlobals>>()
+    else {
+        return;
+    };
 
     // Convert the integer log level that ext/console uses to the corresponding
     // OpenTelemetry log severity.
@@ -1000,10 +1017,13 @@ impl OtelTracer {
     #[static_method]
     #[cppgc]
     fn builtin(state: &mut OpState) -> OtelTracer {
-        let OtelGlobals {
+        let Ok(OtelGlobals {
             builtin_instrumentation_scope,
             ..
-        } = state.borrow::<OtelGlobals>();
+        }) = state.borrow::<anyhow::Result<OtelGlobals>>()
+        else {
+            return OtelTracer(InstrumentationScope::default());
+        };
         OtelTracer(builtin_instrumentation_scope.clone())
     }
 
@@ -1018,7 +1038,10 @@ impl OtelTracer {
         start_time: Option<f64>,
         #[smi] attribute_count: usize,
     ) -> Result<OtelSpan, JsErrorBox> {
-        let OtelGlobals { id_generator, .. } = state.borrow();
+        let Ok(OtelGlobals { id_generator, .. }) = state.borrow::<anyhow::Result<OtelGlobals>>()
+        else {
+            return Err(JsErrorBox::generic("telemetry is currently disabled"));
+        };
         let span_context;
         let parent_span_id;
         match parent {
@@ -1107,7 +1130,10 @@ impl OtelTracer {
         if parent_span_id == SpanId::INVALID {
             return Err(JsErrorBox::generic("invalid span id"));
         };
-        let OtelGlobals { id_generator, .. } = state.borrow();
+        let Ok(OtelGlobals { id_generator, .. }) = state.borrow::<anyhow::Result<OtelGlobals>>()
+        else {
+            return Err(JsErrorBox::generic("telemetry disabled"));
+        };
         let span_context = SpanContext::new(
             parent_trace_id,
             id_generator.new_span_id(),
@@ -1257,7 +1283,11 @@ impl OtelSpan {
                 *std::mem::replace(&mut *state, Box::new(OtelSpanState::Done(span_context)))
             {
                 span.end_time = end_time;
-                let OtelGlobals { span_processor, .. } = op_state.borrow();
+                let Ok(OtelGlobals { span_processor, .. }) =
+                    op_state.borrow::<anyhow::Result<OtelGlobals>>()
+                else {
+                    return;
+                };
                 span_processor.on_end(span);
             }
         }
@@ -1392,7 +1422,7 @@ impl OtelMeter {
         #[string] name: String,
         #[string] version: Option<String>,
         #[string] schema_url: Option<String>,
-    ) -> OtelMeter {
+    ) -> Result<OtelMeter, JsErrorBox> {
         let mut builder = opentelemetry::InstrumentationScope::builder(name);
         if let Some(version) = version {
             builder = builder.with_version(version);
@@ -1401,11 +1431,12 @@ impl OtelMeter {
             builder = builder.with_schema_url(schema_url);
         }
         let scope = builder.build();
-        let meter = state
-            .borrow::<OtelGlobals>()
-            .meter_provider
-            .meter_with_scope(scope);
-        OtelMeter(meter)
+        let Ok(globals) = state.borrow::<anyhow::Result<OtelGlobals>>() else {
+            return Err(JsErrorBox::generic("telemetry is disabled"));
+        };
+
+        let meter = globals.meter_provider.meter_with_scope(scope);
+        Ok(OtelMeter(meter))
     }
 
     #[cppgc]
