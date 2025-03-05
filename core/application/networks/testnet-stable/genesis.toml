@@ -2,7 +2,7 @@ chain_id = 59330
 epoch_start = 1722355659837
 epoch_time = 1800000
 epochs_per_year = 365
-committee_size = 8
+committee_size = 6
 node_count = 100
 min_stake = 1000
 eligibility_time = 1
@@ -62,11 +62,19 @@ genesis_committee = true
 
 [[node_info]]
 owner = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
+<<<<<<< HEAD
 primary_public_key = "AwASeZBa58DPWDHqDcTTRe1ouMqGJBq1yC1Z8iV5KBUS"
 consensus_public_key = "qwVbY2RasR6Qvs9TkdqJ56pj3U8c57AkB4F5AR6onT2EEVNMYYkKuCw2qqZY7TUkytUxnPRz8mcTA9aXtAidLt84voqDEYuef18qh1zztimL1XaZjJxQCLNapkEr5Kr2vMN"
 worker_public_key = "AwASeZBa58DPWDHqDcTTRe1ouMqGJBq1yC1Z8iV5KBUS"
 primary_domain = "15.235.216.225"
 worker_domain = "15.235.216.225"
+=======
+primary_public_key = "HkAXaMqczrC9NPxyhJ59KnSqBQU96o8qnW6urDaCPw3P"
+consensus_public_key = "nuRhivVwS8YsvNcNhBwVybdPh4AJRvrWix1gkhicBUmNfzkko1q5rNpEuCrVghU3jKNGKpcsHeWwYrBFavoynCNRCf2WjEM36TqxQ5WjwwYySVnBApF7vdcFDhQcBPa1WiZ"
+worker_public_key = "HkAXaMqczrC9NPxyhJ59KnSqBQU96o8qnW6urDaCPw3P"
+primary_domain = "141.95.64.216"
+worker_domain = "141.95.64.216"
+>>>>>>> 94a65632 (chore(application): update genesis)
 ports.primary = 4310
 ports.worker = 4311
 ports.mempool = 4210
@@ -84,11 +92,19 @@ genesis_committee = true
 
 [[node_info]]
 owner = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
+<<<<<<< HEAD
 primary_public_key = "5Drki1M3VGVYiKgdb5PUJXzv5qcVjQ81hCzWeKd8PjiS"
 consensus_public_key = "sz1KNJyfitotzg2n7kJeyZfdkdgChdRBxEu9wiTyz7CVvAiehNFVg8VRL3TFMK5airXcTgMQ1YVBL12f1dzTUzUm6XBDDzmxTxtKzCghRykPHdAXXSsP9rPar5Le9bHnJin"
 worker_public_key = "5Drki1M3VGVYiKgdb5PUJXzv5qcVjQ81hCzWeKd8PjiS"
 primary_domain = "57.128.175.56"
 worker_domain = "57.128.175.56"
+=======
+primary_public_key = "FoMVEHRSWhfEkPXgfxaRcxEVQFSchkJgM4wwxEo89251"
+consensus_public_key = "215CXYBiz6qDvsgxiaQNqaTjbLM1Kuv85aniV1hgCwQJsiW5rFDjbDMUi7dS8Ere7gvvzbGL3ztybcPp2Kzi8h3wAiBBtGZE2HG6295fj8xyWGkeXeU7sNxFCesQrRwQf19a"
+worker_public_key = "FoMVEHRSWhfEkPXgfxaRcxEVQFSchkJgM4wwxEo89251"
+primary_domain = "15.235.55.115"
+worker_domain = "15.235.55.115"
+>>>>>>> 94a65632 (chore(application): update genesis)
 ports.primary = 4310
 ports.worker = 4311
 ports.mempool = 4210
@@ -106,11 +122,19 @@ genesis_committee = true
 
 [[node_info]]
 owner = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
+<<<<<<< HEAD
 primary_public_key = "4vmaPja4E1hG4qsmNN8GSJi97PRPLRzDjS9iqpNqyggz"
 consensus_public_key = "sEYALxkymfAxnoYiosWj2AadEbhg9c8c5iCkcGuWrnJAP9G1aTQZQZytH2saqhg5SVJJ4H1QjHudaJHxNDRUpRYZAnpX3jAuDxN5P949DPi2VashX4UJUdKHCRvahiWjDya"
 worker_public_key = "4vmaPja4E1hG4qsmNN8GSJi97PRPLRzDjS9iqpNqyggz"
 primary_domain = "162.19.99.30"
 worker_domain = "162.19.99.30"
+=======
+primary_public_key = "A4nXFyAr2pDHo65Z7MDHYZUTbwy858vvbqh37DCE9W8M"
+consensus_public_key = "264EjoeSMnh2AiDabBs8GQU1aJhjbavsWpuxMD1JDB5wKHijVUQEspD9nsvX6W5TwykVM6jJtmfWq9UYAQQ3aCYvyrQhmcchfhY8QaQ1kvayMp2QeJWFJckGMrCwuJ3r4oWV"
+worker_public_key = "A4nXFyAr2pDHo65Z7MDHYZUTbwy858vvbqh37DCE9W8M"
+primary_domain = "15.235.119.5"
+worker_domain = "15.235.119.5"
+>>>>>>> 94a65632 (chore(application): update genesis)
 ports.primary = 4310
 ports.worker = 4311
 ports.mempool = 4210
@@ -128,11 +152,19 @@ genesis_committee = true
 
 [[node_info]]
 owner = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
+<<<<<<< HEAD
 primary_public_key = "6juSKWradhYu7rgoyg5g7Fyo2dSAWdTgUYR95Et1Hokj"
 consensus_public_key = "23NmbYcuc4qvXCyXcx19o41aku7Kz5VhtzUrtybiAnidyU1TX82McfU3qBd6WphaFm15tQXCod4zH3z4nJ8mWAshY7ypG14QK45Ed17ZT6xtHYCntJZCJRzk2qSf7jvvQPqv"
 worker_public_key = "6juSKWradhYu7rgoyg5g7Fyo2dSAWdTgUYR95Et1Hokj"
 primary_domain = "162.19.99.179"
 worker_domain = "162.19.99.179"
+=======
+primary_public_key = "5ACw3pQKNduDM8TDQ35viiF3LRyKwZkrdYpck498F6Ce"
+consensus_public_key = "xWrBKEC6f5x27EqTDNNzU3LJuV3taqsuX7jhd7rUndnGtB3dkxcTETyFkruS9NFYrSfHyco5kGLuJEEP5bpodFgM2y191K6WLyaeivJWVmwH1bMA3GHNt3o17veuL1V5WP2"
+worker_public_key = "5ACw3pQKNduDM8TDQ35viiF3LRyKwZkrdYpck498F6Ce"
+primary_domain = "148.113.16.100"
+worker_domain = "148.113.16.100"
+>>>>>>> 94a65632 (chore(application): update genesis)
 ports.primary = 4310
 ports.worker = 4311
 ports.mempool = 4210
@@ -150,11 +182,19 @@ genesis_committee = true
 
 [[node_info]]
 owner = "0x2a8cf657769c264b0c7f88e3a716afdeaec1c318"
+<<<<<<< HEAD
 primary_public_key = "Dr1YbaXoYjzZnM7suh1qJ71ZEBsyFzbT3rdxZ4wkPGtz"
 consensus_public_key = "21sU1LgUwSzQFrPruEQYRPjLqYxY1pSUAk61GUrn1jU7qUHBkY7iQRjQrGLdpETU87xic3huqVNMfBD6CXJQrK6kWTAe49nmgbzK8ZTexEccda16W7MVGcjoBnDWSNnmGUGw"
 worker_public_key = "Dr1YbaXoYjzZnM7suh1qJ71ZEBsyFzbT3rdxZ4wkPGtz"
 primary_domain = "141.94.219.127"
 worker_domain = "141.94.219.127"
+=======
+primary_public_key = "JAbgKmAArVThcoUqDx9c382uforNVoN3H88cvJ3a5bC5"
+consensus_public_key = "y4wGTXXczWSDPDCTQ4h45XNZwQQzWXr4MQrcnhmaupAUMURkFRP9vZQ3fAY1xY2F1jZgWkpqAcJxpNfcwotxfbVn56NBhuhABTzBapKLo7pRFd1ou5PBt4LpPZ4sWRnhiSA"
+worker_public_key = "JAbgKmAArVThcoUqDx9c382uforNVoN3H88cvJ3a5bC5"
+primary_domain = "148.113.16.127"
+worker_domain = "148.113.16.127"
+>>>>>>> 94a65632 (chore(application): update genesis)
 ports.primary = 4310
 ports.worker = 4311
 ports.mempool = 4210
@@ -168,6 +208,7 @@ stake.staked = "1000"
 stake.stake_locked_until = 0
 stake.locked = "0"
 stake.locked_until = 0
+<<<<<<< HEAD
 genesis_committee = true
 
 [[node_info]]
@@ -301,6 +342,9 @@ stake.stake_locked_until = 0
 stake.locked = "0"
 stake.locked_until = 0
 genesis_committee = true
+=======
+genesis_committee = false
+>>>>>>> 94a65632 (chore(application): update genesis)
 
 
 [[service]]
