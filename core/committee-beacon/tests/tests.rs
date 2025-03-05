@@ -426,23 +426,6 @@ async fn test_single_revealing_node_fully_slashed() {
         },
     ));
 
-    //TODO(matthias): figure out a way to get the transaction response
-    //assert!(
-    //    matches!(
-    //        error,
-    //        ExecuteTransactionError::Reverted((
-    //            _,
-    //            TransactionReceipt {
-    //                response: TransactionResponse::Revert(ExecutionError::InsufficientStake),
-    //                ..
-    //            },
-    //            _
-    //        ))
-    //    ),
-    //    "{}",
-    //    error
-    //);
-
     // Get reputation measurements so that we can check that the non-revealing node is no longer
     // being monitored later.
     let prev_reputation_measurements_by_node = network
@@ -624,7 +607,7 @@ async fn test_non_revealing_node_partially_slashed_insufficient_stake() {
     }
 
     // Wait for narwhal restart after slashing the non-revealing node.
-    //wait_for_narwhal_restart().await;
+    wait_for_narwhal_restart().await;
 
     // Submit commit transaction from the non-revealing node and check that it's reverted.
     let receipt = network
