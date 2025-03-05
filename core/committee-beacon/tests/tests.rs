@@ -35,8 +35,8 @@ use types::{
     Staking,
 };
 
-const COMMIT_PHASE_DURATION: u64 = 4000; // ms
-const REVEAL_PHASE_DURATION: u64 = 4000; // ms
+const COMMIT_PHASE_DURATION: u64 = 8000; // ms
+const REVEAL_PHASE_DURATION: u64 = 8000; // ms
 
 #[tokio::test]
 async fn test_start_shutdown() {

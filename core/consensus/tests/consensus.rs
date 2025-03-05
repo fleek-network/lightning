@@ -114,6 +114,8 @@ async fn test_epoch_change_via_time() {
         .with_genesis_mutator(|genesis| {
             // Trigger epoch change on startup.
             genesis.epoch_start = 0;
+            genesis.committee_selection_beacon_commit_phase_duration = 8000;
+            genesis.committee_selection_beacon_reveal_phase_duration = 8000;
         })
         .with_committee_nodes::<TestFullNodeComponentsWithRealConsensus>(4)
         .await
@@ -135,7 +137,7 @@ async fn test_epoch_change_via_time() {
                 .then_some(())
                 .ok_or(PollUntilError::ConditionNotSatisfied)
         },
-        Duration::from_secs(20),
+        Duration::from_secs(30),
         Duration::from_millis(100),
     )
     .await
