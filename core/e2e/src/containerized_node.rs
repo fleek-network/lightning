@@ -133,6 +133,13 @@ impl<C: NodeComponents> ContainerizedNode<C> {
             .clone()
     }
 
+    pub fn take_signer_socket(&self) -> SignerSubmitTxSocket {
+        self.node
+            .provider()
+            .get::<<C as NodeComponents>::SignerInterface>()
+            .get_socket()
+    }
+
     pub fn is_genesis_committee(&self) -> bool {
         self.is_genesis_committee
     }

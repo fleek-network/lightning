@@ -32,7 +32,19 @@ use lightning_handshake::config::{HandshakeConfig, TransportConfig};
 use lightning_handshake::handshake::Handshake;
 use lightning_handshake::transports::http::Config;
 use lightning_interfaces::prelude::*;
-use lightning_interfaces::types::{Genesis, GenesisNode, NodePorts, ServiceId, Staking};
+use lightning_interfaces::types::{
+    ExecuteTransactionError,
+    ExecuteTransactionOptions,
+    ExecuteTransactionRequest,
+    ExecuteTransactionResponse,
+    ExecuteTransactionWait,
+    Genesis,
+    GenesisNode,
+    NodePorts,
+    ServiceId,
+    Staking,
+    UpdateMethod,
+};
 use lightning_keystore::{Keystore, KeystoreConfig};
 use lightning_origin_ipfs::config::{Config as IPFSOriginConfig, Gateway};
 use lightning_pinger::{Config as PingerConfig, Pinger};
@@ -220,6 +232,29 @@ impl<C: NodeComponents> Swarm<C> {
             .map(|node| node.take_fetcher_server_socket())
     }
 
+    pub async fn execute_transaction_from_node(
+        &self,
+        node: &NodePublicKey,
+        method: UpdateMethod,
+    ) -> Result<ExecuteTransactionResponse, ExecuteTransactionError> {
+        let resp = self
+            .nodes
+            .get(node)
+            .expect("node should exist")
+            .take_signer_socket()
+            .run(ExecuteTransactionRequest {
+                method,
+                options: Some(ExecuteTransactionOptions {
+                    wait: ExecuteTransactionWait::Receipt,
+                    timeout: Some(Duration::from_secs(10)),
+                    ..Default::default()
+                }),
+            })
+            .await??;
+
+        Ok(resp)
+    }
+
     pub fn nodes(&self) -> Vec<&ContainerizedNode<C>> {
         self.nodes.values().collect::<Vec<_>>()
     }
@@ -325,6 +360,7 @@ pub struct SwarmBuilder {
     ping_timeout: Option<Duration>,
     ipfs_gateways: Option<Vec<Gateway>>,
     chain_id: Option<u32>,
+    total_intervals: Option<u64>,
 }
 
 impl SwarmBuilder {
@@ -429,6 +465,11 @@ impl SwarmBuilder {
         self
     }
 
+    pub fn with_total_intervals(mut self, total_intervals: u64) -> Self {
+        self.total_intervals = Some(total_intervals);
+        self
+    }
+
     pub fn build<C: NodeComponents<ConfigProviderInterface = TomlConfigProvider<C>>>(
         self,
     ) -> Swarm<C> {
@@ -473,7 +514,7 @@ impl SwarmBuilder {
                 .unwrap_or(15000),
 
             committee_selection_beacon_non_reveal_slash_amount: 1000,
-
+            total_intervals: self.total_intervals.unwrap_or(1),
             ..Default::default()
         };
 
