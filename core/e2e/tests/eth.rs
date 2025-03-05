@@ -22,6 +22,8 @@ async fn e2e_eth_client_approve_revoke() {
         .with_directory(temp_dir.path().to_path_buf().try_into().unwrap())
         .with_min_port(20000)
         .with_num_nodes(4)
+        .with_commit_phase_time(3000)
+        .with_reveal_phase_time(3000)
         .with_chain_id(chain_id)
         .persistence(true)
         .with_archiver()
@@ -33,7 +35,7 @@ async fn e2e_eth_client_approve_revoke() {
 
     // give forwarder some time to connect
     // TODO: this shouldn't be needed, but something is weird with the start of each epoch
-    tokio::time::sleep(Duration::from_secs(1)).await;
+    tokio::time::sleep(Duration::from_secs(4)).await;
 
     let rpc_addr = swarm.get_rpc_addresses().into_iter().next().unwrap().1;
 
