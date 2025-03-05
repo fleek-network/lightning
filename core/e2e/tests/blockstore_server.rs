@@ -9,6 +9,7 @@ use lightning_e2e::swarm::Swarm;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::ServerRequest;
 use lightning_interfaces::{_DirTrustedWriter, _FileTrustedWriter};
+use lightning_node_bindings::FullNodeComponents;
 use lightning_origin_ipfs::config::{Gateway, Protocol, RequestFormat};
 use lightning_test_utils::logging;
 use lightning_test_utils::server::spawn_server;
@@ -29,7 +30,11 @@ fn create_content() -> Vec<u8> {
         .collect()
 }
 
-async fn wait_for_origin_propagation(swarm: &Swarm, node: &NodePublicKey, hash: &[u8; 32]) {
+async fn wait_for_origin_propagation<C: NodeComponents>(
+    swarm: &Swarm<C>,
+    node: &NodePublicKey,
+    hash: &[u8; 32],
+) {
     let query_runner = swarm.get_query_runner(node).unwrap();
     lightning_utils::poll::poll_until(
         || async {
@@ -50,7 +55,7 @@ async fn e2e_blockstore_server_get() {
     logging::setup(None);
 
     let temp_dir = tempdir().unwrap();
-    let mut swarm = Swarm::builder()
+    let mut swarm = Swarm::<FullNodeComponents>::builder()
         .with_directory(temp_dir.path().to_path_buf().try_into().unwrap())
         .with_min_port(10700)
         .with_num_nodes(4)
@@ -68,7 +73,7 @@ async fn e2e_blockstore_server_get() {
                 .as_millis() as u64,
         )
         .with_syncronizer_delta(Duration::from_secs(5))
-        .build();
+        .build::<FullNodeComponents>();
     swarm.launch().await.unwrap();
 
     // Wait for RPC to be ready.
@@ -130,7 +135,7 @@ async fn e2e_blockstore_server_with_fetcher() {
         request_format: RequestFormat::CidLast,
     }];
 
-    let mut swarm = Swarm::builder()
+    let mut swarm = Swarm::<FullNodeComponents>::builder()
         .with_directory(temp_dir.path().to_path_buf().try_into().unwrap())
         .with_min_port(10800)
         .with_num_nodes(4)
@@ -149,7 +154,7 @@ async fn e2e_blockstore_server_with_fetcher() {
         )
         .with_syncronizer_delta(Duration::from_secs(5))
         .with_ipfs_gateways(gateways)
-        .build();
+        .build::<FullNodeComponents>();
     swarm.launch().await.unwrap();
 
     // Wait for RPC to be ready.
@@ -209,7 +214,7 @@ async fn e2e_blockstore_server_with_fetcher_recursive_dir() {
 
     let temp_dir = tempdir().unwrap();
 
-    let mut swarm = Swarm::builder()
+    let mut swarm = Swarm::<FullNodeComponents>::builder()
         .with_directory(temp_dir.path().to_path_buf().try_into().unwrap())
         .with_min_port(10900)
         .with_num_nodes(4)
@@ -227,7 +232,7 @@ async fn e2e_blockstore_server_with_fetcher_recursive_dir() {
                 .as_millis() as u64,
         )
         .with_syncronizer_delta(Duration::from_secs(5))
-        .build();
+        .build::<FullNodeComponents>();
     swarm.launch().await.unwrap();
 
     // Wait for RPC to be ready.

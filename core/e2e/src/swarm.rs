@@ -34,7 +34,6 @@ use lightning_handshake::transports::http::Config;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{Genesis, GenesisNode, NodePorts, ServiceId, Staking};
 use lightning_keystore::{Keystore, KeystoreConfig};
-use lightning_node_bindings::FullNodeComponents;
 use lightning_origin_ipfs::config::{Config as IPFSOriginConfig, Gateway};
 use lightning_pinger::{Config as PingerConfig, Pinger};
 use lightning_pool::{Config as PoolConfig, PoolProvider};
@@ -56,12 +55,12 @@ use crate::containerized_node::ContainerizedNode;
 use crate::error::SwarmError;
 use crate::utils::networking::{PortAssigner, Transport};
 
-pub struct Swarm {
-    nodes: HashMap<NodePublicKey, ContainerizedNode>,
+pub struct Swarm<C: NodeComponents> {
+    nodes: HashMap<NodePublicKey, ContainerizedNode<C>>,
     directory: ResolvedPathBuf,
 }
 
-impl Drop for Swarm {
+impl<C: NodeComponents> Drop for Swarm<C> {
     fn drop(&mut self) {
         for (_, node) in self.nodes.drain() {
             drop(node.shutdown());
@@ -70,7 +69,7 @@ impl Drop for Swarm {
     }
 }
 
-impl Swarm {
+impl<C: NodeComponents> Swarm<C> {
     pub fn builder() -> SwarmBuilder {
         SwarmBuilder::default()
     }
@@ -143,7 +142,7 @@ impl Swarm {
 
     pub fn get_query_runners(
         &self,
-    ) -> HashMap<NodePublicKey, c!(FullNodeComponents::ApplicationInterface::SyncExecutor)> {
+    ) -> HashMap<NodePublicKey, c!(C::ApplicationInterface::SyncExecutor)> {
         self.nodes
             .iter()
             .map(|(&pubkey, node)| (pubkey, node.take_cloned_query_runner()))
@@ -153,7 +152,7 @@ impl Swarm {
     pub fn get_query_runner(
         &self,
         node: &NodePublicKey,
-    ) -> Option<c!(FullNodeComponents::ApplicationInterface::SyncExecutor)> {
+    ) -> Option<c!(C::ApplicationInterface::SyncExecutor)> {
         self.nodes
             .get(node)
             .map(|node| node.take_cloned_query_runner())
@@ -177,10 +176,7 @@ impl Swarm {
 
     pub fn get_non_genesis_committee_syncronizer(
         &self,
-    ) -> Vec<(
-        NodePublicKey,
-        fdi::Ref<c!(FullNodeComponents::SyncronizerInterface)>,
-    )> {
+    ) -> Vec<(NodePublicKey, fdi::Ref<c!(C::SyncronizerInterface)>)> {
         self.nodes
             .iter()
             .filter(|(_pubkey, node)| !node.is_genesis_committee())
@@ -188,18 +184,24 @@ impl Swarm {
             .collect()
     }
 
-    pub fn get_blockstores(&self) -> Vec<Blockstore<FullNodeComponents>> {
+    pub fn get_blockstores(&self) -> Vec<<C as NodeComponents>::BlockstoreInterface> {
         self.nodes
             .values()
             .map(|node| node.take_blockstore())
             .collect()
     }
 
-    pub fn get_blockstore(&self, node: &NodePublicKey) -> Option<Blockstore<FullNodeComponents>> {
+    pub fn get_blockstore(
+        &self,
+        node: &NodePublicKey,
+    ) -> Option<<C as NodeComponents>::BlockstoreInterface> {
         self.nodes.get(node).map(|node| node.take_blockstore())
     }
 
-    pub fn get_resolver(&self, node: &NodePublicKey) -> Option<Resolver<FullNodeComponents>> {
+    pub fn get_resolver(
+        &self,
+        node: &NodePublicKey,
+    ) -> Option<<C as NodeComponents>::ResolverInterface> {
         self.nodes.get(node).map(|node| node.take_resolver())
     }
 
@@ -218,7 +220,7 @@ impl Swarm {
             .map(|node| node.take_fetcher_server_socket())
     }
 
-    pub fn nodes(&self) -> Vec<&ContainerizedNode> {
+    pub fn nodes(&self) -> Vec<&ContainerizedNode<C>> {
         self.nodes.values().collect::<Vec<_>>()
     }
 
@@ -226,7 +228,7 @@ impl Swarm {
         self.nodes.get(node).map(|node| node.get_index())
     }
 
-    pub fn started_nodes(&self) -> Vec<&ContainerizedNode> {
+    pub fn started_nodes(&self) -> Vec<&ContainerizedNode<C>> {
         self.nodes
             .values()
             .filter(|node| node.is_started())
@@ -427,7 +429,9 @@ impl SwarmBuilder {
         self
     }
 
-    pub fn build(self) -> Swarm {
+    pub fn build<C: NodeComponents<ConfigProviderInterface = TomlConfigProvider<C>>>(
+        self,
+    ) -> Swarm<C> {
         let num_nodes = self.num_nodes.expect("Number of nodes must be provided.");
         let directory = self.directory.expect("Directory must be provided.");
         let min_port = self.min_port.expect("Minimum port must be provided.");
@@ -532,7 +536,7 @@ impl SwarmBuilder {
             );
 
             // Generate and store the node public key.
-            let (node_pk, consensus_pk) = generate_and_store_node_secret(&config);
+            let (node_pk, consensus_pk) = generate_and_store_node_secret::<C>(&config);
             let owner_sk = AccountOwnerSecretKey::generate();
             let owner_pk = owner_sk.to_pk();
             let owner_eth: EthAddress = owner_pk.into();
@@ -575,7 +579,7 @@ impl SwarmBuilder {
             } else {
                 StorageConfig::InMemory
             };
-            config.inject::<Application<FullNodeComponents>>(ApplicationConfig {
+            config.inject::<Application<C>>(ApplicationConfig {
                 network: None,
                 genesis_path: Some(genesis_path.clone()),
                 storage,
@@ -633,7 +637,7 @@ fn assign_ports(port_assigner: &mut PortAssigner) -> NodePorts {
     }
 }
 
-fn build_config(
+fn build_config<C: NodeComponents>(
     root: &Path,
     ports: NodePorts,
     archiver: bool,
@@ -641,28 +645,28 @@ fn build_config(
     services: &[ServiceId],
     ping_interval: Option<Duration>,
     ipfs_gateways: &Option<Vec<Gateway>>,
-) -> TomlConfigProvider<FullNodeComponents> {
-    let config = TomlConfigProvider::<FullNodeComponents>::default();
+) -> TomlConfigProvider<C> {
+    let config = TomlConfigProvider::<C>::default();
 
-    config.inject::<Resolver<FullNodeComponents>>(ResolverConfig {
+    config.inject::<Resolver<C>>(ResolverConfig {
         store_path: root
             .join("data/resolver_store")
             .try_into()
             .expect("Failed to resolve path"),
     });
-    config.inject::<Rpc<FullNodeComponents>>(RpcConfig {
+    config.inject::<Rpc<C>>(RpcConfig {
         hmac_secret_dir: root.to_path_buf().into(),
         ..RpcConfig::default_with_port(ports.rpc)
     });
 
-    config.inject::<Consensus<FullNodeComponents>>(ConsensusConfig {
+    config.inject::<Consensus<C>>(ConsensusConfig {
         store_path: root
             .join("data/narwhal_store")
             .try_into()
             .expect("Failed to resolve path"),
     });
 
-    config.inject::<Keystore<FullNodeComponents>>(KeystoreConfig {
+    config.inject::<Keystore<C>>(KeystoreConfig {
         node_key_path: root
             .join("keys/node.pem")
             .try_into()
@@ -673,41 +677,41 @@ fn build_config(
             .expect("Failed to resolve path"),
     });
 
-    config.inject::<Blockstore<FullNodeComponents>>(BlockstoreConfig {
+    config.inject::<Blockstore<C>>(BlockstoreConfig {
         root: root
             .join("data/blockstore")
             .try_into()
             .expect("Failed to resolve path"),
     });
 
-    config.inject::<BlockstoreServer<FullNodeComponents>>(BlockstoreServerConfig::default());
+    config.inject::<BlockstoreServer<C>>(BlockstoreServerConfig::default());
 
-    config.inject::<Handshake<FullNodeComponents>>(HandshakeConfig {
+    config.inject::<Handshake<C>>(HandshakeConfig {
         // TODO: figure out how to have e2e testing for the different transports (browser oriented)
         transports: vec![TransportConfig::Http(Config {})],
         http_address: ([0, 0, 0, 0], ports.handshake.http).into(),
         ..Default::default()
     });
 
-    config.inject::<ServiceExecutor<FullNodeComponents>>(ServiceExecutorConfig {
+    config.inject::<ServiceExecutor<C>>(ServiceExecutorConfig {
         services: services.iter().copied().collect(),
         ipc_path: root.join("ipc").try_into().expect("Failed to resolve path"),
     });
 
-    config.inject::<ReputationAggregator<FullNodeComponents>>(RepAggConfig {
+    config.inject::<ReputationAggregator<C>>(RepAggConfig {
         reporter_buffer_size: 1,
     });
 
-    config.inject::<PoolProvider<FullNodeComponents>>(PoolConfig {
+    config.inject::<PoolProvider<C>>(PoolConfig {
         address: format!("127.0.0.1:{}", ports.pool).parse().unwrap(),
         ..Default::default()
     });
 
-    config.inject::<Syncronizer<FullNodeComponents>>(SyncronizerConfig {
+    config.inject::<Syncronizer<C>>(SyncronizerConfig {
         epoch_change_delta: syncronizer_delta,
     });
 
-    config.inject::<Archive<FullNodeComponents>>(ArchiveConfig {
+    config.inject::<Archive<C>>(ArchiveConfig {
         is_archive: archiver,
         store_path: root
             .join("data/archive")
@@ -715,12 +719,12 @@ fn build_config(
             .expect("Failed to resolve path"),
     });
 
-    config.inject::<Pinger<FullNodeComponents>>(PingerConfig {
+    config.inject::<Pinger<C>>(PingerConfig {
         address: format!("127.0.0.1:{}", ports.pinger).parse().unwrap(),
         ping_interval: ping_interval.unwrap_or(Duration::from_millis(1000)),
     });
 
-    config.inject::<Checkpointer<FullNodeComponents>>(CheckpointerConfig {
+    config.inject::<Checkpointer<C>>(CheckpointerConfig {
         database: CheckpointerDatabaseConfig {
             path: root
                 .join("data/checkpointer")
@@ -729,7 +733,7 @@ fn build_config(
         },
     });
 
-    config.inject::<CommitteeBeaconComponent<FullNodeComponents>>(CommitteeBeaconConfig {
+    config.inject::<CommitteeBeaconComponent<C>>(CommitteeBeaconConfig {
         database: CommitteeBeaconDatabaseConfig {
             path: root
                 .join("data/committee-beacon")
@@ -739,7 +743,7 @@ fn build_config(
     });
 
     if let Some(gateways) = ipfs_gateways {
-        config.inject::<Fetcher<FullNodeComponents>>(lightning_fetcher::config::Config {
+        config.inject::<Fetcher<C>>(lightning_fetcher::config::Config {
             ipfs: IPFSOriginConfig {
                 gateways: gateways.clone(),
                 gateway_timeout: Duration::from_millis(5000),
@@ -755,15 +759,14 @@ fn build_config(
 /// of the node and write them into the path specified by the configuration of the signer.
 ///
 /// Returns the public keys of the generated keys.
-fn generate_and_store_node_secret(
-    config: &TomlConfigProvider<FullNodeComponents>,
+fn generate_and_store_node_secret<
+    C: NodeComponents<ConfigProviderInterface = TomlConfigProvider<C>>,
+>(
+    config: &TomlConfigProvider<C>,
 ) -> (NodePublicKey, ConsensusPublicKey) {
-    Keystore::<FullNodeComponents>::generate_keys(
-        config.get::<Keystore<FullNodeComponents>>(),
-        true,
-    )
-    .expect("failed to ensure keys are generated");
-    let keystore = Keystore::<FullNodeComponents>::init(config).expect("failed to load keystore");
+    Keystore::<C>::generate_keys(config.get::<Keystore<C>>(), true)
+        .expect("failed to ensure keys are generated");
+    let keystore = Keystore::<C>::init(config).expect("failed to load keystore");
     (keystore.get_ed25519_pk(), keystore.get_bls_pk())
 }
 
