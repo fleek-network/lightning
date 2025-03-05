@@ -273,7 +273,7 @@
                 inherit cargoArtifacts;
                 partitions = 1;
                 partitionType = "count";
-                cargoNextestExtraArgs = "--workspace";
+                cargoNextestExtraArgs = "--workspace --nocapture";
                 RUST_LOG = "debug";
               }
             );
