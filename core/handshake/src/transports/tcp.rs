@@ -41,7 +41,7 @@ impl Transport for TcpTransport {
     type Sender = TcpSender;
     type Receiver = TcpReceiver;
 
-    async fn bind<P: ExecutorProviderInterface>(
+    async fn bind(
         shutdown: ShutdownWaiter,
         config: Self::Config,
     ) -> Result<(Self, Option<Router>)> {
@@ -120,7 +120,7 @@ fn spawn_handshake_task(
             // Parse the length delimiter
             // TODO: Do better, there are only 3 different handshake request variants/sizes
             let len = u32::from_be_bytes(*array_ref!(buf, 0, 4)) as usize;
-            if len > 157 || len == 0 {
+            if len > 181 || len == 0 {
                 trace!("dropping connection, handshake request delimiter is >157 or 0");
                 return;
             }
@@ -286,7 +286,6 @@ impl TransportReceiver for TcpReceiver {
 mod tests {
     use fleek_crypto::{ClientPublicKey, ClientSignature, NodePublicKey, NodeSignature};
     use lightning_interfaces::ShutdownController;
-    use lightning_service_executor::shim::Provider;
     use tokio::io::AsyncWriteExt;
     use tokio::net::TcpStream;
 
@@ -301,8 +300,7 @@ mod tests {
             address: ([127, 0, 0, 1], 20000).into(),
         };
         // Todo: use mock provider instead?
-        let (mut transport, _) =
-            TcpTransport::bind::<Provider>(notifier.waiter(), config.clone()).await?;
+        let (mut transport, _) = TcpTransport::bind(notifier.waiter(), config.clone()).await?;
 
         // Connect a dummy client
         let mut client = TcpStream::connect(config.address)
@@ -312,6 +310,8 @@ mod tests {
         const REQ_FRAME: HandshakeRequestFrame = HandshakeRequestFrame::Handshake {
             retry: None,
             service: 0,
+            expiry: 0,
+            nonce: 0,
             pk: ClientPublicKey([1; 96]),
             pop: ClientSignature([2; 48]),
         };
