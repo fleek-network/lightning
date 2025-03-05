@@ -5,6 +5,7 @@ use std::ops::DerefMut;
 use std::time::Duration;
 
 use ethers::abi::AbiDecode;
+use ethers::core::k256::elliptic_curve::rand_core::SeedableRng;
 use ethers::types::{Transaction as EthersTransaction, H160};
 use fleek_crypto::{
     ClientPublicKey,
@@ -27,6 +28,8 @@ use lightning_interfaces::types::{
     Epoch,
     ExecutionData,
     ExecutionError,
+    Job,
+    JobStatus,
     Metadata,
     MintInfo,
     NodeIndex,
@@ -70,6 +73,8 @@ use lightning_utils::eth::{
     WithdrawCall,
     WithdrawUnstakedCall,
 };
+use rand::prelude::{SliceRandom, StdRng};
+use sha3::{Digest, Sha3_256};
 
 use super::context::{Backend, TableRef};
 
@@ -138,6 +143,8 @@ pub struct StateExecutor<B: Backend> {
     pub committee_selection_beacon_non_revealing_node: B::Ref<NodeIndex, ()>,
     pub withdraws: B::Ref<u64, WithdrawInfo>,
     pub mints: B::Ref<[u8; 32], MintInfo>,
+    pub assigned_jobs: B::Ref<NodeIndex, Vec<[u8; 32]>>,
+    pub jobs: B::Ref<[u8; 32], Job>,
     pub backend: B,
 }
 
@@ -171,6 +178,8 @@ impl<B: Backend> StateExecutor<B> {
                 .get_table_reference("committee_selection_beacon_non_revealing_node"),
             withdraws: backend.get_table_reference("withdraws"),
             mints: backend.get_table_reference("mints"),
+            assigned_jobs: backend.get_table_reference("assigned_jobs"),
+            jobs: backend.get_table_reference("jobs"),
             backend,
         }
     }
@@ -312,6 +321,9 @@ impl<B: Backend> StateExecutor<B> {
                 self.update_content_registry(txn.payload.sender, updates)
             },
             UpdateMethod::IncrementNonce {} => TransactionResponse::Success(ExecutionData::None),
+            UpdateMethod::AddJobs { jobs } => self.add_jobs(jobs),
+            UpdateMethod::RemoveJobs { jobs } => self.remove_jobs(jobs),
+            UpdateMethod::JobUpdates { updates } => self.update_jobs(updates),
         };
 
         #[cfg(debug_assertions)]
@@ -1269,6 +1281,76 @@ impl<B: Backend> StateExecutor<B> {
         TransactionResponse::Success(ExecutionData::None)
     }
 
+    fn add_jobs(&self, jobs: Vec<Job>) -> TransactionResponse {
+        let mut jobs = jobs
+            .into_iter()
+            .map(|job| (job.hash, job))
+            .collect::<HashMap<_, _>>();
+        let job_hashes = jobs.keys().copied().collect();
+        let assigned_jobs = self.assign_jobs(job_hashes);
+
+        // Record the assignee in the job entry.
+        for (index, node_jobs) in assigned_jobs.iter() {
+            for job_hash in node_jobs {
+                if let Some(job) = jobs.get_mut(job_hash) {
+                    job.assignee = Some(*index);
+                }
+            }
+        }
+
+        // Update each node's assigned job list.
+        for (node, node_jobs) in assigned_jobs {
+            match self.assigned_jobs.get(&node) {
+                Some(mut cur_assigned_jobs) => {
+                    cur_assigned_jobs.extend_from_slice(&node_jobs);
+                    self.assigned_jobs.set(node, cur_assigned_jobs);
+                },
+                None => {
+                    self.assigned_jobs.set(node, node_jobs);
+                },
+            }
+        }
+
+        // Save jobs.
+        for (job_hash, job) in jobs {
+            self.jobs.set(job_hash, job);
+        }
+
+        TransactionResponse::Success(ExecutionData::None)
+    }
+
+    fn remove_jobs(&self, jobs: Vec<[u8; 32]>) -> TransactionResponse {
+        // Remove these jobs from nodes' assigned job lists.
+        for job_hash in jobs {
+            if let Some(job) = self.jobs.get(&job_hash) {
+                if let Some(assignee) = job.assignee {
+                    if let Some(mut assigned_jobs) = self.assigned_jobs.get(&assignee) {
+                        if let Some(pos) = assigned_jobs.iter().position(|h| &job_hash == h) {
+                            assigned_jobs.remove(pos);
+                        }
+
+                        self.assigned_jobs.set(assignee, assigned_jobs);
+                    }
+                }
+            }
+
+            self.jobs.remove(&job_hash);
+        }
+
+        TransactionResponse::Success(ExecutionData::None)
+    }
+
+    fn update_jobs(&self, updates: BTreeMap<[u8; 32], JobStatus>) -> TransactionResponse {
+        for (job_hash, status) in updates {
+            if let Some(mut job) = self.jobs.get(&job_hash) {
+                job.status = Some(status);
+                self.jobs.set(job_hash, job);
+            }
+        }
+
+        TransactionResponse::Success(ExecutionData::None)
+    }
+
     /********Internal Application Functions******** */
     // These functions should only ever be called in the context of an external transaction function
     // They should never panic and any check that could result in that should be done in the
@@ -1914,5 +1996,48 @@ impl<B: Backend> StateExecutor<B> {
 
     pub fn set_epoch_era(&self, era: u64) {
         self.metadata.set(Metadata::EpochEra, Value::EpochEra(era));
+    }
+
+    fn assign_jobs(&self, mut jobs: Vec<[u8; 32]>) -> HashMap<NodeIndex, Vec<[u8; 32]>> {
+        jobs.sort();
+
+        let jobs_hash: [u8; 32] = Sha3_256::digest(jobs.concat()).into();
+        let mut rng: StdRng = SeedableRng::from_seed(jobs_hash);
+
+        let mut nodes: Vec<NodeIndex> = self
+            .get_node_registry()
+            .into_iter()
+            .filter(|index| index.1.participation == Participation::True)
+            .map(|(index, _)| index)
+            .collect();
+        nodes.sort();
+        nodes.shuffle(&mut rng);
+
+        if nodes.is_empty() {
+            tracing::warn!("no nodes in the registry to schedule jobs to")
+        }
+
+        let chunk = if nodes.is_empty() || jobs.len() < nodes.len() {
+            1
+        } else {
+            jobs.len().div_ceil(nodes.len())
+        };
+
+        let mut assigned_jobs = HashMap::new();
+        for (i, sched_jobs) in jobs.into_iter().enumerate() {
+            let node_i = i
+                .checked_div(chunk)
+                .expect("chunk is zero only if there are no jobs to iterate on");
+            let index = nodes
+                .get(node_i)
+                .expect("we divided the work between all existing nodes");
+
+            assigned_jobs
+                .entry(*index)
+                .or_insert_with(Vec::new)
+                .push(sched_jobs);
+        }
+
+        assigned_jobs
     }
 }

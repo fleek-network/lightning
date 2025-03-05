@@ -25,6 +25,7 @@ use lightning_task_broker::TaskBroker;
 use lightning_test_utils::consensus::{MockConsensus, MockForwarder};
 use lightning_topology::Topology;
 use lightning_utils::config::TomlConfigProvider;
+use lightning_watcher::Watcher;
 
 partial_node_components!(FullNodeComponents require full {
     ForwarderInterface = Forwarder<Self>;
@@ -52,6 +53,7 @@ partial_node_components!(FullNodeComponents require full {
     PoolInterface = PoolProvider<Self>;
     PingerInterface = Pinger<Self>;
     IndexerInterface = Indexer<Self>;
+    WatcherInterface = Watcher<Self>;
     DeliveryAcknowledgmentAggregatorInterface = lightning_interfaces::_hacks::Blanket;
 });
 
@@ -81,5 +83,6 @@ partial_node_components!(UseMockConsensus require full {
     PoolInterface = PoolProvider<Self>;
     PingerInterface = Pinger<Self>;
     IndexerInterface = Indexer<Self>;
+    WatcherInterface = Watcher<Self>;
     DeliveryAcknowledgmentAggregatorInterface = lightning_interfaces::_hacks::Blanket;
 });

@@ -244,6 +244,19 @@ impl ApplicationEnv {
                 Value::AccountPublicKey(genesis.protocol_fund_address),
             );
 
+            let total_intervals = if genesis.total_intervals == 0 {
+                1
+            } else {
+                genesis.total_intervals
+            };
+
+            metadata_table.insert(
+                Metadata::TimeInterval,
+                Value::TimeInterval(
+                    genesis.epoch_time / total_intervals
+                )
+            );
+
             metadata_table.insert(Metadata::GovernanceAddress,
                 Value::AccountPublicKey(genesis.governance_address));
             let governance_account = AccountInfo {
@@ -348,6 +361,13 @@ impl ApplicationEnv {
                 ProtocolParamKey::CommitteeSelectionBeaconNonRevealSlashAmount,
                 ProtocolParamValue::CommitteeSelectionBeaconNonRevealSlashAmount(
                     genesis.committee_selection_beacon_non_reveal_slash_amount,
+                ),
+            );
+
+            param_table.insert(
+                ProtocolParamKey::TotalTimeIntervals,
+                ProtocolParamValue::TotalTimeIntervals(
+                    total_intervals,
                 ),
             );
 
