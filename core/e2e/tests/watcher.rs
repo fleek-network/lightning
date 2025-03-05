@@ -83,7 +83,7 @@ pub fn start_listening_server(state: Arc<Mutex<Counter>>) -> JoinHandle<()> {
         let app = Router::new()
             .route("/counter", axum::routing::post(handler))
             .layer(Extension(state));
-        let listener = TcpListener::bind("0.0.0.0:6006").await.unwrap();
+        let listener = TcpListener::bind("0.0.0.0:6067").await.unwrap();
         axum::serve::serve(listener, app.into_make_service())
             .await
             .unwrap();
@@ -126,7 +126,7 @@ impl ExecutorProviderInterface for ProxyProvider {
 
             if let TransportDetail::Task { payload, .. } = header {
                 let res = reqwest::Client::new()
-                    .post("http://0.0.0.0:6006/counter")
+                    .post("http://0.0.0.0:6067/counter")
                     .send()
                     .await
                     .unwrap();
