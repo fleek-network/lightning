@@ -8,6 +8,7 @@ use lightning_e2e::swarm::Swarm;
 use lightning_e2e::utils::shutdown;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::ServiceId;
+use lightning_node_bindings::FullNodeComponents;
 use lightning_service_executor::shim::ServiceExecutor;
 use lightning_test_utils::config::LIGHTNING_TEST_HOME_DIR;
 use lightning_test_utils::logging;
@@ -82,7 +83,7 @@ fn main() -> Result<()> {
         if path.exists() {
             fs::remove_dir_all(&path).expect("Failed to clean up swarm directory before test.");
         }
-        let mut swarm = Swarm::builder()
+        let mut swarm = Swarm::<FullNodeComponents>::builder()
             .with_directory(path)
             .with_min_port(12000)
             .with_num_nodes(args.num_nodes)
@@ -94,7 +95,7 @@ fn main() -> Result<()> {
             .with_archiver()
             .persistence(args.persistence)
             .with_services(args.services)
-            .build();
+            .build::<FullNodeComponents>();
         swarm.launch().await.unwrap();
 
         let mut s = String::from("#####################################\n\n");

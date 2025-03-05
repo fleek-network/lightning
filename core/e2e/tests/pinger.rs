@@ -2,6 +2,7 @@ use std::time::{Duration, SystemTime};
 
 use lightning_e2e::swarm::Swarm;
 use lightning_interfaces::types::Participation;
+use lightning_node_bindings::FullNodeComponents;
 use lightning_rpc::api::RpcClient;
 use lightning_rpc::interface::Fleek;
 use lightning_test_utils::logging;
@@ -12,7 +13,7 @@ async fn e2e_detect_offline_node() {
     logging::setup(None);
 
     let temp_dir = tempdir().unwrap();
-    let mut swarm = Swarm::builder()
+    let mut swarm = Swarm::<FullNodeComponents>::builder()
         .with_directory(temp_dir.path().to_path_buf().try_into().unwrap())
         .with_min_port(10500)
         .with_num_nodes(5)
@@ -33,7 +34,7 @@ async fn e2e_detect_offline_node() {
                 .as_millis() as u64,
         )
         .persistence(true)
-        .build();
+        .build::<FullNodeComponents>();
     swarm.launch_genesis_committee().await.unwrap();
 
     // Wait for RPC to be ready.

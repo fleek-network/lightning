@@ -2,13 +2,10 @@ use std::time::Duration;
 
 use fleek_crypto::AccountOwnerSecretKey;
 use futures::Future;
-use lightning_blockstore::blockstore::Blockstore;
 use lightning_interfaces::fdi::MultiThreadedProvider;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{NodePorts, Staking};
 use lightning_node::ContainedNode;
-use lightning_node_bindings::FullNodeComponents;
-use lightning_resolver::Resolver;
 use lightning_rpc::api::FleekApiClient;
 use lightning_rpc::{Rpc, RpcClient};
 use lightning_utils::config::TomlConfigProvider;
@@ -17,10 +14,10 @@ use types::{Epoch, NodeIndex};
 
 use crate::error::SwarmError;
 
-pub struct ContainerizedNode {
-    config: TomlConfigProvider<FullNodeComponents>,
+pub struct ContainerizedNode<C: NodeComponents> {
+    config: TomlConfigProvider<C>,
     owner_secret_key: AccountOwnerSecretKey,
-    node: ContainedNode<FullNodeComponents>,
+    node: ContainedNode<C>,
     index: NodeIndex,
     genesis_stake: Staking,
     ports: NodePorts,
@@ -28,9 +25,9 @@ pub struct ContainerizedNode {
     started: bool,
 }
 
-impl ContainerizedNode {
+impl<C: NodeComponents> ContainerizedNode<C> {
     pub fn new(
-        config: TomlConfigProvider<FullNodeComponents>,
+        config: TomlConfigProvider<C>,
         owner_secret_key: AccountOwnerSecretKey,
         ports: NodePorts,
         index: NodeIndex,
@@ -39,8 +36,7 @@ impl ContainerizedNode {
     ) -> Self {
         let provider = MultiThreadedProvider::default();
         provider.insert(config.clone());
-        let node =
-            ContainedNode::<FullNodeComponents>::new(provider, Some(format!("NODE-{index}")));
+        let node = ContainedNode::<C>::new(provider, Some(format!("NODE-{index}")));
         Self {
             config,
             owner_secret_key,
@@ -76,7 +72,7 @@ impl ContainerizedNode {
     }
 
     pub fn get_rpc_address(&self) -> String {
-        let config = self.config.get::<Rpc<FullNodeComponents>>();
+        let config = self.config.get::<Rpc<C>>();
         format!("http://{}", config.addr())
     }
 
@@ -96,46 +92,44 @@ impl ContainerizedNode {
         self.genesis_stake.clone()
     }
 
-    pub fn take_syncronizer(&self) -> fdi::Ref<c!(FullNodeComponents::SyncronizerInterface)> {
+    pub fn take_syncronizer(&self) -> fdi::Ref<c!(C::SyncronizerInterface)> {
         self.node
             .provider()
-            .get::<<FullNodeComponents as NodeComponents>::SyncronizerInterface>()
+            .get::<<C as NodeComponents>::SyncronizerInterface>()
     }
 
-    pub fn take_resolver(&self) -> Resolver<FullNodeComponents> {
+    pub fn take_resolver(&self) -> <C as NodeComponents>::ResolverInterface {
         self.node
             .provider()
-            .get::<<FullNodeComponents as NodeComponents>::ResolverInterface>()
+            .get::<<C as NodeComponents>::ResolverInterface>()
             .clone()
     }
 
-    pub fn take_blockstore(&self) -> Blockstore<FullNodeComponents> {
+    pub fn take_blockstore(&self) -> <C as NodeComponents>::BlockstoreInterface {
         self.node
             .provider()
-            .get::<<FullNodeComponents as NodeComponents>::BlockstoreInterface>()
+            .get::<<C as NodeComponents>::BlockstoreInterface>()
             .clone()
     }
 
     pub fn take_blockstore_server_socket(&self) -> BlockstoreServerSocket {
         self.node
             .provider()
-            .get::<<FullNodeComponents as NodeComponents>::BlockstoreServerInterface>()
+            .get::<<C as NodeComponents>::BlockstoreServerInterface>()
             .get_socket()
     }
 
     pub fn take_fetcher_server_socket(&self) -> FetcherSocket {
         self.node
             .provider()
-            .get::<<FullNodeComponents as NodeComponents>::FetcherInterface>()
+            .get::<<C as NodeComponents>::FetcherInterface>()
             .get_socket()
     }
 
-    pub fn take_cloned_query_runner(
-        &self,
-    ) -> c!(FullNodeComponents::ApplicationInterface::SyncExecutor) {
+    pub fn take_cloned_query_runner(&self) -> c!(C::ApplicationInterface::SyncExecutor) {
         self.node
             .provider()
-            .get::<c!(FullNodeComponents::ApplicationInterface::SyncExecutor)>()
+            .get::<c!(C::ApplicationInterface::SyncExecutor)>()
             .clone()
     }
 
