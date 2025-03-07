@@ -161,7 +161,7 @@ interface OtelTracer {
   __key: "tracer";
 
   // deno-lint-ignore no-misused-new
-  new (name: string, version?: string, schemaUrl?: string): OtelTracer;
+  new(name: string, version?: string, schemaUrl?: string): OtelTracer;
 
   startSpan(
     parent: OtelSpan | undefined,
@@ -254,9 +254,9 @@ class Tracer {
       throw new Error("startActiveSpan requires a function argument");
     }
     if (options?.root) {
-      context = undefined;
+      context = ROOT_CONTEXT;
     } else {
-      context = context ?? CURRENT.get();
+      context = context ?? CURRENT.get() ?? ROOT_CONTEXT;
     }
     const span = this.startSpan(name, options, context);
     const ctx = CURRENT.enter(context.setValue(SPAN_KEY, span));

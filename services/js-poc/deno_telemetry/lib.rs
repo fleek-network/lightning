@@ -488,9 +488,7 @@ mod hyper_client {
     impl opentelemetry_http::HttpClient for HyperClient {
         async fn send(&self, request: Request<Vec<u8>>) -> Result<Response<Bytes>, HttpError> {
             let (parts, body) = request.into_parts();
-            println!("request body: {:?}", Bytes::from(body.clone()));
             let request = Request::from_parts(parts, Body(Full::from(body)));
-            println!("request: {:?}, {:?}", request.uri(), request.headers());
             let mut response = self.inner.request(request).await?;
             let headers = std::mem::take(response.headers_mut());
 
