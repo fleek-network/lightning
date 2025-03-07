@@ -65,6 +65,34 @@ pub fn extract(
             map
         },
     );
+
+    let mut otel_endpoint = None;
+    if let Some(v) = headers.get("otel_endpoint") {
+        otel_endpoint = Some(v.parse::<Url>().ok()?);
+    }
+    let otel_headers = headers
+        .iter()
+        .filter_map(|(k, v)| {
+            if k.starts_with("otel_header_") {
+                // strip `otel_header_` prefix from the request header
+                Some((k.replacen("otel_header_", "", 1), v.clone()))
+            } else {
+                None
+            }
+        })
+        .collect();
+    let otel_tags = headers
+        .iter()
+        .filter_map(|(k, v)| {
+            if k.starts_with("otel_tag_") {
+                // strip `otel_header_` prefix from the request header
+                Some((k.replacen("otel_tag_", "", 1), v.clone()))
+            } else {
+                None
+            }
+        })
+        .collect();
+
     let query = (!query.is_empty()).then_some(query);
     let headers = (!headers.is_empty()).then_some(headers);
 
@@ -80,6 +108,9 @@ pub fn extract(
         uri,
         path: Some(path),
         param,
+        otel_endpoint,
+        otel_headers,
+        otel_tags,
     })
 }
 
@@ -108,6 +139,39 @@ mod tests {
                     "query": null,
                     "body": null,
                 })),
+                otel_endpoint: None,
+                otel_headers: HashMap::new(),
+                otel_tags: HashMap::new(),
+            })
+        );
+
+        // Request with open telemetry headers
+        let mut headers = HashMap::new();
+        headers.insert("otel_endpoint".to_string(), "https://foo.bar".to_string());
+        headers.insert("otel_header_test".to_string(), "foobar".to_string());
+        assert_eq!(
+            extract(
+                &Url::parse("http://fleek/blake3/content-hash/").unwrap(),
+                &headers,
+                HttpMethod::GET,
+                vec![],
+            ),
+            Some(Request {
+                origin: Origin::Blake3,
+                uri: "content-hash".to_string(),
+                path: Some("/".to_string()),
+                param: Some(json!({
+                    "method": "GET",
+                    "headers": headers,
+                    "path": "/",
+                    "query": null,
+                    "body": null,
+                })),
+                otel_endpoint: Some("https://foo.bar".parse().unwrap()),
+                otel_headers: [("test".to_string(), "foobar".to_string())]
+                    .into_iter()
+                    .collect(),
+                otel_tags: HashMap::new(),
             })
         );
 
@@ -130,6 +194,9 @@ mod tests {
                     "query": null,
                     "body": "foobar",
                 })),
+                otel_endpoint: None,
+                otel_headers: HashMap::new(),
+                otel_tags: HashMap::new(),
             })
         );
 
@@ -152,6 +219,9 @@ mod tests {
                     "query": null,
                     "body": { "foo": "bar" },
                 })),
+                otel_endpoint: None,
+                otel_headers: HashMap::new(),
+                otel_tags: HashMap::new(),
             })
         );
 
@@ -174,6 +244,9 @@ mod tests {
                     "query": null,
                     "body": null,
                 })),
+                otel_endpoint: None,
+                otel_headers: HashMap::new(),
+                otel_tags: HashMap::new(),
             })
         );
 
@@ -196,6 +269,9 @@ mod tests {
                     "query": null,
                     "body": null,
                 })),
+                otel_endpoint: None,
+                otel_headers: HashMap::new(),
+                otel_tags: HashMap::new(),
             })
         );
 
@@ -218,6 +294,9 @@ mod tests {
                     "query": { "a": "4" },
                     "body": null,
                 })),
+                otel_endpoint: None,
+                otel_headers: HashMap::new(),
+                otel_tags: HashMap::new(),
             })
         );
     }

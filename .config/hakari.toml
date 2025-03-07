@@ -66,5 +66,6 @@ workspace-members = [
   "resolved-pathbuf",
   "safetensors-ndarray",
   "simulon",
-  "sgxencrypt"
+  "sgxencrypt",
+  "deno_telemetry"
 ]

@@ -68,6 +68,7 @@ ethers-contract-abigen = { version = "2", default-features = false, features = [
 fastcrypto-b0db73ecc1bbc313 = { package = "fastcrypto", git = "https://github.com/MystenLabs/fastcrypto", rev = "c961a01596a87e76f590c7e43aca9d57106dbbb1", features = ["copy_key"] }
 fastcrypto-e49888412d456f9d = { package = "fastcrypto", git = "https://github.com/MystenLabs/fastcrypto", rev = "55e7e568842939e01c8545a71d72e2402ad74538", features = ["aes", "copy_key"] }
 ff = { version = "0.13", default-features = false, features = ["alloc"] }
+form_urlencoded = { version = "1" }
 futures = { version = "0.3", features = ["bilock", "unstable"] }
 futures-channel = { version = "0.3", features = ["sink", "unstable"] }
 futures-core = { version = "0.3", features = ["unstable"] }
@@ -147,7 +148,8 @@ ripemd = { version = "0.1", features = ["oid"] }
 rocksdb = { version = "0.21", features = ["multi-threaded-cf"] }
 ruint = { version = "1", features = ["num-bigint", "primitive-types", "serde"] }
 rustc-hex = { version = "2", default-features = false, features = ["std"] }
-rustls = { version = "0.21", features = ["dangerous_configuration", "quic"] }
+rustls-2b5c6dc72f624058 = { package = "rustls", version = "0.23", default-features = false, features = ["logging", "ring", "std", "tls12"] }
+rustls-647d43efb71741da = { package = "rustls", version = "0.21", features = ["dangerous_configuration", "quic"] }
 rustls-pki-types = { version = "1", features = ["std"] }
 rustls-webpki = { version = "0.102" }
 schemars = { version = "0.8", features = ["either"] }
@@ -175,7 +177,8 @@ syn-f595c2ba2a3f28df = { package = "syn", version = "2", features = ["extra-trai
 time = { version = "0.3", features = ["formatting", "local-offset", "macros", "parsing"] }
 tiny-keccak = { version = "2", features = ["keccak", "sha3"] }
 tokio = { version = "1", features = ["full", "test-util", "tracing"] }
-tokio-rustls = { version = "0.24" }
+tokio-rustls-2f80eeee3b1b6c7e = { package = "tokio-rustls", version = "0.26", default-features = false, features = ["ring", "tls12"] }
+tokio-rustls-adf3d7031871b0af = { package = "tokio-rustls", version = "0.24" }
 tokio-stream = { version = "0.1", features = ["net", "sync"] }
 tokio-util = { version = "0.7", features = ["codec", "compat", "io", "rt", "time"] }
 toml_datetime = { version = "0.6", default-features = false, features = ["serde"] }
@@ -246,6 +249,7 @@ ethers-contract-abigen = { version = "2", default-features = false, features = [
 fastcrypto-b0db73ecc1bbc313 = { package = "fastcrypto", git = "https://github.com/MystenLabs/fastcrypto", rev = "c961a01596a87e76f590c7e43aca9d57106dbbb1", features = ["copy_key"] }
 fastcrypto-e49888412d456f9d = { package = "fastcrypto", git = "https://github.com/MystenLabs/fastcrypto", rev = "55e7e568842939e01c8545a71d72e2402ad74538", features = ["aes", "copy_key"] }
 ff = { version = "0.13", default-features = false, features = ["alloc"] }
+form_urlencoded = { version = "1" }
 futures = { version = "0.3", features = ["bilock", "unstable"] }
 futures-channel = { version = "0.3", features = ["sink", "unstable"] }
 futures-core = { version = "0.3", features = ["unstable"] }
@@ -328,7 +332,8 @@ ripemd = { version = "0.1", features = ["oid"] }
 rocksdb = { version = "0.21", features = ["multi-threaded-cf"] }
 ruint = { version = "1", features = ["num-bigint", "primitive-types", "serde"] }
 rustc-hex = { version = "2", default-features = false, features = ["std"] }
-rustls = { version = "0.21", features = ["dangerous_configuration", "quic"] }
+rustls-2b5c6dc72f624058 = { package = "rustls", version = "0.23", default-features = false, features = ["logging", "ring", "std", "tls12"] }
+rustls-647d43efb71741da = { package = "rustls", version = "0.21", features = ["dangerous_configuration", "quic"] }
 rustls-pki-types = { version = "1", features = ["std"] }
 rustls-webpki = { version = "0.102" }
 schemars = { version = "0.8", features = ["either"] }
@@ -357,7 +362,8 @@ syn-f595c2ba2a3f28df = { package = "syn", version = "2", features = ["extra-trai
 time = { version = "0.3", features = ["formatting", "local-offset", "macros", "parsing"] }
 tiny-keccak = { version = "2", features = ["keccak", "sha3"] }
 tokio = { version = "1", features = ["full", "test-util", "tracing"] }
-tokio-rustls = { version = "0.24" }
+tokio-rustls-2f80eeee3b1b6c7e = { package = "tokio-rustls", version = "0.26", default-features = false, features = ["ring", "tls12"] }
+tokio-rustls-adf3d7031871b0af = { package = "tokio-rustls", version = "0.24" }
 tokio-stream = { version = "0.1", features = ["net", "sync"] }
 tokio-util = { version = "0.7", features = ["codec", "compat", "io", "rt", "time"] }
 toml_datetime = { version = "0.6", default-features = false, features = ["serde"] }
@@ -378,7 +384,6 @@ arrayvec = { version = "0.7", default-features = false, features = ["serde"] }
 bitflags = { version = "2", default-features = false, features = ["serde"] }
 event-listener = { version = "5" }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
-mio = { version = "0.8", features = ["net", "os-ext"] }
 openssl = { version = "0.10", features = ["vendored"] }
 openssl-sys = { version = "0.9", default-features = false, features = ["vendored"] }
 rustix = { version = "0.38", features = ["event", "fs", "net", "pipe", "process", "system", "termios", "time"] }
@@ -391,7 +396,6 @@ arrayvec = { version = "0.7", default-features = false, features = ["serde"] }
 bitflags = { version = "2", default-features = false, features = ["serde"] }
 event-listener = { version = "5" }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
-mio = { version = "0.8", features = ["net", "os-ext"] }
 openssl = { version = "0.10", features = ["vendored"] }
 openssl-sys = { version = "0.9", default-features = false, features = ["vendored"] }
 rustix = { version = "0.38", features = ["event", "fs", "net", "pipe", "process", "system", "termios", "time"] }
@@ -408,7 +412,6 @@ core-graphics-types = { version = "0.1" }
 errno = { version = "0.3" }
 event-listener = { version = "5" }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
-mio = { version = "0.8", features = ["net", "os-ext"] }
 rustix = { version = "0.38", features = ["event", "fs", "net", "pipe", "process", "system", "termios", "time"] }
 security-framework-sys = { version = "2" }
 serde_bytes = { version = "0.11", features = ["alloc"] }
@@ -424,7 +427,6 @@ core-graphics-types = { version = "0.1" }
 errno = { version = "0.3" }
 event-listener = { version = "5" }
 jpeg-decoder = { version = "0.3", default-features = false, features = ["rayon"] }
-mio = { version = "0.8", features = ["net", "os-ext"] }
 rustix = { version = "0.38", features = ["event", "fs", "net", "pipe", "process", "system", "termios", "time"] }
 security-framework-sys = { version = "2" }
 serde_bytes = { version = "0.11", features = ["alloc"] }

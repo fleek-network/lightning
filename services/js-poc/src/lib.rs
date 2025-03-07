@@ -130,6 +130,9 @@ async fn handle_request(
         uri,
         path,
         param,
+        otel_endpoint,
+        otel_headers,
+        otel_tags,
     } = request;
     if uri.is_empty() {
         bail!("Empty origin uri");
@@ -150,8 +153,14 @@ async fn handle_request(
     }
 
     // Create runtime and execute the source.
-    let mut runtime =
-        Runtime::new(location.clone(), depth).context("Failed to initialize runtime")?;
+    let mut runtime = Runtime::new(
+        location.clone(),
+        depth,
+        otel_endpoint.map(|u| u.to_string()),
+        otel_headers,
+        otel_tags,
+    )
+    .context("Failed to initialize runtime")?;
     tx.send(runtime.deno.v8_isolate().thread_safe_handle())?;
 
     unsafe {

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use fn_sdk::api::Origin as ApiOrigin;
 use serde::{Deserialize, Serialize};
 
@@ -12,6 +14,7 @@ pub struct Request {
     pub uri: String,
     /// Optional path to provide as the window location,
     /// including query parameters and the fragment.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
     /// Parameter to pass to the script's main function.
     /// For http oriented functions, an object can be passed
@@ -20,6 +23,15 @@ pub struct Request {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(alias = "params", alias = "parameter", alias = "parameters")]
     pub param: Option<serde_json::Value>,
+    /// Optional endpoint to send otlp http logs to
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub otel_endpoint: Option<deno_core::url::Url>,
+    /// Optional headers to include when exporting otlp
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    pub otel_headers: HashMap<String, String>,
+    /// Additional global tags to include with exported data
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    pub otel_tags: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Eq, PartialEq)]
