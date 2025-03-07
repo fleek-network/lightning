@@ -11,8 +11,12 @@ pub use opentelemetry_sdk::metrics::Temporality;
 pub struct TelemetryConfig {
     /// http/protobuf (default), http/json
     pub protocol: Protocol,
+    /// base endpoint to export to
     pub endpoint: Option<String>,
+    /// headers to include with exporter requests
     pub headers: HashMap<String, String>,
+    /// additional global tags to add to exporters
+    pub tags: HashMap<String, String>,
     /// cumulative (default), delta, lowmemory
     pub temporality: Temporality,
     pub client_config: HyperClientConfig,
@@ -38,7 +42,7 @@ impl TelemetryConfig {
                     let lines: Result<HashMap<String, String>, deno_core::anyhow::Error> = v
                         .split(";")
                         .map(|l| {
-                            l.split_once('=')
+                            l.split_once(':')
                                 .map(|(k, v)| (k.to_string(), v.to_string()))
                                 .ok_or(anyhow!("invalid header value"))
                         })
@@ -46,6 +50,8 @@ impl TelemetryConfig {
                     lines
                 })
                 .unwrap_or(Ok(HashMap::new()))?,
+            // TODO
+            tags: HashMap::new(),
             temporality: {
                 match env::var("OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE")
                     .ok()

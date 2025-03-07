@@ -585,6 +585,11 @@ pub fn init(
         ),
     ]));
 
+    // Add any additional resources attributes provided by the runtime
+    resource = resource.merge(&Resource::new(
+        config.tags.into_iter().map(|(k, v)| KeyValue::new(k, v)),
+    ));
+
     let client = hyper_client::HyperClient::new(config.client_config)?;
 
     let span_exporter = HttpExporterBuilder::default()

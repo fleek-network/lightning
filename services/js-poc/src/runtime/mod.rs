@@ -49,6 +49,7 @@ impl Runtime {
         depth: u8,
         otel_endpoint: Option<String>,
         otel_headers: HashMap<String, String>,
+        otel_tags: HashMap<String, String>,
     ) -> Result<Self> {
         let memory_fs = MaybeArc::new(InMemoryFs::default());
         let tape = Tape::new(location.clone());
@@ -68,6 +69,7 @@ impl Runtime {
             protocol: ::deno_telemetry::config::Protocol::HttpBinary,
             endpoint: otel_endpoint,
             headers: otel_headers,
+            tags: otel_tags,
             temporality: ::deno_telemetry::config::Temporality::LowMemory,
             client_config: ::deno_telemetry::config::HyperClientConfig {
                 ca_certs: Default::default(),

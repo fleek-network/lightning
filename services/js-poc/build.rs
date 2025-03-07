@@ -35,6 +35,7 @@ fn main() {
         protocol: ::deno_telemetry::config::Protocol::Grpc,
         endpoint: Some("http://locahost:8080".into()),
         headers: HashMap::new(),
+        tags: HashMap::new(),
         temporality: Temporality::LowMemory,
         client_config: ::deno_telemetry::config::HyperClientConfig {
             ca_certs: Default::default(),

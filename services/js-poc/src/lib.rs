@@ -132,6 +132,7 @@ async fn handle_request(
         param,
         otel_endpoint,
         otel_headers,
+        otel_tags,
     } = request;
     if uri.is_empty() {
         bail!("Empty origin uri");
@@ -157,6 +158,7 @@ async fn handle_request(
         depth,
         otel_endpoint.map(|u| u.to_string()),
         otel_headers,
+        otel_tags,
     )
     .context("Failed to initialize runtime")?;
     tx.send(runtime.deno.v8_isolate().thread_safe_handle())?;

@@ -14,6 +14,7 @@ pub struct Request {
     pub uri: String,
     /// Optional path to provide as the window location,
     /// including query parameters and the fragment.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
     /// Parameter to pass to the script's main function.
     /// For http oriented functions, an object can be passed
@@ -28,6 +29,9 @@ pub struct Request {
     /// Optional headers to include when exporting otlp
     #[serde(skip_serializing_if = "HashMap::is_empty")]
     pub otel_headers: HashMap<String, String>,
+    /// Additional global tags to include with exported data
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    pub otel_tags: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Eq, PartialEq)]

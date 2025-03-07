@@ -81,6 +81,17 @@ pub fn extract(
             }
         })
         .collect();
+    let otel_tags = headers
+        .iter()
+        .filter_map(|(k, v)| {
+            if k.starts_with("otel_tag_") {
+                // strip `otel_header_` prefix from the request header
+                Some((k.replacen("otel_tag_", "", 1), v.clone()))
+            } else {
+                None
+            }
+        })
+        .collect();
 
     let query = (!query.is_empty()).then_some(query);
     let headers = (!headers.is_empty()).then_some(headers);
@@ -99,6 +110,7 @@ pub fn extract(
         param,
         otel_endpoint,
         otel_headers,
+        otel_tags,
     })
 }
 
@@ -129,6 +141,7 @@ mod tests {
                 })),
                 otel_endpoint: None,
                 otel_headers: HashMap::new(),
+                otel_tags: HashMap::new(),
             })
         );
 
@@ -158,6 +171,7 @@ mod tests {
                 otel_headers: [("test".to_string(), "foobar".to_string())]
                     .into_iter()
                     .collect(),
+                otel_tags: HashMap::new(),
             })
         );
 
@@ -182,6 +196,7 @@ mod tests {
                 })),
                 otel_endpoint: None,
                 otel_headers: HashMap::new(),
+                otel_tags: HashMap::new(),
             })
         );
 
@@ -206,6 +221,7 @@ mod tests {
                 })),
                 otel_endpoint: None,
                 otel_headers: HashMap::new(),
+                otel_tags: HashMap::new(),
             })
         );
 
@@ -230,6 +246,7 @@ mod tests {
                 })),
                 otel_endpoint: None,
                 otel_headers: HashMap::new(),
+                otel_tags: HashMap::new(),
             })
         );
 
@@ -254,6 +271,7 @@ mod tests {
                 })),
                 otel_endpoint: None,
                 otel_headers: HashMap::new(),
+                otel_tags: HashMap::new(),
             })
         );
 
@@ -278,6 +296,7 @@ mod tests {
                 })),
                 otel_endpoint: None,
                 otel_headers: HashMap::new(),
+                otel_tags: HashMap::new(),
             })
         );
     }
