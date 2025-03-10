@@ -15,6 +15,9 @@ pub const MAX_UPDATES_CONTENT_REGISTRY: usize = 100;
 /// Max number of delivery acknowledgements allowed per transaction.
 pub const MAX_DELIVERY_ACKNOWLEDGMENTS: usize = 1000;
 
+/// Max number of jobs allowed per transaction.
+pub const MAX_JOBS: usize = 1000;
+
 macro_rules! create_events {
     (
         pub enum Event {
