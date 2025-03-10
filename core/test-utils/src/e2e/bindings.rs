@@ -13,6 +13,7 @@ use lightning_rpc::Rpc;
 use lightning_signer::Signer;
 use lightning_topology::Topology;
 use lightning_utils::config::TomlConfigProvider;
+use lightning_watcher::Watcher;
 
 use super::SyncBroadcaster;
 use crate::consensus::{MockConsensus, MockForwarder};
@@ -54,6 +55,7 @@ partial_node_components!(TestFullNodeComponentsWithMockConsensus {
     RpcInterface = Rpc<Self>;
     SignerInterface = Signer<Self>;
     TopologyInterface = Topology<Self>;
+    WatcherInterface = Watcher<Self>;
 });
 
 partial_node_components!(TestFullNodeComponentsWithRealConsensusWithoutCommitteeBeacon {

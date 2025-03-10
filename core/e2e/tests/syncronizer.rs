@@ -3,6 +3,7 @@ use std::time::{Duration, SystemTime};
 use fleek_blake3 as blake3;
 use lightning_e2e::swarm::Swarm;
 use lightning_interfaces::prelude::*;
+use lightning_node_bindings::FullNodeComponents;
 use lightning_test_utils::logging;
 use tempfile::tempdir;
 
@@ -11,7 +12,7 @@ async fn e2e_syncronize_state() {
     logging::setup(None);
 
     let temp_dir = tempdir().unwrap();
-    let mut swarm = Swarm::builder()
+    let mut swarm = Swarm::<FullNodeComponents>::builder()
         .with_directory(temp_dir.path().to_path_buf().try_into().unwrap())
         .with_min_port(10600)
         .with_num_nodes(5)
@@ -31,7 +32,7 @@ async fn e2e_syncronize_state() {
         )
         .with_syncronizer_delta(Duration::from_secs(5))
         .persistence(true)
-        .build();
+        .build::<FullNodeComponents>();
     swarm.launch_genesis_committee().await.unwrap();
 
     // Wait for RPC to be ready.

@@ -8,6 +8,7 @@ use lightning_interfaces::types::{
     UpdateMethod,
     UpdateRequest,
     MAX_DELIVERY_ACKNOWLEDGMENTS,
+    MAX_JOBS,
     MAX_MEASUREMENTS_PER_TX,
     MAX_UPDATES_CONTENT_REGISTRY,
 };
@@ -100,6 +101,16 @@ impl Validator {
                     } => {
                         if proofs.len() > MAX_DELIVERY_ACKNOWLEDGMENTS {
                             return Err(anyhow!("Too many delivery acknowledgments"));
+                        }
+                    },
+                    UpdateMethod::AddJobs { jobs } => {
+                        if jobs.len() > MAX_JOBS {
+                            return Err(anyhow!("Too many jobs to add"));
+                        }
+                    },
+                    UpdateMethod::RemoveJobs { jobs } => {
+                        if jobs.len() > MAX_JOBS {
+                            return Err(anyhow!("Too many jobs to remove"));
                         }
                     },
                     _ => (),

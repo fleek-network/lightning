@@ -35,6 +35,9 @@ lightning-utils = { path = "../utils" }
 lightning-fetcher = { path = "../fetcher" }
 lightning-origin-ipfs = { path = "../origin-ipfs/" }
 lightning-test-utils = { path = "../test-utils" }
+lightning-task-broker = { path = "../task-broker" }
+lightning-watcher = { path = "../watcher" }
+lightning-forwarder = { path = "../forwarder" }
 tokio.workspace = true
 anyhow.workspace = true
 futures.workspace = true
@@ -57,8 +60,12 @@ clap = { version = "4.2", features = ["derive"] }
 lightning-workspace-hack.workspace = true
 
 [dev-dependencies]
+axum = "0.7"
 cid.workspace = true
+fn-sdk = { path = "../../lib/sdk" }
+reqwest.workspace = true
 tempfile.workspace = true
+tokio-util.workspace = true
 
 [features]
 services = ["lightning-node-bindings/services"]

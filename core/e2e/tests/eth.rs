@@ -7,6 +7,7 @@ use ethers::signers::{LocalWallet, Signer};
 use fleek_crypto::{AccountOwnerSecretKey, EthAddress, SecretKey};
 use lightning_e2e::swarm::Swarm;
 use lightning_interfaces::_SyncQueryRunnerInterface;
+use lightning_node_bindings::FullNodeComponents;
 use lightning_test_utils::logging;
 use lightning_utils::eth::FleekContract;
 use lightning_utils::poll::poll_until;
@@ -18,7 +19,7 @@ async fn e2e_eth_client_approve_revoke() {
 
     let temp_dir = tempdir().unwrap();
     let chain_id = 1337;
-    let mut swarm = Swarm::builder()
+    let mut swarm = Swarm::<FullNodeComponents>::builder()
         .with_directory(temp_dir.path().to_path_buf().try_into().unwrap())
         .with_min_port(20000)
         .with_num_nodes(4)
@@ -27,7 +28,7 @@ async fn e2e_eth_client_approve_revoke() {
         .with_chain_id(chain_id)
         .persistence(true)
         .with_archiver()
-        .build();
+        .build::<FullNodeComponents>();
     swarm.launch().await.unwrap();
 
     // Wait for RPC to be ready.

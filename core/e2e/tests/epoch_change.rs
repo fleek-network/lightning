@@ -5,6 +5,7 @@ use fleek_crypto::NodePublicKey;
 use hp_fixed::unsigned::HpUfixed;
 use lightning_e2e::swarm::{Swarm, SwarmNode};
 use lightning_interfaces::types::Staking;
+use lightning_node_bindings::FullNodeComponents;
 use lightning_rpc::interface::Fleek;
 use lightning_rpc::RpcClient;
 use lightning_test_utils::logging;
@@ -16,7 +17,7 @@ async fn e2e_epoch_change_all_nodes_on_committee() {
 
     // Initialize the swarm.
     let temp_dir = tempdir().unwrap();
-    let mut swarm = Swarm::builder()
+    let mut swarm = Swarm::<FullNodeComponents>::builder()
         .with_directory(temp_dir.path().to_path_buf().try_into().unwrap())
         .with_min_port(10100)
         .with_num_nodes(4)
@@ -33,7 +34,7 @@ async fn e2e_epoch_change_all_nodes_on_committee() {
                 .unwrap()
                 .as_millis() as u64,
         )
-        .build();
+        .build::<FullNodeComponents>();
 
     // Launch genesis committee and wait for RPC to be ready on them.
     swarm.launch_genesis_committee().await.unwrap();
@@ -66,7 +67,7 @@ async fn e2e_epoch_change_with_some_nodes_not_on_committee() {
 
     // Initialize the swarm.
     let temp_dir = tempdir().unwrap();
-    let mut swarm = Swarm::builder()
+    let mut swarm = Swarm::<FullNodeComponents>::builder()
         .with_directory(temp_dir.path().to_path_buf().try_into().unwrap())
         .with_min_port(10200)
         .with_num_nodes(5)
@@ -84,7 +85,7 @@ async fn e2e_epoch_change_with_some_nodes_not_on_committee() {
                 .unwrap()
                 .as_millis() as u64,
         )
-        .build();
+        .build::<FullNodeComponents>();
 
     // Launch genesis committee and wait for RPC to be ready on them.
     swarm.launch_genesis_committee().await.unwrap();
@@ -158,7 +159,7 @@ async fn e2e_test_staking_auction() {
     // Spawn swarm with initially 1 more node than the node_count_param. This should cause one node
     // to be kicked off on epoch change
     let temp_dir = tempdir().unwrap();
-    let mut swarm = Swarm::builder()
+    let mut swarm = Swarm::<FullNodeComponents>::builder()
         .with_directory(temp_dir.path().to_path_buf().try_into().unwrap())
         .with_min_port(10400)
         .with_num_nodes(5)
@@ -176,7 +177,7 @@ async fn e2e_test_staking_auction() {
                 .as_millis() as u64,
         )
         .with_specific_nodes(vec![high_rep_node, low_rep_node])
-        .build();
+        .build::<FullNodeComponents>();
 
     // Launch genesis committee and wait for RPC to be ready on them.
     swarm.launch_genesis_committee().await.unwrap();

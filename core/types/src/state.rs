@@ -10,6 +10,7 @@ use hp_fixed::unsigned::HpUfixed;
 use ink_quill::TranscriptBuilderInput;
 use multiaddr::Multiaddr;
 use num_derive::FromPrimitive;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sha3::{Digest, Sha3_256};
 
@@ -107,6 +108,7 @@ pub enum Metadata {
     CommitteeSelectionBeaconPhase,
     EpochEra,
     WithdrawId,
+    TimeInterval,
 }
 
 /// The Value enum is a data type used to represent values in a key-value pair for a metadata table
@@ -127,6 +129,7 @@ pub enum Value {
     CommitteeSelectionBeaconPhase(CommitteeSelectionBeaconPhase),
     EpochEra(u64),
     WithdrawId(u64),
+    TimeInterval(u64),
 }
 
 impl Value {
@@ -276,6 +279,7 @@ pub enum ProtocolParamKey {
     CommitteeSelectionBeaconRevealPhaseDuration = 19,
     /// The slash amount for non-revealing nodes in the committee selection beacon process.
     CommitteeSelectionBeaconNonRevealSlashAmount = 20,
+    TotalTimeIntervals = 21,
 }
 
 /// The Value enum is a data type used to represent values in a key-value pair for a metadata table
@@ -302,6 +306,7 @@ pub enum ProtocolParamValue {
     CommitteeSelectionBeaconCommitPhaseDuration(u64),
     CommitteeSelectionBeaconRevealPhaseDuration(u64),
     CommitteeSelectionBeaconNonRevealSlashAmount(u64),
+    TotalTimeIntervals(u64),
 }
 
 impl ProtocolParamValue {
@@ -336,6 +341,7 @@ impl ProtocolParamValue {
             ProtocolParamValue::CommitteeSelectionBeaconNonRevealSlashAmount(i) => {
                 Cow::Owned(i.to_le_bytes().to_vec())
             },
+            ProtocolParamValue::TotalTimeIntervals(i) => Cow::Owned(i.to_le_bytes().to_vec()),
         }
     }
 }
@@ -604,4 +610,38 @@ impl TryFrom<String> for Tokens {
             _ => Err(anyhow!("Invalid token: {value}")),
         }
     }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Deserialize, Serialize, JsonSchema)]
+pub struct Job {
+    /// The hash of the job.
+    pub hash: [u8; 32],
+    /// Information about the job for execution purposes.
+    pub info: JobInfo,
+    /// The status of the most recent execution of a job.
+    pub status: Option<JobStatus>,
+    /// The node to which this job was assigned.
+    pub assignee: Option<NodeIndex>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Deserialize, Serialize, JsonSchema)]
+pub struct JobInfo {
+    /// The frequency in which this job should be performed.
+    pub frequency: u32,
+    /// Amount prepaid.
+    pub amount: u32,
+    /// The service that will execute the function.
+    pub service: ServiceId,
+    /// The arguments for the job.
+    pub arguments: Box<[u8]>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Deserialize, Serialize, JsonSchema)]
+pub struct JobStatus {
+    /// Timestamp of the most recent execution.
+    pub last_run: u64,
+    /// Indicates whether the last execution was successful.
+    pub success: bool,
+    /// Records any error message.
+    pub message: Option<String>,
 }
