@@ -3,7 +3,7 @@ use std::fs;
 use std::path::Path;
 use std::time::Duration;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use fleek_crypto::{
     AccountOwnerSecretKey,
     ConsensusPublicKey,
@@ -33,11 +33,7 @@ use lightning_handshake::handshake::Handshake;
 use lightning_handshake::transports::http::Config;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::{
-    ExecuteTransactionError,
-    ExecuteTransactionOptions,
-    ExecuteTransactionRequest,
-    ExecuteTransactionResponse,
-    ExecuteTransactionWait,
+    ExecuteTransaction,
     Genesis,
     GenesisNode,
     NodePorts,
@@ -236,23 +232,19 @@ impl<C: NodeComponents> Swarm<C> {
         &self,
         node: &NodePublicKey,
         method: UpdateMethod,
-    ) -> Result<ExecuteTransactionResponse, ExecuteTransactionError> {
-        let resp = self
-            .nodes
+    ) -> Result<(), anyhow::Error> {
+        self.nodes
             .get(node)
             .expect("node should exist")
             .take_signer_socket()
-            .run(ExecuteTransactionRequest {
+            .run(ExecuteTransaction {
                 method,
-                options: Some(ExecuteTransactionOptions {
-                    wait: ExecuteTransactionWait::Receipt,
-                    timeout: Some(Duration::from_secs(10)),
-                    ..Default::default()
-                }),
+                receipt_tx: None,
             })
-            .await??;
+            .await
+            .map_err(|_| anyhow!("failed to execute transaction"))?;
 
-        Ok(resp)
+        Ok(())
     }
 
     pub fn nodes(&self) -> Vec<&ContainerizedNode<C>> {

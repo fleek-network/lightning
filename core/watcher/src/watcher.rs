@@ -8,7 +8,7 @@ use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use lightning_interfaces::prelude::{BuildGraph, *};
 use lightning_interfaces::schema::task_broker::{TaskRequest, TaskResponse, TaskScope};
-use lightning_interfaces::types::{ExecuteTransactionRequest, JobInfo, JobStatus};
+use lightning_interfaces::types::{JobInfo, JobStatus};
 use lightning_interfaces::{
     c,
     fdi,
@@ -23,7 +23,7 @@ use lightning_interfaces::{
     TaskError,
     WatcherInterface,
 };
-use lightning_types::UpdateMethod;
+use lightning_types::{ExecuteTransaction, UpdateMethod};
 use lightning_utils::application::QueryRunnerExt;
 use lightning_utils::poll::poll_until;
 use tokio::sync::Mutex;
@@ -156,7 +156,7 @@ impl<C: NodeComponents> InnerWatcher<C> {
 
         if let Err(e) = self
             .signer
-            .run(ExecuteTransactionRequest {
+            .run(ExecuteTransaction {
                 method: UpdateMethod::JobUpdates {
                     updates: BTreeMap::from([(
                         job_hash,
@@ -167,7 +167,7 @@ impl<C: NodeComponents> InnerWatcher<C> {
                         },
                     )]),
                 },
-                options: None,
+                receipt_tx: None,
             })
             .await
         {
