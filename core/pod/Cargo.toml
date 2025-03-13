@@ -1,0 +1,12 @@
+[package]
+name = "lightning-pod"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+lightning-interfaces.workspace = true
+tracing.workspace = true
+tokio.workspace = true
+affair.workspace = true
+fleek-crypto.workspace = true
+serde.workspace = true

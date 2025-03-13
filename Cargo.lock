@@ -8677,6 +8677,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "lightning-pod"
+version = "0.0.0"
+dependencies = [
+ "affair",
+ "fleek-crypto",
+ "lightning-interfaces",
+ "serde",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "lightning-pool"
 version = "0.0.0"
 dependencies = [
