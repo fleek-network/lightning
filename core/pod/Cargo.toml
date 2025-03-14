@@ -10,3 +10,18 @@ tokio.workspace = true
 affair.workspace = true
 fleek-crypto.workspace = true
 serde.workspace = true
+futures.workspace = true
+anyhow.workspace = true
+blake3-tree = "0.1.0"
+fn-sdk = { git = "https://github.com/fleek-network/lightning", rev = "0.1.0-alpha.5" }
+dcap-quoteprov = { path = "../../lib/dcap-quoteprov" }
+bytes = { version = "1.7", features = ["serde"]}
+arrayref = "0.3"
+serde_json = "1.0"
+hex = "0.4"
+
+# deps for running sgx enclaves
+aesm-client = { version = "0.6.0", features = ["sgxs"] }
+enclave-runner = { version = "0.6.0" }
+sgxs-loaders = { version = "0.4.0" }
+sgx-isa = { version = "0.4.1", features = ["serde"]}
