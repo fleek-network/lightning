@@ -5384,6 +5384,7 @@ dependencies = [
  "arrayref",
  "bytes",
  "cid",
+ "fleek-crypto",
  "fn-sdk",
  "hex",
  "lightning-schema",
@@ -8856,6 +8857,7 @@ dependencies = [
  "lightning-types",
  "lightning-workspace-hack",
  "serde",
+ "sha2 0.10.8",
 ]
 
 [[package]]

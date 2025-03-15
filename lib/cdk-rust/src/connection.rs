@@ -33,6 +33,9 @@ async fn start_handshake<T: Transport>(
     let frame = HandshakeRequestFrame::Handshake {
         retry: None,
         service: setting.service_id,
+        // TODO
+        expiry: 0,
+        nonce: 0,
         pk,
         // Todo: Create signature.
         pop: ClientSignature([0; 48]),
