@@ -16,13 +16,12 @@ use std::time::{Duration, SystemTime};
 use std::{env, thread};
 
 use config::TelemetryConfig;
-use deno_core::anyhow::{self, bail};
 use deno_core::futures::channel::mpsc;
 use deno_core::futures::channel::mpsc::UnboundedSender;
 use deno_core::futures::future::BoxFuture;
 use deno_core::futures::{stream, FutureExt, Stream, StreamExt};
 use deno_core::v8::DataError;
-use deno_core::{op2, v8, GarbageCollected, OpState};
+use deno_core::{anyhow, op2, v8, GarbageCollected, OpState};
 use deno_error::{JsError, JsErrorBox};
 use once_cell::sync::Lazy;
 use opentelemetry::logs::{AnyValue, LogRecord as LogRecordTrait, Severity};
@@ -543,9 +542,7 @@ pub fn init(
 ) -> deno_core::anyhow::Result<OtelGlobals> {
     let protocol = config.protocol;
 
-    let Some(endpoint) = config.endpoint else {
-        bail!("missing endpoint");
-    };
+    let endpoint = config.endpoint.unwrap_or("".to_string());
     let endpoint = endpoint.trim_end_matches("/").to_string(); // normalize endpoint
 
     // Define the resource attributes that will be attached to all log records.
