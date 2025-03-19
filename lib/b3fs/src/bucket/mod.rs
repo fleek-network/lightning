@@ -240,6 +240,7 @@ impl ContentHeader {
 pub(crate) mod tests {
     use std::env::temp_dir;
 
+    use super::file::writer::FileWriter;
     use super::*;
     use crate::hasher::b3::MAX_BLOCK_SIZE_IN_BYTES;
 
@@ -252,6 +253,20 @@ pub(crate) mod tests {
         fs::remove_dir_all(&temp_dir);
         assert!(Bucket::open(&temp_dir).await.is_ok());
         fs::remove_dir_all(&temp_dir);
+    }
+
+    #[tokio::test]
+    async fn test_read_verify() {
+        // Put file into blockstore
+        let n_blocks = 10;
+        let mut temp_dir = temp_dir();
+        temp_dir.push("test-read-verify");
+        let bucket = Bucket::open(&temp_dir).await.unwrap();
+        let mut writer = FileWriter::new(&bucket).await.unwrap();
+        let mut data = get_random_file(8192 * n_blocks);
+        let mut number_blocks = n_blocks;
+        writer.write(&data).await.unwrap();
+        writer.commit().await.unwrap();
     }
 
     pub(crate) fn get_random_file(size: usize) -> Vec<u8> {
