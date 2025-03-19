@@ -266,7 +266,15 @@ pub(crate) mod tests {
         let mut data = get_random_file(8192 * n_blocks);
         let mut number_blocks = n_blocks;
         writer.write(&data).await.unwrap();
-        writer.commit().await.unwrap();
+        let hash = writer.commit().await.unwrap();
+        println!("{hash:?}");
+
+        // Read from the blockstore
+        let load_content = bucket.get(&hash).await.unwrap();
+        let file_read = load_content.into_file().unwrap();
+
+        let blocks = file_read.num_blocks();
+        let tree = file_read.hashtree().await.unwrap();
     }
 
     pub(crate) fn get_random_file(size: usize) -> Vec<u8> {
