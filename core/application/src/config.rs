@@ -199,9 +199,10 @@ mod config_tests {
                 .map(|s| s.as_str())
                 .or_else(|| err.downcast_ref::<&str>().copied())
                 .unwrap();
+
             assert_eq!(
                 panic_message,
-                "Failed to deserialize 'application' config: unknown variant `invalid`, expected `localnet-example` or `testnet-stable`\nin `network`\n"
+                "Failed to deserialize 'application' config: unknown variant `invalid`, expected one of `localnet-example`, `testnet-stable`, `testnet-staging`\nin `network`\n"
             )
         }
     }
@@ -223,15 +224,17 @@ mod config_tests {
             >(&provider)
         });
         assert!(result.is_err());
+
         if let Err(err) = result {
             let panic_message = err
                 .downcast_ref::<String>()
                 .map(|s| s.as_str())
                 .or_else(|| err.downcast_ref::<&str>().copied())
                 .unwrap();
+
             assert_eq!(
                 panic_message,
-                "invalid value: Error(\"unknown variant `invalid`, expected `localnet-example` or `testnet-stable`\", line: 0, column: 0)"
+                "invalid value: Error(\"unknown variant `invalid`, expected one of `localnet-example`, `testnet-stable`, `testnet-staging`\", line: 0, column: 0)"
             )
         }
     }
