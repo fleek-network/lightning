@@ -42,7 +42,7 @@ impl From<NetworkArg> for Network {
         match network {
             NetworkArg::LocalnetExample => Network::LocalnetExample,
             NetworkArg::TestnetStable => Network::TestnetStable,
-            NetworkArg::TestnetStaging => Network::TestnetStable,
+            NetworkArg::TestnetStaging => Network::TestnetStaging,
         }
     }
 }
