@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use lightning_interfaces::types::Genesis;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "kebab-case")]
 pub enum Network {
     LocalnetExample,
