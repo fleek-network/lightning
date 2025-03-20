@@ -21,9 +21,10 @@
 
 pub mod error;
 pub mod flat;
+pub mod hash_tree;
 pub mod tree;
 
 mod printer;
 
 pub use flat::FlatHashSlice;
-pub use tree::HashTree;
+pub use hash_tree::HashTree;

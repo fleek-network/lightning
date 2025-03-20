@@ -1,7 +1,9 @@
 use arrayref::array_ref;
 use serde::{Deserialize, Serialize};
 
+use super::errors::ReadError;
 use crate::bucket::POSITION_START_HASHES;
+use crate::collections::HashTree;
 
 pub mod reader;
 pub(crate) mod state;
@@ -27,7 +29,7 @@ pub mod writer;
 ///     `<[u8; 32] x T>`
 #[derive(Serialize, Deserialize)]
 #[repr(C, align(4))]
-pub(crate) struct B3FSFile {
+pub struct B3FSFile {
     version: u32,
     num_entries: u32,
     hashes: Vec<[u8; 32]>,
@@ -76,6 +78,10 @@ impl B3FSFile {
             num_entries,
             hashes,
         }
+    }
+
+    pub fn get_hash_tree(&self) -> Result<HashTree, ReadError> {
+        HashTree::try_from(self.hashes()).map_err(|_| ReadError::HashTreeConversion)
     }
 }
 
