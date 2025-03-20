@@ -163,7 +163,7 @@ async fn test_epoch_change_via_transactions() {
     }
 
     // Wait for the forwarder to start
-    tokio::time::sleep(Duration::from_millis(1000)).await;
+    tokio::time::sleep(Duration::from_millis(2000)).await;
 
     // Execute change epoch transactions from 2/3+1 of the committee nodes.
     join_all(
@@ -178,7 +178,7 @@ async fn test_epoch_change_via_transactions() {
     .unwrap();
 
     // Give some time to the committee beacon component to send the commit transaction
-    tokio::time::sleep(Duration::from_millis(4000)).await;
+    tokio::time::sleep(Duration::from_millis(8000)).await;
     // Execute commit phase timeout transactions from 2/3+1 of the committee nodes.
     join_all(network.nodes().take(3).map(|node| {
         node.execute_transaction_from_node(
@@ -191,7 +191,7 @@ async fn test_epoch_change_via_transactions() {
     .unwrap();
 
     // Give some time to the committee beacon component to send the reveal transaction
-    tokio::time::sleep(Duration::from_millis(4000)).await;
+    tokio::time::sleep(Duration::from_millis(8000)).await;
     // Execute commit phase timeout transactions from 2/3+1 of the committee nodes.
     join_all(network.nodes().take(3).map(|node| {
         node.execute_transaction_from_node(

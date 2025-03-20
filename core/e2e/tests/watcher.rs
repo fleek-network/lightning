@@ -150,7 +150,7 @@ impl ExecutorProviderInterface for ProxyProvider {
 async fn test_watcher() {
     logging::setup(None);
 
-    let epoch_time = 10000;
+    let epoch_time = 18000;
 
     // Give: Some counter that will be incremented when a job
     // is executed using the task broker API.
@@ -169,8 +169,8 @@ async fn test_watcher() {
         // another epoch change starts quickly after that, causing our expectation of epoch = 1
         // below to fail.
         .with_epoch_time(epoch_time)
-        .with_commit_phase_time(3000)
-        .with_reveal_phase_time(3000)
+        .with_commit_phase_time(6000)
+        .with_reveal_phase_time(6000)
         .with_epoch_start(
             SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
@@ -250,7 +250,7 @@ async fn test_watcher() {
                 .then_some(())
                 .ok_or(PollUntilError::ConditionNotSatisfied)
         },
-        Duration::from_secs(3),
+        Duration::from_secs(4),
         Duration::from_millis(10),
     )
     .await
@@ -289,7 +289,7 @@ async fn test_watcher() {
             }
             Ok(())
         },
-        Duration::from_secs(3),
+        Duration::from_secs(4),
         Duration::from_millis(10),
     )
     .await
