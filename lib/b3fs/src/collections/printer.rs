@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use arrayvec::ArrayString;
 
-use super::tree::HashTree;
+use super::hash_tree::HashTree;
 
 /// A hacky implementation of a tree printer for a hash tree. This can be improved a lot.
 pub fn print(tree: &HashTree, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
