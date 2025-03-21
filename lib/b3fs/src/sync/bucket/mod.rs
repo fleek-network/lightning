@@ -2,7 +2,7 @@
 //!
 //! This module provides the implementation of [Bucket] and various other primitives which can be
 //! used for interacting with the file system, that is both in read-only and writer mode. A bucket
-//! is created and opened on a location within the actual file system and has a root path where
+//! is created and opened on a location within the actualt file system and has a root path where
 //! all of the contents will be written to.
 //!
 //! The layout of that directory looks like this:
@@ -44,12 +44,12 @@
 //! [2]: dir::reader::Dir
 
 use core::hash;
-use std::io::{Error, ErrorKind, Result};
+use std::fs::{self, File, OpenOptions};
+use std::io::{Error, ErrorKind, Read, Result, Seek};
 use std::path::{Path, PathBuf};
 
 use arrayref::array_ref;
 use rand::random;
-use tokio::fs::{self, File, OpenOptions};
 use tokio::io::{AsyncReadExt, AsyncSeekExt, BufWriter};
 use triomphe::Arc;
 
@@ -109,25 +109,24 @@ impl Bucket {
     }
 
     /// Open a bucket at the given path.
-    pub async fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         // turn the root path into an absolute path. this will prevent any bugs from changing the
         // cwd after the bucket is opened.
         let mut root_path = std::env::current_dir()?;
         root_path.push(&path);
-        fs::create_dir_all(&root_path).await?;
+        fs::create_dir_all(&root_path)?;
 
         let mut blocks_path = root_path.clone();
         blocks_path.push(BLOCKS_PATH);
-
-        fs::create_dir(&blocks_path).await;
+        fs::create_dir(&blocks_path);
 
         let mut headers_path = root_path.clone();
         headers_path.push(HEADERS_PATH);
-        fs::create_dir(&headers_path).await;
+        fs::create_dir(&headers_path);
 
         let mut wal_path = root_path.clone();
         wal_path.push(TEMP_PATH);
-        fs::create_dir(&wal_path).await;
+        fs::create_dir(&wal_path);
 
         Ok(Self {
             root: root_path,
@@ -140,19 +139,18 @@ impl Bucket {
     /// Returns `Ok(true)` if the given content exists in this bucket.
     pub async fn exists(&self, hash: &[u8; 32]) -> Result<bool> {
         let path = self.get_header_path(hash);
-        fs::try_exists(&path).await
+        Path::try_exists(&path)
     }
 
     /// Open a content with the given provided hash. Returns a [`ContentHeader`] on success.
-    pub async fn get(&self, hash: &[u8; 32]) -> Result<ContentHeader> {
+    pub fn get(&self, hash: &[u8; 32]) -> Result<ContentHeader> {
         let path = self.get_header_path(hash);
-        let mut file = OpenOptions::new().read(true).open(path).await?;
+        let mut file = OpenOptions::new().read(true).open(path)?;
         let mut buf = [0u8; 8];
 
         // read the first 8 bytes of the file. the first 8 bytes is always the same format for both
         // the directories and files. the second 4 byte i
-        let n = file.read_exact(&mut buf).await?;
-        debug_assert_eq!(n, 8);
+        file.read_exact(&mut buf)?;
 
         let version = u32::from_le_bytes(*array_ref![buf, 0, 4]);
         if version > 1 {
@@ -170,7 +168,7 @@ impl Bucket {
                 "too many entries in b3fs directory.",
             ));
         }
-        file.rewind().await?;
+        file.rewind()?;
 
         Ok(ContentHeader {
             is_file,
@@ -191,10 +189,10 @@ impl Bucket {
         path
     }
 
-    pub async fn get_block_content(&self, hash: &[u8; 32]) -> Result<Option<Vec<u8>>> {
+    pub fn get_block_content(&self, hash: &[u8; 32]) -> Result<Option<Vec<u8>>> {
         let path = self.get_block_path(hash);
-        if tokio::fs::try_exists(path.clone()).await? {
-            let read = tokio::fs::read(path).await?;
+        if Path::try_exists(&path.clone())? {
+            let read = std::fs::read(path)?;
             Ok(Some(read))
         } else {
             Ok(None)
@@ -245,14 +243,14 @@ pub(crate) mod tests {
     use super::*;
     use crate::hasher::b3::MAX_BLOCK_SIZE_IN_BYTES;
 
-    #[tokio::test]
-    async fn open_should_work_multiple_times() {
+    #[test]
+    fn open_should_work_multiple_times() {
         let mut temp_dir = temp_dir();
         temp_dir.push("b3fs-open-multiple-times");
-        assert!(Bucket::open(&temp_dir).await.is_ok());
-        assert!(Bucket::open(&temp_dir).await.is_ok());
+        assert!(Bucket::open(&temp_dir).is_ok());
+        assert!(Bucket::open(&temp_dir).is_ok());
         fs::remove_dir_all(&temp_dir);
-        assert!(Bucket::open(&temp_dir).await.is_ok());
+        assert!(Bucket::open(&temp_dir).is_ok());
         fs::remove_dir_all(&temp_dir);
     }
 

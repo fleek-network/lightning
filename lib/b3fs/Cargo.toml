@@ -43,3 +43,6 @@ criterion = { version = "0.5", features = ["html_reports"] }
 [[bench]]
 name = "phf"
 harness = false
+
+[features]
+sync = []

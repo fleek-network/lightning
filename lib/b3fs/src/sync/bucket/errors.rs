@@ -1,0 +1,100 @@
+use thiserror::Error;
+
+use crate::hasher::collector::InvalidHashSize;
+use crate::stream::verifier::VerificationError;
+
+#[derive(Error, Debug)]
+pub enum ReadError {
+    #[error("Error while reading from disk. {0}")]
+    ReadingFile(#[from] std::io::Error),
+    #[error("Error getting mut ref to file")]
+    RefFile,
+    #[error("Error while converting hash tree")]
+    HashTreeConversion,
+    #[error("Invalid hashtree {0}")]
+    InvalidHashtree(#[from] crate::sync::collections::error::CollectionTryFromError),
+    #[error("Error while deserializing PHF table. {0}")]
+    Deserialization(String),
+    #[error("Invalid entry at offset {2}. Required name {0:?}, found {1:?}")]
+    InvalidEntryAtOffset(Vec<u8>, Vec<u8>, u32),
+    #[error("Invalid bloom filter")]
+    InvalidBloomFilter,
+    #[error("Hash was not found for block number {0}")]
+    HashNotFound(u32),
+    #[error("Failed to acquire write lock for the file reader")]
+    LockError,
+    #[error("Failed to clone the file reader")]
+    CloneError,
+}
+
+#[derive(Error, Debug)]
+pub enum FeedProofError {
+    #[error("Putter was running without incremental verification.")]
+    UnexpectedCall,
+    #[error("Proof is not matching the current root.")]
+    InvalidProof,
+    #[error("Error getting write lock")]
+    LockError,
+    #[error("Error while feeding proof. {0}")]
+    VerificationError(#[from] crate::stream::verifier::VerificationError),
+}
+
+#[derive(Error, Debug)]
+pub enum WriteError {
+    #[error("The provided content is not matching the hash.")]
+    InvalidContent,
+    #[error("The provided content could not be decompressed.")]
+    DecompressionFailure,
+    #[error("Error while writing to disk. {0}")]
+    IOError(#[from] std::io::Error),
+    #[error("Error while hashing the block. Not found hash for block.")]
+    BlockHashNotFound,
+    #[error("Invalid block hash detected against incremental verifier {0}")]
+    InvalidBlockHash(#[from] VerificationError),
+    #[error("Error while getting current block file. Not found")]
+    BlockFileNotFound,
+    #[error("Error getting mutable lock for write collector")]
+    LockError,
+}
+
+#[derive(Error, Debug)]
+pub enum InsertError {
+    #[error("The provided entry does not meet the expected hash.")]
+    InvalidContent,
+    #[error("The provided entry violates the entry name ordering.")]
+    OrderingError,
+    #[error("Error while writing to disk. {0}")]
+    WritingError(#[from] WriteError),
+    #[error("Error writing to disk. {0}")]
+    IO(#[from] std::io::Error),
+    #[error("Invalid Hash or internal hashes content doing incremental validation {0}")]
+    IncrementalVerification(String),
+    #[error("Error trying to insert entry in phf generator. {0}")]
+    InvalidEntry(#[from] crate::hasher::dir_hasher::Error),
+}
+
+#[derive(Error, Debug)]
+pub enum CommitError {
+    #[error("The putter expected more data to come to a finalized state.")]
+    PartialContent,
+    #[error("The final CID does not match the CID which was expected.")]
+    InvalidCID,
+    #[error("Writing to disk failed.")]
+    WriteFailed,
+    #[error("Error while writing to disk. {0}")]
+    IOError(#[from] std::io::Error),
+    #[error("Invalid Hash or internal hashes content. {0}")]
+    InvalidProof(#[from] InvalidHashSize),
+    #[error("Error while hashing the block. Not found hash for block.")]
+    BlockHashNotFound,
+    #[error("Invalid block hash detected against incremental verifier")]
+    InvalidBlockHash,
+    #[error("Error while serializing data to file. {0}")]
+    Serialization(String),
+    #[error("Error while committing. {0}")]
+    CommitError(#[from] WriteError),
+    #[error("Error while inserting entry. {0}")]
+    CommitInsertError(#[from] InsertError),
+    #[error("Error getting final lock for commit")]
+    LockError,
+}
