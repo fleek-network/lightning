@@ -2,7 +2,6 @@ use std::array::TryFromSliceError;
 
 use arrayref::array_ref;
 use thiserror::Error;
-use tokio::io;
 
 use super::b3::KEY_LEN;
 use super::byte_hasher::{Blake3Hasher, BlockHasher};
@@ -43,9 +42,19 @@ impl BufCollector {
     pub async fn write_hash(
         &mut self,
         mut writer: impl tokio::io::AsyncWriteExt + Unpin,
-    ) -> Result<(), io::Error> {
+    ) -> Result<(), tokio::io::Error> {
         writer.write_all(&self.buffer).await?;
         writer.flush().await?;
+        self.buffer.clear();
+        Ok(())
+    }
+
+    pub fn write_hash_sync(
+        &mut self,
+        mut writer: impl std::io::Write + Unpin,
+    ) -> Result<(), std::io::Error> {
+        writer.write_all(&self.buffer)?;
+        writer.flush()?;
         self.buffer.clear();
         Ok(())
     }

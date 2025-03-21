@@ -48,3 +48,6 @@ pub mod hasher;
 
 #[cfg(test)]
 pub mod test_utils;
+
+//#[cfg(feature = "sync")]
+pub mod sync;

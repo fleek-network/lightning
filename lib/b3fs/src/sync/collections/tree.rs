@@ -46,7 +46,7 @@ where
         if self.pages[page_index].is_none() {
             let start_index = POSITION_START_HASHES as u64 + (page_index * 4096) as u64; // 4KB page size
             let file = self.file_reader.clone();
-            let mut file_lock = file.write().map_err(|_| ReadError::PoisonError)?;
+            let mut file_lock = file.write().map_err(|_| ReadError::LockError)?;
 
             // Determine the remaining bytes in the file
             let file_size = file_lock.seek(SeekFrom::End(0))?; // Get the file size
