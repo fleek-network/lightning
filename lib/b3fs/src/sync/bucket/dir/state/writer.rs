@@ -6,8 +6,6 @@ use bytes::BytesMut;
 use fastbloom_rs::{FilterBuilder, Membership};
 use rand::random;
 use serde::Serialize as _;
-use tokio::fs::{File, OpenOptions};
-use tokio::io::{self, AsyncWriteExt, BufWriter};
 
 use super::*;
 use crate::entry::{BorrowedEntry, BorrowedLink};

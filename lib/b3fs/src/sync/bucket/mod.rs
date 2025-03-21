@@ -50,7 +50,6 @@ use std::path::{Path, PathBuf};
 
 use arrayref::array_ref;
 use rand::random;
-use tokio::io::{AsyncReadExt, AsyncSeekExt, BufWriter};
 use triomphe::Arc;
 
 use crate::utils::{to_hex, Digest};
@@ -137,7 +136,7 @@ impl Bucket {
     }
 
     /// Returns `Ok(true)` if the given content exists in this bucket.
-    pub async fn exists(&self, hash: &[u8; 32]) -> Result<bool> {
+    pub fn exists(&self, hash: &[u8; 32]) -> Result<bool> {
         let path = self.get_header_path(hash);
         Path::try_exists(&path)
     }

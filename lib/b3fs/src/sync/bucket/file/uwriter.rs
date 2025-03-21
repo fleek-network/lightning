@@ -110,7 +110,7 @@ mod tests {
         (temp_dir_path, n_blocks)
     }
 
-    async fn untrusted_writer_then_async_reader_with_proof(
+    fn untrusted_writer_then_async_reader_with_proof(
         test_name: &str,
         num_blocks: usize,
         additional_bytes_size: usize,

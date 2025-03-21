@@ -4,7 +4,6 @@ use std::path::PathBuf;
 use std::sync::RwLock;
 
 use bytes::{BufMut, BytesMut};
-use tokio::io;
 
 use super::*;
 use crate::hasher::b3::MAX_BLOCK_SIZE_IN_BYTES;

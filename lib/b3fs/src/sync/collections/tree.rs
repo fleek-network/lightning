@@ -14,7 +14,7 @@ pub struct SyncHashTree<T: Read + Seek + Unpin> {
     pages: Vec<Option<Box<[[u8; 32]]>>>, // Store loaded pages as boxed slices
 }
 
-/// An asynchronous structure that reads hashes from memory pages.
+/// An synchronous structure that reads hashes from memory pages.
 impl<T> SyncHashTree<T>
 where
     T: Read + Seek + Unpin,
