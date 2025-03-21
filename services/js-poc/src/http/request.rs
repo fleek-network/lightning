@@ -108,9 +108,11 @@ pub fn extract(
         uri,
         path: Some(path),
         param,
-        otel_endpoint,
-        otel_headers,
-        otel_tags,
+        otel: crate::config::OtelConfig {
+            endpoint: otel_endpoint,
+            headers: otel_headers,
+            tags: otel_tags,
+        },
     })
 }
 
@@ -139,9 +141,11 @@ mod tests {
                     "query": null,
                     "body": null,
                 })),
-                otel_endpoint: None,
-                otel_headers: HashMap::new(),
-                otel_tags: HashMap::new(),
+                otel: crate::config::OtelConfig {
+                    endpoint: None,
+                    headers: HashMap::new(),
+                    tags: HashMap::new(),
+                }
             })
         );
 
@@ -167,11 +171,11 @@ mod tests {
                     "query": null,
                     "body": null,
                 })),
-                otel_endpoint: Some("https://foo.bar".parse().unwrap()),
-                otel_headers: [("test".to_string(), "foobar".to_string())]
-                    .into_iter()
-                    .collect(),
-                otel_tags: HashMap::new(),
+                otel: crate::config::OtelConfig {
+                    endpoint: Some("https://foo.bar".parse().unwrap()),
+                    headers: [("test".to_string(), "foobar".to_string())].into(),
+                    tags: HashMap::new(),
+                }
             })
         );
 
@@ -194,9 +198,11 @@ mod tests {
                     "query": null,
                     "body": "foobar",
                 })),
-                otel_endpoint: None,
-                otel_headers: HashMap::new(),
-                otel_tags: HashMap::new(),
+                otel: crate::config::OtelConfig {
+                    endpoint: None,
+                    headers: HashMap::new(),
+                    tags: HashMap::new(),
+                }
             })
         );
 
@@ -219,9 +225,11 @@ mod tests {
                     "query": null,
                     "body": { "foo": "bar" },
                 })),
-                otel_endpoint: None,
-                otel_headers: HashMap::new(),
-                otel_tags: HashMap::new(),
+                otel: crate::config::OtelConfig {
+                    endpoint: None,
+                    headers: HashMap::new(),
+                    tags: HashMap::new(),
+                }
             })
         );
 
@@ -244,9 +252,11 @@ mod tests {
                     "query": null,
                     "body": null,
                 })),
-                otel_endpoint: None,
-                otel_headers: HashMap::new(),
-                otel_tags: HashMap::new(),
+                otel: crate::config::OtelConfig {
+                    endpoint: None,
+                    headers: HashMap::new(),
+                    tags: HashMap::new(),
+                }
             })
         );
 
@@ -269,9 +279,11 @@ mod tests {
                     "query": null,
                     "body": null,
                 })),
-                otel_endpoint: None,
-                otel_headers: HashMap::new(),
-                otel_tags: HashMap::new(),
+                otel: crate::config::OtelConfig {
+                    endpoint: None,
+                    headers: HashMap::new(),
+                    tags: HashMap::new(),
+                }
             })
         );
 
@@ -294,9 +306,11 @@ mod tests {
                     "query": { "a": "4" },
                     "body": null,
                 })),
-                otel_endpoint: None,
-                otel_headers: HashMap::new(),
-                otel_tags: HashMap::new(),
+                otel: crate::config::OtelConfig {
+                    endpoint: None,
+                    headers: HashMap::new(),
+                    tags: HashMap::new(),
+                }
             })
         );
     }
