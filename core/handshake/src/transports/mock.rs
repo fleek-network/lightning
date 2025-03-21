@@ -68,7 +68,7 @@ impl Transport for MockTransport {
     type Sender = MockTransportSender;
     type Receiver = MockTransportReceiver;
 
-    async fn bind<P: ExecutorProviderInterface>(
+    async fn bind(
         _waiter: ShutdownWaiter,
         config: Self::Config,
     ) -> anyhow::Result<(Self, Option<Router>)> {
@@ -170,7 +170,6 @@ impl TransportReceiver for MockTransportReceiver {
 mod tests {
     use fleek_crypto::{ClientPublicKey, ClientSignature};
     use lightning_interfaces::ShutdownController;
-    use lightning_service_executor::shim::Provider;
 
     use super::*;
 
@@ -179,8 +178,7 @@ mod tests {
         let notifier = ShutdownController::default();
         // Todo: use mock provider instead?
         let mut server =
-            MockTransport::bind::<Provider>(notifier.waiter(), MockTransportConfig { port: 420 })
-                .await?;
+            MockTransport::bind(notifier.waiter(), MockTransportConfig { port: 420 }).await?;
 
         let client = dial_mock(420).await.unwrap();
         // send the initial handshake
@@ -190,6 +188,8 @@ mod tests {
                 schema::HandshakeRequestFrame::Handshake {
                     retry: None,
                     service: 0,
+                    expiry: 0,
+                    nonce: 0,
                     pk: ClientPublicKey([1; 96]),
                     pop: ClientSignature([2; 48]),
                 }
