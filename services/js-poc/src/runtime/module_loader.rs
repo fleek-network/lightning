@@ -13,6 +13,7 @@ use deno_core::{
 };
 use deno_error::JsErrorBox;
 use fn_sdk::api::fetch_from_origin;
+use fn_sdk::blockstore::b3fs::entry::BorrowedLink;
 use fn_sdk::blockstore::ContentHandle;
 use tracing::trace;
 
@@ -135,8 +136,95 @@ impl ModuleLoader for FleekModuleLoader {
                         )));
                     };
 
-                    let mut handle = ContentHandle::load(&hash).await?;
-                    let bytes = handle.read_to_end().await?;
+                    let dir_or_handle = fn_sdk::blockstore::load_dir_or_content(&hash).await?;
+                    let bytes = match dir_or_handle {
+                        fn_sdk::blockstore::DirOrContent::Dir(mut dir) => {
+                            let mut segments = module_specifier.path_segments().unwrap().peekable();
+
+                            let bucket = fn_sdk::blockstore::blockstore_root().await;
+                            loop {
+                                let mut segment = segments.next().unwrap();
+                                if segment.is_empty() {
+                                    // if we have an empty segment, there was no final path and we
+                                    // should fallback to loading index.js
+                                    segment = "index.js";
+                                }
+
+                                // load the entry up
+                                let Ok(maybe_entry) = dir.get_entry(segment.as_bytes()).await
+                                else {
+                                    return Err(ModuleLoaderError::Core(
+                                        deno_core::error::CoreError::JsBox(JsErrorBox::generic(
+                                            format!(
+                                                "failed to load dir entries for {module_specifier}"
+                                            ),
+                                        )),
+                                    ));
+                                };
+                                let Some(entry) = maybe_entry else {
+                                    return Err(ModuleLoaderError::Core(
+                                        deno_core::error::CoreError::JsBox(JsErrorBox::generic(
+                                            format!("file not found in dir for {module_specifier}"),
+                                        )),
+                                    ));
+                                };
+
+                                let hash = match entry.link {
+                                    BorrowedLink::Content(hash) => hash,
+                                    // TODO: symlink support
+                                    BorrowedLink::Path(_) => {
+                                        return Err(ModuleLoaderError::Core(
+                                            deno_core::error::CoreError::JsBox(
+                                                JsErrorBox::generic(
+                                                    "symlinks are not supported yet",
+                                                ),
+                                            ),
+                                        ))
+                                    },
+                                };
+
+                                if segments.peek().is_none() {
+                                    // if we are at the final segment, load the file content
+                                    let entry = bucket.get(hash).await?;
+                                    if entry.is_dir() {
+                                        // TODO: should we attempt to load an index.js if the final
+                                        //       segment is a directory?
+                                        return Err(ModuleLoaderError::Core(
+                                            deno_core::error::CoreError::JsBox(
+                                                JsErrorBox::generic(
+                                                    "expected a file, found directory",
+                                                ),
+                                            ),
+                                        ));
+                                    }
+                                    let file = entry.into_file().unwrap();
+                                    let mut handle = ContentHandle::from_file(bucket, file).await?;
+
+                                    // read the content and return it
+                                    break handle.read_to_end().await?;
+                                } else {
+                                    // otherwise, it is a subdir and should be recursed
+                                    let entry = bucket.get(hash).await?;
+                                    if entry.is_file() {
+                                        return Err(ModuleLoaderError::Core(
+                                            deno_core::error::CoreError::JsBox(
+                                                JsErrorBox::generic(
+                                                    "expected a directory, found file",
+                                                ),
+                                            ),
+                                        ));
+                                    }
+
+                                    // store dir for next iteration
+                                    dir = entry.into_dir().unwrap();
+                                }
+                            }
+                        },
+                        fn_sdk::blockstore::DirOrContent::Content(mut content_handle) => {
+                            // the content hash was a file directly, read and return it
+                            content_handle.read_to_end().await?
+                        },
+                    };
 
                     let module = ModuleSource::new(
                         module_type,
