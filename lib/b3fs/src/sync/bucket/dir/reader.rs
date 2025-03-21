@@ -278,9 +278,6 @@ mod tests {
     use std::io::Read;
     use std::path::{Path, PathBuf};
 
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
-    use tokio_stream::StreamExt;
-
     use super::*;
     use crate::entry::OwnedEntry;
     use crate::sync::bucket::dir::writer::DirWriter;
@@ -291,7 +288,7 @@ mod tests {
         temp_dir: &Path,
         entries: Vec<OwnedEntry>,
     ) -> Result<B3Dir, Box<dyn std::error::Error>> {
-        let bucket = Bucket::open(&temp_dir)?;
+        let bucket = Bucket::open(temp_dir)?;
 
         let mut writer = DirWriter::new(&bucket, entries.len())?;
 

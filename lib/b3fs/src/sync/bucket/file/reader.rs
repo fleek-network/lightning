@@ -38,8 +38,6 @@ mod tests {
     use std::io::Write;
 
     use rand::random;
-    use tokio::io::{AsyncRead, AsyncWriteExt};
-    use tokio_stream::StreamExt;
     use triomphe::Arc;
 
     use super::*;
