@@ -1,7 +1,7 @@
-use std::collections::HashMap;
-
 use fn_sdk::api::Origin as ApiOrigin;
 use serde::{Deserialize, Serialize};
+
+use crate::config::OtelConfig;
 
 /// Request to execute some javascript from an origin
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
@@ -23,15 +23,9 @@ pub struct Request {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(alias = "params", alias = "parameter", alias = "parameters")]
     pub param: Option<serde_json::Value>,
-    /// Optional endpoint to send otlp http logs to
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub otel_endpoint: Option<deno_core::url::Url>,
-    /// Optional headers to include when exporting otlp
-    #[serde(skip_serializing_if = "HashMap::is_empty")]
-    pub otel_headers: HashMap<String, String>,
-    /// Additional global tags to include with exported data
-    #[serde(skip_serializing_if = "HashMap::is_empty")]
-    pub otel_tags: HashMap<String, String>,
+    /// Optional configuration for the opentelemetry exporter
+    #[serde(default)]
+    pub otel: OtelConfig,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Eq, PartialEq)]

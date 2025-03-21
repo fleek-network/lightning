@@ -1,8 +1,12 @@
 use anyhow::{bail, Context};
+use cid::Cid;
+use config::FleekConfig;
 use deno_core::futures::stream::FuturesUnordered;
 use deno_core::futures::StreamExt;
 use deno_core::v8::{Global, IsolateHandle, Value};
 use deno_core::{serde_v8, v8, JsRuntime, ModuleSpecifier};
+use fn_sdk::blockstore::b3fs::entry::BorrowedLink;
+use fn_sdk::blockstore::ContentHandle;
 use fn_sdk::connection::Connection;
 use fn_sdk::header::TransportDetail;
 use fn_sdk::http_util::{respond, respond_with_error, respond_with_http_response};
@@ -14,6 +18,7 @@ use crate::runtime::guard::IsolateGuard;
 use crate::runtime::Runtime;
 use crate::stream::{Origin, Request};
 
+pub mod config;
 mod http;
 mod runtime;
 pub mod stream;
@@ -130,9 +135,7 @@ async fn handle_request(
         uri,
         path,
         param,
-        otel_endpoint,
-        otel_headers,
-        otel_tags,
+        otel,
     } = request;
     if uri.is_empty() {
         bail!("Empty origin uri");
@@ -141,11 +144,53 @@ async fn handle_request(
     let module_url = match origin {
         Origin::Blake3 => format!("blake3://{uri}"),
         Origin::Ipfs => format!("ipfs://{uri}"),
-        Origin::Http => uri,
+        Origin::Http => uri.clone(),
         Origin::Unknown => todo!(),
     }
     .parse::<ModuleSpecifier>()
     .context("Invalid origin URI")?;
+
+    // build the runtime config
+    let mut config = FleekConfig { otel };
+
+    // check directory for config file; if it's found, we override
+    // the request configuration with its values
+    if origin == Origin::Ipfs {
+        let Ok(cid) = module_url.host_str().unwrap().parse::<Cid>() else {
+            bail!("invalid ipfs cid");
+        };
+        let Some(hash) =
+            fn_sdk::api::fetch_from_origin(fn_sdk::api::Origin::IPFS, cid.to_bytes()).await
+        else {
+            bail!("failed to fetch from origin")
+        };
+        let bucket = fn_sdk::blockstore::blockstore_root().await;
+        let entry = bucket.get(&hash).await?;
+        if entry.is_dir() {
+            // look for config file
+            let mut dir = entry.into_dir().unwrap();
+            if let Ok(Some(config_file)) = dir.get_entry(b"fleek.config.json").await {
+                match config_file.link {
+                    BorrowedLink::Content(hash) => {
+                        // load file and read contents
+                        let file_entry = bucket.get(hash).await?;
+                        if file_entry.is_file() {
+                            // load handle
+                            let mut handle =
+                                ContentHandle::from_file(bucket, file_entry.into_file().unwrap())
+                                    .await?;
+                            // read content
+                            let content = handle.read_to_end().await?;
+
+                            // parse into FleekConfig and use it
+                            config = serde_json::from_slice(&content)?;
+                        }
+                    },
+                    BorrowedLink::Path(_) => bail!("symlinks are not supported for config files"),
+                }
+            }
+        }
+    }
 
     let mut location = module_url.clone();
     if let Some(path) = path {
@@ -156,9 +201,9 @@ async fn handle_request(
     let mut runtime = Runtime::new(
         location.clone(),
         depth,
-        otel_endpoint.map(|u| u.to_string()),
-        otel_headers,
-        otel_tags,
+        config.otel.endpoint.as_ref().map(|u| u.to_string()),
+        config.otel.headers,
+        config.otel.tags,
     )
     .context("Failed to initialize runtime")?;
     tx.send(runtime.deno.v8_isolate().thread_safe_handle())?;
