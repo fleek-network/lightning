@@ -1,6 +1,10 @@
 use std::io::ErrorKind;
 use std::path::PathBuf;
 
+/// re-export b3fs
+pub use b3fs;
+use b3fs::bucket::dir::reader::B3Dir;
+use b3fs::bucket::file::reader::B3File;
 use b3fs::bucket::Bucket;
 use b3fs::collections::async_hashtree::AsyncHashTree;
 use tokio::fs::File;
@@ -30,6 +34,28 @@ pub fn block_file(hash: &[u8; 32]) -> PathBuf {
     Bucket::block_path(path, hash).expect("Error opening header path")
 }
 
+pub enum DirOrContent {
+    Dir(B3Dir),
+    Content(ContentHandle),
+}
+
+pub async fn load_dir_or_content(hash: &[u8; 32]) -> std::io::Result<DirOrContent> {
+    let bucket = blockstore_root().await;
+    let load_content = bucket.get(hash).await?;
+
+    if load_content.is_dir() {
+        let dir_read = load_content.into_dir().unwrap();
+        Ok(DirOrContent::Dir(dir_read))
+    } else if load_content.is_file() {
+        let file_read = load_content.into_file().unwrap();
+        Ok(DirOrContent::Content(
+            ContentHandle::from_file(bucket, file_read).await?,
+        ))
+    } else {
+        Err(to_std_io_err(Option::<String>::None, "asdf"))
+    }
+}
+
 /// A handle to some content in the blockstore, providing an easy to use utility for accessing
 /// the hash tree and its blocks from the file system.
 pub struct ContentHandle {
@@ -56,8 +82,12 @@ impl ContentHandle {
             None as Option<String>,
             "Error converting content to file reader",
         ))?;
-        let blocks = file_read.num_blocks();
-        let tree = file_read
+        Self::from_file(bucket, file_read).await
+    }
+
+    pub async fn from_file(bucket: Bucket, file: B3File) -> std::io::Result<Self> {
+        let blocks = file.num_blocks();
+        let tree = file
             .hashtree()
             .await
             .map_err(|e| to_std_io_err(Some(e), "Error getting hashtree from reader"))?;
