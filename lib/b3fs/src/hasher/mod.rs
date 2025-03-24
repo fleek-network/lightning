@@ -3,7 +3,7 @@
 //! This provides hashing ability both for content and directory.
 
 pub(crate) mod b3;
-pub(crate) mod collector;
+pub mod collector;
 pub(crate) mod join;
 
 pub mod byte_hasher;
