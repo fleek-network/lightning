@@ -6,9 +6,9 @@ use thiserror::Error;
 use super::b3::KEY_LEN;
 use super::byte_hasher::{Blake3Hasher, BlockHasher};
 use super::HashTreeCollector;
-#[cfg(not(feature = "sync"))]
+#[cfg(feature = "async")]
 use crate::bucket::errors;
-#[cfg(feature = "sync")]
+#[cfg(not(feature = "async"))]
 use crate::sync::bucket::errors;
 use crate::utils;
 
@@ -42,7 +42,7 @@ impl HashTreeCollector for BufCollector {
 }
 
 impl BufCollector {
-    #[cfg(not(feature = "sync"))]
+    #[cfg(feature = "async")]
     pub async fn write_hash(
         &mut self,
         mut writer: impl tokio::io::AsyncWriteExt + Unpin,
@@ -53,11 +53,11 @@ impl BufCollector {
         Ok(())
     }
 
-    #[cfg(feature = "sync")]
+    #[cfg(not(feature = "async"))]
     pub fn write_hash(
         &mut self,
         mut writer: impl std::io::Write + Unpin,
-    ) -> Result<(), tokio::io::Error> {
+    ) -> Result<(), std::io::Error> {
         writer.write_all(&self.buffer)?;
         writer.flush()?;
         self.buffer.clear();
