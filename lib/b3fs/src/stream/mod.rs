@@ -1,5 +1,5 @@
 //! This module mostly deals with Merkle tree style node inclusion proofs and their verification
-//! logic. Along with how we deal with represnting compact encoding of these informations.
+//! logic. Along with how we deal with representing compact encoding of these informations.
 //!
 //! # What is a proof? And flip bits?
 //!
@@ -50,6 +50,7 @@
 
 /// Provides [BucketStream](bucket::BucketStream) to stream either a File or a Directory exploring
 /// its contents.
+#[cfg(not(feature = "sync"))]
 pub mod bucket;
 /// Provides an owned buffer for writing proofs.
 pub mod buffer;

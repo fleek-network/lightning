@@ -13,13 +13,12 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use fleek_blake3::tree;
-use tokio::io::{AsyncReadExt, AsyncSeekExt};
-use tokio::sync::RwLock;
-use tokio_stream::Stream;
 
 use super::error::CollectionTryFromError;
 use super::flat::FlatHashSlice;
+#[cfg(not(feature = "sync"))]
 use crate::bucket::errors::ReadError;
+#[cfg(not(feature = "sync"))]
 use crate::bucket::POSITION_START_HASHES;
 use crate::entry::BorrowedEntry;
 use crate::hasher;
@@ -27,9 +26,13 @@ use crate::hasher::dir_hasher::DirectoryHasher;
 use crate::stream::buffer::ProofBuf;
 use crate::stream::walker::{self, Mode, TreeWalker};
 use crate::stream::ProofEncoder;
+#[cfg(feature = "sync")]
+use crate::sync::bucket::errors::ReadError;
+#[cfg(feature = "sync")]
+use crate::sync::bucket::POSITION_START_HASHES;
 use crate::utils::{block_counter_from_tree_index, is_valid_tree_len, tree_index};
 
-/// A wrapper around a list of hashes that provides access only to the leaf nodes in the tree.
+/// A wraipper around a list of hashes that provides access only to the leaf nodes in the tree.
 #[derive(Clone, Copy)]
 pub struct HashTree<'s> {
     inner: FlatHashSlice<'s>,

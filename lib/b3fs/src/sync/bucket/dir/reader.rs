@@ -18,7 +18,6 @@ use triomphe::Arc;
 
 use super::iter::DirEntriesIter;
 use super::phf::PHF_TABLE_RANDOMIZED_KEY_SIZE;
-use crate::collections::tree::AsyncHashTree;
 use crate::collections::HashTree;
 use crate::entry::{BorrowedEntry, BorrowedLink, OwnedLink};
 use crate::hasher::dir_hasher::B3_DIR_IS_SYM_LINK;

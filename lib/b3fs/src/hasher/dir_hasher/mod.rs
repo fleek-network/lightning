@@ -4,6 +4,7 @@ use std::io::Write;
 use super::b3::platform::Platform;
 use super::iv::{SmallIV, IV};
 use super::HashTreeCollector;
+#[cfg(not(feature = "sync"))]
 use crate::collections::HashTree;
 use crate::entry::{BorrowedEntry, BorrowedLink};
 use crate::utils::{flatten, is_valid_filename, is_valid_symlink, Digest};

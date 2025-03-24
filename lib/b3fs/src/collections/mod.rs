@@ -22,6 +22,7 @@
 pub mod error;
 pub mod flat;
 pub mod hash_tree;
+#[cfg(not(feature = "sync"))]
 pub mod tree;
 
 mod printer;
