@@ -64,7 +64,7 @@ impl WithCollector for FileWriterCollector {
             .write()
             .map_err(|e| io::Error::new(ErrorKind::Other, format!("{e:?}")))?
             .get_tree_mut()
-            .write_hash_sync(writer)
+            .write_hash(writer)
     }
 
     /// Finalizes the last block and prepares the finalized tree

@@ -2,8 +2,8 @@ use arrayref::array_ref;
 use serde::{Deserialize, Serialize};
 
 use super::errors::ReadError;
-use crate::bucket::POSITION_START_HASHES;
 use crate::collections::HashTree;
+use crate::sync::bucket::POSITION_START_HASHES;
 
 pub mod reader;
 pub(crate) mod state;

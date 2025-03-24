@@ -324,7 +324,7 @@ impl<T: WithCollector> WriterState for InnerWriterState<T> {
             self.new_block(root_hash)?;
         }
 
-        final_collector.write_hash_sync(&mut self.header_file.file)?;
+        final_collector.write_hash(&mut self.header_file.file)?;
 
         self.flush(&root_hash)?;
 

@@ -4,11 +4,10 @@ use std::sync::Arc;
 
 use bytes::BytesMut;
 
-use crate::bucket::{errors, POSITION_START_HASHES};
-use crate::collections::tree::AsyncHashTree;
 use crate::collections::HashTree;
 use crate::hasher::b3::KEY_LEN;
 use crate::sync::bucket::errors::ReadError;
+use crate::sync::bucket::{errors, POSITION_START_HASHES};
 use crate::sync::collections::tree::SyncHashTree;
 
 pub struct B3File {
