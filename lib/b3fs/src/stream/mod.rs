@@ -50,7 +50,7 @@
 
 /// Provides [BucketStream](bucket::BucketStream) to stream either a File or a Directory exploring
 /// its contents.
-#[cfg(not(feature = "sync"))]
+#[cfg(feature = "async")]
 pub mod bucket;
 /// Provides an owned buffer for writing proofs.
 pub mod buffer;

@@ -31,7 +31,7 @@
 // 8MB     | 65535         | 32GB
 // 1GB     | 65535         | 4TB
 
-#[cfg(not(feature = "sync"))]
+#[cfg(feature = "async")]
 pub mod bucket;
 
 pub mod stream;
@@ -50,5 +50,5 @@ pub mod hasher;
 #[cfg(test)]
 pub mod test_utils;
 
-#[cfg(feature = "sync")]
+#[cfg(not(feature = "async"))]
 pub mod sync;
