@@ -19,10 +19,12 @@ bytes = "1.5"
 fastbloom-rs = "0.5.9"
 
 # IO / multi-threading
-tokio = { version = "1.28", features = ["full", "tracing"], optional = true }
-tokio-stream = { version = "0.1", optional = true }
+#tokio = { version = "1.28", features = ["full", "tracing"], optional = true }
+#tokio-stream = { version = "0.1", optional = true }
 #tokio = { workspace = true, optional = true }
 #tokio-stream = { workspace = true, optional = true }
+tokio.workspace = true
+tokio-stream.workspace = true
 rayon = "1.10"
 rayon-core = "1.12"
 
@@ -36,10 +38,10 @@ siphasher = "1.0.1"
 
 
 #serialization
-#bincode.workspace = true
-bincode = "1.3.3"
-serde = { version = "1.0", features = ["derive"] }
-#serde.workspace = true
+bincode.workspace = true
+#bincode = "1.3.3"
+#serde = { version = "1.0", features = ["derive"] }
+serde.workspace = true
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
@@ -49,4 +51,4 @@ name = "phf"
 harness = false
 
 [features]
-async = ["tokio", "tokio-stream"]
+sync = []
