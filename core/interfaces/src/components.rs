@@ -31,4 +31,5 @@ define_node_components!([
     PingerInterface,
     IndexerInterface,
     WatcherInterface,
+    PodInterface,
 ]);
