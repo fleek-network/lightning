@@ -5,7 +5,7 @@ use affair::AsyncWorker;
 use fleek_crypto::{NodePublicKey, NodeSecretKey};
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::PodRequest;
-use lightning_interfaces::{spawn_worker, PodInterface, PodSocket};
+use lightning_interfaces::{spawn_worker, PodInterface, PodSocket, ShutdownWaiter};
 use tokio::sync::Mutex;
 use tracing::debug;
 
@@ -15,6 +15,7 @@ use crate::{runner, Config};
 pub struct Pod<C: NodeComponents> {
     socket: PodSocket,
     worker: PodWorker<C>,
+    shutdown: ShutdownWaiter,
     _c: PhantomData<C>,
 }
 
@@ -37,7 +38,7 @@ impl<C: NodeComponents> Pod<C> {
         keystore: &C::KeystoreInterface,
         app: &C::ApplicationInterface,
         fdi::Cloned(_notifier): fdi::Cloned<C::NotifierInterface>,
-        fdi::Cloned(waiter): fdi::Cloned<lightning_interfaces::ShutdownWaiter>,
+        fdi::Cloned(waiter): fdi::Cloned<ShutdownWaiter>,
     ) -> Self {
         let config = config_provider.get::<Self>();
         let query_runner = app.sync_query();
@@ -53,25 +54,41 @@ impl<C: NodeComponents> Pod<C> {
             state: Arc::new(Mutex::new(state)),
         };
 
-        let socket = spawn_worker!(worker.clone(), "POD", waiter, crucial);
+        let waiter_clone = waiter.clone();
+        let socket = spawn_worker!(worker.clone(), "POD", waiter_clone, crucial);
 
         Self {
             socket,
             worker,
+            shutdown: waiter,
             _c: PhantomData,
         }
     }
 
     pub async fn start(
-        _this: fdi::Ref<Self>,
+        this: fdi::Ref<Self>,
         notifier: fdi::Ref<C::NotifierInterface>,
         fdi::Cloned(_query_runner): fdi::Cloned<c![C::ApplicationInterface::SyncExecutor]>,
     ) {
         debug!("POD started");
         let _subscriber = notifier.subscribe_block_executed();
-        tokio::task::spawn_blocking(move || {
-            runner::run();
-        });
+
+        let shutdown = this.shutdown.clone();
+        let waiter = this.shutdown.clone();
+        spawn!(
+            async move {
+                if let Some(result) = shutdown
+                    .run_until_shutdown(tokio::task::spawn_blocking(move || {
+                        runner::run();
+                    }))
+                    .await
+                {
+                    result.expect("POD enclave runner failed")
+                }
+            },
+            "POD enclave runner",
+            crucial(waiter)
+        );
     }
 }
 
