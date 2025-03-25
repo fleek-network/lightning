@@ -64,7 +64,7 @@ mod tests {
 
     use self::writer::FileWriter;
     use super::*;
-    use crate::collections::{tree, HashTree};
+    use crate::collections::HashTree;
     use crate::hasher::byte_hasher::Blake3Hasher;
     use crate::stream::walker::Mode;
     use crate::sync::bucket::file::reader::B3File;
