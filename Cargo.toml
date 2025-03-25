@@ -111,6 +111,7 @@ lightning-topology = { path = "core/topology" }
 lightning-types = { path = "core/types" }
 lightning-utils = { path = "core/utils" }
 lightning-watcher = { path = "core/watcher" }
+lightning-pod = { path = "core/pod" }
 affair = { path = "lib/affair" }
 atomo = { path = "lib/atomo" }
 atomo-rocks = { path = "lib/atomo-rocks" }

@@ -9,7 +9,7 @@ use lightning_interfaces::{spawn_worker, PodInterface, PodSocket};
 use tokio::sync::Mutex;
 use tracing::debug;
 
-use crate::Config;
+use crate::{runner, Config};
 
 #[allow(unused)]
 pub struct Pod<C: NodeComponents> {
@@ -67,9 +67,11 @@ impl<C: NodeComponents> Pod<C> {
         notifier: fdi::Ref<C::NotifierInterface>,
         fdi::Cloned(_query_runner): fdi::Cloned<c![C::ApplicationInterface::SyncExecutor]>,
     ) {
-        let _subscriber = notifier.subscribe_block_executed();
-
         debug!("POD started");
+        let _subscriber = notifier.subscribe_block_executed();
+        tokio::task::spawn_blocking(move || {
+            runner::run();
+        });
     }
 }
 

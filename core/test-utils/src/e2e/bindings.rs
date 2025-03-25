@@ -7,6 +7,7 @@ use lightning_forwarder::Forwarder;
 use lightning_interfaces::partial_node_components;
 use lightning_notifier::Notifier;
 use lightning_pinger::Pinger;
+use lightning_pod::Pod;
 use lightning_pool::PoolProvider;
 use lightning_rep_collector::ReputationAggregator;
 use lightning_rpc::Rpc;
@@ -36,6 +37,7 @@ partial_node_components!(TestFullNodeComponentsWithRealConsensus {
     RpcInterface = Rpc<Self>;
     SignerInterface = Signer<Self>;
     TopologyInterface = Topology<Self>;
+    PodInterface = Pod<Self>;
 });
 
 partial_node_components!(TestFullNodeComponentsWithMockConsensus {
@@ -56,6 +58,7 @@ partial_node_components!(TestFullNodeComponentsWithMockConsensus {
     SignerInterface = Signer<Self>;
     TopologyInterface = Topology<Self>;
     WatcherInterface = Watcher<Self>;
+    PodInterface = Pod<Self>;
 });
 
 partial_node_components!(TestFullNodeComponentsWithRealConsensusWithoutCommitteeBeacon {
@@ -74,6 +77,7 @@ partial_node_components!(TestFullNodeComponentsWithRealConsensusWithoutCommittee
     RpcInterface = Rpc<Self>;
     SignerInterface = Signer<Self>;
     TopologyInterface = Topology<Self>;
+    PodInterface = Pod<Self>;
 });
 
 partial_node_components!(TestFullNodeComponentsWithoutCommitteeBeacon {
@@ -92,4 +96,5 @@ partial_node_components!(TestFullNodeComponentsWithoutCommitteeBeacon {
     RpcInterface = Rpc<Self>;
     SignerInterface = Signer<Self>;
     TopologyInterface = Topology<Self>;
+    PodInterface = Pod<Self>;
 });

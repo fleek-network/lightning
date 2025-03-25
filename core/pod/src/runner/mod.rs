@@ -48,7 +48,10 @@ mod config {
     pub const TLS_PORT: u16 = 55856;
 }
 
-const ENCLAVE: &[u8] = include_bytes!("/home/ubuntu/lightning-pod-enclave/target/x86_64-fortanix-unknown-sgx/release/lightning-pod-enclave.sgxs");
+//const ENCLAVE: &[u8] =
+// include_bytes!("/home/ubuntu/lightning-pod-enclave/target/x86_64-fortanix-unknown-sgx/release/
+// lightning-pod-enclave.sgxs");
+const ENCLAVE: &[u8] = include_bytes!("/home/matthias/Desktop/enclave.bin");
 
 static SGX_SEALED_DATA_PATH: LazyLock<PathBuf> = LazyLock::new(|| {
     std::env::var("SGX_SEALED_DATA_PATH")
@@ -146,19 +149,19 @@ impl UsercallExtension for ExternalService {
     }
 }
 
-pub fn main() {
-    std::thread::spawn(|| {
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .thread_name("sdk")
-            .enable_all()
-            .build()
-            .expect("failed to build sdk runtime");
+pub fn run() {
+    //std::thread::spawn(|| {
+    //    let rt = tokio::runtime::Builder::new_current_thread()
+    //        .thread_name("sdk")
+    //        .enable_all()
+    //        .build()
+    //        .expect("failed to build sdk runtime");
 
-        rt.block_on(async move {
-            fn_sdk::ipc::init_from_env();
-            futures::future::pending::<()>().await
-        });
-    });
+    //    rt.block_on(async move {
+    //        fn_sdk::ipc::init_from_env();
+    //        futures::future::pending::<()>().await
+    //    });
+    //});
 
     // Running the enclave
     let aesm_client = AesmClient::new();
