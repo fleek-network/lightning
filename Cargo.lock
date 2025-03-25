@@ -8757,6 +8757,7 @@ dependencies = [
  "lightning-keystore",
  "lightning-notifier",
  "lightning-pinger",
+ "lightning-pod",
  "lightning-pool",
  "lightning-rep-collector",
  "lightning-resolver",

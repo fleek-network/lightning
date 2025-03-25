@@ -14,6 +14,7 @@ use lightning_interfaces::partial_node_components;
 use lightning_keystore::Keystore;
 use lightning_notifier::Notifier;
 use lightning_pinger::Pinger;
+use lightning_pod::Pod;
 use lightning_pool::PoolProvider;
 use lightning_rep_collector::ReputationAggregator;
 use lightning_resolver::resolver::Resolver;
@@ -54,6 +55,7 @@ partial_node_components!(FullNodeComponents require full {
     PingerInterface = Pinger<Self>;
     IndexerInterface = Indexer<Self>;
     WatcherInterface = Watcher<Self>;
+    PodInterface = Pod<Self>;
     DeliveryAcknowledgmentAggregatorInterface = lightning_interfaces::_hacks::Blanket;
 });
 
@@ -84,5 +86,6 @@ partial_node_components!(UseMockConsensus require full {
     PingerInterface = Pinger<Self>;
     IndexerInterface = Indexer<Self>;
     WatcherInterface = Watcher<Self>;
+    PodInterface = Pod<Self>;
     DeliveryAcknowledgmentAggregatorInterface = lightning_interfaces::_hacks::Blanket;
 });
