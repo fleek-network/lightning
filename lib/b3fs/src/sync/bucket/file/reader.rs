@@ -40,8 +40,8 @@ mod tests {
     use triomphe::Arc;
 
     use super::*;
-    use crate::bucket::POSITION_START_HASHES;
     use crate::hasher::b3::CHUNK_START;
+    use crate::sync::bucket::POSITION_START_HASHES;
     use crate::utils;
 
     #[test]
