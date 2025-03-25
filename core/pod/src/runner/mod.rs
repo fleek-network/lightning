@@ -48,8 +48,7 @@ mod config {
     pub const TLS_PORT: u16 = 55856;
 }
 
-//const ENCLAVE: &[u8] =
-include_bytes!(
+const ENCLAVE: &[u8] = include_bytes!(
     "/home/ubuntu/lightning-pod-enclave/target/x86_64-fortanix-unknown-sgx/release/lightning-pod-enclave.sgxs"
 );
 //const ENCLAVE: &[u8] = include_bytes!("/home/matthias/Desktop/enclave.bin");
