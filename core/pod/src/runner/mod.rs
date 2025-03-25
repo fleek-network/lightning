@@ -6,14 +6,12 @@ use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, LazyLock};
 
 use aesm_client::AesmClient;
-use blockstore::VerifiedStream;
 use enclave_runner::usercalls::{AsyncStream, UsercallExtension};
 use enclave_runner::EnclaveBuilder;
 use futures::FutureExt;
 use req_res::AttestationEndpoint;
 use sgxs_loaders::isgx::Device as IsgxDevice;
 
-mod blockstore;
 mod connection;
 mod req_res;
 
@@ -90,15 +88,6 @@ impl UsercallExtension for ExternalService {
     {
         async move {
             if let Some(subdomain) = addr.strip_suffix(".fleek.network") {
-                // Connect the enclave to a blockstore content-stream
-                if let Some(hash) = subdomain.strip_suffix(".blockstore") {
-                    let hash = hex::decode(hash).expect("valid blake3 hex");
-                    let stream =
-                        Box::new(VerifiedStream::new(arrayref::array_ref![hash, 0, 32]).await?)
-                            as Box<dyn AsyncStream>;
-                    return Ok(Some(stream));
-                }
-
                 // Attestation APIs
                 if let Some(method) = subdomain.strip_suffix(".reqres") {
                     match method {

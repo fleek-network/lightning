@@ -19,6 +19,7 @@ partial_node_components!(PartialBinding {
     ApplicationInterface = Application<Self>;
     TopologyInterface = Topology<Self>;
     ServiceExecutorInterface = ServiceExecutor<Self>;
+    PodInterface = lightning_interfaces::_hacks::Blanket;
 });
 
 #[derive(Parser)]
