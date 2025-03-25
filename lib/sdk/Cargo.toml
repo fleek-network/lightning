@@ -24,7 +24,7 @@ tokio = { version = "1.32", features = [
 ] }
 arrayvec = "0.7"
 ringbuf = "0.3"
-b3fs = { path = "../b3fs" }
+b3fs = { path = "../b3fs", features = ["async"] }
 url.workspace = true
 serde = { version = "1.0", features = ["derive"] }
 serde_cbor = "0.11"
