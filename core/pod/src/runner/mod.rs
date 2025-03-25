@@ -62,7 +62,7 @@ static SGX_SEALED_DATA_PATH: LazyLock<PathBuf> = LazyLock::new(|| {
 
 static PEER_IPS: LazyLock<Vec<String>> = LazyLock::new(|| {
     std::env::var("PEER_IPS")
-        .expect("PEER_IPS env variable not found")
+        .unwrap_or("127.0.0.1,127.0.0.1".to_string())
         .split(',')
         .map(|s| s.to_string())
         .collect()
@@ -70,7 +70,7 @@ static PEER_IPS: LazyLock<Vec<String>> = LazyLock::new(|| {
 
 static OUR_NODE_INDEX: LazyLock<u32> = LazyLock::new(|| {
     std::env::var("OUR_NODE_INDEX")
-        .expect("OUR_NODE_INDEX env variable not found")
+        .unwrap_or(0.to_string())
         .parse()
         .expect("OUR_NODE_INDEX must be a valid integer")
 });
