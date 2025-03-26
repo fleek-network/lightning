@@ -1,3 +1,5 @@
+use std::time::SystemTime;
+
 use anyhow::anyhow;
 use fleek_service_js_poc::stream::Request;
 use lightning_schema::handshake::{HandshakeRequestFrame, RequestFrame, ResponseFrame};
@@ -17,6 +19,14 @@ async fn main() -> anyhow::Result<()> {
         .send_handshake(HandshakeRequestFrame::Handshake {
             retry: None,
             service: SERVICE_ID,
+            // set expiry to 30s from now. We have a runtime cap at 15s, and only plan to run a
+            // single request.
+            expiry: SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs()
+                + 30,
+            nonce: 0, // TODO
             pk: [0; 96].into(),
             pop: [0; 48].into(),
         })

@@ -1,8 +1,16 @@
+use std::time::SystemTime;
+
 use arrayref::array_ref;
 use bytes::{BufMut, BytesMut};
 use cid::Cid;
+use fleek_crypto::{ClientSecretKey, SecretKey};
 use fleek_service_fetcher::Origin;
-use lightning_schema::handshake::{HandshakeRequestFrame, RequestFrame, ResponseFrame};
+use lightning_schema::handshake::{
+    handshake_digest,
+    HandshakeRequestFrame,
+    RequestFrame,
+    ResponseFrame,
+};
 use tcp_client::TcpClient;
 
 const ADDRESS: &str = "127.0.0.1:4221";
@@ -10,20 +18,37 @@ const SERVICE_ID: u32 = 0;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let (origin, uid) = cli::args();
+    let (origin, uid, verify) = cli::args();
 
-    println!("Sending handshake");
-
-    // Connect and handshake with the node
     let mut client = TcpClient::connect(ADDRESS).await?;
-    client
-        .send_handshake(HandshakeRequestFrame::Handshake {
-            retry: None,
-            service: SERVICE_ID,
-            pk: [0; 96].into(),
-            pop: [0; 48].into(),
-        })
-        .await?;
+
+    if verify {
+        println!("sending handshake");
+
+        // TODO(oz): use a real client key assigned to an eth account
+        let sk = ClientSecretKey::generate();
+
+        let expiry = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            + 30;
+        let nonce = 1; // todo
+        let pk = sk.to_pk();
+        let digest = handshake_digest(None, SERVICE_ID, expiry, nonce, pk);
+        let pop = sk.sign(&digest);
+
+        client
+            .send_handshake(HandshakeRequestFrame::Handshake {
+                retry: None,
+                service: SERVICE_ID,
+                expiry,
+                nonce,
+                pk,
+                pop,
+            })
+            .await?;
+    }
 
     println!("Sending content request for {uid}");
 
@@ -75,7 +100,7 @@ async fn main() -> anyhow::Result<()> {
 mod cli {
     use fleek_service_fetcher::Origin;
 
-    pub fn args() -> (Origin, String) {
+    pub fn args() -> (Origin, String, bool) {
         let mut args = std::env::args();
         args.next();
 
@@ -96,17 +121,17 @@ mod cli {
             }
         };
 
-        (origin, uid)
+        (origin, uid, args.any(|v| v == "--pop"))
     }
 
     fn help() {
         println!(
-            "Usage: ./cdn-client <UID> [ipfs|blake3, default: ipfs]
+            "Usage: ./cdn-client <UID> [ipfs|blake3, default: ipfs] [--pop]
 
-Examples: 
+Examples:
     Big Buck Bunny:
         ./cdn-client b4bb88454076fa65e9c6f7f4343b02ccea7fbd9a6b9235d177fe71cfdc5d7043 blake3
-        ./cdn-client bafybeibi5vlbuz3jstustlxbxk7tmxsyjjrxak6us4yqq6z2df3jwidiwi ipfs 
+        ./cdn-client bafybeibi5vlbuz3jstustlxbxk7tmxsyjjrxak6us4yqq6z2df3jwidiwi ipfs
 
     Puppet Image:
         ./cdn-client 62c6f749c80a27813a84066b92a6fdc37fd83779bf9d64f1f1a3692cf3a7dfbd blake3
@@ -116,10 +141,15 @@ Examples:
 }
 
 mod tcp_client {
-    use anyhow::Result;
+    use anyhow::{Context, Result};
     use arrayref::array_ref;
-    use bytes::{Bytes, BytesMut};
-    use lightning_schema::handshake::{HandshakeRequestFrame, RequestFrame, ResponseFrame};
+    use bytes::{Buf, Bytes, BytesMut};
+    use lightning_schema::handshake::{
+        HandshakeRequestFrame,
+        HandshakeResponse,
+        RequestFrame,
+        ResponseFrame,
+    };
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::{TcpStream, ToSocketAddrs};
 
@@ -129,6 +159,7 @@ mod tcp_client {
     }
 
     impl TcpClient {
+        #[inline(always)]
         pub async fn connect<A: ToSocketAddrs>(addr: A) -> Result<Self> {
             let stream = TcpStream::connect(addr).await?;
             Ok(Self {
@@ -137,7 +168,7 @@ mod tcp_client {
             })
         }
 
-        pub async fn recv(&mut self) -> Option<ResponseFrame> {
+        async fn recv_inner(&mut self) -> Option<BytesMut> {
             loop {
                 if self.buffer.len() < 4 {
                     // Read more bytes for the length delimiter
@@ -153,28 +184,39 @@ mod tcp_client {
                     }
 
                     // take the frame bytes from the buffer
-                    let bytes = self.buffer.split_to(len);
+                    self.buffer.advance(4);
+                    let bytes = self.buffer.split_to(len - 4);
 
-                    // decode the frame
-                    match ResponseFrame::decode(&bytes[4..]) {
-                        Ok(frame) => return Some(frame),
-                        Err(_) => {
-                            eprintln!("invalid frame, dropping payload");
-                            continue;
-                        },
-                    }
+                    return Some(bytes);
                 }
             }
         }
 
-        pub async fn send_handshake(&mut self, frame: HandshakeRequestFrame) -> Result<()> {
-            self.send_inner(frame.encode()).await
+        #[inline(always)]
+        pub async fn recv(&mut self) -> Option<ResponseFrame> {
+            ResponseFrame::decode(&self.recv_inner().await?).ok()
         }
 
+        #[inline(always)]
+        pub async fn send_handshake(
+            &mut self,
+            frame: HandshakeRequestFrame,
+        ) -> Result<HandshakeResponse> {
+            self.send_inner(frame.encode()).await?;
+            HandshakeResponse::decode(
+                &self
+                    .recv_inner()
+                    .await
+                    .context("expected handshake response frame")?,
+            )
+        }
+
+        #[inline(always)]
         pub async fn send(&mut self, frame: RequestFrame) -> Result<()> {
             self.send_inner(frame.encode()).await
         }
 
+        #[inline(always)]
         async fn send_inner(&mut self, bytes: Bytes) -> Result<()> {
             self.stream.write_u32(bytes.len() as u32).await?;
             self.stream.write_all(&bytes).await?;
