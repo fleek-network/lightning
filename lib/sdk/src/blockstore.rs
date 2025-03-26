@@ -2,7 +2,7 @@ use std::io::ErrorKind;
 use std::path::PathBuf;
 
 use b3fs::bucket::Bucket;
-use b3fs::collections::tree::AsyncHashTree;
+use b3fs::collections::async_hashtree::AsyncHashTree;
 use tokio::fs::File;
 
 use crate::ipc::BLOCKSTORE;

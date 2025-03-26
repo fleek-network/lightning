@@ -6,7 +6,7 @@ use tokio::fs::{self};
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 
 use crate::bucket::{errors, POSITION_START_HASHES};
-use crate::collections::tree::AsyncHashTree;
+use crate::collections::async_hashtree::AsyncHashTree;
 use crate::collections::HashTree;
 use crate::hasher::b3::KEY_LEN;
 

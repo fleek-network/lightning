@@ -24,7 +24,7 @@ use super::phf::PHF_TABLE_RANDOMIZED_KEY_SIZE;
 use crate::bucket::dir::phf::{calculate_buckets_len, displace, hash, HasherState};
 use crate::bucket::dir::HeaderPositions;
 use crate::bucket::{errors, POSITION_START_HASHES};
-use crate::collections::tree::AsyncHashTree;
+use crate::collections::async_hashtree::AsyncHashTree;
 use crate::collections::HashTree;
 use crate::entry::{BorrowedEntry, BorrowedLink, OwnedLink};
 use crate::hasher::dir_hasher::B3_DIR_IS_SYM_LINK;
