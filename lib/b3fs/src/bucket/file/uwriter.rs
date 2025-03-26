@@ -78,7 +78,7 @@ mod tests {
     use crate::bucket::file::B3FSFile;
     use crate::bucket::tests::get_random_file;
     use crate::bucket::POSITION_START_NUM_ENTRIES;
-    use crate::collections::{tree, HashTree};
+    use crate::collections::{async_hashtree, HashTree};
     use crate::hasher::byte_hasher::Blake3Hasher;
     use crate::stream::walker::Mode;
     use crate::utils::{self, from_hex, tree_index};
