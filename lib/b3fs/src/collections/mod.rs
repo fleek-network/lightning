@@ -19,11 +19,11 @@
 //! [FlatHashSlice]: flat::FlatHashSlice
 //! [HashTree]: tree::HashTree
 
+#[cfg(feature = "async")]
+pub mod async_hashtree;
 pub mod error;
 pub mod flat;
 pub mod hashtree;
-#[cfg(feature = "async")]
-pub mod tree;
 
 mod printer;
 
