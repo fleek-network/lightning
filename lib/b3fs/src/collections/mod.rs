@@ -21,11 +21,11 @@
 
 pub mod error;
 pub mod flat;
-pub mod hash_tree;
+pub mod hashtree;
 #[cfg(feature = "async")]
 pub mod tree;
 
 mod printer;
 
 pub use flat::FlatHashSlice;
-pub use hash_tree::HashTree;
+pub use hashtree::HashTree;
