@@ -13,8 +13,6 @@ use lightning_interfaces::types::{
     Epoch,
     ExecutionData,
     ExecutionError,
-    Job,
-    JobInput,
     Metadata,
     NodeIndex,
     NodeInfo,
@@ -1174,7 +1172,7 @@ impl<B: Backend> StateExecutor<B> {
 
     fn reassign_jobs(&self) {
         // Get all current jobs.
-        let jobs: Vec<Job> = self
+        let jobs = self
             .jobs
             .as_map()
             .values()
@@ -1186,16 +1184,11 @@ impl<B: Backend> StateExecutor<B> {
             })
             .collect();
 
-        // Clear existing job assignments
+        // Clear the tables.
         self.jobs.clear();
         self.assigned_jobs.clear();
 
-        // TODO(samuel): Should reassignments during epoch change preserve the
-        // original job owners, or use a system address?
-        // Reassign each job with its original owner
-        for job in jobs {
-            let job_input = vec![JobInput { info: job.info }];
-            self.add_jobs(job.owner, job_input);
-        }
+        // Add these jobs as new jobs.
+        self.add_jobs(jobs);
     }
 }

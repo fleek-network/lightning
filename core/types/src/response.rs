@@ -173,5 +173,4 @@ pub enum ExecutionError {
     InvalidClientKeyLength,
     DuplicateClientKey,
     MissingClientKey,
-    JobAlreadyExists,
 }

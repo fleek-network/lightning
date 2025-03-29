@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use super::{
     Epoch,
     Event,
-    JobInput,
+    Job,
     JobStatus,
     ProofOfConsensus,
     ProofOfMisbehavior,
@@ -501,8 +501,11 @@ pub enum UpdateMethod {
     UpdateContentRegistry { updates: Vec<ContentUpdate> },
     /// Increment the node nonce.
     IncrementNonce {},
+    // Todo: In the future we should use a different type
+    // instead of `Job` that doesn't expose fields
+    // used for internal purposes, such as `assignee`.
     /// Add new jobs to the jobs table and assign them to nodes.
-    AddJobs { jobs: Vec<JobInput> },
+    AddJobs { jobs: Vec<Job> },
     /// Remove these jobs from the jobs table and unassigned them.
     RemoveJobs { jobs: Vec<[u8; 32]> },
     /// Updates about the jobs' most recent executions.
@@ -791,13 +794,14 @@ impl ToDigest for UpdatePayload {
             },
             UpdateMethod::AddJobs { jobs } => {
                 transcript_builder = transcript_builder.with("transaction_name", &"add_jobs");
-                for (idx, job) in jobs.iter().enumerate() {
+                for job in jobs.iter() {
                     transcript_builder = transcript_builder
-                        .with_prefix(idx.to_string())
+                        .with_prefix(job.hash.encode_hex())
                         .with("service", &job.info.service)
                         .with("frequency", &job.info.frequency)
                         .with("arguments", &job.info.arguments.as_ref())
-                        .with("amount", &HpUfixedWrapper(job.info.amount.clone()));
+                        .with("amount", &job.info.amount)
+                        .with("assignee", &job.assignee)
                 }
             },
             UpdateMethod::RemoveJobs { jobs } => {

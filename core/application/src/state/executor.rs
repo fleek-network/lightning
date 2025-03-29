@@ -29,8 +29,6 @@ use lightning_interfaces::types::{
     ExecutionData,
     ExecutionError,
     Job,
-    JobInfo,
-    JobInput,
     JobStatus,
     Metadata,
     MintInfo,
@@ -323,13 +321,7 @@ impl<B: Backend> StateExecutor<B> {
                 self.update_content_registry(txn.payload.sender, updates)
             },
             UpdateMethod::IncrementNonce {} => TransactionResponse::Success(ExecutionData::None),
-            UpdateMethod::AddJobs { jobs } => {
-                let sender = match self.only_account_owner(txn.payload.sender) {
-                    Ok(account) => account,
-                    Err(e) => return e,
-                };
-                self.add_jobs(sender, jobs)
-            },
+            UpdateMethod::AddJobs { jobs } => self.add_jobs(jobs),
             UpdateMethod::RemoveJobs { jobs } => self.remove_jobs(jobs),
             UpdateMethod::JobUpdates { updates } => self.update_jobs(updates),
         };
@@ -1289,43 +1281,18 @@ impl<B: Backend> StateExecutor<B> {
         TransactionResponse::Success(ExecutionData::None)
     }
 
-    fn add_jobs(&self, sender: EthAddress, jobs: Vec<JobInput>) -> TransactionResponse {
-        let mut total_amount = HpUfixed::<18>::zero();
-        for job_input in &jobs {
-            total_amount += job_input.info.amount.clone();
-        }
-
-        let mut account = self.account_info.get(&sender).unwrap_or_default();
-        if account.flk_balance < total_amount {
-            return TransactionResponse::Revert(ExecutionError::InsufficientBalance);
-        }
-        account.flk_balance -= total_amount;
-        self.account_info.set(sender, account);
-
-        let mut job_entries = Vec::new();
-        for job_input in jobs {
-            let hash = self.compute_job_hash(&sender, &job_input.info);
-            if self.jobs.get(&hash).is_some() {
-                return TransactionResponse::Revert(ExecutionError::JobAlreadyExists);
-            }
-            if !self.is_valid_service_id(job_input.info.service) {
-                return TransactionResponse::Revert(ExecutionError::InvalidServiceId);
-            }
-            let job = Job {
-                hash,
-                owner: sender,
-                info: job_input.info,
-                status: None,
-                assignee: None,
-            };
-            job_entries.push((hash, job));
-        }
-        // Rest of the function (assignment and storage) remains unchanged...
-        let job_hashes = job_entries.iter().map(|(hash, _)| *hash).collect();
+    fn add_jobs(&self, jobs: Vec<Job>) -> TransactionResponse {
+        let mut jobs = jobs
+            .into_iter()
+            .map(|job| (job.hash, job))
+            .collect::<HashMap<_, _>>();
+        let job_hashes = jobs.keys().copied().collect();
         let assigned_jobs = self.assign_jobs(job_hashes);
+
+        // Record the assignee in the job entry.
         for (index, node_jobs) in assigned_jobs.iter() {
             for job_hash in node_jobs {
-                if let Some((_, job)) = job_entries.iter_mut().find(|(h, _)| h == job_hash) {
+                if let Some(job) = jobs.get_mut(job_hash) {
                     job.assignee = Some(*index);
                 }
             }
@@ -1343,8 +1310,10 @@ impl<B: Backend> StateExecutor<B> {
                 },
             }
         }
-        for (hash, job) in job_entries {
-            self.jobs.set(hash, job);
+
+        // Save jobs.
+        for (job_hash, job) in jobs {
+            self.jobs.set(job_hash, job);
         }
 
         TransactionResponse::Success(ExecutionData::None)
@@ -2070,21 +2039,5 @@ impl<B: Backend> StateExecutor<B> {
         }
 
         assigned_jobs
-    }
-
-    /// Generates a unique hash based on sender and job details
-    fn compute_job_hash(&self, owner: &EthAddress, info: &JobInfo) -> [u8; 32] {
-        let mut hasher = Sha3_256::new();
-        hasher.update(owner.0);
-        hasher.update(&info.frequency.to_le_bytes());
-        hasher.update(&info.amount.get_value().to_le_bytes::<32>());
-        hasher.update(&info.service.to_le_bytes());
-        hasher.update(&info.arguments);
-        hasher.finalize().into()
-    }
-
-    /// Validates service IDs early
-    fn is_valid_service_id(&self, service_id: ServiceId) -> bool {
-        self.services.get(&service_id).is_some()
     }
 }
