@@ -616,6 +616,8 @@ impl TryFrom<String> for Tokens {
 pub struct Job {
     /// The hash of the job.
     pub hash: [u8; 32],
+    /// Track the submitter
+    pub owner: EthAddress,
     /// Information about the job for execution purposes.
     pub info: JobInfo,
     /// The status of the most recent execution of a job.
@@ -625,11 +627,16 @@ pub struct Job {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Deserialize, Serialize, JsonSchema)]
+pub struct JobInput {
+    pub info: JobInfo,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Deserialize, Serialize, JsonSchema)]
 pub struct JobInfo {
     /// The frequency in which this job should be performed.
     pub frequency: u32,
     /// Amount prepaid.
-    pub amount: u32,
+    pub amount: HpUfixed<18>,
     /// The service that will execute the function.
     pub service: ServiceId,
     /// The arguments for the job.
