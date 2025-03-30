@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
 use std::collections::HashMap;
 
+use ethers::abi::AbiEncode;
 use fleek_crypto::TransactionSender;
 use fxhash::FxHashMap;
 use hp_fixed::unsigned::HpUfixed;
@@ -1190,12 +1191,24 @@ impl<B: Backend> StateExecutor<B> {
         self.jobs.clear();
         self.assigned_jobs.clear();
 
-        // TODO(samuel): Should reassignments during epoch change preserve the
-        // original job owners, or use a system address?
         // Reassign each job with its original owner
         for job in jobs {
             let job_input = vec![JobInput { info: job.info }];
-            self.add_jobs(job.owner, job_input);
+            match self.add_jobs(job.owner, job_input) {
+                TransactionResponse::Success(_) => {
+                    if let Some(mut job_entry) = self.jobs.get(&job.hash) {
+                        job_entry.prepaid_balance = job.prepaid_balance;
+                        self.jobs.set(job.hash, job_entry);
+                    }
+                },
+                TransactionResponse::Revert(err) => {
+                    tracing::warn!(
+                        "Failed to reassign job {}: {:?}",
+                        job.hash.encode_hex(),
+                        err
+                    );
+                },
+            }
         }
     }
 }

@@ -4,7 +4,7 @@ use std::net::IpAddr;
 use std::ops::DerefMut;
 use std::time::Duration;
 
-use ethers::abi::AbiDecode;
+use ethers::abi::{AbiDecode, AbiEncode};
 use ethers::core::k256::elliptic_curve::rand_core::SeedableRng;
 use ethers::types::{Transaction as EthersTransaction, H160};
 use fleek_crypto::{
@@ -1314,13 +1314,14 @@ impl<B: Backend> StateExecutor<B> {
             let job = Job {
                 hash,
                 owner: sender,
-                info: job_input.info,
+                info: job_input.info.clone(),
                 status: None,
                 assignee: None,
+                prepaid_balance: job_input.info.amount.clone(), // Now valid
             };
             job_entries.push((hash, job));
         }
-        // Rest of the function (assignment and storage) remains unchanged...
+
         let job_hashes = job_entries.iter().map(|(hash, _)| *hash).collect();
         let assigned_jobs = self.assign_jobs(job_hashes);
         for (index, node_jobs) in assigned_jobs.iter() {
@@ -1376,6 +1377,20 @@ impl<B: Backend> StateExecutor<B> {
     fn update_jobs(&self, updates: BTreeMap<[u8; 32], JobStatus>) -> TransactionResponse {
         for (job_hash, status) in updates {
             if let Some(mut job) = self.jobs.get(&job_hash) {
+                if status.success && job.prepaid_balance >= job.info.amount {
+                    let node_index = job.assignee.unwrap();
+                    let node_owner = self.node_info.get(&node_index).unwrap().owner;
+                    let mut node_account = self.account_info.get(&node_owner).unwrap_or_default();
+                    node_account.flk_balance += job.info.amount.clone();
+                    job.prepaid_balance -= job.info.amount.clone();
+                    self.account_info.set(node_owner, node_account);
+                } else if status.success {
+                    tracing::warn!(
+                        "Job {} succeeded but insufficient prepaid balance: {}",
+                        job_hash.encode_hex(),
+                        job.prepaid_balance
+                    );
+                }
                 job.status = Some(status);
                 self.jobs.set(job_hash, job);
             }
@@ -2078,9 +2093,9 @@ impl<B: Backend> StateExecutor<B> {
     fn compute_job_hash(&self, owner: &EthAddress, info: &JobInfo) -> [u8; 32] {
         let mut hasher = Sha3_256::new();
         hasher.update(owner.0);
-        hasher.update(&info.frequency.to_le_bytes());
-        hasher.update(&info.amount.get_value().to_le_bytes::<32>());
-        hasher.update(&info.service.to_le_bytes());
+        hasher.update(info.frequency.to_le_bytes());
+        hasher.update(info.amount.get_value().to_le_bytes::<32>());
+        hasher.update(info.service.to_le_bytes());
         hasher.update(&info.arguments);
         hasher.finalize().into()
     }
