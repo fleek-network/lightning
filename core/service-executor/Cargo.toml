@@ -32,6 +32,7 @@ bincode = "1.3.3"
 fleek-service-fetcher = { path = "../../services/fetcher", optional = true }
 fleek-service-js-poc = { path = "../../services/js-poc", optional = true }
 fleek-service-ai = { path = "../../services/ai", optional = true }
+fleek-service-pod = { path = "../../services/pod", optional = true }
 
 lightning-workspace-hack.workspace = true
 
@@ -41,6 +42,7 @@ services = [
     "dep:fleek-service-fetcher",
     "dep:fleek-service-js-poc",
     "dep:fleek-service-ai",
+    "dep:fleek-service-pod",
 ]
 
 [dev-dependencies]

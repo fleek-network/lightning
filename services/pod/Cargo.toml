@@ -1,0 +1,50 @@
+[package]
+name = "fleek-service-pod"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# project libs
+fn-sdk = { git = "https://github.com/fleek-network/lightning", rev = "0.1.0-alpha.5" }
+dcap-quoteprov = { path = "../../lib/dcap-quoteprov" }
+# TODO(matthias): create a git tag
+#b3fs = { path = "../../lib/b3fs", features = ["async"] }
+b3fs = { git = "https://github.com/fleek-network/lightning", branch = "main", features = ["async"] }
+rand = "0.9.0"
+
+# async
+tokio = { version = "1.39", features = ["full"] }
+futures = "0.3"
+
+# io
+bytes = { version = "1.7", features = ["serde"]}
+arrayref = "0.3"
+
+# encodings
+hex = "0.4"
+blake3-tree = "0.1.0"
+
+# deps for vendored sdk code
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_cbor = "0.11.2"
+serde-big-array = "0.5"
+url = { version = "2.5", features = ["serde"] }
+arrayvec = "0.7"
+
+# deps for running sgx enclaves
+aesm-client = { version = "0.6.0", features = ["sgxs"] }
+enclave-runner = { version = "0.6.0" }
+sgxs-loaders = { version = "0.4.0" }
+sgx-isa = { version = "0.4.1", features = ["serde"]}
+
+whoami = "1.5.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[build-dependencies]
+ureq = "2.10"
+
+[[bin]]
+name = "fn-service-4"
+path = "src/bin.rs"

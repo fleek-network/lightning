@@ -443,6 +443,7 @@ impl<P: ExecutorProviderInterface> Proxy<P> {
         State::Terminated
     }
 
+    // user request is handled
     async fn handle_incoming(
         &mut self,
         is_primary: IsPrimary,
