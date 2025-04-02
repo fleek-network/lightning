@@ -195,7 +195,10 @@ pub fn main() {
         });
     });
 
-    let blockstore_path = PathBuf::from("/tmp/blockstoe_pod_test");
+    let blockstore_path =
+        std::env::var("BLOCKSTORE_PATH").expect("blockstore path env var not set");
+
+    let blockstore_path = PathBuf::from(blockstore_path);
     let blockstore_path_clone = blockstore_path.clone();
     std::thread::spawn(move || {
         let rt = tokio::runtime::Builder::new_current_thread()
