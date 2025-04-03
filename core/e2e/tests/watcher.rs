@@ -5,6 +5,7 @@ use axum::{Extension, Router};
 use fleek_crypto::NodePublicKey;
 use fn_sdk::header::{read_header, TransportDetail};
 use futures::SinkExt;
+use hp_fixed::unsigned::HpUfixed;
 use lightning_application::app::Application;
 use lightning_archive::archive::Archive;
 use lightning_blockstore::blockstore::Blockstore;
@@ -15,7 +16,7 @@ use lightning_committee_beacon::CommitteeBeaconComponent;
 use lightning_e2e::swarm::Swarm;
 use lightning_forwarder::Forwarder;
 use lightning_interfaces::fdi::BuildGraph;
-use lightning_interfaces::types::{Job, JobInfo, UpdateMethod};
+use lightning_interfaces::types::{JobInfo, JobInput, UpdateMethod};
 use lightning_interfaces::{
     fdi,
     partial_node_components,
@@ -192,38 +193,29 @@ async fn test_watcher() {
     let node = pubkeys[2];
 
     // Given: Some jobs.
-    let job1 = Job {
-        hash: [0; 32],
+    let job1 = JobInput {
         info: JobInfo {
             frequency: 1,
-            amount: 0,
+            amount: HpUfixed::<18>::from(0_u32),
             service: 0,
             arguments: vec![0; 4].into_boxed_slice(),
         },
-        status: None,
-        assignee: None,
     };
-    let job2 = Job {
-        hash: [1; 32],
+    let job2 = JobInput {
         info: JobInfo {
             frequency: 1,
-            amount: 0,
+            amount: HpUfixed::<18>::from(0_u32),
             service: 0,
             arguments: vec![1; 4].into_boxed_slice(),
         },
-        status: None,
-        assignee: None,
     };
-    let job3 = Job {
-        hash: [2; 32],
+    let job3 = JobInput {
         info: JobInfo {
             frequency: 1,
-            amount: 0,
+            amount: HpUfixed::<18>::from(0_u32),
             service: 0,
             arguments: vec![2; 4].into_boxed_slice(),
         },
-        status: None,
-        assignee: None,
     };
 
     // When: we submit these jobs for execution.
