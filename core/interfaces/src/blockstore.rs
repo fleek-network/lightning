@@ -121,6 +121,8 @@ pub trait DirTrustedWriter: Send + Sync + 'static {
         last_entry: bool,
     ) -> Result<(), InsertError>;
 
+    fn ready_to_commit(&self) -> bool;
+
     /// Finalize the write, try to write the directory header to the file system.
     async fn commit(self) -> Result<Blake3Hash, CommitError>;
 

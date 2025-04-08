@@ -1,5 +1,6 @@
 #![allow(unused)]
 
+use std::collections::BTreeMap;
 use std::fmt::Write;
 use std::future::Future;
 use std::io;
@@ -144,6 +145,7 @@ impl<C: NodeComponents> BlockstoreInterface<C> for Blockstore<C> {
         let dw = DirWriter::new(&self.get_bucket(), num_entries).await?;
         Ok(DWriter {
             writer: dw,
+            entries: BTreeMap::new(),
             indexer: self.indexer.clone(),
         })
     }
@@ -231,6 +233,10 @@ impl<C: NodeComponents> DirTrustedWriter for DUWriter<C> {
         self.writer.insert(entry, last_entry).await
     }
 
+    fn ready_to_commit(&self) -> bool {
+        self.writer.ready_to_commit()
+    }
+
     async fn commit(self) -> Result<Blake3Hash, CommitError> {
         let hash = self.writer.commit().await?;
         let indexer = self.indexer.get().ok_or_else(|| CommitError::LockError)?;
@@ -244,6 +250,7 @@ impl<C: NodeComponents> DirTrustedWriter for DUWriter<C> {
 }
 pub struct DWriter<C: NodeComponents> {
     writer: DirWriter,
+    entries: BTreeMap<Vec<u8>, b3fs::entry::OwnedEntry>,
     indexer: Arc<OnceLock<C::IndexerInterface>>,
 }
 
@@ -253,10 +260,18 @@ impl<C: NodeComponents> DirTrustedWriter for DWriter<C> {
         entry: b3fs::entry::BorrowedEntry<'_>,
         _last_entry: bool,
     ) -> Result<(), b3fs::bucket::errors::InsertError> {
-        self.writer.insert(entry).await
+        self.entries.insert(entry.name.to_vec(), entry.into());
+        Ok(())
     }
 
-    async fn commit(self) -> Result<Blake3Hash, CommitError> {
+    fn ready_to_commit(&self) -> bool {
+        self.writer.num_entries() == self.entries.len()
+    }
+
+    async fn commit(mut self) -> Result<Blake3Hash, CommitError> {
+        for (_, entry) in self.entries {
+            self.writer.insert(&entry).await?;
+        }
         let hash = self.writer.commit().await?;
         let indexer = self.indexer.get().ok_or_else(|| CommitError::LockError)?;
         IndexerInterface::register(indexer, hash).await;
