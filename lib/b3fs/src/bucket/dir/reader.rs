@@ -105,7 +105,6 @@ impl B3Dir {
         if bloom_filter.contains(name) {
             let phf_table = self.get_phf_table().await?;
             let entry_offset = self.get_entry_offset(name, phf_table).await?;
-            dbg!(String::from_utf8_lossy(name), entry_offset);
             return self.read_entry_at_offset(name, entry_offset).await;
         }
         Ok(None)
@@ -192,16 +191,11 @@ impl B3Dir {
         name: &[u8],
         phf_table: &HasherState,
     ) -> Result<u32, errors::ReadError> {
-        dbg!(self.positions.position_start_phf_table, self.num_entries);
         let hashes = hash(name, phf_table.key);
-        dbg!(hashes.f1, hashes.f2, hashes.g);
         let buckets_len = calculate_buckets_len(self.num_entries as usize);
-        dbg!(buckets_len);
         let bucket = (hashes.g as usize) % buckets_len;
-        dbg!(bucket);
 
         let bucket_offset = self.positions.phf_table_start_disps() + bucket * 4;
-        dbg!(bucket_offset);
         let mut file = self.position_file(bucket_offset as u64).await?;
         let mut bucket_keys = [0u8; 4];
         file.read_exact(&mut bucket_keys).await?;
@@ -211,15 +205,12 @@ impl B3Dir {
 
         let displace = displace(hashes.f1, hashes.f2, d1 as u32, d2 as u32) as usize;
         let idx = displace % self.num_entries as usize;
-        dbg!(displace, idx);
 
         let map_offset = self.positions.phf_table_start_disps() + buckets_len * 4 + idx * 4;
-        dbg!(map_offset);
         let mut file = self.position_file(map_offset as u64).await?;
         let entry_rel_offset = file.read_u32_le().await?;
 
         let entry_offset = self.positions.position_start_entries as u32 + entry_rel_offset;
-        dbg!(entry_rel_offset, entry_offset);
         Ok(entry_offset)
     }
 
@@ -452,7 +443,7 @@ mod tests {
         let reader = B3Dir::new(
             3,
             tokio::fs::File::open(
-                "tests/fixtures/4bc76dc8621d67c905b214f47cfc68924d7994afd2c181f47a449edbc359b514",
+                "tests/fixtures/2713272e28976929bc669d2c89f2a8b2d502385753ab954400c2e2ecf3206dd3",
             )
             .await
             .unwrap(),
