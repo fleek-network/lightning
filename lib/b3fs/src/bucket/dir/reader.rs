@@ -213,7 +213,7 @@ impl B3Dir {
         let idx = displace % self.num_entries as usize;
         dbg!(displace, idx);
 
-        let map_offset = bucket_offset + buckets_len * 4 + idx * 4;
+        let map_offset = self.positions.phf_table_start_disps() + buckets_len * 4 + idx * 4;
         dbg!(map_offset);
         let mut file = self.position_file(map_offset as u64).await?;
         let entry_rel_offset = file.read_u32_le().await?;
