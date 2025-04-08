@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -21,6 +22,9 @@ use tracing::info;
 
 use crate::config::Gateway;
 use crate::Config;
+
+/// { docid: (writer, parent) }
+type DirStack<C> = HashMap<DocId, (c!(C::BlockstoreInterface::DirWriter), Option<DocId>)>;
 
 pub struct IPFSOrigin<C: NodeComponents> {
     client: Arc<Client<HttpsConnector<HttpConnector>, Body>>,
@@ -128,42 +132,89 @@ impl<C: NodeComponents> IPFSOrigin<C> {
             .build();
 
         stream.start(requested_cid).await;
-        let mut hash: [u8; 32] = [0; 32];
+
+        let mut dir_stack = DirStack::<C>::new();
+        let mut hash = [0; 32];
+        let mut dirs_to_commit = Vec::new();
 
         loop {
             let item = stream.next().await?;
-            let mut last_dir: Option<
-                <C::BlockstoreInterface as BlockstoreInterface<C>>::DirWriter,
-            > = None;
+
             match item {
-                Some(IpldItem::ChunkedFile(chunk)) => {
+                Some((IpldItem::ChunkedFile(chunk), parent)) => {
+                    println!("got chunk file");
                     let doc_id = chunk.id().clone();
                     let mut stream_file = stream.new_chunk_file_streamer(chunk).await;
                     let mut file_writer = self.blockstore.file_writer().await?;
                     while let Some(chunk) = stream_file.next_chunk().await? {
                         file_writer.write(chunk.data(), false).await?;
                     }
-                    self.insert_file_into_dir(&mut last_dir, &mut hash, file_writer, &doc_id)
-                        .await?;
+                    self.insert_file_into_dir(
+                        &mut dir_stack,
+                        parent,
+                        file_writer,
+                        &doc_id,
+                        &mut dirs_to_commit,
+                    )
+                    .await?;
                 },
-                Some(IpldItem::File(file)) => {
+                Some((IpldItem::File(file), parent)) => {
+                    println!("got file");
                     let doc_id = file.id().clone();
                     let mut file_writer = self.blockstore.file_writer().await?;
                     file_writer.write(file.data(), false).await?;
-                    self.insert_file_into_dir(&mut last_dir, &mut hash, file_writer, &doc_id)
+                    let hash = self
+                        .insert_file_into_dir(
+                            &mut dir_stack,
+                            parent,
+                            file_writer,
+                            &doc_id,
+                            &mut dirs_to_commit,
+                        )
                         .await?;
+                    println!("finished file {hash:?}");
                 },
-                Some(IpldItem::Dir(dir)) => {
-                    if last_dir.is_some() {
-                        hash = last_dir.take().unwrap().commit().await?;
-                    }
+                Some((IpldItem::Dir(dir), parent)) => {
+                    // create a writer and insert it into the stack
                     let dir_writer = self.blockstore.dir_writer(dir.links().len()).await?;
-                    last_dir.replace(dir_writer);
+                    dir_stack.insert(dir.id().clone(), (dir_writer, parent));
                 },
-                Some(IpldItem::Chunk(_)) => {
+                Some((IpldItem::Chunk(_), _)) => {
                     return Err(anyhow!("Chunked data is not supported"));
                 },
-                None => break,
+                None => {
+                    if !dir_stack.is_empty() {
+                        return Err(anyhow!("incomplete stream"));
+                    }
+
+                    println!("stream ended");
+                    break;
+                },
+            }
+
+            // finalize any complete dirs
+            for id in std::mem::take(&mut dirs_to_commit) {
+                let (writer, parent) = dir_stack.remove(&id).unwrap();
+                let dir_hash = writer.commit().await?;
+
+                // if we have a parent, insert it
+                if let Some(parent) = parent {
+                    if let Some((parent_writer, _)) = dir_stack.get_mut(&parent) {
+                        let file_name = id.file_name().unwrap_or_default();
+                        let entry = b3fs::entry::BorrowedEntry {
+                            name: file_name.as_bytes(),
+                            link: BorrowedLink::Content(&dir_hash),
+                        };
+                        parent_writer.insert(entry, false).await?;
+                        if parent_writer.ready_to_commit() {
+                            // will be resolved in the next pass
+                            dirs_to_commit.push(parent);
+                        }
+                    }
+                } else {
+                    // the item is the root, store the hash
+                    hash = dir_hash;
+                }
             }
         }
 
@@ -171,26 +222,37 @@ impl<C: NodeComponents> IPFSOrigin<C> {
             return Err(anyhow!("Cannot calculate hash"));
         }
 
+        println!("downloaded {hash:?}");
+
         Ok(hash)
     }
 
     async fn insert_file_into_dir(
         &self,
-        last_dir: &mut Option<<C::BlockstoreInterface as BlockstoreInterface<C>>::DirWriter>,
-        hash: &mut [u8; 32],
-        file_writer: <C::BlockstoreInterface as BlockstoreInterface<C>>::FileWriter,
+        dir_stack: &mut DirStack<C>,
+        parent: Option<DocId>,
+        file_writer: c!(C::BlockstoreInterface::FileWriter),
         doc_id: &DocId,
-    ) -> Result<()> {
+        to_commit: &mut Vec<DocId>,
+    ) -> Result<[u8; 32]> {
+        println!("inserting file");
         let file_name = doc_id.file_name().unwrap_or_default();
         let temp_hash = file_writer.commit().await?;
-        if let Some(dir) = last_dir.as_mut() {
-            let entry = BorrowedEntry {
-                name: file_name.as_bytes(),
-                link: BorrowedLink::Content(&temp_hash),
-            };
-            dir.insert(entry, true).await?;
+        if let Some(parent) = parent {
+            if let Some((dir, _)) = dir_stack.get_mut(&parent) {
+                let entry = BorrowedEntry {
+                    name: file_name.as_bytes(),
+                    link: BorrowedLink::Content(&temp_hash),
+                };
+                dir.insert(entry, false).await?;
+                println!("inserted to dir");
+
+                if dir.ready_to_commit() {
+                    to_commit.push(parent);
+                    println!("dir ready to commit")
+                }
+            }
         }
-        *hash = temp_hash;
-        Ok(())
+        Ok(temp_hash)
     }
 }
