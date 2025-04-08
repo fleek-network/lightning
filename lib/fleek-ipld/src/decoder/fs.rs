@@ -51,7 +51,7 @@ impl Link {
 
 /// A unique identifier for an IPLD node, which contains a `Link` and a `PathBuf` with the path to
 /// this document. If `PathBuf` is empty, then this is the root document.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct DocId {
     cid: Cid,
     path: PathBuf,

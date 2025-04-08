@@ -18,9 +18,9 @@ use crate::walker::downloader::Downloader;
 struct StreamState {
     initial_cid: bool,
     current_cid: Option<Cid>,
-    dir_entries: Vec<(DocId, Link)>,
-    cache_items: Vec<IpldItem>,
-    last_item: Option<IpldItem>,
+    dir_entries: Vec<(DocId, Link, Option<DocId>)>,
+    cache_items: Vec<(IpldItem, Option<DocId>)>,
+    last_item: Option<(IpldItem, Option<DocId>)>,
 }
 
 impl StreamState {
@@ -29,16 +29,19 @@ impl StreamState {
         self.initial_cid = true;
     }
 
-    fn add_dir_entry(&mut self, dir_item: DocId, links: Vec<Link>) {
-        self.dir_entries
-            .extend(links.iter().map(|x| (dir_item.clone(), x.clone())));
+    fn add_dir_entry(&mut self, dir_item: DocId, parent: Option<DocId>, links: Vec<Link>) {
+        self.dir_entries.extend(
+            links
+                .iter()
+                .map(|x| (dir_item.clone(), x.clone(), parent.clone())),
+        );
     }
 
-    fn get_list_entries(&self) -> &Vec<(DocId, Link)> {
+    fn get_list_entries(&self) -> &Vec<(DocId, Link, Option<DocId>)> {
         &self.dir_entries
     }
 
-    fn get_next_dir_entry(&mut self) -> Option<IpldItem> {
+    fn get_next_dir_entry(&mut self) -> Option<(IpldItem, Option<DocId>)> {
         self.cache_items.pop()
     }
 }
@@ -71,7 +74,7 @@ where
     /// return `Ok(None)`.
     ///
     /// **Note**: You must call `start` before calling this function.
-    pub async fn next(&mut self) -> Result<Option<IpldItem>, IpldError> {
+    pub async fn next(&mut self) -> Result<Option<(IpldItem, Option<DocId>)>, IpldError> {
         // Not allow calling next if start has not been called
         assert!(
             self.state.initial_cid,
@@ -81,16 +84,20 @@ where
         // If there was an item in the previous iteration, explore it if it is a directory
         // in order to store the links for the next iteration
         if let Some(item) = &self.state.last_item {
-            if item.is_dir() {
-                let dir = item.try_into_dir()?;
+            if item.0.is_dir() {
+                let dir = item.0.try_into_dir()?;
                 self.explore_dir(dir).await?;
             }
             self.state.last_item = None;
         }
 
-        // If there is a current_cid which means first iteration, download it and return the item
+        // If there is a current_cid which means first iteration, download it and return the item.
+        // Parent is always none for the root item.
         if let Some(cid) = self.state.current_cid {
-            let item = self.download_item(cid, Metadata::default()).await.map(Some);
+            let item = self
+                .download_item(cid, Metadata::default(), None)
+                .await
+                .map(Some);
             self.state.current_cid = None;
             if let Ok(item) = &item {
                 self.state.last_item = item.clone();
@@ -110,7 +117,7 @@ where
     }
 
     /// Get the next `n` items from the stream, instead of just one.
-    pub async fn next_n(&mut self, n: usize) -> Result<Vec<IpldItem>, IpldError> {
+    pub async fn next_n(&mut self, n: usize) -> Result<Vec<(IpldItem, Option<DocId>)>, IpldError> {
         let mut items = Vec::with_capacity(n);
         for _ in 0..n {
             if let Some(item) = self.next().await? {
@@ -123,11 +130,13 @@ where
     }
 
     async fn explore_dir(&mut self, item: DirItem) -> Result<(), IpldError> {
+        let parent_id = item.id().clone();
         let links = item.links();
         if links.is_empty() {
             return Ok(());
         }
-        self.state.add_dir_entry(item.id().clone(), links.clone());
+        self.state
+            .add_dir_entry(item.id().clone(), Some(parent_id), links.clone());
         Ok(())
     }
 
@@ -139,11 +148,13 @@ where
             .drain(..num_items)
             .collect::<Vec<_>>();
         let mut set = JoinSet::new();
-        for (id, link) in iter {
+        for (id, link, parent) in iter {
             let self_clone = self.clone();
             set.spawn(async move {
                 let metadata = Metadata::new(0, 0, &link, id.path().clone());
-                self_clone.download_item(*link.cid(), metadata).await
+                self_clone
+                    .download_item(*link.cid(), metadata, parent)
+                    .await
             });
         }
         let mut vec = Vec::with_capacity(num_items);
@@ -163,12 +174,17 @@ where
         StreamChunkedFile::new(self.downloader.clone(), self.reader.clone(), item)
     }
 
-    async fn download_item(&self, cid: Cid, metadata: Metadata) -> Result<IpldItem, IpldError> {
+    async fn download_item(
+        &self,
+        cid: Cid,
+        metadata: Metadata,
+        parent: Option<DocId>,
+    ) -> Result<(IpldItem, Option<DocId>), IpldError> {
         let response = self.downloader.download(&cid).await?;
         let mut reader = self.reader.clone();
         let mut result = reader.read(cid, response.fuse()).await?;
         result.merge_path(metadata.parent_path(), metadata.name());
-        Ok(result)
+        Ok((result, parent))
     }
 }
 

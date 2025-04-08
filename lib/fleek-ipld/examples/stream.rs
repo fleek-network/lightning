@@ -23,19 +23,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     loop {
         let item = stream.next().await?;
         match item {
-            Some(IpldItem::ChunkedFile(chunk)) => {
+            Some((IpldItem::ChunkedFile(chunk), _)) => {
                 let mut stream_file = stream.new_chunk_file_streamer(chunk).await;
                 while let Some(chunk) = stream_file.next_chunk().await? {
                     println!("Chunk: {:?} \n\n", chunk);
                 }
             },
-            Some(IpldItem::File(file)) => {
+            Some((IpldItem::File(file), _)) => {
                 println!("File: {:?} \n\n", file);
             },
-            Some(IpldItem::Dir(dir)) => {
+            Some((IpldItem::Dir(dir), _)) => {
                 println!("Directory: {:?} \n\n", dir);
             },
-            Some(IpldItem::Chunk(_)) => {
+            Some((IpldItem::Chunk(_), _)) => {
                 panic!("Chunked file should be handled by ChunkedFile");
             },
             None => break,
