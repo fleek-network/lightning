@@ -235,6 +235,7 @@ impl B3Dir {
         let mut entry_name = Vec::new();
         let entry_to_check = file.read_until(0x00, &mut entry_name).await;
         check_eof!(entry_to_check);
+        println!("slice: {entry_name:?} {name:?}");
         if &entry_name[..name.len()] != name {
             return Ok(None);
         }

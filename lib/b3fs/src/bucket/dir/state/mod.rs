@@ -206,6 +206,8 @@ impl HeaderFile {
 /// Represents the internal state of a directory.
 pub(super) struct InnerDirState<T> {
     bucket: Bucket,
+    num_entries: usize,
+    insertions: usize,
     phf_generator: PhfGenerator,
     next_position: u32,
     temp_file_path: PathBuf,
@@ -236,6 +238,9 @@ pub trait DirState {
         last_entry: bool,
     ) -> Result<(), errors::InsertError>;
 
+    /// Returns true if directory is ready to commit
+    fn ready_to_commit(&self) -> bool;
+
     /// Commits the changes made to the directory.
     async fn commit(self) -> Result<[u8; 32], errors::CommitError>;
 
@@ -249,13 +254,23 @@ impl<T: WithCollector> DirState for InnerDirState<T> {
         borrowed_entry: BorrowedEntry<'_>,
         last_entry: bool,
     ) -> Result<(), errors::InsertError> {
+        self.insertions += 1;
+        if self.num_entries < self.insertions {
+            return Err(errors::InsertError::TooManyEntries);
+        };
+
         let i = self.next_position;
         self.phf_generator.push(borrowed_entry.name, i);
         let len_inserted = self.header_file.insert_entry(borrowed_entry).await?;
         self.next_position += len_inserted as u32;
         self.bloom_filter.add(borrowed_entry.name);
         self.collector.on_insert(borrowed_entry, last_entry).await?;
+
         Ok(())
+    }
+
+    fn ready_to_commit(&self) -> bool {
+        self.num_entries == self.insertions
     }
 
     async fn commit(mut self) -> Result<[u8; 32], errors::CommitError> {
@@ -298,6 +313,8 @@ impl<T: WithCollector + Default> InnerDirState<T> {
             HeaderFile::from_wal_path(&temp_file_path, num_entries, bloom_filter.hashes()).await?;
         Ok(Self {
             bucket: bucket.clone(),
+            num_entries,
+            insertions: 0,
             phf_generator,
             next_position: 0,
             temp_file_path,
@@ -319,5 +336,9 @@ impl<T: WithCollector + Default> InnerDirState<T> {
     /// Returns a Result containing the new InnerDirState or an IO error.
     pub(crate) async fn new(bucket: &Bucket, num_entries: usize) -> Result<Self, io::Error> {
         Self::new_with_collector(bucket, num_entries, T::default()).await
+    }
+
+    pub fn num_entries(&self) -> usize {
+        self.num_entries
     }
 }

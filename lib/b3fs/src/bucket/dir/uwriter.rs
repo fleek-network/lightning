@@ -74,6 +74,10 @@ impl UntrustedDirWriter {
         self.state.insert_entry(entry.into(), last_entry).await
     }
 
+    pub fn ready_to_commit(&self) -> bool {
+        self.state.ready_to_commit()
+    }
+
     /// Finalizes this write and flushes the data to disk.
     ///
     /// # Returns

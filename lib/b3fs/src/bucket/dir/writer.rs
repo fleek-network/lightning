@@ -59,6 +59,15 @@ impl DirWriter {
         self.state.insert_entry(entry.into(), false).await
     }
 
+    /// Returns true if the writer is ready to commit.
+    pub fn ready_to_commit(&self) -> bool {
+        self.state.ready_to_commit()
+    }
+
+    pub fn num_entries(&self) -> usize {
+        self.state.num_entries()
+    }
+
     /// Finalizes this write and flushes the data to disk.
     ///
     /// # Returns

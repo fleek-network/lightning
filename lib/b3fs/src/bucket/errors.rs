@@ -69,6 +69,8 @@ pub enum InsertError {
     IncrementalVerification(String),
     #[error("Error trying to insert entry in phf generator. {0}")]
     InvalidEntry(#[from] hasher::dir_hasher::Error),
+    #[error("Too many entries have been added to the writer")]
+    TooManyEntries,
 }
 
 #[derive(Error, Debug)]
