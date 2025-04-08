@@ -74,11 +74,11 @@ impl<C: NodeComponents> OriginFetcher<C> {
                         }
                         Ok(Err(e)) => {
                             match e {
-                                ErrorResponse::OriginFetchError(uri) => {
+                                ErrorResponse::OriginFetchError(uri, e) => {
                                     if let Some(tx) = pending_requests.remove(&uri) {
                                         tx.send(Err(OriginError)).expect("Failed to send response");
                                     }
-                                    error!("Failed to fetch data from origin");
+                                    error!("Failed to fetch data from origin: {e}");
                                 },
                             }
                         },
@@ -102,7 +102,7 @@ impl<C: NodeComponents> OriginFetcher<C> {
         self.tasks.spawn(async move {
             match router.route(&pointer).await {
                 Ok(hash) => Ok(SuccessResponse { pointer, hash }),
-                Err(_) => Err(ErrorResponse::OriginFetchError(pointer.uri)),
+                Err(e) => Err(ErrorResponse::OriginFetchError(pointer.uri, e)),
             }
         });
     }
@@ -121,7 +121,7 @@ struct SuccessResponse {
 #[derive(Debug, thiserror::Error)]
 enum ErrorResponse {
     #[error("Failed to fetch data from origin: {0:?}")]
-    OriginFetchError(Uri),
+    OriginFetchError(Uri, anyhow::Error),
 }
 
 #[derive(Debug, Clone, thiserror::Error)]
