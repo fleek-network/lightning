@@ -235,7 +235,11 @@ impl B3Dir {
         let mut entry_name = Vec::new();
         let entry_to_check = file.read_until(0x00, &mut entry_name).await;
         check_eof!(entry_to_check);
-        println!("slice: {entry_name:?} {name:?}");
+        println!(
+            "slice: {:?} {:?}",
+            String::from_utf8(entry_name.clone()).unwrap(),
+            String::from_utf8(name.to_vec()).unwrap()
+        );
         if &entry_name[..name.len()] != name {
             return Ok(None);
         }
@@ -327,6 +331,36 @@ mod tests {
 
         let entry = dir.get_entry(b"file2").await.unwrap().unwrap();
         assert_eq!(entry.name, b"file2");
+        assert!(matches!(entry.link, BorrowedLink::Content(_)));
+
+        // Test non-existent entry
+        let entry = dir.get_entry(b"nonexistent").await.unwrap();
+        assert!(entry.is_none());
+        tokio::fs::remove_dir_all(temp_dir).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_get_entry_with_file_names() {
+        let temp_dir = temp_dir().join("b3fs-test-get-entry-with-file-names");
+        let entries = vec![
+            OwnedEntry {
+                name: "b.js".as_bytes().into(),
+                link: OwnedLink::Content([1; 32]),
+            },
+            OwnedEntry {
+                name: "fleek.config.json".as_bytes().into(),
+                link: OwnedLink::Content([2; 32]),
+            },
+            OwnedEntry {
+                name: "index.js".as_bytes().into(),
+                link: OwnedLink::Content([3; 32]),
+            },
+        ];
+        let mut dir = create_test_dir(&temp_dir, entries).await.unwrap();
+
+        // Test existing file
+        let entry = dir.get_entry(b"fleek.config.json").await.unwrap().unwrap();
+        assert_eq!(entry.name, b"fleek.config.json");
         assert!(matches!(entry.link, BorrowedLink::Content(_)));
 
         // Test non-existent entry
