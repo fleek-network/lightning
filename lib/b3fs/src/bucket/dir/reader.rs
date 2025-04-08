@@ -105,6 +105,7 @@ impl B3Dir {
         if bloom_filter.contains(name) {
             let phf_table = self.get_phf_table().await?;
             let entry_offset = self.get_entry_offset(name, phf_table).await?;
+            dbg!(String::from_utf8_lossy(name), entry_offset);
             return self.read_entry_at_offset(name, entry_offset).await;
         }
         Ok(None)
@@ -171,12 +172,12 @@ impl B3Dir {
                     .position_file(self.positions.position_start_phf_table as u64)
                     .await?;
                 let key = file.read_u64_le().await?;
-                let mut disps = vec![(0u16, 0u16); self.positions.phf_disps_len];
+                let mut disps = vec![(0u16, 0u16); self.num_entries as usize];
                 for disp in &mut disps {
                     disp.0 = file.read_u16_le().await?;
                     disp.1 = file.read_u16_le().await?;
                 }
-                let mut map = vec![0u32; self.positions.phf_entries_len];
+                let mut map = vec![0u32; self.num_entries as usize];
                 for offset in &mut map {
                     *offset = file.read_u32_le().await?;
                 }
@@ -191,12 +192,16 @@ impl B3Dir {
         name: &[u8],
         phf_table: &HasherState,
     ) -> Result<u32, errors::ReadError> {
+        dbg!(self.positions.position_start_phf_table, self.num_entries);
         let hashes = hash(name, phf_table.key);
+        dbg!(hashes.f1, hashes.f2, hashes.g);
         let buckets_len = calculate_buckets_len(self.num_entries as usize);
+        dbg!(buckets_len);
         let bucket = (hashes.g as usize) % buckets_len;
+        dbg!(bucket);
 
-        let bucket_offset =
-            self.positions.position_start_phf_table + PHF_TABLE_RANDOMIZED_KEY_SIZE + bucket * 4;
+        let bucket_offset = self.positions.phf_table_start_disps() + bucket * 4;
+        dbg!(bucket_offset);
         let mut file = self.position_file(bucket_offset as u64).await?;
         let mut bucket_keys = [0u8; 4];
         file.read_exact(&mut bucket_keys).await?;
@@ -204,18 +209,17 @@ impl B3Dir {
         let d1 = u16::from_le_bytes(*array_ref!(bucket_keys, 0, 2));
         let d2 = u16::from_le_bytes(*array_ref!(bucket_keys, 2, 2));
 
-        let idx = displace(hashes.f1, hashes.f2, d1 as u32, d2 as u32) as usize
-            % self.num_entries as usize;
+        let displace = displace(hashes.f1, hashes.f2, d1 as u32, d2 as u32) as usize;
+        let idx = displace % self.num_entries as usize;
+        dbg!(displace, idx);
 
-        let map_offset = self.positions.position_start_phf_table
-            + PHF_TABLE_RANDOMIZED_KEY_SIZE
-            + buckets_len * 4
-            + idx * 4;
+        let map_offset = bucket_offset + buckets_len * 4 + idx * 4;
+        dbg!(map_offset);
         let mut file = self.position_file(map_offset as u64).await?;
         let entry_rel_offset = file.read_u32_le().await?;
 
-        let entry_offset = POSITION_START_HASHES as u32 + entry_rel_offset;
-
+        let entry_offset = self.positions.position_start_entries as u32 + entry_rel_offset;
+        dbg!(entry_rel_offset, entry_offset);
         Ok(entry_offset)
     }
 
@@ -225,8 +229,7 @@ impl B3Dir {
         name: &'a [u8],
         offset: u32,
     ) -> Result<Option<BorrowedEntry<'a>>, errors::ReadError> {
-        let start_entry: u64 =
-            self.positions.position_start_entries as u64 + offset as u64 - name.len() as u64 - 3;
+        let start_entry: u64 = offset as u64;
         let file = self.position_file(start_entry).await?;
         let mut file = BufReader::new(file);
         let flag = file.read_u8().await;
@@ -362,10 +365,14 @@ mod tests {
         let entry = dir.get_entry(b"fleek.config.json").await.unwrap().unwrap();
         assert_eq!(entry.name, b"fleek.config.json");
         assert!(matches!(entry.link, BorrowedLink::Content(_)));
+        let entry = dir.get_entry(b"index.js").await.unwrap().unwrap();
+        assert_eq!(entry.name, b"index.js");
+        assert!(matches!(entry.link, BorrowedLink::Content(_)));
 
-        // Test non-existent entry
-        let entry = dir.get_entry(b"nonexistent").await.unwrap();
-        assert!(entry.is_none());
+        let entry = dir.get_entry(b"b.js").await.unwrap().unwrap();
+        assert_eq!(entry.name, b"b.js");
+        assert!(matches!(entry.link, BorrowedLink::Content(_)));
+
         tokio::fs::remove_dir_all(temp_dir).await.unwrap();
     }
 

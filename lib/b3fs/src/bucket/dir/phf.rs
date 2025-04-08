@@ -122,7 +122,6 @@ fn try_generate_hash(entries: &[(InlineVec, Offset)], key: u64) -> Option<Hasher
                 for (hashes, offset) in &bucket.keys {
                     let idx = (displace(hashes.f1, hashes.f2, d1 as u32, d2 as u32)
                         % (table_len as u32)) as usize;
-
                     if map[idx] != 0 {
                         for &idx in &values_to_clean {
                             map[idx] = 0;
