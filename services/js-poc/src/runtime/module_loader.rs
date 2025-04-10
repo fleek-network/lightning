@@ -1,6 +1,7 @@
 use arrayref::array_ref;
 use cid::Cid;
 use deno_core::error::ModuleLoaderError;
+use deno_core::futures::StreamExt;
 use deno_core::url::Host;
 use deno_core::{
     ModuleLoadResponse,
@@ -65,7 +66,7 @@ impl ModuleLoader for FleekModuleLoader {
             },
         };
 
-        let module_specifier = module_specifier.clone();
+        let mut module_specifier = module_specifier.clone();
         match module_specifier.scheme() {
             "blake3" => {
                 let Some(Host::Domain(host)) = module_specifier.host() else {
@@ -139,15 +140,43 @@ impl ModuleLoader for FleekModuleLoader {
                     let dir_or_handle = fn_sdk::blockstore::load_dir_or_content(&hash).await?;
                     let bytes = match dir_or_handle {
                         fn_sdk::blockstore::DirOrContent::Dir(mut dir) => {
-                            let mut segments = module_specifier.path_segments().unwrap().peekable();
+                            if module_specifier.path().is_empty() {
+                                // set default file ahead of time to avoid cannot-be-a-base errors
+                                module_specifier.set_path("index.js");
+                            }
 
                             let bucket = fn_sdk::blockstore::blockstore_root().await;
+                            let mut segments = module_specifier.path_segments().unwrap().peekable();
+
                             loop {
                                 let mut segment = segments.next().unwrap();
                                 if segment.is_empty() {
                                     // if we have an empty segment, there was no final path and we
                                     // should fallback to loading index.js
                                     segment = "index.js";
+                                }
+
+                                let mut entries = dir.entries().await.unwrap();
+                                while let Some(Ok(entry)) = entries.next().await {
+                                    println!("name: {:?}", bytes::Bytes::from(entry.name.to_vec()));
+                                    match entry.link {
+                                        fn_sdk::blockstore::b3fs::entry::OwnedLink::Content(
+                                            hash,
+                                        ) => {
+                                            println!(
+                                                "content: {:?}",
+                                                bytes::Bytes::from(hash.to_vec())
+                                            );
+                                        },
+                                        fn_sdk::blockstore::b3fs::entry::OwnedLink::Link(
+                                            small_vec,
+                                        ) => {
+                                            println!(
+                                                "link: {:?}",
+                                                bytes::Bytes::from(small_vec.to_vec())
+                                            );
+                                        },
+                                    }
                                 }
 
                                 // load the entry up
