@@ -167,7 +167,7 @@ async fn handle_request(
         let bucket = fn_sdk::blockstore::blockstore_root().await;
         let entry = bucket.get(&hash).await?;
         if entry.is_dir() {
-            // look for config file
+            // check for a config file
             let mut dir = entry.into_dir().unwrap();
             if let Ok(Some(config_file)) = dir.get_entry(b"fleek.config.json").await {
                 match config_file.link {
@@ -184,6 +184,7 @@ async fn handle_request(
 
                             // parse into FleekConfig and use it
                             config = serde_json::from_slice(&content)?;
+                            debug!("Config file successfully loaded: {config:?}");
                         }
                     },
                     BorrowedLink::Path(_) => bail!("symlinks are not supported for config files"),

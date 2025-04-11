@@ -1,7 +1,6 @@
 use arrayref::array_ref;
 use cid::Cid;
 use deno_core::error::ModuleLoaderError;
-use deno_core::futures::StreamExt;
 use deno_core::url::Host;
 use deno_core::{
     ModuleLoadResponse,
@@ -154,29 +153,6 @@ impl ModuleLoader for FleekModuleLoader {
                                     // if we have an empty segment, there was no final path and we
                                     // should fallback to loading index.js
                                     segment = "index.js";
-                                }
-
-                                let mut entries = dir.entries().await.unwrap();
-                                while let Some(Ok(entry)) = entries.next().await {
-                                    println!("name: {:?}", bytes::Bytes::from(entry.name.to_vec()));
-                                    match entry.link {
-                                        fn_sdk::blockstore::b3fs::entry::OwnedLink::Content(
-                                            hash,
-                                        ) => {
-                                            println!(
-                                                "content: {:?}",
-                                                bytes::Bytes::from(hash.to_vec())
-                                            );
-                                        },
-                                        fn_sdk::blockstore::b3fs::entry::OwnedLink::Link(
-                                            small_vec,
-                                        ) => {
-                                            println!(
-                                                "link: {:?}",
-                                                bytes::Bytes::from(small_vec.to_vec())
-                                            );
-                                        },
-                                    }
                                 }
 
                                 // load the entry up
