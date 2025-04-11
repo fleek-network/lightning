@@ -76,7 +76,7 @@ impl<C: NodeComponents> OriginFetcher<C> {
                             match e {
                                 ErrorResponse::OriginFetchError(uri, e) => {
                                     if let Some(tx) = pending_requests.remove(&uri) {
-                                        tx.send(Err(OriginError)).expect("Failed to send response");
+                                        tx.send(Err(OriginError(e.to_string()))).expect("Failed to send response");
                                     }
                                     error!("Failed to fetch data from origin: {e}");
                                 },
@@ -125,5 +125,5 @@ enum ErrorResponse {
 }
 
 #[derive(Debug, Clone, thiserror::Error)]
-#[error("Failed to fetch data from origin")]
-pub struct OriginError;
+#[error("Failed to fetch data from origin: {0:?}")]
+pub struct OriginError(String);
