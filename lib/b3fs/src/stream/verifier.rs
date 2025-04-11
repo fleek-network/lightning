@@ -447,7 +447,6 @@ mod tests {
             let over_allocation = actual_tree.capacity() - actual_tree.len();
             total_over_allocation += over_allocation;
             total_reallocation += reallocation;
-            // println!("n={n}: over_allocation={}\tgrow={}", over_allocation, grow);
         }
 
         // since reserve_exact is used:

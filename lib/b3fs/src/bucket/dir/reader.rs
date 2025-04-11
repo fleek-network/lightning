@@ -229,19 +229,21 @@ impl B3Dir {
         let mut entry_name = Vec::new();
         let entry_to_check = file.read_until(0x00, &mut entry_name).await;
         check_eof!(entry_to_check);
-        println!(
-            "slice: {:?} {:?}",
+        dbg!(
+            flag,
+            start_entry,
             String::from_utf8(entry_name.clone()).unwrap(),
             String::from_utf8(name.to_vec()).unwrap()
         );
         if &entry_name[..name.len()] != name {
             return Ok(None);
         }
+        let pos = file.stream_position().await;
         if flag == B3_DIR_IS_SYM_LINK {
             let mut content = Vec::new();
             file.read_until(0x00, &mut content).await?;
             let content = content[..content.len() - 1].to_vec().into_boxed_slice();
-            let static_slice: &'static [u8] = Box::leak(content);
+            let static_slice: &'a [u8] = Box::leak(content);
             return Ok(Some(BorrowedEntry {
                 name,
                 link: BorrowedLink::Path(static_slice),
@@ -249,7 +251,7 @@ impl B3Dir {
         } else {
             let mut buffer: [u8; 32] = vec![0u8; 32].try_into().unwrap();
             file.read_exact(&mut buffer).await?;
-            let static_slice: &'static [u8; 32] = unsafe { mem::transmute_copy(&buffer) };
+            let static_slice: &'a [u8; 32] = unsafe { mem::transmute(&buffer) };
             return Ok(Some(BorrowedEntry {
                 name,
                 link: BorrowedLink::Content(static_slice),
@@ -355,15 +357,14 @@ mod tests {
         // Test existing file
         let entry = dir.get_entry(b"fleek.config.json").await.unwrap().unwrap();
         assert_eq!(entry.name, b"fleek.config.json");
-        assert!(matches!(entry.link, BorrowedLink::Content(_)));
+        assert!(matches!(entry.link, BorrowedLink::Content(x) if *x == [2; 32]));
         let entry = dir.get_entry(b"index.js").await.unwrap().unwrap();
         assert_eq!(entry.name, b"index.js");
-        assert!(matches!(entry.link, BorrowedLink::Content(_)));
+        assert!(matches!(entry.link, BorrowedLink::Content(x) if *x == [3; 32]));
 
         let entry = dir.get_entry(b"b.js").await.unwrap().unwrap();
         assert_eq!(entry.name, b"b.js");
-        assert!(matches!(entry.link, BorrowedLink::Content(_)));
-
+        assert!(matches!(entry.link, BorrowedLink::Content(x) if *x == [1; 32]));
         tokio::fs::remove_dir_all(temp_dir).await.unwrap();
     }
 

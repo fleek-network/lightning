@@ -168,7 +168,7 @@ impl B3Dir {
         file.read_exact(&mut u64_bytes)?;
         let key = u64::from_le_bytes(u64_bytes);
 
-        let mut disps = vec![(0u16, 0u16); self.positions.phf_disps_len];
+        let mut disps = vec![(0u16, 0u16); self.num_entries as usize];
 
         let mut u16_bytes = [0; 2];
 
@@ -178,7 +178,7 @@ impl B3Dir {
             file.read_exact(&mut u16_bytes)?;
             disp.1 = u16::from_le_bytes(u16_bytes);
         }
-        let mut map = vec![0u32; self.positions.phf_entries_len];
+        let mut map = vec![0u32; self.num_entries as usize];
         let mut u32_bytes = [0; 4];
         for offset in &mut map {
             file.read_exact(&mut u32_bytes)?;
@@ -201,8 +201,7 @@ impl B3Dir {
         let buckets_len = calculate_buckets_len(self.num_entries as usize);
         let bucket = (hashes.g as usize) % buckets_len;
 
-        let bucket_offset =
-            self.positions.position_start_phf_table + PHF_TABLE_RANDOMIZED_KEY_SIZE + bucket * 4;
+        let bucket_offset = self.positions.phf_table_start_disps() + bucket * 4;
         let mut file = self.position_file(bucket_offset as u64)?;
         let mut bucket_keys = [0u8; 4];
         file.read_exact(&mut bucket_keys)?;
@@ -213,17 +212,14 @@ impl B3Dir {
         let idx = displace(hashes.f1, hashes.f2, d1 as u32, d2 as u32) as usize
             % self.num_entries as usize;
 
-        let map_offset = self.positions.position_start_phf_table
-            + PHF_TABLE_RANDOMIZED_KEY_SIZE
-            + buckets_len * 4
-            + idx * 4;
+        let map_offset = self.positions.phf_table_start_disps() + buckets_len * 4 + idx * 4;
         let mut file = self.position_file(map_offset as u64)?;
 
         let mut u32_bytes = [0; 4];
         file.read_exact(&mut u32_bytes)?;
         let entry_rel_offset = u32::from_le_bytes(u32_bytes);
 
-        let entry_offset = POSITION_START_HASHES as u32 + entry_rel_offset;
+        let entry_offset = self.positions.position_start_entries as u32 + entry_rel_offset;
 
         Ok(entry_offset)
     }
@@ -234,8 +230,7 @@ impl B3Dir {
         name: &'a [u8],
         offset: u32,
     ) -> Result<Option<BorrowedEntry<'a>>, errors::ReadError> {
-        let start_entry: u64 =
-            self.positions.position_start_entries as u64 + offset as u64 - name.len() as u64 - 3;
+        let start_entry: u64 = offset as u64;
         let file = self.position_file(start_entry)?;
         let mut file = BufReader::new(file);
 
@@ -253,7 +248,7 @@ impl B3Dir {
             let mut content = Vec::new();
             file.read_until(0x00, &mut content)?;
             let content = content[..content.len() - 1].to_vec().into_boxed_slice();
-            let static_slice: &'static [u8] = Box::leak(content);
+            let static_slice: &'a [u8] = Box::leak(content);
             return Ok(Some(BorrowedEntry {
                 name,
                 link: BorrowedLink::Path(static_slice),
@@ -261,7 +256,7 @@ impl B3Dir {
         } else {
             let mut buffer: [u8; 32] = vec![0u8; 32].try_into().unwrap();
             file.read_exact(&mut buffer)?;
-            let static_slice: &'static [u8; 32] = unsafe { mem::transmute_copy(&buffer) };
+            let static_slice: &'a [u8; 32] = unsafe { mem::transmute(&buffer) };
             return Ok(Some(BorrowedEntry {
                 name,
                 link: BorrowedLink::Content(static_slice),
@@ -424,7 +419,7 @@ mod tests {
         let reader = B3Dir::new(
             3,
             std::fs::File::open(
-                "tests/fixtures/4bc76dc8621d67c905b214f47cfc68924d7994afd2c181f47a449edbc359b514",
+                "tests/fixtures/2713272e28976929bc669d2c89f2a8b2d502385753ab954400c2e2ecf3206dd3",
             )
             .unwrap(),
         );

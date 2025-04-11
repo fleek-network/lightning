@@ -125,7 +125,8 @@ impl Iterator for DirEntriesIter {
 
             self.position += entry_name.len() as u64 + size as u64 + 2;
             // Remove the marker bit 0x00
-            let content = path_buffer[0..size - 1].to_vec();
+            path_buffer.pop();
+            let content = path_buffer;
 
             Some(Ok(OwnedEntry {
                 name: entry_name.into(),
