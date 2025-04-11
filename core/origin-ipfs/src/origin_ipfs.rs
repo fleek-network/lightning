@@ -18,7 +18,7 @@ use lightning_interfaces::prelude::*;
 use lightning_interfaces::types::Blake3Hash;
 use lightning_interfaces::{DirTrustedWriter, FileTrustedWriter};
 use tokio::time::timeout;
-use tracing::info;
+use tracing::{debug, info};
 
 use crate::config::Gateway;
 use crate::Config;
@@ -142,7 +142,6 @@ impl<C: NodeComponents> IPFSOrigin<C> {
 
             match item {
                 Some((IpldItem::ChunkedFile(chunk), parent)) => {
-                    println!("got chunk file");
                     let doc_id = chunk.id().clone();
                     let mut stream_file = stream.new_chunk_file_streamer(chunk).await;
                     let mut file_writer = self.blockstore.file_writer().await?;
@@ -159,20 +158,17 @@ impl<C: NodeComponents> IPFSOrigin<C> {
                     .await?;
                 },
                 Some((IpldItem::File(file), parent)) => {
-                    println!("got file");
                     let doc_id = file.id().clone();
                     let mut file_writer = self.blockstore.file_writer().await?;
                     file_writer.write(file.data(), false).await?;
-                    let hash = self
-                        .insert_file_into_dir(
-                            &mut dir_stack,
-                            parent,
-                            file_writer,
-                            &doc_id,
-                            &mut dirs_to_commit,
-                        )
-                        .await?;
-                    println!("finished file {hash:?}");
+                    self.insert_file_into_dir(
+                        &mut dir_stack,
+                        parent,
+                        file_writer,
+                        &doc_id,
+                        &mut dirs_to_commit,
+                    )
+                    .await?;
                 },
                 Some((IpldItem::Dir(dir), parent)) => {
                     // create a writer and insert it into the stack
@@ -187,7 +183,6 @@ impl<C: NodeComponents> IPFSOrigin<C> {
                         return Err(anyhow!("incomplete stream"));
                     }
 
-                    println!("stream ended");
                     break;
                 },
             }
@@ -222,7 +217,7 @@ impl<C: NodeComponents> IPFSOrigin<C> {
             return Err(anyhow!("Cannot calculate hash"));
         }
 
-        println!("downloaded {hash:?}");
+        debug!("Successfully downloaded {hash:?}");
 
         Ok(hash)
     }
@@ -235,7 +230,6 @@ impl<C: NodeComponents> IPFSOrigin<C> {
         doc_id: &DocId,
         to_commit: &mut Vec<DocId>,
     ) -> Result<[u8; 32]> {
-        println!("inserting file");
         let file_name = doc_id.file_name().unwrap_or_default();
         let temp_hash = file_writer.commit().await?;
         if let Some(parent) = parent {
@@ -245,11 +239,9 @@ impl<C: NodeComponents> IPFSOrigin<C> {
                     link: BorrowedLink::Content(&temp_hash),
                 };
                 dir.insert(entry, false).await?;
-                println!("inserted to dir");
 
                 if dir.ready_to_commit() {
                     to_commit.push(parent);
-                    println!("dir ready to commit")
                 }
             }
         }
