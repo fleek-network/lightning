@@ -161,14 +161,16 @@ impl<C: NodeComponents> IPFSOrigin<C> {
                     let doc_id = file.id().clone();
                     let mut file_writer = self.blockstore.file_writer().await?;
                     file_writer.write(file.data(), false).await?;
-                    self.insert_file_into_dir(
-                        &mut dir_stack,
-                        parent,
-                        file_writer,
-                        &doc_id,
-                        &mut dirs_to_commit,
-                    )
-                    .await?;
+                    // store the hash in case this is a single file download
+                    hash = self
+                        .insert_file_into_dir(
+                            &mut dir_stack,
+                            parent,
+                            file_writer,
+                            &doc_id,
+                            &mut dirs_to_commit,
+                        )
+                        .await?;
                 },
                 Some((IpldItem::Dir(dir), parent)) => {
                     // create a writer and insert it into the stack
