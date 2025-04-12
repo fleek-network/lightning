@@ -148,14 +148,15 @@ impl<C: NodeComponents> IPFSOrigin<C> {
                     while let Some(chunk) = stream_file.next_chunk().await? {
                         file_writer.write(chunk.data(), false).await?;
                     }
-                    self.insert_file_into_dir(
-                        &mut dir_stack,
-                        parent,
-                        file_writer,
-                        &doc_id,
-                        &mut dirs_to_commit,
-                    )
-                    .await?;
+                    hash = self
+                        .insert_file_into_dir(
+                            &mut dir_stack,
+                            parent,
+                            file_writer,
+                            &doc_id,
+                            &mut dirs_to_commit,
+                        )
+                        .await?;
                 },
                 Some((IpldItem::File(file), parent)) => {
                     let doc_id = file.id().clone();
