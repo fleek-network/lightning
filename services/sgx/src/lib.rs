@@ -76,6 +76,7 @@ static OUR_NODE_INDEX: LazyLock<u32> = LazyLock::new(|| {
 #[derive(Debug)]
 struct ExternalService {
     attest_state: Arc<req_res::EndpointState>,
+    root: PathBuf,
 }
 
 impl UsercallExtension for ExternalService {
@@ -91,9 +92,9 @@ impl UsercallExtension for ExternalService {
                 // Connect the enclave to a blockstore content-stream
                 if let Some(hash) = subdomain.strip_suffix(".blockstore") {
                     let hash = hex::decode(hash).expect("valid blake3 hex");
-                    let stream =
-                        Box::new(VerifiedStream::new(arrayref::array_ref![hash, 0, 32]).await?)
-                            as Box<dyn AsyncStream>;
+                    let stream = Box::new(
+                        VerifiedStream::new(arrayref::array_ref![hash, 0, 32], &self.root).await?,
+                    ) as Box<dyn AsyncStream>;
                     return Ok(Some(stream));
                 }
 
@@ -181,7 +182,10 @@ pub fn main() {
 
     // TODO: figure out a flow to generate a signature for the compiled enclave and committing it.
     enclave_builder.dummy_signature();
-    enclave_builder.usercall_extension(ExternalService { attest_state });
+    enclave_builder.usercall_extension(ExternalService {
+        attest_state,
+        root: fn_sdk::blockstore::blockstore_root().into(),
+    });
     let enclave = enclave_builder.build(&mut device).unwrap();
 
     enclave

@@ -1,18 +1,23 @@
 use std::borrow::BorrowMut;
 use std::future::Future;
-use std::io::Result as IoResult;
+use std::io::{Error as IoError, Result as IoResult};
+use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
-use blake3_tree::ProofBuf;
+use b3fs::bucket::Bucket;
+use b3fs::collections::async_hashtree::AsyncHashTree;
+use b3fs::stream::ProofBuf;
 use bytes::{BufMut, BytesMut};
-use fn_sdk::blockstore::ContentHandle;
 use futures::{ready, FutureExt};
 use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::sync::Mutex;
 
-trait ReadFut: Future<Output = Result<Vec<u8>, std::io::Error>> + Send + Sync {}
-impl<T: Future<Output = Result<Vec<u8>, std::io::Error>> + Send + Sync> ReadFut for T {}
+type Block = (Vec<u8>, ProofBuf);
+
+trait ReadFut: Future<Output = Result<Block, std::io::Error>> + Send + Sync {}
+impl<T: Future<Output = Result<Block, std::io::Error>> + Send + Sync> ReadFut for T {}
 
 /// Leading bit for flagging proofs and chunks.
 /// Payloads are either a proof segment (max ~4MiB initial proof),
@@ -22,41 +27,85 @@ const LEADING_BIT: u32 = 1 << 31;
 /// Owned blockstore request stream. Responsible for writing a verified
 /// stream of blockstore content to `AsyncRead` calls. Drops all writes.
 pub struct VerifiedStream {
-    current: usize,
-    handle: Arc<ContentHandle>,
+    current: u32,
+    bucket: Bucket,
+    tree: Arc<Mutex<AsyncHashTree<tokio::fs::File>>>,
+    num_blocks: u32,
     read_fut: Option<Pin<Box<dyn ReadFut>>>,
     buffer: BytesMut,
+    data_sent: usize,
 }
 
 impl VerifiedStream {
-    pub async fn new(hash: &[u8; 32]) -> Result<Self, std::io::Error> {
+    pub async fn new(hash: &[u8; 32], blockstore_path: &Path) -> Result<Self, IoError> {
         if !fn_sdk::api::fetch_blake3(*hash).await {
-            return Err(std::io::Error::new(
+            return Err(IoError::new(
                 std::io::ErrorKind::NotFound,
                 "failed to fetch blake3 hash",
             ));
         }
 
-        let handle = Arc::new(ContentHandle::load(hash).await?);
+        let bucket = Bucket::open(blockstore_path).await?;
+        let content_header = bucket.get(hash).await?;
+        let num_blocks = content_header.blocks();
+        let Some(file) = content_header.into_file() else {
+            return Err(IoError::new(
+                std::io::ErrorKind::Other,
+                "only files are supported right now",
+            ));
+        };
+
+        let tree = file
+            .hashtree()
+            .await
+            .map_err(|e| IoError::new(std::io::ErrorKind::Other, e))?;
+
+        let tree = Arc::new(Mutex::new(tree));
 
         // TODO: Estimate and validate content length limits, based on the
         //       number of chunk hashes in the proof.
 
         // Create the buffer and write the starting proof to it right away
-        let mut buffer = BytesMut::new();
-        let proof = ProofBuf::new(handle.tree.as_ref(), 0);
-        buffer.put_u32(proof.len() as u32);
-        buffer.put_slice(proof.as_slice());
+        let buffer = BytesMut::new();
 
         let current = 0;
-        let handle_clone = handle.clone();
-        let read_fut = Some(Box::pin(async move { handle_clone.read(current).await }) as _);
+
+        let tree_clone = tree.clone();
+        let bucket_clone = bucket.clone();
+        let read_fut = Some(Box::pin(async move {
+            let mut tree = tree_clone.lock().await;
+
+            let hash = tree
+                .get_hash(current)
+                .await
+                .map_err(|e| IoError::new(std::io::ErrorKind::Other, e))?;
+
+            let proof = tree
+                .generate_proof(current)
+                .await
+                .map_err(|e| IoError::new(std::io::ErrorKind::Other, e))?;
+
+            let Some(hash) = hash else {
+                return Err(IoError::new(std::io::ErrorKind::Other, "hash not found"));
+            };
+
+            let data = bucket_clone.get_block_content(&hash).await?;
+
+            let Some(data) = data else {
+                return Err(IoError::new(std::io::ErrorKind::Other, "data not found"));
+            };
+
+            Ok((data, proof))
+        }) as _);
 
         Ok(Self {
             current,
-            handle,
+            bucket,
+            tree,
+            num_blocks,
             read_fut,
             buffer,
+            data_sent: 0,
         })
     }
 }
@@ -80,13 +129,21 @@ impl AsyncRead for VerifiedStream {
             // poll pending read call
             if let Some(fut) = self.read_fut.borrow_mut() {
                 match ready!(fut.poll_unpin(cx)) {
-                    Ok(block) => {
+                    Ok((block, proof)) => {
                         // remove future
                         self.read_fut = None;
+
+                        // write proof
+                        // TODO(matthias): check if empty?
+                        // if !proof.is_empty() {
+                        self.buffer.put_u32(proof.len() as u32);
+                        self.buffer.put_slice(proof.as_slice());
+                        // }
 
                         // write chunk payload (with leading bit set)
                         self.buffer.put_u32(block.len() as u32 | LEADING_BIT);
                         self.buffer.put_slice(&block);
+                        self.data_sent += block.len();
 
                         // flush read buffer
                         continue;
@@ -95,25 +152,44 @@ impl AsyncRead for VerifiedStream {
                 }
             }
 
-            // exit if we finished the last block
-            if self.handle.len() == self.current {
-                // Since no data was written, this is effectively an EOF signal.
-                return Poll::Ready(Ok(()));
-            }
-
             // queue the next block read
             self.current += 1;
             let current = self.current;
-            let handle = self.handle.clone();
-            let fut = Box::pin(async move { handle.read(current).await });
-            self.read_fut = Some(fut);
 
-            // write next proof payload
-            let proof = ProofBuf::resume(self.handle.tree.as_ref(), self.current);
-            if !proof.is_empty() {
-                self.buffer.put_u32(proof.len() as u32);
-                self.buffer.put_slice(proof.as_slice());
+            // exit if we finished the last block
+            if self.num_blocks == self.current {
+                // This tells the receiver that the stream ended
+                self.buffer.put_u32(LEADING_BIT);
+                continue;
             }
+
+            let bucket_clone = self.bucket.clone();
+            let tree_clone = self.tree.clone();
+            self.read_fut = Some(Box::pin(async move {
+                let mut tree = tree_clone.lock().await;
+
+                let hash = tree
+                    .get_hash(current)
+                    .await
+                    .map_err(|e| IoError::new(std::io::ErrorKind::Other, e))?;
+
+                let proof = tree
+                    .generate_proof(current)
+                    .await
+                    .map_err(|e| IoError::new(std::io::ErrorKind::Other, e))?;
+
+                let Some(hash) = hash else {
+                    return Err(IoError::new(std::io::ErrorKind::Other, "hash not found"));
+                };
+
+                let data = bucket_clone.get_block_content(&hash).await?;
+
+                let Some(data) = data else {
+                    return Err(IoError::new(std::io::ErrorKind::Other, "data not found"));
+                };
+
+                Ok((data, proof))
+            }) as _);
 
             continue;
         }
