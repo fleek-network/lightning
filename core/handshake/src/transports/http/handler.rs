@@ -1,24 +1,29 @@
 use std::collections::HashMap;
 use std::fmt::Display;
+use std::net::SocketAddr;
 use std::str::FromStr;
 
 use axum::body::Body;
-use axum::extract::{OriginalUri, Path, Query};
+use axum::extract::{ConnectInfo, OriginalUri, Path, Query};
 use axum::http::{HeaderMap, Method, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Extension;
 use bytes::Bytes;
 use fleek_crypto::{ClientPublicKey, ClientSignature};
-use fn_sdk::header::{HttpMethod, HttpOverrides, TransportDetail};
+use fn_sdk::header::{ConnectionHeader, HttpMethod, HttpOverrides, TransportDetail};
 use lightning_interfaces::schema::handshake::{HandshakeRequestFrame, RequestFrame};
 use lightning_interfaces::ExecutorProviderInterface;
 use lightning_metrics::increment_counter;
+use rand::RngCore;
+use tokio::net::UnixStream;
 use tokio::sync::oneshot;
+use tracing::error;
 use url::Url;
 
 use crate::handshake::Context;
 use crate::transports::http::{HttpReceiver, HttpSender, Service};
 
+#[allow(clippy::too_many_arguments)]
 pub async fn handler<P: ExecutorProviderInterface>(
     method: Method,
     headers: HeaderMap,
@@ -26,6 +31,7 @@ pub async fn handler<P: ExecutorProviderInterface>(
     Path(map): Path<HashMap<String, String>>,
     Query(params): Query<HashMap<String, String>>,
     Extension(provider): Extension<Context<P>>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     payload: Bytes,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     let service_id = map
@@ -46,6 +52,76 @@ pub async fn handler<P: ExecutorProviderInterface>(
         _ => return Err((StatusCode::NOT_FOUND, "invalid method".to_string())),
     };
 
+    println!("ServiceID: {service_id:?}");
+    println!("Method: {method:?}");
+    println!("Headers: {:?}", headers);
+    println!("Uri: {:?}", uri);
+    println!("Map: {:?}", map);
+    println!("Params: {:?}", params);
+    println!("Payload: {}", payload.len());
+    println!("IpAddress: {:?}", addr);
+
+    // Create the url sent to the service
+    let path = uri.path().split('/').skip(3).collect::<Vec<_>>().join("/");
+    let mut url = Url::parse("http://fleek/").unwrap();
+    url.set_path(&path);
+    url.set_query(uri.query());
+
+    if matches!(service_id, Service::Pod) {
+        // TODO(matthias): start the work for the request
+        // forward this request to the runner worker
+
+        let mut request_id = [0u8; 8];
+        rand::thread_rng().fill_bytes(&mut request_id[4..]);
+        request_id[0..4].copy_from_slice(&addr.to_string().as_bytes()[0..4]);
+        let request_id = u64::from_le_bytes(request_id);
+
+        let transport_detail = TransportDetail::HttpRequest {
+            request_id,
+            method,
+            url,
+            header: headers
+                .into_iter()
+                .filter_map(|(name, val)| {
+                    if let Some(name) = name {
+                        if let Ok(val) = val.to_str() {
+                            Some((name.to_string(), val.to_string()))
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                })
+                .collect(),
+        };
+        let header = ConnectionHeader {
+            pk: None,
+            transport_detail,
+        };
+
+        tokio::spawn(async move {
+            // TODO(matthias): get the socket path from a config
+            match UnixStream::connect("/home/ubuntu/.lightning/ipc/service-4/conn").await {
+                Ok(mut stream) => {
+                    if let Err(e) = fn_sdk::header::write_header(&header, &mut stream).await {
+                        error!("failed to send request to POD worker: {e:?}");
+                    }
+                },
+                Err(e) => {
+                    println!("failed to connect to POD worker: {e:?}");
+                },
+            }
+        });
+
+        return Ok((
+            StatusCode::FOUND,
+            [("Location", format!("https://162.19.235.168:8081{}", uri))],
+            "",
+        )
+            .into_response());
+    }
+
     let body_frame = RequestFrame::ServicePayload { bytes: payload };
 
     let handshake_frame = HandshakeRequestFrame::Handshake {
@@ -59,16 +135,11 @@ pub async fn handler<P: ExecutorProviderInterface>(
     let (body_tx, body_rx) = async_channel::bounded(16);
     let (termination_tx, termination_rx) = oneshot::channel();
 
-    // Create the url sent to the service
-    let path = uri.path().split('/').skip(3).collect::<Vec<_>>().join("/");
-    let mut url = Url::parse("http://fleek/").unwrap();
-    url.set_path(&path);
-    url.set_query(uri.query());
-
     let sender = HttpSender::new(service_id, frame_tx, body_tx, termination_tx);
     let receiver = HttpReceiver::new(
         frame_rx,
         TransportDetail::HttpRequest {
+            request_id: 0,
             method,
             url,
             header: headers

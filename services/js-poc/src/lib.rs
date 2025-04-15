@@ -83,6 +83,7 @@ async fn handle_connection(
                 .context("Could not read body.")?;
 
             let TransportDetail::HttpRequest {
+                request_id: _,
                 method,
                 ref url,
                 ref header,

@@ -47,12 +47,13 @@ impl Transport for HttpTransport {
 }
 
 // TODO(oz): remove this, handshake should not need changes to support a service
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 #[repr(u32)]
 pub enum Service {
     Fetcher = 0,
     Js = 1,
     Sgx = 3,
+    Pod = 4,
 }
 
 impl TryFrom<u32> for Service {
@@ -63,6 +64,7 @@ impl TryFrom<u32> for Service {
             0 => Ok(Service::Fetcher),
             1 => Ok(Service::Js),
             3 => Ok(Service::Sgx),
+            4 => Ok(Service::Pod),
             _ => Err((StatusCode::NOT_FOUND, "route not found".to_string())),
         }
     }

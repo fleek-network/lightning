@@ -24,6 +24,7 @@ pub struct EndpointState {
     target_info: Targetinfo,
     ecdsa_key_id: Vec<u8>,
     blockstore_path: PathBuf,
+    enclave_socket_path: PathBuf,
 }
 
 fn get_algorithm_id(key_id: &[u8]) -> u32 {
@@ -34,7 +35,7 @@ fn get_algorithm_id(key_id: &[u8]) -> u32 {
 }
 
 impl EndpointState {
-    pub fn init(blockstore_path: PathBuf) -> anyhow::Result<Self> {
+    pub fn init(blockstore_path: PathBuf, enclave_socket_path: PathBuf) -> anyhow::Result<Self> {
         let aesm_client = AesmClient::new();
         let key_ids = aesm_client.get_supported_att_key_ids().unwrap();
         println!("got key ids");
@@ -59,6 +60,7 @@ impl EndpointState {
             target_info,
             ecdsa_key_id,
             blockstore_path,
+            enclave_socket_path,
         })
     }
 
@@ -135,6 +137,10 @@ impl EndpointState {
 
     pub fn get_blockstore_path(&self) -> &Path {
         &self.blockstore_path
+    }
+
+    pub fn get_enclave_socket_path(&self) -> &Path {
+        &self.enclave_socket_path
     }
 }
 

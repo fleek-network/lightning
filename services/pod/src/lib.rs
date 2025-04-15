@@ -17,12 +17,14 @@ use req_res::AttestationEndpoint;
 use sgxs_loaders::isgx::Device as IsgxDevice;
 use tokio::io::AsyncWriteExt;
 use tokio::net::UnixStream;
+use tokio::sync::Notify;
 
 use crate::blockstore::VerifiedStream;
 
 mod blockstore;
 mod connection;
 mod req_res;
+mod worker;
 
 mod config {
     /* WASM configuration */
@@ -150,9 +152,12 @@ impl UsercallExtension for ExternalService {
                 // Bind to request listener. Can only be used once (when enclave starts up).
                 static STARTED: AtomicBool = AtomicBool::new(false);
                 if !STARTED.swap(true, std::sync::atomic::Ordering::Relaxed) {
-                    return Ok(Some(
-                        Box::new(connection::ConnectionListener::bind().await) as _
-                    ));
+                    return Ok(Some(Box::new(
+                        connection::ConnectionListener::bind(
+                            self.attest_state.get_enclave_socket_path(),
+                        )
+                        .await,
+                    ) as _));
                 }
             }
 
@@ -195,61 +200,81 @@ pub fn main() {
         });
     });
 
+    let enclave_socket_path = PathBuf::from(std::env::var("IPC_PATH").unwrap()).join("enclave");
+    let enclave_socket_path_clone = enclave_socket_path.clone();
+    let handshake_socket_path = PathBuf::from(std::env::var("IPC_PATH").unwrap()).join("conn");
+
+    std::thread::spawn(|| {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .thread_name("worker")
+            .enable_all()
+            .build()
+            .expect("failed to build worker");
+
+        rt.block_on(async move {
+            let shutdown = Arc::new(Notify::new());
+            worker::Worker::new(handshake_socket_path, enclave_socket_path_clone, shutdown)
+                .start()
+                .await
+                .expect("failed to run worker")
+        });
+    });
+
     let blockstore_path =
         std::env::var("BLOCKSTORE_PATH").expect("blockstore path env var not set");
 
     let blockstore_path = PathBuf::from(blockstore_path);
     let blockstore_path_clone = blockstore_path.clone();
-    std::thread::spawn(move || {
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .thread_name("test")
-            .enable_all()
-            .build()
-            .expect("failed to build sdk runtime");
+    //std::thread::spawn(move || {
+    //    let rt = tokio::runtime::Builder::new_current_thread()
+    //        .thread_name("test")
+    //        .enable_all()
+    //        .build()
+    //        .expect("failed to build sdk runtime");
 
-        rt.block_on(async move {
-            // Put file into bucket
-            let n_blocks = 10;
-            let bucket = Bucket::open(&blockstore_path_clone).await.unwrap();
-            let mut writer = FileWriter::new(&bucket).await.unwrap();
-            let data = get_random_file(8192 * n_blocks);
-            writer.write(&data).await.unwrap();
-            let root_hash = writer.commit().await.unwrap();
+    //    rt.block_on(async move {
+    //        // Put file into bucket
+    //        let n_blocks = 10;
+    //        let bucket = Bucket::open(&blockstore_path_clone).await.unwrap();
+    //        let mut writer = FileWriter::new(&bucket).await.unwrap();
+    //        let data = get_random_file(8192 * n_blocks);
+    //        writer.write(&data).await.unwrap();
+    //        let root_hash = writer.commit().await.unwrap();
 
-            println!("data to send: {}", data.len());
+    //        println!("data to send: {}", data.len());
 
-            tokio::time::sleep(Duration::from_secs(15)).await;
-            match UnixStream::connect("/home/ubuntu/.lightning/ipc/service-4/conn").await {
-                Ok(mut stream) => {
-                    println!(">>> connect successfully");
-                    if let Err(e) = stream.write_all(&32u32.to_be_bytes()).await {
-                        println!(">> error: {e:?}");
-                    }
-                    if let Err(e) = stream.write_all(&root_hash).await {
-                        println!(">> error: {e:?}");
-                    }
-                    println!(">> write success");
-                },
-                Err(e) => {
-                    println!("error: {e:?}");
-                },
-            }
+    //        tokio::time::sleep(Duration::from_secs(15)).await;
+    //        match UnixStream::connect("/home/ubuntu/.lightning/ipc/service-4/conn").await {
+    //            Ok(mut stream) => {
+    //                println!(">>> connect successfully");
+    //                if let Err(e) = stream.write_all(&32u32.to_be_bytes()).await {
+    //                    println!(">> error: {e:?}");
+    //                }
+    //                if let Err(e) = stream.write_all(&root_hash).await {
+    //                    println!(">> error: {e:?}");
+    //                }
+    //                println!(">> write success");
+    //            },
+    //            Err(e) => {
+    //                println!("error: {e:?}");
+    //            },
+    //        }
 
-            let content_header = bucket.get(&root_hash).await.unwrap();
-            let num_blocks = content_header.blocks();
+    //        let content_header = bucket.get(&root_hash).await.unwrap();
+    //        let num_blocks = content_header.blocks();
 
-            let file = content_header.into_file().unwrap();
-            let mut tree = file.hashtree().await.unwrap();
+    //        let file = content_header.into_file().unwrap();
+    //        let mut tree = file.hashtree().await.unwrap();
 
-            let mut data: Vec<u8> = Vec::new();
-            for block in 0..num_blocks {
-                let hash_ = tree.get_hash(block).await.unwrap().unwrap();
-                let chunk = bucket.get_block_content(&hash_).await.unwrap().unwrap();
-                data.extend(&chunk);
-            }
-            println!("DATA read from bucket: {}", data.len());
-        });
-    });
+    //        let mut data: Vec<u8> = Vec::new();
+    //        for block in 0..num_blocks {
+    //            let hash_ = tree.get_hash(block).await.unwrap().unwrap();
+    //            let chunk = bucket.get_block_content(&hash_).await.unwrap().unwrap();
+    //            data.extend(&chunk);
+    //        }
+    //        println!("DATA read from bucket: {}", data.len());
+    //    });
+    //});
 
     // Running the enclave
     let aesm_client = AesmClient::new();
@@ -265,7 +290,7 @@ pub fn main() {
 
     // setup attestation state
     let attest_state = Arc::new(
-        req_res::EndpointState::init(blockstore_path)
+        req_res::EndpointState::init(blockstore_path, enclave_socket_path)
             .expect("failed to initialize attestation endpoint"),
     );
     println!("initialized attestation endpoint");

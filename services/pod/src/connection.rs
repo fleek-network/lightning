@@ -1,6 +1,6 @@
 //! Mostly copied from `lib/fn_sdk/src/connection.rs`
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::task::Poll;
 
@@ -19,10 +19,9 @@ pub struct ConnectionListener {
 }
 
 impl ConnectionListener {
-    pub async fn bind() -> Self {
-        let listener =
-            UnixListener::bind(PathBuf::from(std::env::var("IPC_PATH").unwrap()).join("conn"))
-                .expect("failed to bind to connection socket listener");
+    pub async fn bind(enclave_socket_path: &Path) -> Self {
+        let listener = UnixListener::bind(enclave_socket_path)
+            .expect("failed to bind to connection socket listener");
         let ConnectionListener { rx } = ConnectionListener::new(listener);
         Self { rx }
     }

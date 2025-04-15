@@ -50,9 +50,9 @@ genesis_committee = true
 
 [[node_info]]
 owner = "0x959807B8D94B324A74117956731F09E2893aCd72"
-primary_public_key = "Qt1DzUoTEn7n4itYpAPhaDsXhcriuXe1e7n7uZztGfg"
-consensus_public_key = "21cq5icj1pWKk9DBwdUFSW6nqBrwtzHtvKWcLNrqFRxZV8UbdKYzdoSs8C1u7s7M4FKADDqsHnxETh56hdSK2Z65nsbW3xME1fNcT1s8dfHwCFk567mV4fmSSgH73mTe1H3a"
-worker_public_key = "Qt1DzUoTEn7n4itYpAPhaDsXhcriuXe1e7n7uZztGfg"
+primary_public_key = "DYitSZMtscXe88u4Hgxp5kQcHs6vDYciX9iv3HnnsnSb"
+consensus_public_key = "251udeFwCYdm1nU9VYGa2EnqDn7QxYAnba3ecfUtWRkmfvwiNgTaLaFPBn9xR9p5tBAR5UqQ4cWec5DNDd12tuYNezQ5tgef3RZPVQRf63aB75a8pnLtMPECEDUAcQKhnSaV"
+worker_public_key = "DYitSZMtscXe88u4Hgxp5kQcHs6vDYciX9iv3HnnsnSb"
 primary_domain = "127.0.0.1"
 worker_domain = "127.0.0.1"
 ports.primary = 24310

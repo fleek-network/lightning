@@ -47,6 +47,7 @@ pub struct HttpOverrides {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum TransportDetail {
     HttpRequest {
+        request_id: u64,
         method: HttpMethod,
         url: Url,
         header: HashMap<String, String>,
