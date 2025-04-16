@@ -134,11 +134,10 @@ impl AsyncRead for VerifiedStream {
                         self.read_fut = None;
 
                         // write proof
-                        // TODO(matthias): check if empty?
-                        // if !proof.is_empty() {
-                        self.buffer.put_u32(proof.len() as u32);
-                        self.buffer.put_slice(proof.as_slice());
-                        // }
+                        if !proof.is_empty() {
+                            self.buffer.put_u32(proof.len() as u32);
+                            self.buffer.put_slice(proof.as_slice());
+                        }
 
                         // write chunk payload (with leading bit set)
                         self.buffer.put_u32(block.len() as u32 | LEADING_BIT);
