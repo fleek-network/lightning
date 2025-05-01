@@ -273,18 +273,25 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
             let shutdown_fut = shutdown.notified();
             pin!(shutdown_fut);
 
-            let res = wait_and_signal_epoch_change(
-                &query_runner,
-                &txn_socket,
-                &mut shutdown_fut,
-                epoch,
-                time_until_epoch_transition,
-                check_phase_duration,
-            )
-            .await;
+            let phase = query_runner.get_committee_selection_beacon_phase();
+            let res = if let Some(phase) = phase {
+                Some((phase.get_epoch(), phase.get_round()))
+            } else {
+                wait_and_signal_epoch_change(
+                    &query_runner,
+                    &txn_socket,
+                    &mut shutdown_fut,
+                    epoch,
+                    time_until_epoch_transition,
+                    check_phase_duration,
+                )
+                .await
+            };
 
             if let Some((_commit_phase_epoch, round)) = res {
-                // We are in the commit phase now
+                // We are in the commit phase now or the reveal phase now.
+                // It's possible to be in the reveal phase here, because the node might restart
+                // while being in the reveal phase.
 
                 // TODO(matthias): what should we do if the commit_phase_epoch doesn't match the
                 // current epoch?
@@ -293,16 +300,21 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
 
                 let mut commit_phase_round = round;
                 loop {
-                    let res = wait_and_signal_commit_phase_timeout(
-                        &query_runner,
-                        &txn_socket,
-                        &mut shutdown_fut,
-                        epoch,
-                        commit_phase_round,
-                        commit_phase_duration,
-                        check_phase_duration,
-                    )
-                    .await;
+                    let phase = query_runner.get_committee_selection_beacon_phase();
+                    let res = if let Some(phase) = phase {
+                        Some((phase.get_epoch(), phase.get_round()))
+                    } else {
+                        wait_and_signal_commit_phase_timeout(
+                            &query_runner,
+                            &txn_socket,
+                            &mut shutdown_fut,
+                            epoch,
+                            commit_phase_round,
+                            commit_phase_duration,
+                            check_phase_duration,
+                        )
+                        .await
+                    };
 
                     let Some((_commit_epoch, round)) = res else {
                         // We detected an epoch change and don't have to await the reveal phase
@@ -314,16 +326,21 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
                         break;
                     };
 
-                    let res = wait_and_signal_reveal_phase_timeout(
-                        &query_runner,
-                        &txn_socket,
-                        &mut shutdown_fut,
-                        epoch,
-                        round,
-                        reveal_phase_duration,
-                        check_phase_duration,
-                    )
-                    .await;
+                    let phase = query_runner.get_committee_selection_beacon_phase();
+                    let res = if let Some(phase) = phase {
+                        Some((phase.get_epoch(), phase.get_round()))
+                    } else {
+                        wait_and_signal_reveal_phase_timeout(
+                            &query_runner,
+                            &txn_socket,
+                            &mut shutdown_fut,
+                            epoch,
+                            round,
+                            reveal_phase_duration,
+                            check_phase_duration,
+                        )
+                        .await
+                    };
 
                     let Some((_commit_epoch, round)) = res else {
                         // We changed epochs successfully.
