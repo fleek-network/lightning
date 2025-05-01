@@ -200,6 +200,22 @@ pub enum CommitteeSelectionBeaconPhase {
     Reveal((Epoch, CommitteeSelectionBeaconRound)),
 }
 
+impl CommitteeSelectionBeaconPhase {
+    pub fn get_epoch(&self) -> Epoch {
+        match self {
+            CommitteeSelectionBeaconPhase::Commit((epoch, _)) => *epoch,
+            CommitteeSelectionBeaconPhase::Reveal((epoch, _)) => *epoch,
+        }
+    }
+
+    pub fn get_round(&self) -> CommitteeSelectionBeaconRound {
+        match self {
+            CommitteeSelectionBeaconPhase::Commit((_, round)) => *round,
+            CommitteeSelectionBeaconPhase::Reveal((_, round)) => *round,
+        }
+    }
+}
+
 /// Indicates the participation status of a node.
 #[rustfmt::skip]
 #[derive(
