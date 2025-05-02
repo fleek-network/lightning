@@ -301,9 +301,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
                 let mut commit_phase_round = round;
                 loop {
                     let phase = query_runner.get_committee_selection_beacon_phase();
-                    let res = if let Some(phase) = phase {
-                        Some((phase.get_epoch(), phase.get_round()))
-                    } else {
+                    let res = if let Some(CommitteeSelectionBeaconPhase::Commit((_))) = phase {
                         wait_and_signal_commit_phase_timeout(
                             &query_runner,
                             &txn_socket,
@@ -312,11 +310,14 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
                             commit_phase_round,
                             commit_phase_duration,
                             check_phase_duration,
-                        )
-                        .await
+                        ).await
+                    } else if let Some(CommitteeSelectionBeaconPhase::Reveal((epoch, round))) = phase {
+                        Some((epoch, round))
+                    } else {
+                        None
                     };
 
-                    let Some((_commit_epoch, round)) = res else {
+                    let Some((_commit_epoch, _round)) = res else {
                         // We detected an epoch change and don't have to await the reveal phase
                         // anymore.
                         // This can only happen if a node is out of sync and does not commit during
@@ -327,9 +328,7 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
                     };
 
                     let phase = query_runner.get_committee_selection_beacon_phase();
-                    let res = if let Some(phase) = phase {
-                        Some((phase.get_epoch(), phase.get_round()))
-                    } else {
+                    let res = if let Some(CommitteeSelectionBeaconPhase::Reveal((epoch, round))) = phase {
                         wait_and_signal_reveal_phase_timeout(
                             &query_runner,
                             &txn_socket,
@@ -338,8 +337,11 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
                             round,
                             reveal_phase_duration,
                             check_phase_duration,
-                        )
-                        .await
+                        ).await
+                    } else if let Some(CommitteeSelectionBeaconPhase::Commit((epoch, round))) = phase {
+                        Some((epoch, round))
+                    } else {
+                        None
                     };
 
                     let Some((_commit_epoch, round)) = res else {
