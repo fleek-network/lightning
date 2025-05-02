@@ -301,7 +301,8 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
                 let mut commit_phase_round = round;
                 loop {
                     let phase = query_runner.get_committee_selection_beacon_phase();
-                    let res = if let Some(CommitteeSelectionBeaconPhase::Commit((_))) = phase {
+                    let res = if let Some(CommitteeSelectionBeaconPhase::Commit((epoch, _))) = phase
+                    {
                         wait_and_signal_commit_phase_timeout(
                             &query_runner,
                             &txn_socket,
@@ -310,8 +311,11 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
                             commit_phase_round,
                             commit_phase_duration,
                             check_phase_duration,
-                        ).await
-                    } else if let Some(CommitteeSelectionBeaconPhase::Reveal((epoch, round))) = phase {
+                        )
+                        .await
+                    } else if let Some(CommitteeSelectionBeaconPhase::Reveal((epoch, round))) =
+                        phase
+                    {
                         Some((epoch, round))
                     } else {
                         None
@@ -328,7 +332,9 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
                     };
 
                     let phase = query_runner.get_committee_selection_beacon_phase();
-                    let res = if let Some(CommitteeSelectionBeaconPhase::Reveal((epoch, round))) = phase {
+                    let res = if let Some(CommitteeSelectionBeaconPhase::Reveal((epoch, round))) =
+                        phase
+                    {
                         wait_and_signal_reveal_phase_timeout(
                             &query_runner,
                             &txn_socket,
@@ -337,8 +343,11 @@ impl<Q: SyncQueryRunnerInterface, P: PubSub<PubSubMsg> + 'static, NE: Emitter>
                             round,
                             reveal_phase_duration,
                             check_phase_duration,
-                        ).await
-                    } else if let Some(CommitteeSelectionBeaconPhase::Commit((epoch, round))) = phase {
+                        )
+                        .await
+                    } else if let Some(CommitteeSelectionBeaconPhase::Commit((epoch, round))) =
+                        phase
+                    {
                         Some((epoch, round))
                     } else {
                         None
