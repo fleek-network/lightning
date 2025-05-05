@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
 use std::collections::HashMap;
 
+use ethers::abi::AbiEncode;
 use fleek_crypto::TransactionSender;
 use fxhash::FxHashMap;
 use hp_fixed::unsigned::HpUfixed;
@@ -13,6 +14,8 @@ use lightning_interfaces::types::{
     Epoch,
     ExecutionData,
     ExecutionError,
+    Job,
+    JobInput,
     Metadata,
     NodeIndex,
     NodeInfo,
@@ -1172,7 +1175,7 @@ impl<B: Backend> StateExecutor<B> {
 
     fn reassign_jobs(&self) {
         // Get all current jobs.
-        let jobs = self
+        let jobs: Vec<Job> = self
             .jobs
             .as_map()
             .values()
@@ -1184,11 +1187,28 @@ impl<B: Backend> StateExecutor<B> {
             })
             .collect();
 
-        // Clear the tables.
+        // Clear existing job assignments
         self.jobs.clear();
         self.assigned_jobs.clear();
 
-        // Add these jobs as new jobs.
-        self.add_jobs(jobs);
+        // Reassign each job with its original owner
+        for job in jobs {
+            let job_input = vec![JobInput { info: job.info }];
+            match self.add_jobs(job.owner, job_input) {
+                TransactionResponse::Success(_) => {
+                    if let Some(mut job_entry) = self.jobs.get(&job.hash) {
+                        job_entry.prepaid_balance = job.prepaid_balance;
+                        self.jobs.set(job.hash, job_entry);
+                    }
+                },
+                TransactionResponse::Revert(err) => {
+                    tracing::warn!(
+                        "Failed to reassign job {}: {:?}",
+                        job.hash.encode_hex(),
+                        err
+                    );
+                },
+            }
+        }
     }
 }

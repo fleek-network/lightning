@@ -632,12 +632,21 @@ impl TryFrom<String> for Tokens {
 pub struct Job {
     /// The hash of the job.
     pub hash: [u8; 32],
+    /// Track the submitter
+    pub owner: EthAddress,
     /// Information about the job for execution purposes.
     pub info: JobInfo,
     /// The status of the most recent execution of a job.
     pub status: Option<JobStatus>,
     /// The node to which this job was assigned.
     pub assignee: Option<NodeIndex>,
+    /// Track remaining funds.
+    pub prepaid_balance: HpUfixed<18>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Deserialize, Serialize, JsonSchema)]
+pub struct JobInput {
+    pub info: JobInfo,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Deserialize, Serialize, JsonSchema)]
@@ -645,10 +654,27 @@ pub struct JobInfo {
     /// The frequency in which this job should be performed.
     pub frequency: u32,
     /// Amount prepaid.
-    pub amount: u32,
+    pub amount: HpUfixed<18>,
     /// The service that will execute the function.
     pub service: ServiceId,
-    /// The arguments for the job.
+    /// Arguments for the job, encoded as a JSON string in UTF-8 bytes.
+    ///
+    /// This field contains the arguments to be passed to the JavaScript function executed by
+    /// the service. Clients must encode arguments as a JSON string (e.g., `{"foo": "bar", "baz":
+    /// 42}`) and convert it to UTF-8 bytes. Nodes will decode these bytes back to a JSON
+    /// string and parse it for execution.
+    ///
+    /// Example in JavaScript:
+    /// ```javascript
+    /// const args = { foo: "bar", baz: 42 };
+    /// const argsBytes = Buffer.from(JSON.stringify(args), "utf8");
+    /// // Use argsBytes in the AddJobs transaction
+    /// ```
+    /// Example in Rust:
+    /// ```rust
+    /// let args = serde_json::json!({"foo": "bar", "baz": 42});
+    /// let args_bytes: Box<[u8]> = serde_json::to_vec(&args).unwrap().into_boxed_slice();
+    /// ```
     pub arguments: Box<[u8]>,
 }
 
