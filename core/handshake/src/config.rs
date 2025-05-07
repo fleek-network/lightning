@@ -9,6 +9,8 @@ use crate::transports;
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(default)]
 pub struct HandshakeConfig {
+    /// Enable validating client pop signatures
+    pub validate: bool,
     /// List of transports to enable
     #[serde(rename = "transport")]
     pub transports: Vec<TransportConfig>,
@@ -24,6 +26,7 @@ pub struct HandshakeConfig {
 impl Default for HandshakeConfig {
     fn default() -> Self {
         Self {
+            validate: false, // disabled by default until gateway is ready
             transports: vec![
                 TransportConfig::WebRTC(Default::default()),
                 TransportConfig::WebTransport(Default::default()),

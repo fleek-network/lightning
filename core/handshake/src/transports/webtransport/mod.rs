@@ -38,7 +38,7 @@ impl Transport for WebTransport {
     type Sender = WebTransportSender;
     type Receiver = WebTransportReceiver;
 
-    async fn bind<P: ExecutorProviderInterface>(
+    async fn bind(
         shutdown: ShutdownWaiter,
         config: Self::Config,
     ) -> anyhow::Result<(Self, Option<Router>)> {

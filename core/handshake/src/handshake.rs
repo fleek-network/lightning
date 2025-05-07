@@ -5,13 +5,15 @@ use async_channel::{bounded, Sender};
 use axum::{Extension, Router};
 use axum_server::Handle;
 use dashmap::DashMap;
-use fleek_crypto::NodePublicKey;
+use fleek_crypto::{NodePublicKey, NodeSecretKey, PublicKey, SecretKey};
 use fn_sdk::header::{write_header, ConnectionHeader};
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use lightning_interfaces::prelude::*;
 use lightning_interfaces::schema::handshake::{HandshakeRequestFrame, TerminationReason};
+use lightning_metrics::increment_counter;
 use rand::RngCore;
+use schema::handshake::{handshake_digest, HandshakeResponse};
 use tracing::warn;
 use triomphe::Arc;
 
@@ -32,7 +34,10 @@ pub struct Handshake<C: NodeComponents> {
 }
 
 struct Run<C: NodeComponents> {
-    ctx: Context<c![C::ServiceExecutorInterface::Provider]>,
+    ctx: Context<
+        c![C::ServiceExecutorInterface::Provider],
+        c![C::ApplicationInterface::SyncExecutor],
+    >,
     // The axum_server Server API (TLS server) does not have a `with_graceful_shutdown`
     // similarly to axum Server. The only way to shut it down gracefully is via its Handle API.
     handle: Handle,
@@ -45,12 +50,22 @@ impl<C: NodeComponents> Handshake<C> {
         config: &C::ConfigProviderInterface,
         keystore: &C::KeystoreInterface,
         service_executor: &C::ServiceExecutorInterface,
+        query_runner: &c!(C::ApplicationInterface::SyncExecutor),
         fdi::Cloned(waiter): fdi::Cloned<ShutdownWaiter>,
     ) -> Self {
         let config = config.get::<Self>();
         let provider = service_executor.get_provider();
         let pk = keystore.get_ed25519_pk();
-        let ctx = Context::new(provider, waiter, config.timeout);
+        let sk = keystore.get_ed25519_sk();
+        let ctx = Context::new(
+            pk,
+            sk,
+            provider,
+            query_runner.clone(),
+            waiter,
+            config.timeout,
+            config.validate,
+        );
         let handle = Handle::new();
 
         Self {
@@ -134,13 +149,17 @@ pub struct TokenState {
 
 /// Shared context given to the transport listener tasks and the connection proxies.
 #[derive(Clone)]
-pub struct Context<P: ExecutorProviderInterface> {
+pub struct Context<P: ExecutorProviderInterface, QR: SyncQueryRunnerInterface> {
+    pk: NodePublicKey,
+    sk: NodeSecretKey,
     /// Service unix socket provider
     provider: P,
+    query_runner: QR,
     pub(crate) shutdown: ShutdownWaiter,
     connection_counter: Arc<AtomicU64>,
     connections: Arc<DashMap<u64, ConnectionEntry>>,
     timeout: Duration,
+    pub(crate) validate: bool,
 }
 
 struct ConnectionEntry {
@@ -153,21 +172,33 @@ struct ConnectionEntry {
     timeout: u128,
 }
 
-impl<P: ExecutorProviderInterface> Context<P> {
-    pub fn new(provider: P, waiter: ShutdownWaiter, timeout: Duration) -> Self {
+impl<P: ExecutorProviderInterface, QR: SyncQueryRunnerInterface> Context<P, QR> {
+    pub fn new(
+        pk: NodePublicKey,
+        sk: NodeSecretKey,
+        provider: P,
+        query_runner: QR,
+        waiter: ShutdownWaiter,
+        timeout: Duration,
+        validate: bool,
+    ) -> Self {
         Self {
+            pk,
+            sk,
             provider,
+            query_runner,
             shutdown: waiter,
             connection_counter: AtomicU64::new(0).into(),
             connections: DashMap::new().into(),
             timeout,
+            validate,
         }
     }
 
     pub async fn handle_new_connection<S: TransportSender, R: TransportReceiver>(
         &self,
         request: HandshakeRequestFrame,
-        sender: S,
+        mut sender: S,
         mut receiver: R,
     ) where
         (S, R): Into<TransportPair>,
@@ -178,15 +209,64 @@ impl<P: ExecutorProviderInterface> Context<P> {
                 retry: None,
                 service,
                 pk,
-                ..
+                expiry,
+                nonce,
+                pop,
             } => {
-                // TODO: Verify proof of possession
-                // TODO: Send handshake response
+                if self.validate {
+                    // 1. check the expiry
+                    let now = SystemTime::now()
+                        .duration_since(SystemTime::UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs();
+                    if expiry <= now {
+                        sender.terminate(TerminationReason::InvalidHandshake).await;
+                        return;
+                    }
+
+                    // 2. TODO: check the nonce against app state or zero if not found
+                    let current_nonce = self.query_runner.get_client_nonce(&pk);
+                    if nonce <= current_nonce {
+                        sender.terminate(TerminationReason::InvalidHandshake).await;
+                        return;
+                    }
+
+                    // 3. compute the handshake digest
+                    let digest = handshake_digest(None, service, expiry, nonce, pk);
+
+                    // 4. validate client signature
+                    // TODO: we currently double hash this, should we just build the
+                    //       signature payload from the encoding directly ?
+                    if pk.verify(&pop, &digest) != Ok(true) {
+                        sender.terminate(TerminationReason::InvalidHandshake).await;
+                        increment_counter!(
+                            "handshake_invalid_signatures",
+                            Some("Counter for rejected handshake signatures")
+                        );
+                        return;
+                    }
+
+                    // 5. Finally send the handshake response, signing the handshake digest from the
+                    //    client we just validated.
+                    // TODO: again should we avoid double hashing here
+                    sender
+                        .send_handshake_response(HandshakeResponse {
+                            pk: self.pk,
+                            pop: self.sk.sign(&digest),
+                        })
+                        .await;
+                }
 
                 // Attempt to connect to the service, getting the unix socket.
                 let Some(mut socket) = self.provider.connect(service).await else {
                     sender.terminate(TerminationReason::InvalidService).await;
                     warn!("failed to connect to service {service}");
+                    let service_id = service.to_string();
+                    increment_counter!(
+                        "handshake_service_socket_not_found",
+                        Some("Number of times a service failed to connect"),
+                        "service" => service_id.as_str()
+                    );
                     return;
                 };
 
@@ -197,6 +277,14 @@ impl<P: ExecutorProviderInterface> Context<P> {
 
                 if let Err(e) = write_header(&header, &mut socket).await {
                     sender.terminate(TerminationReason::ServiceTerminated).await;
+                    let service_id = service.to_string();
+                    increment_counter!(
+                        "handshake_connection_header_write_failed",
+                        Some(
+                            "Number of times services failed before connection header was successfully sent"
+                        ),
+                        "service" => service_id.as_str()
+                    );
                     warn!("failed to write connection header to service {service}: {e}");
                     return;
                 }

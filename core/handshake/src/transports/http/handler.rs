@@ -7,11 +7,16 @@ use axum::extract::{OriginalUri, Path, Query};
 use axum::http::{HeaderMap, Method, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Extension;
+use base64::Engine;
 use bytes::Bytes;
-use fleek_crypto::{ClientPublicKey, ClientSignature};
+use fleek_crypto::{ClientPublicKey, ClientSignature, PublicKey};
 use fn_sdk::header::{HttpMethod, HttpOverrides, TransportDetail};
-use lightning_interfaces::schema::handshake::{HandshakeRequestFrame, RequestFrame};
-use lightning_interfaces::ExecutorProviderInterface;
+use lightning_interfaces::schema::handshake::{
+    HandshakeRequestFrame,
+    HandshakeResponse,
+    RequestFrame,
+};
+use lightning_interfaces::{ExecutorProviderInterface, SyncQueryRunnerInterface};
 use lightning_metrics::increment_counter;
 use tokio::sync::oneshot;
 use url::Url;
@@ -19,13 +24,13 @@ use url::Url;
 use crate::handshake::Context;
 use crate::transports::http::{HttpReceiver, HttpSender, Service};
 
-pub async fn handler<P: ExecutorProviderInterface>(
+pub async fn handler<P: ExecutorProviderInterface, QR: SyncQueryRunnerInterface>(
     method: Method,
     headers: HeaderMap,
     OriginalUri(uri): OriginalUri,
     Path(map): Path<HashMap<String, String>>,
     Query(params): Query<HashMap<String, String>>,
-    Extension(provider): Extension<Context<P>>,
+    Extension(provider): Extension<Context<P, QR>>,
     payload: Bytes,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     let service_id = map
@@ -48,11 +53,17 @@ pub async fn handler<P: ExecutorProviderInterface>(
 
     let body_frame = RequestFrame::ServicePayload { bytes: payload };
 
-    let handshake_frame = HandshakeRequestFrame::Handshake {
-        service: service_id as u32,
-        pk: ClientPublicKey([0; 96]),
-        pop: ClientSignature([0; 48]),
-        retry: None,
+    let handshake_frame = if provider.validate {
+        unimplemented!("TODO: HTTP Handshake Spec");
+    } else {
+        HandshakeRequestFrame::Handshake {
+            retry: None,
+            service: service_id as u32,
+            expiry: 0,
+            nonce: 0,
+            pk: ClientPublicKey([0; 96]),
+            pop: ClientSignature([0; 48]),
+        }
     };
 
     let (frame_tx, frame_rx) = async_channel::bounded(8);
@@ -114,6 +125,21 @@ pub async fn handler<P: ExecutorProviderInterface>(
         response_builder = response_builder.header("Content-Type", content_type);
     }
 
+    // Read the handshake response and include it in the response headers
+    let handshake_res = if provider.validate {
+        let res_bytes = body_rx
+            .recv()
+            .await
+            .map_err(|_| bad_request("Channel closed before handshake response sent"))
+            .and_then(|res| {
+                res.map_err(|e| bad_request(format!("Unable to get handshake response: {e}")))
+            })?;
+        // Safety: handshake will always encode this frame correctly
+        Some(HandshakeResponse::decode(&res_bytes).unwrap())
+    } else {
+        None
+    };
+
     // If the service is the javascript service. Await the first response as the possible header
     // overrides and over ride the response headers
     if matches!(service_id, Service::Js | Service::Fetcher) {
@@ -138,6 +164,15 @@ pub async fn handler<P: ExecutorProviderInterface>(
             response_builder = response_builder.status(status);
         }
     }
+
+    if let Some(HandshakeResponse { pk, pop }) = handshake_res {
+        // Fill in the node key and pop fields
+        response_builder = response_builder.header("x-fleek-node-key", pk.to_base58());
+        response_builder = response_builder.header(
+            "x-fleek-node-pop",
+            base64::prelude::BASE64_STANDARD.encode(pop.0),
+        );
+    };
 
     let body = Body::from_stream(body_rx);
 
